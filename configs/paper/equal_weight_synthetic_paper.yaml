@@ -1,0 +1,13 @@
+paper_session_name: equal_weight_synthetic_paper
+mode: simulated
+candidate_id:
+data_path: examples/data/sample_multi_asset_ohlcv.csv
+strategy: equal_weight_buy_and_hold
+strategy_params: {lookback_days: 60, rebalance_frequency: monthly, max_weight_per_asset: 0.25}
+universe: {symbols: [SPY, QQQ, IWM, TLT, GLD]}
+initial_cash: 100000
+costs: {fixed_commission: 0.0, percentage_commission: 0.0005, slippage_bps: 2.0, spread_bps: 1.0}
+risk_limits: {max_gross_exposure: 1.0, max_weight_per_asset: 0.25, max_daily_loss_pct: 0.02, max_total_drawdown_pct: 0.10, max_turnover_per_rebalance: 0.50, min_cash_pct: 0.01, max_orders_per_day: 50, allow_short: false, allow_leverage: false, kill_switch_enabled: true}
+execution: {rebalance_frequency: monthly, execution_price: next_open, fractional_shares: true}
+state_dir: state/paper
+output_dir: outputs/paper

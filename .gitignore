@@ -19,3 +19,11 @@ data/raw/
 data/processed/
 outputs/
 .env
+
+# Phase 5 local artifacts
+state/
+outputs/
+data/cache/
+data/raw/
+data/processed/
+.env

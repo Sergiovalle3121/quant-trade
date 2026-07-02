@@ -27,3 +27,7 @@ Research multi-strategy capital allocation, correlation management, and portfoli
 ## Phase 4 complete: Strategy Research Lab
 
 Adds multi-asset daily research workflows, benchmark comparisons, robustness diagnostics, and synthetic offline demos. Phase 5 should focus on strategy selection and paper-trading readiness, not real-money trading.
+
+## Phase 5
+
+Implemented strategy selection, promotion checks, simulated paper replay, risk guardrails, local state, audit logs, and monitoring reports. Phase 6 should prepare real paper broker integration separately while still prohibiting real-money trading.

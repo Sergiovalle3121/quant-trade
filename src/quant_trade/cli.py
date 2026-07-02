@@ -29,8 +29,12 @@ from quant_trade.strategies import STRATEGY_REGISTRY, get_strategy
 app = typer.Typer(help="Research-only quantitative trading tooling.")
 data_app = typer.Typer(help="Historical data ingestion and validation.")
 research_app = typer.Typer(help="Multi-asset research lab commands.")
+selection_app = typer.Typer(help="Strategy candidate selection commands.")
+paper_app = typer.Typer(help="Local simulated paper-trading commands.")
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
+app.add_typer(selection_app, name="selection")
+app.add_typer(paper_app, name="paper")
 console = Console()
 
 
@@ -248,6 +252,188 @@ def research_robustness(
 ) -> None:
     """Run configured robustness diagnostics for an experiment."""
     _run_research_config(config)
+
+
+@selection_app.command("run")
+def selection_run(
+    outputs_dir: Annotated[Path, typer.Option(help="Research outputs root")] = Path("outputs"),
+    criteria: Annotated[Path, typer.Option(help="Selection criteria YAML")] = Path(
+        "configs/selection/conservative_daily.yaml"
+    ),
+) -> None:
+    """Select conservative paper-trading candidates from local research artifacts."""
+    from quant_trade.research.candidate import SelectionCriteria
+    from quant_trade.research.selection import run_selection
+
+    out = run_selection(outputs_dir, SelectionCriteria.from_yaml(criteria))
+    console.print(f"Selection complete: {out}")
+
+
+@selection_app.command("promote")
+def selection_promote(
+    candidate_file: Annotated[Path, typer.Option(help="candidates.json path")],
+    candidate_id: Annotated[str | None, typer.Option(help="Candidate id")] = None,
+    approval_notes: Annotated[str, typer.Option(help="Human approval notes")] = "",
+) -> None:
+    """Evaluate whether a candidate can become simulated paper-ready."""
+    from quant_trade.research.candidate import CandidateStrategy
+    from quant_trade.research.promotion import evaluate_promotion, save_promotion_report
+
+    items = json.loads(candidate_file.read_text(encoding="utf-8"))
+    raw = next(
+        (x for x in items if candidate_id is None or x["candidate_id"] == candidate_id), None
+    )
+    if raw is None:
+        raise typer.BadParameter("candidate_id not found")
+    raw["approval_notes"] = approval_notes or raw.get("approval_notes", "")
+    cand = CandidateStrategy.from_dict(raw)
+    risk_config = {
+        "kill_switch_enabled": True,
+        "max_gross_exposure": cand.max_gross_exposure,
+        "max_weight_per_asset": cand.max_weight_per_asset,
+    }
+    report = evaluate_promotion(cand, Path(cand.research_run_dir), risk_config)
+    if report.overall_status == "pass":
+        raw["status"] = "paper_ready"
+    save_promotion_report(candidate_file.parent / f"promotion_{cand.candidate_id}.json", report)
+    console.print(f"Promotion status: {report.overall_status}")
+
+
+@paper_app.command("init")
+def paper_init(config: Annotated[Path, typer.Option(help="Paper config YAML")]) -> None:
+    from quant_trade.paper.config import load_paper_config
+    from quant_trade.paper.models import PaperSessionState
+    from quant_trade.paper.state import save_state
+
+    cfg = load_paper_config(config)
+    state = PaperSessionState(
+        cash=cfg.initial_cash, equity=cfg.initial_cash, high_water_mark=cfg.initial_cash
+    )
+    path = Path(cfg.state_dir) / cfg.paper_session_name / "latest_state.json"
+    save_state(path, state)
+    console.print(f"Initialized simulated session {cfg.paper_session_name}. State path: {path}")
+
+
+@paper_app.command("run")
+def paper_run(config: Annotated[Path, typer.Option(help="Paper config YAML")]) -> None:
+    from quant_trade.paper.simulator import PaperTradingSimulator
+
+    out = PaperTradingSimulator(config).run()
+    final = json.loads((out / "final_state.json").read_text(encoding="utf-8"))
+    console.print(f"Session output: {out}")
+    console.print(
+        f"Final equity: {final['equity']:.2f}; "
+        f"max drawdown: {final['max_drawdown']:.2%}; "
+        f"kill switch: {final['kill_switch_active']}"
+    )
+
+
+@paper_app.command("status")
+def paper_status(
+    session: Annotated[str, typer.Option(help="Paper session name")],
+    state_dir: Annotated[Path, typer.Option(help="State root")] = Path("state/paper"),
+) -> None:
+    path = state_dir / session / "latest_state.json"
+    if not path.exists():
+        raise typer.BadParameter(f"state not found: {path}")
+    console.print(path.read_text(encoding="utf-8"))
+
+
+def _set_session(
+    session: str, status: str | None = None, kill: bool | None = None, reason: str = ""
+) -> None:
+    from quant_trade.paper.state import load_state, save_state
+
+    path = Path("state/paper") / session / "latest_state.json"
+    st = load_state(path)
+    if status:
+        st.status = status  # type: ignore[assignment]
+    if kill is not None:
+        st.kill_switch_active = kill
+    save_state(path, st)
+    console.print(f"Updated {session}: {status or ''} {reason}")
+
+
+@paper_app.command("pause")
+def paper_pause(session: Annotated[str, typer.Option(help="Paper session name")]) -> None:
+    _set_session(session, "paused")
+
+
+@paper_app.command("resume")
+def paper_resume(session: Annotated[str, typer.Option(help="Paper session name")]) -> None:
+    _set_session(session, "running", False)
+
+
+@paper_app.command("kill-switch")
+def paper_kill_switch(
+    session: Annotated[str, typer.Option(help="Paper session name")],
+    reason: Annotated[str, typer.Option(help="Reason")],
+) -> None:
+    _set_session(session, "paused", True, reason)
+
+
+@paper_app.command("report")
+def paper_report(
+    session: Annotated[str, typer.Option(help="Paper session name")],
+    output_dir: Annotated[Path, typer.Option(help="Output root")] = Path("outputs/paper"),
+) -> None:
+    runs = sorted((output_dir / session).glob("*/paper_summary.md"))
+    if not runs:
+        raise typer.BadParameter("no paper report found")
+    console.print(runs[-1].read_text(encoding="utf-8"))
+
+
+@paper_app.command("from-candidate")
+def paper_from_candidate(
+    candidate_file: Annotated[Path, typer.Option(help="candidates.json")],
+    candidate_id: Annotated[str, typer.Option(help="Candidate id")],
+    data_path: Annotated[Path, typer.Option(help="Local data path")],
+    initial_cash: Annotated[float, typer.Option(help="Initial cash")] = 100000.0,
+) -> None:
+    from quant_trade.paper.config import write_yaml
+
+    items = json.loads(candidate_file.read_text(encoding="utf-8"))
+    raw = next((x for x in items if x["candidate_id"] == candidate_id), None)
+    if raw is None:
+        raise typer.BadParameter("candidate_id not found")
+    payload = {
+        "paper_session_name": f"{raw['name']}_paper",
+        "mode": "simulated",
+        "candidate_id": candidate_id,
+        "data_path": str(data_path),
+        "strategy": raw["strategy_name"],
+        "strategy_params": raw["strategy_params"],
+        "universe": {"symbols": raw["universe"]},
+        "initial_cash": initial_cash,
+        "costs": {
+            "fixed_commission": 0.0,
+            "percentage_commission": 0.0005,
+            "slippage_bps": 2.0,
+            "spread_bps": 1.0,
+        },
+        "risk_limits": {
+            "max_gross_exposure": 1.0,
+            "max_weight_per_asset": raw.get("max_weight_per_asset", 0.25),
+            "max_daily_loss_pct": 0.02,
+            "max_total_drawdown_pct": 0.10,
+            "max_turnover_per_rebalance": 0.50,
+            "min_cash_pct": 0.01,
+            "max_orders_per_day": 50,
+            "allow_short": False,
+            "allow_leverage": False,
+            "kill_switch_enabled": True,
+        },
+        "execution": {
+            "rebalance_frequency": "monthly",
+            "execution_price": "next_open",
+            "fractional_shares": True,
+        },
+        "state_dir": "state/paper",
+        "output_dir": "outputs/paper",
+    }
+    path = Path("configs/paper") / f"{payload['paper_session_name']}.yaml"
+    write_yaml(path, payload)
+    console.print(f"Created simulated paper config: {path}")
 
 
 if __name__ == "__main__":
