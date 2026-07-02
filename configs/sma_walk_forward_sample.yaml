@@ -1,0 +1,11 @@
+experiment_name: sma_walk_forward_sample
+strategy: sma_crossover
+strategy_params: {}
+parameter_grid: {short_window: [2, 3], long_window: [5, 8]}
+ranking_metric: sharpe
+data_path: examples/data/sample_ohlcv.csv
+initial_cash: 10000
+costs: {percentage_commission: 0.001, slippage_bps: 1.0}
+risk_settings: {}
+split: {method: walk_forward, train_size: 12, test_size: 6, step_size: 6}
+output_dir: outputs

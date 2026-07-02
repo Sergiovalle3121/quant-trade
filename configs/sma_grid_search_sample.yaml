@@ -1,0 +1,11 @@
+experiment_name: sma_grid_search_sample
+strategy: sma_crossover
+strategy_params: {}
+parameter_grid: {short_window: [2, 3, 5], long_window: [6, 8, 12]}
+ranking_metric: sharpe
+data_path: examples/data/sample_ohlcv.csv
+initial_cash: 10000
+costs: {percentage_commission: 0.001, slippage_bps: 1.0}
+risk_settings: {}
+split: {method: chronological, train_fraction: 0.7}
+output_dir: outputs
