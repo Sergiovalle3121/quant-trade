@@ -9,3 +9,12 @@
 - Explain assumptions, limitations, and model risk in documentation.
 - Do not optimize for fake backtest profits or hide unfavorable results.
 - This repository is research/backtesting only until explicitly approved otherwise.
+
+
+## Data provider rules
+
+- Never commit market data cache files.
+- Never commit API keys, secrets, or `.env` files.
+- Data provider tests must be mocked and must not require network access.
+- Any new provider must normalize to the canonical OHLCV schema and include validation tests.
+- No live trading, broker execution APIs, order routing, or real-money trading.

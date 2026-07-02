@@ -1,0 +1,6 @@
+provider: csv
+symbols: ["SPY"]
+start: "2020-01-01"
+end: "2020-01-10"
+interval: "1d"
+path: "examples/data/sample_ohlcv.csv"

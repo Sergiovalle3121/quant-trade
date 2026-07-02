@@ -27,7 +27,7 @@ def load_ohlcv_csv(path: str | Path) -> pd.DataFrame:
     if data.empty:
         raise CsvValidationError("OHLCV CSV contains no rows")
 
-    data = data.loc[:, REQUIRED_COLUMNS].copy()
+    data = data.copy()
     data["timestamp"] = pd.to_datetime(data["timestamp"], utc=False, errors="coerce")
     numeric_columns = ["open", "high", "low", "close", "volume"]
     for column in numeric_columns:

@@ -62,6 +62,7 @@ def calculate_metrics(
         trade_list = trades
     return calculate_performance(equity_curve, trade_list)
 
+
 __all__ = [
     "BacktestEngine",
     "BacktestResult",
