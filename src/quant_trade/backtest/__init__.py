@@ -12,6 +12,19 @@ from quant_trade.metrics.performance import calculate_performance
 from quant_trade.strategies.base import Strategy
 
 
+class _SignalFrameStrategy:
+    """Adapter for older callers that pass a signal DataFrame directly."""
+
+    name = "signal_frame"
+
+    def __init__(self, signals: pd.DataFrame) -> None:
+        self._signals = signals
+
+    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        del data
+        return self._signals
+
+
 def load_ohlcv(path: str) -> pd.DataFrame:
     """Load canonical timestamp-based OHLCV research data."""
     return load_ohlcv_csv(path)
@@ -19,12 +32,17 @@ def load_ohlcv(path: str) -> pd.DataFrame:
 
 def run_backtest(
     data: pd.DataFrame,
-    strategy: Strategy,
+    strategy: Strategy | pd.DataFrame,
     initial_cash: float = 10_000.0,
     cost_model: CostModel | None = None,
 ) -> BacktestResult:
     """Run the standard backtest engine with a strategy instance."""
-    return BacktestEngine(initial_cash=initial_cash, cost_model=cost_model).run(data, strategy)
+    strategy_instance = (
+        _SignalFrameStrategy(strategy) if isinstance(strategy, pd.DataFrame) else strategy
+    )
+    return BacktestEngine(initial_cash=initial_cash, cost_model=cost_model).run(
+        data, strategy_instance
+    )
 
 
 def calculate_metrics(

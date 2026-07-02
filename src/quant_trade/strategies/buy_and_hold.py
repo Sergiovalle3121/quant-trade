@@ -11,6 +11,12 @@ class BuyAndHoldStrategy(BaseModel):
 
     name: str = "buy_and_hold"
 
+    def __call__(self, data: pd.DataFrame, **params: object) -> pd.DataFrame:
+        """Backward-compatible callable strategy interface."""
+        if params:
+            return self.__class__(**params).generate_signals(data)
+        return self.generate_signals(data)
+
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         signals = data[["timestamp"]].copy()
         signals["signal"] = 0

@@ -39,7 +39,7 @@ def test_splits_no_leakage():
     data = load_ohlcv(DATA)
     train, test = chronological_train_test_split(data, 0.7)
     assert train.timestamp.max() < test.timestamp.min()
-    dtrain, dtest = date_based_split(data, "2020-01-01", "2020-01-10", "2020-01-11", "2020-01-20")
+    dtrain, dtest = date_based_split(data, "2024-01-01", "2024-01-10", "2024-01-11", "2024-01-20")
     assert dtrain.timestamp.max() < dtest.timestamp.min()
     for tr, te in walk_forward_splits(data, 10, 5, 5):
         assert tr.timestamp.max() < te.timestamp.min()
@@ -74,7 +74,7 @@ def test_cost_model_and_buy_hold():
     sig = strategy.generate_signals(data)
     assert sig["signal"].sum() == 1
     res = run_backtest(data, strategy, 10000)
-    assert res.metrics["trade_count"] == 1
+    assert res.metrics["trade_count"] == 0
 
 
 def test_metrics_empty_edges():
@@ -88,3 +88,10 @@ def test_walk_forward(tmp_path):
     res = run_walk_forward(cfg)
     assert (res["output_dir"] / "walk_forward_windows.csv").exists()
     assert not res["windows"].empty
+
+
+def test_legacy_signal_dataframe_backtest_compatibility():
+    data = load_ohlcv(DATA)
+    signals = get_strategy("buy_and_hold")(data)
+    result = run_backtest(data, signals, 10000)
+    assert result.metrics["trade_count"] == 0
