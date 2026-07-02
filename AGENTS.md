@@ -18,3 +18,7 @@
 - Data provider tests must be mocked and must not require network access.
 - Any new provider must normalize to the canonical OHLCV schema and include validation tests.
 - No live trading, broker execution APIs, order routing, or real-money trading.
+
+## Phase 4 research lab guidance
+
+Multi-asset strategy lab code remains research/backtesting only. Do not add broker connectivity, order routing, live trading, secrets, or real-money execution. Keep benchmark, robustness, and cost assumptions explicit.

@@ -1,0 +1,30 @@
+experiment_name: cross_sectional_momentum_synthetic
+mode: multi_asset_research
+data_path: examples/data/sample_multi_asset_ohlcv.csv
+initial_cash: 100000
+strategy: cross_sectional_momentum
+strategy_params:
+  lookback_days: 63
+  top_n: 2
+  rebalance_frequency: monthly
+  max_weight_per_asset: 0.25
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 2.0
+  spread_bps: 1.0
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs

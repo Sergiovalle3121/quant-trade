@@ -9,3 +9,7 @@ Future research tracks:
 - Volatility targeting and portfolio-level risk budgeting.
 - Machine learning models only after strong baseline strategies and clean evaluation pipelines.
 - Reinforcement learning is deferred until data, simulation, and evaluation are robust enough to avoid misleading results.
+
+## Phase 4 research lab
+
+Use the multi-asset research CLI for daily liquid ETF/equity studies. Treat all included strategies as transparent baselines for research, not production alpha. Always compare with benchmarks and inspect robustness artifacts before considering Phase 5 paper-trading readiness.

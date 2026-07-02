@@ -107,3 +107,14 @@ quant-trade backtest --strategy buy_and_hold --data data/cache/synthetic/SPY/1d/
 ```
 
 The data layer normalizes OHLCV bars to a canonical UTC schema, validates quality, writes a local CSV cache, and stores JSON manifests. Do not commit downloaded data, API keys, secrets, or `.env` files. This project remains research/backtesting only and includes no live trading or broker execution.
+
+## Phase 4 Strategy Research Lab
+
+The repository now includes a research-only multi-asset daily strategy lab. It supports canonical long-form OHLCV panels, baseline long-only signal models, next-open rebalance backtesting, benchmark comparisons, robustness diagnostics, and offline synthetic examples.
+
+```bash
+quant-trade research list-strategies
+quant-trade research run --config configs/research/equal_weight_synthetic.yaml
+```
+
+See `docs/STRATEGY_LAB.md` for assumptions, safety limits, and the strategy advancement checklist.
