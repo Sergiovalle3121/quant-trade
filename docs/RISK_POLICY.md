@@ -7,3 +7,7 @@
 - Paper trading must demonstrate stable operations, reconciliation, monitoring, and risk controls before real capital.
 - Backtests can lie because of lookahead bias, overfitting, survivorship bias, poor cost assumptions, and market regime changes.
 - Future validation must include walk-forward analysis and out-of-sample testing.
+
+## Strategy advancement checklist
+
+A strategy cannot move to paper trading unless CI is green, it beats benchmark out-of-sample after realistic costs, max drawdown is acceptable, cost sensitivity is acceptable, performance is not dependent on one lucky period, reasonable parameter ranges work, economic rationale is clear, turnover is suitable, a human reviews it, and paper-trading risk limits are defined.

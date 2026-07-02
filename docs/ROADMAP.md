@@ -23,3 +23,7 @@ Add alerts, drawdown limits, position checks, data health checks, and emergency 
 
 ## Phase 7: Strategy portfolio and capital allocation
 Research multi-strategy capital allocation, correlation management, and portfolio-level constraints.
+
+## Phase 4 complete: Strategy Research Lab
+
+Adds multi-asset daily research workflows, benchmark comparisons, robustness diagnostics, and synthetic offline demos. Phase 5 should focus on strategy selection and paper-trading readiness, not real-money trading.

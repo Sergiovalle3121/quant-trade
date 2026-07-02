@@ -28,7 +28,9 @@ from quant_trade.strategies import STRATEGY_REGISTRY, get_strategy
 
 app = typer.Typer(help="Research-only quantitative trading tooling.")
 data_app = typer.Typer(help="Historical data ingestion and validation.")
+research_app = typer.Typer(help="Multi-asset research lab commands.")
 app.add_typer(data_app, name="data")
+app.add_typer(research_app, name="research")
 console = Console()
 
 
@@ -192,6 +194,60 @@ def walk_forward_command(
     result = run_walk_forward(load_experiment_config(config))
     console.print(f"Walk-forward complete. Output directory: {result['output_dir']}")
     console.print(f"Windows evaluated: {len(result['windows'])}")
+
+
+@research_app.command("list-strategies")
+def research_list_strategies() -> None:
+    """List available multi-asset research signal models."""
+    from quant_trade.research.strategy_registry import list_research_signal_models
+
+    table = Table(title="Research signal models")
+    table.add_column("Name")
+    for name in list_research_signal_models():
+        table.add_row(name)
+    console.print(table)
+
+
+def _run_research_config(config: Path) -> dict:
+    from quant_trade.research.multi_asset_runner import (
+        load_multi_asset_config,
+        run_multi_asset_research_experiment,
+    )
+
+    result = run_multi_asset_research_experiment(load_multi_asset_config(config))
+    console.print(f"Experiment complete: {config}")
+    console.print(f"Symbols: {', '.join(result['symbols'])}")
+    console.print(f"Train range: {result['train_range'][0]} to {result['train_range'][1]}")
+    console.print(f"Test range: {result['test_range'][0]} to {result['test_range'][1]}")
+    console.print(f"Strategy return: {result['test_metrics']['total_return']:.2%}")
+    console.print(f"Benchmark return: {result['comparison_test']['benchmark_total_return']:.2%}")
+    console.print(f"Excess return: {result['comparison_test']['excess_return']:.2%}")
+    console.print(f"Sharpe: {result['test_metrics']['sharpe']:.2f}")
+    console.print(f"Max drawdown: {result['test_metrics']['max_drawdown']:.2%}")
+    console.print(f"Output directory: {result['output_dir']}")
+    return result
+
+
+@research_app.command("run")
+def research_run(config: Annotated[Path, typer.Option(help="Multi-asset research YAML")]) -> None:
+    """Run a multi-asset research experiment."""
+    _run_research_config(config)
+
+
+@research_app.command("compare")
+def research_compare(
+    config: Annotated[Path, typer.Option(help="Multi-asset research YAML")],
+) -> None:
+    """Run an experiment and print benchmark comparison."""
+    _run_research_config(config)
+
+
+@research_app.command("robustness")
+def research_robustness(
+    config: Annotated[Path, typer.Option(help="Multi-asset research YAML")],
+) -> None:
+    """Run configured robustness diagnostics for an experiment."""
+    _run_research_config(config)
 
 
 if __name__ == "__main__":
