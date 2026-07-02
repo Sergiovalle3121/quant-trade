@@ -1,7 +1,7 @@
 experiment_name: sma_walk_forward_sample
 strategy: sma_crossover
 strategy_params: {}
-parameter_grid: {short_window: [2, 3], long_window: [5, 8]}
+parameter_grid: {fast_window: [2, 3], slow_window: [5, 8]}
 ranking_metric: sharpe
 data_path: examples/data/sample_ohlcv.csv
 initial_cash: 10000

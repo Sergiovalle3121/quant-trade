@@ -18,6 +18,12 @@ class SmaCrossoverStrategy(BaseModel):
     slow_window: int = Field(default=7, gt=2)
     name: str = "sma_crossover"
 
+    def __call__(self, data: pd.DataFrame, **params: object) -> pd.DataFrame:
+        """Backward-compatible callable strategy interface."""
+        if params:
+            return self.__class__(**params).generate_signals(data)
+        return self.generate_signals(data)
+
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         if self.fast_window >= self.slow_window:
             raise ValueError("fast_window must be smaller than slow_window")

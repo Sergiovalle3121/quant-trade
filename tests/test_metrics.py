@@ -11,6 +11,7 @@ def test_metrics_handle_empty_data() -> None:
     metrics = calculate_performance(pd.DataFrame(), [])
     assert metrics["total_return"] == pytest.approx(0.0)
     assert metrics["number_of_trades"] == 0
+    assert metrics["trade_count"] == 0
 
 
 def test_metrics_handle_normal_case() -> None:
@@ -36,5 +37,6 @@ def test_metrics_handle_normal_case() -> None:
     metrics = calculate_performance(equity, trades)
     assert metrics["total_return"] == pytest.approx(0.04)
     assert metrics["number_of_trades"] == 1
+    assert metrics["trade_count"] == 1
     assert metrics["win_rate"] == pytest.approx(1.0)
     assert metrics["max_drawdown"] < 0

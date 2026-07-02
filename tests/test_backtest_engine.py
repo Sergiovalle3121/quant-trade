@@ -1,6 +1,8 @@
+from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.engine import BacktestEngine
 from quant_trade.data.csv_loader import load_ohlcv_csv
 from quant_trade.risk.risk_manager import RiskManager
+from quant_trade.strategies.buy_and_hold import BuyAndHoldStrategy
 from quant_trade.strategies.sma_crossover import SmaCrossoverStrategy
 
 
@@ -22,3 +24,13 @@ def test_risk_manager_prevents_oversizing() -> None:
         cash=10_000, equity=10_000, price=100, current_position_value=2_000
     )
     assert no_capacity == 0
+
+
+def test_backtest_accepts_cost_model() -> None:
+    data = load_ohlcv_csv("examples/data/sample_ohlcv.csv")
+    result = BacktestEngine(
+        initial_cash=10_000,
+        cost_model=CostModel(fixed_commission=1.0, percentage_commission=0.001, spread_bps=1.0),
+    ).run(data, BuyAndHoldStrategy())
+    assert not result.equity_curve.empty
+    assert result.metrics["trade_count"] == 0

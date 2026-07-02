@@ -1,7 +1,13 @@
-from pathlib import Path
+"""Helpers for writing research artifacts."""
+
+from __future__ import annotations
+
 import json
-import yaml
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
+import yaml
 
 
 def create_run_dir(base: str | Path, name: str) -> Path:
@@ -11,25 +17,30 @@ def create_run_dir(base: str | Path, name: str) -> Path:
     if not candidate.exists():
         candidate.mkdir()
         return candidate
-    i = 1
-    while (root / f"{name}_{i:03d}").exists():
-        i += 1
-    candidate = root / f"{name}_{i:03d}"
+    suffix = 1
+    while (root / f"{name}_{suffix:03d}").exists():
+        suffix += 1
+    candidate = root / f"{name}_{suffix:03d}"
     candidate.mkdir()
     return candidate
 
 
-def write_json(path: Path, data: dict):
+def write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2, default=str) + "\n")
 
 
-def write_yaml(path: Path, data: dict):
+def write_yaml(path: Path, data: dict[str, Any]) -> None:
     path.write_text(yaml.safe_dump(data, sort_keys=False))
 
 
-def write_csv(path: Path, df: pd.DataFrame):
-    df.to_csv(path, index=False)
+def write_csv(path: Path, data: Any) -> None:
+    if isinstance(data, pd.DataFrame):
+        frame = data
+    else:
+        rows = [item.model_dump() if hasattr(item, "model_dump") else item for item in data]
+        frame = pd.DataFrame(rows)
+    frame.to_csv(path, index=False)
 
 
-def write_summary(path: Path, title: str, lines: list[str]):
+def write_summary(path: Path, title: str, lines: list[str]) -> None:
     path.write_text("# " + title + "\n\n" + "\n".join(lines) + "\n")

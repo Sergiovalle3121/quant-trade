@@ -1,22 +1,29 @@
-from itertools import product
+"""Grid-search research workflow."""
+
+from __future__ import annotations
+
 import json
+from itertools import product
+from typing import Any
+
 import pandas as pd
+
 from quant_trade.backtest import CostModel, load_ohlcv, run_backtest
-from quant_trade.research.runner import _split
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
+from quant_trade.research.runner import _split
 from quant_trade.strategies import get_strategy
 
 
-def expand_parameter_grid(grid: dict):
+def expand_parameter_grid(grid: dict[str, list[Any]]):
     keys = list(grid)
     for vals in product(*[grid[k] for k in keys]):
-        yield dict(zip(keys, vals))
+        yield dict(zip(keys, vals, strict=True))
 
 
-def valid_params(strategy: str, params: dict) -> bool:
+def valid_params(strategy: str, params: dict[str, Any]) -> bool:
     return not (
         strategy == "sma_crossover"
-        and params.get("short_window", 0) >= params.get("long_window", 10**9)
+        and params.get("fast_window", 0) >= params.get("slow_window", 10**9)
     )
 
 
@@ -25,14 +32,13 @@ def run_grid_search(cfg):
     train, test = _split(data, cfg)
     rows = []
     skipped = []
-    strat = get_strategy(cfg.strategy)
     cost = CostModel(**cfg.costs.__dict__)
     for params in expand_parameter_grid(cfg.parameter_grid):
         if not valid_params(cfg.strategy, params):
             skipped.append(params)
             continue
-        tr = run_backtest(train, strat(train, **params), cfg.initial_cash, cost)
-        te = run_backtest(test, strat(test, **params), cfg.initial_cash, cost)
+        tr = run_backtest(train, get_strategy(cfg.strategy, **params), cfg.initial_cash, cost)
+        te = run_backtest(test, get_strategy(cfg.strategy, **params), cfg.initial_cash, cost)
         row = {
             "params": json.dumps(params, sort_keys=True),
             "train_total_return": tr.metrics["total_return"],

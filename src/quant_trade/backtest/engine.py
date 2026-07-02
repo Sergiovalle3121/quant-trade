@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.portfolio import Portfolio
 from quant_trade.core.models import PortfolioSnapshot, Trade
 from quant_trade.metrics.performance import calculate_performance
@@ -29,6 +30,7 @@ class BacktestEngine(BaseModel):
     transaction_cost_bps: float = Field(default=1.0, ge=0)
     slippage_bps: float = Field(default=2.0, ge=0)
     risk_manager: RiskManager = Field(default_factory=RiskManager)
+    cost_model: CostModel | None = None
 
     def run(self, data: pd.DataFrame, strategy: Strategy) -> BacktestResult:
         signals = strategy.generate_signals(data).set_index("timestamp")
@@ -111,8 +113,11 @@ class BacktestEngine(BaseModel):
         )
 
     def _execution_price(self, open_price: float, signal: float) -> float:
-        slippage = self.slippage_bps / 10_000
+        slippage = 0.0 if self.cost_model is not None else self.slippage_bps / 10_000
         return open_price * (1 + slippage if signal > 0 else 1 - slippage)
 
     def _cost(self, quantity: float, price: float) -> float:
-        return quantity * price * self.transaction_cost_bps / 10_000
+        notional = quantity * price
+        if self.cost_model is not None:
+            return self.cost_model.trade_cost(notional)
+        return notional * self.transaction_cost_bps / 10_000
