@@ -1,6 +1,6 @@
 experiment_name: mean_reversion_sample
 strategy: mean_reversion
-strategy_params: {window: 5, z_threshold: 0.5}
+strategy_params: {window: 5, entry_z: -1.0, exit_z: 0.0}
 data_path: examples/data/sample_ohlcv.csv
 initial_cash: 10000
 costs: {fixed_commission: 0.0, percentage_commission: 0.001, slippage_bps: 1.0}

@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+
 from quant_trade.backtest import CostModel, calculate_metrics, load_ohlcv, run_backtest
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import expand_parameter_grid, run_grid_search, valid_params
@@ -24,7 +25,11 @@ def test_config_loads_and_validates():
 def test_bad_config(tmp_path):
     p = tmp_path / "bad.yaml"
     p.write_text(
-        "experiment_name: x\nstrategy: sma_crossover\nstrategy_params: {}\ndata_path: x\ninitial_cash: -1\n"
+        "experiment_name: x\n"
+        "strategy: sma_crossover\n"
+        "strategy_params: {}\n"
+        "data_path: x\n"
+        "initial_cash: -1\n"
     )
     with pytest.raises(ValueError, match="initial_cash"):
         load_experiment_config(p)
@@ -33,15 +38,15 @@ def test_bad_config(tmp_path):
 def test_splits_no_leakage():
     data = load_ohlcv(DATA)
     train, test = chronological_train_test_split(data, 0.7)
-    assert train.date.max() < test.date.min()
+    assert train.timestamp.max() < test.timestamp.min()
     dtrain, dtest = date_based_split(data, "2020-01-01", "2020-01-10", "2020-01-11", "2020-01-20")
-    assert dtrain.date.max() < dtest.date.min()
+    assert dtrain.timestamp.max() < dtest.timestamp.min()
     for tr, te in walk_forward_splits(data, 10, 5, 5):
-        assert tr.date.max() < te.date.min()
+        assert tr.timestamp.max() < te.timestamp.min()
 
 
 def test_grid_expansion_invalid_and_ranking(tmp_path):
-    combos = list(expand_parameter_grid({"short_window": [5, 10], "long_window": [8]}))
+    combos = list(expand_parameter_grid({"fast_window": [5, 10], "slow_window": [8]}))
     assert len(combos) == 2 and not valid_params("sma_crossover", combos[1])
     cfg = load_experiment_config("configs/sma_grid_search_sample.yaml")
     cfg.output_dir = str(tmp_path)
@@ -65,14 +70,16 @@ def test_cost_model_and_buy_hold():
     assert CostModel(fixed_commission=2).trade_cost(1000) == 2
     assert CostModel(slippage_bps=10).trade_cost(1000) == 1
     data = load_ohlcv(DATA)
-    sig = get_strategy("buy_and_hold")(data)
-    res = run_backtest(data, sig, 10000)
+    strategy = get_strategy("buy_and_hold")
+    sig = strategy.generate_signals(data)
+    assert sig["signal"].sum() == 1
+    res = run_backtest(data, strategy, 10000)
     assert res.metrics["trade_count"] == 1
 
 
 def test_metrics_empty_edges():
-    m = calculate_metrics(pd.DataFrame(), pd.DataFrame(), 10000)
-    assert m["sharpe"] is None and m["profit_factor"] is None
+    m = calculate_metrics(pd.DataFrame(), [])
+    assert m["sharpe"] == 0.0 and m["trade_count"] == 0
 
 
 def test_walk_forward(tmp_path):

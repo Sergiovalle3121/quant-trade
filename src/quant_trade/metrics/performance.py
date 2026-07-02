@@ -45,6 +45,7 @@ def calculate_performance(equity_curve: pd.DataFrame, trades: list[Trade]) -> di
         "max_drawdown": max_drawdown,
         "win_rate": win_rate,
         "number_of_trades": len(trades),
+        "trade_count": len(trades),
         "exposure": exposure,
     }
 
@@ -66,5 +67,6 @@ def _empty_metrics() -> dict[str, Any]:
         "max_drawdown": 0.0,
         "win_rate": 0.0,
         "number_of_trades": 0,
+        "trade_count": 0,
         "exposure": 0.0,
     }

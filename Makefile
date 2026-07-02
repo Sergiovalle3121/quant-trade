@@ -4,7 +4,8 @@ install:
 	pip install -e '.[dev]'
 
 test:
-	pytest
+	python -m compileall -q src tests
+	pytest -q
 
 lint:
 	ruff check .

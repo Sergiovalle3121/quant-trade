@@ -1,6 +1,6 @@
 experiment_name: sma_crossover_sample
 strategy: sma_crossover
-strategy_params: {short_window: 3, long_window: 8}
+strategy_params: {fast_window: 3, slow_window: 8}
 data_path: examples/data/sample_ohlcv.csv
 initial_cash: 10000
 costs: {fixed_commission: 0.0, percentage_commission: 0.001, slippage_bps: 1.0, spread_bps: 1.0}
