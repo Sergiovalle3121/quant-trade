@@ -9,7 +9,7 @@ description = "Research-first quantitative trading backtesting platform foundati
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "numpy>=1.26",
+  "numpy>=1.26,<2.3",
   "pandas>=2.1",
   "pydantic>=2.5",
   "typer>=0.12",
@@ -34,6 +34,9 @@ dev = [
 [project.scripts]
 quant-trade = "quant_trade.cli:app"
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -53,4 +56,5 @@ warn_redundant_casts = true
 no_implicit_optional = true
 check_untyped_defs = true
 ignore_missing_imports = true
+no_site_packages = true
 disable_error_code = ["import-untyped"]
