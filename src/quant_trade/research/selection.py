@@ -1,0 +1,172 @@
+from __future__ import annotations
+
+import csv
+import json
+from dataclasses import asdict
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from quant_trade.research.candidate import CandidateStrategy, SelectionCriteria, utc_now_iso
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _find_runs(outputs_dir: Path) -> list[Path]:
+    return [p.parent for p in outputs_dir.rglob("results.json") if "selection" not in p.parts]
+
+
+def _metric(payload: dict[str, Any], *keys: str) -> float | None:
+    cur: Any = payload
+    for key in keys:
+        if not isinstance(cur, dict) or key not in cur:
+            return None
+        cur = cur[key]
+    return float(cur) if cur is not None else None
+
+
+def _reasons(result: dict[str, Any], criteria: SelectionCriteria) -> list[str]:
+    reasons: list[str] = []
+    strategy = str(result.get("strategy", result.get("strategy_name", "")))
+    symbols = [str(s) for s in result.get("symbols", result.get("universe", []))]
+    if criteria.allowed_strategies and strategy not in criteria.allowed_strategies:
+        reasons.append("strategy is not in allowed_strategies")
+    if criteria.allowed_symbols and any(s not in criteria.allowed_symbols for s in symbols):
+        reasons.append("universe contains symbols outside allowed_symbols")
+    test_sharpe = _metric(result, "test_metrics", "sharpe")
+    if test_sharpe is None or test_sharpe < criteria.min_test_sharpe:
+        reasons.append("missing or insufficient test Sharpe")
+    train_sharpe = _metric(result, "train_metrics", "sharpe")
+    if (
+        train_sharpe is None
+        or test_sharpe is None
+        or train_sharpe - test_sharpe > criteria.max_train_test_sharpe_gap
+    ):
+        reasons.append("missing or excessive train/test Sharpe gap")
+    drawdown = abs(_metric(result, "test_metrics", "max_drawdown") or 999.0)
+    if drawdown > criteria.max_test_drawdown:
+        reasons.append("missing or excessive test drawdown")
+    turnover = _metric(result, "test_metrics", "turnover") or _metric(result, "turnover")
+    if turnover is None or turnover > criteria.max_turnover:
+        reasons.append("missing or excessive turnover")
+    excess = _metric(result, "comparison_test", "excess_return")
+    if excess is None or excess < criteria.min_excess_return:
+        reasons.append("missing or insufficient excess return")
+    if criteria.require_beats_benchmark and (excess is None or excess <= 0):
+        reasons.append("strategy does not beat benchmark")
+    months = _metric(result, "test_months")
+    if months is None:
+        tr = result.get("test_range")
+        if isinstance(tr, list | tuple) and len(tr) == 2:
+            try:
+                start = datetime.fromisoformat(str(tr[0]).replace("Z", "+00:00"))
+                end = datetime.fromisoformat(str(tr[1]).replace("Z", "+00:00"))
+                months = max(0.0, (end - start).days / 30.0)
+            except ValueError:
+                months = None
+    if months is None or months < criteria.min_test_months:
+        reasons.append("missing or insufficient out-of-sample test months")
+    robust = result.get("robustness", {}) if isinstance(result.get("robustness", {}), dict) else {}
+    if criteria.require_cost_sensitivity_pass and robust.get("cost_sensitivity_pass") is not True:
+        reasons.append("cost sensitivity check missing or failed")
+    if criteria.require_subperiod_pass and robust.get("subperiod_pass") is not True:
+        reasons.append("subperiod check missing or failed")
+    if criteria.require_no_red_flags and result.get("red_flags"):
+        reasons.append("red flags present")
+    return reasons
+
+
+def _candidate_from_result(
+    run_dir: Path, result: dict[str, Any], reasons: list[str]
+) -> CandidateStrategy:
+    strategy = str(result.get("strategy", result.get("strategy_name", "unknown")))
+    symbols = [str(s) for s in result.get("symbols", result.get("universe", []))]
+    params = (
+        result.get("strategy_params", {})
+        if isinstance(result.get("strategy_params", {}), dict)
+        else {}
+    )
+    return CandidateStrategy(
+        candidate_id=f"{strategy}-{run_dir.name}",
+        name=str(result.get("experiment_name", run_dir.name)),
+        strategy_name=strategy,
+        strategy_params=params,
+        universe=symbols,
+        benchmark=str(result.get("benchmark", "equal_weight_universe")),
+        data_start=str((result.get("test_range") or result.get("data_range") or ["", ""])[0]),
+        data_end=str((result.get("test_range") or result.get("data_range") or ["", ""])[1]),
+        research_run_dir=str(run_dir),
+        selected_at_utc=utc_now_iso(),
+        selected_by="quant-trade selection",
+        status="candidate" if not reasons else "rejected",
+        approval_notes="",
+        risk_notes="Simulated paper trading only; no broker connectivity.",
+        known_limitations=(
+            "Selected from historical research artifacts; not evidence of future profitability."
+        ),
+        required_capital=float(result.get("initial_cash", 0.0) or 0.0),
+        expected_rebalance_frequency=str(params.get("rebalance_frequency", "unknown")),
+        max_weight_per_asset=float(params.get("max_weight_per_asset", 1.0)),
+        max_gross_exposure=float(result.get("max_gross_exposure", 1.0) or 1.0),
+        estimated_turnover=float(
+            (_metric(result, "test_metrics", "turnover") or result.get("turnover", 0.0)) or 0.0
+        ),
+        expected_cost_sensitivity="pass"
+        if result.get("robustness", {}).get("cost_sensitivity_pass")
+        else "unknown_or_fail",
+        tags=["phase5", "simulated-paper-only"],
+        rejection_reasons=reasons,
+    )
+
+
+def select_candidates_from_outputs(
+    outputs_dir: Path, criteria: SelectionCriteria
+) -> list[CandidateStrategy]:
+    candidates: list[CandidateStrategy] = []
+    for run_dir in _find_runs(outputs_dir):
+        result = _load_json(run_dir / "results.json")
+        reasons = _reasons(result, criteria)
+        candidate = _candidate_from_result(run_dir, result, reasons)
+        if candidate.status == "candidate":
+            candidates.append(candidate)
+    return candidates
+
+
+def run_selection(outputs_dir: Path, criteria: SelectionCriteria) -> Path:
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    out = outputs_dir / "selection" / run_id
+    out.mkdir(parents=True, exist_ok=True)
+    all_items = []
+    for run_dir in _find_runs(outputs_dir):
+        result = _load_json(run_dir / "results.json")
+        all_items.append(_candidate_from_result(run_dir, result, _reasons(result, criteria)))
+    candidates = [c for c in all_items if c.status == "candidate"]
+    rejected = [c for c in all_items if c.status == "rejected"]
+    (out / "selection_criteria.yaml").write_text(
+        yaml.safe_dump(criteria.to_dict()), encoding="utf-8"
+    )
+    (out / "candidates.json").write_text(
+        json.dumps([c.to_dict() for c in candidates], indent=2), encoding="utf-8"
+    )
+    for name, rows in {"candidates.csv": candidates, "rejected.csv": rejected}.items():
+        with (out / name).open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(
+                fh, fieldnames=list(asdict(all_items[0]).keys()) if all_items else ["candidate_id"]
+            )
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row.to_dict())
+    (out / "selection_summary.md").write_text(
+        (
+            f"# Strategy selection summary\n\nSelected: {len(candidates)}\n\n"
+            f"Rejected: {len(rejected)}\n\n"
+            "Conservative selection requires complete metrics and robustness evidence. "
+            "This is not a profitability claim.\n"
+        ),
+        encoding="utf-8",
+    )
+    return out

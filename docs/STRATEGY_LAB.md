@@ -18,3 +18,7 @@ Interpret train/test results conservatively. Benchmark comparison, cost sensitiv
 ## Advancement checklist
 
 A strategy cannot move to paper trading unless CI is green, it beats benchmark out-of-sample after realistic costs, drawdown is acceptable, it survives cost sensitivity, returns are not dominated by one period, reasonable parameter ranges work, economic rationale is clear, turnover is appropriate, a human reviews it, and paper-trading risk limits are defined.
+
+## Candidate handoff
+
+Research outputs may be screened by `quant-trade selection run`. Candidates require conservative criteria and human approval before simulated paper readiness.

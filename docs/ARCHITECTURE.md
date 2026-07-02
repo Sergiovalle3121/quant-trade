@@ -11,3 +11,7 @@ Quant Trade separates concerns so research code remains testable and safe.
 - **Monitoring** is future-only and should cover system health, data quality, orders, positions, and drawdowns before live use.
 
 This boundary keeps later integrations replaceable: NautilusTrader, broker adapters, data vendors, and cloud services can be added behind explicit interfaces after human approval.
+
+## Phase 5 transition layer
+
+The transition layer contains research candidate selection, promotion checks, simulated paper engine, risk manager, append-only audit events, reports, and a simulated broker stub only. No live adapters exist.

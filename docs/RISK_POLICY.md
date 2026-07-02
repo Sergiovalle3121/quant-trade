@@ -11,3 +11,7 @@
 ## Strategy advancement checklist
 
 A strategy cannot move to paper trading unless CI is green, it beats benchmark out-of-sample after realistic costs, max drawdown is acceptable, cost sensitivity is acceptable, performance is not dependent on one lucky period, reasonable parameter ranges work, economic rationale is clear, turnover is suitable, a human reviews it, and paper-trading risk limits are defined.
+
+## Simulated paper risk guardrails
+
+Phase 5 enforces local risk limits for gross exposure, max asset weight, turnover, cash, leverage, shorting, order counts, and total drawdown kill switches. Broker connectivity is intentionally absent.

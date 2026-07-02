@@ -22,3 +22,7 @@
 ## Phase 4 research lab guidance
 
 Multi-asset strategy lab code remains research/backtesting only. Do not add broker connectivity, order routing, live trading, secrets, or real-money execution. Keep benchmark, robustness, and cost assumptions explicit.
+
+## Phase 5 safety
+
+Paper trading code must remain simulated-only using local/cached data. Do not add live broker adapters, secrets, real order routing, or real-money trading paths.

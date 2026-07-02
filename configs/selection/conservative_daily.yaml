@@ -1,0 +1,10 @@
+min_test_sharpe: 0.5
+min_excess_return: 0.0
+max_test_drawdown: 0.20
+max_turnover: 3.0
+require_beats_benchmark: true
+require_cost_sensitivity_pass: true
+require_subperiod_pass: false
+require_no_red_flags: false
+min_test_months: 12
+max_train_test_sharpe_gap: 1.0

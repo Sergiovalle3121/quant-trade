@@ -118,3 +118,7 @@ quant-trade research run --config configs/research/equal_weight_synthetic.yaml
 ```
 
 See `docs/STRATEGY_LAB.md` for assumptions, safety limits, and the strategy advancement checklist.
+
+## Phase 5: Strategy selection and simulated paper readiness
+
+This repository now includes conservative candidate selection and a local-only simulated paper-trading workflow. No live broker integration, order routing, secrets, or real-money trading is implemented. See `docs/STRATEGY_SELECTION.md` and `docs/PAPER_TRADING.md`.
