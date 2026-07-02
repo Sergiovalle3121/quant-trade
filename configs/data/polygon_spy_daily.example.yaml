@@ -1,0 +1,8 @@
+provider: polygon
+symbols: ["SPY"]
+start: "2015-01-01"
+end: "2024-12-31"
+interval: "1d"
+adjusted: true
+output_dir: "data/cache"
+force_refresh: false

@@ -86,3 +86,24 @@ Writes walk-forward window results and aggregate metrics under `outputs/`.
 - Cost models are configurable but still simplified relative to real venues.
 - Grid search and walk-forward outputs are research diagnostics; they are not live-trading signals.
 - Do not add broker APIs, live execution, paid feeds, keys, tokens, or credentials without explicit human approval.
+
+## Phase 3 historical data workflow
+
+Install optional prototype data providers when needed:
+
+```bash
+python -m pip install -e ".[dev,data]"
+```
+
+Research-only data ingestion examples:
+
+```bash
+quant-trade data fetch --provider synthetic --symbol SPY --start 2020-01-01 --end 2020-12-31 --interval 1d
+quant-trade data fetch --provider yfinance --symbol SPY --start 2015-01-01 --end 2024-12-31 --interval 1d
+quant-trade data validate --path data/cache/synthetic/SPY/1d/SPY_2020-01-01_2020-12-31_adjusted.csv
+quant-trade data info --path data/cache/synthetic/SPY/1d/SPY_2020-01-01_2020-12-31_adjusted.csv
+quant-trade data list-cache
+quant-trade backtest --strategy buy_and_hold --data data/cache/synthetic/SPY/1d/SPY_2020-01-01_2020-12-31_adjusted.csv --initial-cash 10000
+```
+
+The data layer normalizes OHLCV bars to a canonical UTC schema, validates quality, writes a local CSV cache, and stores JSON manifests. Do not commit downloaded data, API keys, secrets, or `.env` files. This project remains research/backtesting only and includes no live trading or broker execution.

@@ -13,3 +13,9 @@ htmlcov/
 dist/
 build/
 .DS_Store
+
+data/cache/
+data/raw/
+data/processed/
+outputs/
+.env

@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
 from rich.console import Console
 from rich.table import Table
 
 from quant_trade.backtest.engine import BacktestEngine
 from quant_trade.config import get_settings
+from quant_trade.data.cache import list_cache, write_cache
 from quant_trade.data.csv_loader import load_ohlcv_csv
+from quant_trade.data.providers import get_data_provider
+from quant_trade.data.quality import generate_quality_report
+from quant_trade.data.requests import HistoricalDataRequest
+from quant_trade.data.validation import validate_ohlcv
 from quant_trade.logging_config import configure_logging
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
@@ -20,6 +27,8 @@ from quant_trade.research.walk_forward import run_walk_forward
 from quant_trade.strategies import STRATEGY_REGISTRY, get_strategy
 
 app = typer.Typer(help="Research-only quantitative trading tooling.")
+data_app = typer.Typer(help="Historical data ingestion and validation.")
+app.add_typer(data_app, name="data")
 console = Console()
 
 
@@ -45,6 +54,91 @@ def _print_metrics(
     table.add_row("Max drawdown", f"{metrics['max_drawdown']:.2%}")
     table.add_row("Trade count", str(metrics["trade_count"]))
     console.print(table)
+
+
+def _request_from_options(
+    provider: str,
+    symbols: list[str],
+    start: str,
+    end: str,
+    interval: str,
+    adjusted: bool,
+    output_dir: str,
+    force_refresh: bool,
+    config: Path | None,
+) -> HistoricalDataRequest:
+    payload = {
+        "provider": provider,
+        "symbols": symbols,
+        "start": start,
+        "end": end,
+        "interval": interval,
+        "adjusted": adjusted,
+        "output_dir": output_dir,
+        "force_refresh": force_refresh,
+    }
+    if config is not None:
+        loaded = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+        payload.update(loaded)
+    return HistoricalDataRequest(**payload)
+
+
+@data_app.command("fetch")
+def data_fetch(
+    provider: Annotated[
+        str, typer.Option(help="Provider: csv, synthetic, yfinance, polygon")
+    ] = "synthetic",
+    symbol: Annotated[
+        list[str] | None, typer.Option("--symbol", help="Symbol; repeat for multiple symbols")
+    ] = None,
+    start: Annotated[str, typer.Option(help="Start date YYYY-MM-DD")] = "2020-01-01",
+    end: Annotated[str, typer.Option(help="End date YYYY-MM-DD")] = "2020-12-31",
+    interval: Annotated[str, typer.Option(help="Bar interval")] = "1d",
+    adjusted: Annotated[bool, typer.Option("--adjusted/--no-adjusted")] = True,
+    output_dir: Annotated[str, typer.Option(help="Cache output directory")] = "data/cache",
+    force_refresh: Annotated[bool, typer.Option(help="Overwrite existing cache file")] = False,
+    config: Annotated[Path | None, typer.Option(help="YAML config path")] = None,
+) -> None:
+    """Fetch, normalize, validate, and cache historical data."""
+    request = _request_from_options(
+        provider,
+        symbol or ["SPY"],
+        start,
+        end,
+        interval,
+        adjusted,
+        output_dir,
+        force_refresh,
+        config,
+    )
+    data = get_data_provider(request.provider).fetch_ohlcv(request)
+    report = generate_quality_report(data)
+    path = write_cache(data, request, report.warnings)
+    console.print(f"Cached {len(data)} rows: {path}")
+
+
+@data_app.command("validate")
+def data_validate(path: Annotated[Path, typer.Option(help="CSV dataset path")]) -> None:
+    """Validate a cached or local canonical OHLCV dataset."""
+    data = validate_ohlcv(load_ohlcv_csv(path))
+    console.print(f"Validation passed: {len(data)} rows")
+
+
+@data_app.command("info")
+def data_info(path: Annotated[Path, typer.Option(help="CSV dataset path")]) -> None:
+    """Print dataset metadata and quality summary."""
+    data = load_ohlcv_csv(path)
+    console.print(json.dumps(generate_quality_report(data).to_dict(), indent=2))
+
+
+@data_app.command("list-cache")
+def data_list_cache(
+    provider: Annotated[str | None, typer.Option(help="Optional provider filter")] = None,
+    output_dir: Annotated[str, typer.Option(help="Cache root")] = "data/cache",
+) -> None:
+    """List cached CSV datasets."""
+    for path in list_cache(output_dir, provider):
+        console.print(path)
 
 
 @app.command()
