@@ -1,0 +1,13 @@
+# Architecture
+
+Quant Trade separates concerns so research code remains testable and safe.
+
+- **Data** loads and validates local OHLCV files. Data quality problems should fail early.
+- **Strategy** converts market data into timestamped research signals without touching brokerage or account state.
+- **Backtesting** simulates long-only fills, portfolio accounting, costs, and slippage deterministically.
+- **Risk** caps trade and position size and prevents leverage in this first version.
+- **Metrics** evaluates outcomes without changing simulation state.
+- **Execution** is future-only. No broker connectivity exists in this foundation.
+- **Monitoring** is future-only and should cover system health, data quality, orders, positions, and drawdowns before live use.
+
+This boundary keeps later integrations replaceable: NautilusTrader, broker adapters, data vendors, and cloud services can be added behind explicit interfaces after human approval.
