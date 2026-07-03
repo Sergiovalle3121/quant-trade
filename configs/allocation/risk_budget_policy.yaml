@@ -1,0 +1,14 @@
+policy:
+  max_total_capital: 100000.0
+  max_strategy_weight: 0.35
+  min_strategy_weight: 0.05
+  max_strategy_drawdown: 0.12
+  max_portfolio_drawdown: 0.10
+  max_pairwise_correlation: 0.85
+  max_cluster_exposure: 0.50
+  max_single_strategy_loss_contribution: 0.60
+  min_cash_buffer_pct: 0.20
+  volatility_target: 0.12
+  allow_leverage: false
+  allow_short: false
+  real_money_enabled: false

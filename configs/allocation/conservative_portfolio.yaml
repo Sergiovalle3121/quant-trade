@@ -1,0 +1,4 @@
+registry_path: configs/allocation/allocation_registry.yaml
+output_root: outputs/allocation
+allocator: conservative_blend
+policy_path: configs/allocation/risk_budget_policy.yaml
