@@ -53,3 +53,7 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 19 readiness safety
+
+Readiness dossier and capital ramp code is governance analysis only. Keep real_money_ready=false, real_money_approved=false, and live_trading_enabled=false in outputs. Do not add live broker endpoints, real orders, or real-money approval paths.

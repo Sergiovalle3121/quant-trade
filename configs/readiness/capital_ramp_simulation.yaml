@@ -1,0 +1,26 @@
+run_id: sample_readiness
+output_root: outputs/readiness
+capital_levels: [10000, 25000, 50000, 100000, 250000]
+max_position_pct: 0.1
+expected_turnover: 0.5
+cost_bps: 5
+max_drawdown_pct: 0.15
+daily_loss_pct: 0.02
+risk_budget_pct: 0.2
+stress_loss_pct: 0.25
+capacity_limit: 100000
+paper_capital: 100000
+seed: 42
+paths: 200
+horizon_days: 40
+daily_returns: [0.001, -0.002, 0.003, -0.004, 0.0, -0.01]
+ruin_drawdown_threshold: -0.2
+daily_loss_threshold: -0.03
+loss_limits:
+  portfolio_daily_loss_pct: 0.02
+  strategy_daily_loss_pct: 0.01
+  max_drawdown_pct: 0.15
+  per_symbol_notional_pct: 0.1
+  kill_switch_pct: 0.05
+  pause_pct: 0.03
+  review_pct: 0.02

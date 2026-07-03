@@ -144,3 +144,7 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 ## Phase 9: Paper trading trials
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
+
+## Phase 19 Paper-to-Capital Readiness
+
+Phase 19 adds paper-only readiness dossiers, capital ramp simulation, loss limits, risk-of-ruin estimates, and governance checklists. These artifacts are for human review only and do not approve real-money trading. Paper performance does not guarantee real results; any real-money decision requires a separate explicit human/legal/risk process outside this codebase. Live endpoints and real-money approval remain blocked.

@@ -1,0 +1,16 @@
+run_id: sample_readiness
+output_root: outputs/readiness
+governance_checklist:
+  ci_green_evidence: true
+  security_scan_pass: true
+  no_secrets_finding: true
+  approval_records_exist: true
+  paper_trial_review_packs_exist: true
+  ops_reliability_meets_threshold: true
+  stress_tests_completed: true
+  tca_reviewed: true
+  allocation_governance_completed: true
+  kill_switch_tested: true
+  incident_response_tested: true
+  human_review_notes_exist: true
+  real_money_approval_impossible_in_code: true

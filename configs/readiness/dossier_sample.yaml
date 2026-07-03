@@ -1,0 +1,21 @@
+run_id: sample_readiness
+output_root: outputs/readiness
+executive_summary: Paper-only readiness dossier for governance review. This does not approve real-money trading.
+required_evidence: [research_results, paper_trial_results, security_controls]
+safety_status: {real_money_ready: false, real_money_approved: false, live_trading_enabled: false}
+strategy_inventory: [{strategy_id: demo_mean_reversion, status: paper_only}]
+evidence_database_summary: {records: 12, missing_records: 0}
+research_results: {completed: true, sharpe: 0.8}
+oos_walk_forward_results: {completed: true, windows: 3}
+paper_trial_results: {completed: true, days: 30}
+ops_reliability: {uptime_pct: 99.0}
+security_controls: {security_scan_pass: true, no_secrets_finding: true}
+stress_tests: {completed: true}
+tca_execution_quality: {reviewed: true}
+allocation_simulation: {completed: true}
+incident_history: []
+approval_history: [{approval: paper_review, real_money_approved: false}]
+open_risks: [{risk: Paper results may not transfer to live markets, owner: risk}]
+blocking_issues: []
+human_review_notes: Human review required before any future non-paper decision.
+final_status: paper_capital_ramp_ready
