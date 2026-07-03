@@ -1,0 +1,23 @@
+candidates:
+  - strategy_id: trend_paper
+    strategy_name: ts_momentum
+    status: approved_paper
+    approved_for_paper: true
+    evidence_paths: [tests/fixtures/allocation/trend_evidence.md]
+    daily_returns_path: tests/fixtures/allocation/trend_returns.csv
+    expected_volatility: 0.12
+    max_drawdown: -0.04
+  - strategy_id: meanrev_paper
+    strategy_name: mean_reversion
+    status: approved_paper
+    approved_for_paper: true
+    evidence_paths: [tests/fixtures/allocation/meanrev_evidence.md]
+    daily_returns_path: tests/fixtures/allocation/meanrev_returns.csv
+    expected_volatility: 0.10
+    max_drawdown: -0.03
+  - strategy_id: missing_evidence
+    strategy_name: equal_weight
+    status: approved_paper
+    approved_for_paper: true
+    evidence_paths: [tests/fixtures/allocation/does_not_exist.md]
+    daily_returns_path: tests/fixtures/allocation/trend_returns.csv
