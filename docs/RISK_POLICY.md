@@ -37,3 +37,8 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+
+## Human approval control gates
+
+Phase 17 approval gates add human review records for research promotion, paper trials, simulated allocation, broker paper submission, cloud paper enablement, kill-switch clearance, incidents, and archive deletion. These controls do not approve real-money trading.

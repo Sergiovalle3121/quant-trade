@@ -37,3 +37,8 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+
+## Approval workflow architecture
+
+The approvals package is a local JSON/JSONL control-plane component. It exposes CLI commands and `require_approval` / `verify_approval` hooks for future integration without introducing network services or broker dependencies.

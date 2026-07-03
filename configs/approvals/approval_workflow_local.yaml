@@ -1,0 +1,6 @@
+run_id: local
+output_dir: outputs/approvals
+default_ttl_hours: 24
+required_reviewers:
+  - Sergio
+policy_path: configs/approvals/approval_policy_conservative.yaml

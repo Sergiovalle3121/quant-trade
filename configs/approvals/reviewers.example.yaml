@@ -1,0 +1,5 @@
+reviewers:
+  - name: Sergio
+    role: human_governance_reviewer
+    allowed_scopes:
+      - paper_only

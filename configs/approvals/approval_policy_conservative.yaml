@@ -1,0 +1,7 @@
+name: conservative_human_approval_policy
+paper_only: true
+real_money_approved: false
+missing_evidence_blocks: true
+broker_paper_order_submission_requires_explicit_paper_only: true
+kill_switch_clear_requires_note: true
+archive_delete_requires_explicit_confirmation: true

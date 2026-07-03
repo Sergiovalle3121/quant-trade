@@ -21,3 +21,8 @@ Paper fills are not proof of profitability. They can be optimistic, stale, parti
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+
+## Human approvals
+
+Paper operation changes that continue, pause, complete, or clear kill switches can be represented as local approval requests. Missing evidence, expiry, rejection, and real-money approval attempts block the gate.

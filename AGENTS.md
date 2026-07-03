@@ -53,3 +53,7 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 17 human approval safety
+
+Approval workflow code must remain local and paper-only. `real_money_approved` must always be false, approval tests must be offline, and broker/cloud approval gates must not call live endpoints or store secrets.

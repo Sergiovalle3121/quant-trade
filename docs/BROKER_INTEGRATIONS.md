@@ -9,3 +9,8 @@ Before any real-money consideration: independent risk review, endpoint redesign,
 ## Phase 7 cloud paper deployment note
 
 Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.
+
+
+## Paper submission approval
+
+Future broker paper submission should verify a `broker_paper_order_submission` approval before submitting a paper-only plan. The approval must include evidence and explicit paper-only reviewer notes; it must not enable live endpoints or real-money trading.
