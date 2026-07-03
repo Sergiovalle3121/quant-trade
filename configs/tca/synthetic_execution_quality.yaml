@@ -1,0 +1,3 @@
+name: synthetic_execution_quality
+policy_path: configs/tca/tca_policy_conservative.yaml
+output_dir: outputs/tca

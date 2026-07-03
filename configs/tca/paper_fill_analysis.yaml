@@ -1,0 +1,5 @@
+name: paper_fill_analysis
+policy_path: configs/tca/tca_policy_conservative.yaml
+output_dir: outputs/tca
+paper_only: true
+real_money_ready: false

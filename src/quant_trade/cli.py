@@ -34,6 +34,7 @@ research_app = typer.Typer(help="Multi-asset research lab commands.")
 selection_app = typer.Typer(help="Strategy candidate selection commands.")
 paper_app = typer.Typer(help="Local simulated paper-trading commands.")
 broker_app = typer.Typer(help="Safe paper broker integration commands.")
+tca_app = typer.Typer(help="Offline execution quality and transaction cost analysis commands.")
 
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
@@ -42,7 +43,42 @@ app.add_typer(paper_app, name="paper")
 app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
+app.add_typer(tca_app, name="tca")
 console = Console()
+
+
+def _run_tca_command(config: Path, label: str) -> None:
+    from quant_trade.tca.analysis import write_artifacts
+
+    out = write_artifacts(config)
+    console.print(f"{label} complete: {out}")
+    console.print("Paper-only TCA artifact; real_money_ready=false")
+
+
+@tca_app.command("run")
+def tca_run(config: Annotated[Path, typer.Option(help="TCA YAML config")]) -> None:
+    """Run offline execution quality analysis."""
+    _run_tca_command(config, "TCA run")
+
+
+@tca_app.command("analyze-paper")
+def tca_analyze_paper(
+    config: Annotated[Path, typer.Option(help="TCA paper fill YAML config")],
+) -> None:
+    """Analyze simulated paper fills without broker or network calls."""
+    _run_tca_command(config, "Paper fill analysis")
+
+
+@tca_app.command("compare")
+def tca_compare(config: Annotated[Path, typer.Option(help="TCA comparison YAML config")]) -> None:
+    """Compare research cost assumptions with paper execution proxies."""
+    _run_tca_command(config, "TCA comparison")
+
+
+@tca_app.command("dashboard")
+def tca_dashboard(config: Annotated[Path, typer.Option(help="TCA dashboard YAML config")]) -> None:
+    """Generate a static offline TCA dashboard."""
+    _run_tca_command(config, "TCA dashboard")
 
 
 def _strategy_help() -> str:

@@ -144,3 +144,16 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 ## Phase 9: Paper trading trials
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
+
+## Phase 16: Execution Quality Lab + TCA v2
+
+Run offline, paper-only transaction cost analysis with:
+
+```bash
+quant-trade tca run --config configs/tca/synthetic_execution_quality.yaml
+quant-trade tca analyze-paper --config configs/tca/paper_fill_analysis.yaml
+quant-trade tca compare --config configs/tca/paper_fill_analysis.yaml
+quant-trade tca dashboard --config configs/tca/paper_fill_analysis.yaml
+```
+
+Artifacts are written under `outputs/tca/<run_id>/`. TCA uses conservative OHLCV proxy assumptions and always reports `real_money_ready=false`.

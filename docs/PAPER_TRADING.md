@@ -29,3 +29,7 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+## Phase 16 execution quality review
+
+Simulated paper fills can be reviewed with the offline TCA commands. These reports are diagnostics only: OHLCV proxies are not realistic venue fills and do not approve real-money trading.

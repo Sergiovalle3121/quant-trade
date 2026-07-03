@@ -53,3 +53,7 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 16 execution quality safety
+
+TCA code is offline and research-only. Keep `real_money_ready=false`, avoid network/broker calls, and document OHLCV proxy limitations for execution-quality changes.

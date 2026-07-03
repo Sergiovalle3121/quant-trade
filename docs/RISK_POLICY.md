@@ -37,3 +37,7 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+## Transaction cost risk
+
+Execution-quality degradation should be treated conservatively. Higher slippage, spread, partial-fill, or rejected-rate measurements reduce quality and never create real-money approval.

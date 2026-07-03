@@ -1,0 +1,11 @@
+name: conservative_offline_tca
+real_money_ready: false
+default_equity: 100000
+research_assumed_cost_bps: 10
+execution:
+  model: spread_adjusted_open
+  slippage_bps: 5
+  spread_bps: 2
+  max_participation_rate: 0.10
+  impact_bps_per_10pct_adv: 4
+  reject_when_over_capacity: false
