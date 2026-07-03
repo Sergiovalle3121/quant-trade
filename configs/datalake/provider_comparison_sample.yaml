@@ -1,0 +1,6 @@
+symbol: SPY
+interval: 1d
+provider_a: local_csv_a
+provider_b: local_csv_b
+price_diff_threshold_pct: 1.0
+paper_only: true

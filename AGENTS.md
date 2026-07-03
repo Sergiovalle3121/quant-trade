@@ -54,6 +54,7 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
 
-## Phase 12 evidence safety
 
-Evidence database and scorecard code must remain local/offline. Do not commit SQLite databases, secrets, live broker paths, or any field that marks a strategy as real-money ready. Scorecards must keep `real_money_ready=false`.
+## Phase 15 data lake safety
+
+Data lake code is research/backtesting only. Do not commit generated datasets, snapshots, manifests, market data, secrets, or paid-provider responses. Data lake tests must remain offline and deterministic. Dataset versions and quality reports do not imply live-trading readiness.

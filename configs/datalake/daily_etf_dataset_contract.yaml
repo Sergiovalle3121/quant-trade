@@ -1,0 +1,11 @@
+required_columns: [timestamp, symbol, open, high, low, close, volume]
+min_row_count: 1
+max_missing_pct: 0.0
+duplicate_policy: fail
+timezone_policy: date
+expected_interval: 1d
+allowed_symbols: [SPY, QQQ, IWM]
+validate_prices: true
+validate_volume: true
+max_gap_days: 5
+stale_data_threshold_days: null

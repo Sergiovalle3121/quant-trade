@@ -145,6 +145,7 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
 
-## Phase 12: Evidence database and scorecards
 
-The platform includes a local SQLite evidence database and conservative strategy scorecards for offline research governance. Initialize it with `quant-trade evidence init --config configs/evidence/local_evidence_db.yaml`, ingest artifacts from `outputs`, and generate scorecards, lineage exports, search results, and a static dashboard. The evidence system is paper-only/research-only and never sets `real_money_ready=true`.
+## Phase 15: Data Lake v2 + Dataset Versioning
+
+The project now includes a research-only versioned data lake (`quant-trade datalake ...`) for local CSV registration, immutable versions, snapshots, contracts, quality reports, provider comparison utilities, lineage artifacts, and a static dashboard. Generated market data artifacts remain ignored by git and are not approved for live trading. See `docs/DATA_LAKE.md`, `docs/DATASET_VERSIONING.md`, and `docs/DATA_CONTRACTS.md`.

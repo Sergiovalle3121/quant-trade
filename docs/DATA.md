@@ -45,3 +45,8 @@ Set secrets only in your local environment, never in Git:
 export POLYGON_API_KEY="..."
 export DATA_CACHE_DIR=data/cache
 ```
+
+
+## Versioned research data lake
+
+Phase 15 adds `src/quant_trade/datalake/` for offline dataset registration, versioning, snapshots, contracts, quality checks, and lineage reports. Local data lake artifacts are generated under `data/lake/` and must not be committed except placeholder documentation files.

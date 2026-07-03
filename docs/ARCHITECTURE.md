@@ -38,6 +38,7 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
 
-## Phase 12 evidence layer
 
-The evidence layer (`quant_trade.evidence`) is an offline SQLite subsystem that indexes local artifacts, computes checksums, redacts/skips likely secrets, and produces conservative scorecards. It has no broker connectivity and no network dependency.
+## Data Lake v2 architecture
+
+The data lake layer sits above provider adapters/cache and below research workflows. It records dataset registry entries, manifests, deterministic hashes, snapshots, contract validation results, quality reports, provider comparison diagnostics, and static dashboard artifacts. The layer is explicitly research-only and has no broker or live execution path.

@@ -35,5 +35,13 @@ data/cache/
 data/raw/
 data/processed/
 
-# Local evidence databases
-data/evidence/*.sqlite
+# Phase 15 data lake generated artifacts
+data/lake/datasets/
+data/lake/snapshots/
+data/lake/manifests/
+!data/lake/datasets/README.md
+!data/lake/snapshots/README.md
+!data/lake/manifests/README.md
+!data/lake/datasets/
+!data/lake/snapshots/
+!data/lake/manifests/
