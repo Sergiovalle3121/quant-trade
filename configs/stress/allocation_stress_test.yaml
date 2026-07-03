@@ -1,0 +1,9 @@
+policy_file: configs/stress/stress_policy_conservative.yaml
+scenario_file: configs/stress/equity_etf_scenarios.yaml
+symbols: [SPY, TLT, GLD]
+output_dir: outputs/stress
+cost_model:
+  commission: 0.0
+  spread_bps: 1.0
+  slippage_bps: 2.0
+real_money_ready: false

@@ -1,0 +1,34 @@
+scenarios:
+  - name: spy_one_day_crash
+    scenario_type: price_shock
+    shocks: {SPY: -0.08}
+    severity: high
+    required_symbols: [SPY]
+  - name: volatility_spike_2x
+    scenario_type: volatility_spike
+    volatility_multiplier: 2.0
+  - name: correlation_spike_down
+    scenario_type: correlation_spike
+    shocks: {SPY: -0.05, TLT: -0.05, GLD: -0.05}
+    correlation_direction: -1.0
+  - name: liquidity_shock_costs
+    scenario_type: liquidity_shock
+    liquidity_cost_multiplier: 4.0
+    slippage_bps_add: 15.0
+  - name: overnight_gap_against_position
+    scenario_type: gap_risk
+    shocks: {SPY: -0.06}
+  - name: drawdown_replay_sample
+    scenario_type: drawdown_replay
+    shocks: {SPY: -0.04}
+  - name: benchmark_crash_spy
+    scenario_type: benchmark_crash
+    shocks: {SPY: -0.12}
+    benchmark_symbol: SPY
+  - name: rate_shock_proxy_tlt_gld_equity
+    scenario_type: rate_shock_proxy
+    shocks: {TLT: -0.10, GLD: -0.04, SPY: -0.06}
+  - name: strategy_pause_scenario
+    scenario_type: strategy_pause_scenario
+  - name: operational_failure_scenario
+    scenario_type: operational_failure_scenario
