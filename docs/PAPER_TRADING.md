@@ -7,3 +7,7 @@ Forward replay iterates timestamps chronologically and passes only data availabl
 Use `quant-trade paper init`, `run`, `status`, `pause`, `resume`, `kill-switch`, and `report` with configs under `configs/paper/`.
 
 Do not move to real broker paper trading unless CI is green, a candidate has human approval, simulated paper passes, risk limits and kill switch are tested, monitoring reports are generated, data quality is verified, no secrets are committed, broker integration receives separate review, and real-money trading remains prohibited.
+
+## Phase 6 Alpaca Paper Warning
+
+Alpaca Paper support is paper-only, manually confirmed, and hard-blocks live endpoints. Paper results are simulations and are not real-money results.

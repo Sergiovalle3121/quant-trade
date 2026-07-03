@@ -26,3 +26,7 @@ Multi-asset strategy lab code remains research/backtesting only. Do not add brok
 ## Phase 5 safety
 
 Paper trading code must remain simulated-only using local/cached data. Do not add live broker adapters, secrets, real order routing, or real-money trading paths.
+
+## Phase 6 broker integration safety
+
+Alpaca support is paper-only. Keep live endpoints, live keys, shorting, leverage, and real-money execution out of the repository. Broker tests must mock network calls.

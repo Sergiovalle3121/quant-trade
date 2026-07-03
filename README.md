@@ -122,3 +122,7 @@ See `docs/STRATEGY_LAB.md` for assumptions, safety limits, and the strategy adva
 ## Phase 5: Strategy selection and simulated paper readiness
 
 This repository now includes conservative candidate selection and a local-only simulated paper-trading workflow. No live broker integration, order routing, secrets, or real-money trading is implemented. See `docs/STRATEGY_SELECTION.md` and `docs/PAPER_TRADING.md`.
+
+## Phase 6 Safe Broker Paper Integration
+
+`quant-trade broker` adds offline broker checks, dry-run planning, manual Alpaca Paper submission, account/position/order inspection, cancel-all with confirmation, and reconciliation. Live endpoints and live-money trading are not implemented and are rejected.

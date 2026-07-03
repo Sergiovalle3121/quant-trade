@@ -15,3 +15,7 @@ This boundary keeps later integrations replaceable: NautilusTrader, broker adapt
 ## Phase 5 transition layer
 
 The transition layer contains research candidate selection, promotion checks, simulated paper engine, risk manager, append-only audit events, reports, and a simulated broker stub only. No live adapters exist.
+
+## Phase 6 Broker Layer
+
+The execution package contains broker-neutral models, safety validation, Alpaca Paper adapter, order mapping, reconciliation, and sanitized audit logging. No live-money broker path exists.
