@@ -1,0 +1,4 @@
+critical_drawdown_pct: 20
+warning_drawdown_pct: 10
+max_rejected_orders_per_day: 5
+stale_heartbeat_minutes: 60

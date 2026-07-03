@@ -1,0 +1,13 @@
+min_calendar_days_observed: 1
+min_success_rate: 0.8
+max_critical_incidents: 0
+max_open_incidents: 0
+max_drawdown_pct: 20
+max_rejected_order_rate: 0.1
+require_kill_switch_drill_passed: true
+require_reconciliation_passed: true
+require_fill_analysis: true
+require_no_stale_heartbeats: true
+require_dashboard_generated: true
+require_manual_review_notes: false
+real_money_ready: false

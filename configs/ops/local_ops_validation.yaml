@@ -1,0 +1,33 @@
+ops_name: phase8_local_ops
+environment: local
+mode: local_validation
+session_registry_path: configs/ops/session_registry.yaml
+artifact_roots:
+  - tests/fixtures/ops
+  - outputs
+  - outputs/paper
+  - outputs/broker_plans
+  - outputs/cloud
+state_roots:
+  - state/paper
+  - state/broker
+audit_roots:
+  - audits
+dashboard_output_dir: outputs/ops_dashboards
+reports_output_dir: outputs/ops_reports
+incident_output_dir: outputs/incidents
+archive_output_dir: outputs/archive
+allow_live_trading: false
+real_money_enabled: false
+allow_paper_order_submission: false
+secrets_redaction_enabled: true
+stale_heartbeat_minutes: 60
+max_allowed_drawdown_pct: 20.0
+max_rejected_orders_per_day: 5
+max_missing_artifacts: 0
+min_success_rate_rolling_7d: 0.8
+min_success_rate_rolling_30d: 0.8
+require_kill_switch_test: true
+require_reconciliation: true
+require_artifact_integrity: true
+require_no_critical_incidents: true
