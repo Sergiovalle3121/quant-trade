@@ -1,0 +1,10 @@
+services:
+  quant-trade:
+    build: ..
+    command: ["cloud", "run-job", "--config", "/app/configs/cloud/local_dry_run.yaml", "--job", "health_check"]
+    volumes:
+      - ../configs:/app/configs:ro
+      - ../outputs:/app/outputs
+      - ../state:/app/state
+    environment:
+      QUANT_TRADE_GLOBAL_KILL_SWITCH: "false"

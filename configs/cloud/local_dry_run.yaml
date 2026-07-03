@@ -1,0 +1,29 @@
+environment: local
+deployment_name: local-paper-lab
+job_name: health_check
+mode: dry_run
+allow_paper_order_submission: false
+allow_live_trading: false
+real_money_enabled: false
+broker_provider: simulated
+broker_config_path: configs/broker/simulated_broker.yaml
+paper_config_path: configs/paper/equal_weight_synthetic_paper.yaml
+schedule_timezone: UTC
+artifact_uri: outputs
+state_uri: state/cloud
+heartbeat_uri: state/cloud/heartbeat.json
+kill_switch_uri: state/cloud/kill_switch.json
+secrets:
+  provider: env
+monitoring:
+  emit_json_logs: true
+  emit_cloudwatch_embedded_metrics: false
+  alert_on_job_failure: true
+  alert_on_kill_switch: true
+  alert_on_drawdown: true
+  alert_on_rejected_orders: true
+  stale_heartbeat_minutes: 30
+locking:
+  enabled: true
+  provider: local
+  ttl_minutes: 30

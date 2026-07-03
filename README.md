@@ -126,3 +126,7 @@ This repository now includes conservative candidate selection and a local-only s
 ## Phase 6 Safe Broker Paper Integration
 
 `quant-trade broker` adds offline broker checks, dry-run planning, manual Alpaca Paper submission, account/position/order inspection, cancel-all with confirmation, and reconciliation. Live endpoints and live-money trading are not implemented and are rejected.
+
+## Phase 7 cloud paper deployment
+
+Cloud commands are paper-only and default to dry-run behavior. Example: `quant-trade cloud run-job --config configs/cloud/local_dry_run.yaml --job health_check`. AWS templates under `infra/aws/` are review-before-apply and never enable live trading.

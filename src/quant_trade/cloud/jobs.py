@@ -1,0 +1,203 @@
+from __future__ import annotations
+
+import json
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from time import monotonic
+
+import yaml
+
+from quant_trade.cloud.config import CloudConfig, load_cloud_config
+from quant_trade.cloud.exceptions import SafetyGateError
+from quant_trade.cloud.health import run_health_check
+from quant_trade.cloud.heartbeat import Heartbeat, write_heartbeat
+from quant_trade.cloud.kill_switch import assert_not_killed, get_kill_switch_status
+from quant_trade.cloud.locks import LocalFileLock
+from quant_trade.cloud.monitoring import JobSummary, emit_metric, structured_log
+from quant_trade.cloud.secrets import AwsSecretsManagerProvider, EnvSecretsProvider
+from quant_trade.cloud.storage import backend_for_uri
+
+
+def new_run_id() -> str:
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+
+
+def _base_uri(config: CloudConfig, run_id: str) -> str:
+    return (
+        f"{config.artifact_uri.rstrip('/')}/cloud/"
+        f"{config.deployment_name}/{config.job_name}/{run_id}"
+    )
+
+
+def _heartbeat(
+    config: CloudConfig, run_id: str, status: str, summary: dict | None = None
+) -> Heartbeat:
+    return Heartbeat(
+        deployment_name=config.deployment_name,
+        job_name=config.job_name,
+        run_id=run_id,
+        status=status,
+        started_at_utc=datetime.now(UTC).isoformat(),
+        mode=config.mode,
+        broker_provider=config.broker_provider,
+        paper_submission_enabled=config.allow_paper_order_submission,
+        kill_switch_active=get_kill_switch_status(config).active,
+        summary=summary or {},
+    )
+
+
+def _write_artifacts(
+    config: CloudConfig, run_id: str, summary: JobSummary, events: list[dict]
+) -> None:
+    storage = backend_for_uri(config.artifact_uri)
+    base = _base_uri(config, run_id)
+    storage.write_text(
+        f"{base}/cloud_config_used.yaml", yaml.safe_dump(config.to_safe_dict(), sort_keys=False)
+    )
+    storage.write_json(f"{base}/job_summary.json", summary.model_dump(mode="json"))
+    storage.write_text(
+        f"{base}/job_summary.md",
+        f"# Cloud Job Summary\n\nStatus: {summary.status}\nRun: {run_id}\n",
+    )
+    hb = _heartbeat(config, run_id, summary.status, {"duration_seconds": summary.duration_seconds})
+    storage.write_json(f"{base}/heartbeat.json", hb.model_dump(mode="json"))
+    storage.write_json(f"{base}/metrics.json", [m.model_dump(mode="json") for m in summary.metrics])
+    storage.write_text(
+        f"{base}/events.jsonl", "\n".join(json.dumps(e, sort_keys=True) for e in events) + "\n"
+    )
+    storage.write_json(
+        f"{base}/artifacts_index.json",
+        {
+            "base_uri": base,
+            "files": [
+                "cloud_config_used.yaml",
+                "job_summary.json",
+                "job_summary.md",
+                "heartbeat.json",
+                "metrics.json",
+                "events.jsonl",
+                "artifacts_index.json",
+            ],
+        },
+    )
+
+
+def validate_broker_submit_gates(config: CloudConfig) -> None:
+    if config.mode != "alpaca_paper_submit":
+        raise SafetyGateError("mode must be alpaca_paper_submit")
+    if not config.allow_paper_order_submission:
+        raise SafetyGateError("paper order submission disabled")
+    if config.allow_live_trading or config.real_money_enabled:
+        raise SafetyGateError("live/real-money flags must be false")
+    if config.broker_provider != "alpaca_paper":
+        raise SafetyGateError("broker provider must be alpaca_paper")
+    assert_not_killed(config)
+    provider = (
+        EnvSecretsProvider()
+        if config.secrets.provider == "env"
+        else AwsSecretsManagerProvider(secret_id=config.secrets.alpaca_paper_secret_id)
+    )
+    provider.get_alpaca_paper_credentials()
+    structured_log("broker_paper_submission_allowed", provider=config.broker_provider)
+
+
+def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
+    config = load_cloud_config(config_path)
+    config.job_name = job_name or config.job_name
+    run_id = new_run_id()
+    start = monotonic()
+    events = [{"event": "cloud_job_started", "run_id": run_id, "job": config.job_name}]
+    structured_log("cloud_job_started", run_id=run_id, job=config.job_name)
+    storage = backend_for_uri(config.heartbeat_uri)
+    write_heartbeat(storage, config.heartbeat_uri, _heartbeat(config, run_id, "running"))
+    metrics = []
+    status = "success"
+    error = None
+    try:
+        if config.job_name == "health_check":
+            run_health_check(config)
+        elif config.job_name == "heartbeat":
+            metrics.append(
+                emit_metric("heartbeat_age_seconds", 0, dimensions={"job": config.job_name})
+            )
+        elif config.job_name == "simulated_paper_run":
+            if config.paper_config_path:
+                from quant_trade.paper.simulator import PaperTradingSimulator
+
+                PaperTradingSimulator(Path(config.paper_config_path)).run()
+                metrics.append(emit_metric("equity", 0, dimensions={"job": config.job_name}))
+            else:
+                metrics.append(emit_metric("equity", 0, dimensions={"job": config.job_name}))
+        elif config.job_name == "broker_plan":
+            metrics.append(
+                emit_metric(
+                    "paper_orders_planned", 0, dimensions={"deployment": config.deployment_name}
+                )
+            )
+        elif config.job_name == "broker_submit_paper":
+            validate_broker_submit_gates(config)
+            lock = LocalFileLock(
+                Path(str(config.state_uri).replace("s3://", "state/cloud/")) / "locks"
+            )
+            rec = lock.acquire_lock("broker_submit_paper", run_id, config.locking.ttl_minutes)
+            try:
+                # Submission remains fail-closed unless wired to a reviewed plan.
+                raise SafetyGateError(
+                    "cloud paper submission requires a reviewed broker plan; "
+                    "no auto-submit is implemented"
+                )
+            finally:
+                lock.release_lock(rec.lock_name, run_id)
+        elif config.job_name in {"data_refresh", "research_run"}:
+            metrics.append(
+                emit_metric("stale_data_warning", 0, dimensions={"job": config.job_name})
+            )
+        else:
+            raise SafetyGateError(f"unknown cloud job: {config.job_name}")
+    except Exception as exc:
+        status = "failure"
+        error = str(exc)
+        metrics.append(emit_metric("job_failure", 1, dimensions={"job": config.job_name}))
+        events.append({"event": "cloud_job_failed", "error": error})
+    duration = monotonic() - start
+    metrics.append(
+        emit_metric(
+            "job_success", 1 if status == "success" else 0, dimensions={"job": config.job_name}
+        )
+    )
+    metrics.append(
+        emit_metric("job_duration_seconds", duration, "Seconds", {"job": config.job_name})
+    )
+    summary = JobSummary(
+        run_id=run_id,
+        job_name=config.job_name,
+        status=status,
+        started_at_utc=datetime.now(UTC).isoformat(),
+        completed_at_utc=datetime.now(UTC).isoformat(),
+        duration_seconds=duration,
+        metrics=metrics,
+        error=error,
+    )
+    events.append(
+        {
+            "event": "cloud_job_completed" if status == "success" else "cloud_job_failed",
+            "run_id": run_id,
+            "status": status,
+        }
+    )
+    write_heartbeat(
+        storage,
+        config.heartbeat_uri,
+        _heartbeat(config, run_id, status, {"error": error} if error else {}),
+    )
+    _write_artifacts(config, run_id, summary, events)
+    structured_log(
+        "cloud_job_completed" if status == "success" else "cloud_job_failed",
+        run_id=run_id,
+        status=status,
+        error=error,
+    )
+    if status != "success":
+        raise SafetyGateError(error or "cloud job failed")
+    return summary

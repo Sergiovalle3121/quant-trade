@@ -5,3 +5,7 @@ Phase 6 implements Alpaca Paper first because it has a small HTTPS paper API and
 IBKR is deferred because it requires TWS/IB Gateway setup, operational supervision, and separate paper validation. The repository contains only a non-network IBKR stub in this phase.
 
 Before any real-money consideration: independent risk review, endpoint redesign, kill switch testing, cloud monitoring, approval workflow, and explicit human authorization are required.
+
+## Phase 7 cloud paper deployment note
+
+Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.

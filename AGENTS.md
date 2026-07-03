@@ -30,3 +30,7 @@ Paper trading code must remain simulated-only using local/cached data. Do not ad
 ## Phase 6 broker integration safety
 
 Alpaca support is paper-only. Keep live endpoints, live keys, shorting, leverage, and real-money execution out of the repository. Broker tests must mock network calls.
+
+## Phase 7 cloud safety
+
+Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentials must be optional, Terraform apply must be manual, and live broker endpoints remain prohibited.

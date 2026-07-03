@@ -11,3 +11,7 @@ Do not move to real broker paper trading unless CI is green, a candidate has hum
 ## Phase 6 Alpaca Paper Warning
 
 Alpaca Paper support is paper-only, manually confirmed, and hard-blocks live endpoints. Paper results are simulations and are not real-money results.
+
+## Phase 7 cloud paper deployment note
+
+Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.

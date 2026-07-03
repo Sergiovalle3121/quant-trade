@@ -1,0 +1,15 @@
+name: AWS Deploy Plan (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      apply: { type: boolean, default: false }
+      enable_paper_submission: { type: boolean, default: false }
+concurrency: quant-trade-aws-paper
+jobs:
+  terraform:
+    environment: paper
+    runs-on: ubuntu-latest
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Run terraform plan by default. Apply only when input apply=true after manual approval. No live endpoints."

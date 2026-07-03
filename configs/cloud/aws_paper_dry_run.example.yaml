@@ -1,0 +1,27 @@
+environment: aws
+deployment_name: aws-paper-dry-run
+job_name: broker_plan
+mode: broker_plan
+allow_paper_order_submission: false
+allow_live_trading: false
+real_money_enabled: false
+broker_provider: alpaca_paper
+broker_config_path: configs/broker/alpaca_paper.example.yaml
+paper_config_path: configs/paper/equal_weight_synthetic_paper.yaml
+schedule_timezone: UTC
+artifact_uri: s3://REPLACE_BUCKET/artifacts
+state_uri: s3://REPLACE_BUCKET/state
+heartbeat_uri: s3://REPLACE_BUCKET/state/heartbeat.json
+kill_switch_uri: s3://REPLACE_BUCKET/state/kill_switch.json
+secrets:
+  provider: aws_secrets_manager
+  alpaca_paper_secret_id: quant-trade/paper/alpaca
+monitoring:
+  emit_json_logs: true
+  emit_cloudwatch_embedded_metrics: true
+  stale_heartbeat_minutes: 30
+locking:
+  enabled: true
+  provider: dynamodb
+  table_name: quant-trade-paper-locks
+  ttl_minutes: 30

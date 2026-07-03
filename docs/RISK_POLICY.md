@@ -19,3 +19,7 @@ Phase 5 enforces local risk limits for gross exposure, max asset weight, turnove
 ## Broker Paper Guardrails
 
 Phase 6 rejects live mode, live-like endpoints, shorting, leverage, unsupported assets, oversized orders, and ambiguous configuration. Paper order submission requires explicit confirmation flags.
+
+## Phase 7 cloud paper deployment note
+
+Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.
