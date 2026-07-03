@@ -1,0 +1,9 @@
+policy:
+  name: conservative_phase11
+  max_daily_loss_pct: 0.03
+  max_drawdown_pct: 0.12
+  max_liquidity_cost_pct: 0.01
+  max_slippage_bps: 25.0
+  max_exposure: 1.0
+  required_symbols: [SPY]
+  real_money_ready: false

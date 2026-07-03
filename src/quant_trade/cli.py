@@ -20,6 +20,7 @@ from quant_trade.data.providers import get_data_provider
 from quant_trade.data.quality import generate_quality_report
 from quant_trade.data.requests import HistoricalDataRequest
 from quant_trade.data.validation import validate_ohlcv
+from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
 from quant_trade.ops.cli import ops_app
 from quant_trade.research.experiment_config import load_experiment_config
@@ -479,6 +480,58 @@ def paper_from_candidate(
     console.print(f"Created simulated paper config: {path}")
 
 
+@stress_app.command("list-scenarios")
+def stress_list_scenarios(
+    config: Annotated[Path, typer.Option(help="Stress scenario YAML")],
+) -> None:
+    """List configured simulation-only stress scenarios."""
+    from quant_trade.stress.config import load_stress_scenarios
+
+    table = Table(title="Stress scenarios")
+    table.add_column("Name")
+    table.add_column("Type")
+    table.add_column("Severity")
+    for scenario in load_stress_scenarios(config):
+        table.add_row(scenario.name, scenario.scenario_type, scenario.severity)
+    console.print(table)
+
+
+def _run_stress_suite(config: Path):
+    from quant_trade.stress.config import load_stress_config, load_suite_config
+    from quant_trade.stress.reports import generate_stress_report
+    from quant_trade.stress.simulator import load_stress_data, run_scenario_suite
+
+    policy, scenarios, payload = load_suite_config(config)
+    data = load_stress_data(payload)
+    results = run_scenario_suite(data, scenarios, policy, payload.get("cost_model"))
+    report = generate_stress_report(
+        results, load_stress_config(config), Path(payload.get("output_dir", "outputs/stress"))
+    )
+    console.print(f"Stress run complete: outputs/stress/{report.run_id}")
+    console.print(f"Decision: {report.decision.status}; real_money_ready=false")
+    return report
+
+
+@stress_app.command("run")
+def stress_run(config: Annotated[Path, typer.Option(help="Stress suite YAML")]) -> None:
+    """Run deterministic offline stress scenarios and write artifacts."""
+    _run_stress_suite(config)
+
+
+@stress_app.command("report")
+def stress_report(config: Annotated[Path, typer.Option(help="Stress suite YAML")]) -> None:
+    """Run the stress suite and print a conservative summary."""
+    report = _run_stress_suite(config)
+    console.print(f"Worst scenario: {report.worst_scenario}")
+
+
+@stress_app.command("dashboard")
+def stress_dashboard(config: Annotated[Path, typer.Option(help="Stress suite YAML")]) -> None:
+    """Run the stress suite and print the generated dashboard path."""
+    report = _run_stress_suite(config)
+    console.print(f"Dashboard: outputs/stress/{report.run_id}/dashboard/index.html")
+
+
 def _broker_from_config(config_path: Path, confirm: bool = False):
     from quant_trade.execution.alpaca_paper import AlpacaPaperBroker
     from quant_trade.execution.config import load_broker_config
@@ -682,6 +735,81 @@ def broker_reconcile(
         f"# Reconciliation\n\nPassed: {report.passed}\n", encoding="utf-8"
     )
     print(f"Reconciliation artifacts: {out}")
+
+
+allocation_app = typer.Typer(help="Paper-only capital allocation simulation commands.")
+allocation_decision_app = typer.Typer(help="Record paper-only allocation governance decisions.")
+allocation_app.add_typer(allocation_decision_app, name="decision")
+app.add_typer(allocation_app, name="allocation")
+
+
+@allocation_app.command("list-candidates")
+def allocation_list_candidates(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+) -> None:
+    from quant_trade.allocation.config import load_allocation_config
+    from quant_trade.allocation.registry import eligible_candidates
+
+    cfg = load_allocation_config(config)
+    candidates, rejected, _ = eligible_candidates(cfg["registry_path"])
+    table = Table(title="Paper allocation candidates (real_money_ready=false)")
+    table.add_column("Strategy ID")
+    table.add_column("Status")
+    table.add_column("Result")
+    for c in candidates:
+        table.add_row(c.strategy_id, c.status, "eligible")
+    for sid, reason in rejected.items():
+        table.add_row(sid, "rejected", reason)
+    console.print(table)
+
+
+@allocation_app.command("run")
+def allocation_run(config: Annotated[Path, typer.Option(help="Allocation YAML config")]) -> None:
+    from quant_trade.allocation.run import run_allocation
+
+    out, result, _, rejected = run_allocation(config)
+    console.print(f"Allocation artifacts: {out}")
+    selected = len(result.allocation.allocations)
+    console.print(f"Selected: {selected} Rejected: {len(rejected)} real_money_ready=false")
+
+
+@allocation_app.command("risk-report")
+def allocation_risk_report(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+) -> None:
+    from quant_trade.allocation.run import run_allocation
+
+    out, result, _, _ = run_allocation(config)
+    console.print(json.dumps(result.risk_report.to_dict(), indent=2))
+    console.print(f"Output path: {out / 'risk_budget_report.json'}")
+
+
+@allocation_app.command("dashboard")
+def allocation_dashboard(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+) -> None:
+    from quant_trade.allocation.run import run_allocation
+
+    out, _, _, _ = run_allocation(config)
+    console.print(f"Dashboard: {out / 'dashboard' / 'index.html'}")
+
+
+@allocation_decision_app.command("record")
+def allocation_decision_record(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+    strategy_id: Annotated[str, typer.Option()],
+    decision: Annotated[str, typer.Option()],
+    human_notes: Annotated[str, typer.Option()] = "",
+) -> None:
+    from quant_trade.allocation.config import load_allocation_config
+    from quant_trade.allocation.governance import record_decision
+    from quant_trade.allocation.registry import eligible_candidates
+
+    cfg = load_allocation_config(config)
+    candidates, _, _ = eligible_candidates(cfg["registry_path"])
+    evidence = next((c.evidence_paths for c in candidates if c.strategy_id == strategy_id), [])
+    path = record_decision("manual", strategy_id, decision, evidence, human_notes)
+    console.print(f"Recorded paper-only allocation decision: {path}; real_money_approved=false")
 
 
 if __name__ == "__main__":
@@ -1005,3 +1133,98 @@ def trials_run_review_cycle(
     )
     (out / "warnings.json").write_text(json.dumps(warnings), encoding="utf-8")
     console.print(f"Output path: {out}/review_cycle_summary.json")
+
+
+evidence_app = typer.Typer(help="Local strategy evidence database commands.")
+app.add_typer(evidence_app, name="evidence")
+
+
+@evidence_app.command("init")
+def evidence_init(config: Annotated[Path, typer.Option(help="Evidence YAML config path")]) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.database import initialize_database
+
+    cfg = load_evidence_config(config)
+    initialize_database(cfg.database_path)
+    console.print(f"Initialized evidence database: {cfg.database_path}")
+
+
+@evidence_app.command("ingest")
+def evidence_ingest(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    path: Annotated[Path, typer.Option(help="Artifact root path")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.ingest import ingest_path
+
+    report = ingest_path(load_evidence_config(config), path)
+    console.print(
+        "Ingested "
+        f"{report.artifacts_ingested}/{report.artifacts_seen} artifacts: "
+        f"{report.output_path}"
+    )
+
+
+@evidence_app.command("list-strategies")
+def evidence_list_strategies(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.database import list_strategies
+
+    for strategy_id in list_strategies(load_evidence_config(config).database_path):
+        console.print(strategy_id)
+
+
+@evidence_app.command("scorecard")
+def evidence_scorecard(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    strategy_id: Annotated[str, typer.Option(help="Strategy id")],
+) -> None:
+    import time
+
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.scorecard import build_scorecard, persist_scorecard
+
+    cfg = load_evidence_config(config)
+    scorecard = build_scorecard(cfg, strategy_id)
+    path = persist_scorecard(cfg, scorecard, f"scorecard_{int(time.time())}")
+    console.print(f"Scorecard written: {path}")
+    console.print(f"real_money_ready={str(scorecard.real_money_ready).lower()}")
+
+
+@evidence_app.command("search")
+def evidence_search(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    query: Annotated[str, typer.Option(help="Search query")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.search import search
+
+    for row in search(load_evidence_config(config).database_path, query):
+        console.print(f"{row['strategy_id']}\t{row['artifact_type']}\t{row['path']}")
+
+
+@evidence_app.command("lineage")
+def evidence_lineage(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    strategy_id: Annotated[str, typer.Option(help="Strategy id")],
+) -> None:
+    import time
+
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.lineage import export_lineage
+
+    path = export_lineage(load_evidence_config(config), strategy_id, f"lineage_{int(time.time())}")
+    console.print(f"Lineage written: {path}")
+
+
+@evidence_app.command("dashboard")
+def evidence_dashboard(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.dashboard import build_dashboard
+
+    path = build_dashboard(load_evidence_config(config))
+    console.print(f"Dashboard written: {path}")

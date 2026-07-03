@@ -1,0 +1,13 @@
+minimum_pass_score: 70
+minimum_category_score: 50
+weights:
+  research_quality: 1.2
+  out_of_sample_performance: 1.2
+  robustness: 1.0
+  stress_resilience: 1.0
+  paper_trial_performance: 1.2
+  operational_reliability: 1.0
+  execution_quality: 0.8
+  risk_control: 1.2
+  governance_completeness: 1.0
+  human_review_completeness: 1.0
