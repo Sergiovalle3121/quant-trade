@@ -648,6 +648,81 @@ def broker_reconcile(
     print(f"Reconciliation artifacts: {out}")
 
 
+allocation_app = typer.Typer(help="Paper-only capital allocation simulation commands.")
+allocation_decision_app = typer.Typer(help="Record paper-only allocation governance decisions.")
+allocation_app.add_typer(allocation_decision_app, name="decision")
+app.add_typer(allocation_app, name="allocation")
+
+
+@allocation_app.command("list-candidates")
+def allocation_list_candidates(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+) -> None:
+    from quant_trade.allocation.config import load_allocation_config
+    from quant_trade.allocation.registry import eligible_candidates
+
+    cfg = load_allocation_config(config)
+    candidates, rejected, _ = eligible_candidates(cfg["registry_path"])
+    table = Table(title="Paper allocation candidates (real_money_ready=false)")
+    table.add_column("Strategy ID")
+    table.add_column("Status")
+    table.add_column("Result")
+    for c in candidates:
+        table.add_row(c.strategy_id, c.status, "eligible")
+    for sid, reason in rejected.items():
+        table.add_row(sid, "rejected", reason)
+    console.print(table)
+
+
+@allocation_app.command("run")
+def allocation_run(config: Annotated[Path, typer.Option(help="Allocation YAML config")]) -> None:
+    from quant_trade.allocation.run import run_allocation
+
+    out, result, _, rejected = run_allocation(config)
+    console.print(f"Allocation artifacts: {out}")
+    selected = len(result.allocation.allocations)
+    console.print(f"Selected: {selected} Rejected: {len(rejected)} real_money_ready=false")
+
+
+@allocation_app.command("risk-report")
+def allocation_risk_report(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+) -> None:
+    from quant_trade.allocation.run import run_allocation
+
+    out, result, _, _ = run_allocation(config)
+    console.print(json.dumps(result.risk_report.to_dict(), indent=2))
+    console.print(f"Output path: {out / 'risk_budget_report.json'}")
+
+
+@allocation_app.command("dashboard")
+def allocation_dashboard(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+) -> None:
+    from quant_trade.allocation.run import run_allocation
+
+    out, _, _, _ = run_allocation(config)
+    console.print(f"Dashboard: {out / 'dashboard' / 'index.html'}")
+
+
+@allocation_decision_app.command("record")
+def allocation_decision_record(
+    config: Annotated[Path, typer.Option(help="Allocation YAML config")],
+    strategy_id: Annotated[str, typer.Option()],
+    decision: Annotated[str, typer.Option()],
+    human_notes: Annotated[str, typer.Option()] = "",
+) -> None:
+    from quant_trade.allocation.config import load_allocation_config
+    from quant_trade.allocation.governance import record_decision
+    from quant_trade.allocation.registry import eligible_candidates
+
+    cfg = load_allocation_config(config)
+    candidates, _, _ = eligible_candidates(cfg["registry_path"])
+    evidence = next((c.evidence_paths for c in candidates if c.strategy_id == strategy_id), [])
+    path = record_decision("manual", strategy_id, decision, evidence, human_notes)
+    console.print(f"Recorded paper-only allocation decision: {path}; real_money_approved=false")
+
+
 if __name__ == "__main__":
     app()
 

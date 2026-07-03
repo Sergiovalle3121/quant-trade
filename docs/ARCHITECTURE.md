@@ -37,3 +37,7 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+## Allocation Architecture
+
+`quant_trade.allocation` contains paper-only configuration loading, candidate registry validation, deterministic allocators, correlation analysis, portfolio simulation, governance decision records, reports, and static dashboard generation. It consumes local CSV evidence and emits artifacts only.

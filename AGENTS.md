@@ -53,3 +53,7 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 10 allocation safety
+
+Capital allocation code is simulation/governance only. Keep `real_money_ready=false`, `real_money_enabled=false`, `allow_leverage=false`, and `allow_short=false`. Allocation tests must remain offline and deterministic; missing evidence must fail conservatively.

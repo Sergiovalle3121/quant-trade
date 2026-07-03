@@ -144,3 +144,15 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 ## Phase 9: Paper trading trials
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
+
+## Phase 10: Capital Allocation Simulation
+
+Paper-only portfolio allocation commands live under `quant-trade allocation`. They evaluate approved simulated strategies, preserve cash buffers, enforce no leverage/no shorting/no real-money policy settings, and write offline governance artifacts under `outputs/allocation/<run_id>/`.
+
+Example:
+
+```bash
+quant-trade allocation run --config configs/allocation/conservative_portfolio.yaml
+```
+
+This is simulation/governance only; `real_money_ready=false` and no broker calls or real orders are supported.
