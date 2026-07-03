@@ -1,0 +1,9 @@
+real_money_ready: false
+secret_scan_policy: configs/security/secret_scan_policy.yaml
+config_paths:
+  - configs
+  - deploy
+  - .github/workflows
+audit_paths:
+  - outputs
+  - state

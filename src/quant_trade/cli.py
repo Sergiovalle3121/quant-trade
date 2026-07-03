@@ -26,6 +26,7 @@ from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
 from quant_trade.research.runner import run_experiment
 from quant_trade.research.walk_forward import run_walk_forward
+from quant_trade.security.cli import security_app
 from quant_trade.strategies import STRATEGY_REGISTRY, get_strategy
 
 app = typer.Typer(help="Research-only quantitative trading tooling.")
@@ -42,6 +43,7 @@ app.add_typer(paper_app, name="paper")
 app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
+app.add_typer(security_app, name="security")
 console = Console()
 
 

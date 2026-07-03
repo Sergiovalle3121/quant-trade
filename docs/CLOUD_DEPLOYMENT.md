@@ -10,3 +10,7 @@ Phase 7 supports AWS cloud deployment for PAPER workflows only. No live trading,
 - Activate the kill switch with `quant-trade cloud kill-switch activate --config configs/cloud/local_dry_run.yaml --reason "manual safety"`.
 - Pause schedules in EventBridge, rollback to a prior image tag, rotate leaked secrets immediately, and review any wrong paper orders before re-enabling submission.
 - Control costs with schedule frequency, log retention, Fargate CPU/memory, S3 lifecycle rules, and DynamoDB on-demand locks.
+
+## Phase 18 security hardening
+
+Security, compliance-style, and audit-hardening checks are offline and paper-only. They must not introduce live trading, live broker endpoints, secrets, external scanning-service dependencies, or legal/financial claims. Security reports must keep `real_money_ready=false`.

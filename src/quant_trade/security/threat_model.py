@@ -1,0 +1,1 @@
+from quant_trade.security.reports import threat_model_markdown as threat_model_markdown

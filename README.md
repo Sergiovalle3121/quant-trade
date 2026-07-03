@@ -144,3 +144,7 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 ## Phase 9: Paper trading trials
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
+
+## Phase 18 security hardening
+
+Security, compliance-style, and audit-hardening checks are offline and paper-only. They must not introduce live trading, live broker endpoints, secrets, external scanning-service dependencies, or legal/financial claims. Security reports must keep `real_money_ready=false`.

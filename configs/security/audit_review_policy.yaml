@@ -1,0 +1,7 @@
+audit_paths:
+  - outputs
+  - state
+required_fields:
+  - event_id
+  - timestamp
+  - event_type

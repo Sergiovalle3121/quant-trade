@@ -9,3 +9,7 @@ Before any real-money consideration: independent risk review, endpoint redesign,
 ## Phase 7 cloud paper deployment note
 
 Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.
+
+## Phase 18 security hardening
+
+Security, compliance-style, and audit-hardening checks are offline and paper-only. They must not introduce live trading, live broker endpoints, secrets, external scanning-service dependencies, or legal/financial claims. Security reports must keep `real_money_ready=false`.

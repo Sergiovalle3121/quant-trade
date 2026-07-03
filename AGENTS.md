@@ -53,3 +53,7 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 18 security hardening
+
+Security, compliance-style, and audit-hardening checks are offline and paper-only. They must not introduce live trading, live broker endpoints, secrets, external scanning-service dependencies, or legal/financial claims. Security reports must keep `real_money_ready=false`.
