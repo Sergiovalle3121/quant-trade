@@ -145,14 +145,15 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
 
-## Phase 10: Capital Allocation Simulation
+## Phase 11 Stress Testing + Scenario Lab
 
-Paper-only portfolio allocation commands live under `quant-trade allocation`. They evaluate approved simulated strategies, preserve cash buffers, enforce no leverage/no shorting/no real-money policy settings, and write offline governance artifacts under `outputs/allocation/<run_id>/`.
-
-Example:
+Phase 11 adds a simulation-only stress lab for adverse market, liquidity, gap, benchmark, rate-proxy, strategy-pause, and operational-failure scenarios. It is offline and deterministic by default and never marks output as real-money ready.
 
 ```bash
-quant-trade allocation run --config configs/allocation/conservative_portfolio.yaml
+quant-trade stress list-scenarios --config configs/stress/equity_etf_scenarios.yaml
+quant-trade stress run --config configs/stress/allocation_stress_test.yaml
+quant-trade stress report --config configs/stress/allocation_stress_test.yaml
+quant-trade stress dashboard --config configs/stress/allocation_stress_test.yaml
 ```
 
-This is simulation/governance only; `real_money_ready=false` and no broker calls or real orders are supported.
+See `docs/STRESS_TESTING.md` and `docs/SCENARIO_LAB.md` for safety rules, artifacts, and scenario definitions.

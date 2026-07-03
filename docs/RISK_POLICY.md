@@ -38,6 +38,6 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
 
-## Phase 10 Allocation Risk Policy
+## Phase 11 stress gates
 
-Allocation policy prohibits leverage, shorting, live broker usage, and real-money enablement. Simulated portfolios must preserve configured cash buffers, cap individual strategy weights, flag high correlation, and reject missing evidence conservatively.
+Stress testing is a conservative simulation layer. Required data gaps create warnings and scenario failures. Stress reports include drawdown, daily-loss, liquidity-cost, slippage, exposure, capital-at-risk, and recovery estimates, but `real_money_ready` remains false and no report can approve live trading.
