@@ -37,3 +37,7 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+## Phase 11 stress architecture
+
+`quant_trade.stress` contains configuration loaders, scenario models, deterministic shock transforms, cost/liquidity helpers, suite simulation, report generation, and static dashboard output. The package uses local data only and is wired into the Typer CLI under `quant-trade stress`.

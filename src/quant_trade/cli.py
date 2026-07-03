@@ -34,6 +34,7 @@ research_app = typer.Typer(help="Multi-asset research lab commands.")
 selection_app = typer.Typer(help="Strategy candidate selection commands.")
 paper_app = typer.Typer(help="Local simulated paper-trading commands.")
 broker_app = typer.Typer(help="Safe paper broker integration commands.")
+stress_app = typer.Typer(help="Simulation-only stress testing commands.")
 
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
@@ -42,6 +43,7 @@ app.add_typer(paper_app, name="paper")
 app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
+app.add_typer(stress_app, name="stress")
 console = Console()
 
 
@@ -441,6 +443,58 @@ def paper_from_candidate(
     path = Path("configs/paper") / f"{payload['paper_session_name']}.yaml"
     write_yaml(path, payload)
     console.print(f"Created simulated paper config: {path}")
+
+
+@stress_app.command("list-scenarios")
+def stress_list_scenarios(
+    config: Annotated[Path, typer.Option(help="Stress scenario YAML")],
+) -> None:
+    """List configured simulation-only stress scenarios."""
+    from quant_trade.stress.config import load_stress_scenarios
+
+    table = Table(title="Stress scenarios")
+    table.add_column("Name")
+    table.add_column("Type")
+    table.add_column("Severity")
+    for scenario in load_stress_scenarios(config):
+        table.add_row(scenario.name, scenario.scenario_type, scenario.severity)
+    console.print(table)
+
+
+def _run_stress_suite(config: Path):
+    from quant_trade.stress.config import load_stress_config, load_suite_config
+    from quant_trade.stress.reports import generate_stress_report
+    from quant_trade.stress.simulator import load_stress_data, run_scenario_suite
+
+    policy, scenarios, payload = load_suite_config(config)
+    data = load_stress_data(payload)
+    results = run_scenario_suite(data, scenarios, policy, payload.get("cost_model"))
+    report = generate_stress_report(
+        results, load_stress_config(config), Path(payload.get("output_dir", "outputs/stress"))
+    )
+    console.print(f"Stress run complete: outputs/stress/{report.run_id}")
+    console.print(f"Decision: {report.decision.status}; real_money_ready=false")
+    return report
+
+
+@stress_app.command("run")
+def stress_run(config: Annotated[Path, typer.Option(help="Stress suite YAML")]) -> None:
+    """Run deterministic offline stress scenarios and write artifacts."""
+    _run_stress_suite(config)
+
+
+@stress_app.command("report")
+def stress_report(config: Annotated[Path, typer.Option(help="Stress suite YAML")]) -> None:
+    """Run the stress suite and print a conservative summary."""
+    report = _run_stress_suite(config)
+    console.print(f"Worst scenario: {report.worst_scenario}")
+
+
+@stress_app.command("dashboard")
+def stress_dashboard(config: Annotated[Path, typer.Option(help="Stress suite YAML")]) -> None:
+    """Run the stress suite and print the generated dashboard path."""
+    report = _run_stress_suite(config)
+    console.print(f"Dashboard: outputs/stress/{report.run_id}/dashboard/index.html")
 
 
 def _broker_from_config(config_path: Path, confirm: bool = False):
