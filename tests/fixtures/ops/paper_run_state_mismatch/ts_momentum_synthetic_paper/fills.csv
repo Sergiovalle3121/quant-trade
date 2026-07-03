@@ -1,0 +1,2 @@
+timestamp,fill_id,order_id,client_order_id,symbol,quantity,fill_price,commission
+2026-01-02T00:01:00Z,f1,o1,c1,SPY,5,200.5,0

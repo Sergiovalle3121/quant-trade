@@ -39,3 +39,13 @@ Cloud Paper Deployment + Monitoring: scheduled paper workflow, external secrets,
 ## Phase 7 cloud paper deployment note
 
 Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.
+
+
+## Phase 8 operations safety
+
+- Operations code must never call broker/network in tests.
+- Never expose secrets in dashboard/alerts/incidents.
+- New alert categories need tests.
+- New readiness criteria need docs.
+- Retention deletes require explicit confirmation.
+- No command may imply real-money readiness.

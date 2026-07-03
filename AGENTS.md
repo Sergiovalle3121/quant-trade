@@ -34,3 +34,13 @@ Alpaca support is paper-only. Keep live endpoints, live keys, shorting, leverage
 ## Phase 7 cloud safety
 
 Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentials must be optional, Terraform apply must be manual, and live broker endpoints remain prohibited.
+
+
+## Phase 8 operations safety
+
+- Operations code must never call broker/network in tests.
+- Never expose secrets in dashboard/alerts/incidents.
+- New alert categories need tests.
+- New readiness criteria need docs.
+- Retention deletes require explicit confirmation.
+- No command may imply real-money readiness.

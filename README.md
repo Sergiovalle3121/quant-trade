@@ -130,3 +130,13 @@ This repository now includes conservative candidate selection and a local-only s
 ## Phase 7 cloud paper deployment
 
 Cloud commands are paper-only and default to dry-run behavior. Example: `quant-trade cloud run-job --config configs/cloud/local_dry_run.yaml --job health_check`. AWS templates under `infra/aws/` are review-before-apply and never enable live trading.
+
+
+## Phase 8 operations safety
+
+- Operations code must never call broker/network in tests.
+- Never expose secrets in dashboard/alerts/incidents.
+- New alert categories need tests.
+- New readiness criteria need docs.
+- Retention deletes require explicit confirmation.
+- No command may imply real-money readiness.
