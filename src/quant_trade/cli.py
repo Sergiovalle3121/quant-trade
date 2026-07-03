@@ -969,3 +969,98 @@ def trials_run_review_cycle(
     )
     (out / "warnings.json").write_text(json.dumps(warnings), encoding="utf-8")
     console.print(f"Output path: {out}/review_cycle_summary.json")
+
+
+evidence_app = typer.Typer(help="Local strategy evidence database commands.")
+app.add_typer(evidence_app, name="evidence")
+
+
+@evidence_app.command("init")
+def evidence_init(config: Annotated[Path, typer.Option(help="Evidence YAML config path")]) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.database import initialize_database
+
+    cfg = load_evidence_config(config)
+    initialize_database(cfg.database_path)
+    console.print(f"Initialized evidence database: {cfg.database_path}")
+
+
+@evidence_app.command("ingest")
+def evidence_ingest(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    path: Annotated[Path, typer.Option(help="Artifact root path")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.ingest import ingest_path
+
+    report = ingest_path(load_evidence_config(config), path)
+    console.print(
+        "Ingested "
+        f"{report.artifacts_ingested}/{report.artifacts_seen} artifacts: "
+        f"{report.output_path}"
+    )
+
+
+@evidence_app.command("list-strategies")
+def evidence_list_strategies(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.database import list_strategies
+
+    for strategy_id in list_strategies(load_evidence_config(config).database_path):
+        console.print(strategy_id)
+
+
+@evidence_app.command("scorecard")
+def evidence_scorecard(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    strategy_id: Annotated[str, typer.Option(help="Strategy id")],
+) -> None:
+    import time
+
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.scorecard import build_scorecard, persist_scorecard
+
+    cfg = load_evidence_config(config)
+    scorecard = build_scorecard(cfg, strategy_id)
+    path = persist_scorecard(cfg, scorecard, f"scorecard_{int(time.time())}")
+    console.print(f"Scorecard written: {path}")
+    console.print(f"real_money_ready={str(scorecard.real_money_ready).lower()}")
+
+
+@evidence_app.command("search")
+def evidence_search(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    query: Annotated[str, typer.Option(help="Search query")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.search import search
+
+    for row in search(load_evidence_config(config).database_path, query):
+        console.print(f"{row['strategy_id']}\t{row['artifact_type']}\t{row['path']}")
+
+
+@evidence_app.command("lineage")
+def evidence_lineage(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+    strategy_id: Annotated[str, typer.Option(help="Strategy id")],
+) -> None:
+    import time
+
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.lineage import export_lineage
+
+    path = export_lineage(load_evidence_config(config), strategy_id, f"lineage_{int(time.time())}")
+    console.print(f"Lineage written: {path}")
+
+
+@evidence_app.command("dashboard")
+def evidence_dashboard(
+    config: Annotated[Path, typer.Option(help="Evidence YAML config path")],
+) -> None:
+    from quant_trade.evidence.config import load_evidence_config
+    from quant_trade.evidence.dashboard import build_dashboard
+
+    path = build_dashboard(load_evidence_config(config))
+    console.print(f"Dashboard written: {path}")

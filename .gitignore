@@ -34,3 +34,6 @@ outputs/
 data/cache/
 data/raw/
 data/processed/
+
+# Local evidence databases
+data/evidence/*.sqlite

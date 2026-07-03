@@ -1,0 +1,4 @@
+database_path: data/evidence/quant_trade_evidence.sqlite
+output_dir: outputs
+scorecard_policy_path: configs/evidence/scorecard_policy_conservative.yaml
+max_artifact_bytes: 1000000
