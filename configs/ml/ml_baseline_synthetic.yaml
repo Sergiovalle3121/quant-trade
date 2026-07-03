@@ -1,0 +1,16 @@
+run_id: synthetic_ml_baseline
+output_root: outputs/ml
+provider: synthetic
+symbols: [AAA, BBB, CCC]
+start: '2020-01-01'
+end: '2021-01-01'
+interval: 1d
+seed: 42
+horizon_days: 5
+train_fraction: 0.7
+embargo_days: 1
+model: simple_rank_model
+prediction_bucket_count: 5
+top_fraction: 0.34
+initial_cash: 100000.0
+real_money_ready: false

@@ -13,3 +13,8 @@ Future research tracks:
 ## Phase 4 research lab
 
 Use the multi-asset research CLI for daily liquid ETF/equity studies. Treat all included strategies as transparent baselines for research, not production alpha. Always compare with benchmarks and inspect robustness artifacts before considering Phase 5 paper-trading readiness.
+
+
+## Phase 13 Safe ML Alpha Lab
+
+Supervised ML baselines may be evaluated as research signals only after leakage checks, chronological out-of-sample validation, and explicit model-risk documentation. They must not be promoted automatically or treated as live-trading evidence.

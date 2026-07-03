@@ -144,3 +144,8 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 ## Phase 9: Paper trading trials
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
+
+
+## Phase 13 Safe ML Alpha Lab
+
+The repository includes a research-only supervised ML alpha lab with deterministic synthetic-data examples, past-only features, forward labels, chronological validation, leakage reports, and static dashboards. Run `quant-trade ml run --config configs/ml/ml_baseline_synthetic.yaml`. It does not support live trading, broker orders, auto-deployment, reinforcement learning, deep learning, or real-money readiness; ML artifacts always set `real_money_ready=false`. See `docs/ML_ALPHA_LAB.md` and `docs/ML_LEAKAGE_PREVENTION.md`.

@@ -37,3 +37,8 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 ## Phase 9 paper trial management
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
+
+
+## Safe ML Alpha Lab
+
+`quant_trade.ml` contains offline supervised-learning research components: feature generation, forward labels, chronological splits, leakage checks, simple baselines, evaluation, reports, and a static dashboard. The package uses lazy optional scikit-learn imports so the base install remains lightweight.

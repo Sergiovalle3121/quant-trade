@@ -53,3 +53,10 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 13 ML alpha lab safety
+
+- ML code is supervised, offline, and research-only.
+- Do not add reinforcement learning, deep learning, online learning, auto-deployment, broker calls, live trading, or real-money readiness.
+- ML features must be past-only, labels forward-shifted, splits chronological, and tests deterministic/offline.
+- ML artifacts must keep `real_money_ready=false` and avoid profitability claims.

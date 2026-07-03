@@ -1,0 +1,8 @@
+research_only: true
+leakage_policy:
+  chronological_split_required: true
+  random_shuffle_allowed: false
+  labels_must_shift_forward: true
+  embargo_days_default: 1
+  auto_promotion_allowed: false
+real_money_ready: false

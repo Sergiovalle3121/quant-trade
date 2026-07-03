@@ -1,0 +1,14 @@
+research_only: true
+feature_policy:
+  use_only_past_data: true
+  prohibited_columns: [future_return, forward_return, label, target, next_return]
+  allowed_features:
+    - lagged returns
+    - rolling volatility
+    - rolling momentum
+    - SMA distance
+    - volume change
+    - drawdown from rolling high
+    - market return lag
+    - cross-sectional ranks
+real_money_ready: false

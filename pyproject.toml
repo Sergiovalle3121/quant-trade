@@ -18,6 +18,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ml = [
+  "scikit-learn>=1.4",
+]
+
 cloud = [
   "boto3>=1.34",
 ]
