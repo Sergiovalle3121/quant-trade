@@ -31,3 +31,7 @@ Adds multi-asset daily research workflows, benchmark comparisons, robustness dia
 ## Phase 5
 
 Implemented strategy selection, promotion checks, simulated paper replay, risk guardrails, local state, audit logs, and monitoring reports. Phase 6 should prepare real paper broker integration separately while still prohibiting real-money trading.
+
+## Recommended Phase 7
+
+Cloud Paper Deployment + Monitoring: scheduled paper workflow, external secrets, alerts, health checks, dashboards, backup/audit retention, and no real-money trading.

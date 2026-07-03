@@ -1,0 +1,17 @@
+provider: simulated
+mode: simulated
+base_url: https://paper-api.alpaca.markets
+dry_run_default: true
+confirm_required: true
+asset_class: equities
+allow_fractional: true
+allow_short: false
+allow_leverage: false
+max_notional_per_order: 1000
+max_orders_per_day: 20
+max_gross_exposure: 1.0
+max_symbol_weight: 0.25
+min_cash_pct: 0.02
+universe: ["SPY", "QQQ", "IWM", "TLT", "GLD"]
+audit_dir: audits/broker
+state_dir: state/broker

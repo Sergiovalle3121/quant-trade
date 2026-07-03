@@ -27,3 +27,10 @@ data/cache/
 data/raw/
 data/processed/
 .env
+
+audits/
+state/
+outputs/
+data/cache/
+data/raw/
+data/processed/

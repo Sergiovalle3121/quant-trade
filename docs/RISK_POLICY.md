@@ -15,3 +15,7 @@ A strategy cannot move to paper trading unless CI is green, it beats benchmark o
 ## Simulated paper risk guardrails
 
 Phase 5 enforces local risk limits for gross exposure, max asset weight, turnover, cash, leverage, shorting, order counts, and total drawdown kill switches. Broker connectivity is intentionally absent.
+
+## Broker Paper Guardrails
+
+Phase 6 rejects live mode, live-like endpoints, shorting, leverage, unsupported assets, oversized orders, and ambiguous configuration. Paper order submission requires explicit confirmation flags.

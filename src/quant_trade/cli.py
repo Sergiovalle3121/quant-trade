@@ -31,10 +31,12 @@ data_app = typer.Typer(help="Historical data ingestion and validation.")
 research_app = typer.Typer(help="Multi-asset research lab commands.")
 selection_app = typer.Typer(help="Strategy candidate selection commands.")
 paper_app = typer.Typer(help="Local simulated paper-trading commands.")
+broker_app = typer.Typer(help="Safe paper broker integration commands.")
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
 app.add_typer(selection_app, name="selection")
 app.add_typer(paper_app, name="paper")
+app.add_typer(broker_app, name="broker")
 console = Console()
 
 
@@ -434,6 +436,211 @@ def paper_from_candidate(
     path = Path("configs/paper") / f"{payload['paper_session_name']}.yaml"
     write_yaml(path, payload)
     console.print(f"Created simulated paper config: {path}")
+
+
+def _broker_from_config(config_path: Path, confirm: bool = False):
+    from quant_trade.execution.alpaca_paper import AlpacaPaperBroker
+    from quant_trade.execution.config import load_broker_config
+    from quant_trade.execution.simulated_broker import SimulatedBroker
+
+    cfg = load_broker_config(config_path)
+    if cfg.provider == "simulated":
+        return cfg, SimulatedBroker()
+    return cfg, AlpacaPaperBroker(cfg, confirm_paper_order=confirm)
+
+
+@broker_app.command("check")
+def broker_check(config: Annotated[Path, typer.Option(help="Broker YAML config")]) -> None:
+    from quant_trade.execution.config import load_broker_config
+
+    cfg = load_broker_config(config)
+    missing = []
+    if cfg.provider == "alpaca_paper":
+        import os
+
+        for name in ("ALPACA_PAPER_API_KEY", "ALPACA_PAPER_SECRET_KEY"):
+            if not os.getenv(name):
+                missing.append(name)
+    console.print(
+        json.dumps(
+            {
+                "ok": True,
+                "provider": cfg.provider,
+                "mode": cfg.mode,
+                "paper": True,
+                "missing_credentials": missing,
+            },
+            indent=2,
+        )
+    )
+
+
+@broker_app.command("account")
+def broker_account(config: Annotated[Path, typer.Option(help="Broker YAML config")]) -> None:
+    _, broker = _broker_from_config(config)
+    console.print(json.dumps(broker.get_account().to_dict(), indent=2))
+
+
+@broker_app.command("positions")
+def broker_positions(config: Annotated[Path, typer.Option(help="Broker YAML config")]) -> None:
+    _, broker = _broker_from_config(config)
+    console.print(json.dumps([p.to_dict() for p in broker.get_positions()], indent=2))
+
+
+@broker_app.command("orders")
+def broker_orders(config: Annotated[Path, typer.Option(help="Broker YAML config")]) -> None:
+    _, broker = _broker_from_config(config)
+    console.print(json.dumps([o.to_dict() for o in broker.get_open_orders()], indent=2))
+
+
+@broker_app.command("cancel-all")
+def broker_cancel_all(
+    config: Annotated[Path, typer.Option(help="Broker YAML config")],
+    confirm_paper_cancel: Annotated[bool, typer.Option("--confirm-paper-cancel")] = False,
+) -> None:
+    if not confirm_paper_cancel:
+        raise typer.BadParameter("--confirm-paper-cancel is required")
+    _, broker = _broker_from_config(config)
+    broker.cancel_all_orders()
+    console.print("Paper cancel-all completed")
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+@broker_app.command("plan")
+def broker_plan(
+    paper_config: Annotated[Path, typer.Option(help="Existing simulated paper config")],
+    broker_config: Annotated[Path, typer.Option(help="Broker YAML config")],
+) -> None:
+    import csv
+    import uuid
+    from datetime import UTC, datetime
+
+    from quant_trade.execution.broker import BrokerAccount
+    from quant_trade.execution.config import load_broker_config
+    from quant_trade.execution.order_mapper import paper_order_to_broker_order_request
+    from quant_trade.execution.safety import validate_order_safety
+    from quant_trade.paper.config import load_paper_config
+    from quant_trade.paper.models import PaperOrder
+
+    pcfg = load_paper_config(paper_config)
+    bcfg = load_broker_config(broker_config)
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    out = Path("outputs/broker_plans") / pcfg.paper_session_name / run_id
+    symbol = (bcfg.universe or pcfg.universe.get("symbols") or ["SPY"])[0]
+    paper_order = PaperOrder(
+        order_id=uuid.uuid4().hex,
+        timestamp=run_id,
+        symbol=symbol,
+        side="buy",
+        quantity=1.0,
+        reason="phase6 dry-run plan sample",
+    )
+    req = paper_order_to_broker_order_request(paper_order, bcfg)
+    account = BrokerAccount(
+        bcfg.provider,
+        "local****",
+        "USD",
+        pcfg.initial_cash,
+        pcfg.initial_cash,
+        pcfg.initial_cash,
+        "planning",
+        True,
+    )
+    risk = validate_order_safety(req, bcfg, account)
+    _write_json(out / "proposed_orders.json", [req.to_dict()])
+    _write_json(out / "risk_checks.json", [risk])
+    _write_json(
+        out / "dry_run_results.json",
+        [{"client_order_id": req.client_order_id, "status": "dry_run"}],
+    )
+    (out / "broker_config_used.yaml").write_text(
+        yaml.safe_dump(bcfg.to_dict(), sort_keys=False), encoding="utf-8"
+    )
+    with (out / "proposed_orders.csv").open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(req.to_dict()))
+        writer.writeheader()
+        writer.writerow(req.to_dict())
+    (out / "plan_summary.md").write_text(
+        f"# Broker Plan\n\nRun: {run_id}\n\nDry-run only; no broker network calls.\n",
+        encoding="utf-8",
+    )
+    print(f"Broker plan created: {out}")
+
+
+@broker_app.command("submit-plan")
+def broker_submit_plan(
+    plan_dir: Annotated[Path, typer.Option(help="Plan directory")],
+    broker_config: Annotated[Path, typer.Option(help="Broker YAML config")],
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+    confirm_paper_order: Annotated[bool, typer.Option("--confirm-paper-order")] = False,
+    execute_paper: Annotated[bool, typer.Option("--execute-paper")] = False,
+) -> None:
+    import csv
+    import uuid
+    from datetime import UTC, datetime
+
+    from quant_trade.execution.broker import BrokerOrderRequest
+
+    if not plan_dir.exists() or not (plan_dir / "proposed_orders.json").exists():
+        raise typer.BadParameter("invalid plan directory")
+    if not dry_run and not (confirm_paper_order and execute_paper):
+        raise typer.BadParameter("use --dry-run or both --confirm-paper-order and --execute-paper")
+    cfg, broker = _broker_from_config(broker_config, confirm=confirm_paper_order)
+    rows = json.loads((plan_dir / "proposed_orders.json").read_text(encoding="utf-8"))
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    out = Path("outputs/broker_submissions") / plan_dir.parent.name / run_id
+    submitted = []
+    rejected = []
+    for row in rows:
+        row["dry_run"] = bool(dry_run)
+        req = BrokerOrderRequest(**row)
+        try:
+            submitted.append(broker.submit_order(req).to_dict())
+        except Exception as exc:
+            rejected.append({"client_order_id": req.client_order_id, "reason": str(exc)})
+    _write_json(out / "submitted_orders.json", submitted)
+    _write_json(out / "rejected_orders.json", rejected)
+    _write_json(out / "broker_responses.json", {"submitted": submitted, "rejected": rejected})
+    _write_json(out / "submission_audit.jsonl", {"provider": cfg.provider, "dry_run": dry_run})
+    with (out / "submitted_orders.csv").open("w", newline="", encoding="utf-8") as fh:
+        if submitted:
+            writer = csv.DictWriter(fh, fieldnames=list(submitted[0]))
+            writer.writeheader()
+            writer.writerows(submitted)
+    (out / "submission_summary.md").write_text(
+        f"# Broker Submission\n\nSubmitted: {len(submitted)}\nRejected: {len(rejected)}\n",
+        encoding="utf-8",
+    )
+    print(f"Broker submission artifacts: {out}")
+
+
+@broker_app.command("reconcile")
+def broker_reconcile(
+    config: Annotated[Path, typer.Option(help="Broker YAML config")],
+    state_path: Annotated[Path, typer.Option(help="Local paper latest_state.json")],
+) -> None:
+    import uuid
+    from datetime import UTC, datetime
+
+    from quant_trade.execution.reconciliation import reconcile_paper_state_with_broker
+    from quant_trade.paper.state import load_state
+
+    _, broker = _broker_from_config(config)
+    report = reconcile_paper_state_with_broker(
+        load_state(state_path), broker.get_account(), broker.get_positions()
+    )
+    out = Path("outputs/reconciliation") / (
+        datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    )
+    _write_json(out / "reconciliation.json", report.to_dict())
+    (out / "reconciliation_summary.md").write_text(
+        f"# Reconciliation\n\nPassed: {report.passed}\n", encoding="utf-8"
+    )
+    print(f"Reconciliation artifacts: {out}")
 
 
 if __name__ == "__main__":
