@@ -25,3 +25,7 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 - New readiness criteria need docs.
 - Retention deletes require explicit confirmation.
 - No command may imply real-money readiness.
+
+## Phase 9 paper trial management
+
+Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.

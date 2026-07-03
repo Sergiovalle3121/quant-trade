@@ -1,0 +1,3 @@
+trial_id,date,paper_session_id,equity,cash,daily_return,cumulative_return,drawdown,benchmark_return,excess_return,orders_count,fills_count,rejected_orders_count,turnover,gross_exposure,max_position_weight,slippage_bps,risk_events_count,open_incidents_count,heartbeat_status,reconciliation_status,kill_switch_active,notes
+sample,2026-06-01,sample_paper,100000,2000,0,0,0,0,0,2,2,0,0.05,1,0.3,2,0,0,ok,pass,false,
+sample,2026-06-02,sample_paper,98000,2100,-0.02,-0.02,-0.02,0.001,-0.021,2,2,0,0.25,1,0.3,12,0,0,ok,pass,false,

@@ -17,3 +17,7 @@ Daily checklist:
 10. Confirm kill switch status.
 
 Paper fills are not proof of profitability. They can be optimistic, stale, partially missing, or operationally inconsistent. Critical alerts require stopping promotion work, preserving artifacts, opening or updating an incident, running reconciliation, and documenting manual review notes.
+
+## Phase 9 paper trial management
+
+Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.

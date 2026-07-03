@@ -1,0 +1,72 @@
+policy_path: configs/trials/trial_policy_conservative.yaml
+trials:
+  - trial_id: ts_momentum_90d
+    display_name: Time-Series Momentum 90-Day Paper Trial
+    status: active
+    candidate_id: ts_momentum_candidate
+    paper_session_id: ts_momentum_synthetic_paper
+    strategy_name: ts_momentum
+    strategy_params: {lookback_days: 63}
+    universe: [SPY, QQQ, TLT]
+    benchmark: SPY
+    paper_config_path: configs/paper/ts_momentum_synthetic.yaml
+    ops_config_path: configs/ops/paper_ops.yaml
+    research_run_dir: tests/fixtures/trials/research_run_good
+    start_date: '2026-06-01'
+    planned_end_date: '2026-08-30'
+    trial_length_days: 90
+    review_frequency: weekly
+    timezone: UTC
+    owner: research
+    reviewer: operations
+    initial_paper_equity: 100000.0
+    expected_rebalance_frequency: monthly
+    expected_turnover_range: [0.02, 0.20]
+    tags: [phase9, paper-only]
+    notes: Paper-only trial; no real-money approval.
+  - trial_id: ma_trend_90d
+    display_name: Moving Average Trend 90-Day Paper Trial
+    status: planned
+    paper_session_id: ma_trend_synthetic_paper
+    strategy_name: ma_trend
+    strategy_params: {fast_window: 20, slow_window: 100}
+    universe: [SPY, EFA, TLT]
+    benchmark: SPY
+    paper_config_path: configs/paper/ma_trend_synthetic.yaml
+    ops_config_path: configs/ops/paper_ops.yaml
+    research_run_dir: tests/fixtures/trials/research_run_good
+    start_date: '2026-07-01'
+    planned_end_date: '2026-09-29'
+    trial_length_days: 90
+    review_frequency: weekly
+    timezone: UTC
+    owner: research
+    reviewer: operations
+    initial_paper_equity: 100000.0
+    expected_rebalance_frequency: monthly
+    expected_turnover_range: [0.02, 0.25]
+    tags: [phase9, paper-only]
+    notes: Planned paper-only trial.
+  - trial_id: equal_weight_60d
+    display_name: Equal Weight 60-Day Paper Trial
+    status: planned
+    paper_session_id: equal_weight_synthetic_paper
+    strategy_name: equal_weight
+    strategy_params: {rebalance: monthly}
+    universe: [SPY, QQQ, TLT]
+    benchmark: SPY
+    paper_config_path: configs/paper/equal_weight_synthetic.yaml
+    ops_config_path: configs/ops/paper_ops.yaml
+    research_run_dir: tests/fixtures/trials/research_run_good
+    start_date: '2026-07-01'
+    planned_end_date: '2026-08-30'
+    trial_length_days: 60
+    review_frequency: monthly
+    timezone: UTC
+    owner: research
+    reviewer: operations
+    initial_paper_equity: 100000.0
+    expected_rebalance_frequency: monthly
+    expected_turnover_range: [0.01, 0.15]
+    tags: [phase9, paper-only]
+    notes: Planned paper-only trial.
