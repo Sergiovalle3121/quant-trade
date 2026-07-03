@@ -650,3 +650,322 @@ def broker_reconcile(
 
 if __name__ == "__main__":
     app()
+
+trials_app = typer.Typer(help="Paper-only trial management commands.")
+review_trials_app = typer.Typer(help="Generate trial review packs.")
+decision_trials_app = typer.Typer(help="Recommend and record paper-only trial decisions.")
+trials_app.add_typer(review_trials_app, name="review")
+trials_app.add_typer(decision_trials_app, name="decision")
+app.add_typer(trials_app, name="trials")
+
+
+def _load_trial_and_policy(config: Path, trial_id: str):
+    from quant_trade.trials.config import load_trial_policy
+    from quant_trade.trials.registry import get_trial, load_trial_registry
+
+    reg = load_trial_registry(config)
+    return reg, get_trial(reg, trial_id), load_trial_policy(reg.get("policy_path"))
+
+
+@trials_app.command("list")
+def trials_list(
+    config: Annotated[Path, typer.Option(help="Trial registry YAML")] = Path(
+        "configs/trials/trial_registry.yaml"
+    ),
+) -> None:
+    from quant_trade.trials.registry import list_trials, load_trial_registry
+
+    reg = load_trial_registry(config)
+    table = Table(title="Paper-only strategy trials (real_money_ready=false)")
+    for col in ["Trial", "Status", "Strategy", "Session"]:
+        table.add_column(col)
+    for t in list_trials(reg):
+        table.add_row(t.trial_id, t.status, t.strategy_name, t.paper_session_id)
+    console.print(table)
+    console.print("Registry snapshot: outputs/trials/registry/trial_registry_snapshot.json")
+
+
+@trials_app.command("show")
+def trials_show(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    console.print(json.dumps(t.to_dict(), indent=2, default=str))
+    console.print("real_money_ready=false")
+
+
+@trials_app.command("status")
+def trials_status(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    console.print(f"{t.trial_id}: {t.status}; paper-only; real_money_ready=false")
+
+
+@trials_app.command("collect")
+def trials_collect(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.tracker import collect_daily_records
+
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    rec = collect_daily_records(t)
+    console.print(
+        f"Collected {len(rec)} records. Output path: outputs/trials/{trial_id}/daily_records.csv"
+    )
+
+
+@trials_app.command("performance")
+def trials_performance(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.performance import calculate_trial_performance
+    from quant_trade.trials.tracker import collect_daily_records
+
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    perf = calculate_trial_performance(collect_daily_records(t))
+    console.print(json.dumps(perf, indent=2, default=str))
+    console.print(f"Output path: outputs/trials/{trial_id}/daily_records.csv")
+
+
+@trials_app.command("drift")
+def trials_drift(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.drift import analyze_drift, write_drift_report
+    from quant_trade.trials.expectations import load_expectations_from_research_artifacts
+    from quant_trade.trials.performance import calculate_trial_performance
+    from quant_trade.trials.tracker import collect_daily_records
+
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    rep = analyze_drift(
+        t,
+        calculate_trial_performance(collect_daily_records(t)),
+        load_expectations_from_research_artifacts(t.research_run_dir),
+    )
+    p = write_drift_report(rep, Path("outputs/trials") / trial_id / "drift_report.json")
+    console.print(json.dumps(rep.to_dict(), indent=2))
+    console.print(f"Output path: {p}")
+
+
+def _review_cmd(kind: str, trial_id: str, config: Path) -> None:
+    from quant_trade.trials.review import generate_review_pack
+
+    _, t, pol = _load_trial_and_policy(config, trial_id)
+    out = generate_review_pack(
+        t, f"{kind}_review" if kind != "final" else "final_trial_review", pol
+    )
+    console.print(f"Generated paper-only review pack. Output path: {out}")
+
+
+@review_trials_app.command("weekly")
+def trials_review_weekly(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    _review_cmd("weekly", trial_id, config)
+
+
+@review_trials_app.command("monthly")
+def trials_review_monthly(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    _review_cmd("monthly", trial_id, config)
+
+
+@review_trials_app.command("final")
+def trials_review_final(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    _review_cmd("final", trial_id, config)
+
+
+@decision_trials_app.command("recommend")
+def trials_decision_recommend(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.decisions import recommend_decision, record_decision
+    from quant_trade.trials.drift import analyze_drift
+    from quant_trade.trials.performance import calculate_trial_performance
+    from quant_trade.trials.tracker import collect_daily_records
+
+    _, t, pol = _load_trial_and_policy(config, trial_id)
+    perf = calculate_trial_performance(collect_daily_records(t))
+    dec = recommend_decision(
+        {
+            "trial_id": trial_id,
+            "performance_summary": perf,
+            "drift_report": analyze_drift(t, perf).to_dict(),
+            "evidence_paths": [],
+        },
+        pol,
+    )
+    p = record_decision(dec)
+    console.print(json.dumps(dec.to_dict(), indent=2))
+    console.print(f"Output path: {p}")
+
+
+@decision_trials_app.command("record")
+def trials_decision_record(
+    trial_id: Annotated[str, typer.Option()],
+    decision: Annotated[str, typer.Option()],
+    human_notes: Annotated[str, typer.Option()] = "",
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.decisions import DecisionRecord, record_decision
+
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    rec = DecisionRecord(
+        f"manual_{trial_id}",
+        t.trial_id,
+        decision,
+        "Human paper-only decision.",
+        [],
+        [],
+        [],
+        t.reviewer,
+        human_notes,
+        real_money_approved=False,
+    )
+    p = record_decision(rec)
+    console.print(f"Recorded decision real_money_approved=false. Output path: {p}")
+
+
+@trials_app.command("due")
+def trials_due(
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from datetime import date
+
+    from quant_trade.trials.registry import load_trial_registry
+    from quant_trade.trials.schedule import reviews_due
+
+    reg = load_trial_registry(config)
+    due = reviews_due(reg, date.today())
+    console.print(json.dumps([t.trial_id for t in due], indent=2))
+    console.print("real_money_ready=false")
+
+
+@trials_app.command("calendar")
+def trials_calendar(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.schedule import generate_review_calendar
+
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    p = generate_review_calendar(t)
+    console.print(f"Output path: {p}")
+
+
+@trials_app.command("evidence")
+def trials_evidence(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.evidence import build_evidence_index, write_evidence_index
+
+    _, t, _ = _load_trial_and_policy(config, trial_id)
+    p = write_evidence_index(build_evidence_index(t), Path("outputs/trials") / trial_id)
+    console.print(f"Output path: {p}")
+
+
+@trials_app.command("dashboard")
+def trials_dashboard(
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.dashboard import generate_trial_dashboard
+    from quant_trade.trials.registry import load_trial_registry
+
+    p = generate_trial_dashboard(load_trial_registry(config))
+    console.print(f"Output path: {p}/index.html")
+
+
+@trials_app.command("archive")
+def trials_archive(
+    trial_id: Annotated[str, typer.Option()],
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    from quant_trade.trials.archive import archive_trial
+
+    _load_trial_and_policy(config, trial_id)
+    p = archive_trial(trial_id)
+    console.print(f"Output path: {p}")
+
+
+@trials_app.command("run-review-cycle")
+def trials_run_review_cycle(
+    config: Annotated[Path, typer.Option()] = Path("configs/trials/trial_registry.yaml"),
+) -> None:
+    import csv
+
+    from quant_trade.trials.dashboard import generate_trial_dashboard
+    from quant_trade.trials.decisions import recommend_decision
+    from quant_trade.trials.drift import analyze_drift
+    from quant_trade.trials.models import utc_now
+    from quant_trade.trials.performance import calculate_trial_performance
+    from quant_trade.trials.registry import find_trials_by_status, load_trial_registry
+    from quant_trade.trials.review import generate_review_pack
+    from quant_trade.trials.tracker import collect_daily_records
+
+    reg = load_trial_registry(config)
+    run_id = utc_now().replace(":", "").split(".")[0]
+    out = Path("outputs/trials/review_cycles") / run_id
+    out.mkdir(parents=True, exist_ok=True)
+    processed = []
+    decisions = []
+    reviews = []
+    warnings: list[str] = []
+    for t in find_trials_by_status(reg, "active"):
+        perf = calculate_trial_performance(collect_daily_records(t))
+        dr = analyze_drift(t, perf)
+        dec = recommend_decision(
+            {
+                "trial_id": t.trial_id,
+                "performance_summary": perf,
+                "drift_report": dr.to_dict(),
+                "evidence_paths": [],
+            },
+            __import__("quant_trade.trials.models", fromlist=["TrialPolicy"]).TrialPolicy(),
+        )
+        rp = generate_review_pack(t, "weekly_review")
+        processed.append(t.trial_id)
+        decisions.append(dec.to_dict())
+        reviews.append(str(rp))
+    dash = generate_trial_dashboard(reg)
+    (out / "review_cycle_summary.json").write_text(
+        json.dumps(
+            {
+                "trials_processed": processed,
+                "decisions_recommended": decisions,
+                "reviews_generated": reviews,
+                "dashboard": str(dash),
+                "real_money_ready": False,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (out / "review_cycle_summary.md").write_text(
+        "# Review Cycle Summary\n\nPaper-only. real_money_ready=false.\n", encoding="utf-8"
+    )
+    for name, rows in [("trials_processed.csv", processed), ("reviews_generated.csv", reviews)]:
+        with (out / name).open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["value"])
+            [w.writerow([x]) for x in rows]
+    (out / "decisions_recommended.csv").write_text(
+        "trial_id,decision,real_money_approved\n"
+        + "\n".join(f"{d['trial_id']},{d['decision']},false" for d in decisions),
+        encoding="utf-8",
+    )
+    (out / "warnings.json").write_text(json.dumps(warnings), encoding="utf-8")
+    console.print(f"Output path: {out}/review_cycle_summary.json")

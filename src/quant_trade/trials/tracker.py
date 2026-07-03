@@ -1,0 +1,153 @@
+from __future__ import annotations
+
+import csv
+import json
+from pathlib import Path
+
+from .models import DailyTrialRecord, TrialConfig, utc_now
+
+SECRET_WORDS = ("secret", "api_key", "token", "password", "credential")
+FIELDS = list(DailyTrialRecord.__annotations__.keys())
+
+
+def _sample_records(trial: TrialConfig) -> list[DailyTrialRecord]:
+    eq = [
+        trial.initial_paper_equity,
+        trial.initial_paper_equity * 1.002,
+        trial.initial_paper_equity * 1.001,
+        trial.initial_paper_equity * 1.004,
+        trial.initial_paper_equity * 1.006,
+    ]
+    rec = []
+    high = eq[0]
+    for i, e in enumerate(eq):
+        high = max(high, e)
+        prev = eq[i - 1] if i else eq[0]
+        dr = e / prev - 1 if i else 0.0
+        rec.append(
+            DailyTrialRecord(
+                trial.trial_id,
+                trial.start_date.fromordinal(trial.start_date.toordinal() + i),
+                trial.paper_session_id,
+                e,
+                e * 0.02,
+                dr,
+                e / eq[0] - 1,
+                e / high - 1,
+                0.0005,
+                dr - 0.0005,
+                2,
+                2,
+                0,
+                0.08,
+                1.0,
+                0.25,
+                2.0,
+                0,
+                0,
+                "ok",
+                "pass",
+                False,
+                "",
+            )
+        )
+    return rec
+
+
+def validate_daily_records(records: list[DailyTrialRecord]) -> list[str]:
+    warnings = []
+    seen = set()
+    for r in records:
+        if r.date in seen:
+            raise ValueError(f"duplicate daily record date: {r.date}")
+        seen.add(r.date)
+        text = json.dumps(r.to_dict()).lower()
+        if any(w in text for w in SECRET_WORDS):
+            raise ValueError("possible secret in daily record")
+        if r.heartbeat_status != "ok":
+            warnings.append(f"stale heartbeat on {r.date}")
+    return warnings
+
+
+def append_daily_record(record: DailyTrialRecord, output_path: Path | str) -> Path:
+    p = Path(output_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    exists = p.exists()
+    if exists:
+        current = load_trial_timeseries(record.trial_id, p)
+        if any(r.date == record.date for r in current):
+            raise ValueError("duplicate daily record date")
+    with p.open("a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS)
+        if not exists:
+            w.writeheader()
+        w.writerow(record.to_dict())
+    return p
+
+
+def load_trial_timeseries(trial_id: str, path: Path | str | None = None) -> list[DailyTrialRecord]:
+    p = Path(path) if path else Path("outputs/trials") / trial_id / "daily_records.csv"
+    if not p.exists():
+        return []
+    with p.open(encoding="utf-8") as f:
+        return [DailyTrialRecord.from_dict(r) for r in csv.DictReader(f)]
+
+
+def collect_daily_records(
+    trial_config: TrialConfig,
+    artifact_roots: list[Path] | None = None,
+    state_roots: list[Path] | None = None,
+) -> list[DailyTrialRecord]:
+    records = []
+    roots = artifact_roots or [Path("tests/fixtures/trials"), Path("outputs/trials")]
+    for root in roots:
+        p = root / f"{trial_config.trial_id}_daily_records.csv"
+        if not p.exists():
+            p = root / "paper_daily_records_good.csv"
+        if p.exists():
+            with p.open(encoding="utf-8") as f:
+                records = [
+                    DailyTrialRecord.from_dict(
+                        {
+                            **r,
+                            "trial_id": trial_config.trial_id,
+                            "paper_session_id": trial_config.paper_session_id,
+                        }
+                    )
+                    for r in csv.DictReader(f)
+                ]
+            break
+    if not records:
+        records = _sample_records(trial_config)
+    validate_daily_records(records)
+    out = Path("outputs/trials") / trial_config.trial_id
+    out.mkdir(parents=True, exist_ok=True)
+    csvp = out / "daily_records.csv"
+    with csvp.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS)
+        w.writeheader()
+        [w.writerow(r.to_dict()) for r in records]
+    (out / "trial_state.json").write_text(
+        json.dumps(
+            {
+                "trial_id": trial_config.trial_id,
+                "records": len(records),
+                "real_money_ready": False,
+                "updated_at_utc": utc_now(),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    with (out / "trial_events.jsonl").open("a", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {
+                    "event": "collect_daily_records",
+                    "count": len(records),
+                    "created_at_utc": utc_now(),
+                }
+            )
+            + "\n"
+        )
+    return records

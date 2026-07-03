@@ -44,3 +44,12 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - New readiness criteria need docs.
 - Retention deletes require explicit confirmation.
 - No command may imply real-money readiness.
+
+## Phase 9 trial-management safety
+
+- Trial code must never approve real-money trading.
+- Review packs must always include a paper-only warning.
+- Decision records must always set `real_money_approved=false`.
+- Missing evidence should fail conservative checks.
+- New decision statuses require tests and docs.
+- No secrets in trial artifacts.
