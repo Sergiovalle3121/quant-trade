@@ -144,3 +144,8 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 ## Phase 9: Paper trading trials
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
+
+
+## Phase 15: Data Lake v2 + Dataset Versioning
+
+The project now includes a research-only versioned data lake (`quant-trade datalake ...`) for local CSV registration, immutable versions, snapshots, contracts, quality reports, provider comparison utilities, lineage artifacts, and a static dashboard. Generated market data artifacts remain ignored by git and are not approved for live trading. See `docs/DATA_LAKE.md`, `docs/DATASET_VERSIONING.md`, and `docs/DATA_CONTRACTS.md`.

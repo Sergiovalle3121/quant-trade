@@ -1,0 +1,17 @@
+lake_root: data/lake
+outputs_root: outputs/datalake
+registry_dir: data/lake/registry
+manifests_dir: data/lake/manifests
+snapshots_dir: data/lake/snapshots
+datasets_dir: data/lake/datasets
+quality_reports_dir: data/lake/quality_reports
+dataset:
+  dataset_id: sample_daily_etf
+  name: Sample Daily ETF Dataset
+  symbols: [SPY]
+  asset_class: etf
+  provider: local_csv
+  interval: 1d
+  start: '2020-01-01'
+  end: '2020-01-03'
+  adjusted: true

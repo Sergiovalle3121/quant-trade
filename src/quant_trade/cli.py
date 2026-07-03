@@ -20,6 +20,7 @@ from quant_trade.data.providers import get_data_provider
 from quant_trade.data.quality import generate_quality_report
 from quant_trade.data.requests import HistoricalDataRequest
 from quant_trade.data.validation import validate_ohlcv
+from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
 from quant_trade.ops.cli import ops_app
 from quant_trade.research.experiment_config import load_experiment_config
@@ -42,6 +43,7 @@ app.add_typer(paper_app, name="paper")
 app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
+app.add_typer(datalake_app, name="datalake")
 console = Console()
 
 

@@ -53,3 +53,8 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+
+## Phase 15 data lake safety
+
+Data lake code is research/backtesting only. Do not commit generated datasets, snapshots, manifests, market data, secrets, or paid-provider responses. Data lake tests must remain offline and deterministic. Dataset versions and quality reports do not imply live-trading readiness.
