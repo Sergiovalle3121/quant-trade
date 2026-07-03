@@ -19,3 +19,7 @@ The transition layer contains research candidate selection, promotion checks, si
 ## Phase 6 Broker Layer
 
 The execution package contains broker-neutral models, safety validation, Alpaca Paper adapter, order mapping, reconciliation, and sanitized audit logging. No live-money broker path exists.
+
+## Phase 7 cloud paper deployment note
+
+Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.

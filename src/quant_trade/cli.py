@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from quant_trade.backtest.engine import BacktestEngine
+from quant_trade.cloud.entrypoint import cloud_app
 from quant_trade.config import get_settings
 from quant_trade.data.cache import list_cache, write_cache
 from quant_trade.data.csv_loader import load_ohlcv_csv
@@ -32,11 +33,13 @@ research_app = typer.Typer(help="Multi-asset research lab commands.")
 selection_app = typer.Typer(help="Strategy candidate selection commands.")
 paper_app = typer.Typer(help="Local simulated paper-trading commands.")
 broker_app = typer.Typer(help="Safe paper broker integration commands.")
+
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
 app.add_typer(selection_app, name="selection")
 app.add_typer(paper_app, name="paper")
 app.add_typer(broker_app, name="broker")
+app.add_typer(cloud_app, name="cloud")
 console = Console()
 
 

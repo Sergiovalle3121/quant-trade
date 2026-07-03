@@ -1,0 +1,11 @@
+name: Docker Build (manual)
+on: { workflow_dispatch: { inputs: { push_to_ecr: { type: boolean, default: false } } } }
+concurrency: quant-trade-docker-build
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t quant-trade:paper .
+      - run: echo "ECR push is optional and requires OIDC role configuration; no long-lived AWS keys."

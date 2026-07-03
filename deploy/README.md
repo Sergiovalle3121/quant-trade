@@ -1,3 +1,5 @@
-# Deployment Examples
+# Local cloud paper examples
 
-Docs-only placeholder for future cloud paper deployment. Do not auto-submit orders or store secrets here.
+These examples are dry-run/local-storage only and never auto-submit paper orders.
+
+Run: `./deploy/local-cloud-dry-run.sh` or use `docker-compose.paper.example.yml`.

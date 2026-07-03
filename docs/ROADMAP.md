@@ -35,3 +35,7 @@ Implemented strategy selection, promotion checks, simulated paper replay, risk g
 ## Recommended Phase 7
 
 Cloud Paper Deployment + Monitoring: scheduled paper workflow, external secrets, alerts, health checks, dashboards, backup/audit retention, and no real-money trading.
+
+## Phase 7 cloud paper deployment note
+
+Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.
