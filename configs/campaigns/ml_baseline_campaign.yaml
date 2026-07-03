@@ -1,0 +1,14 @@
+campaign_id: ml_baseline
+campaign_name: ML Baseline Campaign
+mode: ml_baseline_campaign
+universe: [SPY]
+data_path: tests/fixtures/synthetic_ohlcv.csv
+strategies: [sma_crossover]
+parameter_grids: {sma_crossover: {short_window: [5], long_window: [30]}}
+cost_assumptions: [{slippage_bps: 2, spread_bps: 1}]
+split_policy: {method: chronological, train_fraction: 0.7}
+benchmark: SPY
+max_runs: 2
+output_dir: outputs/campaigns
+random_seed: 7
+real_money_enabled: false

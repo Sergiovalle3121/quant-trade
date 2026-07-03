@@ -1,0 +1,30 @@
+campaign_id: daily_etf_research
+campaign_name: Daily ETF Research Campaign
+mode: research_strategy_campaign
+universe: [SPY, QQQ, IWM]
+data_path: tests/fixtures/synthetic_ohlcv.csv
+strategies: [sma_crossover, mean_reversion]
+parameter_grids:
+  sma_crossover:
+    short_window: [5, 10]
+    long_window: [20, 50]
+  mean_reversion:
+    lookback: [10, 20]
+cost_assumptions:
+  - slippage_bps: 1
+    spread_bps: 1
+  - slippage_bps: 5
+    spread_bps: 2
+split_policy:
+  method: chronological
+  train_fraction: 0.7
+benchmark: SPY
+max_runs: 8
+output_dir: outputs/campaigns
+allow_parallel: false
+random_seed: 42
+overfitting_guardrails:
+  max_parameter_combinations: 50
+ranking_policy:
+  composite: conservative
+real_money_enabled: false

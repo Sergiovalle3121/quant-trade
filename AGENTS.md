@@ -53,3 +53,9 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 - Missing evidence should fail conservative checks.
 - New decision statuses require tests and docs.
 - No secrets in trial artifacts.
+
+## Phase 14 research campaign safety
+
+- Campaigns are offline research/backtesting automation only.
+- Do not add live trading, broker order submission, automatic live promotion, real-money readiness claims, network requirements, or secrets.
+- Campaign ranking must remain multi-factor and conservative with explicit overfitting guardrails.

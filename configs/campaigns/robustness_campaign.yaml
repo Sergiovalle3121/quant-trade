@@ -1,0 +1,14 @@
+campaign_id: robustness
+campaign_name: Robustness Campaign
+mode: robustness_campaign
+universe: [SPY, QQQ]
+data_path: tests/fixtures/synthetic_ohlcv.csv
+strategies: [sma_crossover]
+parameter_grids: {sma_crossover: {short_window: [5, 10], long_window: [30, 60]}}
+cost_assumptions: [{slippage_bps: 1, spread_bps: 1}, {slippage_bps: 10, spread_bps: 5}]
+split_policy: {method: walk_forward, train_size: 120, test_size: 40, step_size: 40}
+benchmark: SPY
+max_runs: 6
+output_dir: outputs/campaigns
+random_seed: 11
+real_money_enabled: false

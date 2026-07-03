@@ -13,3 +13,7 @@ Future research tracks:
 ## Phase 4 research lab
 
 Use the multi-asset research CLI for daily liquid ETF/equity studies. Treat all included strategies as transparent baselines for research, not production alpha. Always compare with benchmarks and inspect robustness artifacts before considering Phase 5 paper-trading readiness.
+
+## Phase 14 Campaign Automation
+
+Use research campaigns to run controlled batches across strategies, parameters, costs, splits, and stress assumptions. Campaign outputs are for human review and must not be treated as production approval.

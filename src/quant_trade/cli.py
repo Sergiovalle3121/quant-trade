@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from quant_trade.backtest.engine import BacktestEngine
+from quant_trade.campaigns.cli import campaigns_app
 from quant_trade.cloud.entrypoint import cloud_app
 from quant_trade.config import get_settings
 from quant_trade.data.cache import list_cache, write_cache
@@ -42,6 +43,7 @@ app.add_typer(paper_app, name="paper")
 app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
+app.add_typer(campaigns_app, name="campaigns")
 console = Console()
 
 

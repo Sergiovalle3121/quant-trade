@@ -1,0 +1,9 @@
+max_parameter_combinations: 50
+require_oos_metrics: true
+require_benchmark_comparison: true
+require_cost_sensitivity: true
+min_trades: 5
+max_drawdown: 0.35
+max_train_test_gap: 0.25
+max_turnover: 8.0
+single_metric_ranking_allowed: false
