@@ -54,6 +54,6 @@ Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; 
 
 Paper trial management formalizes 30/60/90-day simulated strategy trials, weekly/monthly review packs, strategy decay checks, evidence requirements, and conservative decisions. Human notes are required before advancement within paper operations. Real-money approval remains explicitly out of scope and must remain false.
 
-## Phase 11 — Stress Testing + Scenario Lab
+## Phase 12 — Strategy Evidence Database + Scorecards
 
-Implemented a simulation-only stress lab with adverse scenario configuration, deterministic shock application, conservative breach detection, report artifacts, CLI commands, and documentation. Future phases should deepen fixture coverage and scenario calibration without introducing live trading or network dependencies.
+Phase 12 introduces local evidence indexing, artifact lineage, search, static dashboards, and conservative strategy scorecards. Future phases may add richer schema migrations and cross-run analytics while preserving paper-only safety constraints.

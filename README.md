@@ -145,15 +145,6 @@ Cloud commands are paper-only and default to dry-run behavior. Example: `quant-t
 
 The `quant-trade trials` command group manages paper-only 30/60/90-day strategy trials, daily records, drift checks, review packs, evidence indexes, conservative decisions, dashboards, archives, and review cycles. These workflows are offline/dry-run by default and never approve real-money trading.
 
-## Phase 11 Stress Testing + Scenario Lab
+## Phase 12: Evidence database and scorecards
 
-Phase 11 adds a simulation-only stress lab for adverse market, liquidity, gap, benchmark, rate-proxy, strategy-pause, and operational-failure scenarios. It is offline and deterministic by default and never marks output as real-money ready.
-
-```bash
-quant-trade stress list-scenarios --config configs/stress/equity_etf_scenarios.yaml
-quant-trade stress run --config configs/stress/allocation_stress_test.yaml
-quant-trade stress report --config configs/stress/allocation_stress_test.yaml
-quant-trade stress dashboard --config configs/stress/allocation_stress_test.yaml
-```
-
-See `docs/STRESS_TESTING.md` and `docs/SCENARIO_LAB.md` for safety rules, artifacts, and scenario definitions.
+The platform includes a local SQLite evidence database and conservative strategy scorecards for offline research governance. Initialize it with `quant-trade evidence init --config configs/evidence/local_evidence_db.yaml`, ingest artifacts from `outputs`, and generate scorecards, lineage exports, search results, and a static dashboard. The evidence system is paper-only/research-only and never sets `real_money_ready=true`.
