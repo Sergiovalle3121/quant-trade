@@ -7,8 +7,10 @@ import json
 import pandas as pd
 
 from quant_trade.backtest import CostModel, calculate_metrics, load_ohlcv, run_backtest
+from quant_trade.metrics.statistics import return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
 from quant_trade.research.grid_search import expand_parameter_grid, valid_params
+from quant_trade.research.ledger import append_trial
 from quant_trade.research.splits import TIME_COLUMN, walk_forward_splits
 from quant_trade.strategies import get_strategy
 
@@ -45,7 +47,11 @@ def run_walk_forward(cfg):
     data = load_ohlcv(cfg.data_path)
     split = cfg.split
     splits = walk_forward_splits(
-        data, split.train_size or 10, split.test_size or 5, split.step_size or 5
+        data,
+        split.train_size or 10,
+        split.test_size or 5,
+        split.step_size or 5,
+        embargo_bars=split.embargo_bars,
     )
     cost = CostModel(**cfg.costs.__dict__)
     rows = []
@@ -67,6 +73,22 @@ def run_walk_forward(cfg):
         best_metric, best_params = max(scored, key=lambda item: item[0])
         test_res = run_backtest(
             test, get_strategy(cfg.strategy, **best_params), cfg.initial_cash, cost
+        )
+        test_moments = return_moments(test_res.equity_curve["equity"].astype(float).pct_change())
+        append_trial(
+            cfg.output_dir,
+            {
+                "source": "walk_forward",
+                "experiment_name": cfg.experiment_name,
+                "strategy": cfg.strategy,
+                "strategy_params": best_params,
+                "window": window_number,
+                "trials_in_window": len(scored),
+                "test_sharpe": float(test_res.metrics.get("sharpe", 0.0)),
+                "test_sharpe_per_period": test_moments["sharpe_per_period"],
+                "test_total_return": float(test_res.metrics.get("total_return", 0.0)),
+                "trade_count": int(test_res.metrics.get("trade_count", 0)),
+            },
         )
         rows.append(
             {

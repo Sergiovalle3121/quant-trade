@@ -72,13 +72,26 @@ def run_multi_asset_backtest(
     allow_leverage: bool = False,
     allow_short: bool = False,
     fractional_shares: bool = True,
+    rebalance_band: float = 0.0,
 ) -> MultiAssetBacktestResult:
     # Omitted costs resolve to a conservative default; a frictionless run must
     # be requested explicitly by passing an all-zero CostModel.
     cost_model = cost_model if cost_model is not None else CONSERVATIVE_COST_MODEL
-    validate_panel_schema(data)
+    if rebalance_band < 0:
+        raise ValueError("rebalance_band must be >= 0")
+    validated = validate_panel_schema(data)
     opens = pivot_open(data)
     closes = pivot_close(data)
+    # Perp funding accrual: longs pay positive funding, shorts receive it.
+    funding = None
+    if "funding_rate" in data.columns:
+        funding = (
+            validated.assign(
+                funding_rate=pd.to_numeric(data["funding_rate"], errors="coerce").to_numpy()
+            )
+            .pivot(index="timestamp", columns="symbol", values="funding_rate")
+            .sort_index()
+        )
     dates = list(closes.index)
     symbols = list(closes.columns)
     tw = (
@@ -127,6 +140,13 @@ def run_multi_asset_backtest(
                 delta = target_val - cur
                 if abs(delta) < 1e-9:
                     continue
+                # No-trade band: skip drifts smaller than the band in weight
+                # points, but always allow full exits so risk-off targets are
+                # never suppressed by the turnover control.
+                if rebalance_band > 0 and port_val > 0 and w != 0:
+                    drift = abs(delta) / port_val
+                    if drift < rebalance_band:
+                        continue
                 q = delta / float(price)
                 q = math.trunc(q) if not fractional_shares else q
                 notional = abs(q * float(price))
@@ -148,6 +168,13 @@ def run_multi_asset_backtest(
             pending = None
         else:
             turnover = 0.0
+        if funding is not None and ts in funding.index:
+            for s in symbols:
+                rate = funding.loc[ts, s] if s in funding.columns else np.nan
+                price = closes.loc[ts, s]
+                if pd.isna(rate) or rate == 0 or pd.isna(price) or abs(qty[s]) < 1e-12:
+                    continue
+                cash -= qty[s] * float(price) * float(rate)
         equity = cash + sum(
             qty[s] * float(closes.loc[ts, s]) for s in symbols if pd.notna(closes.loc[ts, s])
         )

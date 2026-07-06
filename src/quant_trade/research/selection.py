@@ -9,7 +9,9 @@ from typing import Any
 
 import yaml
 
+from quant_trade.metrics.statistics import expected_max_sharpe, psr_from_moments
 from quant_trade.research.candidate import CandidateStrategy, SelectionCriteria, utc_now_iso
+from quant_trade.research.ledger import ledger_path, ledger_stats
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -29,8 +31,48 @@ def _metric(payload: dict[str, Any], *keys: str) -> float | None:
     return float(cur) if cur is not None else None
 
 
-def _reasons(result: dict[str, Any], criteria: SelectionCriteria) -> list[str]:
+def _statistical_reasons(
+    result: dict[str, Any],
+    criteria: SelectionCriteria,
+    trial_stats: tuple[int, float] | None,
+) -> list[str]:
+    """Gates that separate statistical evidence from lucky point estimates."""
     reasons: list[str] = []
+    if criteria.min_trade_count > 0:
+        trades = _metric(result, "test_metrics", "trade_count")
+        if trades is None or trades < criteria.min_trade_count:
+            reasons.append("missing or insufficient test trade count")
+    if criteria.min_probabilistic_sharpe > 0:
+        psr = _metric(result, "test_metrics", "psr")
+        if psr is None or psr < criteria.min_probabilistic_sharpe:
+            reasons.append("missing or insufficient probabilistic Sharpe ratio")
+    if criteria.require_deflated_sharpe:
+        sr = _metric(result, "test_metrics", "sharpe_per_period")
+        n_obs = _metric(result, "test_metrics", "observations")
+        skew = _metric(result, "test_metrics", "skewness")
+        kurt = _metric(result, "test_metrics", "kurtosis")
+        if trial_stats is None:
+            reasons.append("trial ledger missing; cannot compute deflated Sharpe")
+        elif sr is None or n_obs is None or skew is None or kurt is None:
+            reasons.append("missing return moments; cannot compute deflated Sharpe")
+        else:
+            n_trials, sharpe_variance = trial_stats
+            threshold = expected_max_sharpe(n_trials, sharpe_variance)
+            dsr = psr_from_moments(sr, int(n_obs), skew, kurt, benchmark_sharpe=threshold)
+            if dsr < criteria.min_deflated_sharpe:
+                reasons.append(
+                    f"deflated Sharpe {dsr:.3f} below {criteria.min_deflated_sharpe} "
+                    f"(after {n_trials} recorded trials)"
+                )
+    return reasons
+
+
+def _reasons(
+    result: dict[str, Any],
+    criteria: SelectionCriteria,
+    trial_stats: tuple[int, float] | None = None,
+) -> list[str]:
+    reasons: list[str] = _statistical_reasons(result, criteria, trial_stats)
     strategy = str(result.get("strategy", result.get("strategy_name", "")))
     symbols = [str(s) for s in result.get("symbols", result.get("universe", []))]
     if criteria.allowed_strategies and strategy not in criteria.allowed_strategies:
@@ -123,13 +165,20 @@ def _candidate_from_result(
     )
 
 
+def _trial_stats(outputs_dir: Path) -> tuple[int, float] | None:
+    if not ledger_path(outputs_dir).exists():
+        return None
+    return ledger_stats(outputs_dir)
+
+
 def select_candidates_from_outputs(
     outputs_dir: Path, criteria: SelectionCriteria
 ) -> list[CandidateStrategy]:
     candidates: list[CandidateStrategy] = []
+    stats = _trial_stats(outputs_dir)
     for run_dir in _find_runs(outputs_dir):
         result = _load_json(run_dir / "results.json")
-        reasons = _reasons(result, criteria)
+        reasons = _reasons(result, criteria, stats)
         candidate = _candidate_from_result(run_dir, result, reasons)
         if candidate.status == "candidate":
             candidates.append(candidate)
@@ -141,9 +190,10 @@ def run_selection(outputs_dir: Path, criteria: SelectionCriteria) -> Path:
     out = outputs_dir / "selection" / run_id
     out.mkdir(parents=True, exist_ok=True)
     all_items = []
+    stats = _trial_stats(outputs_dir)
     for run_dir in _find_runs(outputs_dir):
         result = _load_json(run_dir / "results.json")
-        all_items.append(_candidate_from_result(run_dir, result, _reasons(result, criteria)))
+        all_items.append(_candidate_from_result(run_dir, result, _reasons(result, criteria, stats)))
     candidates = [c for c in all_items if c.status == "candidate"]
     rejected = [c for c in all_items if c.status == "rejected"]
     (out / "selection_criteria.yaml").write_text(

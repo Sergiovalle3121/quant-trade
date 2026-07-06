@@ -125,6 +125,12 @@ quant-trade data fetch-funding --provider ccxt-binance --symbol BTC-USDT-PERP --
 
 See `docs/CRYPTO_DATA.md` for symbology, pagination/rate-limit behavior, quality checks, and crypto research configs. Every research run records the dataset's sha256 (`dataset_binding`) for reproducibility.
 
+## Alpha components and statistical validation
+
+The research lab includes a volatility-targeted multi-horizon momentum signal (`multi_horizon_tsmom`), Donchian breakout with ATR exits (`donchian_breakout`), and perpetual funding carry (`funding_carry`, requires funding data joined via `attach_funding_rates`). The multi-asset engine supports shorts (explicit `allow_short`), per-bar funding accrual, and no-trade rebalance bands (`portfolio.rebalance_band`).
+
+Every backtest evaluation appends to an append-only trial ledger (`outputs/trial_ledger.jsonl`); research runs emit `results.json` with PSR and return moments, and the selection layer gates on trade count, probabilistic Sharpe, and the ledger-driven deflated Sharpe ratio. Train/test splits support an embargo (`split.embargo_bars`). See `docs/STATISTICAL_VALIDATION.md`.
+
 ## Phase 4 Strategy Research Lab
 
 The repository now includes a research-only multi-asset daily strategy lab. It supports canonical long-form OHLCV panels, baseline long-only signal models, next-open rebalance backtesting, benchmark comparisons, robustness diagnostics, and offline synthetic examples.

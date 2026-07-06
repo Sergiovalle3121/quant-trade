@@ -1,0 +1,45 @@
+# Flagship v1 signal: multi-horizon time-series momentum with portfolio
+# volatility targeting, no-trade rebalance bands, and a train/test embargo.
+# Requires a prior crypto backfill (see configs/data/ccxt_crypto_majors_daily
+# .example.yaml); copy to a non-example name and point data_path at the cache.
+#
+# allow_short stays false until short handling is validated in paper; flip it
+# together with portfolio.allow_short for long/short research on perps.
+experiment_name: multi_horizon_tsmom_crypto_daily
+mode: multi_asset_research
+data_path: data/cache/ccxt-kraken/BTC-USD_ETH-USD_SOL-USD_XRP-USD_ADA-USD/1d/BTC-USD_ETH-USD_SOL-USD_XRP-USD_ADA-USD_2020-01-01_2025-12-31_adjusted.csv
+initial_cash: 100000
+strategy: multi_horizon_tsmom
+strategy_params:
+  lookbacks: [21, 63, 126, 252]
+  volatility_window: 63
+  portfolio_volatility_target: 0.20
+  max_weight_per_asset: 0.25
+  max_gross_exposure: 1.0
+  allow_short: false
+  rebalance_frequency: weekly
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+  # Skip drifts below 5 weight points; full exits always execute.
+  rebalance_band: 0.05
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0010
+  slippage_bps: 5.0
+  spread_bps: 3.0
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+  # Embargo covers the longest lookback so no train information leaks into
+  # the out-of-sample window.
+  embargo_bars: 252
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs

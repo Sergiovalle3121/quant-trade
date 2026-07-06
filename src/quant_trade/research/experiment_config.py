@@ -34,6 +34,9 @@ class SplitConfig:
     train_size: int | None = None
     test_size: int | None = None
     step_size: int | None = None
+    # Bars dropped at the train/test boundary so lookback features cannot
+    # leak train information into out-of-sample evidence.
+    embargo_bars: int = 0
 
 
 @dataclass

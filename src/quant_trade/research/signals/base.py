@@ -42,17 +42,25 @@ def rebalance_mask(index: pd.DatetimeIndex, frequency: str) -> pd.Series:
     raise ValueError("rebalance_frequency must be daily, weekly, or monthly")
 
 
-def weights_to_long(weights: pd.DataFrame, rebalance: pd.Series | None = None) -> pd.DataFrame:
+def weights_to_long(
+    weights: pd.DataFrame,
+    rebalance: pd.Series | None = None,
+    allow_short: bool = False,
+) -> pd.DataFrame:
     """Serialize a wide target-weight matrix into long-form rebalance targets.
 
     Zero weights are emitted (NaN counts as zero) so an all-flat target is an
     explicit exit-to-cash rebalance instead of a silently skipped date. When
     ``rebalance`` is given, only timestamps marked True emit rows; timestamps
-    without rows mean "no rebalance", never "go to cash".
+    without rows mean "no rebalance", never "go to cash". Negative weights
+    (short targets) require ``allow_short=True``; without it they raise so a
+    long-only pipeline can never silently strip a short leg.
     """
     filled = weights.fillna(0.0)
-    if (filled.to_numpy() < 0).any():
-        raise ValueError("weights_to_long is long-only; negative weights are not supported")
+    if not allow_short and (filled.to_numpy() < 0).any():
+        raise ValueError(
+            "negative weights require allow_short=True; refusing to silently drop shorts"
+        )
     if rebalance is not None:
         keep = rebalance.reindex(weights.index, fill_value=False).astype(bool)
         filled = filled.loc[keep]

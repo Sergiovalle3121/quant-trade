@@ -28,7 +28,7 @@ def _split(data, cfg: ExperimentConfig):
     s = cfg.split
     if s.method == "date":
         return date_based_split(data, s.train_start, s.train_end, s.test_start, s.test_end)
-    return chronological_train_test_split(data, s.train_fraction)
+    return chronological_train_test_split(data, s.train_fraction, s.embargo_bars)
 
 
 def _run(data, cfg: ExperimentConfig, params: dict[str, Any]):

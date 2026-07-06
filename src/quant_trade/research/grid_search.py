@@ -9,7 +9,9 @@ from typing import Any
 import pandas as pd
 
 from quant_trade.backtest import CostModel, load_ohlcv, run_backtest
+from quant_trade.metrics.statistics import return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
+from quant_trade.research.ledger import append_trial
 from quant_trade.research.runner import _split
 from quant_trade.strategies import get_strategy
 
@@ -39,6 +41,22 @@ def run_grid_search(cfg):
             continue
         tr = run_backtest(train, get_strategy(cfg.strategy, **params), cfg.initial_cash, cost)
         te = run_backtest(test, get_strategy(cfg.strategy, **params), cfg.initial_cash, cost)
+        # Every evaluated combination is a trial; the deflated Sharpe of any
+        # eventual winner must account for the full breadth of this search.
+        test_moments = return_moments(te.equity_curve["equity"].astype(float).pct_change())
+        append_trial(
+            cfg.output_dir,
+            {
+                "source": "grid_search",
+                "experiment_name": cfg.experiment_name,
+                "strategy": cfg.strategy,
+                "strategy_params": params,
+                "test_sharpe": float(te.metrics.get("sharpe", 0.0)),
+                "test_sharpe_per_period": test_moments["sharpe_per_period"],
+                "test_total_return": float(te.metrics.get("total_return", 0.0)),
+                "trade_count": int(te.metrics.get("trade_count", 0)),
+            },
+        )
         row = {
             "params": json.dumps(params, sort_keys=True),
             "train_total_return": tr.metrics["total_return"],
