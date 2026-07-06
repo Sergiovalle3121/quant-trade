@@ -16,7 +16,11 @@ import pandas as pd
 from quant_trade.data.panel import pivot_close
 from quant_trade.metrics.performance import periods_per_year
 from quant_trade.research.signals.base import rebalance_mask, weights_to_long
-from quant_trade.research.signals.sizing import cap_weights, scale_to_portfolio_vol_target
+from quant_trade.research.signals.sizing import (
+    cap_weights,
+    correlation_regime_scaler,
+    scale_to_portfolio_vol_target,
+)
 
 DEFAULT_LOOKBACKS = (21, 63, 126, 252)
 
@@ -58,6 +62,20 @@ def multi_horizon_tsmom(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFr
         volatility_window=vol_window,
         max_gross_exposure=max_gross,
     )
+    # Vol targeting may scale UP toward the gross cap; the per-asset cap must
+    # survive that scaling or the engine rejects the weights.
+    weights = cap_weights(weights, max_w)
+    # Optional correlation-regime de-risking: vol targeting misses the moment
+    # diversification evaporates because everything sells off together.
+    corr_threshold = params.get("regime_correlation_threshold")
+    if corr_threshold is not None:
+        weights = correlation_regime_scaler(
+            weights,
+            close,
+            correlation_window=int(params.get("regime_correlation_window", 42)),
+            correlation_threshold=float(corr_threshold),
+            derisk_factor=float(params.get("regime_derisk_factor", 0.5)),
+        )
     return weights_to_long(
         weights, rebalance=rebalance_mask(close.index, freq), allow_short=allow_short
     )

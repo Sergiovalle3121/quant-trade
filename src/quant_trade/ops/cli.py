@@ -139,6 +139,27 @@ def fill_cmd(
     console.print(f"Status: pass Output: {out}")
 
 
+@ops_app.command("calibrate-costs")
+def calibrate_costs_cmd(
+    run_dir: Annotated[Path, typer.Option(help="Session run directory with orders/fills CSVs")],
+) -> None:
+    """Suggest CostModel parameters from measured fills (research feedback loop)."""
+    import json as _json
+
+    from .fill_analysis import calibrate_cost_model
+
+    suggestion = calibrate_cost_model(analyze_fills(run_dir))
+    console.print(_json.dumps(suggestion, indent=2))
+    if suggestion.get("status") == "ok":
+        console.print(
+            "\nSuggested research config costs block:\n"
+            f"costs:\n"
+            f"  percentage_commission: {suggestion['suggested_percentage_commission']}\n"
+            f"  slippage_bps: {suggestion['suggested_slippage_bps']}\n"
+            "  spread_bps: keep your venue's measured half-spread"
+        )
+
+
 @ops_app.command("reconcile")
 def reconcile_cmd(
     config: Annotated[Path, typer.Option()], session: Annotated[str, typer.Option()]

@@ -61,3 +61,41 @@ def scale_to_portfolio_vol_target(
 def cap_weights(weights: pd.DataFrame, max_weight_per_asset: float) -> pd.DataFrame:
     """Symmetric per-asset cap that preserves sign."""
     return weights.clip(lower=-max_weight_per_asset, upper=max_weight_per_asset)
+
+
+def correlation_regime_scaler(
+    weights: pd.DataFrame,
+    close: pd.DataFrame,
+    correlation_window: int = 42,
+    correlation_threshold: float = 0.75,
+    derisk_factor: float = 0.5,
+) -> pd.DataFrame:
+    """De-risk when cross-asset correlation spikes.
+
+    Vol targeting handles volatility regimes; this handles the failure mode
+    it misses — diversification evaporating as everything starts moving
+    together (the signature of systemic crypto sell-offs). When the trailing
+    mean pairwise correlation exceeds the threshold at a rebalance date, the
+    whole row scales down by ``derisk_factor``. Causal: correlation at t uses
+    returns through t; the engine executes at t+1's open.
+    """
+    if not 0 < derisk_factor <= 1:
+        raise ValueError("derisk_factor must be in (0, 1]")
+    if close.shape[1] < 2:
+        return weights
+    returns = close.pct_change()
+    mean_corr = pd.Series(index=returns.index, dtype=float)
+    for i in range(correlation_window, len(returns.index)):
+        window = returns.iloc[i - correlation_window + 1 : i + 1]
+        corr = window.corr()
+        n = corr.shape[0]
+        if n < 2:
+            continue
+        off_diagonal = (corr.sum().sum() - n) / (n * (n - 1))
+        mean_corr.iloc[i] = off_diagonal
+    scaled = weights.copy().astype(float)
+    for ts in weights.index:
+        value = mean_corr.get(ts)
+        if value is not None and pd.notna(value) and value > correlation_threshold:
+            scaled.loc[ts] = scaled.loc[ts] * derisk_factor
+    return scaled
