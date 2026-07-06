@@ -3,6 +3,7 @@ from __future__ import annotations
 from quant_trade.research.signals import FunctionSignalModel
 from quant_trade.research.signals.breakout import donchian_breakout
 from quant_trade.research.signals.carry import funding_carry
+from quant_trade.research.signals.ensemble import ensemble_signal
 from quant_trade.research.signals.mean_reversion import simple_mean_reversion_etf
 from quant_trade.research.signals.momentum import cross_sectional_momentum, time_series_momentum
 from quant_trade.research.signals.trend import (
@@ -14,6 +15,7 @@ from quant_trade.research.signals.volatility import volatility_scaled_momentum
 
 REGISTRY = {
     "multi_horizon_tsmom": FunctionSignalModel("multi_horizon_tsmom", multi_horizon_tsmom),
+    "ensemble": FunctionSignalModel("ensemble", ensemble_signal),
     "donchian_breakout": FunctionSignalModel("donchian_breakout", donchian_breakout),
     "funding_carry": FunctionSignalModel("funding_carry", funding_carry),
     "equal_weight_buy_and_hold": FunctionSignalModel(

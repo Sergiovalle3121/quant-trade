@@ -925,11 +925,24 @@ def trials_export_daily_records(
     output_root: Annotated[Path, typer.Option(help="Trials output root")] = Path(
         "outputs/trials"
     ),
+    benchmark_data: Annotated[
+        Path | None, typer.Option(help="Canonical OHLCV CSV for the benchmark leg")
+    ] = None,
+    benchmark_symbol: Annotated[
+        str | None, typer.Option(help="Benchmark symbol, e.g. BTC-USD")
+    ] = None,
 ) -> None:
     """Bridge a real paper run into the trial system's daily-record format."""
     from quant_trade.trials.export import export_daily_records_from_paper_run
 
-    path = export_daily_records_from_paper_run(run_dir, trial_id, paper_session_id, output_root)
+    path = export_daily_records_from_paper_run(
+        run_dir,
+        trial_id,
+        paper_session_id,
+        output_root,
+        benchmark_data=benchmark_data,
+        benchmark_symbol=benchmark_symbol,
+    )
     console.print(f"Exported daily records: {path}")
 
 

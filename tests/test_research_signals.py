@@ -36,6 +36,10 @@ def test_all_signals_generate_weights():
                 "max_weight_per_asset": 0.5,
                 "rebalance_frequency": "monthly",
                 "top_n": 2,
+                "components": [
+                    {"name": "time_series_momentum", "params": {"lookback_days": 20}},
+                    {"name": "moving_average_trend_filter", "params": {"sma_window": 20}},
+                ],
             },
         )
         assert set(w.columns) == {"timestamp", "symbol", "target_weight"}

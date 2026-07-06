@@ -30,12 +30,34 @@ def _day(value: str) -> date:
     return date.fromisoformat(str(value)[:10])
 
 
+def _benchmark_daily_returns(
+    benchmark_data: Path | str | None, benchmark_symbol: str | None
+) -> dict[date, float]:
+    """Daily buy-and-hold returns of a benchmark symbol from a canonical CSV."""
+    if not benchmark_data or not benchmark_symbol:
+        return {}
+    import pandas as pd
+
+    frame = pd.read_csv(benchmark_data)
+    frame = frame[frame["symbol"].astype(str).str.upper() == benchmark_symbol.upper()]
+    if frame.empty:
+        raise ValueError(f"benchmark symbol {benchmark_symbol} not found in {benchmark_data}")
+    frame = frame.sort_values("timestamp")
+    closes = pd.to_numeric(frame["close"], errors="coerce")
+    days = [_day(ts) for ts in frame["timestamp"]]
+    returns = closes.pct_change().fillna(0.0).tolist()
+    return dict(zip(days, returns, strict=True))
+
+
 def export_daily_records_from_paper_run(
     run_dir: Path | str,
     trial_id: str,
     paper_session_id: str,
     output_root: Path | str = Path("outputs/trials"),
+    benchmark_data: Path | str | None = None,
+    benchmark_symbol: str | None = None,
 ) -> Path:
+    benchmark_returns = _benchmark_daily_returns(benchmark_data, benchmark_symbol)
     run = Path(run_dir)
     snapshots = _read_csv(run / "account_snapshots.csv")
     if not snapshots:
@@ -94,8 +116,8 @@ def export_daily_records_from_paper_run(
                 daily_return=daily_return,
                 cumulative_return=equity / first_equity - 1 if first_equity > 0 else 0.0,
                 drawdown=-abs(float(snap.get("drawdown", 0) or 0)),
-                benchmark_return=0.0,
-                excess_return=0.0,
+                benchmark_return=benchmark_returns.get(day, 0.0),
+                excess_return=daily_return - benchmark_returns.get(day, 0.0),
                 orders_count=orders_by_day.get(day, 0),
                 fills_count=fills_by_day.get(day, 0),
                 rejected_orders_count=rejected_by_day.get(day, 0),
@@ -108,7 +130,11 @@ def export_daily_records_from_paper_run(
                 heartbeat_status="ok",
                 reconciliation_status="pass",
                 kill_switch_active=day in kill_switch_days,
-                notes="benchmark/slippage/max-weight not derivable from session artifacts",
+                notes=(
+                    "slippage/max-weight not derivable from session artifacts"
+                    if benchmark_returns
+                    else "benchmark/slippage/max-weight not derivable from session artifacts"
+                ),
             )
         )
     validate_daily_records(records)
