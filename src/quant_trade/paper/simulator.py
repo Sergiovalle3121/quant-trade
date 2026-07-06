@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
+
 from quant_trade.backtest.costs import CostModel
 from quant_trade.data.csv_loader import load_ohlcv_csv
 from quant_trade.paper.config import load_paper_config
@@ -19,7 +21,7 @@ from quant_trade.paper.models import (
 from quant_trade.paper.rebalancer import target_weights_to_orders
 from quant_trade.paper.reports import write_csvs, write_report
 from quant_trade.paper.risk import generate_risk_events, should_trigger_kill_switch, validate_order
-from quant_trade.paper.state import save_state
+from quant_trade.paper.state import load_state, save_state
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 
@@ -44,12 +46,28 @@ class PaperTradingSimulator:
         data = data[data["symbol"].isin(self.config.universe.get("symbols", []))].sort_values(
             "timestamp"
         )
-        state = PaperSessionState(
-            cash=self.config.initial_cash,
-            equity=self.config.initial_cash,
-            high_water_mark=self.config.initial_cash,
-            status="running",
+        state_path = (
+            Path(self.config.state_dir) / self.config.paper_session_name / "latest_state.json"
         )
+        resume = bool((self.config.execution or {}).get("resume_from_state", False))
+        if resume and state_path.exists():
+            state = load_state(state_path)
+            if state.kill_switch_active or state.status == "paused":
+                raise RuntimeError(
+                    "persisted session is paused or kill-switched; an operator must clear "
+                    "the flags explicitly before resuming"
+                )
+            if state.last_processed_timestamp:
+                cutoff = pd.Timestamp(state.last_processed_timestamp)
+                data = data[data["timestamp"] > cutoff]
+            state.status = "running"
+        else:
+            state = PaperSessionState(
+                cash=self.config.initial_cash,
+                equity=self.config.initial_cash,
+                high_water_mark=self.config.initial_cash,
+                status="running",
+            )
         snapshots = []
         orders = []
         fills = []
@@ -65,6 +83,16 @@ class PaperTradingSimulator:
         # bar t's open would fill using close-derived information from the same
         # bar (look-ahead) and systematically flatter paper results.
         pending_target: dict[str, float] | None = None
+        current_day = ""
+        day_start_equity = state.equity
+        orders_filled_today = 0
+
+        def _daily_loss_breached() -> bool:
+            if day_start_equity <= 0:
+                return False
+            loss = 1 - state.equity / day_start_equity
+            return loss > self.config.risk_limits.max_daily_loss_pct
+
         for ts, day in data.groupby("timestamp", sort=True):
             ts_str = str(ts)
             state.last_processed_timestamp = ts_str
@@ -79,6 +107,22 @@ class PaperTradingSimulator:
             state.max_drawdown = max(
                 state.max_drawdown, 1 - state.equity / max(state.high_water_mark, 1e-9)
             )
+            bar_day = ts_str[:10]
+            if bar_day != current_day:
+                current_day = bar_day
+                day_start_equity = state.equity
+                orders_filled_today = 0
+            if _daily_loss_breached() and not state.kill_switch_active:
+                state.kill_switch_active = True
+                state.status = "paused"
+                events.append(
+                    create_event(
+                        ts_str,
+                        "daily_loss_circuit_breaker",
+                        "daily loss limit breached; trading halted",
+                        "critical",
+                    ).to_dict()
+                )
             if should_trigger_kill_switch(state, self.config.risk_limits):
                 state.kill_switch_active = True
                 state.status = "paused"
@@ -94,6 +138,20 @@ class PaperTradingSimulator:
                         create_event(ts_str, "rebalance_due", "rebalance orders created").to_dict()
                     )
                 for order in new_orders:
+                    if orders_filled_today >= self.config.risk_limits.max_orders_per_day:
+                        order.status = "rejected"
+                        order.reason = "max_orders_per_day reached"
+                        orders.append(order.to_dict())
+                        events.append(
+                            create_event(
+                                ts_str,
+                                "order_rejected",
+                                order.reason,
+                                "warning",
+                                order.to_dict(),
+                            ).to_dict()
+                        )
+                        continue
                     ok, reason = validate_order(order, state, self.config.risk_limits, prices)
                     if not ok:
                         order.status = "rejected"
@@ -142,6 +200,7 @@ class PaperTradingSimulator:
                     state.fills.append(fill)
                     fills.append(fill.to_dict())
                     orders.append(order.to_dict())
+                    orders_filled_today += 1
                     events.append(
                         create_event(
                             ts_str, "order_filled", "order filled", details=order.to_dict()
@@ -174,6 +233,18 @@ class PaperTradingSimulator:
             for ev in generate_risk_events(ts_str, state, self.config.risk_limits):
                 risk_events.append(ev.to_dict())
                 events.append(ev.to_dict())
+            if _daily_loss_breached() and not state.kill_switch_active:
+                state.kill_switch_active = True
+                state.status = "paused"
+                events.append(
+                    create_event(
+                        ts_str,
+                        "daily_loss_circuit_breaker",
+                        "daily loss limit breached after fills; trading halted",
+                        "critical",
+                    ).to_dict()
+                )
+                continue
             if should_trigger_kill_switch(state, self.config.risk_limits):
                 state.kill_switch_active = True
                 state.status = "paused"

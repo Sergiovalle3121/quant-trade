@@ -101,12 +101,24 @@ class S3StorageBackend:
         return self.client.get_object(Bucket=b, Key=k)["Body"].read().decode()
 
     def exists(self, uri: str) -> bool:
+        """True/False only for a definitive answer; storage failures raise.
+
+        Swallowing IAM/network errors here previously reported the kill-switch
+        file as absent (inactive) exactly when infrastructure was degraded —
+        safety mechanisms built on exists() must fail closed, not open.
+        """
         b, k = parse_s3_uri(uri)
         try:
             self.client.head_object(Bucket=b, Key=k)
             return True
-        except Exception:
-            return False
+        except Exception as exc:
+            status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get(
+                "HTTPStatusCode"
+            )
+            error_code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+            if status == 404 or error_code in {"404", "NoSuchKey", "NotFound"}:
+                return False
+            raise StorageError(f"cannot determine existence of {uri}: {exc}") from exc
 
     def list(self, uri: str) -> list[str]:
         b, k = parse_s3_uri(uri)

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel
 
 from quant_trade.cloud.config import CloudConfig
-from quant_trade.cloud.exceptions import SafetyGateError
+from quant_trade.cloud.exceptions import SafetyGateError, StorageError
 from quant_trade.cloud.monitoring import structured_log
 from quant_trade.cloud.storage import backend_for_uri
 
@@ -29,12 +29,23 @@ def get_kill_switch_status(config: CloudConfig) -> KillSwitchStatus:
             active=True, reason="environment kill switch", activated_by="env", source="env"
         )
     else:
-        storage = backend_for_uri(config.kill_switch_uri)
-        st = (
-            KillSwitchStatus(source="file")
-            if not storage.exists(config.kill_switch_uri)
-            else KillSwitchStatus(**storage.read_json(config.kill_switch_uri), source="file")
-        )
+        # Fail closed: if storage cannot be read, the kill switch is ACTIVE.
+        # The one state a safety mechanism must never reach is "silently off
+        # because infrastructure is degraded".
+        try:
+            storage = backend_for_uri(config.kill_switch_uri)
+            st = (
+                KillSwitchStatus(source="file")
+                if not storage.exists(config.kill_switch_uri)
+                else KillSwitchStatus(**storage.read_json(config.kill_switch_uri), source="file")
+            )
+        except StorageError as exc:
+            st = KillSwitchStatus(
+                active=True,
+                reason=f"kill-switch storage unreadable (failing closed): {exc}",
+                activated_by="storage-error",
+                source="storage-error",
+            )
     structured_log("kill_switch_checked", active=st.active, source=st.source)
     return st
 

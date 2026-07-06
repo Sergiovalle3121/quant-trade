@@ -390,6 +390,23 @@ def paper_run(config: Annotated[Path, typer.Option(help="Paper config YAML")]) -
     )
 
 
+@paper_app.command("loop")
+def paper_loop(
+    config: Annotated[Path, typer.Option(help="Paper loop config YAML (mode: paper_loop)")],
+    max_cycles: Annotated[int, typer.Option(help="Cycles to run (bounded; 0 = forever)")] = 1,
+    interval_seconds: Annotated[float, typer.Option(help="Sleep between cycles")] = 3600.0,
+) -> None:
+    """Run the paper-only live loop: fetch bars, execute the pending target at
+    the newest bar's open, decide the next target, persist state + heartbeat."""
+    from quant_trade.live.loop import LoopConfig, PaperLoopRunner
+
+    runner = PaperLoopRunner(LoopConfig.from_yaml(config))
+    results = runner.run_forever(
+        interval_seconds=interval_seconds, max_cycles=max_cycles if max_cycles > 0 else None
+    )
+    console.print(json.dumps(results[-1], indent=2, default=str))
+
+
 @paper_app.command("status")
 def paper_status(
     session: Annotated[str, typer.Option(help="Paper session name")],

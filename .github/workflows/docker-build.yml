@@ -1,11 +1,25 @@
 name: Docker Build (manual)
-on: { workflow_dispatch: { inputs: { push_to_ecr: { type: boolean, default: false } } } }
+
+# Build-only: proves the image builds from a clean checkout. Pushing to ECR
+# happens from the deploy workstation (docs/CLOUD_DEPLOYMENT.md); CI holds
+# no AWS credentials for this repository.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - "requirements.lock.txt"
+      - "pyproject.toml"
+
 concurrency: quant-trade-docker-build
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t quant-trade:paper .
-      - run: echo "ECR push is optional and requires OIDC role configuration; no long-lived AWS keys."
+      - name: Build image
+        run: docker build -t quant-trade:paper .
+      - name: Smoke-run default command availability
+        run: docker run --rm --entrypoint quant-trade quant-trade:paper --help
