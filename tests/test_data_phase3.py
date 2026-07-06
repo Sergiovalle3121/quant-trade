@@ -143,7 +143,9 @@ def test_polygon_mock(monkeypatch) -> None:
         get_data_provider("polygon").fetch_ohlcv(req)
     monkeypatch.setenv("POLYGON_API_KEY", "placeholder")
     response = types.SimpleNamespace(
-        json=lambda: {"results": [{"t": 1577836800000, "o": 1, "h": 2, "l": 1, "c": 2, "v": 100}]}
+        status_code=200,
+        text="",
+        json=lambda: {"results": [{"t": 1577836800000, "o": 1, "h": 2, "l": 1, "c": 2, "v": 100}]},
     )
     monkeypatch.setitem(
         sys.modules, "requests", types.SimpleNamespace(get=lambda *a, **k: response)

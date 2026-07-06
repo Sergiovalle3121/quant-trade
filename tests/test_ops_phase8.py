@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -113,9 +114,11 @@ def test_alerts_incidents_dashboard_archive_inspect(
     assert (tmp_path / "dash/index.html").exists()
     assert "x" not in (tmp_path / "dash/dashboard.json").read_text(encoding="utf-8")
 
-    archive = archive_run_artifacts(
-        FIX / "paper_run_valid/ts_momentum_synthetic_paper", tmp_path / "archive"
-    )
+    # archive_run_artifacts writes artifacts_index.json into the run dir;
+    # archive from a copy so the committed fixture is never mutated.
+    run_copy = tmp_path / "paper_run_valid" / "ts_momentum_synthetic_paper"
+    shutil.copytree(FIX / "paper_run_valid/ts_momentum_synthetic_paper", run_copy)
+    archive = archive_run_artifacts(run_copy, tmp_path / "archive")
     assert verify_archive(archive)
     assert apply_retention_policy(tmp_path / "none", 1, 1)["candidates"] == []
 

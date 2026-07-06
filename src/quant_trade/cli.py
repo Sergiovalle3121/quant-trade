@@ -45,6 +45,7 @@ app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
+app.add_typer(stress_app, name="stress")
 console = Console()
 
 
@@ -102,7 +103,10 @@ def _request_from_options(
 @data_app.command("fetch")
 def data_fetch(
     provider: Annotated[
-        str, typer.Option(help="Provider: csv, synthetic, yfinance, polygon")
+        str,
+        typer.Option(
+            help="Provider: ccxt-<exchange> (e.g. ccxt-kraken), csv, synthetic, yfinance, polygon"
+        ),
     ] = "synthetic",
     symbol: Annotated[
         list[str] | None, typer.Option("--symbol", help="Symbol; repeat for multiple symbols")
@@ -127,10 +131,58 @@ def data_fetch(
         force_refresh,
         config,
     )
-    data = get_data_provider(request.provider).fetch_ohlcv(request)
-    report = generate_quality_report(data)
+    data_provider = get_data_provider(request.provider)
+    if not data_provider.supports_interval(request.interval):
+        raise typer.BadParameter(
+            f"provider {request.provider} does not support interval {request.interval}"
+        )
+    data = data_provider.fetch_ohlcv(request)
+    report = generate_quality_report(
+        data,
+        expected_interval=request.interval,
+        always_open=request.provider.startswith("ccxt"),
+    )
+    for warning in report.warnings:
+        console.print(f"[yellow]warning:[/yellow] {warning}")
     path = write_cache(data, request, report.warnings)
     console.print(f"Cached {len(data)} rows: {path}")
+
+
+@data_app.command("fetch-funding")
+def data_fetch_funding(
+    provider: Annotated[
+        str, typer.Option(help="ccxt provider with derivatives, e.g. ccxt-binance")
+    ] = "ccxt-binance",
+    symbol: Annotated[
+        list[str] | None,
+        typer.Option("--symbol", help="Perpetual symbol BASE-QUOTE-PERP; repeat for multiple"),
+    ] = None,
+    start: Annotated[str, typer.Option(help="Start date YYYY-MM-DD")] = "2023-01-01",
+    end: Annotated[str, typer.Option(help="End date YYYY-MM-DD")] = "2023-12-31",
+    output_dir: Annotated[str, typer.Option(help="Cache output directory")] = "data/cache",
+    force_refresh: Annotated[bool, typer.Option(help="Overwrite existing cache file")] = False,
+) -> None:
+    """Fetch perpetual funding-rate history (research-only, public endpoints)."""
+    from datetime import date as date_type
+
+    from quant_trade.data.providers.ccxt_provider import CcxtProvider
+
+    data_provider = get_data_provider(provider)
+    if not isinstance(data_provider, CcxtProvider):
+        raise typer.BadParameter("funding rates require a ccxt-<exchange> provider")
+    symbols = [s.strip().upper() for s in (symbol or ["BTC-USDT-PERP"])]
+    start_date = date_type.fromisoformat(start)
+    end_date = date_type.fromisoformat(end)
+    if start_date >= end_date:
+        raise typer.BadParameter("start must be before end")
+    frame = data_provider.fetch_funding_rates(symbols, start_date, end_date)
+    name = f"{'_'.join(symbols)}_{start}_{end}_funding.csv"
+    path = Path(output_dir) / data_provider.name / "funding" / name
+    if path.exists() and not force_refresh:
+        raise typer.BadParameter(f"funding cache already exists (use --force-refresh): {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(path, index=False)
+    console.print(f"Cached {len(frame)} funding rows: {path}")
 
 
 @data_app.command("validate")

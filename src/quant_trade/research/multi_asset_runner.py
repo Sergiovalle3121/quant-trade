@@ -7,8 +7,9 @@ from typing import Any
 import pandas as pd
 import yaml
 
-from quant_trade.backtest.costs import CostModel
+from quant_trade.backtest.costs import CONSERVATIVE_COST_MODEL, CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
+from quant_trade.data.manifest import file_sha256
 from quant_trade.data.panel import load_canonical_dataset
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_yaml
 from quant_trade.reporting.research_report import generate_research_summary
@@ -25,7 +26,12 @@ def load_multi_asset_config(path: str | Path) -> dict[str, Any]:
 
 
 def _cost(cfg: dict[str, Any]) -> CostModel:
-    return CostModel(**{k: float(v) for k, v in cfg.get("costs", {}).items()})
+    costs = cfg.get("costs")
+    if costs is None:
+        # A config without a costs block gets conservative defaults; zero
+        # costs must be requested explicitly.
+        return CONSERVATIVE_COST_MODEL
+    return CostModel(**{k: float(v) for k, v in costs.items()})
 
 
 def _split(data: pd.DataFrame, frac: float) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -43,6 +49,13 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     if not data_path.exists():
         raise FileNotFoundError(f"{data_path} not found. Run quant-trade data fetch ... first.")
     data = load_canonical_dataset(data_path)
+    # Bind the run to the exact bytes it consumed so results are reproducible
+    # and auditable against dataset versions.
+    dataset_binding = {
+        "data_path": str(data_path),
+        "data_sha256": file_sha256(data_path),
+        "rows": int(len(data)),
+    }
     train, test = _split(data, float(config.get("split", {}).get("train_fraction", 0.7)))
     strategy = str(config["strategy"])
     params = dict(config.get("strategy_params", {}))
@@ -86,7 +99,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     out = create_run_dir(
         config.get("output_dir", "outputs"), f"{config['experiment_name']}_{run_id}"
     )
-    write_yaml(out / "config_used.yaml", config)
+    write_yaml(out / "config_used.yaml", {**config, "dataset_binding": dataset_binding})
     write_json(out / "metrics_train.json", r_train.metrics)
     write_json(out / "metrics_test.json", r_test.metrics)
     write_json(out / "benchmark_train.json", b_train.metrics)
@@ -120,6 +133,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
             "rows": len(data),
             "start": str(data.timestamp.min()),
             "end": str(data.timestamp.max()),
+            "data_sha256": dataset_binding["data_sha256"],
         },
         strategy=strategy,
         strategy_params=params,
@@ -137,4 +151,5 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "symbols": sorted(data.symbol.unique()),
         "train_range": [str(train.timestamp.min()), str(train.timestamp.max())],
         "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
+        "dataset_binding": dataset_binding,
     }

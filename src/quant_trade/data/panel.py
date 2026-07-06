@@ -18,7 +18,11 @@ def validate_panel_schema(data: pd.DataFrame) -> pd.DataFrame:
     if data.empty:
         raise MarketDataValidationError("panel data is empty")
     f = data.copy()
-    raw_ts = f["timestamp"].astype(str).str.replace(r"(?<=\d)Z$", "T00:00:00Z", regex=True)
+    # Expand only bare dates like "2020-01-02Z"; a broader suffix match would
+    # corrupt standard ISO timestamps ("...T00:00:00Z") into invalid strings.
+    raw_ts = f["timestamp"].astype(str).str.replace(
+        r"^(\d{4}-\d{2}-\d{2})Z$", r"\1T00:00:00Z", regex=True
+    )
     f["timestamp"] = pd.to_datetime(raw_ts, utc=True, errors="coerce")
     f["symbol"] = f["symbol"].astype(str).str.upper().str.strip()
     for c in ["open", "high", "low", "close", "volume"]:

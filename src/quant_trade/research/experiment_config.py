@@ -8,11 +8,19 @@ import yaml
 
 @dataclass
 class CostConfig:
+    """Trading-cost settings for experiments.
+
+    Defaults are deliberately conservative (5 bps commission, 5 bps slippage,
+    2 bps spread): omitting the ``costs`` block must never produce a
+    frictionless backtest. Zero costs require explicitly setting every field
+    to 0 in the experiment config.
+    """
+
     fixed_commission: float = 0.0
-    percentage_commission: float = 0.0
-    slippage_bps: float = 0.0
+    percentage_commission: float = 0.0005
+    slippage_bps: float = 5.0
     min_commission: float = 0.0
-    spread_bps: float = 0.0
+    spread_bps: float = 2.0
 
 
 @dataclass

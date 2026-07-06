@@ -1,0 +1,12 @@
+# Backfill daily spot OHLCV for liquid crypto majors from Kraken public
+# endpoints (research-only; no API keys). Copy to a non-example name and run:
+#   quant-trade data fetch --config configs/data/ccxt_crypto_majors_daily.yaml
+# Downloaded data is cached under data/cache/ and must never be committed.
+provider: ccxt-kraken
+symbols: ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "ADA-USD"]
+start: "2020-01-01"
+end: "2025-12-31"
+interval: "1d"
+adjusted: true
+output_dir: "data/cache"
+force_refresh: false

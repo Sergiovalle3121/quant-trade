@@ -21,8 +21,8 @@ def time_series_momentum(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataF
         raise ValueError("lookback_days must be >= 1")
     close = pivot_close(data)
     mom = close / close.shift(lb) - 1
-    mask = (mom > 0) & rebalance_mask(close.index, freq).values[:, None]
-    return weights_to_long(_cap_equal(mask, max_w))
+    mask = mom > 0
+    return weights_to_long(_cap_equal(mask, max_w), rebalance=rebalance_mask(close.index, freq))
 
 
 def cross_sectional_momentum(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
@@ -41,5 +41,5 @@ def cross_sectional_momentum(data: pd.DataFrame, params: dict[str, Any]) -> pd.D
         mask = ranks.le(max(1, int(len(close.columns) * float(top_q))))
     else:
         mask = ranks <= max(1, len(close.columns) // 2)
-    mask = mask & mom.notna() & rebalance_mask(close.index, freq).values[:, None]
-    return weights_to_long(_cap_equal(mask, max_w))
+    mask = mask & mom.notna()
+    return weights_to_long(_cap_equal(mask, max_w), rebalance=rebalance_mask(close.index, freq))
