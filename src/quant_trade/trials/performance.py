@@ -21,7 +21,10 @@ def calculate_trial_performance(daily_records: list[DailyTrialRecord]) -> dict[s
     rs = [r.daily_return for r in daily_records]
     br = [r.benchmark_return for r in daily_records]
     total = daily_records[-1].cumulative_return
-    bench = sum(br)
+    # Compound the benchmark like the strategy leg; mixing an arithmetic sum
+    # with a compounded return biases excess return with the sign of the
+    # benchmark's variance drag.
+    bench = math.prod(1 + b for b in br) - 1
     vol = _std(rs) * math.sqrt(252)
     downside = [min(0, x) for x in rs]
     orders = sum(r.orders_count for r in daily_records)
@@ -63,12 +66,47 @@ def calculate_trial_performance(daily_records: list[DailyTrialRecord]) -> dict[s
         "best_day": max(rs),
         "worst_day": min(rs),
         "positive_day_rate": sum(1 for r in rs if r > 0) / len(rs),
-        "benchmark_correlation": 0.0,
+        "benchmark_correlation": _correlation(rs, br),
         "tracking_error": _std([a - b for a, b in zip(rs, br, strict=False)]) * math.sqrt(252),
-        "information_ratio": 0.0,
+        "information_ratio": _information_ratio(rs, br),
+        "psr": _trial_psr(rs),
+        "minimum_track_record_days": _min_track_record(rs),
         "warnings": [],
         "real_money_ready": False,
     }
+
+
+def _correlation(rs: list[float], br: list[float]) -> float:
+    if len(rs) < 3 or _std(rs) == 0 or _std(br) == 0:
+        return 0.0
+    return float(statistics.correlation(rs, br))
+
+
+def _information_ratio(rs: list[float], br: list[float]) -> float:
+    diffs = [a - b for a, b in zip(rs, br, strict=False)]
+    te = _std(diffs)
+    if te == 0 or not diffs:
+        return 0.0
+    return float(statistics.mean(diffs) * 252 / (te * math.sqrt(252)))
+
+
+def _trial_psr(rs: list[float]) -> float:
+    """P[true Sharpe > 0] for the trial's realized daily returns."""
+    import pandas as pd
+
+    from quant_trade.metrics.statistics import probabilistic_sharpe_ratio
+
+    return probabilistic_sharpe_ratio(pd.Series(rs))
+
+
+def _min_track_record(rs: list[float]) -> float:
+    """Days of track record needed before the Sharpe is credibly above zero."""
+    import pandas as pd
+
+    from quant_trade.metrics.statistics import minimum_track_record_length
+
+    value = minimum_track_record_length(pd.Series(rs))
+    return float(value) if math.isfinite(value) else -1.0
 
 
 def compare_trial_to_benchmark(daily_records: list[DailyTrialRecord]) -> dict[str, float]:

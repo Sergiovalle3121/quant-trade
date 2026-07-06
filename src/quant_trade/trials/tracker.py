@@ -4,54 +4,11 @@ import csv
 import json
 from pathlib import Path
 
+from .exceptions import TrialDataMissingError
 from .models import DailyTrialRecord, TrialConfig, utc_now
 
 SECRET_WORDS = ("secret", "api_key", "token", "password", "credential")
 FIELDS = list(DailyTrialRecord.__annotations__.keys())
-
-
-def _sample_records(trial: TrialConfig) -> list[DailyTrialRecord]:
-    eq = [
-        trial.initial_paper_equity,
-        trial.initial_paper_equity * 1.002,
-        trial.initial_paper_equity * 1.001,
-        trial.initial_paper_equity * 1.004,
-        trial.initial_paper_equity * 1.006,
-    ]
-    rec = []
-    high = eq[0]
-    for i, e in enumerate(eq):
-        high = max(high, e)
-        prev = eq[i - 1] if i else eq[0]
-        dr = e / prev - 1 if i else 0.0
-        rec.append(
-            DailyTrialRecord(
-                trial.trial_id,
-                trial.start_date.fromordinal(trial.start_date.toordinal() + i),
-                trial.paper_session_id,
-                e,
-                e * 0.02,
-                dr,
-                e / eq[0] - 1,
-                e / high - 1,
-                0.0005,
-                dr - 0.0005,
-                2,
-                2,
-                0,
-                0.08,
-                1.0,
-                0.25,
-                2.0,
-                0,
-                0,
-                "ok",
-                "pass",
-                False,
-                "",
-            )
-        )
-    return rec
 
 
 def validate_daily_records(records: list[DailyTrialRecord]) -> list[str]:
@@ -98,12 +55,17 @@ def collect_daily_records(
     artifact_roots: list[Path] | None = None,
     state_roots: list[Path] | None = None,
 ) -> list[DailyTrialRecord]:
+    """Load REAL daily records for a trial; fail closed when none exist.
+
+    A trial process that invents data when records are missing manufactures
+    exactly the false confidence it exists to prevent. Export records from a
+    paper session first: `quant-trade trials export-daily-records ...`.
+    """
+    del state_roots
     records = []
-    roots = artifact_roots or [Path("tests/fixtures/trials"), Path("outputs/trials")]
+    roots = artifact_roots or [Path("outputs/trials")]
     for root in roots:
         p = root / f"{trial_config.trial_id}_daily_records.csv"
-        if not p.exists():
-            p = root / "paper_daily_records_good.csv"
         if p.exists():
             with p.open(encoding="utf-8") as f:
                 records = [
@@ -118,7 +80,12 @@ def collect_daily_records(
                 ]
             break
     if not records:
-        records = _sample_records(trial_config)
+        searched = ", ".join(str(r) for r in roots)
+        raise TrialDataMissingError(
+            f"no daily records found for trial {trial_config.trial_id} (searched: {searched}); "
+            "export them from a paper session with "
+            "'quant-trade trials export-daily-records' - trial data is never fabricated"
+        )
     validate_daily_records(records)
     out = Path("outputs/trials") / trial_config.trial_id
     out.mkdir(parents=True, exist_ok=True)

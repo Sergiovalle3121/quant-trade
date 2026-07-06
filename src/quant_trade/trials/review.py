@@ -44,10 +44,13 @@ class ReviewPack:
 
 
 def generate_review_pack(
-    trial: TrialConfig, review_type: str, policy: TrialPolicy | None = None
+    trial: TrialConfig,
+    review_type: str,
+    policy: TrialPolicy | None = None,
+    artifact_roots: list[Path] | None = None,
 ) -> Path:
     policy = policy or TrialPolicy()
-    records = collect_daily_records(trial)
+    records = collect_daily_records(trial, artifact_roots=artifact_roots)
     perf = calculate_trial_performance(records)
     exp = load_expectations_from_research_artifacts(trial.research_run_dir)
     drift = analyze_drift(trial, perf, exp)

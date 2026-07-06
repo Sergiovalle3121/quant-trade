@@ -917,6 +917,22 @@ def trials_collect(
     )
 
 
+@trials_app.command("export-daily-records")
+def trials_export_daily_records(
+    run_dir: Annotated[Path, typer.Option(help="Paper session run directory")],
+    trial_id: Annotated[str, typer.Option(help="Trial ID the records belong to")],
+    paper_session_id: Annotated[str, typer.Option(help="Paper session ID")],
+    output_root: Annotated[Path, typer.Option(help="Trials output root")] = Path(
+        "outputs/trials"
+    ),
+) -> None:
+    """Bridge a real paper run into the trial system's daily-record format."""
+    from quant_trade.trials.export import export_daily_records_from_paper_run
+
+    path = export_daily_records_from_paper_run(run_dir, trial_id, paper_session_id, output_root)
+    console.print(f"Exported daily records: {path}")
+
+
 @trials_app.command("performance")
 def trials_performance(
     trial_id: Annotated[str, typer.Option()],
