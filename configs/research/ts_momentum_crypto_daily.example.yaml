@@ -1,0 +1,36 @@
+# Time-series momentum on liquid crypto majors with realistic taker-grade
+# costs. Requires a prior backfill, e.g.:
+#   quant-trade data fetch --config configs/data/ccxt_crypto_majors_daily.yaml
+# then point data_path at the cached CSV. Metrics annualize with the observed
+# bar density (~365/yr for crypto daily), not the equity 252-day calendar.
+experiment_name: ts_momentum_crypto_daily
+mode: multi_asset_research
+data_path: data/cache/ccxt-kraken/BTC-USD_ETH-USD_SOL-USD_XRP-USD_ADA-USD/1d/BTC-USD_ETH-USD_SOL-USD_XRP-USD_ADA-USD_2020-01-01_2025-12-31_adjusted.csv
+initial_cash: 100000
+strategy: time_series_momentum
+strategy_params:
+  lookback_days: 90
+  rebalance_frequency: weekly
+  max_weight_per_asset: 0.25
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+# Conservative retail taker profile: ~10 bps taker fee + 5 bps slippage +
+# 3 bps half-spread per side. Do not lower these without measured fills.
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0010
+  slippage_bps: 5.0
+  spread_bps: 3.0
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs

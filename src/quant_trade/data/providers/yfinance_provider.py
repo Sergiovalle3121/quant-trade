@@ -34,14 +34,28 @@ class YFinanceProvider:
         if raw.empty:
             raise ValueError("yfinance returned no rows")
         frames = []
+        failures: dict[str, str] = {}
         if isinstance(raw.columns, pd.MultiIndex):
+            # Isolate symbols: yfinance returns all-NaN columns for failed
+            # tickers, which previously crashed or poisoned the whole batch.
             for symbol in request.symbols:
-                part = raw[symbol].reset_index()
-                frames.append(
-                    normalize_ohlcv(
-                        part, provider=self.name, interval=request.interval, symbol=symbol
+                try:
+                    if symbol not in raw.columns.get_level_values(0):
+                        raise ValueError("symbol missing from yfinance response")
+                    part = raw[symbol].reset_index()
+                    price_columns = [c for c in part.columns if c != "Date" and c != "Datetime"]
+                    if part[price_columns].isna().all().all():
+                        raise ValueError("yfinance returned only NaN rows (failed download)")
+                    part = part.dropna(how="any")
+                    if part.empty:
+                        raise ValueError("no complete rows returned")
+                    frames.append(
+                        normalize_ohlcv(
+                            part, provider=self.name, interval=request.interval, symbol=symbol
+                        )
                     )
-                )
+                except ValueError as exc:
+                    failures[symbol] = str(exc)
         else:
             frames.append(
                 normalize_ohlcv(
@@ -50,5 +64,11 @@ class YFinanceProvider:
                     interval=request.interval,
                     symbol=request.symbols[0],
                 )
+            )
+        if failures:
+            details = "; ".join(f"{sym}: {msg}" for sym, msg in sorted(failures.items()))
+            raise ValueError(
+                f"yfinance: {len(failures)}/{len(request.symbols)} symbols failed - "
+                f"refusing to return a partial panel. {details}"
             )
         return validate_ohlcv(pd.concat(frames, ignore_index=True))

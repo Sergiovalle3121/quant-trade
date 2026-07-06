@@ -1,0 +1,33 @@
+# Cross-sectional momentum (hold top performers) on crypto majors with
+# realistic taker-grade costs. Requires a prior backfill; see
+# configs/data/ccxt_crypto_majors_daily.example.yaml.
+experiment_name: cross_sectional_momentum_crypto_daily
+mode: multi_asset_research
+data_path: data/cache/ccxt-kraken/BTC-USD_ETH-USD_SOL-USD_XRP-USD_ADA-USD/1d/BTC-USD_ETH-USD_SOL-USD_XRP-USD_ADA-USD_2020-01-01_2025-12-31_adjusted.csv
+initial_cash: 100000
+strategy: cross_sectional_momentum
+strategy_params:
+  lookback_days: 90
+  top_n: 2
+  rebalance_frequency: weekly
+  max_weight_per_asset: 0.5
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.5
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0010
+  slippage_bps: 5.0
+  spread_bps: 3.0
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs

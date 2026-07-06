@@ -28,7 +28,10 @@ def load_ohlcv_csv(path: str | Path) -> pd.DataFrame:
         raise CsvValidationError("OHLCV CSV contains no rows")
 
     data = data.copy()
-    data["timestamp"] = pd.to_datetime(data["timestamp"], utc=False, errors="coerce")
+    # The canonical time axis is UTC everywhere (panel, cache, research);
+    # parsing naive here made backtest/paper timestamps diverge from the
+    # research panel for the same file.
+    data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True, errors="coerce")
     numeric_columns = ["open", "high", "low", "close", "volume"]
     for column in numeric_columns:
         data[column] = pd.to_numeric(data[column], errors="coerce")

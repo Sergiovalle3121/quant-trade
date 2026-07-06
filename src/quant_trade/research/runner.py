@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from quant_trade.backtest import CostModel, load_ohlcv, run_backtest
+from quant_trade.data.manifest import file_sha256
 from quant_trade.reporting.artifacts import (
     create_run_dir,
     write_csv,
@@ -36,6 +38,11 @@ def _run(data, cfg: ExperimentConfig, params: dict[str, Any]):
 
 def run_experiment(cfg: ExperimentConfig):
     data = load_ohlcv(cfg.data_path)
+    dataset_binding = {
+        "data_path": str(cfg.data_path),
+        "data_sha256": file_sha256(Path(cfg.data_path)),
+        "rows": int(len(data)),
+    }
     train, test = _split(data, cfg)
     train_res = _run(train, cfg, cfg.strategy_params)
     test_res = _run(test, cfg, cfg.strategy_params)
@@ -54,7 +61,7 @@ def run_experiment(cfg: ExperimentConfig):
         metrics["benchmark_sharpe"] = benchmark["sharpe"]
         metrics["alpha_approximation"] = metrics["total_return"] - benchmark["total_return"]
     out = create_run_dir(cfg.output_dir, cfg.experiment_name)
-    write_yaml(out / "config_used.yaml", asdict(cfg))
+    write_yaml(out / "config_used.yaml", {**asdict(cfg), "dataset_binding": dataset_binding})
     write_json(out / "metrics_train.json", train_res.metrics)
     write_json(out / "metrics_test.json", test_res.metrics)
     write_csv(out / "trades.csv", test_res.trades)

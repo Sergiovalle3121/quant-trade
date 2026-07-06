@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-SUPPORTED_INTERVALS = {"1d", "1h", "30m", "15m", "5m", "1m"}
+SUPPORTED_INTERVALS = {"1d", "4h", "1h", "30m", "15m", "5m", "1m"}
 
 
 class HistoricalDataRequest(BaseModel):

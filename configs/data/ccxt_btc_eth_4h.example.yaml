@@ -1,0 +1,11 @@
+# Medium-frequency (4h) bars for BTC/ETH from Kraken public endpoints.
+# Copy to a non-example name and run:
+#   quant-trade data fetch --config configs/data/ccxt_btc_eth_4h.yaml
+provider: ccxt-kraken
+symbols: ["BTC-USD", "ETH-USD"]
+start: "2022-01-01"
+end: "2025-12-31"
+interval: "4h"
+adjusted: true
+output_dir: "data/cache"
+force_refresh: false

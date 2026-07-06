@@ -111,7 +111,19 @@ quant-trade data list-cache
 quant-trade backtest --strategy buy_and_hold --data data/cache/synthetic/SPY/1d/SPY_2020-01-01_2020-12-31_adjusted.csv --initial-cash 10000
 ```
 
-The data layer normalizes OHLCV bars to a canonical UTC schema, validates quality, writes a local CSV cache, and stores JSON manifests. Do not commit downloaded data, API keys, secrets, or `.env` files. This project remains research/backtesting only and includes no live trading or broker execution.
+The data layer normalizes OHLCV bars to a canonical UTC schema, validates quality (including bar-gap and return-spike detection), writes a local CSV cache, and stores JSON manifests. Do not commit downloaded data, API keys, secrets, or `.env` files. This project remains research/backtesting only and includes no live trading or broker execution.
+
+## Crypto market data (research-only)
+
+The `ccxt-<exchange>` providers fetch spot/perpetual OHLCV and funding-rate history from public exchange endpoints (no keys, no order routing):
+
+```bash
+python -m pip install -e ".[crypto]"
+quant-trade data fetch --provider ccxt-kraken --symbol BTC-USD --symbol ETH-USD --start 2020-01-01 --end 2025-12-31 --interval 1d
+quant-trade data fetch-funding --provider ccxt-binance --symbol BTC-USDT-PERP --start 2023-01-01 --end 2025-12-31
+```
+
+See `docs/CRYPTO_DATA.md` for symbology, pagination/rate-limit behavior, quality checks, and crypto research configs. Every research run records the dataset's sha256 (`dataset_binding`) for reproducibility.
 
 ## Phase 4 Strategy Research Lab
 

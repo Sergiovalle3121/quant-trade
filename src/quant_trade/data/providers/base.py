@@ -34,6 +34,12 @@ def get_data_provider(name: str) -> MarketDataProvider:
         from quant_trade.data.providers.polygon_provider import PolygonProvider
 
         return PolygonProvider()
+    if key == "ccxt" or key.startswith("ccxt-"):
+        from quant_trade.data.providers.ccxt_provider import CcxtProvider
+
+        exchange = key.split("-", 1)[1] if "-" in key else "kraken"
+        return CcxtProvider(exchange_id=exchange)
     raise ValueError(
-        f"unknown data provider '{name}'. Valid providers: csv, polygon, synthetic, yfinance"
+        f"unknown data provider '{name}'. Valid providers: ccxt-<exchange> "
+        "(e.g. ccxt-kraken, ccxt-binance), csv, polygon, synthetic, yfinance"
     )

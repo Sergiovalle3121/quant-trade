@@ -34,7 +34,9 @@ def date_based_split(
     test_start: Any,
     test_end: Any,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    ts, te, ss, se = map(pd.Timestamp, [train_start, train_end, test_start, test_end])
+    ts, te, ss, se = (
+        pd.to_datetime(v, utc=True) for v in [train_start, train_end, test_start, test_end]
+    )
     if not (ts <= te < ss <= se):
         raise ValueError("dates must satisfy train_start <= train_end < test_start <= test_end")
     df = _sorted(data)
