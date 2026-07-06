@@ -1,0 +1,39 @@
+# Paper-only live loop: daily crypto momentum on Kraken public data.
+# Copy to a non-example name; run one cycle per day (cron/systemd timer) or
+# leave it looping:
+#   quant-trade paper loop --config configs/paper/loop_crypto_daily.yaml \
+#     --max-cycles 0 --interval-seconds 3600
+# Cycles are idempotent: without a new bar they only refresh the heartbeat.
+mode: paper_loop
+session_name: crypto_tsmom_loop
+strategy: multi_horizon_tsmom
+strategy_params:
+  lookbacks: [21, 63, 126]
+  volatility_window: 63
+  portfolio_volatility_target: 0.20
+  max_weight_per_asset: 0.25
+  rebalance_frequency: weekly
+universe:
+  symbols: ["BTC-USD", "ETH-USD", "SOL-USD"]
+initial_cash: 100000
+costs:
+  percentage_commission: 0.0010
+  slippage_bps: 5.0
+  spread_bps: 3.0
+risk_limits:
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.30
+  max_daily_loss_pct: 0.05
+  max_total_drawdown_pct: 0.20
+  max_turnover_per_rebalance: 0.75
+  min_cash_pct: 0.01
+  max_orders_per_day: 20
+  kill_switch_enabled: true
+provider:
+  name: ccxt-kraken
+  interval: 1d
+  history_bars: 400
+state_dir: state/paper_loop
+# Optional cloud wiring (s3:// URIs supported); storage errors fail CLOSED:
+# kill_switch_uri: s3://my-bucket/quant-trade/kill_switch.json
+# heartbeat_uri: s3://my-bucket/quant-trade/heartbeat.json

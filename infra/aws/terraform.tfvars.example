@@ -1,3 +1,6 @@
-image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/quant-trade:paper"
-artifact_bucket_name = "replace-with-unique-quant-trade-paper-bucket"
+aws_region              = "us-east-1"
+project_name            = "quant-trade"
+image_uri               = "123456789012.dkr.ecr.us-east-1.amazonaws.com/quant-trade:paper"
+artifact_bucket_name    = "replace-with-unique-quant-trade-paper-bucket"
+alert_email             = "you@example.com"
 enable_paper_submission = false

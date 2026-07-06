@@ -1,15 +1,28 @@
-name: AWS Deploy Plan (manual)
+name: Terraform validate (manual)
+
+# Validation only: fmt + init(-backend=false) + validate. Applying is a
+# deliberate human action from a reviewed workstation with credentials;
+# CI never holds AWS credentials for this repository.
+
 on:
   workflow_dispatch:
-    inputs:
-      apply: { type: boolean, default: false }
-      enable_paper_submission: { type: boolean, default: false }
+  pull_request:
+    paths:
+      - "infra/aws/**"
+
 concurrency: quant-trade-aws-paper
+
 jobs:
-  terraform:
-    environment: paper
+  validate:
     runs-on: ubuntu-latest
-    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Run terraform plan by default. Apply only when input apply=true after manual approval. No live endpoints."
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.*"
+      - name: Terraform fmt
+        run: terraform -chdir=infra/aws fmt -check -diff
+      - name: Terraform init (no backend)
+        run: terraform -chdir=infra/aws init -backend=false -input=false
+      - name: Terraform validate
+        run: terraform -chdir=infra/aws validate

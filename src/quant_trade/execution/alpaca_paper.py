@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -22,6 +23,9 @@ from quant_trade.execution.safety import (
     validate_order_safety,
     validate_paper_mode,
 )
+
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_BACKOFF_BASE_SECONDS = 1.0
 
 
 class AlpacaPaperBroker:
@@ -47,23 +51,63 @@ class AlpacaPaperBroker:
         return {"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret}
 
     def _request(
-        self, method: str, path: str, *, json_payload: dict[str, Any] | None = None
+        self,
+        method: str,
+        path: str,
+        *,
+        json_payload: dict[str, Any] | None = None,
+        allow_retry: bool = True,
     ) -> Any:
+        """HTTP with bounded retry on throttling/transient failures.
+
+        Order submission passes ``allow_retry=False`` and handles its own
+        recovery via client_order_id lookup, because blindly re-POSTing an
+        order whose first attempt may have landed risks duplicates.
+        """
         validate_alpaca_paper_endpoint(self.base_url)
         headers = self._headers()
         import requests
 
-        response = requests.request(
-            method,
-            f"{self.base_url}{path}",
-            headers=headers,
-            json=json_payload,
-            timeout=self.config.timeout_seconds,
-        )
-        response.raise_for_status()
-        if response.text:
-            return sanitize_raw_payload(response.json())
-        return {}
+        max_attempts = max(1, int(getattr(self.config, "max_retries", 3))) if allow_retry else 1
+        last_detail = ""
+        for attempt in range(max_attempts):
+            try:
+                response = requests.request(
+                    method,
+                    f"{self.base_url}{path}",
+                    headers=headers,
+                    json=json_payload,
+                    timeout=self.config.timeout_seconds,
+                )
+            except requests.RequestException as exc:
+                last_detail = str(exc)
+                if attempt < max_attempts - 1:
+                    time.sleep(_BACKOFF_BASE_SECONDS * (2**attempt))
+                    continue
+                raise
+            if response.status_code in _RETRYABLE_STATUS and attempt < max_attempts - 1:
+                retry_after = float(response.headers.get("Retry-After", 0) or 0)
+                time.sleep(max(retry_after, _BACKOFF_BASE_SECONDS * (2**attempt)))
+                last_detail = f"HTTP {response.status_code}"
+                continue
+            response.raise_for_status()
+            if response.text:
+                return sanitize_raw_payload(response.json())
+            return {}
+        raise RuntimeError(f"alpaca request failed after {max_attempts} attempts: {last_detail}")
+
+    def _find_order_by_client_id(self, client_order_id: str) -> BrokerOrder | None:
+        """Recovery probe after an ambiguous submit failure."""
+        try:
+            raw = self._request(
+                "GET",
+                f"/v2/orders:by_client_order_id?client_order_id={client_order_id}",
+            )
+        except Exception:
+            return None
+        if isinstance(raw, dict) and raw.get("id"):
+            return self._map_order(raw)
+        return None
 
     def get_account(self) -> BrokerAccount:
         raw = self._request("GET", "/v2/account")
@@ -153,26 +197,61 @@ class AlpacaPaperBroker:
             mode=self.config.mode,
             details=order.to_dict(),
         )
+        client_order_id = order.client_order_id or f"qt-{uuid.uuid4()}"
         payload = {
             "symbol": order.symbol,
             "side": order.side,
             "qty": str(order.quantity),
             "type": order.order_type,
             "time_in_force": order.time_in_force,
-            "client_order_id": order.client_order_id,
+            "client_order_id": client_order_id,
         }
         if order.limit_price is not None:
             payload["limit_price"] = str(order.limit_price)
-        result = self._map_order(self._request("POST", "/v2/orders", json_payload=payload))
+        import requests
+
+        max_attempts = max(1, int(getattr(self.config, "max_retries", 3)))
+        submitted: BrokerOrder | None = None
+        for attempt in range(max_attempts):
+            try:
+                submitted = self._map_order(
+                    self._request("POST", "/v2/orders", json_payload=payload, allow_retry=False)
+                )
+                break
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else 0
+                if status not in _RETRYABLE_STATUS:
+                    raise  # 4xx: the order was rejected, not lost
+                recovered = self._find_order_by_client_id(client_order_id)
+                if recovered is not None:
+                    submitted = recovered
+                    break
+                if attempt < max_attempts - 1:
+                    time.sleep(_BACKOFF_BASE_SECONDS * (2**attempt))
+                    continue
+                raise
+            except requests.RequestException:
+                # Timeout/connection drop: the POST may have landed. Look the
+                # order up by client_order_id before retrying to avoid dupes.
+                recovered = self._find_order_by_client_id(client_order_id)
+                if recovered is not None:
+                    submitted = recovered
+                    break
+                if attempt < max_attempts - 1:
+                    time.sleep(_BACKOFF_BASE_SECONDS * (2**attempt))
+                    continue
+                raise
+        if submitted is None:
+            raise RuntimeError("order submission failed with no recoverable state")
         append_audit_event(
             self.config.audit_dir,
             "paper_order_submitted",
             "Submitted Alpaca Paper order",
             provider=self.config.provider,
             mode=self.config.mode,
-            details=result.to_dict(),
+            details=submitted.to_dict(),
         )
-        return result
+        return submitted
 
     def cancel_order(self, order_id: str) -> None:
         self._request("DELETE", f"/v2/orders/{order_id}")

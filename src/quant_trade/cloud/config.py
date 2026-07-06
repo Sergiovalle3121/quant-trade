@@ -35,6 +35,9 @@ class MonitoringConfig(BaseModel):
     alert_on_drawdown: bool = True
     alert_on_rejected_orders: bool = True
     stale_heartbeat_minutes: int = Field(default=30, gt=0)
+    # When set, job failures publish to this SNS topic so a 3am failure
+    # notifies a human instead of dying silently in a log group.
+    sns_topic_arn: str | None = None
 
 
 class LockingConfig(BaseModel):
