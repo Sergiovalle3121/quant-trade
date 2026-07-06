@@ -300,6 +300,25 @@ def research_run(config: Annotated[Path, typer.Option(help="Multi-asset research
     _run_research_config(config)
 
 
+@research_app.command("walk-forward-multi")
+def research_walk_forward_multi(
+    config: Annotated[Path, typer.Option(help="Multi-asset walk-forward YAML")],
+) -> None:
+    """Rolling out-of-sample validation on the multi-asset engine."""
+    import yaml as _yaml
+
+    from quant_trade.research.walk_forward_multi import run_multi_asset_walk_forward
+
+    raw = _yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+    raw.setdefault("experiment_name", config.stem)
+    result = run_multi_asset_walk_forward(raw)
+    agg = result["aggregate_metrics"]
+    console.print(f"Windows: {agg.get('windows')}")
+    console.print(f"OOS Sharpe: {agg.get('sharpe'):.3f}  PSR: {agg.get('psr'):.3f}")
+    console.print(f"Positive window rate: {agg.get('positive_window_rate'):.2%}")
+    console.print(f"Output directory: {result['output_dir']}")
+
+
 @research_app.command("compare")
 def research_compare(
     config: Annotated[Path, typer.Option(help="Multi-asset research YAML")],

@@ -1,0 +1,24 @@
+# Rolling out-of-sample validation of the flagship signal on real crypto data.
+# Requires a prior backfill (see docs/CRYPTO_DATA.md). Run:
+#   quant-trade research walk-forward-multi --config <this file, renamed>
+mode: multi_asset_walk_forward
+experiment_name: wf_tsmom_crypto_daily
+data_path: data/cache/ccxt-binance/BTC-USDT_ETH-USDT_SOL-USDT/1d/BTC-USDT_ETH-USDT_SOL-USDT_2020-01-01_2025-12-31_adjusted.csv
+strategy: multi_horizon_tsmom
+strategy_params:
+  volatility_window: 63
+  portfolio_volatility_target: 0.20
+  max_weight_per_asset: 0.4
+  rebalance_frequency: weekly
+parameter_grid:
+  lookbacks: [[21, 63], [21, 63, 126], [63, 126, 252]]
+split:
+  train_size: 378   # ~1 year of crypto daily bars for selection
+  test_size: 126    # ~4 months strictly out-of-sample
+  step_size: 126
+  embargo_bars: 21
+initial_cash: 100000
+costs: {percentage_commission: 0.0010, slippage_bps: 5.0, spread_bps: 3.0}
+portfolio: {max_weight_per_asset: 0.4, rebalance_band: 0.05}
+ranking_metric: sharpe
+output_dir: outputs

@@ -80,8 +80,17 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     initial = float(config.get("initial_cash", 100000))
     cost = _cost(config)
     model = get_research_signal_model(strategy)
-    w_train = model.generate(train, params)
-    w_test = model.generate(test, params)
+    # Registered signals are causal (weights at t depend only on bars <= t,
+    # enforced by the truncation-invariance tests), so generating on the full
+    # panel and slicing is leak-free AND restores the whole test window as
+    # evidence. Generating from the test slice alone burned the entire signal
+    # lookback inside the test window (a 126-bar lookback left a 96-bar test
+    # window with ~0 live bars).
+    w_all = model.generate(data, params)
+    train_ts = set(train["timestamp"].unique())
+    test_ts = set(test["timestamp"].unique())
+    w_train = w_all[w_all["timestamp"].isin(train_ts)].copy()
+    w_test = w_all[w_all["timestamp"].isin(test_ts)].copy()
     port = config.get("portfolio", {})
     max_weight = float(port.get("max_weight_per_asset", params.get("max_weight_per_asset", 1.0)))
     allow_leverage = bool(port.get("allow_leverage", False))
