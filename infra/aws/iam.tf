@@ -52,9 +52,9 @@ resource "aws_iam_role_policy" "paper_host" {
         }
       },
       {
-        Sid    = "LockTable"
-        Effect = "Allow"
-        Action = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem"]
+        Sid      = "LockTable"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem"]
         Resource = [aws_dynamodb_table.locks.arn]
       },
       {
