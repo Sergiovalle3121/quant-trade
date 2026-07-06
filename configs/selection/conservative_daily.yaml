@@ -8,3 +8,8 @@ require_subperiod_pass: false
 require_no_red_flags: false
 min_test_months: 12
 max_train_test_sharpe_gap: 1.0
+# Statistical gates: point estimates are not evidence.
+min_trade_count: 30
+min_probabilistic_sharpe: 0.90
+require_deflated_sharpe: true
+min_deflated_sharpe: 0.5

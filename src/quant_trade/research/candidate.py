@@ -70,6 +70,12 @@ class SelectionCriteria:
     max_train_test_sharpe_gap: float = 1.0
     allowed_strategies: list[str] | None = None
     allowed_symbols: list[str] | None = None
+    # Statistical gates (0 / False = disabled for backward compatibility;
+    # the shipped conservative configs enable them).
+    min_trade_count: int = 0
+    min_probabilistic_sharpe: float = 0.0
+    require_deflated_sharpe: bool = False
+    min_deflated_sharpe: float = 0.5
 
     @classmethod
     def from_yaml(cls, path: Path) -> SelectionCriteria:

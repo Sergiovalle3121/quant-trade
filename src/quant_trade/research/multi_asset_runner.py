@@ -11,9 +11,11 @@ from quant_trade.backtest.costs import CONSERVATIVE_COST_MODEL, CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.data.manifest import file_sha256
 from quant_trade.data.panel import load_canonical_dataset
+from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_yaml
 from quant_trade.reporting.research_report import generate_research_summary
 from quant_trade.research.benchmarks import compare_to_benchmark, run_benchmark
+from quant_trade.research.ledger import append_trial
 from quant_trade.research.robustness import cost_sensitivity, rolling_metrics, subperiod_analysis
 from quant_trade.research.strategy_registry import get_research_signal_model
 
@@ -34,11 +36,22 @@ def _cost(cfg: dict[str, Any]) -> CostModel:
     return CostModel(**{k: float(v) for k, v in costs.items()})
 
 
-def _split(data: pd.DataFrame, frac: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _split(
+    data: pd.DataFrame, frac: float, embargo_bars: int = 0
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Chronological split with an optional embargo.
+
+    ``embargo_bars`` drops that many bars at the start of the test window so
+    signals whose lookbacks straddle the boundary cannot leak train-period
+    information into the out-of-sample evidence.
+    """
     dates = sorted(data["timestamp"].unique())
     cut = max(1, min(len(dates) - 1, int(len(dates) * frac)))
+    test_start = cut + max(0, int(embargo_bars))
+    if test_start >= len(dates):
+        raise ValueError("embargo_bars leaves no test data")
     return data[data.timestamp.isin(dates[:cut])].copy(), data[
-        data.timestamp.isin(dates[cut:])
+        data.timestamp.isin(dates[test_start:])
     ].copy()
 
 
@@ -56,7 +69,12 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "data_sha256": file_sha256(data_path),
         "rows": int(len(data)),
     }
-    train, test = _split(data, float(config.get("split", {}).get("train_fraction", 0.7)))
+    split_cfg = config.get("split", {})
+    train, test = _split(
+        data,
+        float(split_cfg.get("train_fraction", 0.7)),
+        int(split_cfg.get("embargo_bars", 0)),
+    )
     strategy = str(config["strategy"])
     params = dict(config.get("strategy_params", {}))
     initial = float(config.get("initial_cash", 100000))
@@ -67,7 +85,8 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     port = config.get("portfolio", {})
     max_weight = float(port.get("max_weight_per_asset", params.get("max_weight_per_asset", 1.0)))
     allow_leverage = bool(port.get("allow_leverage", False))
-    allow_short = bool(port.get("allow_short", False))
+    allow_short = bool(port.get("allow_short", params.get("allow_short", False)))
+    rebalance_band = float(port.get("rebalance_band", 0.0))
     r_train = run_multi_asset_backtest(
         train,
         w_train,
@@ -76,6 +95,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         max_weight_per_asset=max_weight,
         allow_leverage=allow_leverage,
         allow_short=allow_short,
+        rebalance_band=rebalance_band,
     )
     r_test = run_multi_asset_backtest(
         test,
@@ -85,6 +105,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         max_weight_per_asset=max_weight,
         allow_leverage=allow_leverage,
         allow_short=allow_short,
+        rebalance_band=rebalance_band,
     )
     bcfg = dict(config.get("benchmark", {"type": "equal_weight_universe"}))
     b_train = run_benchmark(train, bcfg, initial, cost)
@@ -113,18 +134,68 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     write_csv(out / "target_weights_test.csv", w_test)
     rob = config.get("robustness", {})
     files = []
+    robustness_flags: dict[str, Any] = {}
     if rob.get("run_cost_sensitivity", False):
         cs = cost_sensitivity(test, strategy, params, initial)
         write_csv(out / "cost_sensitivity.csv", cs)
         files.append("cost_sensitivity.csv")
+        high = cs[cs["cost_level"] == "high"] if "cost_level" in cs.columns else cs.iloc[0:0]
+        # Pass = still profitable at the highest cost assumption.
+        robustness_flags["cost_sensitivity_pass"] = bool(
+            not high.empty and float(high.iloc[0].get("total_return", 0.0)) > 0.0
+        )
     if rob.get("run_subperiod_analysis", False):
         sp = subperiod_analysis(r_test.equity_curve)
         write_csv(out / "subperiod_analysis.csv", sp)
         files.append("subperiod_analysis.csv")
+        # Pass = at least half the calendar years are positive.
+        robustness_flags["subperiod_pass"] = bool(
+            not sp.empty and float((sp["return"] > 0).mean()) >= 0.5
+        )
     if rob.get("run_rolling_metrics", False):
         rm = rolling_metrics(r_test.equity_curve)
         write_csv(out / "rolling_metrics.csv", rm)
         files.append("rolling_metrics.csv")
+    test_returns = r_test.equity_curve["equity"].astype(float).pct_change().dropna()
+    moments = return_moments(test_returns)
+    psr = probabilistic_sharpe_ratio(test_returns)
+    results_payload = {
+        "experiment_name": config["experiment_name"],
+        "strategy": strategy,
+        "strategy_params": params,
+        "symbols": sorted(data.symbol.unique()),
+        "initial_cash": initial,
+        "benchmark": str(bcfg.get("type", "equal_weight_universe")),
+        "max_gross_exposure": float(port.get("max_gross_exposure", 1.0)),
+        "train_metrics": r_train.metrics,
+        "test_metrics": {
+            **r_test.metrics,
+            "turnover": float(r_test.metrics.get("total_turnover", 0.0)),
+            "trade_count": int(len(r_test.trades)),
+            "psr": psr,
+            **moments,
+        },
+        "comparison_test": c_test,
+        "train_range": [str(train.timestamp.min()), str(train.timestamp.max())],
+        "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
+        "robustness": robustness_flags,
+        "dataset_binding": dataset_binding,
+    }
+    write_json(out / "results.json", results_payload)
+    append_trial(
+        config.get("output_dir", "outputs"),
+        {
+            "source": "multi_asset_research",
+            "experiment_name": config["experiment_name"],
+            "strategy": strategy,
+            "strategy_params": params,
+            "data_sha256": dataset_binding["data_sha256"],
+            "test_sharpe": float(r_test.metrics.get("sharpe", 0.0)),
+            "test_sharpe_per_period": moments["sharpe_per_period"],
+            "test_total_return": float(r_test.metrics.get("total_return", 0.0)),
+            "trade_count": int(len(r_test.trades)),
+        },
+    )
     generate_research_summary(
         out / "summary.md",
         experiment_name=config["experiment_name"],

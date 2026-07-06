@@ -16,15 +16,24 @@ def _sorted(data: pd.DataFrame) -> pd.DataFrame:
 
 
 def chronological_train_test_split(
-    data: pd.DataFrame, train_fraction: float
+    data: pd.DataFrame, train_fraction: float, embargo_bars: int = 0
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Chronological split with an optional embargo.
+
+    ``embargo_bars`` drops that many bars at the start of the test window so
+    lookback features straddling the boundary cannot leak train information
+    into the out-of-sample evidence.
+    """
     if not 0 < train_fraction < 1:
         raise ValueError("train_fraction must be between 0 and 1")
+    if embargo_bars < 0:
+        raise ValueError("embargo_bars must be >= 0")
     df = _sorted(data)
     cut = int(len(df) * train_fraction)
-    if cut <= 0 or cut >= len(df):
-        raise ValueError("insufficient data for train/test split")
-    return df.iloc[:cut].copy(), df.iloc[cut:].copy()
+    test_start = cut + embargo_bars
+    if cut <= 0 or test_start >= len(df):
+        raise ValueError("insufficient data for train/test split with embargo")
+    return df.iloc[:cut].copy(), df.iloc[test_start:].copy()
 
 
 def date_based_split(
@@ -48,16 +57,19 @@ def date_based_split(
 
 
 def walk_forward_splits(
-    data: pd.DataFrame, train_size: int, test_size: int, step_size: int
+    data: pd.DataFrame, train_size: int, test_size: int, step_size: int, embargo_bars: int = 0
 ) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
     if min(train_size, test_size, step_size) <= 0:
         raise ValueError("window sizes must be positive")
+    if embargo_bars < 0:
+        raise ValueError("embargo_bars must be >= 0")
     df = _sorted(data)
     out = []
     start = 0
-    while start + train_size + test_size <= len(df):
+    while start + train_size + embargo_bars + test_size <= len(df):
         train = df.iloc[start : start + train_size].copy()
-        test = df.iloc[start + train_size : start + train_size + test_size].copy()
+        test_from = start + train_size + embargo_bars
+        test = df.iloc[test_from : test_from + test_size].copy()
         if train[TIME_COLUMN].max() >= test[TIME_COLUMN].min():
             raise ValueError("test window must occur after train window")
         out.append((train, test))

@@ -81,6 +81,30 @@ def align_universe(data: pd.DataFrame, min_history_bars: int | None = None) -> p
     return f[f["symbol"].isin(keep)].reset_index(drop=True)
 
 
+def attach_funding_rates(panel: pd.DataFrame, funding: pd.DataFrame) -> pd.DataFrame:
+    """Left-join per-bar funding rates onto an OHLCV panel.
+
+    ``funding`` needs timestamp/symbol/funding_rate columns (the schema of
+    ``quant-trade data fetch-funding`` output). Bars without a funding
+    observation get 0.0 so the backtest accrues nothing for them.
+    """
+    f = validate_panel_schema(panel)
+    required = {"timestamp", "symbol", "funding_rate"}
+    missing = required - set(funding.columns)
+    if missing:
+        raise ValueError(f"funding frame missing columns: {', '.join(sorted(missing))}")
+    g = funding.copy()
+    g["timestamp"] = pd.to_datetime(g["timestamp"], utc=True, errors="coerce")
+    g["symbol"] = g["symbol"].astype(str).str.upper().str.strip()
+    g["funding_rate"] = pd.to_numeric(g["funding_rate"], errors="coerce")
+    g = g.dropna(subset=["timestamp", "funding_rate"])
+    # Perp funding typically posts every 8h; aggregate to one rate per bar.
+    g = g.groupby(["timestamp", "symbol"], as_index=False)["funding_rate"].sum()
+    merged = f.merge(g, on=["timestamp", "symbol"], how="left")
+    merged["funding_rate"] = merged["funding_rate"].fillna(0.0)
+    return merged
+
+
 def load_canonical_dataset(path: str | Path) -> pd.DataFrame:
     p = Path(path)
     if not p.exists():
