@@ -42,10 +42,27 @@ def rebalance_mask(index: pd.DatetimeIndex, frequency: str) -> pd.Series:
     raise ValueError("rebalance_frequency must be daily, weekly, or monthly")
 
 
-def weights_to_long(weights: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for ts, row in weights.iterrows():
-        for sym, w in row.dropna().items():
-            if float(w) > 0:
-                rows.append({"timestamp": ts, "symbol": sym, "target_weight": float(w)})
-    return pd.DataFrame(rows, columns=["timestamp", "symbol", "target_weight"])
+def weights_to_long(weights: pd.DataFrame, rebalance: pd.Series | None = None) -> pd.DataFrame:
+    """Serialize a wide target-weight matrix into long-form rebalance targets.
+
+    Zero weights are emitted (NaN counts as zero) so an all-flat target is an
+    explicit exit-to-cash rebalance instead of a silently skipped date. When
+    ``rebalance`` is given, only timestamps marked True emit rows; timestamps
+    without rows mean "no rebalance", never "go to cash".
+    """
+    filled = weights.fillna(0.0)
+    if (filled.to_numpy() < 0).any():
+        raise ValueError("weights_to_long is long-only; negative weights are not supported")
+    if rebalance is not None:
+        keep = rebalance.reindex(weights.index, fill_value=False).astype(bool)
+        filled = filled.loc[keep]
+    if filled.empty:
+        return pd.DataFrame(columns=["timestamp", "symbol", "target_weight"])
+    stacked = filled.stack()
+    return pd.DataFrame(
+        {
+            "timestamp": stacked.index.get_level_values(0),
+            "symbol": stacked.index.get_level_values(1).astype(str),
+            "target_weight": stacked.to_numpy(dtype=float),
+        }
+    )

@@ -35,7 +35,5 @@ def moving_average_trend_filter(data: pd.DataFrame, params: dict[str, Any]) -> p
     if window < 2:
         raise ValueError("sma_window must be >= 2")
     close = pivot_close(data)
-    mask = (close > close.rolling(window).mean()) & rebalance_mask(close.index, freq).values[
-        :, None
-    ]
-    return weights_to_long(_cap_equal(mask, max_w))
+    mask = close > close.rolling(window).mean()
+    return weights_to_long(_cap_equal(mask, max_w), rebalance=rebalance_mask(close.index, freq))

@@ -45,6 +45,7 @@ app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
+app.add_typer(stress_app, name="stress")
 console = Console()
 
 

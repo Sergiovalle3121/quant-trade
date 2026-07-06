@@ -28,6 +28,12 @@ class PaperTradingSimulator:
         self.config_path = config_path
         self.config = load_paper_config(config_path)
         self.cost_model = CostModel(**self.config.costs)
+        execution_price = str((self.config.execution or {}).get("execution_price", "next_open"))
+        if execution_price != "next_open":
+            raise ValueError(
+                "only execution.execution_price=next_open is supported; signals decided on "
+                "bar t fill at bar t+1's open to match the backtest engine"
+            )
 
     def run(self) -> Path:
         run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -55,6 +61,10 @@ class PaperTradingSimulator:
         ]
         risk_events = []
         model = get_research_signal_model(self.config.strategy)
+        # Targets decided on bar t are executed at bar t+1's open. Executing at
+        # bar t's open would fill using close-derived information from the same
+        # bar (look-ahead) and systematically flatter paper results.
+        pending_target: dict[str, float] | None = None
         for ts, day in data.groupby("timestamp", sort=True):
             ts_str = str(ts)
             state.last_processed_timestamp = ts_str
@@ -74,16 +84,8 @@ class PaperTradingSimulator:
                 state.status = "paused"
             if state.status == "paused" or state.kill_switch_active:
                 continue
-            hist = data[data["timestamp"] <= ts]
-            signals = model.generate(hist, self.config.strategy_params)
-            todays = signals[signals["timestamp"] == ts] if not signals.empty else signals
-            if not todays.empty:
-                target = {str(r.symbol): float(r.target_weight) for r in todays.itertuples()}
-                events.append(
-                    create_event(
-                        ts_str, "signal_generated", "target weights generated", details=target
-                    ).to_dict()
-                )
+            target, pending_target = pending_target, None
+            if target is not None:
                 new_orders = target_weights_to_orders(
                     state, target, prices, self.config.risk_limits, self.cost_model
                 )
@@ -115,8 +117,9 @@ class PaperTradingSimulator:
                         pos = state.positions.get(
                             order.symbol, PaperPosition(order.symbol, 0.0, price, price)
                         )
+                        prior_value = pos.quantity * pos.average_cost
                         pos.quantity += order.quantity
-                        pos.average_cost = price
+                        pos.average_cost = (prior_value + notional) / pos.quantity
                         pos.last_price = price
                         state.positions[order.symbol] = pos
                     else:
@@ -177,6 +180,24 @@ class PaperTradingSimulator:
                 events.append(
                     create_event(
                         ts_str, "kill_switch_triggered", "kill switch active", "critical"
+                    ).to_dict()
+                )
+                continue
+            # Decide targets from history through this bar; they become
+            # actionable at the next bar's open.
+            hist = data[data["timestamp"] <= ts]
+            signals = model.generate(hist, self.config.strategy_params)
+            todays = signals[signals["timestamp"] == ts] if not signals.empty else signals
+            if not todays.empty:
+                pending_target = {
+                    str(r.symbol): float(r.target_weight) for r in todays.itertuples()
+                }
+                events.append(
+                    create_event(
+                        ts_str,
+                        "signal_generated",
+                        "target weights generated",
+                        details=pending_target,
                     ).to_dict()
                 )
         state.status = "stopped" if not state.kill_switch_active else "paused"

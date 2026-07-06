@@ -23,6 +23,4 @@ def volatility_scaled_momentum(data: pd.DataFrame, params: dict[str, Any]) -> pd
     raw = (1 / vol).where(mom > 0).replace([float("inf")], pd.NA)
     weights = raw.div(raw.sum(axis=1), axis=0).fillna(0).clip(upper=max_w)
     rb = rebalance_mask(close.index, str(params.get("rebalance_frequency", "monthly")))
-    rb_frame = pd.DataFrame({column: rb for column in weights.columns}, index=weights.index)
-    weights = weights.where(rb_frame, 0.0)
-    return weights_to_long(weights)
+    return weights_to_long(weights, rebalance=rb)

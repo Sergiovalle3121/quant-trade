@@ -23,11 +23,6 @@ def simple_mean_reversion_etf(data: pd.DataFrame, params: dict[str, Any]) -> pd.
     mu = r.rolling(tw).mean()
     sig = r.rolling(tw).std()
     score = (r - mu) / sig
-    mask = (
-        (score < z)
-        & (close > close.rolling(tw).mean())
-        & rebalance_mask(close.index, str(params.get("rebalance_frequency", "weekly"))).values[
-            :, None
-        ]
-    )
-    return weights_to_long(_cap_equal(mask, max_w))
+    mask = (score < z) & (close > close.rolling(tw).mean())
+    rb = rebalance_mask(close.index, str(params.get("rebalance_frequency", "weekly")))
+    return weights_to_long(_cap_equal(mask, max_w), rebalance=rb)

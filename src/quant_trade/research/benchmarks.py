@@ -8,6 +8,7 @@ import pandas as pd
 from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.data.panel import validate_panel_schema
+from quant_trade.metrics.performance import periods_per_year
 from quant_trade.research.signals.trend import equal_weight_buy_and_hold
 
 
@@ -82,7 +83,8 @@ def compare_to_benchmark(
         s = strategy_equity.set_index("timestamp")["equity"].pct_change()
         b = benchmark_equity.set_index("timestamp")["equity"].pct_change()
         diff = (s - b).dropna()
-        te = float(diff.std(ddof=0) * np.sqrt(252)) if len(diff) > 1 else 0.0
+        ppy = periods_per_year(diff.index)
+        te = float(diff.std(ddof=0) * np.sqrt(ppy)) if len(diff) > 1 else 0.0
         comp["tracking_error"] = te
-        comp["information_ratio"] = float(diff.mean() * 252 / te) if te else 0.0
+        comp["information_ratio"] = float(diff.mean() * ppy / te) if te else 0.0
     return comp

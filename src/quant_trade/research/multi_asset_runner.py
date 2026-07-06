@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 import yaml
 
-from quant_trade.backtest.costs import CostModel
+from quant_trade.backtest.costs import CONSERVATIVE_COST_MODEL, CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.data.panel import load_canonical_dataset
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_yaml
@@ -25,7 +25,12 @@ def load_multi_asset_config(path: str | Path) -> dict[str, Any]:
 
 
 def _cost(cfg: dict[str, Any]) -> CostModel:
-    return CostModel(**{k: float(v) for k, v in cfg.get("costs", {}).items()})
+    costs = cfg.get("costs")
+    if costs is None:
+        # A config without a costs block gets conservative defaults; zero
+        # costs must be requested explicitly.
+        return CONSERVATIVE_COST_MODEL
+    return CostModel(**{k: float(v) for k, v in costs.items()})
 
 
 def _split(data: pd.DataFrame, frac: float) -> tuple[pd.DataFrame, pd.DataFrame]:

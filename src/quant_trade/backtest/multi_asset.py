@@ -7,8 +7,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from quant_trade.backtest.costs import CostModel
+from quant_trade.backtest.costs import CONSERVATIVE_COST_MODEL, CostModel
 from quant_trade.data.panel import pivot_close, pivot_open, validate_panel_schema
+from quant_trade.metrics.performance import periods_per_year
 
 TRADING_DAYS = 252
 
@@ -27,10 +28,11 @@ def _metrics(eq: pd.DataFrame) -> dict[str, Any]:
     equity = eq["equity"].astype(float)
     ret = equity.pct_change().dropna()
     total = float(equity.iloc[-1] / equity.iloc[0] - 1) if equity.iloc[0] else 0.0
-    years = max(len(equity) / TRADING_DAYS, 1 / TRADING_DAYS)
-    vol = float(ret.std(ddof=0) * math.sqrt(TRADING_DAYS)) if len(ret) > 1 else 0.0
+    ppy = periods_per_year(eq["timestamp"]) if "timestamp" in eq else float(TRADING_DAYS)
+    years = max(len(equity) / ppy, 1 / ppy)
+    vol = float(ret.std(ddof=0) * math.sqrt(ppy)) if len(ret) > 1 else 0.0
     downside = ret[ret < 0]
-    dvol = float(downside.std(ddof=0) * math.sqrt(TRADING_DAYS)) if len(downside) > 1 else 0.0
+    dvol = float(downside.std(ddof=0) * math.sqrt(ppy)) if len(downside) > 1 else 0.0
     dd = equity / equity.cummax() - 1
     months = (
         eq.resample("ME", on="timestamp").last()["equity"].pct_change().dropna()
@@ -43,8 +45,8 @@ def _metrics(eq: pd.DataFrame) -> dict[str, Any]:
         if len(equity) > 1
         else 0.0,
         "volatility": vol,
-        "sharpe": float(ret.mean() * TRADING_DAYS / vol) if vol else 0.0,
-        "sortino": float(ret.mean() * TRADING_DAYS / dvol) if dvol else 0.0,
+        "sharpe": float(ret.mean() * ppy / vol) if vol else 0.0,
+        "sortino": float(ret.mean() * ppy / dvol) if dvol else 0.0,
         "max_drawdown": float(dd.min()) if len(dd) else 0.0,
         "calmar": float(((equity.iloc[-1] / equity.iloc[0]) ** (1 / years) - 1) / abs(dd.min()))
         if len(dd) and dd.min() < 0
@@ -71,7 +73,9 @@ def run_multi_asset_backtest(
     allow_short: bool = False,
     fractional_shares: bool = True,
 ) -> MultiAssetBacktestResult:
-    cost_model = cost_model or CostModel()
+    # Omitted costs resolve to a conservative default; a frictionless run must
+    # be requested explicitly by passing an all-zero CostModel.
+    cost_model = cost_model if cost_model is not None else CONSERVATIVE_COST_MODEL
     validate_panel_schema(data)
     opens = pivot_open(data)
     closes = pivot_close(data)
@@ -105,8 +109,11 @@ def run_multi_asset_backtest(
     for i, ts in enumerate(dates):
         if pending is not None:
             prices = opens.loc[ts].combine_first(closes.loc[ts])
+            # Value the portfolio at the same prices used for the fills. Using
+            # the execution bar's closes here would leak that bar's future
+            # intraday move into the trade sizing (look-ahead).
             port_val = cash + sum(
-                qty[s] * float(closes.loc[ts, s]) for s in symbols if pd.notna(closes.loc[ts, s])
+                qty[s] * float(prices[s]) for s in symbols if pd.notna(prices[s])
             )
             turnover = 0.0
             desired = {s: 0.0 for s in symbols}

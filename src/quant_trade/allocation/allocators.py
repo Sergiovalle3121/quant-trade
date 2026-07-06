@@ -2,22 +2,35 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quant_trade.metrics.performance import periods_per_year
+
 from .models import AllocationCandidate, AllocationPolicy, PortfolioAllocation, StrategyAllocation
 
 
 def _bounded(weights: dict[str, float], policy: AllocationPolicy) -> dict[str, float]:
+    """Clip weights to policy bounds and cap gross exposure at the investable
+    fraction.
+
+    Zero and negative raw weights stay at zero: an allocator that deliberately
+    excluded a strategy (e.g. after a drawdown breach) must not have it
+    resurrected by the minimum-weight floor. Totals below the investable
+    fraction are preserved rather than scaled back up, so deliberate
+    de-risking (volatility targeting) survives this pass.
+    """
     investable = max(0.0, 1.0 - policy.min_cash_buffer_pct)
     if not weights:
         return {}
     clipped = {
-        k: min(policy.max_strategy_weight, max(policy.min_strategy_weight, v))
+        k: min(policy.max_strategy_weight, max(policy.min_strategy_weight, v)) if v > 0 else 0.0
         for k, v in weights.items()
     }
     total = sum(clipped.values())
     if total <= 0:
         return {k: 0.0 for k in clipped}
-    scaled = {k: v / total * investable for k, v in clipped.items()}
-    return {k: min(policy.max_strategy_weight, v) for k, v in scaled.items()}
+    if total > investable:
+        scale = investable / total
+        clipped = {k: v * scale for k, v in clipped.items()}
+    return clipped
 
 
 def _build(
@@ -95,12 +108,18 @@ def risk_budget_allocator(
 ) -> PortfolioAllocation:
     inv = inverse_volatility_allocator(run_id, candidates, returns, policy)
     weights = {a.strategy_id: a.weight for a in inv.allocations}
-    if policy.volatility_target and not returns.empty:
-        port = returns[list(weights)].mul(pd.Series(weights)).sum(axis=1)
-        vol = float(port.std() * (252**0.5))
-        if vol > policy.volatility_target and vol > 0:
-            weights = {k: v * policy.volatility_target / vol for k, v in weights.items()}
-    return _build(run_id, _bounded(weights, policy), policy)
+    if policy.volatility_target and not returns.empty and weights:
+        available = [k for k in weights if k in returns.columns]
+        if available:
+            port = returns[available].mul(pd.Series({k: weights[k] for k in available})).sum(axis=1)
+            ppy = periods_per_year(port.index)
+            vol = float(port.std() * (ppy**0.5))
+            if vol > policy.volatility_target and vol > 0:
+                # Scale down after bounding; re-running _bounded here would
+                # renormalize gross exposure back up and undo the targeting.
+                scale = policy.volatility_target / vol
+                weights = {k: v * scale for k, v in weights.items()}
+    return _build(run_id, weights, policy)
 
 
 def conservative_blend_allocator(

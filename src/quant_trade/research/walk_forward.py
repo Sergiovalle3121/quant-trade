@@ -13,6 +13,34 @@ from quant_trade.research.splits import TIME_COLUMN, walk_forward_splits
 from quant_trade.strategies import get_strategy
 
 
+def _stitch_oos_equity(curves: list[pd.DataFrame], initial_cash: float) -> pd.DataFrame:
+    """Compound per-window OOS returns into one continuous equity curve.
+
+    Each window's backtest restarts at ``initial_cash``; naively concatenating
+    the raw equity levels would manufacture a fake return at every window seam
+    and let drawdowns span the resets. Compounding within-window returns
+    instead yields aggregate metrics that describe only realized OOS returns.
+    """
+    pieces = []
+    for curve in curves:
+        if curve.empty or "equity" not in curve:
+            continue
+        eq = pd.to_numeric(curve["equity"], errors="coerce")
+        returns = eq.pct_change()
+        piece = pd.DataFrame(
+            {
+                "timestamp": curve.get("timestamp", pd.NaT),
+                "window_return": returns,
+            }
+        ).iloc[1:]
+        pieces.append(piece.dropna(subset=["window_return"]))
+    if not pieces:
+        return pd.DataFrame()
+    stitched = pd.concat(pieces, ignore_index=True)
+    stitched["equity"] = initial_cash * (1 + stitched["window_return"]).cumprod()
+    return stitched[["timestamp", "equity"]]
+
+
 def run_walk_forward(cfg):
     data = load_ohlcv(cfg.data_path)
     split = cfg.split
@@ -30,7 +58,10 @@ def run_walk_forward(cfg):
             result = run_backtest(
                 train, get_strategy(cfg.strategy, **params), cfg.initial_cash, cost
             )
-            scored.append((result.metrics.get(cfg.ranking_metric) or -1e99, params))
+            metric_value = result.metrics.get(cfg.ranking_metric)
+            scored.append(
+                (float(metric_value) if metric_value is not None else float("-inf"), params)
+            )
         if not scored:
             continue
         best_metric, best_params = max(scored, key=lambda item: item[0])
@@ -52,7 +83,7 @@ def run_walk_forward(cfg):
         )
         curves.append(test_res.equity_curve)
     df = pd.DataFrame(rows)
-    combined = pd.concat(curves, ignore_index=True) if curves else pd.DataFrame()
+    combined = _stitch_oos_equity(curves, cfg.initial_cash)
     aggregate_metrics = calculate_metrics(combined, []) if not combined.empty else {}
     out = create_run_dir(cfg.output_dir, cfg.experiment_name)
     write_csv(out / "walk_forward_windows.csv", df)

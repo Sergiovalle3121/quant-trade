@@ -16,39 +16,49 @@ def _symbol_mask(data: pd.DataFrame, symbol: str) -> pd.Series:
 
 
 def apply_price_shock(data: pd.DataFrame, scenario: StressScenario) -> pd.DataFrame:
+    """Apply a persistent price shock from each symbol's second bar onward.
+
+    The shock must start after the first bar and persist so that it shows up
+    once in the return series with its true sign: shocking only the first bar
+    made every subsequent return rebound, reporting crashes as gains.
+    """
     shocked = data.copy()
     if shocked.empty:
         return shocked
     for symbol, pct in scenario.shocks.items():
-        mask = _symbol_mask(shocked, symbol)
-        if not bool(mask.any()):
+        symbol_index = shocked.index[_symbol_mask(shocked, symbol)]
+        if len(symbol_index) < 2:
             continue
-        first_index = shocked.index[mask][0]
-        row_mask = mask & (shocked.index == first_index)
+        shock_rows = symbol_index[1:]
         for column in PRICE_COLUMNS:
             if column in shocked.columns:
-                shocked.loc[row_mask, column] = shocked.loc[row_mask, column].astype(float) * (
-                    1.0 + pct
-                )
+                shocked.loc[shock_rows, column] = shocked.loc[shock_rows, column].astype(
+                    float
+                ) * (1.0 + pct)
     return shocked
 
 
 def apply_correlation_spike(data: pd.DataFrame, scenario: StressScenario) -> pd.DataFrame:
+    """Move every affected symbol the same way, persistently, from bar two on."""
     shocked = data.copy()
     if shocked.empty or "close" not in shocked.columns:
         return shocked
     direction = -1.0 if scenario.correlation_direction < 0 else 1.0
     for symbol in scenario.shocks or {"ALL": direction * 0.05}:
-        mask = (
+        magnitude = 1.0 + abs(scenario.shocks.get(symbol, 0.05)) * direction
+        if symbol == "ALL" and "symbol" in shocked.columns:
+            for group_index in shocked.groupby("symbol").groups.values():
+                if len(group_index) >= 2:
+                    shocked.loc[group_index[1:], "close"] *= magnitude
+            continue
+        symbol_index = shocked.index[
             _symbol_mask(shocked, symbol)
             if symbol != "ALL"
             else pd.Series(True, index=shocked.index)
-        )
-        if bool(mask.any()):
-            first_index = shocked.index[mask][0]
-            shocked.loc[mask & (shocked.index == first_index), "close"] *= (
-                1.0 + abs(scenario.shocks.get(symbol, 0.05)) * direction
-            )
+        ]
+        if len(symbol_index) < 2:
+            continue
+        shocked.loc[symbol_index[1:], "close"] *= magnitude
     return shocked
 
 

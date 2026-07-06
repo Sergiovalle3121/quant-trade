@@ -83,7 +83,12 @@ Writes walk-forward window results and aggregate metrics under `outputs/`.
 
 - Strategies are educational baselines for framework validation.
 - The engine is deterministic and long-only with simplified next-bar execution assumptions.
-- Cost models are configurable but still simplified relative to real venues.
+- Cost models are configurable but still simplified relative to real venues. Omitting the
+  `costs` block resolves to conservative defaults (5 bps commission, 5 bps slippage, 2 bps
+  spread); a frictionless backtest requires explicitly setting every cost field to zero.
+- Causality is enforced by regression tests (`tests/test_no_lookahead.py`): decisions on bar t
+  fill at bar t+1's open in both the backtest engines and the paper simulator, and golden-file
+  tests (`tests/test_golden_regression.py`) fail CI on silent P&L drift.
 - Grid search and walk-forward outputs are research diagnostics; they are not live-trading signals.
 - Do not add broker APIs, live execution, paid feeds, keys, tokens, or credentials without explicit human approval.
 
