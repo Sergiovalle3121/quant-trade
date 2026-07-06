@@ -92,10 +92,15 @@ def compare_actual_to_expectations(
 ) -> dict[str, Any]:
     warnings = []
     breaches = []
-    if (
-        float(actual_metrics.get("total_return", 0))
-        < expected_performance.expected_monthly_return_range[0]
-    ):
+    # total_return is cumulative over the whole trial; the expectation range
+    # is a 21-bar (monthly) bound. Pro-rate the bound to the observed horizon
+    # or a 90-day trial can never breach a monthly floor.
+    observed_days = max(1.0, float(actual_metrics.get("days_observed", 21)))
+    horizon_factor = observed_days / 21.0
+    scaled_floor = expected_performance.expected_monthly_return_range[0] * max(
+        1.0, horizon_factor
+    )
+    if float(actual_metrics.get("total_return", 0)) < scaled_floor:
         breaches.append("performance below expected range")
     if (
         float(actual_metrics.get("volatility", 0))

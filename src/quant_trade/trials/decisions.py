@@ -32,6 +32,11 @@ class DecisionRecord:
 
 
 def recommend_decision(review_pack: dict[str, Any], policy: TrialPolicy) -> DecisionRecord:
+    """Apply every enforceable TrialPolicy dimension to the performance summary.
+
+    Policy fields that exist but are never checked are worse than absent —
+    operators configure them believing they gate something.
+    """
     trial_id = str(review_pack.get("trial_id", "unknown"))
     drift = review_pack.get("drift_report", {}) or {}
     perf = review_pack.get("performance_summary", {}) or {}
@@ -41,6 +46,31 @@ def recommend_decision(review_pack: dict[str, Any], policy: TrialPolicy) -> Deci
         blocks.append("critical incidents exceed policy")
     if float(perf.get("max_drawdown", 0)) < -policy.max_total_drawdown_pct:
         blocks.append("drawdown exceeds policy")
+    if float(perf.get("worst_day", 0)) < -policy.max_daily_loss_pct:
+        blocks.append("single-day loss exceeds policy")
+    if float(perf.get("rejected_order_rate", 0)) > policy.max_rejected_order_rate:
+        blocks.append("rejected-order rate exceeds policy")
+    if float(perf.get("average_slippage_bps", 0)) > policy.max_slippage_bps:
+        blocks.append("average slippage exceeds policy")
+    if float(perf.get("operational_success_rate", 1.0)) < policy.min_success_rate:
+        blocks.append("operational success rate below policy")
+    if int(perf.get("stale_heartbeat_count", 0)) > policy.max_stale_heartbeats:
+        blocks.append("stale heartbeats exceed policy")
+    if policy.require_reconciliation_pass and int(perf.get("reconciliation_fail_count", 0)) > 0:
+        blocks.append("reconciliation failures present")
+    if float(perf.get("excess_return", 0)) < policy.min_excess_return_vs_benchmark:
+        blocks.append("excess return below policy floor")
+    if int(perf.get("days_observed", 0)) < policy.min_observation_days:
+        warns.append(
+            f"only {perf.get('days_observed', 0)} observation days "
+            f"(policy requires {policy.min_observation_days}); evidence is thin"
+        )
+    psr = perf.get("psr")
+    if psr is not None and float(psr) < 0.5:
+        warns.append(
+            "probabilistic Sharpe below 0.5: trial performance is statistically "
+            "indistinguishable from zero so far"
+        )
     if policy.require_manual_review_notes and not review_pack.get("human_notes"):
         warns.append("human review notes required before advancement")
     decision = "pause_trial" if blocks else ("needs_human_review" if warns else "continue_trial")

@@ -82,6 +82,12 @@ def update_trial_status(
     t = get_trial(reg, trial_id)
     t.status = status  # type: ignore[assignment]
     validate_trial(t)
+    # Persist the transition: a governance state machine that forgets its
+    # decisions on the next load is not a state machine.
+    p = Path(registry_path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    raw["trials"] = [trial.to_dict() for trial in list_trials(reg)]
+    p.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     out = Path("outputs/trials") / trial_id / "trial_events.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("a", encoding="utf-8") as f:

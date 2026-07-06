@@ -42,7 +42,9 @@ def test_expectations_drift_and_decision_are_paper_only() -> None:
 def test_review_pack_and_calendar_outputs() -> None:
     registry = load_trial_registry(Path("tests/fixtures/trials/trial_registry_sample.yaml"))
     trial = get_trial(registry, "ts_momentum_90d")
-    review_dir = generate_review_pack(trial, "weekly_review")
+    review_dir = generate_review_pack(
+        trial, "weekly_review", artifact_roots=[Path("tests/fixtures/trials")]
+    )
     calendar_path = generate_review_calendar(trial)
     assert (review_dir / "review_pack.md").exists()
     assert "PAPER-ONLY" in (review_dir / "review_pack.md").read_text(encoding="utf-8")
