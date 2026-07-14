@@ -39,7 +39,16 @@ def rebalance_mask(index: pd.DatetimeIndex, frequency: str) -> pd.Series:
             index.to_series().dt.month.ne(index.to_series().shift().dt.month.to_numpy()),
             index=index,
         ).fillna(True)
-    raise ValueError("rebalance_frequency must be daily, weekly, or monthly")
+    if f == "quarterly":
+        # Strict quarter starts (first bar of Jan/Apr/Jul/Oct): unlike the
+        # other frequencies there is no first-bar fallback, so a series that
+        # starts mid-quarter emits nothing until the next quarter boundary.
+        months = index.to_series().dt.month
+        return pd.Series(
+            (months.ne(months.shift().to_numpy()) & months.isin([1, 4, 7, 10])).to_numpy(),
+            index=index,
+        )
+    raise ValueError("rebalance_frequency must be daily, weekly, monthly, or quarterly")
 
 
 def weights_to_long(

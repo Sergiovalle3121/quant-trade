@@ -34,6 +34,7 @@ import yaml
 
 from quant_trade.backtest.costs import CostModel
 from quant_trade.cloud.exceptions import SafetyGateError, StorageError
+from quant_trade.cloud.monitoring import emit_metric
 from quant_trade.cloud.storage import backend_for_uri
 from quant_trade.data.providers.base import MarketDataProvider, get_data_provider
 from quant_trade.data.requests import HistoricalDataRequest
@@ -69,6 +70,12 @@ class LoopConfig:
     state_dir: str = "state/paper_loop"
     kill_switch_uri: str | None = None
     heartbeat_uri: str | None = None
+    # When true, every heartbeat also emits the heartbeat_age_seconds EMF
+    # metric (namespace QuantTrade/CloudPaper, dimension job=heartbeat) that
+    # the provisioned CloudWatch dead-man alarm watches: a dead loop stops
+    # emitting and the alarm breaches on missing data. Requires the process
+    # stdout to be shipped to CloudWatch Logs (the awslogs docker driver).
+    emit_cloudwatch_metrics: bool = False
 
     @classmethod
     def from_yaml(cls, path: Path) -> LoopConfig:
@@ -96,6 +103,7 @@ class LoopConfig:
             state_dir=str(raw.get("state_dir", "state/paper_loop")),
             kill_switch_uri=raw.get("kill_switch_uri"),
             heartbeat_uri=raw.get("heartbeat_uri"),
+            emit_cloudwatch_metrics=bool(raw.get("emit_cloudwatch_metrics", False)),
         )
 
 
@@ -175,6 +183,39 @@ class PaperLoopRunner:
             encoding="utf-8",
         )
 
+    # -------------------------------------------------------------- history
+
+    def _append_jsonl(self, name: str, rows: list[dict[str, Any]]) -> None:
+        """Append-only per-session history; consumed by `paper export-session`."""
+        if not rows:
+            return
+        path = self._state_root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(row, sort_keys=True, default=str) + "\n")
+
+    def _snapshot_row(self, state: LoopState, ts_str: str) -> dict[str, Any]:
+        session = state.session
+        gross = sum(abs(p.quantity * p.last_price) for p in session.positions.values())
+        return {
+            "timestamp": ts_str,
+            "cash": session.cash,
+            "equity": session.equity,
+            "gross_exposure": (gross / session.equity) if session.equity else 0.0,
+            "realized_pnl": session.realized_pnl,
+            "unrealized_pnl": session.unrealized_pnl,
+            "drawdown": session.max_drawdown,
+        }
+
+    def _persist_history(
+        self, state: LoopState, executed: list[PaperOrder], ts_str: str
+    ) -> None:
+        self._append_jsonl("snapshots.jsonl", [self._snapshot_row(state, ts_str)])
+        self._append_jsonl("orders.jsonl", [o.to_dict() for o in executed])
+        self._append_jsonl("events.jsonl", state.events)
+        state.events = []
+
     # --------------------------------------------------------------- safety
 
     def _kill_switch_active(self) -> tuple[bool, str]:
@@ -209,6 +250,16 @@ class PaperLoopRunner:
 
         with contextlib.suppress(StorageError):
             backend_for_uri(uri).write_json(uri, payload)
+        if self.config.emit_cloudwatch_metrics:
+            # Value 0 = "alive right now"; the dead-man alarm fires on the
+            # metric going missing, not on the value.
+            emit_metric(
+                "heartbeat_age_seconds",
+                0.0,
+                unit="Seconds",
+                dimensions={"job": "heartbeat"},
+                emf=True,
+            )
 
     # ---------------------------------------------------------------- cycle
 
@@ -308,6 +359,7 @@ class PaperLoopRunner:
             last_ts = state.session.last_processed_timestamp
             self._halt(state, f"kill switch active: {reason}", last_ts)
             self._save_state(state)
+            self._persist_history(state, [], last_ts)
             self._write_heartbeat(state, {"action": "halted", "reason": reason})
             raise SafetyGateError(f"kill switch active: {reason}")
         if state.session.kill_switch_active or state.session.status == "paused":
@@ -349,11 +401,13 @@ class PaperLoopRunner:
         if self._daily_loss_breached(state):
             self._halt(state, "daily loss limit breached", newest_str)
             self._save_state(state)
+            self._persist_history(state, [], newest_str)
             self._write_heartbeat(state, {"action": "halted", "reason": "daily_loss"})
             return {"action": "halted", "orders": 0}
         if session.max_drawdown >= self.config.risk_limits.max_total_drawdown_pct:
             self._halt(state, "total drawdown limit breached", newest_str)
             self._save_state(state)
+            self._persist_history(state, [], newest_str)
             self._write_heartbeat(state, {"action": "halted", "reason": "max_drawdown"})
             return {"action": "halted", "orders": 0}
 
@@ -387,6 +441,7 @@ class PaperLoopRunner:
             (p.last_price - p.average_cost) * p.quantity for p in session.positions.values()
         )
         self._save_state(state)
+        self._persist_history(state, executed, newest_str)
         summary = {
             "action": "traded" if executed else "marked",
             "orders": len(executed),
