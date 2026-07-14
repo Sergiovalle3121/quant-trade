@@ -1,0 +1,26 @@
+mode: multi_asset_walk_forward
+experiment_name: wf_vol_targeted_equal_weight_etf_real_daily
+data_path: data/real_input/etf_daily_2005_2024.csv
+strategy: vol_targeted_equal_weight
+split:
+  train_size: 756
+  test_size: 252
+  step_size: 252
+  embargo_bars: 63
+initial_cash: 100000
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 5.0
+  spread_bps: 2.0
+ranking_metric: sharpe
+output_dir: outputs
+strategy_params:
+  target_volatility: 0.1
+  volatility_window: 63
+  rebalance_frequency: monthly
+  max_weight_per_asset: 0.25
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_weight_per_asset: 0.25

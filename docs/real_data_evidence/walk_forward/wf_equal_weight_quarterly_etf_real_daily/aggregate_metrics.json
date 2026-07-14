@@ -1,0 +1,15 @@
+{
+  "total_return": 2.3548104067068336,
+  "cagr": 0.07852251365336027,
+  "volatility": 0.11418631909288639,
+  "sharpe": 0.7193952984105544,
+  "sortino": 0.8222385694013721,
+  "max_drawdown": -0.28378483897168305,
+  "win_rate": 0.0,
+  "number_of_trades": 0,
+  "trade_count": 0,
+  "exposure": 0.0,
+  "psr": 0.9978914228164566,
+  "windows": 16,
+  "positive_window_rate": 0.875
+}

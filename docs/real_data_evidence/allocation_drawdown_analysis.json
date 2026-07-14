@@ -1,0 +1,28 @@
+{
+  "inverse_volatility": {
+    "max_dd": -0.24631597756670753,
+    "max_dd_date": "2022-10-14",
+    "covid_dd": -0.2005628694109145
+  },
+  "vol_targeted_equal_weight": {
+    "max_dd": -0.2076545854395606,
+    "max_dd_date": "2020-03-18",
+    "covid_dd": -0.2076545854395606
+  },
+  "equal_weight_quarterly": {
+    "max_dd": -0.26059460532052636,
+    "max_dd_date": "2022-10-14",
+    "covid_dd": -0.20622477656385174
+  },
+  "equal_weight_benchmark": {
+    "max_dd": -0.257052009116184,
+    "max_dd_date": "2022-10-14",
+    "covid_dd": -0.2140454078551799
+  },
+  "_ledger": {
+    "n_trials": 109,
+    "sharpe_variance": 0.0025817269775679735,
+    "expected_max_sharpe_per_period": 0.13011480917323026,
+    "annualized_equiv": 2.065508561753958
+  }
+}

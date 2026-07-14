@@ -1,0 +1,35 @@
+# Benchmark-aware allocation experiment: simple risk parity. Parameters were
+# fixed in the pre-registered plan before any real-data results were seen
+# (docs/BENCHMARK_AWARE_VERDICT.md). Costs are the conservative 5/5/2 bps
+# profile; embargo = volatility lookback (63), aligning the OOS window with
+# the phase-1 baseline runs.
+experiment_name: inverse_volatility_etf_real_daily
+mode: multi_asset_research
+data_path: data/real_input/etf_daily_2005_2024.csv
+initial_cash: 100000
+strategy: inverse_volatility
+strategy_params:
+  volatility_window: 63
+  rebalance_frequency: monthly
+  max_weight_per_asset: 0.35
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.35
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 5.0
+  spread_bps: 2.0
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+  embargo_bars: 63
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs

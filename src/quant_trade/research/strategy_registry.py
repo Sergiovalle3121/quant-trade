@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from quant_trade.research.signals import FunctionSignalModel
+from quant_trade.research.signals.allocation import (
+    equal_weight_quarterly,
+    inverse_volatility,
+    vol_targeted_equal_weight,
+)
 from quant_trade.research.signals.breakout import donchian_breakout
 from quant_trade.research.signals.carry import funding_carry
 from quant_trade.research.signals.ensemble import ensemble_signal
@@ -33,6 +38,13 @@ REGISTRY = {
     ),
     "simple_mean_reversion_etf": FunctionSignalModel(
         "simple_mean_reversion_etf", simple_mean_reversion_etf
+    ),
+    "inverse_volatility": FunctionSignalModel("inverse_volatility", inverse_volatility),
+    "vol_targeted_equal_weight": FunctionSignalModel(
+        "vol_targeted_equal_weight", vol_targeted_equal_weight
+    ),
+    "equal_weight_quarterly": FunctionSignalModel(
+        "equal_weight_quarterly", equal_weight_quarterly
     ),
 }
 
