@@ -1,0 +1,47 @@
+{
+  "SPY": {
+    "test_sharpe": 0.2588403073402796,
+    "test_total_return": 0.01819966695190023,
+    "test_max_drawdown": -0.035593334319213854,
+    "benchmark_buy_hold_return": 0.14963769447206676,
+    "alpha_vs_buy_hold": -0.13143802752016653,
+    "train_sharpe": -0.16759718711464827,
+    "trade_count": 100
+  },
+  "QQQ": {
+    "test_sharpe": 0.24086553284636414,
+    "test_total_return": 0.02216201624591263,
+    "test_max_drawdown": -0.047805837467530754,
+    "benchmark_buy_hold_return": 0.23193822135654374,
+    "alpha_vs_buy_hold": -0.2097762051106311,
+    "train_sharpe": -0.03243226626854746,
+    "trade_count": 106
+  },
+  "IWM": {
+    "test_sharpe": -0.3415682688784329,
+    "test_total_return": -0.03383916364780726,
+    "test_max_drawdown": -0.06494053182583881,
+    "benchmark_buy_hold_return": 0.06727320575172979,
+    "alpha_vs_buy_hold": -0.10111236939953705,
+    "train_sharpe": -0.32470339775838136,
+    "trade_count": 102
+  },
+  "TLT": {
+    "test_sharpe": -0.285474969399783,
+    "test_total_return": -0.020350679042349107,
+    "test_max_drawdown": -0.06791501409200207,
+    "benchmark_buy_hold_return": -0.015871010531136376,
+    "alpha_vs_buy_hold": -0.004479668511212731,
+    "train_sharpe": -0.2821953327561718,
+    "trade_count": 111
+  },
+  "GLD": {
+    "test_sharpe": 0.05006807684412049,
+    "test_total_return": 0.0031042552127120704,
+    "test_max_drawdown": -0.02997090633212529,
+    "benchmark_buy_hold_return": 0.09784380667203241,
+    "alpha_vs_buy_hold": -0.09473955145932034,
+    "train_sharpe": 0.2861351316869159,
+    "trade_count": 105
+  }
+}

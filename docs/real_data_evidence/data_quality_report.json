@@ -1,0 +1,25 @@
+{
+  "row_count": 25165,
+  "symbol_count": 5,
+  "min_timestamp": "2005-01-03 00:00:00+00:00",
+  "max_timestamp": "2024-12-31 00:00:00+00:00",
+  "missing_values_by_column": {
+    "timestamp": 0,
+    "symbol": 0,
+    "open": 0,
+    "high": 0,
+    "low": 0,
+    "close": 0,
+    "volume": 0,
+    "provider": 0,
+    "interval": 0
+  },
+  "duplicate_timestamps_by_symbol": 0,
+  "non_monotonic_timestamps": false,
+  "invalid_ohlc_rows": 0,
+  "zero_volume_rows": 0,
+  "gap_count": 0,
+  "max_gap_multiple": 0.0,
+  "spike_count": 0,
+  "warnings": []
+}

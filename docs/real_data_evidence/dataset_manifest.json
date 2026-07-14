@@ -1,0 +1,23 @@
+{
+  "dataset": "etf_daily_2005_2024.csv",
+  "local_path": "data/real_input/etf_daily_2005_2024.csv",
+  "sha256": "b7d6ec8ad2a6b80360057ed14e1fed0233c48b6b7f6d530a0bd3151205184745",
+  "bytes": 3113269,
+  "rows": 25165,
+  "symbols": [
+    "GLD",
+    "IWM",
+    "QQQ",
+    "SPY",
+    "TLT"
+  ],
+  "bars_per_symbol": 5033,
+  "span": [
+    "2005-01-03T00:00:00+00:00",
+    "2024-12-31T00:00:00+00:00"
+  ],
+  "provider": "yfinance (auto_adjust=True, total-return adjusted)",
+  "interval": "1d",
+  "sourcing": "Downloaded by repository owner on their machine (session egress policy blocks market-data hosts); delivered via session file upload; raw CSV is never committed to git.",
+  "quality": "repo validators passed: 0 missing, 0 duplicates, 0 invalid OHLC, 0 zero-volume rows, 0 gaps, 0 spikes; extremes match known market history (2008-10-13, 2020-03-16, 2013-04-15 gold crash)."
+}

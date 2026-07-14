@@ -1,0 +1,92 @@
+{
+  "experiment_name": "cross_sectional_momentum_etf_real_daily",
+  "strategy": "cross_sectional_momentum",
+  "strategy_params": {
+    "lookback_days": 63,
+    "top_n": 2,
+    "rebalance_frequency": "monthly",
+    "max_weight_per_asset": 0.25
+  },
+  "symbols": [
+    "GLD",
+    "IWM",
+    "QQQ",
+    "SPY",
+    "TLT"
+  ],
+  "initial_cash": 100000.0,
+  "benchmark": "equal_weight_universe",
+  "max_gross_exposure": 1.0,
+  "train_metrics": {
+    "total_return": 1.0293039730254252,
+    "cagr": 0.05187023396472301,
+    "volatility": 0.07116002486203424,
+    "sharpe": 0.7465296795116115,
+    "sortino": 0.9834402981968411,
+    "max_drawdown": -0.20215650900964865,
+    "calmar": 0.2565845355107874,
+    "average_turnover": 0.016765459516000704,
+    "total_turnover": 59.06471387487048,
+    "average_positions": 1.9528810672722112,
+    "max_positions": 2,
+    "exposure": 0.4893920448358274,
+    "hit_rate": 0.5388983532084043,
+    "best_month": 0.06465312456819272,
+    "worst_month": -0.057463784213061087,
+    "monthly_win_rate": 0.6167664670658682
+  },
+  "test_metrics": {
+    "total_return": 0.21949440410718069,
+    "cagr": 0.035108581133812766,
+    "volatility": 0.08212605913958194,
+    "sharpe": 0.4615798186920862,
+    "sortino": 0.6420022767322626,
+    "max_drawdown": -0.20374139885975373,
+    "calmar": 0.17231932896455623,
+    "average_turnover": 0.018564898911370108,
+    "total_turnover": 26.863408724752546,
+    "average_positions": 1.972356599861783,
+    "max_positions": 2,
+    "exposure": 0.4940422175259332,
+    "hit_rate": 0.5366528354080221,
+    "best_month": 0.06454981096941714,
+    "worst_month": -0.057301790143229,
+    "monthly_win_rate": 0.5882352941176471,
+    "turnover": 26.863408724752546,
+    "trade_count": 188,
+    "psr": 0.8645505444748707,
+    "sharpe_per_period": 0.029088648903934713,
+    "observations": 1446.0,
+    "skewness": -0.26833796411147126,
+    "kurtosis": 5.03461678706263
+  },
+  "comparison_test": {
+    "strategy_total_return": 0.21949440410718069,
+    "benchmark_total_return": 0.8384204966184776,
+    "excess_return": -0.6189260925112969,
+    "strategy_sharpe": 0.4615798186920862,
+    "benchmark_sharpe": 0.812482108073836,
+    "strategy_max_drawdown": -0.20374139885975373,
+    "benchmark_max_drawdown": -0.257052009116184,
+    "alpha_approximation": -0.6189260925112969,
+    "tracking_error": 0.10741368248197886,
+    "information_ratio": -0.7291694432181047
+  },
+  "train_range": [
+    "2005-01-03 00:00:00+00:00",
+    "2018-12-31 00:00:00+00:00"
+  ],
+  "test_range": [
+    "2019-04-03 00:00:00+00:00",
+    "2024-12-31 00:00:00+00:00"
+  ],
+  "robustness": {
+    "cost_sensitivity_pass": true,
+    "subperiod_pass": true
+  },
+  "dataset_binding": {
+    "data_path": "data/real_input/etf_daily_2005_2024.csv",
+    "data_sha256": "b7d6ec8ad2a6b80360057ed14e1fed0233c48b6b7f6d530a0bd3151205184745",
+    "rows": 25165
+  }
+}

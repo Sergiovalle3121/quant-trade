@@ -1,0 +1,16 @@
+{
+  "total_return": 0.02216201624591263,
+  "cagr": 0.0036802875735855167,
+  "volatility": 0.015778724947734777,
+  "sharpe": 0.24086553284636414,
+  "sortino": 0.2495986566023587,
+  "max_drawdown": -0.047805837467530754,
+  "win_rate": 0.4716981132075472,
+  "number_of_trades": 106,
+  "trade_count": 106,
+  "exposure": 0.6058588548601864,
+  "benchmark_total_return": 0.23193822135654374,
+  "benchmark_max_drawdown": -0.07796633338802028,
+  "benchmark_sharpe": 0.8597518854444711,
+  "alpha_approximation": -0.2097762051106311
+}
