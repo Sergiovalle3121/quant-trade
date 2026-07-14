@@ -1,0 +1,14 @@
+# Single-asset diagnostic on real TLT daily data 2005-2024. Params are the
+# repo sample defaults (fast 3 / slow 8); costs are the conservative 5/5/2 bps
+# profile used across the real-data validation; embargo covers the slow SMA.
+# NOTE: this legacy single-asset path emits no results.json/PSR, so it is NOT
+# comparable with the conservative selection gate; reported separately.
+experiment_name: sma_crossover_tlt_real_daily
+strategy: sma_crossover
+strategy_params: {fast_window: 3, slow_window: 8}
+data_path: data/real_input/TLT_daily_2005_2024.csv
+initial_cash: 100000
+costs: {fixed_commission: 0.0, percentage_commission: 0.0005, slippage_bps: 5.0, spread_bps: 2.0}
+risk_settings: {max_drawdown_review_threshold: 0.2}
+split: {method: chronological, train_fraction: 0.7, embargo_bars: 8}
+output_dir: outputs

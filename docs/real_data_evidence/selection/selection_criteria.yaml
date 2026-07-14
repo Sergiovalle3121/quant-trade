@@ -1,0 +1,16 @@
+allowed_strategies: null
+allowed_symbols: null
+max_test_drawdown: 0.2
+max_train_test_sharpe_gap: 1.0
+max_turnover: 3.0
+min_deflated_sharpe: 0.5
+min_excess_return: 0.0
+min_probabilistic_sharpe: 0.9
+min_test_months: 12
+min_test_sharpe: 0.5
+min_trade_count: 30
+require_beats_benchmark: true
+require_cost_sensitivity_pass: true
+require_deflated_sharpe: true
+require_no_red_flags: false
+require_subperiod_pass: false

@@ -1,0 +1,33 @@
+# Real-data validation run: params verbatim from ma_trend_synthetic.yaml
+# (no parameter search). Costs are the repo's conservative defaults
+# (5/5/2 bps). Embargo = longest lookback (sma_window 50).
+experiment_name: ma_trend_etf_real_daily
+mode: multi_asset_research
+data_path: data/real_input/etf_daily_2005_2024.csv
+initial_cash: 100000
+strategy: moving_average_trend_filter
+strategy_params:
+  sma_window: 50
+  rebalance_frequency: monthly
+  max_weight_per_asset: 0.25
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 5.0
+  spread_bps: 2.0
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+  embargo_bars: 50
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs

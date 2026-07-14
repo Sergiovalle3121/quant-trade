@@ -1,0 +1,22 @@
+# Rolling OOS validation of moving_average_trend_filter on the real ETF
+# panel. Small textbook-SMA grid (50/100/200); embargo covers the largest
+# window in the grid. Costs 5/5/2 bps.
+mode: multi_asset_walk_forward
+experiment_name: wf_ma_trend_etf_real_daily
+data_path: data/real_input/etf_daily_2005_2024.csv
+strategy: moving_average_trend_filter
+strategy_params:
+  rebalance_frequency: monthly
+  max_weight_per_asset: 0.25
+parameter_grid:
+  sma_window: [50, 100, 200]
+split:
+  train_size: 756
+  test_size: 252
+  step_size: 252
+  embargo_bars: 200
+initial_cash: 100000
+costs: {fixed_commission: 0.0, percentage_commission: 0.0005, slippage_bps: 5.0, spread_bps: 2.0}
+portfolio: {allow_leverage: false, allow_short: false, max_weight_per_asset: 0.25}
+ranking_metric: sharpe
+output_dir: outputs

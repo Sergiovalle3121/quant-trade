@@ -1,0 +1,416 @@
+{
+  "wf_ma_trend_etf_real_daily_20260714_042308": {
+    "windows": 16,
+    "beat_benchmark_windows": 5,
+    "mean_excess_per_window": -0.036261244667594825,
+    "compounded_strategy_return": 2.3910173815400686,
+    "compounded_benchmark_return": 4.672403654912713,
+    "compounded_excess": -2.281386273372644,
+    "per_window": [
+      {
+        "window": 1,
+        "test_start": "2008-10-20",
+        "test_end": "2009-10-19",
+        "strategy_return": 0.2177738165081675,
+        "benchmark_return": 0.2399553126199463,
+        "excess": -0.022181496111778803
+      },
+      {
+        "window": 2,
+        "test_start": "2009-10-20",
+        "test_end": "2010-10-19",
+        "strategy_return": 0.1229473159916412,
+        "benchmark_return": 0.16399573957857116,
+        "excess": -0.041048423586929964
+      },
+      {
+        "window": 3,
+        "test_start": "2010-10-20",
+        "test_end": "2011-10-18",
+        "strategy_return": 0.1381150074694239,
+        "benchmark_return": 0.13563393051511397,
+        "excess": 0.0024810769543099354
+      },
+      {
+        "window": 4,
+        "test_start": "2011-10-19",
+        "test_end": "2012-10-17",
+        "strategy_return": 0.0450142183691277,
+        "benchmark_return": 0.171182475636807,
+        "excess": -0.1261682572676793
+      },
+      {
+        "window": 5,
+        "test_start": "2012-10-18",
+        "test_end": "2013-10-21",
+        "strategy_return": 0.1423327609250015,
+        "benchmark_return": 0.07651885348834275,
+        "excess": 0.06581390743665874
+      },
+      {
+        "window": 6,
+        "test_start": "2013-10-22",
+        "test_end": "2014-10-21",
+        "strategy_return": 0.0092548494454827,
+        "benchmark_return": 0.08478762076235125,
+        "excess": -0.07553277131686854
+      },
+      {
+        "window": 7,
+        "test_start": "2014-10-22",
+        "test_end": "2015-10-21",
+        "strategy_return": -0.0163377857353411,
+        "benchmark_return": 0.0496363554283199,
+        "excess": -0.065974141163661
+      },
+      {
+        "window": 8,
+        "test_start": "2015-10-22",
+        "test_end": "2016-10-20",
+        "strategy_return": 0.0275385592845294,
+        "benchmark_return": 0.0777890894447868,
+        "excess": -0.05025053016025739
+      },
+      {
+        "window": 9,
+        "test_start": "2016-10-21",
+        "test_end": "2017-10-20",
+        "strategy_return": 0.1656456559360384,
+        "benchmark_return": 0.13155098501464813,
+        "excess": 0.03409467092139026
+      },
+      {
+        "window": 10,
+        "test_start": "2017-10-23",
+        "test_end": "2018-10-22",
+        "strategy_return": 0.0386847052185734,
+        "benchmark_return": 0.040890110396833546,
+        "excess": -0.0022054051782601433
+      },
+      {
+        "window": 11,
+        "test_start": "2018-10-23",
+        "test_end": "2019-10-23",
+        "strategy_return": 0.0441979606360749,
+        "benchmark_return": 0.1490435820855358,
+        "excess": -0.10484562144946091
+      },
+      {
+        "window": 12,
+        "test_start": "2019-10-24",
+        "test_end": "2020-10-22",
+        "strategy_return": 0.1844685543361539,
+        "benchmark_return": 0.239087070696826,
+        "excess": -0.05461851636067211
+      },
+      {
+        "window": 13,
+        "test_start": "2020-10-23",
+        "test_end": "2021-10-22",
+        "strategy_return": 0.1913098883020376,
+        "benchmark_return": 0.17789847320955698,
+        "excess": 0.013411415092480616
+      },
+      {
+        "window": 14,
+        "test_start": "2021-10-25",
+        "test_end": "2022-10-24",
+        "strategy_return": -0.1789437876302991,
+        "benchmark_return": -0.21564577813191677,
+        "excess": 0.036701990501617654
+      },
+      {
+        "window": 15,
+        "test_start": "2022-10-25",
+        "test_end": "2023-10-25",
+        "strategy_return": -0.026796638726526,
+        "benchmark_return": 0.07393022244151459,
+        "excess": -0.1007268611680406
+      },
+      {
+        "window": 16,
+        "test_start": "2023-10-26",
+        "test_end": "2024-10-25",
+        "strategy_return": 0.2551630858670495,
+        "benchmark_return": 0.3442940376914152,
+        "excess": -0.0891309518243657
+      }
+    ]
+  },
+  "wf_tsmom_etf_real_daily_20260714_042138": {
+    "windows": 16,
+    "beat_benchmark_windows": 3,
+    "mean_excess_per_window": -0.05785952827887967,
+    "compounded_strategy_return": 0.994877817844775,
+    "compounded_benchmark_return": 3.6156387256558,
+    "compounded_excess": -2.620760907811025,
+    "per_window": [
+      {
+        "window": 1,
+        "test_start": "2008-07-07",
+        "test_end": "2009-07-06",
+        "strategy_return": -0.1883898109926077,
+        "benchmark_return": -0.10317060212016604,
+        "excess": -0.08521920887244167
+      },
+      {
+        "window": 2,
+        "test_start": "2009-07-07",
+        "test_end": "2010-07-06",
+        "strategy_return": 0.1254606693932309,
+        "benchmark_return": 0.21704732650078462,
+        "excess": -0.09158665710755373
+      },
+      {
+        "window": 3,
+        "test_start": "2010-07-07",
+        "test_end": "2011-07-05",
+        "strategy_return": 0.1210309454802041,
+        "benchmark_return": 0.2402201380071145,
+        "excess": -0.1191891925269104
+      },
+      {
+        "window": 4,
+        "test_start": "2011-07-06",
+        "test_end": "2012-07-03",
+        "strategy_return": 0.0723713398939074,
+        "benchmark_return": 0.12070479484689445,
+        "excess": -0.04833345495298705
+      },
+      {
+        "window": 5,
+        "test_start": "2012-07-05",
+        "test_end": "2013-07-08",
+        "strategy_return": 0.0744597679305489,
+        "benchmark_return": 0.04114173934672838,
+        "excess": 0.03331802858382052
+      },
+      {
+        "window": 6,
+        "test_start": "2013-07-09",
+        "test_end": "2014-07-08",
+        "strategy_return": 0.032308759523105,
+        "benchmark_return": 0.16397762685604023,
+        "excess": -0.13166886733293523
+      },
+      {
+        "window": 7,
+        "test_start": "2014-07-09",
+        "test_end": "2015-07-08",
+        "strategy_return": 0.0262412609186508,
+        "benchmark_return": 0.04769229567198785,
+        "excess": -0.02145103475333705
+      },
+      {
+        "window": 8,
+        "test_start": "2015-07-09",
+        "test_end": "2016-07-07",
+        "strategy_return": 0.0194135938828357,
+        "benchmark_return": 0.08697158165902419,
+        "excess": -0.06755798777618849
+      },
+      {
+        "window": 9,
+        "test_start": "2016-07-08",
+        "test_end": "2017-07-07",
+        "strategy_return": 0.0475768675859236,
+        "benchmark_return": 0.06916321725426089,
+        "excess": -0.021586349668337286
+      },
+      {
+        "window": 10,
+        "test_start": "2017-07-10",
+        "test_end": "2018-07-09",
+        "strategy_return": 0.103564322810975,
+        "benchmark_return": 0.14465977814549058,
+        "excess": -0.041095455334515585
+      },
+      {
+        "window": 11,
+        "test_start": "2018-07-10",
+        "test_end": "2019-07-10",
+        "strategy_return": -0.0211444948408623,
+        "benchmark_return": 0.0772204830878056,
+        "excess": -0.0983649779286679
+      },
+      {
+        "window": 12,
+        "test_start": "2019-07-11",
+        "test_end": "2020-07-09",
+        "strategy_return": 0.0417136344271986,
+        "benchmark_return": 0.1955746262999991,
+        "excess": -0.1538609918728005
+      },
+      {
+        "window": 13,
+        "test_start": "2020-07-10",
+        "test_end": "2021-07-09",
+        "strategy_return": 0.2402374351887259,
+        "benchmark_return": 0.22693655560310755,
+        "excess": 0.013300879585618347
+      },
+      {
+        "window": 14,
+        "test_start": "2021-07-12",
+        "test_end": "2022-07-11",
+        "strategy_return": -0.0542387237112715,
+        "benchmark_return": -0.15195417045189108,
+        "excess": 0.09771544674061958
+      },
+      {
+        "window": 15,
+        "test_start": "2022-07-12",
+        "test_end": "2023-07-12",
+        "strategy_return": 0.0384120348229448,
+        "benchmark_return": 0.1476117371394572,
+        "excess": -0.10919970231651238
+      },
+      {
+        "window": 16,
+        "test_start": "2023-07-13",
+        "test_end": "2024-07-12",
+        "strategy_return": 0.0903588687199441,
+        "benchmark_return": 0.17133179564889,
+        "excess": -0.0809729269289459
+      }
+    ]
+  },
+  "wf_vol_momentum_etf_real_daily_20260714_042223": {
+    "windows": 16,
+    "beat_benchmark_windows": 3,
+    "mean_excess_per_window": -0.05428979036534479,
+    "compounded_strategy_return": 1.1347043153942646,
+    "compounded_benchmark_return": 3.6156387256558,
+    "compounded_excess": -2.4809344102615354,
+    "per_window": [
+      {
+        "window": 1,
+        "test_start": "2008-07-07",
+        "test_end": "2009-07-06",
+        "strategy_return": -0.1613675861880182,
+        "benchmark_return": -0.10317060212016604,
+        "excess": -0.05819698406785215
+      },
+      {
+        "window": 2,
+        "test_start": "2009-07-07",
+        "test_end": "2010-07-06",
+        "strategy_return": 0.1175309666192203,
+        "benchmark_return": 0.21704732650078462,
+        "excess": -0.09951635988156432
+      },
+      {
+        "window": 3,
+        "test_start": "2010-07-07",
+        "test_end": "2011-07-05",
+        "strategy_return": 0.1309237408106531,
+        "benchmark_return": 0.2402201380071145,
+        "excess": -0.10929639719646139
+      },
+      {
+        "window": 4,
+        "test_start": "2011-07-06",
+        "test_end": "2012-07-03",
+        "strategy_return": 0.0788296847065883,
+        "benchmark_return": 0.12070479484689445,
+        "excess": -0.04187511014030615
+      },
+      {
+        "window": 5,
+        "test_start": "2012-07-05",
+        "test_end": "2013-07-08",
+        "strategy_return": 0.072381603222815,
+        "benchmark_return": 0.04114173934672838,
+        "excess": 0.031239863876086627
+      },
+      {
+        "window": 6,
+        "test_start": "2013-07-09",
+        "test_end": "2014-07-08",
+        "strategy_return": 0.0324965056080852,
+        "benchmark_return": 0.16397762685604023,
+        "excess": -0.13148112124795502
+      },
+      {
+        "window": 7,
+        "test_start": "2014-07-09",
+        "test_end": "2015-07-08",
+        "strategy_return": 0.0688382687651747,
+        "benchmark_return": 0.04769229567198785,
+        "excess": 0.021145973093186846
+      },
+      {
+        "window": 8,
+        "test_start": "2015-07-09",
+        "test_end": "2016-07-07",
+        "strategy_return": 0.011180132547681,
+        "benchmark_return": 0.08697158165902419,
+        "excess": -0.0757914491113432
+      },
+      {
+        "window": 9,
+        "test_start": "2016-07-08",
+        "test_end": "2017-07-07",
+        "strategy_return": 0.0554298885655679,
+        "benchmark_return": 0.06916321725426089,
+        "excess": -0.013733328688692988
+      },
+      {
+        "window": 10,
+        "test_start": "2017-07-10",
+        "test_end": "2018-07-09",
+        "strategy_return": 0.0919888652282205,
+        "benchmark_return": 0.14465977814549058,
+        "excess": -0.05267091291727008
+      },
+      {
+        "window": 11,
+        "test_start": "2018-07-10",
+        "test_end": "2019-07-10",
+        "strategy_return": -0.0351699656787877,
+        "benchmark_return": 0.0772204830878056,
+        "excess": -0.11239044876659329
+      },
+      {
+        "window": 12,
+        "test_start": "2019-07-11",
+        "test_end": "2020-07-09",
+        "strategy_return": 0.0776716771001375,
+        "benchmark_return": 0.1955746262999991,
+        "excess": -0.1179029491998616
+      },
+      {
+        "window": 13,
+        "test_start": "2020-07-10",
+        "test_end": "2021-07-09",
+        "strategy_return": 0.1906064681562254,
+        "benchmark_return": 0.22693655560310755,
+        "excess": -0.03633008744688215
+      },
+      {
+        "window": 14,
+        "test_start": "2021-07-12",
+        "test_end": "2022-07-11",
+        "strategy_return": -0.037490995246308,
+        "benchmark_return": -0.15195417045189108,
+        "excess": 0.11446317520558308
+      },
+      {
+        "window": 15,
+        "test_start": "2022-07-12",
+        "test_end": "2023-07-12",
+        "strategy_return": 0.0342754565610921,
+        "benchmark_return": 0.1476117371394572,
+        "excess": -0.11333628057836509
+      },
+      {
+        "window": 16,
+        "test_start": "2023-07-13",
+        "test_end": "2024-07-12",
+        "strategy_return": 0.0983675668716643,
+        "benchmark_return": 0.17133179564889,
+        "excess": -0.0729642287772257
+      }
+    ]
+  }
+}

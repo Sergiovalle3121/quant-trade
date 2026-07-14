@@ -45,3 +45,6 @@ data/lake/manifests/
 !data/lake/datasets/
 !data/lake/snapshots/
 !data/lake/manifests/
+
+# Real market data inputs are never committed; evidence keeps sha256 + metrics only.
+data/real_input/
