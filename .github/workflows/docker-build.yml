@@ -1,8 +1,8 @@
 name: Docker Build (manual)
 
-# Build-only: proves the image builds from a clean checkout. Pushing to ECR
-# happens from the deploy workstation (docs/CLOUD_DEPLOYMENT.md); CI holds
-# no AWS credentials for this repository.
+# Build-only: proves the image builds from a clean checkout on PRs. Pushing
+# to ECR happens in docker-push-ecr.yml on main via OIDC-assumed short-lived
+# credentials; no long-lived AWS keys are stored in this repository.
 
 on:
   workflow_dispatch:

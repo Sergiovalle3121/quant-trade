@@ -1,0 +1,55 @@
+name: Docker Push to ECR
+
+# Builds the paper image and pushes it to ECR using OIDC-assumed short-lived
+# AWS credentials — no long-lived AWS keys are stored in GitHub. The IAM role
+# and its main-branch-only trust policy live in infra/aws/github_oidc.tf.
+# Enable by setting two repository variables from the terraform outputs:
+#   AWS_ECR_PUSH_ROLE_ARN  = github_actions_ecr_push_role_arn
+#   ECR_REPOSITORY_URL     = ecr_repository_url
+# Until they are set, the job skips (it does not fail main).
+# Note: runners build linux/amd64, matching the t3-class paper host; a move
+# to Graviton (t4g) would require a buildx/arm64 setup here.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "requirements.lock.txt"
+      - "pyproject.toml"
+      - "src/**"
+      - "configs/**"
+
+concurrency: quant-trade-docker-push
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: vars.AWS_ECR_PUSH_ROLE_ARN != '' && vars.ECR_REPOSITORY_URL != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t quant-trade:paper .
+      - name: Smoke-run default command availability
+        run: docker run --rm --entrypoint quant-trade quant-trade:paper --help
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Push moving :paper tag plus immutable :sha tag for rollback
+        run: |
+          ECR="${{ vars.ECR_REPOSITORY_URL }}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          docker tag quant-trade:paper "$ECR:paper"
+          docker tag quant-trade:paper "$ECR:sha-$SHORT_SHA"
+          docker push "$ECR:paper"
+          docker push "$ECR:sha-$SHORT_SHA"
+          echo "Pushed $ECR:paper and $ECR:sha-$SHORT_SHA"

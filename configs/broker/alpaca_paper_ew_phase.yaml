@@ -1,0 +1,25 @@
+# Alpaca PAPER broker config for the equal-weight paper phase (Track 2).
+# Credentials come from ALPACA_PAPER_API_KEY / ALPACA_PAPER_SECRET_KEY env
+# vars (on the EC2 host, injected from AWS Secrets Manager) — never from this
+# file. Only the official paper endpoint is accepted; live is hard-blocked.
+provider: alpaca_paper
+mode: paper
+base_url: https://paper-api.alpaca.markets
+dry_run_default: true
+confirm_required: true
+universe: [SPY, QQQ, IWM, TLT, GLD]
+asset_class: equities
+allow_fractional: true
+allow_short: false
+allow_leverage: false
+# An equal-weight rebalance on ~100k paper equity places ~20k per symbol at
+# initial investment; per-order notional above that indicates a sizing bug.
+max_notional_per_order: 30000.0
+max_orders_per_day: 20
+max_gross_exposure: 1.0
+max_symbol_weight: 0.25
+min_cash_pct: 0.01
+audit_dir: audits/broker
+state_dir: state/broker
+real_money_enabled: false
+allow_live_trading: false

@@ -73,14 +73,16 @@ def equal_weight_quarterly(data: pd.DataFrame, params: dict[str, Any]) -> pd.Dat
 
     Control for rebalance friction against the daily-refreshed equal-weight
     benchmark: identical target portfolio, strictly fewer rebalances. Between
-    quarter starts the portfolio drifts (no rows emitted means "hold").
+    rebalances the portfolio drifts (no rows emitted means "hold").
+
+    ``rebalance_frequency`` (default ``quarterly``) exists so an accelerated
+    paper-validation session can exercise the identical code path at a
+    faster cadence; production configs leave it at the default.
     """
     max_w = float(params.get("max_weight_per_asset", 1.0))
+    freq = str(params.get("rebalance_frequency", "quarterly"))
     close = pivot_close(data)
     weights = pd.DataFrame(
         min(1.0 / len(close.columns), max_w), index=close.index, columns=close.columns
     )
-    months = close.index.to_series().dt.month
-    quarter_start = months.ne(months.shift().to_numpy()) & months.isin([1, 4, 7, 10])
-    mask = pd.Series(quarter_start.to_numpy(), index=close.index)
-    return weights_to_long(weights, rebalance=mask)
+    return weights_to_long(weights, rebalance=rebalance_mask(close.index, freq))

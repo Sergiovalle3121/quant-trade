@@ -1,0 +1,41 @@
+# PRODUCTION paper loop: equal weight, quarterly rebalance (the strategy's
+# default cadence — this file must NOT set rebalance_frequency).
+# Before deploying, replace REPLACE_BUCKET with the terraform artifacts-bucket
+# output. Paper-only; no broker connectivity exists in the loop.
+# Run with --interval-seconds 240 so the 300s CloudWatch dead-man alarm always
+# has heartbeat data (cycles are idempotent; off-hours cycles are no-ops).
+mode: paper_loop
+session_name: ew_quarterly_prod
+strategy: equal_weight_quarterly
+strategy_params:
+  max_weight_per_asset: 0.25
+universe:
+  symbols: [SPY, QQQ, IWM, TLT, GLD]
+initial_cash: 100000
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 5.0
+  spread_bps: 2.0
+risk_limits:
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+  # Wide enough that market beta does not halt the session (a fully-invested
+  # 5-ETF portfolio can move 3-6% in a bad day); plumbing faults, not market
+  # moves, are what these breakers exist to catch here.
+  max_daily_loss_pct: 0.06
+  max_total_drawdown_pct: 0.30
+  max_turnover_per_rebalance: 1.5
+  min_cash_pct: 0.01
+  max_orders_per_day: 20
+  allow_short: false
+  allow_leverage: false
+  kill_switch_enabled: true
+provider:
+  name: yfinance
+  interval: 1d
+  history_bars: 400
+state_dir: state/paper_loop
+kill_switch_uri: s3://REPLACE_BUCKET/cloud/kill_switch.json
+heartbeat_uri: s3://REPLACE_BUCKET/cloud/heartbeats/ew_quarterly_prod.json
+emit_cloudwatch_metrics: true

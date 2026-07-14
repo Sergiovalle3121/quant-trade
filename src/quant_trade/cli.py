@@ -426,6 +426,68 @@ def paper_loop(
     console.print(json.dumps(results[-1], indent=2, default=str))
 
 
+@paper_app.command("export-session")
+def paper_export_session(
+    config: Annotated[Path, typer.Option(help="Paper loop config YAML (mode: paper_loop)")],
+    output_dir: Annotated[str, typer.Option(help="Export root")] = "outputs/paper_loop_exports",
+) -> None:
+    """Materialize the standard paper artifact set (six CSVs, paper_metrics.json,
+    final_state.json) from a 24/7 loop session so ops/trials can consume it."""
+    from dataclasses import asdict
+    from datetime import UTC, datetime
+
+    from quant_trade.live.loop import LoopConfig
+    from quant_trade.paper.models import PaperTradingConfig
+    from quant_trade.paper.reports import write_csvs, write_report
+    from quant_trade.paper.state import load_state
+
+    cfg = LoopConfig.from_yaml(config)
+    root = Path(cfg.state_dir) / cfg.session_name
+    state_path = root / "latest_state.json"
+    if not state_path.exists():
+        raise typer.BadParameter(f"loop session state not found: {state_path}")
+    state = load_state(state_path)
+
+    def _read_jsonl(name: str) -> list[dict]:
+        path = root / name
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+    snapshots = _read_jsonl("snapshots.jsonl")
+    orders = _read_jsonl("orders.jsonl")
+    events = _read_jsonl("events.jsonl")
+    fills = [f.to_dict() for f in state.fills]
+    positions = [asdict(p) for p in state.positions.values()]
+    # Halt events double as risk events so ops alerting sees breaker trips.
+    risk_events = [e for e in events if e.get("severity") == "critical"]
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    out = Path(output_dir) / cfg.session_name / run_id
+    out.mkdir(parents=True, exist_ok=True)
+    pcfg = PaperTradingConfig(
+        paper_session_name=cfg.session_name,
+        mode="paper_loop_export",
+        data_path=f"provider:{cfg.provider}",
+        strategy=cfg.strategy,
+        strategy_params=cfg.strategy_params,
+        universe={"symbols": cfg.symbols},
+        initial_cash=cfg.initial_cash,
+        costs=cfg.costs,
+        risk_limits=cfg.risk_limits,
+        execution={"execution_price": "next_open"},
+        state_dir=cfg.state_dir,
+        output_dir=output_dir,
+    )
+    write_csvs(out, snapshots, orders, fills, positions, events, risk_events)
+    metrics = write_report(out, pcfg, state, orders, fills, snapshots, risk_events)
+    (out / "final_state.json").write_text(
+        json.dumps(state.to_dict(), indent=2, default=str), encoding="utf-8"
+    )
+    console.print(f"Exported {len(snapshots)} snapshots, {len(orders)} orders, "
+                  f"{len(fills)} fills to {out}")
+    console.print(f"Total return: {metrics['total_return']:.2%}")
+
+
 @paper_app.command("status")
 def paper_status(
     session: Annotated[str, typer.Option(help="Paper session name")],
@@ -717,6 +779,135 @@ def broker_plan(
         encoding="utf-8",
     )
     print(f"Broker plan created: {out}")
+
+
+@broker_app.command("rebalance-plan")
+def broker_rebalance_plan(
+    loop_config: Annotated[Path, typer.Option(help="Paper loop config YAML (mode: paper_loop)")],
+    broker_config: Annotated[Path, typer.Option(help="Broker YAML config")],
+    data: Annotated[
+        Path | None,
+        typer.Option(help="Canonical OHLCV panel CSV override (offline/testing); "
+                          "default fetches via the loop's provider"),
+    ] = None,
+    state_path: Annotated[
+        Path | None, typer.Option(help="Override the loop session latest_state.json")
+    ] = None,
+) -> None:
+    """Strategy-aware paper order plan: regenerate the loop strategy's target for
+    the newest bar and diff it against the loop session's positions. Dry-run
+    only — submission stays in `broker submit-plan`. A safety failure on ANY
+    order fails the whole plan (partial rebalances are worse than none)."""
+    import csv
+    import uuid
+    from datetime import UTC, datetime
+
+    from quant_trade.backtest.costs import CostModel
+    from quant_trade.execution.broker import BrokerAccount
+    from quant_trade.execution.config import load_broker_config
+    from quant_trade.execution.exceptions import BrokerSafetyError
+    from quant_trade.execution.order_mapper import paper_order_to_broker_order_request
+    from quant_trade.execution.safety import validate_order_safety
+    from quant_trade.live.loop import LoopConfig, PaperLoopRunner
+    from quant_trade.paper.rebalancer import target_weights_to_orders
+    from quant_trade.paper.state import load_state
+    from quant_trade.research.strategy_registry import get_research_signal_model
+
+    cfg = LoopConfig.from_yaml(loop_config)
+    bcfg = load_broker_config(broker_config)
+    sp = state_path or Path(cfg.state_dir) / cfg.session_name / "latest_state.json"
+    if not sp.exists():
+        raise typer.BadParameter(f"loop session state not found: {sp} (run the paper loop first)")
+    session = load_state(sp)
+    if data is not None:
+        from quant_trade.data.panel import load_canonical_dataset
+
+        panel = load_canonical_dataset(data)
+    else:
+        panel = PaperLoopRunner(cfg)._fetch_panel()
+    panel = panel[panel["symbol"].isin(cfg.symbols)].sort_values("timestamp")
+    if panel.empty:
+        raise typer.BadParameter("no market data available for the configured symbols")
+    newest_ts = panel["timestamp"].max()
+    newest = panel[panel["timestamp"] == newest_ts]
+    prices = {str(r.symbol): float(r.open) for r in newest.itertuples()}
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    out = Path("outputs/broker_plans") / cfg.session_name / run_id
+    signals = get_research_signal_model(cfg.strategy).generate(panel, cfg.strategy_params)
+    todays = signals[signals["timestamp"] == newest_ts] if not signals.empty else signals
+    if todays.empty:
+        _write_json(out / "proposed_orders.json", [])
+        _write_json(out / "risk_checks.json", [])
+        _write_json(out / "dry_run_results.json", [])
+        (out / "plan_summary.md").write_text(
+            f"# Broker Rebalance Plan\n\nRun: {run_id}\n\nBar: {newest_ts}\n\n"
+            "No rebalance due on this bar for this strategy; zero orders.\n"
+            "Dry-run only; no broker network calls.\n",
+            encoding="utf-8",
+        )
+        print(f"No rebalance due; empty plan created: {out}")
+        return
+    target = {str(r.symbol): float(r.target_weight) for r in todays.itertuples()}
+    orders = target_weights_to_orders(
+        session, target, prices, cfg.risk_limits, CostModel(**cfg.costs)
+    )
+    requests, risk_checks, dry_rows, skipped = [], [], [], []
+    account = BrokerAccount(
+        bcfg.provider, "local****", "USD", session.cash, session.equity, session.equity,
+        "planning", True,
+    )
+    failure: str | None = None
+    for order in orders:
+        if not bcfg.allow_fractional:
+            whole = float(int(order.quantity))
+            if whole <= 0:
+                skipped.append({"symbol": order.symbol, "reason": "sub-share after rounding"})
+                continue
+            order.quantity = whole
+        try:
+            req = paper_order_to_broker_order_request(order, bcfg)
+            risk = validate_order_safety(req, bcfg, account)
+        except BrokerSafetyError as exc:
+            failure = f"{order.symbol} {order.side} {order.quantity}: {exc}"
+            break
+        requests.append(req)
+        risk_checks.append({**risk, "planned_price": prices.get(req.symbol, 0.0),
+                            "planned_notional": req.quantity * prices.get(req.symbol, 0.0)})
+        dry_rows.append({"client_order_id": req.client_order_id, "status": "dry_run"})
+    if failure is not None:
+        _write_json(out / "plan_failure.json", {"failed_order": failure, "bar": str(newest_ts)})
+        (out / "plan_summary.md").write_text(
+            f"# Broker Rebalance Plan — FAILED SAFETY VALIDATION\n\nRun: {run_id}\n\n"
+            f"Bar: {newest_ts}\n\nFailed order: {failure}\n\n"
+            "No orders were written; a partial rebalance plan is never emitted.\n",
+            encoding="utf-8",
+        )
+        print(f"Plan FAILED safety validation: {failure}")
+        raise typer.Exit(code=1)
+    _write_json(out / "proposed_orders.json", [r.to_dict() for r in requests])
+    _write_json(out / "risk_checks.json", risk_checks)
+    _write_json(out / "skipped_orders.json", skipped)
+    _write_json(out / "dry_run_results.json", dry_rows)
+    _write_json(out / "target_weights.json", target)
+    (out / "broker_config_used.yaml").write_text(
+        yaml.safe_dump(bcfg.to_dict(), sort_keys=False), encoding="utf-8"
+    )
+    with (out / "proposed_orders.csv").open("w", newline="", encoding="utf-8") as fh:
+        if requests:
+            writer = csv.DictWriter(fh, fieldnames=list(requests[0].to_dict()))
+            writer.writeheader()
+            writer.writerows([r.to_dict() for r in requests])
+    sells = sum(1 for r in requests if r.side == "sell")
+    (out / "plan_summary.md").write_text(
+        f"# Broker Rebalance Plan\n\nRun: {run_id}\n\nSession: {cfg.session_name}\n\n"
+        f"Strategy: {cfg.strategy}\n\nBar: {newest_ts}\n\n"
+        f"Orders: {len(requests)} ({sells} sells, {len(requests) - sells} buys); "
+        f"skipped: {len(skipped)}\n\n"
+        "Dry-run only; no broker network calls. Submit explicitly with "
+        "`quant-trade broker submit-plan`.\n",
+        encoding="utf-8",
+    )
+    print(f"Rebalance plan created: {out} ({len(requests)} orders)")
 
 
 @broker_app.command("submit-plan")

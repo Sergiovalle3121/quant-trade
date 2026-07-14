@@ -1,0 +1,37 @@
+# VALIDATION paper loop: identical code path to production, accelerated to a
+# weekly cadence so the full rebalance cycle is exercised ~12 times in the
+# 90-day phase. Disjoint session name, state, and heartbeat from production.
+# Replace REPLACE_BUCKET with the terraform artifacts-bucket output.
+mode: paper_loop
+session_name: ew_weekly_val
+strategy: equal_weight_quarterly
+strategy_params:
+  max_weight_per_asset: 0.25
+  rebalance_frequency: weekly
+universe:
+  symbols: [SPY, QQQ, IWM, TLT, GLD]
+initial_cash: 100000
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 5.0
+  spread_bps: 2.0
+risk_limits:
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+  max_daily_loss_pct: 0.06
+  max_total_drawdown_pct: 0.30
+  max_turnover_per_rebalance: 1.5
+  min_cash_pct: 0.01
+  max_orders_per_day: 20
+  allow_short: false
+  allow_leverage: false
+  kill_switch_enabled: true
+provider:
+  name: yfinance
+  interval: 1d
+  history_bars: 400
+state_dir: state/paper_loop
+kill_switch_uri: s3://REPLACE_BUCKET/cloud/kill_switch.json
+heartbeat_uri: s3://REPLACE_BUCKET/cloud/heartbeats/ew_weekly_val.json
+emit_cloudwatch_metrics: true

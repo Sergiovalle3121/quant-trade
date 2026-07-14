@@ -51,3 +51,10 @@ variable "enable_paper_submission" {
   type    = bool
   default = false
 }
+
+# GitHub repository (owner/name) whose main-branch workflows may assume the
+# CI image-push role via OIDC.
+variable "github_repository" {
+  type    = string
+  default = "Sergiovalle3121/quant-trade"
+}

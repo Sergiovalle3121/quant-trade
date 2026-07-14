@@ -21,3 +21,7 @@ output "alerts_topic_arn" {
 output "lock_table" {
   value = aws_dynamodb_table.locks.name
 }
+
+output "github_actions_ecr_push_role_arn" {
+  value = aws_iam_role.github_actions_ecr_push.arn
+}
