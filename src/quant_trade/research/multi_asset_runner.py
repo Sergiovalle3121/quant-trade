@@ -11,6 +11,7 @@ from quant_trade.backtest.costs import CONSERVATIVE_COST_MODEL, CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.data.manifest import file_sha256
 from quant_trade.data.panel import load_canonical_dataset
+from quant_trade.execution.bar_model import BarExecutionPolicy
 from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_yaml
 from quant_trade.reporting.research_report import generate_research_summary
@@ -34,6 +35,42 @@ def _cost(cfg: dict[str, Any]) -> CostModel:
         # costs must be requested explicitly.
         return CONSERVATIVE_COST_MODEL
     return CostModel(**{k: float(v) for k, v in costs.items()})
+
+
+def _execution_policy(cfg: dict[str, Any]) -> BarExecutionPolicy:
+    return BarExecutionPolicy.from_mapping(cfg.get("execution"))
+
+
+def _execution_summary(order_events: pd.DataFrame, trades: pd.DataFrame) -> dict[str, Any]:
+    if order_events.empty:
+        return {
+            "orders_submitted": 0,
+            "quantity_fill_rate": 0.0,
+            "partial_or_expired_orders": 0,
+            "partial_or_expired_order_rate": 0.0,
+            "average_participation_rate": 0.0,
+            "average_price_impact_bps": 0.0,
+        }
+    submitted = order_events[order_events["event_type"] == "submitted"]
+    terminal = order_events.groupby("order_id", sort=False, as_index=False).tail(1)
+    requested = float(submitted["requested_quantity"].sum())
+    filled = float(trades["quantity"].sum()) if not trades.empty else 0.0
+    return {
+        "orders_submitted": int(len(submitted)),
+        "quantity_fill_rate": filled / requested if requested > 0 else 0.0,
+        "partial_or_expired_orders": int(
+            terminal["status"].isin(["partially_filled", "expired", "cancelled"]).sum()
+        ),
+        "partial_or_expired_order_rate": float(
+            terminal["status"].isin(["partially_filled", "expired", "cancelled"]).mean()
+        ),
+        "average_participation_rate": (
+            float(trades["participation_rate"].mean()) if not trades.empty else 0.0
+        ),
+        "average_price_impact_bps": (
+            float(trades["price_impact_bps"].mean()) if not trades.empty else 0.0
+        ),
+    }
 
 
 def _split(
@@ -96,6 +133,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     allow_leverage = bool(port.get("allow_leverage", False))
     allow_short = bool(port.get("allow_short", params.get("allow_short", False)))
     rebalance_band = float(port.get("rebalance_band", 0.0))
+    execution_policy = _execution_policy(config)
     r_train = run_multi_asset_backtest(
         train,
         w_train,
@@ -105,6 +143,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         allow_leverage=allow_leverage,
         allow_short=allow_short,
         rebalance_band=rebalance_band,
+        execution_policy=execution_policy,
     )
     r_test = run_multi_asset_backtest(
         test,
@@ -115,10 +154,23 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         allow_leverage=allow_leverage,
         allow_short=allow_short,
         rebalance_band=rebalance_band,
+        execution_policy=execution_policy,
     )
     bcfg = dict(config.get("benchmark", {"type": "equal_weight_universe"}))
-    b_train = run_benchmark(train, bcfg, initial, cost)
-    b_test = run_benchmark(test, bcfg, initial, cost)
+    b_train = run_benchmark(
+        train,
+        bcfg,
+        initial,
+        cost,
+        execution_policy=execution_policy,
+    )
+    b_test = run_benchmark(
+        test,
+        bcfg,
+        initial,
+        cost,
+        execution_policy=execution_policy,
+    )
     c_train = compare_to_benchmark(
         r_train.metrics, b_train.metrics, r_train.equity_curve, b_train.equity_curve
     )
@@ -140,12 +192,20 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     write_csv(out / "equity_curve_test.csv", r_test.equity_curve)
     write_csv(out / "positions_test.csv", r_test.positions)
     write_csv(out / "trades_test.csv", r_test.trades)
+    write_csv(out / "order_events_train.csv", r_train.order_events)
+    write_csv(out / "order_events_test.csv", r_test.order_events)
     write_csv(out / "target_weights_test.csv", w_test)
     rob = config.get("robustness", {})
     files = []
     robustness_flags: dict[str, Any] = {}
     if rob.get("run_cost_sensitivity", False):
-        cs = cost_sensitivity(test, strategy, params, initial)
+        cs = cost_sensitivity(
+            test,
+            strategy,
+            params,
+            initial,
+            execution_policy=execution_policy,
+        )
         write_csv(out / "cost_sensitivity.csv", cs)
         files.append("cost_sensitivity.csv")
         high = cs[cs["cost_level"] == "high"] if "cost_level" in cs.columns else cs.iloc[0:0]
@@ -168,6 +228,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     test_returns = r_test.equity_curve["equity"].astype(float).pct_change().dropna()
     moments = return_moments(test_returns)
     psr = probabilistic_sharpe_ratio(test_returns)
+    execution_test = _execution_summary(r_test.order_events, r_test.trades)
     results_payload = {
         "experiment_name": config["experiment_name"],
         "strategy": strategy,
@@ -189,6 +250,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
         "robustness": robustness_flags,
         "dataset_binding": dataset_binding,
+        "execution_test": execution_test,
     }
     write_json(out / "results.json", results_payload)
     append_trial(
@@ -232,4 +294,6 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "train_range": [str(train.timestamp.min()), str(train.timestamp.max())],
         "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
         "dataset_binding": dataset_binding,
+        "execution_test": execution_test,
     }
+
