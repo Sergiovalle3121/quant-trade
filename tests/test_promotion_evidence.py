@@ -30,10 +30,19 @@ def _risk():
         "max_drawdown": 0.20,
         "max_turnover": 3.0,
         "min_net_excess_return": 0.0,
+        "min_quantity_fill_rate": 0.90,
+        "max_partial_or_expired_order_rate": 0.10,
     }
 
 
-def _write_results(path, *, excess=0.05, cost_pass=True):
+def _write_results(
+    path,
+    *,
+    excess=0.05,
+    cost_pass=True,
+    fill_rate=0.98,
+    incomplete_rate=0.02,
+):
     path.mkdir(exist_ok=True)
     (path / "results.json").write_text(
         json.dumps(
@@ -41,6 +50,10 @@ def _write_results(path, *, excess=0.05, cost_pass=True):
                 "comparison_test": {"excess_return": excess},
                 "test_metrics": {"max_drawdown": -0.10},
                 "robustness": {"cost_sensitivity_pass": cost_pass},
+                "execution_test": {
+                    "quantity_fill_rate": fill_rate,
+                    "partial_or_expired_order_rate": incomplete_rate,
+                },
                 "test_range": ["2023-01-01", "2024-01-01"],
             }
         ),
@@ -75,4 +88,14 @@ def test_promotion_blocks_missing_results_and_prior_rejections(tmp_path):
     assert "candidate_not_rejected" in failed
     assert "selection_rejections_empty" in failed
     assert "results_json_readable" in failed
+
+
+def test_promotion_blocks_unexecutable_oos_orders(tmp_path):
+    _write_results(tmp_path, fill_rate=0.75, incomplete_rate=0.40)
+    report = evaluate_promotion(_candidate(), tmp_path, _risk())
+    assert report.overall_status == "fail"
+    failed = {check.name for check in report.checks if check.status == "fail"}
+    assert "execution_fill_rate_ok" in failed
+    assert "execution_completion_rate_ok" in failed
+
 
