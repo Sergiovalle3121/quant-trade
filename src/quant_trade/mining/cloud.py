@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.8 seconds
-Output:
 """Cloud artifact publishing with an injectable offline storage boundary."""
 
 from __future__ import annotations
