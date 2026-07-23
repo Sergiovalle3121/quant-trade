@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.9 seconds
-Output:
 """Domain models for conservative crypto-mining economics."""
 
 from __future__ import annotations
