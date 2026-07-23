@@ -7,6 +7,7 @@ import pandas as pd
 
 from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
+from quant_trade.execution.bar_model import BarExecutionPolicy
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 
@@ -16,6 +17,7 @@ def parameter_sensitivity_grid(
     param_grid: dict[str, list[Any]],
     initial_cash: float,
     cost_model: CostModel,
+    execution_policy: BarExecutionPolicy | None = None,
 ) -> pd.DataFrame:
     rows = []
     keys = list(param_grid)
@@ -23,7 +25,13 @@ def parameter_sensitivity_grid(
         params = dict(zip(keys, vals, strict=True))
         try:
             w = get_research_signal_model(strategy_name).generate(data, params)
-            res = run_multi_asset_backtest(data, w, initial_cash, cost_model)
+            res = run_multi_asset_backtest(
+                data,
+                w,
+                initial_cash,
+                cost_model,
+                execution_policy=execution_policy,
+            )
             rows.append({**params, **res.metrics, "error": ""})
         except Exception as exc:
             rows.append({**params, "error": str(exc)})
@@ -31,7 +39,11 @@ def parameter_sensitivity_grid(
 
 
 def cost_sensitivity(
-    data: pd.DataFrame, strategy_name: str, params: dict[str, Any], initial_cash: float
+    data: pd.DataFrame,
+    strategy_name: str,
+    params: dict[str, Any],
+    initial_cash: float,
+    execution_policy: BarExecutionPolicy | None = None,
 ) -> pd.DataFrame:
     levels = {
         "zero": CostModel(),
@@ -43,7 +55,16 @@ def cost_sensitivity(
     w = get_research_signal_model(strategy_name).generate(data, params)
     for name, cost in levels.items():
         rows.append(
-            {"cost_level": name, **run_multi_asset_backtest(data, w, initial_cash, cost).metrics}
+            {
+                "cost_level": name,
+                **run_multi_asset_backtest(
+                    data,
+                    w,
+                    initial_cash,
+                    cost,
+                    execution_policy=execution_policy,
+                ).metrics,
+            }
         )
     return pd.DataFrame(rows)
 
@@ -91,3 +112,4 @@ def simple_bootstrap_or_block_bootstrap(
         draws = clean.sample(n=len(clean), replace=True, random_state=i).to_numpy()
         rows.append({"sample": i, "total_return": float((1 + draws).prod() - 1)})
     return pd.DataFrame(rows)
+
