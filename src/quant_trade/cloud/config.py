@@ -60,6 +60,7 @@ class CloudConfig(BaseModel):
     paper_config_path: str | None = None
     data_config_path: str | None = None
     research_config_path: str | None = None
+    mining_config_path: str | None = None
     schedule_timezone: str = "UTC"
     artifact_uri: str
     state_uri: str
