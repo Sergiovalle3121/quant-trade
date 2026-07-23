@@ -17,6 +17,15 @@ def paper_metrics(
 ) -> dict[str, float | int | bool]:
     initial = snapshots[0]["equity"] if snapshots else state.high_water_mark
     total_costs = sum(float(f.get("cost", 0.0)) for f in fills)
+    requested_quantity = sum(float(order.get("quantity", 0.0)) for order in orders)
+    filled_quantity = sum(float(order.get("filled_quantity", 0.0)) for order in orders)
+    partial_orders = sum(
+        1
+        for order in orders
+        if 0
+        < float(order.get("filled_quantity", 0.0))
+        < float(order.get("quantity", 0.0))
+    )
     return {
         "total_return": (state.equity / initial - 1) if initial else 0.0,
         "max_drawdown": state.max_drawdown,
@@ -26,6 +35,24 @@ def paper_metrics(
         "number_of_orders": len(orders),
         "number_of_fills": len(fills),
         "rejected_orders": sum(1 for o in orders if o.get("status") == "rejected"),
+        "expired_orders": sum(1 for o in orders if o.get("status") == "expired"),
+        "cancelled_orders": sum(1 for o in orders if o.get("status") == "cancelled"),
+        "partial_fill_orders": partial_orders,
+        "quantity_fill_rate": (
+            filled_quantity / requested_quantity if requested_quantity > 0 else 0.0
+        ),
+        "average_participation_rate": (
+            sum(float(fill.get("participation_rate", 0.0)) for fill in fills)
+            / len(fills)
+            if fills
+            else 0.0
+        ),
+        "average_price_impact_bps": (
+            sum(float(fill.get("price_impact_bps", 0.0)) for fill in fills)
+            / len(fills)
+            if fills
+            else 0.0
+        ),
         "average_daily_turnover": 0.0,
         "max_gross_exposure": max((s.get("gross_exposure", 0.0) for s in snapshots), default=0.0),
         "max_single_position_weight": 0.0,
@@ -59,6 +86,11 @@ def write_report(
         f"Max drawdown: {metrics['max_drawdown']:.2%}\n\n"
         f"Orders: {len(orders)}\n\n"
         f"Fills: {len(fills)}\n\n"
+        f"Quantity fill rate: {metrics['quantity_fill_rate']:.2%}\n\n"
+        f"Partial-fill orders: {metrics['partial_fill_orders']}\n\n"
+        f"Expired orders: {metrics['expired_orders']}\n\n"
+        f"Average participation: {metrics['average_participation_rate']:.2%}\n\n"
+        f"Average impact: {metrics['average_price_impact_bps']:.2f} bps\n\n"
         f"Costs paid: {metrics['total_costs']:.2f}\n\n"
         f"Kill switch active: {state.kill_switch_active}\n\n"
         "Next recommended action: review audit logs and risk events before any further "
@@ -86,3 +118,4 @@ def write_csvs(
         "risk_events.csv": risk_events,
     }.items():
         pd.DataFrame(rows).to_csv(out / name, index=False)
+
