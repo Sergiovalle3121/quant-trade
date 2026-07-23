@@ -1,0 +1,51 @@
+# Hardware-only example based on Bitmain's dated S21 XP specification.
+# Source updated 2024-07-25:
+# https://support.bitmain.com/hc/en-us/articles/35383015643673-S21-XP-Specifications
+# Market/network/electricity values below are deliberately illustrative and
+# MUST be replaced by attributable point-in-time observations before use.
+rigs:
+  - name: s21-xp-dated-spec-example
+    algorithm: sha256
+    hashrate_hs: 270000000000000
+    power_watts: 3645
+    hardware_cost_usd: 5000
+    shipping_cost_usd: 500
+    import_cost_usd: 500
+    installation_cost_usd: 250
+    residual_value_usd: 500
+    useful_life_days: 1095
+    uptime_rate: 0.95
+    temperature_c: 70
+    pue: 1.15
+    stale_reject_rate: 0.02
+    monthly_demand_charge_usd: 50
+    daily_maintenance_cost_usd: 0.50
+
+markets:
+  - coin: BTC-ILLUSTRATIVE-NOT-CURRENT
+    algorithm: sha256
+    coin_price_usd: 50000
+    network_hashrate_hs: 800000000000000000000
+    block_reward_coin: 3.125
+    blocks_per_day: 144
+    pool_fee_rate: 0.02
+    source: illustrative-placeholder-not-market-evidence
+    captured_at_utc: "2024-07-25T00:00:00Z"
+
+policy:
+  electricity_usd_per_kwh: 0.10
+  min_daily_profit_usd: 5
+  min_margin_rate: 0.15
+  price_haircut_rate: 0.30
+  monthly_difficulty_growth_rate: 0.10
+  stress_horizon_days: 30
+  max_temperature_c: 80
+  require_temperature: true
+  max_cloud_hourly_cost_usd: 0
+  tax_rate: 0
+  annual_discount_rate: 0.12
+  analysis_horizon_days: 1095
+  require_positive_npv: true
+  # Informational conversion only; replace with a dated source if required.
+  usd_mxn_rate: 18
+
