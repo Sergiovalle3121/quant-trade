@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -9,6 +9,13 @@ import pandas as pd
 
 from quant_trade.backtest.costs import CONSERVATIVE_COST_MODEL, CostModel
 from quant_trade.data.panel import pivot_close, pivot_open, validate_panel_schema
+from quant_trade.execution.bar_model import (
+    BarExecutionPolicy,
+    BarOrderState,
+    ExecutionStatus,
+    cancel_order,
+    execute_market_order_on_bar,
+)
 from quant_trade.metrics.performance import periods_per_year
 
 TRADING_DAYS = 252
@@ -20,6 +27,15 @@ class MultiAssetBacktestResult:
     positions: pd.DataFrame
     trades: pd.DataFrame
     metrics: dict[str, Any]
+    order_events: pd.DataFrame = field(default_factory=pd.DataFrame)
+
+
+@dataclass(frozen=True)
+class _TargetIntent:
+    weights: dict[str, float]
+    decided_bar_index: int
+    eligible_bar_index: int
+    decided_at: Any
 
 
 def _split_order(current: float, target: float) -> tuple[float, float]:
@@ -166,6 +182,7 @@ def run_multi_asset_backtest(
     allow_short: bool = False,
     fractional_shares: bool = True,
     rebalance_band: float = 0.0,
+    execution_policy: BarExecutionPolicy | None = None,
 ) -> MultiAssetBacktestResult:
     # Omitted costs resolve to a conservative default; a frictionless run must
     # be requested explicitly by passing an all-zero CostModel.
@@ -176,9 +193,23 @@ def run_multi_asset_backtest(
         raise ValueError("max_weight_per_asset must be finite and > 0")
     if not math.isfinite(rebalance_band) or rebalance_band < 0:
         raise ValueError("rebalance_band must be >= 0")
+    policy = execution_policy or BarExecutionPolicy()
+    if not fractional_shares and policy.lot_size is None:
+        policy = replace(policy, lot_size=1.0)
+    if (
+        not fractional_shares
+        and policy.lot_size is not None
+        and (policy.lot_size < 1 or not float(policy.lot_size).is_integer())
+    ):
+        raise ValueError("non-fractional execution requires an integer lot_size >= 1")
     validated = validate_panel_schema(data)
     opens = pivot_open(data)
     closes = pivot_close(data)
+    volumes = (
+        validated.pivot(index="timestamp", columns="symbol", values="volume")
+        .sort_index()
+        .reindex(index=closes.index, columns=closes.columns)
+    )
     # Perp funding accrual: longs pay positive funding, shorts receive it.
     funding = None
     if "funding_rate" in data.columns:
@@ -224,93 +255,223 @@ def run_multi_asset_backtest(
             raise ValueError("target weights imply leverage")
     cash = float(initial_cash)
     qty = {s: 0.0 for s in symbols}
-    eq_rows = []
-    pos_rows = []
-    tr_rows = []
-    pending: dict[str, float] | None = None
+    eq_rows: list[dict[str, Any]] = []
+    pos_rows: list[dict[str, Any]] = []
+    tr_rows: list[dict[str, Any]] = []
+    order_event_rows: list[dict[str, Any]] = []
+    open_orders: list[BarOrderState] = []
+    pending_targets: list[_TargetIntent] = []
+    order_sequence = 0
     by_ts = {k: g for k, g in tw.groupby("timestamp")}
+
+    def record_order_event(
+        timestamp: Any,
+        event_type: str,
+        order: BarOrderState,
+        fill: Any = None,
+    ) -> None:
+        order_event_rows.append(
+            {
+                "timestamp": timestamp,
+                "event_type": event_type,
+                "order_id": order.order_id,
+                "symbol": order.symbol,
+                "side": order.side,
+                "requested_quantity": abs(order.signed_quantity),
+                "filled_quantity": order.cumulative_filled_quantity,
+                "remaining_quantity": abs(float(order.remaining_quantity or 0.0)),
+                "status": order.status.value,
+                "reason": order.reason,
+                "fill_id": fill.fill_id if fill is not None else "",
+                "fill_quantity": fill.quantity if fill is not None else 0.0,
+                "fill_price": fill.price if fill is not None else 0.0,
+                "participation_rate": (
+                    fill.participation_rate if fill is not None else 0.0
+                ),
+                "price_impact_bps": (
+                    fill.price_impact_bps if fill is not None else 0.0
+                ),
+            }
+        )
+
     for i, ts in enumerate(dates):
-        if pending is not None:
-            # Missing opens are not silently replaced with the execution bar's
-            # close. The previous close may value an existing position, but an
-            # order without an observable open is deferred by skipping it.
-            prices = opens.loc[ts]
-            valuation_prices = prices.combine_first(closes.iloc[i - 1])
-            port_val = cash + sum(
-                qty[s] * float(valuation_prices[s])
-                for s in symbols
-                if pd.notna(valuation_prices[s])
-            )
-            if not math.isfinite(port_val) or port_val <= 0:
-                raise ValueError("portfolio equity must remain finite and positive")
-            turnover = 0.0
+        turnover = 0.0
+        prices = opens.loc[ts]
+        bar_volumes = volumes.loc[ts]
+        previous_close = closes.iloc[max(0, i - 1)]
+        valuation_prices = prices.combine_first(previous_close)
+        port_val = cash + sum(
+            qty[s] * float(valuation_prices[s])
+            for s in symbols
+            if pd.notna(valuation_prices[s])
+        )
+        if not math.isfinite(port_val) or port_val <= 0:
+            raise ValueError("portfolio equity must remain finite and positive")
+
+        def attempt_orders(
+            orders: list[BarOrderState],
+            current_prices: pd.Series = prices,
+            current_volumes: pd.Series = bar_volumes,
+            bar_index: int = i,
+            turnover_denominator: float = port_val,
+            timestamp: Any = ts,
+        ) -> list[BarOrderState]:
+            nonlocal cash, turnover
+            retained: list[BarOrderState] = []
+            for order in sorted(
+                orders, key=lambda item: (item.signed_quantity > 0, item.symbol)
+            ):
+                candidate = replace(order)
+                raw_price = current_prices.get(order.symbol, np.nan)
+                raw_volume = current_volumes.get(order.symbol, np.nan)
+                fill = execute_market_order_on_bar(
+                    candidate,
+                    bar_index=bar_index,
+                    open_price=(
+                        float(raw_price)
+                        if pd.notna(raw_price) and math.isfinite(float(raw_price))
+                        else None
+                    ),
+                    volume=(
+                        float(raw_volume)
+                        if pd.notna(raw_volume) and math.isfinite(float(raw_volume))
+                        else None
+                    ),
+                    policy=policy,
+                )
+                if fill is not None:
+                    signed_fill = fill.quantity if order.side == "buy" else -fill.quantity
+                    notional = abs(signed_fill * fill.price)
+                    cost = cost_model.trade_cost(notional)
+                    next_cash = cash - signed_fill * fill.price - cost
+                    if not allow_leverage and next_cash < -1e-8:
+                        candidate = replace(order)
+                        candidate.status = ExecutionStatus.REJECTED
+                        candidate.reason = (
+                            "fill would create negative cash after costs and impact"
+                        )
+                        fill = None
+                    else:
+                        cash = (
+                            max(0.0, next_cash)
+                            if not allow_leverage
+                            else next_cash
+                        )
+                        qty[order.symbol] += signed_fill
+                        turnover += notional / turnover_denominator
+                        tr_rows.append(
+                            {
+                                "timestamp": timestamp,
+                                "order_id": order.order_id,
+                                "fill_id": fill.fill_id,
+                                "symbol": order.symbol,
+                                "side": order.side,
+                                "quantity": fill.quantity,
+                                "price": fill.price,
+                                "notional": notional,
+                                "cost": cost,
+                                "participation_rate": fill.participation_rate,
+                                "price_impact_bps": fill.price_impact_bps,
+                                "order_status": candidate.status.value,
+                            }
+                        )
+                record_order_event(
+                    timestamp, candidate.status.value, candidate, fill
+                )
+                if not candidate.is_terminal:
+                    retained.append(candidate)
+            return retained
+
+        # Existing partial orders receive their next attempt before a newly
+        # eligible target cancels and replaces any remaining quantity.
+        if open_orders:
+            open_orders = attempt_orders(open_orders)
+
+        eligible_targets = [
+            intent for intent in pending_targets if intent.eligible_bar_index <= i
+        ]
+        pending_targets = [
+            intent for intent in pending_targets if intent.eligible_bar_index > i
+        ]
+        if eligible_targets:
+            intent = eligible_targets[-1]
+            for stale_order in open_orders:
+                cancel_order(stale_order, "superseded by a newer target")
+                record_order_event(ts, "cancelled", stale_order)
+            open_orders = []
+
             desired = {s: 0.0 for s in symbols}
-            desired.update(pending)
+            desired.update(intent.weights)
             reducing_orders: list[tuple[str, float, float]] = []
             increasing_orders: list[tuple[str, float, float]] = []
             for s in sorted(desired):
-                w = desired[s]
-                price = prices.get(s, np.nan)
-                if pd.isna(price) or not math.isfinite(float(price)) or price <= 0:
+                weight = desired[s]
+                execution_price = prices.get(s, np.nan)
+                sizing_price = (
+                    execution_price
+                    if pd.notna(execution_price)
+                    and math.isfinite(float(execution_price))
+                    and execution_price > 0
+                    else valuation_prices.get(s, np.nan)
+                )
+                if (
+                    pd.isna(sizing_price)
+                    or not math.isfinite(float(sizing_price))
+                    or sizing_price <= 0
+                ):
                     continue
-                target_val = port_val * w
-                cur = qty.get(s, 0.0) * float(price)
-                delta = target_val - cur
+                price = float(sizing_price)
+                target_val = port_val * weight
+                current_value = qty.get(s, 0.0) * price
+                delta = target_val - current_value
                 if abs(delta) < 1e-9:
                     continue
-                # No-trade band: skip drifts smaller than the band in weight
-                # points, but always allow full exits so risk-off targets are
-                # never suppressed by the turnover control.
-                if rebalance_band > 0 and port_val > 0 and w != 0:
+                if rebalance_band > 0 and weight != 0:
                     drift = abs(delta) / port_val
                     if drift < rebalance_band:
                         continue
-                target_quantity = target_val / float(price)
-                reducing, increasing = _split_order(qty.get(s, 0.0), target_quantity)
+                target_quantity = target_val / price
+                reducing, increasing = _split_order(
+                    qty.get(s, 0.0), target_quantity
+                )
                 if abs(reducing) > 1e-12:
-                    reducing_orders.append((s, reducing, float(price)))
+                    reducing_orders.append((s, reducing, price))
                 if abs(increasing) > 1e-12:
-                    increasing_orders.append((s, increasing, float(price)))
+                    increasing_orders.append((s, increasing, price))
 
-            def execute_orders(
-                orders: list[tuple[str, float, float]],
+            def submit_orders(
+                requests: list[tuple[str, float, float]],
                 scale: float,
-                execution_ts: Any = ts,
-                turnover_denominator: float = port_val,
-            ) -> None:
-                nonlocal cash, turnover
-                # Proceeds are available before any buy/cover on the same bar.
-                for symbol, requested, price in sorted(
-                    orders, key=lambda item: (item[1] > 0, item[0])
-                ):
-                    executed = _scaled_quantity(requested, scale, fractional_shares)
-                    if abs(executed) < 1e-12:
-                        continue
-                    notional = abs(executed * price)
-                    cost = cost_model.trade_cost(notional)
-                    next_cash = cash - executed * price - cost
-                    if not allow_leverage and next_cash < -1e-8:
-                        raise RuntimeError(
-                            "internal sizing error: trade would create negative cash"
-                        )
-                    cash = max(0.0, next_cash) if not allow_leverage else next_cash
-                    qty[symbol] += executed
-                    turnover += notional / turnover_denominator
-                    tr_rows.append(
-                        {
-                            "timestamp": execution_ts,
-                            "symbol": symbol,
-                            "side": "buy" if executed > 0 else "sell",
-                            "quantity": abs(executed),
-                            "price": price,
-                            "notional": notional,
-                            "cost": cost,
-                        }
+                target_intent: _TargetIntent = intent,
+                timestamp: Any = ts,
+            ) -> list[BarOrderState]:
+                nonlocal order_sequence
+                submitted: list[BarOrderState] = []
+                for symbol, requested, _ in requests:
+                    quantity = _scaled_quantity(
+                        requested, scale, fractional_shares
                     )
+                    if abs(quantity) < 1e-12:
+                        continue
+                    order_sequence += 1
+                    order = BarOrderState(
+                        order_id=f"bt-{order_sequence:08d}",
+                        symbol=symbol,
+                        signed_quantity=quantity,
+                        submitted_bar_index=target_intent.decided_bar_index,
+                        eligible_bar_index=target_intent.eligible_bar_index,
+                    )
+                    record_order_event(timestamp, "submitted", order)
+                    submitted.append(order)
+                return submitted
 
-            reduction_sells = [order for order in reducing_orders if order[1] < 0]
-            reduction_buys = [order for order in reducing_orders if order[1] > 0]
-            execute_orders(reduction_sells, 1.0)
+            reduction_sells = [
+                order for order in reducing_orders if order[1] < 0
+            ]
+            reduction_buys = [
+                order for order in reducing_orders if order[1] > 0
+            ]
+            open_orders.extend(attempt_orders(submit_orders(reduction_sells, 1.0)))
             cover_scale = (
                 1.0
                 if allow_leverage
@@ -324,7 +485,9 @@ def run_multi_asset_backtest(
                     float("inf"),
                 )
             )
-            execute_orders(reduction_buys, cover_scale)
+            open_orders.extend(
+                attempt_orders(submit_orders(reduction_buys, cover_scale))
+            )
 
             if allow_leverage:
                 _, _, projected_equity, _ = _simulate_orders(
@@ -337,7 +500,9 @@ def run_multi_asset_backtest(
                     fractional_shares,
                 )
                 if not math.isfinite(projected_equity) or projected_equity <= 0:
-                    raise ValueError("transaction costs would exhaust portfolio equity")
+                    raise ValueError(
+                        "transaction costs would exhaust portfolio equity"
+                    )
                 increase_scale = 1.0
             else:
                 increase_scale = _maximum_feasible_scale(
@@ -349,7 +514,10 @@ def run_multi_asset_backtest(
                     fractional_shares,
                     1.0,
                 )
-            execute_orders(increasing_orders, increase_scale)
+            open_orders.extend(
+                attempt_orders(submit_orders(increasing_orders, increase_scale))
+            )
+
             if not allow_leverage and cash < -1e-9:
                 raise RuntimeError("internal sizing error: negative cash")
             execution_equity = cash + sum(
@@ -368,10 +536,9 @@ def run_multi_asset_backtest(
                 not allow_leverage
                 and execution_gross > execution_equity + 1e-8
             ):
-                raise RuntimeError("internal sizing error: gross exposure exceeds equity")
-            pending = None
-        else:
-            turnover = 0.0
+                raise RuntimeError(
+                    "internal sizing error: gross exposure exceeds equity"
+                )
         if funding is not None and ts in funding.index:
             for s in symbols:
                 rate = funding.loc[ts, s] if s in funding.columns else np.nan
@@ -419,7 +586,25 @@ def run_multi_asset_backtest(
                     }
                 )
         if ts in by_ts and i < len(dates) - 1:
-            pending = {str(r.symbol): float(r.target_weight) for r in by_ts[ts].itertuples()}
+            target = {
+                str(row.symbol): float(row.target_weight)
+                for row in by_ts[ts].itertuples()
+            }
+            eligible_index = i + 1 + policy.additional_latency_bars
+            if eligible_index < len(dates):
+                pending_targets.append(
+                    _TargetIntent(target, i, eligible_index, ts)
+                )
+    for order in open_orders:
+        cancel_order(order, "backtest ended before order completed")
+        record_order_event(dates[-1], "cancelled", order)
     eq = pd.DataFrame(eq_rows)
-    return MultiAssetBacktestResult(eq, pd.DataFrame(pos_rows), pd.DataFrame(tr_rows), _metrics(eq))
+    return MultiAssetBacktestResult(
+        eq,
+        pd.DataFrame(pos_rows),
+        pd.DataFrame(tr_rows),
+        _metrics(eq),
+        pd.DataFrame(order_event_rows),
+    )
+
 
