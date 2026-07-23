@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.9 seconds
-Output:
 """Conservative mining profitability calculations with explicit shutdown gates."""
 
 from __future__ import annotations
