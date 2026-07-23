@@ -60,6 +60,7 @@ class CloudConfig(BaseModel):
     paper_config_path: str | None = None
     data_config_path: str | None = None
     research_config_path: str | None = None
+    mining_config_path: str | None = None
     schedule_timezone: str = "UTC"
     artifact_uri: str
     state_uri: str
@@ -115,3 +116,4 @@ def load_cloud_config(path: Path | str) -> CloudConfig:
 def write_cloud_config(path: Path, config: CloudConfig) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(config.to_safe_dict(), sort_keys=False), encoding="utf-8")
+
