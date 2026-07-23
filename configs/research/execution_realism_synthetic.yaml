@@ -1,0 +1,36 @@
+# Synthetic execution-convergence example; not evidence of deployable alpha.
+experiment_name: execution_realism_synthetic
+mode: multi_asset_research
+data_path: examples/data/sample_multi_asset_ohlcv.csv
+initial_cash: 100000
+strategy: equal_weight_buy_and_hold
+strategy_params:
+  max_weight_per_asset: 0.25
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 2.0
+  spread_bps: 1.0
+execution:
+  additional_latency_bars: 1
+  max_volume_participation_rate: 0.0001
+  lot_size: 1
+  max_order_age_bars: 3
+  market_impact_bps_at_full_participation: 100
+benchmark:
+  type: equal_weight_universe
+split:
+  method: chronological
+  train_fraction: 0.7
+  embargo_bars: 1
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs
+
