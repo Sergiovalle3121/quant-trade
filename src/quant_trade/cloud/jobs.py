@@ -5,6 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic
+from typing import Any
 
 import yaml
 
@@ -48,7 +49,11 @@ def _heartbeat(
 
 
 def _write_artifacts(
-    config: CloudConfig, run_id: str, summary: JobSummary, events: list[dict]
+    config: CloudConfig,
+    run_id: str,
+    summary: JobSummary,
+    events: list[dict],
+    extra_files: list[str] | None = None,
 ) -> None:
     storage = backend_for_uri(config.artifact_uri)
     base = _base_uri(config, run_id)
@@ -78,6 +83,7 @@ def _write_artifacts(
                 "metrics.json",
                 "events.jsonl",
                 "artifacts_index.json",
+                *(extra_files or []),
             ],
         },
     )
@@ -145,7 +151,9 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
     config.job_name = job_name or config.job_name
     run_id = new_run_id()
     start = monotonic()
-    events = [{"event": "cloud_job_started", "run_id": run_id, "job": config.job_name}]
+    events: list[dict[str, Any]] = [
+        {"event": "cloud_job_started", "run_id": run_id, "job": config.job_name}
+    ]
     structured_log("cloud_job_started", run_id=run_id, job=config.job_name)
     storage = backend_for_uri(config.heartbeat_uri)
     # Measure staleness BEFORE overwriting the previous heartbeat, or the
@@ -154,11 +162,62 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
     write_heartbeat(storage, config.heartbeat_uri, _heartbeat(config, run_id, "running"))
     emf = config.monitoring.emit_cloudwatch_embedded_metrics
     metrics = []
+    extra_artifacts: list[str] = []
     status = "success"
     error = None
     try:
         if config.job_name == "health_check":
             run_health_check(config)
+        elif config.job_name == "mining_evaluation":
+            if not config.mining_config_path:
+                raise SafetyGateError("mining_evaluation requires mining_config_path")
+            assert_not_killed(config)
+            from quant_trade.mining.config import load_mining_config
+            from quant_trade.mining.profitability import evaluate_all
+
+            rigs, markets, policy = load_mining_config(Path(config.mining_config_path))
+            evaluations = evaluate_all(rigs, markets, policy)
+            go_count = sum(item.decision == "GO" for item in evaluations)
+            report: dict[str, Any] = {
+                "evaluations": [item.to_dict() for item in evaluations],
+                "go_count": go_count,
+                "authorized_to_start_miner": False,
+                "cloud_resources_created": False,
+            }
+            filename = "mining_profitability_report.json"
+            storage.write_json(f"{_base_uri(config, run_id)}/{filename}", report)
+            extra_artifacts.append(filename)
+            best_stressed = max(item.stressed_net_profit_usd for item in evaluations)
+            metrics.extend(
+                [
+                    emit_metric(
+                        "mining_go_count",
+                        float(go_count),
+                        dimensions={"job": config.job_name},
+                        emf=emf,
+                    ),
+                    emit_metric(
+                        "mining_best_stressed_profit_usd",
+                        best_stressed,
+                        "None",
+                        dimensions={"job": config.job_name},
+                        emf=emf,
+                    ),
+                    emit_metric(
+                        "mining_authorized_to_start",
+                        0,
+                        dimensions={"job": config.job_name},
+                        emf=emf,
+                    ),
+                ]
+            )
+            events.append(
+                {
+                    "event": "mining_evaluation_completed",
+                    "go_count": go_count,
+                    "authorized_to_start_miner": False,
+                }
+            )
         elif config.job_name == "heartbeat":
             metrics.append(
                 emit_metric(
@@ -268,7 +327,7 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
         config.heartbeat_uri,
         _heartbeat(config, run_id, status, {"error": error} if error else {}),
     )
-    _write_artifacts(config, run_id, summary, events)
+    _write_artifacts(config, run_id, summary, events, extra_artifacts)
     structured_log(
         "cloud_job_completed" if status == "success" else "cloud_job_failed",
         run_id=run_id,
@@ -278,3 +337,4 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
     if status != "success":
         raise SafetyGateError(error or "cloud job failed")
     return summary
+
