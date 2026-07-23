@@ -96,6 +96,7 @@ def evaluate_promotion(
         comparison = results.get("comparison_test", {})
         test_metrics = results.get("test_metrics", {})
         robustness = results.get("robustness", {})
+        execution = results.get("execution_test", {})
         test_range = results.get("test_range")
         excess = (
             _optional_float(comparison.get("excess_return"))
@@ -111,6 +112,20 @@ def evaluate_promotion(
         min_excess = float(risk_config.get("min_net_excess_return", 0.0))
         max_drawdown = float(risk_config.get("max_drawdown", 0.20))
         max_turnover = float(risk_config.get("max_turnover", 3.0))
+        min_fill_rate = float(risk_config.get("min_quantity_fill_rate", 0.90))
+        max_incomplete_rate = float(
+            risk_config.get("max_partial_or_expired_order_rate", 0.10)
+        )
+        fill_rate = (
+            _optional_float(execution.get("quantity_fill_rate"))
+            if isinstance(execution, dict)
+            else None
+        )
+        incomplete_rate = (
+            _optional_float(execution.get("partial_or_expired_order_rate"))
+            if isinstance(execution, dict)
+            else None
+        )
         add(
             "beats_benchmark_after_costs",
             excess is not None and excess > min_excess,
@@ -131,6 +146,17 @@ def evaluate_promotion(
             isinstance(robustness, dict)
             and robustness.get("cost_sensitivity_pass") is True,
             "cost sensitivity evidence is missing or failed",
+        )
+        add(
+            "execution_fill_rate_ok",
+            fill_rate is not None and fill_rate >= min_fill_rate,
+            f"OOS quantity fill rate must be at least {min_fill_rate:.2%}",
+        )
+        add(
+            "execution_completion_rate_ok",
+            incomplete_rate is not None and incomplete_rate <= max_incomplete_rate,
+            "partial/expired/cancelled OOS order rate must not exceed "
+            f"{max_incomplete_rate:.2%}",
         )
         add(
             "walk_forward_or_oos_exists",
@@ -155,4 +181,5 @@ def evaluate_promotion(
 def save_promotion_report(path: Path, report: PromotionReport) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+
 

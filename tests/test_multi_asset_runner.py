@@ -14,4 +14,8 @@ def test_runner_artifacts(tmp_path):
         (out / "metrics_test.json").exists()
         and (out / "summary.md").exists()
         and (out / "target_weights_test.csv").exists()
+        and (out / "order_events_test.csv").exists()
     )
+    assert res["execution_test"]["orders_submitted"] > 0
+    assert 0 <= res["execution_test"]["quantity_fill_rate"] <= 1
+

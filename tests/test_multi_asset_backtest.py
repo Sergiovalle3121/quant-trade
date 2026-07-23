@@ -4,6 +4,7 @@ import pytest
 from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.data.panel import load_canonical_dataset
+from quant_trade.execution.bar_model import BarExecutionPolicy
 from quant_trade.research.signals.trend import equal_weight_buy_and_hold
 
 DATA = "examples/data/sample_multi_asset_ohlcv.csv"
@@ -13,6 +14,21 @@ def _two_asset_data():
     data = load_canonical_dataset(DATA).query("symbol in ['SPY','QQQ']")
     dates = sorted(data["timestamp"].unique())[:4]
     return data[data["timestamp"].isin(dates)].copy(), dates
+
+
+def _constant_single_asset_data(bars=5, volume=100):
+    timestamps = pd.date_range("2026-01-01", periods=bars, freq="D", tz="UTC")
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "symbol": "SPY",
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.0,
+            "volume": float(volume),
+        }
+    ), list(timestamps)
 
 
 def test_backtest_outputs_and_costs():
@@ -186,4 +202,88 @@ def test_missing_execution_open_does_not_fallback_to_same_bar_close():
     result = run_multi_asset_backtest(data, weights, cost_model=CostModel())
 
     assert result.trades.empty
+    assert "expired" in set(result.order_events["status"])
+    assert any(
+        "missing or invalid execution open" in reason
+        for reason in result.order_events["reason"]
+    )
+
+
+def test_default_execution_policy_is_regression_compatible():
+    data, dates = _two_asset_data()
+    weights = pd.DataFrame(
+        [{"timestamp": dates[0], "symbol": "SPY", "target_weight": 1.0}]
+    )
+    implicit = run_multi_asset_backtest(data, weights, cost_model=CostModel())
+    explicit = run_multi_asset_backtest(
+        data,
+        weights,
+        cost_model=CostModel(),
+        execution_policy=BarExecutionPolicy(),
+    )
+
+    pd.testing.assert_frame_equal(implicit.equity_curve, explicit.equity_curve)
+    pd.testing.assert_frame_equal(implicit.trades, explicit.trades)
+    pd.testing.assert_frame_equal(implicit.order_events, explicit.order_events)
+
+
+def test_volume_participation_persists_partial_order_until_expiry():
+    data, dates = _constant_single_asset_data()
+    weights = pd.DataFrame(
+        [{"timestamp": dates[0], "symbol": "SPY", "target_weight": 1.0}]
+    )
+    result = run_multi_asset_backtest(
+        data,
+        weights,
+        initial_cash=10_000,
+        cost_model=CostModel(),
+        execution_policy=BarExecutionPolicy(
+            max_volume_participation_rate=0.10,
+            max_order_age_bars=3,
+            market_impact_bps_at_full_participation=100,
+        ),
+    )
+
+    assert len(result.trades) == 4
+    assert (result.trades["quantity"] == 10).all()
+    assert result.trades["participation_rate"].tolist() == pytest.approx([0.10] * 4)
+    assert result.trades["price"].tolist() == pytest.approx([100.1] * 4)
+    assert result.trades["order_id"].nunique() == 1
+    order_events = result.order_events
+    assert "partially_filled" in set(order_events["status"])
+    assert order_events.iloc[-1]["status"] == "expired"
+    assert order_events.iloc[-1]["filled_quantity"] == 40
+    assert order_events.iloc[-1]["remaining_quantity"] == 60
+    assert result.equity_curve["cash"].min() >= 0
+
+
+def test_additional_latency_bars_cannot_pull_fill_forward():
+    data, dates = _constant_single_asset_data()
+    weights = pd.DataFrame(
+        [{"timestamp": dates[0], "symbol": "SPY", "target_weight": 0.5}]
+    )
+    result = run_multi_asset_backtest(
+        data,
+        weights,
+        cost_model=CostModel(),
+        execution_policy=BarExecutionPolicy(additional_latency_bars=1),
+    )
+
+    assert list(result.trades["timestamp"]) == [dates[2]]
+    assert result.order_events.iloc[0]["status"] == "submitted"
+
+
+def test_non_fractional_execution_rejects_fractional_lot_policy():
+    data, dates = _constant_single_asset_data()
+    weights = pd.DataFrame(
+        [{"timestamp": dates[0], "symbol": "SPY", "target_weight": 0.5}]
+    )
+    with pytest.raises(ValueError, match="integer lot_size"):
+        run_multi_asset_backtest(
+            data,
+            weights,
+            fractional_shares=False,
+            execution_policy=BarExecutionPolicy(lot_size=0.5),
+        )
+
 
