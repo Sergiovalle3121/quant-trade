@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.9 seconds
-Output:
 # Cloud-first crypto-mining economics
 
 This module evaluates whether an explicitly authorized mining worker has a
