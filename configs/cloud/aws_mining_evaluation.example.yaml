@@ -1,0 +1,25 @@
+environment: aws
+deployment_name: aws-mining-evaluator
+job_name: mining_evaluation
+mode: dry_run
+allow_paper_order_submission: false
+allow_live_trading: false
+real_money_enabled: false
+broker_provider: simulated
+mining_config_path: configs/mining/aws_profitability_example.yaml
+schedule_timezone: UTC
+artifact_uri: s3://REPLACE_BUCKET/artifacts
+state_uri: s3://REPLACE_BUCKET/state
+heartbeat_uri: s3://REPLACE_BUCKET/state/mining_heartbeat.json
+kill_switch_uri: s3://REPLACE_BUCKET/state/kill_switch.json
+monitoring:
+  emit_json_logs: true
+  emit_cloudwatch_embedded_metrics: true
+  alert_on_job_failure: true
+  sns_topic_arn: null
+locking:
+  enabled: true
+  provider: dynamodb
+  table_name: quant-trade-paper-locks
+  ttl_minutes: 30
+

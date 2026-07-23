@@ -374,6 +374,9 @@ def selection_promote(
         "kill_switch_enabled": True,
         "max_gross_exposure": cand.max_gross_exposure,
         "max_weight_per_asset": cand.max_weight_per_asset,
+        "max_drawdown": 0.20,
+        "max_turnover": 3.0,
+        "min_net_excess_return": 0.0,
     }
     report = evaluate_promotion(cand, Path(cand.research_run_dir), risk_config)
     if report.overall_status == "pass":
