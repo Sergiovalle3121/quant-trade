@@ -64,11 +64,34 @@ Reports now include quantity fill rate, partial/expired/cancelled order counts,
 average participation, and average impact. These metrics flow into the existing
 trial evidence process; they do not authorize live trading.
 
-## Remaining convergence work
+## Backtest and paper convergence
 
-`BarExecutionPolicy` and `BarOrderState` are shared execution-domain types, but
-the multi-asset research backtester still needs to adopt their persistent
-order lifecycle. Until that convergence is complete, paper results with
-participation/latency controls are deliberately more conservative than the
-legacy backtest. Live trading remains `NO-GO`.
+The multi-asset research backtester and simulated paper runner now use
+`BarExecutionPolicy` and `BarOrderState`. Research YAML may include the same
+latency, volume-participation, lot, age, and impact fields. Cost sensitivity
+and walk-forward windows inherit that policy instead of silently reverting to
+unlimited fills.
+
+The backtest writes `order_events_train.csv` and `order_events_test.csv`, while
+`results.json` includes a separate execution summary. Order-state diagnostics
+are not mixed into return metrics, preserving metric contracts and golden
+regression checks.
+
+Default policy still preserves the earlier next-open/full-fill behavior so
+existing experiments remain reproducible. This compatibility default is not a
+claim that unlimited liquidity is realistic. Promotion-grade experiments
+should use a conservative policy calibrated from paper evidence and compare
+both the compatibility and constrained cases.
+
+Promotion now fails closed when `results.json` lacks execution evidence, when
+OOS quantity fill rate is below the configured minimum (90% by default), or
+when partial/expired/cancelled order rate exceeds the configured maximum (10%
+by default). These thresholds can be made stricter in the risk policy, but
+must not be weakened merely to pass a candidate.
+
+The two engines share execution semantics but retain separate portfolio
+accounting implementations. Cross-engine replay parity and explicit exchange
+calendar/session rules remain required before any real-money consideration.
+Live trading remains `NO-GO`.
+
 
