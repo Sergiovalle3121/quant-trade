@@ -1,3 +1,10 @@
+from quant_trade.execution.bar_model import (
+    BarExecutionPolicy,
+    BarFillDecision,
+    BarOrderState,
+    ExecutionStatus,
+    execute_market_order_on_bar,
+)
 from quant_trade.execution.broker import (
     BrokerAccount,
     BrokerCapabilities,
@@ -18,4 +25,10 @@ __all__ = [
     "BrokerOrder",
     "BrokerOrderRequest",
     "BrokerPosition",
+    "BarExecutionPolicy",
+    "BarFillDecision",
+    "BarOrderState",
+    "ExecutionStatus",
+    "execute_market_order_on_bar",
 ]
+
