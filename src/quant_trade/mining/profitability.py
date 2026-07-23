@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from quant_trade.mining.models import (
     MiningEvaluation,
     MiningMarketSnapshot,
@@ -11,6 +13,63 @@ from quant_trade.mining.models import (
 
 _DAYS_PER_MONTH = 30.0
 _DAYS_PER_YEAR = 365.0
+_UNATTRIBUTABLE_SOURCE_MARKERS = (
+    "manual",
+    "placeholder",
+    "replace",
+    "illustrative",
+    "unknown",
+    "example",
+)
+
+
+def _evaluation_time(value: datetime | None) -> datetime:
+    evaluated_at = datetime.now(UTC) if value is None else value
+    if evaluated_at.tzinfo is None:
+        raise ValueError("evaluated_at_utc must be timezone-aware")
+    return evaluated_at.astimezone(UTC)
+
+
+def _snapshot_evidence(
+    market: MiningMarketSnapshot,
+    policy: MiningPolicy,
+    evaluated_at: datetime,
+) -> tuple[float | None, list[str]]:
+    reasons: list[str] = []
+    normalized_source = market.source.strip().casefold()
+    if policy.require_attributable_market_source and (
+        not normalized_source
+        or any(marker in normalized_source for marker in _UNATTRIBUTABLE_SOURCE_MARKERS)
+    ):
+        reasons.append("market snapshot source is missing or not attributable")
+
+    captured_at: datetime | None = None
+    if market.captured_at_utc.strip():
+        try:
+            parsed = datetime.fromisoformat(market.captured_at_utc.strip().replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("timestamp has no timezone")
+            captured_at = parsed.astimezone(UTC)
+        except ValueError:
+            captured_at = None
+
+    age_hours: float | None = None
+    if captured_at is not None:
+        age_hours = (evaluated_at - captured_at).total_seconds() / 3600
+    if policy.require_fresh_market_snapshot:
+        if captured_at is None:
+            reasons.append("market snapshot capture time is missing or invalid")
+        elif age_hours is not None:
+            future_tolerance = policy.max_future_clock_skew_minutes / 60
+            if age_hours < -future_tolerance:
+                reasons.append("market snapshot capture time is in the future")
+            elif age_hours > policy.max_market_snapshot_age_hours:
+                reasons.append(
+                    "market snapshot is stale: "
+                    f"{age_hours:.2f}h exceeds "
+                    f"{policy.max_market_snapshot_age_hours:.2f}h"
+                )
+    return (max(0.0, age_hours) if age_hours is not None else None), reasons
 
 
 def _present_value(
@@ -26,11 +85,7 @@ def _present_value(
     if abs(daily_rate) < 1e-15:
         cash_flow_pv = daily_cash_flow_usd * horizon_days
     else:
-        cash_flow_pv = (
-            daily_cash_flow_usd
-            * (1 - (1 + daily_rate) ** (-horizon_days))
-            / daily_rate
-        )
+        cash_flow_pv = daily_cash_flow_usd * (1 - (1 + daily_rate) ** (-horizon_days)) / daily_rate
     residual_pv = residual_value_usd * (1 + daily_rate) ** (-horizon_days)
     return -capex_usd + cash_flow_pv + residual_pv
 
@@ -76,12 +131,16 @@ def evaluate_mining(
     rig: MiningRig,
     market: MiningMarketSnapshot,
     policy: MiningPolicy,
+    evaluated_at_utc: datetime | None = None,
 ) -> MiningEvaluation:
     """Evaluate a rig/coin pair without network calls or process execution."""
     if rig.algorithm.casefold() != market.algorithm.casefold():
         raise ValueError(
             f"incompatible algorithms: rig={rig.algorithm!r}, market={market.algorithm!r}"
         )
+
+    evaluated_at = _evaluation_time(evaluated_at_utc)
+    snapshot_age_hours, evidence_reasons = _snapshot_evidence(market, policy, evaluated_at)
 
     expected_coin = (
         rig.hashrate_hs
@@ -157,16 +216,11 @@ def evaluate_mining(
     )
     net_coin_after_pool = realized_coin * (1 - market.pool_fee_rate)
     break_even_coin_price = (
-        fixed_cost_excluding_pool / net_coin_after_pool
-        if net_coin_after_pool > 0
-        else None
+        fixed_cost_excluding_pool / net_coin_after_pool if net_coin_after_pool > 0 else None
     )
-    effective_th_per_day = (
-        rig.hashrate_hs / 1e12 * rig.uptime_rate * (1 - rig.stale_reject_rate)
-    )
+    effective_th_per_day = rig.hashrate_hs / 1e12 * rig.uptime_rate * (1 - rig.stale_reject_rate)
     break_even_hashprice = (
-        fixed_cost_excluding_pool
-        / (effective_th_per_day * (1 - market.pool_fee_rate))
+        fixed_cost_excluding_pool / (effective_th_per_day * (1 - market.pool_fee_rate))
         if effective_th_per_day > 0 and market.pool_fee_rate < 1
         else None
     )
@@ -198,17 +252,13 @@ def evaluate_mining(
         horizon_days=policy.analysis_horizon_days,
     )
     annualized_roi = (
-        net_cash * _DAYS_PER_YEAR / rig.total_capex_usd
-        if rig.total_capex_usd > 0
-        else None
+        net_cash * _DAYS_PER_YEAR / rig.total_capex_usd if rig.total_capex_usd > 0 else None
     )
     payback_days = (
-        rig.total_capex_usd / net_cash
-        if rig.total_capex_usd > 0 and net_cash > 0
-        else None
+        rig.total_capex_usd / net_cash if rig.total_capex_usd > 0 and net_cash > 0 else None
     )
 
-    reasons: list[str] = []
+    reasons: list[str] = list(evidence_reasons)
     if net < policy.min_daily_profit_usd:
         reasons.append("expected net profit is below the policy minimum")
     if margin < policy.min_margin_rate:
@@ -260,6 +310,11 @@ def evaluate_mining(
         npv_usd=npv,
         irr_annual_rate=irr,
         net_profit_mxn=net * policy.usd_mxn_rate if policy.usd_mxn_rate else None,
+        market_source=market.source,
+        market_captured_at_utc=market.captured_at_utc,
+        market_snapshot_age_hours=snapshot_age_hours,
+        market_snapshot_sha256=market.snapshot_sha256,
+        evaluated_at_utc=evaluated_at.replace(microsecond=0).isoformat(),
     )
 
 
@@ -267,10 +322,12 @@ def evaluate_all(
     rigs: tuple[MiningRig, ...],
     markets: tuple[MiningMarketSnapshot, ...],
     policy: MiningPolicy,
+    evaluated_at_utc: datetime | None = None,
 ) -> list[MiningEvaluation]:
     """Evaluate compatible pairs and rank by stressed profitability."""
+    evaluated_at = _evaluation_time(evaluated_at_utc)
     evaluations = [
-        evaluate_mining(rig, market, policy)
+        evaluate_mining(rig, market, policy, evaluated_at)
         for rig in rigs
         for market in markets
         if rig.algorithm.casefold() == market.algorithm.casefold()
@@ -282,5 +339,3 @@ def evaluate_all(
         key=lambda item: (item.stressed_net_profit_usd, item.net_profit_usd),
         reverse=True,
     )
-
-

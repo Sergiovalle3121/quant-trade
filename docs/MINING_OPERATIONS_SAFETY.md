@@ -15,6 +15,8 @@ hardware; or sign a wallet transaction.
 - Missing temperature, excess temperature, excess cloud hourly cost, negative
   stressed profit, inadequate margin/profit, or non-positive required NPV
   produces `NO-GO`.
+- Missing, placeholder, future-dated, or stale market evidence produces
+  `NO-GO`; every snapshot is fingerprinted in the report.
 - Wallet support, if added later, must be watch-only in the evaluator. Private
   keys, seed phrases, and signing belong outside this repository.
 

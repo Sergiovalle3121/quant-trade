@@ -3,6 +3,19 @@
 All calculations use daily USD values unless a field says otherwise. They are
 deterministic projections from supplied assumptions, not forecasts.
 
+## Snapshot provenance and freshness
+
+Market/network inputs are point-in-time evidence. The default policy rejects
+manual, illustrative, replacement, unknown, or placeholder sources; missing
+or invalid UTC capture times; observations older than 24 hours; and timestamps
+too far in the future. These checks are configurable but should not be relaxed
+to obtain a `GO`.
+
+Reports bind the complete market snapshot with a SHA-256 fingerprint and
+record its source, capture time, age, and evaluation time. Use CLI
+`--as-of-utc` for reproducible historical evaluation. See
+`docs/VALIDATION_EVIDENCE_V3.md`.
+
 ## Production and revenue
 
 Expected daily coin is the rig's share of network hash rate multiplied by block

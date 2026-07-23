@@ -13,3 +13,6 @@ min_trade_count: 30
 min_probabilistic_sharpe: 0.90
 require_deflated_sharpe: true
 min_deflated_sharpe: 0.5
+require_walk_forward_overfitting_evidence: true
+max_walk_forward_pbo: 0.50
+min_walk_forward_windows: 4

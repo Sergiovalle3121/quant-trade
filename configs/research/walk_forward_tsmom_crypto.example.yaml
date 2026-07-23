@@ -21,4 +21,7 @@ initial_cash: 100000
 costs: {percentage_commission: 0.0010, slippage_bps: 5.0, spread_bps: 3.0}
 portfolio: {max_weight_per_asset: 0.4, rebalance_band: 0.05}
 ranking_metric: sharpe
+overfitting:
+  max_walk_forward_pbo: 0.50
+  min_windows: 4
 output_dir: outputs

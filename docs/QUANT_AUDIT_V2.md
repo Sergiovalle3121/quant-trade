@@ -110,6 +110,20 @@ Resultados iguales no son esperables sin un contrato compartido de reloj, precio
 
 `run_multi_asset_backtest` valida el esquema de pesos antes de construir órdenes. Se añadieron regresiones para duplicados, símbolos desconocidos y pesos no numéricos. Los errores ahora detienen la simulación en lugar de aceptar o sobrescribir silenciosamente datos ambiguos.
 
+## Actualización de evidencia V3
+
+- Walk-forward registra todas las combinaciones probadas, no solo el ganador.
+- El rango OOS del ganador de entrenamiento produce una estimación empírica
+  de PBO; poca historia, una sola variante o PBO excesivo generan `NO-GO`.
+- La selección conservadora exige evidencia walk-forward vinculada al mismo
+  SHA-256 de dataset y a la misma estrategia.
+- Minería rechaza snapshots manuales, placeholder, vencidos, inválidos o
+  fechados en el futuro; cada evaluación registra procedencia, edad y huella
+  SHA-256.
+- Estos cambios refuerzan el rechazo de falsos positivos. No demuestran
+  rentabilidad y no habilitan trading live, infraestructura AWS ni procesos de
+  minería.
+
 ## Baseline reproducible
 
 Comandos requeridos:

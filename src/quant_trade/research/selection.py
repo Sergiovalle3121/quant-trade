@@ -64,6 +64,35 @@ def _statistical_reasons(
                     f"deflated Sharpe {dsr:.3f} below {criteria.min_deflated_sharpe} "
                     f"(after {n_trials} recorded trials)"
                 )
+    if criteria.require_walk_forward_overfitting_evidence:
+        evidence = result.get("overfitting_evidence")
+        if not isinstance(evidence, dict):
+            reasons.append("walk-forward overfitting evidence is missing")
+        else:
+            pbo = _metric(evidence, "walk_forward_pbo")
+            windows = _metric(evidence, "windows")
+            result_binding = result.get("dataset_binding")
+            evidence_binding = evidence.get("dataset_binding")
+            same_dataset = (
+                isinstance(result_binding, dict)
+                and isinstance(evidence_binding, dict)
+                and result_binding.get("data_sha256") == evidence_binding.get("data_sha256")
+            )
+            if not same_dataset:
+                reasons.append("walk-forward evidence dataset does not match the research run")
+            if evidence.get("strategy") != result.get("strategy"):
+                reasons.append("walk-forward evidence strategy does not match the research run")
+            if evidence.get("decision") != "PASS":
+                reasons.append("walk-forward overfitting evidence did not pass")
+            if pbo is None or pbo > criteria.max_walk_forward_pbo:
+                reasons.append(
+                    f"walk-forward PBO is missing or exceeds {criteria.max_walk_forward_pbo:.3f}"
+                )
+            if windows is None or windows < criteria.min_walk_forward_windows:
+                reasons.append(
+                    "walk-forward evidence has fewer than "
+                    f"{criteria.min_walk_forward_windows} windows"
+                )
     return reasons
 
 
