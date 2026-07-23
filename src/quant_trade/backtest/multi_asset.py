@@ -105,6 +105,27 @@ def run_multi_asset_backtest(
         else pd.Series(dtype="datetime64[ns, UTC]")
     )
     if not tw.empty:
+        required_weight_columns = {"timestamp", "symbol", "target_weight"}
+        missing_weight_columns = required_weight_columns - set(tw.columns)
+        if missing_weight_columns:
+            raise ValueError(
+                "target_weights missing required columns: "
+                + ", ".join(sorted(missing_weight_columns))
+            )
+        tw["symbol"] = tw["symbol"].astype(str).str.upper().str.strip()
+        tw["target_weight"] = pd.to_numeric(tw["target_weight"], errors="coerce")
+        if tw[["timestamp", "symbol", "target_weight"]].isna().any().any():
+            raise ValueError("target_weights contains missing or invalid values")
+        if (tw["symbol"] == "").any():
+            raise ValueError("target_weights symbol cannot be empty")
+        if tw.duplicated(["timestamp", "symbol"]).any():
+            raise ValueError("duplicate target weight rows for timestamp/symbol")
+        unknown_symbols = sorted(set(tw["symbol"]) - set(symbols))
+        if unknown_symbols:
+            raise ValueError(
+                "target_weights contains symbols absent from market data: "
+                + ", ".join(unknown_symbols)
+            )
         if (tw["target_weight"] < 0).any() and not allow_short:
             raise ValueError("negative target weights require allow_short=True")
         if (tw["target_weight"].abs() > max_weight_per_asset + 1e-12).any():
