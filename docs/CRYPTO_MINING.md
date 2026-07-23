@@ -8,10 +8,14 @@ join a pool, handle wallets, or start a process. Every report keeps
 ## What is included
 
 - owned-hardware and AWS hourly-cost economics;
-- pool fee, electricity, operating cost, and hardware depreciation;
+- pool fee, PUE-adjusted electricity, rejected shares, demand charge,
+  maintenance, operating cost, and complete installed-capital depreciation;
 - price haircut and network-difficulty growth stress;
 - temperature telemetry and maximum cloud-hourly-cost gates;
-- break-even electricity, hardware ROI, and payback diagnostics;
+- break-even electricity/coin/hashprice, production cost, cash payback, NPV,
+  and IRR diagnostics;
+- base, optimistic, pessimistic, price, difficulty, uptime, tariff, ventilation,
+  and extreme deterministic scenarios;
 - local JSON output and optional S3 publication through the existing AWS
   storage adapter;
 - deterministic tests with no network or AWS credentials.
@@ -28,6 +32,18 @@ purchase-model dependent; the repository deliberately does not hardcode them.
 quant-trade mining evaluate \
   --config configs/mining/aws_profitability_example.yaml \
   --output outputs/mining/profitability_report.json
+```
+
+Calculate unit economics or the fixed scenario matrix:
+
+```bash
+quant-trade mining break-even \
+  --config configs/mining/s21_xp_dated_example.yaml \
+  --output outputs/mining/break_even_report.json
+
+quant-trade mining stress \
+  --config configs/mining/s21_xp_dated_example.yaml \
+  --output outputs/mining/stress_report.json
 ```
 
 Publish the same report to AWS:
@@ -60,13 +76,16 @@ Do not commit credentials.
 ## Model risk
 
 Expected blocks are probabilistic. Pool payout rules, rejected shares,
-staleness, latency, Spot interruption, taxes, exchange fees, withdrawal costs,
-hardware failure, EBS, public IPv4, and data-transfer charges can reduce
-profitability. A `GO` is an eligibility result from supplied assumptions, not a
-profit guarantee. Refresh snapshots and AWS prices before every run and prefer
-a conservative `NO-GO` whenever inputs are stale or unverifiable.
+staleness, latency, curtailment, Spot interruption, taxes, exchange fees,
+withdrawal costs, hardware failure, PUE, EBS, public IPv4, and data-transfer
+charges can reduce profitability. A `GO` is an eligibility result from supplied
+assumptions, not a profit guarantee. Refresh snapshots and AWS prices before
+every run and prefer a conservative `NO-GO` whenever inputs are stale or
+unverifiable. See `MINING_ECONOMICS.md` for formula conventions and
+`MINING_OPERATIONS_SAFETY.md` for the deliberately disabled control plane.
 
 The software must only run on infrastructure owned or explicitly authorized by
 the operator. It contains no stealth, persistence, propagation, credential
 collection, or resource-hijacking behavior.
+
 
