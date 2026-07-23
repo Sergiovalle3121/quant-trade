@@ -52,6 +52,7 @@ def test_backtest_rejects_unknown_symbols():
 def test_backtest_rejects_non_numeric_target_weights():
     data = load_canonical_dataset(DATA).query("symbol in ['SPY','QQQ']")
     weights = equal_weight_buy_and_hold(data, {"max_weight_per_asset": 0.5})
+    weights["target_weight"] = weights["target_weight"].astype(object)
     weights.loc[weights.index[0], "target_weight"] = "not-a-number"
 
     with pytest.raises(ValueError, match="missing or invalid values"):

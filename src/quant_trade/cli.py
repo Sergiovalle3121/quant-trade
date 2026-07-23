@@ -22,6 +22,7 @@ from quant_trade.data.requests import HistoricalDataRequest
 from quant_trade.data.validation import validate_ohlcv
 from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
+from quant_trade.mining.cli import mining_app
 from quant_trade.ops.cli import ops_app
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
@@ -45,6 +46,7 @@ app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
+app.add_typer(mining_app, name="mining")
 app.add_typer(stress_app, name="stress")
 console = Console()
 
