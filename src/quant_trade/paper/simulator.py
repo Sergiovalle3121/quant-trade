@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
-import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,6 +10,13 @@ import pandas as pd
 
 from quant_trade.backtest.costs import CostModel
 from quant_trade.data.csv_loader import load_ohlcv_csv
+from quant_trade.execution.bar_model import (
+    BarExecutionPolicy,
+    BarOrderState,
+    ExecutionStatus,
+    cancel_order,
+    execute_market_order_on_bar,
+)
 from quant_trade.paper.config import load_paper_config
 from quant_trade.paper.events import create_event
 from quant_trade.paper.models import (
@@ -36,6 +43,12 @@ class PaperTradingSimulator:
                 "only execution.execution_price=next_open is supported; signals decided on "
                 "bar t fill at bar t+1's open to match the backtest engine"
             )
+        self.execution_policy = BarExecutionPolicy.from_mapping(self.config.execution)
+        if (
+            not bool((self.config.execution or {}).get("fractional_shares", True))
+            and self.execution_policy.lot_size is None
+        ):
+            self.execution_policy = replace(self.execution_policy, lot_size=1.0)
 
     def run(self) -> Path:
         run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -85,7 +98,38 @@ class PaperTradingSimulator:
         pending_target: dict[str, float] | None = None
         current_day = ""
         day_start_equity = state.equity
-        orders_filled_today = 0
+        orders_submitted_today = 0
+
+        def _execution_state(order) -> BarOrderState:
+            status = (
+                ExecutionStatus.SUBMITTED
+                if order.status == "pending"
+                else ExecutionStatus(order.status)
+            )
+            direction = 1.0 if order.side == "buy" else -1.0
+            return BarOrderState(
+                order_id=order.order_id,
+                symbol=order.symbol,
+                signed_quantity=direction * order.quantity,
+                submitted_bar_index=order.submitted_bar_index,
+                eligible_bar_index=order.eligible_bar_index,
+                remaining_quantity=direction * float(order.remaining_quantity or 0.0),
+                cumulative_filled_quantity=order.filled_quantity,
+                average_fill_price=order.fill_price,
+                fill_count=order.fill_count,
+                status=status,
+                reason=order.reason,
+                last_attempt_bar_index=order.last_attempt_bar_index,
+            )
+
+        def _sync_order(order, execution_order: BarOrderState) -> None:
+            order.status = execution_order.status.value
+            order.reason = execution_order.reason
+            order.remaining_quantity = abs(float(execution_order.remaining_quantity or 0.0))
+            order.filled_quantity = execution_order.cumulative_filled_quantity
+            order.fill_price = execution_order.average_fill_price
+            order.fill_count = execution_order.fill_count
+            order.last_attempt_bar_index = execution_order.last_attempt_bar_index
 
         def _daily_loss_breached() -> bool:
             if day_start_equity <= 0:
@@ -94,9 +138,12 @@ class PaperTradingSimulator:
             return loss > self.config.risk_limits.max_daily_loss_pct
 
         for ts, day in data.groupby("timestamp", sort=True):
+            bar_index = state.processed_bar_count
+            state.processed_bar_count += 1
             ts_str = str(ts)
             state.last_processed_timestamp = ts_str
             prices = {str(r.symbol): float(r.open) for r in day.itertuples()}
+            volumes = {str(r.symbol): float(r.volume) for r in day.itertuples()}
             for sym, pos in state.positions.items():
                 if sym in prices:
                     pos.last_price = prices[sym]
@@ -111,7 +158,7 @@ class PaperTradingSimulator:
             if bar_day != current_day:
                 current_day = bar_day
                 day_start_equity = state.equity
-                orders_filled_today = 0
+                orders_submitted_today = 0
             if _daily_loss_breached() and not state.kill_switch_active:
                 state.kill_switch_active = True
                 state.status = "paused"
@@ -130,6 +177,22 @@ class PaperTradingSimulator:
                 continue
             target, pending_target = pending_target, None
             if target is not None:
+                if state.open_orders:
+                    for old_order in state.open_orders:
+                        execution_order = _execution_state(old_order)
+                        cancel_order(execution_order, "superseded by a newer target")
+                        _sync_order(old_order, execution_order)
+                        orders.append(old_order.to_dict())
+                        events.append(
+                            create_event(
+                                ts_str,
+                                "order_cancelled",
+                                old_order.reason,
+                                "warning",
+                                old_order.to_dict(),
+                            ).to_dict()
+                        )
+                    state.open_orders = []
                 new_orders = target_weights_to_orders(
                     state, target, prices, self.config.risk_limits, self.cost_model
                 )
@@ -138,7 +201,10 @@ class PaperTradingSimulator:
                         create_event(ts_str, "rebalance_due", "rebalance orders created").to_dict()
                     )
                 for order in new_orders:
-                    if orders_filled_today >= self.config.risk_limits.max_orders_per_day:
+                    if (
+                        orders_submitted_today
+                        >= self.config.risk_limits.max_orders_per_day
+                    ):
                         order.status = "rejected"
                         order.reason = "max_orders_per_day reached"
                         orders.append(order.to_dict())
@@ -163,49 +229,123 @@ class PaperTradingSimulator:
                             ).to_dict()
                         )
                         continue
-                    price = prices[order.symbol]
-                    notional = order.quantity * price
+                    order.status = "submitted"
+                    order.submitted_bar_index = bar_index
+                    order.eligible_bar_index = (
+                        bar_index + self.execution_policy.additional_latency_bars
+                    )
+                    order.remaining_quantity = order.quantity
+                    state.open_orders.append(order)
+                    orders_submitted_today += 1
+                    events.append(
+                        create_event(
+                            ts_str,
+                            "order_submitted",
+                            "order accepted by simulated execution model",
+                            details=order.to_dict(),
+                        ).to_dict()
+                    )
+
+            retained_orders = []
+            for order in sorted(
+                state.open_orders,
+                key=lambda item: (item.side == "buy", item.symbol, item.order_id),
+            ):
+                execution_order = _execution_state(order)
+                fill_decision = execute_market_order_on_bar(
+                    execution_order,
+                    bar_index=bar_index,
+                    open_price=prices.get(order.symbol),
+                    volume=volumes.get(order.symbol),
+                    policy=self.execution_policy,
+                )
+                if fill_decision is not None:
+                    notional = fill_decision.quantity * fill_decision.price
                     cost = self.cost_model.trade_cost(notional)
-                    order.status = "filled"
+                    if (
+                        order.side == "buy"
+                        and not self.config.risk_limits.allow_leverage
+                        and state.cash - notional - cost
+                        < state.equity * self.config.risk_limits.min_cash_pct - 1e-9
+                    ):
+                        # Discard the tentative execution mutation. Preserve
+                        # prior partial fills, but do not report this rejected
+                        # proposal as filled quantity.
+                        execution_order = _execution_state(order)
+                        execution_order.status = ExecutionStatus.REJECTED
+                        execution_order.reason = (
+                            "fill would breach cash reserve after costs and impact"
+                        )
+                        fill_decision = None
+                _sync_order(order, execution_order)
+                if fill_decision is not None:
+                    price = fill_decision.price
+                    notional = fill_decision.quantity * price
+                    cost = self.cost_model.trade_cost(notional)
                     order.filled_at = ts_str
-                    order.fill_price = price
-                    order.cost = cost
+                    order.cost += cost
                     if order.side == "buy":
                         state.cash -= notional + cost
                         pos = state.positions.get(
-                            order.symbol, PaperPosition(order.symbol, 0.0, price, price)
+                            order.symbol,
+                            PaperPosition(order.symbol, 0.0, price, price),
                         )
                         prior_value = pos.quantity * pos.average_cost
-                        pos.quantity += order.quantity
+                        pos.quantity += fill_decision.quantity
                         pos.average_cost = (prior_value + notional) / pos.quantity
                         pos.last_price = price
                         state.positions[order.symbol] = pos
                     else:
                         pos = state.positions[order.symbol]
-                        pos.quantity -= order.quantity
+                        pos.quantity -= fill_decision.quantity
                         state.cash += notional - cost
-                        state.realized_pnl += (price - pos.average_cost) * order.quantity - cost
+                        state.realized_pnl += (
+                            (price - pos.average_cost) * fill_decision.quantity - cost
+                        )
                         if pos.quantity <= 1e-9:
                             del state.positions[order.symbol]
-                    fill = PaperFill(
-                        str(uuid.uuid4()),
+                    paper_fill = PaperFill(
+                        f"{order.order_id}:{order.fill_count}",
                         order.order_id,
                         ts_str,
                         order.symbol,
                         order.side,
-                        order.quantity,
+                        fill_decision.quantity,
                         price,
                         cost,
+                        fill_decision.participation_rate,
+                        fill_decision.price_impact_bps,
                     )
-                    state.fills.append(fill)
-                    fills.append(fill.to_dict())
-                    orders.append(order.to_dict())
-                    orders_filled_today += 1
+                    state.fills.append(paper_fill)
+                    fills.append(paper_fill.to_dict())
+                    event_type = (
+                        "order_filled"
+                        if order.status == "filled"
+                        else "order_partially_filled"
+                    )
                     events.append(
                         create_event(
-                            ts_str, "order_filled", "order filled", details=order.to_dict()
+                            ts_str,
+                            event_type,
+                            event_type.replace("_", " "),
+                            details=order.to_dict(),
                         ).to_dict()
                     )
+                if execution_order.is_terminal:
+                    orders.append(order.to_dict())
+                    if fill_decision is None and order.status in {"rejected", "expired"}:
+                        events.append(
+                            create_event(
+                                ts_str,
+                                f"order_{order.status}",
+                                order.reason,
+                                "warning",
+                                order.to_dict(),
+                            ).to_dict()
+                        )
+                else:
+                    retained_orders.append(order)
+            state.open_orders = retained_orders
             state.equity = state.cash + sum(
                 p.quantity * p.last_price for p in state.positions.values()
             )
@@ -272,6 +412,21 @@ class PaperTradingSimulator:
                     ).to_dict()
                 )
         state.status = "stopped" if not state.kill_switch_active else "paused"
+        for order in state.open_orders:
+            execution_order = _execution_state(order)
+            cancel_order(execution_order, "session ended before order completed")
+            _sync_order(order, execution_order)
+            orders.append(order.to_dict())
+            events.append(
+                create_event(
+                    state.last_processed_timestamp,
+                    "order_cancelled",
+                    order.reason,
+                    "warning",
+                    order.to_dict(),
+                ).to_dict()
+            )
+        state.open_orders = []
         events.append(
             create_event(
                 state.last_processed_timestamp, "session_completed", "simulated session completed"
@@ -288,3 +443,4 @@ class PaperTradingSimulator:
             state,
         )
         return out
+
