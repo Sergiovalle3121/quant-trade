@@ -8,7 +8,7 @@ returns. Every parameter evaluation is recorded in the trial ledger so the
 deflated Sharpe of any eventual winner accounts for the full search.
 
 Signals are generated once per parameter set on the FULL panel and sliced per
-window — registered signals are causal (enforced by the truncation-invariance
+window â€” registered signals are causal (enforced by the truncation-invariance
 tests), so this is leak-free and gives every test window full signal coverage
 instead of burning the lookback inside it.
 """
@@ -28,7 +28,7 @@ from quant_trade.data.panel import load_canonical_dataset
 from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
 from quant_trade.research.ledger import append_trial
-from quant_trade.research.multi_asset_runner import _cost
+from quant_trade.research.multi_asset_runner import _cost, _execution_policy
 from quant_trade.research.strategy_registry import get_research_signal_model
 from quant_trade.research.walk_forward import _stitch_oos_equity
 
@@ -59,6 +59,7 @@ def _window_result(
         allow_leverage=bool(port.get("allow_leverage", False)),
         allow_short=bool(port.get("allow_short", False)),
         rebalance_band=float(port.get("rebalance_band", 0.0)),
+        execution_policy=_execution_policy(config),
     )
 
 
@@ -185,3 +186,4 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
         "aggregate_metrics": aggregate,
         "dataset_binding": dataset_binding,
     }
+
