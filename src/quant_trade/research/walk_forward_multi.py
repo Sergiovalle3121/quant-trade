@@ -8,7 +8,7 @@ returns. Every parameter evaluation is recorded in the trial ledger so the
 deflated Sharpe of any eventual winner accounts for the full search.
 
 Signals are generated once per parameter set on the FULL panel and sliced per
-window â€” registered signals are causal (enforced by the truncation-invariance
+window — registered signals are causal (enforced by the truncation-invariance
 tests), so this is leak-free and gives every test window full signal coverage
 instead of burning the lookback inside it.
 """
@@ -186,4 +186,3 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
         "aggregate_metrics": aggregate,
         "dataset_binding": dataset_binding,
     }
-
