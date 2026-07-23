@@ -1,0 +1,39 @@
+Exit code: 0
+Wall time: 1 seconds
+Output:
+# Illustrative inputs only. Replace every market and EC2 price with a fresh,
+# attributable snapshot before making a decision. This example should be NO-GO.
+rigs:
+  - name: aws-authorized-worker
+    algorithm: sha256
+    hashrate_hs: 100000000000000
+    power_watts: 3200
+    hardware_cost_usd: 0
+    uptime_rate: 0.90
+    temperature_c: 70
+    infrastructure_hourly_cost_usd: 1.50
+    electricity_included: true
+    daily_operating_cost_usd: 0.25
+
+markets:
+  - coin: EXAMPLE-POW
+    algorithm: sha256
+    coin_price_usd: 100000
+    network_hashrate_hs: 800000000000000000000
+    block_reward_coin: 3.125
+    blocks_per_day: 144
+    pool_fee_rate: 0.02
+    source: replace-with-attributable-snapshot
+    captured_at_utc: replace-me
+
+policy:
+  electricity_usd_per_kwh: 0
+  min_daily_profit_usd: 5
+  min_margin_rate: 0.15
+  price_haircut_rate: 0.30
+  monthly_difficulty_growth_rate: 0.10
+  stress_horizon_days: 30
+  max_temperature_c: 80
+  require_temperature: true
+  max_cloud_hourly_cost_usd: 2
+
