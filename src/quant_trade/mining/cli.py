@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.8 seconds
-Output:
 """CLI for offline, cloud-aware mining economics and shutdown decisions."""
 
 from __future__ import annotations
