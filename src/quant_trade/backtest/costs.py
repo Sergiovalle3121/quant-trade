@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 
@@ -8,6 +9,18 @@ class CostModel:
     slippage_bps: float = 0.0
     min_commission: float = 0.0
     spread_bps: float = 0.0
+
+    def __post_init__(self) -> None:
+        for name in (
+            "fixed_commission",
+            "percentage_commission",
+            "slippage_bps",
+            "min_commission",
+            "spread_bps",
+        ):
+            value = float(getattr(self, name))
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and non-negative")
 
     def trade_cost(self, notional: float, *, include_slippage: bool = True) -> float:
         """Total cash cost for a trade of ``notional``.
@@ -34,3 +47,4 @@ CONSERVATIVE_COST_MODEL = CostModel(
     slippage_bps=5.0,
     spread_bps=2.0,
 )
+
