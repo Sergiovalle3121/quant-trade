@@ -8,12 +8,17 @@ import pandas as pd
 from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.data.panel import validate_panel_schema
+from quant_trade.execution.bar_model import BarExecutionPolicy
 from quant_trade.metrics.performance import periods_per_year
 from quant_trade.research.signals.trend import equal_weight_buy_and_hold
 
 
 def run_benchmark(
-    data: pd.DataFrame, benchmark_config: dict[str, Any], initial_cash: float, cost_model: CostModel
+    data: pd.DataFrame,
+    benchmark_config: dict[str, Any],
+    initial_cash: float,
+    cost_model: CostModel,
+    execution_policy: BarExecutionPolicy | None = None,
 ):
     kind = benchmark_config.get("type", "equal_weight_universe")
     f = validate_panel_schema(data)
@@ -49,7 +54,13 @@ def run_benchmark(
         weights = equal_weight_buy_and_hold(f, {})
     else:
         raise ValueError(f"Unknown benchmark type: {kind}")
-    return run_multi_asset_backtest(f, weights, initial_cash, cost_model)
+    return run_multi_asset_backtest(
+        f,
+        weights,
+        initial_cash,
+        cost_model,
+        execution_policy=execution_policy,
+    )
 
 
 def compare_to_benchmark(
@@ -88,3 +99,4 @@ def compare_to_benchmark(
         comp["tracking_error"] = te
         comp["information_ratio"] = float(diff.mean() * ppy / te) if te else 0.0
     return comp
+
