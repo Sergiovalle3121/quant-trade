@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.8 seconds
-Output:
 import pytest
 
 from quant_trade.mining.cloud import publish_report
