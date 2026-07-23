@@ -4,7 +4,16 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 Side = Literal["buy", "sell"]
-OrderStatus = Literal["pending", "filled", "rejected", "cancelled"]
+OrderStatus = Literal[
+    "pending",
+    "submitted",
+    "deferred",
+    "partially_filled",
+    "filled",
+    "rejected",
+    "cancelled",
+    "expired",
+]
 SessionStatus = Literal["initialized", "running", "paused", "stopped"]
 
 
@@ -30,6 +39,16 @@ class PaperOrder:
     filled_at: str = ""
     fill_price: float = 0.0
     cost: float = 0.0
+    filled_quantity: float = 0.0
+    remaining_quantity: float | None = None
+    fill_count: int = 0
+    submitted_bar_index: int = 0
+    eligible_bar_index: int = 0
+    last_attempt_bar_index: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.remaining_quantity is None:
+            self.remaining_quantity = self.quantity
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -45,6 +64,8 @@ class PaperFill:
     quantity: float
     price: float
     cost: float
+    participation_rate: float = 0.0
+    price_impact_bps: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -141,6 +162,8 @@ class PaperSessionState:
     last_processed_timestamp: str = ""
     kill_switch_active: bool = False
     status: SessionStatus = "initialized"
+    processed_bar_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
