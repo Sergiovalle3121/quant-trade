@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.9 seconds
-Output:
 """YAML configuration for offline mining profitability evaluation."""
 
 from __future__ import annotations
