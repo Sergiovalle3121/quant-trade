@@ -94,16 +94,29 @@ def run_multi_asset_backtest(
         )
     dates = list(closes.index)
     symbols = list(closes.columns)
-    tw = (
-        target_weights.copy()
-        if not target_weights.empty
-        else pd.DataFrame(columns=["timestamp", "symbol", "target_weight"])
-    )
-    tw["timestamp"] = (
-        pd.to_datetime(tw["timestamp"], utc=True, errors="coerce")
-        if not tw.empty
-        else pd.Series(dtype="datetime64[ns, UTC]")
-    )
+    required_weight_columns = {"timestamp", "symbol", "target_weight"}
+    if target_weights.empty:
+        tw = pd.DataFrame(columns=sorted(required_weight_columns))
+        tw["timestamp"] = pd.Series(dtype="datetime64[ns, UTC]")
+    else:
+        missing_columns = required_weight_columns.difference(target_weights.columns)
+        if missing_columns:
+            raise ValueError(
+                f"target_weights missing required columns: {sorted(missing_columns)}"
+            )
+        tw = target_weights.loc[:, ["timestamp", "symbol", "target_weight"]].copy()
+        tw["timestamp"] = pd.to_datetime(tw["timestamp"], utc=True, errors="coerce")
+        tw["symbol"] = tw["symbol"].astype("string").str.strip()
+        tw["target_weight"] = pd.to_numeric(tw["target_weight"], errors="coerce")
+        if tw[["timestamp", "symbol", "target_weight"]].isna().any().any():
+            raise ValueError("target_weights contains missing or invalid values")
+        if tw["symbol"].eq("").any():
+            raise ValueError("target_weights contains an empty symbol")
+        if tw.duplicated(["timestamp", "symbol"]).any():
+            raise ValueError("target_weights contains duplicate timestamp/symbol rows")
+        unknown_symbols = sorted(set(tw["symbol"]).difference(symbols))
+        if unknown_symbols:
+            raise ValueError(f"target_weights contains unknown symbols: {unknown_symbols}")
     if not tw.empty:
         if (tw["target_weight"] < 0).any() and not allow_short:
             raise ValueError("negative target weights require allow_short=True")
