@@ -146,3 +146,30 @@ Next: V6-4 — HistoricalCarryPanel (paginated klines+funding backfill).
 - 8 new tests. Suite: **616 passed, 11 xfailed** · ruff/mypy clean.
 
 Next: V6-5 — H1/H2 settlement signals everywhere + real H3 + DSR/PBO gates.
+
+## CP5 — 2026-07-25T01:30Z — V6-5: settlement signals, real H3, DSR/PBO, caps
+
+- **H closed:** the jsonl path now derives its signal from SETTLEMENTS (last
+  settled rate held between events; zero settlements ⇒ zero signal ⇒ polls
+  carry no entry authority) — same semantics as the panel path; the signal
+  series feeds the ledger AND the cost stress identically.
+- **I closed:** `carry/cross_venue.py` — real perp-perp dispersion: long the
+  lower-funding perp, short the higher, settled-spread trailing signal,
+  per-venue marks (never concatenated) with divergence booked as P&L,
+  per-switch fees + transfer costs, terminal close, independent cash-vs-
+  totals reconciliation. Scanner kind `cross_venue_dispersion` (H3 config
+  updated): requires BOTH panels, runs the engine, fixture panels stay
+  TEST_ONLY; real panels reach at most RESEARCH_CANDIDATE pending gates.
+- **J closed:** `evaluate_carry_promotion` now EXECUTES DSR (from the
+  persisted return series + conservative trial counting from the trial
+  ledger) and a PBO estimate (walk-forward negative-window fraction, ≥4
+  windows required, pre-registered 0.50 limit), plus a reconciled-ledger
+  requirement; the review exposes a `statistics` section.
+- **M closed:** explicit leveraged-cap policy — `max_gross_exposure` is
+  enforced WITH leverage (cash constraint relaxed, cap never silenced) in
+  the engine, runner, and now `walk_forward_multi` windows.
+- 5 xfail markers removed (H, I, J, M×2); V4/V5 tests updated to the new
+  completeness bar. 6 new cross-venue tests. Suite: **627 passed, 6
+  xfailed** · ruff/mypy clean.
+
+Next: V6-6 — common-unit economic board + strict lineage (K/L).

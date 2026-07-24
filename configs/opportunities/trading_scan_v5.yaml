@@ -75,18 +75,17 @@ hypotheses:
         embargo_bars: 1
 
   - id: H3
-    name: "Cross-venue funding dispersion (Bybit vs OKX)"
+    name: "Perp-perp cross-venue funding dispersion (Bybit vs OKX)"
     registered_in: docs/PROFIT_HYPOTHESES_V5.md
-    # H3 evaluates complete single-identity campaigns from H1 and H2 — it can
-    # only run once BOTH venue datasets exist. Identities are never mixed.
-    requires_datasets:
-      - data/carry/funding_history_bybit.jsonl
-      - data/carry/funding_history_okx.jsonl
-    campaign:
-      experiment_name: h3_cross_venue_dispersion
-      data:
-        source: jsonl_observations
-        path: data/carry/funding_history_bybit.jsonl
-      signal:
-        entry_threshold: 0.00003
-        trailing_window: 3
+    # V6: H3 is a REAL two-venue engine (carry/cross_venue.py) — long the
+    # lower-funding perp, short the higher, settled-spread signal, per-venue
+    # marks/collateral, transfer costs. Runs only when BOTH panels exist.
+    kind: cross_venue_dispersion
+    venues:
+      - venue: bybit
+        panel: data/carry/panel/bybit_btc
+      - venue: okx
+        panel: data/carry/panel/okx_btc
+    signal:
+      entry_threshold: 0.00003
+      trailing_window: 3

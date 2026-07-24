@@ -274,7 +274,20 @@ def _load_snapshots(
         manifest = build_file_manifest(
             path, records, provenance_notes="point-in-time collector JSONL"
         )
-        return snapshots, manifest, settlements, None
+        # SETTLEMENT-DRIVEN signal (V6-H): each bar's signal is the most
+        # recent SETTLED rate known at that bar, held between settlements —
+        # three five-minute polls can never substitute three 8h settlements.
+        # Zero settlements => zero signal => no entry authority from polls.
+        settle_sorted = sorted(settlements, key=lambda x: x[0])
+        signal: list[float] = []
+        idx, last = 0, 0.0
+        for snap in snapshots:
+            t = pd.to_datetime(snap.captured_at_utc, utc=True)
+            while idx < len(settle_sorted) and settle_sorted[idx][0] <= t:
+                last = settle_sorted[idx][1]
+                idx += 1
+            signal.append(last)
+        return snapshots, manifest, settlements, signal
     if source == "panel":
         # HistoricalCarryPanel (V6-F): klines provide the quotes, funding
         # accrues at exact settlement instants, and the SIGNAL series is the
@@ -630,17 +643,82 @@ def evaluate_carry_promotion(
     observations = metrics.get("observations")
     skew = metrics.get("skewness")
     kurt = metrics.get("kurtosis")
+    statistics: dict[str, Any] = {}
     if sharpe_pp is None or observations is None or skew is None or kurt is None:
         failures.append("persisted return moments incomplete; PSR cannot be recomputed")
     else:
         psr = psr_from_moments(
             float(sharpe_pp), int(observations), float(skew), float(kurt), 0.0
         )
+        statistics["psr"] = psr
         if psr < 0.95:
             failures.append(f"recomputed PSR {psr:.3f} below 0.95")
+
+    # DSR and PBO are EXECUTED gates, not documentation (V6-J).
+    import json as _json
+
+    import pandas as _pd
+
+    from quant_trade.metrics.statistics import deflated_sharpe_ratio
+
+    returns_csv = results_path.parent / "net_returns.csv"
+    trial_path = Path(ledger_dir) / "trial_ledger.jsonl"
+    trial_sharpes: list[float] = []
+    n_trials = 0
+    if trial_path.exists():
+        for line in trial_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            n_trials += 1
+            try:
+                value = _json.loads(line).get("test_sharpe_per_period")
+            except _json.JSONDecodeError:
+                continue
+            if isinstance(value, int | float):
+                trial_sharpes.append(float(value))
+    effective_trials = max(1, n_trials)
+    sharpe_variance = (
+        float(_pd.Series(trial_sharpes).var(ddof=0)) if len(trial_sharpes) >= 2 else 0.0
+    )
+    statistics["effective_trials"] = effective_trials
+    statistics["sharpe_variance"] = sharpe_variance
+    if returns_csv.exists():
+        net_series = _pd.read_csv(returns_csv)["net_return"].astype(float).dropna()
+        dsr = deflated_sharpe_ratio(net_series, effective_trials, sharpe_variance)
+        statistics["dsr"] = dsr
+        if dsr < 0.95:
+            failures.append(
+                f"recomputed DSR {dsr:.3f} below 0.95 "
+                f"({effective_trials} trial(s) counted conservatively)"
+            )
+    else:
+        failures.append("net_returns.csv missing; DSR cannot be recomputed")
+
+    windows = payload.get("walk_forward") or []
+    if len(windows) < 4:
+        failures.append(
+            f"PBO needs >= 4 walk-forward windows; only {len(windows)} available"
+        )
+    else:
+        negative = sum(
+            1 for w in windows if float(w.get("test_total_return", 0.0)) <= 0.0
+        )
+        pbo_estimate = negative / len(windows)
+        statistics["pbo_estimate"] = pbo_estimate
+        statistics["pbo_method"] = "walk_forward_negative_window_fraction"
+        if pbo_estimate > 0.5:
+            failures.append(
+                f"PBO estimate {pbo_estimate:.2f} above the pre-registered 0.50 limit"
+            )
+
+    ledger_summary = payload.get("ledger") or {}
+    if not ledger_summary.get("reconciled"):
+        failures.append("economic ledger missing or not reconciled in artifacts")
+
     return {
         "status": "PAPER_CANDIDATE" if not failures else "REJECTED",
         "failures": failures,
+        "statistics": statistics,
         "real_money_authorized": False,
     }
 

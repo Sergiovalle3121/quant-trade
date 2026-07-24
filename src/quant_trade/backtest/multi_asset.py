@@ -97,6 +97,8 @@ def _maximum_feasible_scale(
     cost_model: CostModel,
     fractional_shares: bool,
     max_gross: float,
+    *,
+    allow_negative_cash: bool = False,
 ) -> float:
     if not orders:
         return 0.0
@@ -113,7 +115,7 @@ def _maximum_feasible_scale(
         )
         return (
             math.isfinite(simulated_cash)
-            and simulated_cash >= -1e-9
+            and (allow_negative_cash or simulated_cash >= -1e-9)
             and math.isfinite(equity)
             and equity > 0
             and gross_value <= max_gross * equity + 1e-8
@@ -192,14 +194,13 @@ def run_multi_asset_backtest(
         raise ValueError("initial_cash must be finite and > 0")
     if not math.isfinite(max_weight_per_asset) or max_weight_per_asset <= 0:
         raise ValueError("max_weight_per_asset must be finite and > 0")
-    if max_gross_exposure is not None:
-        if not math.isfinite(max_gross_exposure) or max_gross_exposure <= 0:
-            raise ValueError("max_gross_exposure must be finite and > 0")
-        if allow_leverage:
-            raise ValueError(
-                "max_gross_exposure enforcement together with allow_leverage is "
-                "not implemented; refusing a cap that would be silently ignored"
-            )
+    # Explicit leveraged-cap policy (V6-M): a configured cap is ENFORCED with
+    # and without leverage — leverage relaxes the cash constraint, never the
+    # cap. A silenced cap is worse than no cap.
+    if max_gross_exposure is not None and (
+        not math.isfinite(max_gross_exposure) or max_gross_exposure <= 0
+    ):
+        raise ValueError("max_gross_exposure must be finite and > 0")
     # The gross cap actually applied when sizing exposure-increasing orders.
     applied_max_gross = 1.0 if max_gross_exposure is None else max_gross_exposure
     if not math.isfinite(rebalance_band) or rebalance_band < 0:
@@ -514,7 +515,21 @@ def run_multi_asset_backtest(
                     raise ValueError(
                         "transaction costs would exhaust portfolio equity"
                     )
-                increase_scale = 1.0
+                # leverage relaxes the cash constraint, never a configured cap
+                increase_scale = (
+                    1.0
+                    if max_gross_exposure is None
+                    else _maximum_feasible_scale(
+                        cash,
+                        qty,
+                        increasing_orders,
+                        valuation_prices,
+                        cost_model,
+                        fractional_shares,
+                        applied_max_gross,
+                        allow_negative_cash=True,
+                    )
+                )
             else:
                 increase_scale = _maximum_feasible_scale(
                     cash,
@@ -550,7 +565,7 @@ def run_multi_asset_backtest(
                 raise RuntimeError(
                     "internal sizing error: gross exposure exceeds equity"
                 )
-        if max_gross_exposure is not None and not allow_leverage:
+        if max_gross_exposure is not None:
             # A gross cap is a standing risk limit, not a rebalance-time
             # suggestion: when drift pushes exposure above the cap between
             # rebalances, trim every position proportionally at the next

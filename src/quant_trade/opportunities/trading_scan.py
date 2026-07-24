@@ -83,6 +83,79 @@ def _last_backfill_evidence(attempts_log: Path) -> str | None:
     return None
 
 
+def _scan_cross_venue(hyp: dict[str, Any], resolve: Any) -> TradingOpportunityRow:
+    """H3 for real (V6-I): two venues, two ledgers, settled-spread signal."""
+    from quant_trade.carry.cross_venue import (
+        panel_to_dispersion_bars,
+        run_perp_perp_dispersion,
+    )
+    from quant_trade.carry.panel import load_panel
+    from quant_trade.evidence.receipts import resolve_dir_provenance
+
+    row = TradingOpportunityRow(
+        hypothesis_id=str(hyp.get("id", "?")),
+        name=str(hyp.get("name", "")),
+        status="",
+        registered_in=str(hyp.get("registered_in", "")),
+    )
+    venues = hyp.get("venues") or []
+    if len(venues) != 2:
+        row.status = "NOT_RUN_DATASET_REJECTED"
+        row.reasons = ["cross_venue_dispersion requires exactly two venue panels"]
+        return row
+    row.dataset_paths = [str(v.get("panel", "")) for v in venues]
+    missing = [p for p in row.dataset_paths if not resolve(p).exists()]
+    if missing:
+        row.status = "NOT_RUN_NO_DATASET"
+        row.reasons = [f"registered dataset missing: {p}" for p in missing]
+        return row
+    signal_cfg = hyp.get("signal", {})
+    try:
+        panels = [load_panel(resolve(str(v["panel"]))) for v in venues]
+        result = run_perp_perp_dispersion(
+            panel_to_dispersion_bars(panels[0]),
+            panel_to_dispersion_bars(panels[1]),
+            venue_a=str(venues[0]["venue"]),
+            venue_b=str(venues[1]["venue"]),
+            entry_threshold=float(signal_cfg.get("entry_threshold", 0.0)),
+            trailing_window=int(signal_cfg.get("trailing_window", 3)),
+        )
+    except ValueError as exc:
+        row.status = "NOT_RUN_DATASET_REJECTED"
+        row.reasons = [str(exc)]
+        return row
+    provenances = {
+        resolve_dir_provenance(resolve(str(v["panel"])) / "receipts.jsonl").provenance
+        for v in venues
+    }
+    row.data_source = provenances.pop() if len(provenances) == 1 else "mixed"
+    row.metrics = {
+        "total_return": result.final_equity / result.initial_capital - 1.0,
+        "sharpe_per_period": None,
+        "funding_spread_captured": result.totals.funding_spread,
+        "mark_divergence_pnl": result.totals.mark_divergence_pnl,
+        "entries": result.entries,
+        "switches": result.switches,
+        "reconciled": result.reconciled,
+    }
+    if not result.reconciled:
+        row.status = "NOT_RUN_DATASET_REJECTED"
+        row.reasons = ["cross-venue ledger failed reconciliation"]
+    elif row.data_source != "real":
+        row.status = "NOT_RUN_INSUFFICIENT_REAL_DATA"
+        row.reasons = [
+            f"panel provenance is {row.data_source!r}; only receipt-verified "
+            "live data counts"
+        ]
+    else:
+        row.status = "RESEARCH_CANDIDATE"
+        row.reasons = [
+            "cross-venue dispersion computed on real panels; promotion requires "
+            "the full statistical gate set and must beat max(H1, H2, cash)"
+        ]
+    return row
+
+
 def load_trading_scan_config(path: str | Path) -> dict[str, Any]:
     payload = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     if not payload.get("hypotheses"):
@@ -104,6 +177,10 @@ def scan_trading_opportunities(
 
     rows: list[TradingOpportunityRow] = []
     for hyp in config["hypotheses"]:
+        kind = str(hyp.get("kind", "single_venue_carry"))
+        if kind == "cross_venue_dispersion":
+            rows.append(_scan_cross_venue(hyp, resolve))
+            continue
         campaign = hyp.get("campaign")
         if campaign is None and hyp.get("campaign_config"):
             campaign = yaml.safe_load(

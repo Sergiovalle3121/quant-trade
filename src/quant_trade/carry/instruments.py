@@ -177,9 +177,9 @@ class InstrumentIdentity:
             perpetual_instrument_id=(
                 canonical_instrument_id(venue, perp_raw) if venue else perp_raw
             ),
-            contract_type=str(record.get("contract_type", "linear_perpetual")),
+            contract_type=str(record.get("contract_type") or "linear_perpetual"),
             quote_asset=quote,
-            settlement_asset=str(record.get("settlement_asset", quote)),
+            settlement_asset=str(record.get("settlement_asset") or quote),
             funding_interval_hours=float(record.get("funding_interval_hours", 8.0)),
         )
 

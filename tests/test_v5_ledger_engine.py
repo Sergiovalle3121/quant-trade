@@ -151,7 +151,9 @@ def test_max_gross_exposure_caps_the_engine():
     )
 
 
-def test_max_gross_with_leverage_fails_closed():
+def test_max_gross_with_leverage_is_enforced_not_refused():
+    # V6-M: the explicit leveraged-cap policy — leverage relaxes the cash
+    # constraint, never the cap. The configured cap binds under leverage too.
     from quant_trade.backtest.costs import CostModel
     from quant_trade.backtest.multi_asset import run_multi_asset_backtest
     from quant_trade.data.panel import load_canonical_dataset
@@ -160,11 +162,12 @@ def test_max_gross_with_leverage_fails_closed():
     data = load_canonical_dataset("examples/data/sample_multi_asset_ohlcv.csv")
     model = get_research_signal_model("equal_weight_quarterly")
     weights = model.generate(data, {})
-    with pytest.raises(ValueError, match="max_gross_exposure"):
-        run_multi_asset_backtest(
-            data, weights, 10_000, CostModel(),
-            allow_leverage=True, max_gross_exposure=1.5,
-        )
+    capped = run_multi_asset_backtest(
+        data, weights, 10_000, CostModel(),
+        allow_leverage=True, max_gross_exposure=0.5,
+    )
+    gross = capped.equity_curve["gross_exposure"].astype(float)
+    assert float(gross.max()) <= 0.5 * 1.005, "the cap must bind under leverage"
 
 
 def test_negative_funding_ledger_loses_money():

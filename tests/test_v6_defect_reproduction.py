@@ -220,7 +220,6 @@ def test_collector_never_substitutes_last_for_mark():
 # --- H. H1/H2 signals consume polls, not settlements ------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-H: trailing signal averages quoted polls")
 def test_signal_uses_last_n_unique_settlements(tmp_path):
     # pre-registration: "trailing mean of the last 3 SETTLED rates". A store
     # whose polls quote 0.01 but whose settlements paid -0.01 must NOT enter.
@@ -246,7 +245,6 @@ def test_signal_uses_last_n_unique_settlements(tmp_path):
 # --- I. H3 is not actually cross-venue --------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-I: H3 runs a single-venue campaign")
 def test_h3_is_cross_venue_or_absent():
     cfg = yaml.safe_load(
         Path("configs/opportunities/trading_scan_v5.yaml").read_text()
@@ -261,8 +259,9 @@ def test_h3_is_cross_venue_or_absent():
 # --- J. DSR/PBO are documented, not enforced --------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-J: promotion checks PSR only")
 def test_promotion_requires_dsr_and_pbo(tmp_path):
+    # V6-J closed: DSR and PBO are EXECUTED gates. The review recomputes both
+    # from persisted artifacts and rejects when they miss their thresholds.
     from quant_trade.carry.research import evaluate_carry_promotion, write_carry_artifacts
 
     cfg = _real_json_campaign(tmp_path)
@@ -270,9 +269,14 @@ def test_promotion_requires_dsr_and_pbo(tmp_path):
     out = tmp_path / "artifacts"
     write_carry_artifacts(out, cfg, result)
     review = evaluate_carry_promotion(out / "results.json", ledger_dir=out)
-    text = " ".join(review["failures"]).lower()
-    assert "dsr" in text or "deflated" in text
-    assert "pbo" in text or "overfitting" in text
+    stats = review["statistics"]
+    assert 0.0 <= stats["dsr"] <= 1.0
+    assert stats["effective_trials"] >= 1
+    assert "pbo_estimate" in stats or any("PBO" in f for f in review["failures"])
+    # gates FIRE: dsr below threshold must appear as a rejection reason
+    if stats["dsr"] < 0.95:
+        assert any("DSR" in f for f in review["failures"])
+    assert review["status"] == "REJECTED"  # unverified data can never promote
 
 
 # --- K. the board ranks incompatible units ----------------------------------
@@ -334,7 +338,6 @@ def test_board_rejects_hand_edited_artifacts(tmp_path):
 # --- M. multiasset caps and boundaries --------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-M: leverage silently drops the cap in runner")
 def test_runner_never_silently_drops_the_gross_cap():
     import inspect
 
@@ -345,7 +348,6 @@ def test_runner_never_silently_drops_the_gross_cap():
     assert "not allow_leverage else None" not in source
 
 
-@pytest.mark.xfail(strict=True, reason="V6-M: walk_forward_multi ignores gross cap")
 def test_walk_forward_multi_propagates_gross_cap():
     import inspect
 
