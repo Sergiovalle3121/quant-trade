@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -79,6 +80,32 @@ def _execution_summary(order_events: pd.DataFrame, trades: pd.DataFrame) -> dict
     }
 
 
+def _load_overfitting_evidence(
+    config: dict[str, Any],
+    dataset_binding: dict[str, Any],
+    strategy: str,
+) -> dict[str, Any] | None:
+    raw_path = config.get("overfitting_evidence_path")
+    if raw_path is None:
+        return None
+    path = Path(str(raw_path))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid overfitting evidence file: {path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("overfitting evidence must be a JSON object")
+    evidence_binding = payload.get("dataset_binding")
+    if (
+        not isinstance(evidence_binding, dict)
+        or evidence_binding.get("data_sha256") != dataset_binding["data_sha256"]
+    ):
+        raise ValueError("overfitting evidence dataset hash does not match the research dataset")
+    if payload.get("strategy") != strategy:
+        raise ValueError("overfitting evidence strategy does not match the research strategy")
+    return payload
+
+
 def _split(
     data: pd.DataFrame, frac: float, embargo_bars: int = 0
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -120,6 +147,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     )
     strategy = str(config["strategy"])
     params = dict(config.get("strategy_params", {}))
+    overfitting_evidence = _load_overfitting_evidence(config, dataset_binding, strategy)
     initial = float(config.get("initial_cash", 100000))
     cost = _cost(config)
     model = get_research_signal_model(strategy)
@@ -282,6 +310,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "dataset_binding": dataset_binding,
         "execution_test": execution_test,
         "execution_policy": execution_policy_block,
+        "overfitting_evidence": overfitting_evidence,
     }
     write_json(out / "results.json", results_payload)
     split_policy = (
@@ -339,5 +368,5 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
         "dataset_binding": dataset_binding,
         "execution_test": execution_test,
+        "overfitting_evidence": overfitting_evidence,
     }
-

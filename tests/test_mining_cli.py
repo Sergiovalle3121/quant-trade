@@ -43,6 +43,7 @@ policy:
     payload = json.loads(report.read_text(encoding="utf-8"))
     assert payload["authorized_to_start_miner"] is False
     assert payload["cloud_resources_created"] is False
+    assert any("source" in reason for reason in payload["evaluations"][0]["reasons"])
 
 
 def test_break_even_and_stress_commands_remain_offline(tmp_path):
@@ -67,6 +68,8 @@ markets:
     network_hashrate_hs: 1000000000
     block_reward_coin: 1
     blocks_per_day: 100
+    source: unit-test-snapshot
+    captured_at_utc: "2026-07-23T00:00:00Z"
 policy:
   electricity_usd_per_kwh: 0.10
   min_daily_profit_usd: 1
@@ -84,11 +87,14 @@ policy:
             str(config),
             "--output",
             str(break_even_report),
+            "--as-of-utc",
+            "2026-07-23T01:00:00Z",
         ],
     )
     assert break_even.exit_code == 0
     break_even_payload = json.loads(break_even_report.read_text(encoding="utf-8"))
     assert break_even_payload["break_even"][0]["break_even_coin_price_usd"] > 0
+    assert len(break_even_payload["break_even"][0]["market_snapshot_sha256"]) == 64
     assert break_even_payload["authorized_to_start_miner"] is False
 
     stress_report = tmp_path / "stress.json"
@@ -101,6 +107,8 @@ policy:
             str(config),
             "--output",
             str(stress_report),
+            "--as-of-utc",
+            "2026-07-23T01:00:00Z",
         ],
     )
     assert stress.exit_code == 0
@@ -108,5 +116,3 @@ policy:
     assert len(stress_payload["scenarios"]) == 9
     assert stress_payload["no_go_count"] > 0
     assert stress_payload["cloud_resources_created"] is False
-
-
