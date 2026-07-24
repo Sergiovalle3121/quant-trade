@@ -11,8 +11,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from quant_trade.mining.cashflow import project_mining_cashflow
 from quant_trade.mining.cloud import publish_report
-from quant_trade.mining.config import load_mining_config
+from quant_trade.mining.config import load_mining_config, load_projection_config
+from quant_trade.mining.market import bottom_up_hashprice, compare_hashprice
 from quant_trade.mining.profitability import evaluate_all
 from quant_trade.mining.scenarios import evaluate_all_scenarios
 
@@ -142,6 +144,81 @@ def mining_break_even(
     _write_json_report(report, output)
     console.print(f"Break-even report: {output}")
     console.print("authorized_to_start_miner=false cloud_resources_created=false")
+
+
+@mining_app.command("project")
+def mining_project(
+    config: Annotated[Path, typer.Option(help="Projection YAML (rig + market + assumptions)")],
+    output: Annotated[Path, typer.Option(help="JSON projection report")] = Path(
+        "outputs/mining/cashflow_projection.json"
+    ),
+    include_daily: Annotated[
+        bool, typer.Option(help="Include the full daily series in the JSON report")
+    ] = False,
+) -> None:
+    """Dynamic per-period NPV/IRR (fixes the V1 constant-cash-flow overstatement)."""
+    rig, market, assumptions = load_projection_config(config)
+    projection = project_mining_cashflow(rig, market, assumptions)
+    decision = "GO" if projection.npv_usd > 0 else "NO-GO"
+    report: dict[str, object] = {
+        "decision": decision,
+        **projection.to_dict(include_daily=include_daily),
+        **_safety_metadata(),
+    }
+    _write_json_report(report, output)
+
+    table = Table(title="Mining cash-flow projection (execution disabled)")
+    for column in ["Metric", "Value"]:
+        table.add_column(column)
+    irr = (
+        f"{projection.irr_annual_rate:.1%}"
+        if projection.irr_annual_rate is not None
+        else "undefined"
+    )
+    payback = (
+        str(projection.discounted_payback_days)
+        if projection.discounted_payback_days is not None
+        else "never"
+    )
+    prod_cost = (
+        f"${projection.production_cost_usd_per_coin:,.0f}"
+        if projection.production_cost_usd_per_coin is not None
+        else "n/a"
+    )
+    table.add_row("Decision", decision)
+    table.add_row("Dynamic NPV", f"${projection.npv_usd:,.0f}")
+    table.add_row("Constant-flow NPV (V1)", f"${projection.constant_flow_npv_usd:,.0f}")
+    table.add_row("Overstatement removed", f"${projection.npv_overstatement_vs_constant:,.0f}")
+    table.add_row("IRR (annual)", irr)
+    table.add_row("Discounted payback (days)", payback)
+    table.add_row("Production cost / coin", prod_cost)
+    console.print(table)
+    console.print(f"Projection report: {output}")
+    console.print("authorized_to_start_miner=false hardware_control_enabled=false")
+
+
+@mining_app.command("hashprice")
+def mining_hashprice(
+    config: Annotated[Path, typer.Option(help="Projection YAML (uses its market block)")],
+    max_relative_divergence: Annotated[
+        float, typer.Option(help="Alert if the two methods diverge by more than this")
+    ] = 0.10,
+) -> None:
+    """Compare direct vs bottom-up hashprice; alert on divergence (no averaging)."""
+    _rig, market, _assumptions = load_projection_config(config)
+    comparison = compare_hashprice(market, max_relative_divergence=max_relative_divergence)
+    table = Table(title="Hashprice methods (read-only)")
+    for column in ["Method", "USD/TH/day"]:
+        table.add_column(column)
+    table.add_row("bottom-up", f"{bottom_up_hashprice(market):.4f}")
+    direct = comparison.direct_usd_per_th_day
+    table.add_row("direct", f"{direct:.4f}" if direct is not None else "n/a")
+    console.print(table)
+    if comparison.alert:
+        console.print(f"[bold red]ALERT[/bold red]: {comparison.alert}")
+    else:
+        console.print("methods agree within tolerance")
+    console.print(f"source: {market.source_name} stale={market.is_stale}")
 
 
 @mining_app.command("stress")
