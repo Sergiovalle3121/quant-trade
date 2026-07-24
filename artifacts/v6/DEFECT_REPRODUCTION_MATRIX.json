@@ -1,0 +1,100 @@
+{
+  "artifact": "DEFECT_REPRODUCTION_MATRIX",
+  "base_sha": "1a9833a",
+  "defects": [
+    {
+      "defect": "A",
+      "evidence": "run_carry_research uses carry_campaign_returns; run_carry_ledger never called; artifacts carry no ledger",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "stateful ledger disconnected from research/promotion"
+    },
+    {
+      "defect": "B",
+      "evidence": "metrics.funding_events = len(returns) bars; min_funding_events gate satisfied by 120 polls with 0 settlements",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "sufficiency counts polls not settlements"
+    },
+    {
+      "defect": "C",
+      "evidence": "_stressed_total omits settlements= kwarg (legacy funding re-fabricated at 2x/3x); taker_fee_bps not multiplied",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "cost stress drops settlements and part of the cost stack"
+    },
+    {
+      "defect": "D",
+      "evidence": "observations_to_snapshot_records hardcodes data_source='real'; dataclasses.replace can relabel synthetic as real; no receipt verification",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "provenance self-declared"
+    },
+    {
+      "defect": "E",
+      "evidence": "backfill perpetual_instrument_id='bybit:BTCUSDT'; ccxt collector uses 'BTC/USDT:USDT' and empty ids; same economic pair fails single-identity check",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "backfill and collector derive different identities"
+    },
+    {
+      "defect": "F",
+      "evidence": "settlement-only store raises 'dataset contains no quote observations'; no synchronized spot/mark/index history exists",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "backfill cannot feed research"
+    },
+    {
+      "defect": "G",
+      "evidence": "CcxtFundingAdapter.observe: perp_mark=float(perp['last']) despite model doc",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "collector stores last as mark"
+    },
+    {
+      "defect": "H",
+      "evidence": "trailing signal averages per-snapshot quoted rates; three 5-minute polls can substitute three 8h settlements",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "H1/H2 signal consumes polls"
+    },
+    {
+      "defect": "I",
+      "evidence": "trading_scan_v5 H3 campaign runs only the bybit dataset; no spread, switching, transfer or counterparty costs",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "H3 not cross-venue"
+    },
+    {
+      "defect": "J",
+      "evidence": "evaluate_carry_promotion recomputes PSR only; a campaign can promote without DSR or PBO",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "DSR/PBO documented not enforced"
+    },
+    {
+      "defect": "K",
+      "evidence": "eligible scores mix sharpe_per_period (trading), USD/hour (mining) and annual yield (cash) in one ranking",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "board compares incompatible units"
+    },
+    {
+      "defect": "L",
+      "evidence": "opportunities rank loads JSON without schema, hash, lineage, freshness or evaluated_at verification",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "board accepts arbitrary artifacts"
+    },
+    {
+      "defect": "M",
+      "evidence": "runner drops max_gross under allow_leverage silently; walk_forward_multi never mentions gross cap",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "multiasset caps/boundaries"
+    },
+    {
+      "defect": "N",
+      "evidence": "evidence_sha256 hashes the record itself; verification only requires non-empty; failure_injected is an operator boolean",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "paper readiness/parity accept written evidence"
+    },
+    {
+      "defect": "O",
+      "evidence": "hashprice inline in YAML without source/freshness; ComputeQuote/InstanceSpecification carry no raw_sha256; KAS cell priced in USD/TH/day",
+      "status": "REPRODUCED_RED_TEST",
+      "summary": "mining accepts declared evidence"
+    }
+  ],
+  "policy": "xfail(strict) markers are removed only when the fix lands; an unexpected pass fails the suite",
+  "red_test_file": "tests/test_v6_defect_reproduction.py",
+  "schema_version": 1,
+  "sprint": "V6"
+}

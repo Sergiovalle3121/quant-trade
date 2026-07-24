@@ -29,7 +29,7 @@ def _normal_survival(z: float) -> float:
 def _round_trip_friction(snapshot: CarrySnapshot, costs: CarryCostModel) -> float:
     """One-time friction as a fraction of notional for the four fills."""
     per_fill_bps = (
-        snapshot.taker_fee_bps
+        snapshot.taker_fee_bps * costs.fee_multiplier
         + costs.half_spread_bps
         + costs.slippage_bps
         + costs.market_impact_bps
