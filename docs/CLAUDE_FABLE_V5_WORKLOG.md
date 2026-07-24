@@ -68,3 +68,29 @@ Next: V5-1 instrument identity + poll/settlement event semantics.
   funding loses money, determinism. Suite: **557 passed** · ruff/mypy clean.
 
 Next: V5-3 funding backfill CLI + pre-registered hypotheses + campaign.
+
+## CP3 — 2026-07-24T20:30Z — V5-3: backfill CLI + pre-registration
+
+- `carry/backfill.py` (new): Bybit/OKX PUBLIC funding-history backfill.
+  Pure parsers separated from network fetch (fully offline-testable);
+  response symbol must match the requested instrument or the parse fails
+  closed ("refusing to relabel records"); raw bytes preserved
+  content-addressed (`raw/<sha256>.json`) and every stored record is
+  byte-bound via `raw_sha256`; every attempt (success/failure) appended to
+  `backfill_attempts.jsonl` with the exact URL and verbatim error.
+- `carry/store.py`: settlement/prediction events may honestly omit order-book
+  prices (history endpoints carry none — inventing them would be fabricated
+  evidence); quote events still REQUIRE the full price set.
+- CLI `quant-trade carry backfill --venue bybit|okx` with `--fixture` replay
+  (provenance marked `fixture`, source_name prefixed — TEST_ONLY forever).
+- **Live attempts executed and recorded:** both venues →
+  `NOT_RUN_NETWORK_BLOCKED`, error verbatim
+  `URLError: <urlopen error Tunnel connection failed: 403 Forbidden>`,
+  logged in `data/carry/backfill_attempts.jsonl` (committed as evidence).
+- `docs/PROFIT_HYPOTHESES_V5.md`: H1–H5 pre-registered (fixed identities,
+  signals, gates, falsifiers) BEFORE any campaign; synthetic campaign run
+  confirms honest terminal `NOT_RUN_INSUFFICIENT_REAL_DATA`.
+- 9 new tests (`tests/test_v5_backfill.py`). Suite: **566 passed** ·
+  ruff/mypy clean.
+
+Next: V5-4 reproducible promotion (`carry promote`, clean-room rebuild).

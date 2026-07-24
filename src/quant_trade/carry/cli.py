@@ -100,6 +100,55 @@ def carry_collect_once(
     raise typer.Exit(code=1 if summary.errors and not summary.captured else 0)
 
 
+@carry_app.command("backfill")
+def carry_backfill(
+    venue: Annotated[str, typer.Option(help="bybit | okx (public endpoints, no keys)")],
+    symbol: Annotated[str, typer.Option(help="Canonical base symbol, e.g. BTC")] = "BTC",
+    output: Annotated[Path, typer.Option(help="JSONL funding-history store")] = Path(
+        "data/carry/funding_history.jsonl"
+    ),
+    limit: Annotated[int, typer.Option(help="Events per request (venue-capped)")] = 200,
+    fixture: Annotated[
+        Path | None,
+        typer.Option(help="Replay canned raw bytes offline (marked as fixture provenance)"),
+    ] = None,
+    raw_dir: Annotated[
+        Path | None, typer.Option(help="Content-addressed raw payload directory")
+    ] = None,
+) -> None:
+    """Backfill settled funding history from a venue's PUBLIC endpoint.
+
+    Settlements are the only events realized funding P&L may accrue from.
+    A blocked network records NOT_RUN with the verbatim error — never silence.
+    """
+    from quant_trade.carry.backfill import run_backfill
+
+    result = run_backfill(
+        venue,
+        symbol,
+        output,
+        limit=limit,
+        fixture_path=fixture,
+        raw_dir=raw_dir,
+    )
+    colour = "green" if result.status == "OK" else "yellow"
+    console.print(f"Backfill: [bold {colour}]{result.status}[/bold {colour}]")
+    console.print(f"  url: {result.url}")
+    console.print(f"  provenance: {result.provenance}")
+    if result.status == "OK":
+        console.print(
+            f"  parsed={result.events_parsed} appended={result.appended} "
+            f"deduplicated={result.deduplicated}"
+        )
+        console.print(f"  raw: {result.raw_path} (sha256={result.raw_sha256[:16]}…)")
+        console.print(f"  store: {result.store_path}")
+    else:
+        console.print(f"  error: {result.error}")
+    console.print(f"  attempts log: {result.attempts_log}")
+    console.print("read-only backfill: no orders, no keys, no daemon")
+    raise typer.Exit(code=0 if result.status == "OK" else 1)
+
+
 @carry_app.command("dataset-audit")
 def carry_dataset_audit(
     path: Annotated[Path, typer.Option(help="JSONL funding-history store")],

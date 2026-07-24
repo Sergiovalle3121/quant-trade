@@ -38,13 +38,16 @@ class FundingObservation:
     symbol: str
     captured_at_utc: str  # local wall clock at capture
     exchange_timestamp_utc: str  # the venue's own event/publish time
-    spot_bid: float
-    spot_ask: float
-    perp_bid: float
-    perp_ask: float
-    perp_mark: float
-    perp_index: float
-    realized_funding_rate: float
+    # Quote events MUST carry the full price set; settlement/prediction events
+    # from funding-history endpoints have no order book attached, and inventing
+    # prices would be fabricated evidence — None is the honest value there.
+    spot_bid: float | None = None
+    spot_ask: float | None = None
+    perp_bid: float | None = None
+    perp_ask: float | None = None
+    perp_mark: float | None = None
+    perp_index: float | None = None
+    realized_funding_rate: float = 0.0
     funding_interval_hours: float = 8.0
     next_funding_time_utc: str | None = None
     predicted_funding_rate: float | None = None
@@ -65,20 +68,27 @@ class FundingObservation:
             raise ValueError("venue and symbol are required")
         if not self.captured_at_utc.strip() or not self.exchange_timestamp_utc.strip():
             raise ValueError("captured_at_utc and exchange_timestamp_utc are required")
+        if self.source_event not in EVENT_TYPES:
+            raise ValueError(f"source_event must be one of {EVENT_TYPES}")
+        prices_required = self.source_event in QUOTE_EVENTS
         for name in ("spot_bid", "spot_ask", "perp_bid", "perp_ask", "perp_mark", "perp_index"):
             value = getattr(self, name)
+            if value is None:
+                if prices_required:
+                    raise ValueError(f"{name} is required for quote events")
+                continue
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and > 0")
-        if self.spot_bid > self.spot_ask:
-            raise ValueError("spot_bid cannot exceed spot_ask")
-        if self.perp_bid > self.perp_ask:
-            raise ValueError("perp_bid cannot exceed perp_ask")
+        for bid, ask, label in (
+            (self.spot_bid, self.spot_ask, "spot"),
+            (self.perp_bid, self.perp_ask, "perp"),
+        ):
+            if bid is not None and ask is not None and bid > ask:
+                raise ValueError(f"{label}_bid cannot exceed {label}_ask")
         if not math.isfinite(self.realized_funding_rate):
             raise ValueError("realized_funding_rate must be finite")
         if self.funding_interval_hours <= 0:
             raise ValueError("funding_interval_hours must be > 0")
-        if self.source_event not in EVENT_TYPES:
-            raise ValueError(f"source_event must be one of {EVENT_TYPES}")
         if self.contract_type not in ("linear_perpetual", "inverse_perpetual"):
             raise ValueError("contract_type must be linear_perpetual or inverse_perpetual")
         if self.perp_last is not None and (
