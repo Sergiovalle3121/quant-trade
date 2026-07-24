@@ -67,15 +67,13 @@ def _poll_store(tmp_path, n=120):
 # --- A. the stateful ledger is not wired into research/promotion ----------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-A: run_carry_research does not run the ledger")
 def test_campaign_verdict_is_backed_by_a_reconciled_ledger(tmp_path):
     result = run_carry_research(_real_json_campaign(tmp_path))
-    ledger = result.ledger_summary  # desired API: the ledger IS the P&L path
+    ledger = result.ledger_summary
     assert ledger["reconciled"] is True
     assert "unwind_costs" in ledger
 
 
-@pytest.mark.xfail(strict=True, reason="V6-A: artifacts contain no ledger evidence")
 def test_artifacts_include_ledger_reconciliation(tmp_path):
     from quant_trade.carry.research import write_carry_artifacts
 
@@ -90,7 +88,6 @@ def test_artifacts_include_ledger_reconciliation(tmp_path):
 # --- B. sufficiency counts polls, not settlements --------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-B: min_funding_events counts bars/polls")
 def test_pure_poll_store_cannot_satisfy_the_sufficiency_gate(tmp_path):
     store = _poll_store(tmp_path, n=120)
     with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
@@ -109,7 +106,6 @@ def test_pure_poll_store_cannot_satisfy_the_sufficiency_gate(tmp_path):
 # --- C. cost stress does not propagate settlements or the full cost stack --
 
 
-@pytest.mark.xfail(strict=True, reason="V6-C: _stressed_total drops settlements")
 def test_cost_stress_keeps_settlement_semantics(tmp_path):
     store = _poll_store(tmp_path, n=120)  # zero settlements => zero funding
     with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
@@ -125,7 +121,6 @@ def test_cost_stress_keeps_settlement_semantics(tmp_path):
     assert result.metrics["total_return_2x_costs"] <= 0.0
 
 
-@pytest.mark.xfail(strict=True, reason="V6-C: taker fee is not multiplied in stress")
 def test_cost_stress_multiplies_every_cost_component(tmp_path):
     import inspect
 

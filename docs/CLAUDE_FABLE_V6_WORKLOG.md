@@ -42,3 +42,35 @@ explicitly during the session.
 
 Next: V6-1 — single economic source of truth (ledger wired into research,
 cost stress with settlements, independent reconciliation, ledger artifacts).
+
+## CP1 — 2026-07-24T23:35Z — V6-1: single economic truth (defects A/B/C closed)
+
+- **Ledger rewritten as a real balance sheet** (`carry/ledger_engine.py`):
+  `cash` mutated flow-by-flow (spot purchase/sale, margin post/release,
+  per-fill fees, conversion/withdrawal, cash-settled funding, per-bar
+  variation margin, collateral yield, carrying costs, emergency unwinds) with
+  a cash-flow JOURNAL; per-bar `equity = cash + spot·price + margin`.
+  Reconciliation now compares two INDEPENDENT accounting paths — final
+  balance-sheet equity vs initial + separately-accumulated category totals —
+  not one expression against itself. `signal_rates` decouples signal from
+  quoted rates (V6-5 hook). Perp exit fees priced on perp, not spot.
+- **Research consumes the ledger as THE promotable path** (defect A):
+  `run_carry_research` runs `run_carry_ledger` (unreconciled ledger refuses
+  to produce evidence), aborted two-leg entries reject the campaign, and
+  `carry_campaign_returns` is now marked DIAGNOSTIC — NON-PROMOTABLE.
+  Artifacts gained `reconciliation.json`, `equity_curve.csv`,
+  `funding_cashflows.jsonl`; results.json embeds the ledger summary;
+  promotion byte-compares all six artifacts.
+- **Settlement sufficiency** (defect B): metrics expose
+  `unique_settlement_count`, `settlement_span_days`,
+  `settlement_coverage_ratio`; the gate counts UNIQUE SETTLEMENTS (polls
+  never count) — 120 polls with 0 settlements now fail sufficiency.
+- **Cost stress** (defect C): 2×/3× rerun the SAME ledger with the same
+  settlements/signals/fills; new `CarryCostModel.fee_multiplier` scales the
+  venue `taker_fee_bps` inside `_round_trip_friction`, and
+  `conversion_withdrawal_cost` is now actually charged at entry.
+- 5 xfail markers removed (A×2, B, C×2); one V5 test recalibrated to
+  perp-notional funding scale. Suite: **596 passed, 16 xfailed** ·
+  ruff/mypy clean.
+
+Next: V6-2 — authentic provenance chain (IngestionReceipt).

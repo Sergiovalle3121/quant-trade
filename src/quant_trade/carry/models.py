@@ -113,6 +113,10 @@ class CarryCostModel:
     perp_margin_cost_annual: float = 0.0
     # one-time frictions amortized over the holding period (fraction of notional)
     conversion_withdrawal_cost: float = 0.0
+    # stress-side multiplier applied to the VENUE's taker fee (the snapshot's
+    # taker_fee_bps) inside the friction stack, so 2x/3x cost scenarios scale
+    # every per-fill component — not just the model-side ones
+    fee_multiplier: float = 1.0
 
     def __post_init__(self) -> None:
         for name in ("half_spread_bps", "slippage_bps", "market_impact_bps"):
@@ -123,6 +127,8 @@ class CarryCostModel:
             "conversion_withdrawal_cost",
         ):
             _non_negative(name, getattr(self, name))
+        if self.fee_multiplier < 1.0:
+            raise ValueError("fee_multiplier must be >= 1.0 (stress can only add cost)")
 
 
 @dataclass(frozen=True)

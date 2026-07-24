@@ -36,7 +36,7 @@ from quant_trade.carry.models import (
     CarryPosition,
     CarrySnapshot,
 )
-from quant_trade.evidence.canonical_json import atomic_write_json
+from quant_trade.evidence.canonical_json import atomic_write_json, canonical_dumps
 from quant_trade.evidence.manifest import (
     DatasetManifest,
     build_dataset_manifest,
@@ -59,6 +59,10 @@ class CarryCampaignResult:
     walk_forward: list[dict[str, Any]]
     per_snapshot_go_fraction: float
     dataset_manifest: dict[str, Any] = field(default_factory=dict)
+    # the stateful ledger IS the promotable P&L path (V6-A): its totals,
+    # reconciliation verdict and cash-flow journal ride with every campaign
+    ledger_summary: dict[str, Any] = field(default_factory=dict)
+    ledger_cashflows: list[dict[str, Any]] = field(default_factory=list)
 
 
 def carry_campaign_returns(
@@ -70,7 +74,12 @@ def carry_campaign_returns(
     collateral_yield_annual: float = 0.0,
     settlements: list[tuple[Any, float]] | None = None,
 ) -> pd.DataFrame:
-    """Causal per-interval TOTAL economic returns of the two-leg position.
+    """DIAGNOSTIC ONLY — NON-PROMOTABLE aggregate return arithmetic.
+
+    The promotable P&L path is :func:`quant_trade.carry.ledger_engine.
+    run_carry_ledger` (an explicit reconciled balance sheet); this helper
+    survives only as a cross-check and for lightweight diagnostics. Nothing
+    downstream may promote a campaign from these numbers.
 
     Position at ``t`` is decided from the trailing mean of realized funding up
     to ``t`` (never future funding). For every held interval the series books:
@@ -256,18 +265,30 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         config.get("capital", {}).get("collateral_yield_annual", 0.0)
     )
 
-    returns = carry_campaign_returns(
+    # THE promotable P&L path: the stateful, reconciled ledger (V6-A). The
+    # legacy aggregate arithmetic remains available only as a diagnostic.
+    from quant_trade.carry.ledger_engine import run_carry_ledger
+
+    ledger = run_carry_ledger(
         snapshots,
         costs,
         entry_threshold=entry_threshold,
         trailing_window=trailing_window,
+        initial_capital=1.0,
+        perp_leverage=position.perp_leverage,
         collateral_yield_annual=collateral_yield_annual,
         settlements=settlements,
     )
+    if not ledger.reconciled:
+        raise ValueError(
+            f"ledger failed reconciliation by {ledger.reconciliation_error!r}; "
+            "refusing to produce campaign evidence from unbalanced accounts"
+        )
+    returns = ledger.bars
     net = returns["net_return"].astype(float)
-    active = net[returns["position"].shift(fill_value=0.0) > 0]
+    active = net[returns["position"] > 0]
     moments = return_moments(net)
-    total_return = float((1.0 + net).prod() - 1.0)
+    total_return = float(ledger.final_equity / ledger.initial_capital - 1.0)
 
     # per-snapshot economic GO fraction (diagnostic, not the campaign verdict)
     go = [evaluate_carry(s, position, costs, policy).decision == "GO" for s in snapshots]
@@ -316,7 +337,11 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     except ValueError:
         walk_forward = []
 
-    # cost stress: rerun the full economics at 2x and 3x every friction
+    # cost stress: rerun the SAME ledger — same settlements, same signals,
+    # same fills — multiplying the ENTIRE cost stack (V6-C). fee_multiplier
+    # scales the venue's taker_fee_bps inside the friction; every model-side
+    # component is multiplied explicitly. The multiplier can never change the
+    # strategy, only what it costs.
     def _stressed_total(multiple: float) -> float:
         stressed_costs = dataclasses.replace(
             costs,
@@ -326,15 +351,19 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
             spot_custody_cost_annual=costs.spot_custody_cost_annual * multiple,
             perp_margin_cost_annual=costs.perp_margin_cost_annual * multiple,
             conversion_withdrawal_cost=costs.conversion_withdrawal_cost * multiple,
+            fee_multiplier=costs.fee_multiplier * multiple,  # venue taker_fee_bps
         )
-        stressed = carry_campaign_returns(
+        stressed = run_carry_ledger(
             snapshots,
             stressed_costs,
             entry_threshold=entry_threshold,
             trailing_window=trailing_window,
+            initial_capital=1.0,
+            perp_leverage=position.perp_leverage,
             collateral_yield_annual=collateral_yield_annual,
-        )["net_return"].astype(float)
-        return float((1.0 + stressed).prod() - 1.0)
+            settlements=settlements,
+        )
+        return float(stressed.final_equity / stressed.initial_capital - 1.0)
 
     total_return_2x = _stressed_total(2.0)
     total_return_3x = _stressed_total(3.0)
@@ -362,6 +391,28 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     if len(stamps) >= 2:
         span_days = float((stamps.max() - stamps.min()).total_seconds() / 86400.0)
 
+    # settlement sufficiency (V6-B): polls NEVER count. For collector/backfill
+    # datasets the settlement list is the deduped truth; legacy generators
+    # emit one snapshot per funding interval, so each bar IS a settlement.
+    if settlements is not None:
+        settle_times = sorted(pd.to_datetime(ts, utc=True) for ts, _ in settlements)
+        unique_settlement_count = len(settle_times)
+        settlement_span_days = (
+            float((settle_times[-1] - settle_times[0]).total_seconds() / 86400.0)
+            if len(settle_times) >= 2
+            else 0.0
+        )
+    else:
+        unique_settlement_count = int(len(returns))
+        settlement_span_days = span_days
+    intervals_per_year = snapshots[0].funding_intervals_per_year
+    expected_settlements = (
+        settlement_span_days / 365.25 * intervals_per_year if settlement_span_days else 0.0
+    )
+    settlement_coverage_ratio = (
+        unique_settlement_count / expected_settlements if expected_settlements >= 1.0 else 1.0
+    )
+
     metrics = {
         "total_return": total_return,
         "total_return_2x_costs": total_return_2x,
@@ -370,7 +421,10 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         "funding_pnl_total": float(returns["funding_pnl"].sum()),
         "collateral_yield_total": float(returns["collateral_yield"].sum()),
         "active_intervals": int(len(active)),
-        "funding_events": int(len(returns)),
+        "funding_events": unique_settlement_count,  # settlements, never polls
+        "unique_settlement_count": unique_settlement_count,
+        "settlement_span_days": settlement_span_days,
+        "settlement_coverage_ratio": settlement_coverage_ratio,
         "span_days": span_days,
         "subperiod_returns": half_returns,
         "min_margin_distance": margin_path.min_margin_distance,
@@ -394,9 +448,10 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         insufficiency.append(
             f"data_source is {data_source!r}; only genuinely collected real data counts"
         )
-    if len(returns) < min_events:
+    if unique_settlement_count < min_events:
         insufficiency.append(
-            f"{len(returns)} funding events < required minimum {min_events}"
+            f"{unique_settlement_count} unique funding settlement(s) < required "
+            f"minimum {min_events} (polls never count as settlements)"
         )
     if span_days < min_span:
         insufficiency.append(f"span {span_days:.1f}d < required minimum {min_span:.0f}d")
@@ -425,6 +480,11 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
             rejection.append(f"probabilistic Sharpe {psr:.3f} below {min_psr}")
         if margin_path.breached:
             rejection.append("perp margin path breached maintenance along the trajectory")
+        if ledger.aborted_entries > 0:
+            rejection.append(
+                f"{ledger.aborted_entries} two-leg entr(y/ies) aborted on "
+                "fill-rate/hedge failure; execution quality below minimum"
+            )
         if any(h <= 0 for h in half_returns):
             rejection.append("a subperiod half is not positive; regime stability unproven")
         negative_windows = [
@@ -451,6 +511,8 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         walk_forward=walk_forward,
         per_snapshot_go_fraction=go_fraction,
         dataset_manifest=manifest.to_dict(),
+        ledger_summary=ledger.to_dict(),
+        ledger_cashflows=ledger.cashflows,
     )
 
 
@@ -546,10 +608,27 @@ def write_carry_artifacts(
         "comparison_test": {"excess_return": result.metrics["total_return"]},
         "dataset_manifest": manifest,
         "dataset_binding": {"data_sha256": dataset_byte_sha},
+        "ledger": result.ledger_summary,
     }
     results_path = atomic_write_json(out / "results.json", results_payload)
     atomic_write_json(out / "dataset_manifest.json", manifest)
     result.net_return_series.to_csv(out / "net_returns.csv", index=False)
+    # the ledger's evidence rides with every campaign (V6-A): the equity
+    # curve, the reconciliation verdict, and the raw cash-flow journal
+    atomic_write_json(
+        out / "reconciliation.json",
+        {
+            "ledger": result.ledger_summary,
+            "identity": "final_balance_sheet_equity == initial + sum(category totals)",
+        },
+    )
+    if "equity" in result.net_return_series.columns:
+        result.net_return_series[["timestamp", "equity"]].to_csv(
+            out / "equity_curve.csv", index=False
+        )
+    with (out / "funding_cashflows.jsonl").open("w", encoding="utf-8") as handle:
+        for entry in result.ledger_cashflows:
+            handle.write(canonical_dumps(entry) + "\n")
     append_trial_record(
         out,
         build_trial_record(
