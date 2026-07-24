@@ -50,10 +50,15 @@ class TradingScanResult:
     counts_by_status: dict[str, int]
 
     def to_dict(self) -> dict[str, Any]:
+        from quant_trade.evidence.receipts import normalized_rows_sha256
+
         return {
             "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",
-            "schema_version": 1,
+            "schema_version": 2,
             "evaluated_at_utc": self.evaluated_at_utc,
+            # the tamper anchor: the board recomputes this from the rows it
+            # receives and refuses to rank when it no longer matches
+            "rows_sha256": normalized_rows_sha256([r.to_dict() for r in self.rows]),
             "rows": [r.to_dict() for r in self.rows],
             "counts_by_status": self.counts_by_status,
             "real_money_authorized": False,
@@ -236,6 +241,9 @@ def scan_trading_opportunities(
             "total_return": result.metrics.get("total_return"),
             "sharpe_per_period": result.metrics.get("sharpe_per_period"),
             "active_intervals": result.metrics.get("active_intervals"),
+            # span feeds the board's COMMON UNIT (annualized net ROC)
+            "span_days": result.metrics.get("span_days"),
+            "unique_settlement_count": result.metrics.get("unique_settlement_count"),
         }
         row.per_snapshot_go_fraction = result.per_snapshot_go_fraction
         row.walk_forward_windows = len(result.walk_forward)

@@ -282,31 +282,43 @@ def test_promotion_requires_dsr_and_pbo(tmp_path):
 # --- K. the board ranks incompatible units ----------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-K: sharpe vs USD/h vs annual yield")
 def test_board_scores_share_one_unit():
-    from quant_trade.opportunities.board import build_opportunity_board
+    # V6-K closed: a Sharpe-only trading row and a margin-only mining cell
+    # can no longer be ranked against cash's annual yield — rows without a
+    # common-unit return are tracked with the reason, never scored.
+    from quant_trade.opportunities.board import build_opportunity_board, lineage_for_rows
 
+    trading_rows = [
+        {
+            "hypothesis_id": "HX",
+            "status": "PAPER_CANDIDATE",
+            "data_source": "real",
+            "metrics": {"sharpe_per_period": 0.05},
+            "reasons": [],
+        }
+    ]
+    mining_cells = [
+        {
+            "identity": "x",
+            "status": "ECONOMIC_CANDIDATE_PAPER_ONLY",
+            "test_only": False,
+            "conditional_economics": {"margin_per_hour_usd": 0.06},
+            "reasons": [],
+        }
+    ]
     board = build_opportunity_board(
-        trading_rows=[
-            {
-                "hypothesis_id": "HX",
-                "status": "PAPER_CANDIDATE",
-                "data_source": "real",
-                "metrics": {"sharpe_per_period": 0.05},
-                "reasons": [],
-            }
-        ],
-        mining_cells=[
-            {
-                "identity": "x",
-                "status": "ECONOMIC_CANDIDATE_PAPER_ONLY",
-                "test_only": False,
-                "conditional_economics": {"margin_per_hour_usd": 0.06},
-                "reasons": [],
-            }
-        ],
+        trading_rows=trading_rows,
+        mining_cells=mining_cells,
         cash_yield_annual=0.04,
         evaluated_at_utc="2026-07-24T23:00:00Z",
+        trading_lineage=lineage_for_rows(
+            trading_rows, artifact="TRADING_OPPORTUNITY_LEADERBOARD",
+            path="<memory>", evaluated_at_utc="2026-07-24T23:00:00Z",
+        ),
+        mining_lineage=lineage_for_rows(
+            mining_cells, artifact="MINING_RENTAL_MATRIX",
+            path="<memory>", evaluated_at_utc="2026-07-24T23:00:00Z",
+        ),
     )
     units = {e.get("score_unit") for e in board["entries"] if e["eligible"]}
     assert units == {"annualized_net_return_on_capital"}
@@ -315,7 +327,6 @@ def test_board_scores_share_one_unit():
 # --- L. the board trusts arbitrary artifacts --------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-L: rank verifies no schema/hash/lineage")
 def test_board_rejects_hand_edited_artifacts(tmp_path):
     from quant_trade.opportunities.board import build_opportunity_board
 

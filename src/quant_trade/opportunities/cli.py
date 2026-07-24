@@ -131,6 +131,20 @@ def rank(
         mining_cells=mining_payload.get("cells", []),
         cash_yield_annual=cash_yield_annual,
         evaluated_at_utc=evaluated_at_utc or _now_utc(),
+        # lineage from the artifacts' EMBEDDED hashes: an edited row can no
+        # longer rank (V6-L) — the board recomputes and compares
+        trading_lineage={
+            "artifact": str(trading_payload.get("artifact", "")),
+            "path": str(trading),
+            "evaluated_at_utc": str(trading_payload.get("evaluated_at_utc", "")),
+            "rows_sha256": str(trading_payload.get("rows_sha256", "")),
+        },
+        mining_lineage={
+            "artifact": str(mining_payload.get("artifact", "")),
+            "path": str(mining),
+            "evaluated_at_utc": str(mining_payload.get("evaluated_at_utc", "")),
+            "rows_sha256": str(mining_payload.get("rows_sha256", "")),
+        },
     )
     table = Table(title="Unified opportunity board")
     for column in ("Rank", "Entry", "Kind", "Status", "Eligible"):

@@ -173,3 +173,25 @@ Next: V6-5 — H1/H2 settlement signals everywhere + real H3 + DSR/PBO gates.
   xfailed** · ruff/mypy clean.
 
 Next: V6-6 — common-unit economic board + strict lineage (K/L).
+
+## CP6 — 2026-07-25T02:00Z — V6-6: common-unit board + verified lineage (K/L)
+
+- **K closed:** every ranked score is now ANNUALIZED NET RETURN ON CAPITAL —
+  trading rows annualize `total_return` over `span_days` (the scanner now
+  exports both), mining cells need `margin_per_hour ÷ all-in cost per hour`
+  (labelled linear hourly extrapolation), cash is its annual yield. A row
+  that cannot express the common unit is tracked with the exact reason and
+  NEVER ranked — Sharpe-vs-USD/h-vs-yield rankings are impossible.
+- **L closed:** the board requires lineage for BOTH inputs (artifact kind,
+  path, evaluated_at, rows hash embedded at scan time), recomputes the rows
+  hash from what it actually receives, and refuses hand-edited artifacts,
+  missing lineage, wrong artifact kinds, or mismatched evaluation clocks.
+  Scan artifacts (leaderboard + matrix) embed `rows_sha256` as the tamper
+  anchor; `lineage_for_rows` is the one legitimate construction path.
+- Board artifact renamed `UNIFIED_ECONOMIC_BOARD` (schema 2); allocation
+  carries the lineage through. CLI `rank` builds lineage from the
+  artifacts' EMBEDDED hashes.
+- 2 xfail markers removed (K, L); V5 board tests updated to lineage +
+  common-unit inputs. Suite: **629 passed, 4 xfailed** · ruff/mypy clean.
+
+Next: V6-7 — persistent shadow portfolio + honest readiness (N).

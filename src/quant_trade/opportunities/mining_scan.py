@@ -62,10 +62,14 @@ class MiningScanResult:
     safety: dict[str, bool]
 
     def to_dict(self) -> dict[str, Any]:
+        from quant_trade.evidence.receipts import normalized_rows_sha256
+
         return {
             "artifact": "MINING_RENTAL_MATRIX",
-            "schema_version": 1,
+            "schema_version": 2,
             "evaluated_at_utc": self.evaluated_at_utc,
+            # tamper anchor: recomputed by the board before any ranking
+            "rows_sha256": normalized_rows_sha256([c.to_dict() for c in self.cells]),
             "cells": [c.to_dict() for c in self.cells],
             "counts_by_status": self.counts_by_status,
             "safety": self.safety,
