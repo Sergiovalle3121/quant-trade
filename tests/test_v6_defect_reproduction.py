@@ -156,7 +156,6 @@ def test_observation_bridge_does_not_invent_real_provenance():
 # --- E. backfill and collector derive different identities ------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-E: no canonical instrument catalog")
 def test_backfill_and_collector_share_one_canonical_identity():
     from quant_trade.carry.instruments import canonical_instrument_id
 
@@ -189,7 +188,6 @@ def test_backfilled_settlements_can_power_research_via_panel(tmp_path):
 # --- G. the collector stores last as mark ----------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-G: perp last is used as perp_mark")
 def test_collector_never_substitutes_last_for_mark():
     import inspect
 

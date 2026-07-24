@@ -97,3 +97,26 @@ Next: V6-2 — authentic provenance chain (IngestionReceipt).
   ruff/mypy clean.
 
 Next: V6-3 — canonical instrument catalog + collector mark/index fixes.
+
+## CP3 — 2026-07-25T00:25Z — V6-3: canonical identity + honest collector (E/G)
+
+- `carry/instruments.py`: `parse_symbol` normalizes EVERY spelling — venue
+  native (`BTCUSDT`, `BTC-USDT-SWAP`), ccxt unified (`BTC/USDT:USDT`),
+  canonical ids (idempotent round-trip) and bare bases — to (base, quote);
+  `canonical_instrument_id`/`canonical_spot_id` yield ONE id per economic
+  pair per venue. `InstrumentIdentity.from_record` normalizes stored ids
+  through the same path, so backfill and collector records of the same pair
+  can never split into per-adapter identities. Seed metadata table
+  (funding interval, native symbols, contract terms) fails closed on
+  unknown pairs.
+- `carry/collector.py` (V6-G): mark ONLY from the funding payload's
+  `markPrice` (missing mark fails closed — the last trade is never
+  substituted); index ONLY from `indexPrice`; `perp_last` preserved as
+  last; bid/ask required, no `or last` fallbacks; funding interval from
+  instrument metadata; ccxt clients cached per venue with an explicit
+  `close()`; canonical instrument ids stamped on every observation.
+- `carry/backfill.py` stamps canonical spot/perp ids.
+- 2 more xfail markers removed (E, G); 2 V5 asserts updated to canonical
+  ids. Suite: **607 passed, 12 xfailed** · ruff/mypy clean.
+
+Next: V6-4 — HistoricalCarryPanel (paginated klines+funding backfill).

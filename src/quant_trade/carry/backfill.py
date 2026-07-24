@@ -26,6 +26,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from quant_trade.carry.instruments import canonical_instrument_id, canonical_spot_id
 from quant_trade.carry.store import (
     AppendResult,
     FundingObservation,
@@ -114,7 +115,8 @@ def parse_bybit_funding_history(
                 source_event="funding_settlement",
                 source_name=source_name,
                 raw_sha256=raw_sha,
-                perpetual_instrument_id=f"bybit:{expected}",
+                perpetual_instrument_id=canonical_instrument_id("bybit", expected),
+                spot_instrument_id=canonical_spot_id("bybit", expected),
                 contract_type="linear_perpetual",
                 quote_asset="USDT",
                 settlement_asset="USDT",
@@ -163,7 +165,8 @@ def parse_okx_funding_history(
                 source_event="funding_settlement",
                 source_name=source_name,
                 raw_sha256=raw_sha,
-                perpetual_instrument_id=f"okx:{expected}",
+                perpetual_instrument_id=canonical_instrument_id("okx", expected),
+                spot_instrument_id=canonical_spot_id("okx", expected),
                 contract_type="linear_perpetual",
                 quote_asset="USDT",
                 settlement_asset="USDT",
