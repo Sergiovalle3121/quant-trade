@@ -28,3 +28,12 @@ def test_carry_help_lists_commands():
     assert result.exit_code == 0
     assert "research" in result.output
     assert "scenarios" in result.output
+
+
+def test_selection_and_research_expose_v2_commands():
+    selection = runner.invoke(app, ["selection", "--help"])
+    assert selection.exit_code == 0
+    assert "promote-v2" in selection.output
+    research = runner.invoke(app, ["research", "--help"])
+    assert research.exit_code == 0
+    assert "ledger-report" in research.output

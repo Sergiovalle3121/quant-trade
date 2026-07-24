@@ -395,6 +395,71 @@ def selection_promote(
     console.print(f"Promotion status: {report.overall_status}")
 
 
+@selection_app.command("promote-v2")
+def selection_promote_v2(
+    run_dir: Annotated[Path, typer.Option(help="Research run dir containing results.json")],
+    policy: Annotated[Path, typer.Option(help="conservative_v2 policy YAML")] = Path(
+        "configs/selection/conservative_v2.yaml"
+    ),
+    ledger_dir: Annotated[
+        Path | None, typer.Option(help="Trial ledger dir (defaults to run_dir parent)")
+    ] = None,
+    approval_notes: Annotated[str, typer.Option(help="Human approval notes")] = "",
+    output: Annotated[Path | None, typer.Option(help="Where to write the decision JSON")] = None,
+) -> None:
+    """Recompute evidence from artifacts and apply the conservative V2 gate."""
+    from quant_trade.research.promotion_v2 import (
+        PromotionPolicyV2,
+        evaluate_promotion_v2,
+        save_promotion_decision,
+    )
+
+    pol = PromotionPolicyV2.from_yaml(policy)
+    decision = evaluate_promotion_v2(
+        run_dir, pol, ledger_dir=ledger_dir, approval_notes=approval_notes or None
+    )
+    colour = "green" if decision.status == "paper_candidate" else "red"
+    console.print(f"Decision: [bold {colour}]{decision.status}[/bold {colour}]")
+    console.print("real_money_authorized=False (never)")
+    table = Table(title="Conservative V2 gate (recomputed from artifacts)")
+    table.add_column("Gate")
+    table.add_column("Result")
+    for gate in decision.gates:
+        table.add_row(gate.name, "PASS" if gate.passed else "FAIL")
+    console.print(table)
+    if decision.failed_gates:
+        console.print(f"Failed: {', '.join(decision.failed_gates)}")
+    if output is not None:
+        save_promotion_decision(output, decision)
+        console.print(f"Decision report: {output}")
+
+
+@research_app.command("ledger-report")
+def research_ledger_report(
+    outputs_dir: Annotated[Path, typer.Option(help="Directory containing trial_ledger.jsonl")],
+) -> None:
+    """Audit the trial ledger: counts, corruption, and the DSR trial basis."""
+    from quant_trade.research.ledger import ledger_integrity_report
+
+    report = ledger_integrity_report(outputs_dir)
+    status = "INTACT" if report.is_intact else "CORRUPT"
+    colour = "green" if report.is_intact else "red"
+    console.print(f"Ledger: [bold {colour}]{status}[/bold {colour}] ({report.path})")
+    table = Table(title="Trial ledger integrity")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    table.add_row("Valid records", str(report.valid_records))
+    table.add_row("Corrupt lines", str(report.corrupt_lines))
+    table.add_row("Hypotheses", str(report.n_hypotheses))
+    table.add_row("Attempts", str(report.n_attempts))
+    table.add_row("Valid observations", str(report.n_valid_observations))
+    table.add_row("Failed / discarded", f"{report.n_failed} / {report.n_discarded}")
+    table.add_row("Effective DSR trials", str(report.effective_trial_count))
+    console.print(table)
+    for note in report.notes:
+        console.print(f"[yellow]note:[/yellow] {note}")
+
+
 @paper_app.command("init")
 def paper_init(config: Annotated[Path, typer.Option(help="Paper config YAML")]) -> None:
     from quant_trade.paper.config import load_paper_config
