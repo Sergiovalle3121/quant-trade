@@ -28,7 +28,6 @@ def _carry_config() -> dict:
 # --- Defect A: carry results.json is YAML, not JSON -----------------------
 
 
-@pytest.mark.xfail(reason="defect A: write_carry_artifacts emits YAML as .json", strict=True)
 def test_defect_a_carry_results_json_is_parseable_json(tmp_path):
     cfg = _carry_config()
     result = run_carry_research(cfg)
@@ -40,7 +39,6 @@ def test_defect_a_carry_results_json_is_parseable_json(tmp_path):
 # --- Defect B: dataset binding hashes config, not file bytes --------------
 
 
-@pytest.mark.xfail(reason="defect B: dataset binding ignores dataset bytes", strict=True)
 def test_defect_b_changing_dataset_bytes_changes_binding(tmp_path):
     path = tmp_path / "snapshots.json"
     cfg = _carry_config()

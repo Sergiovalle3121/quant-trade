@@ -12,12 +12,11 @@ look, so an optimistic simulation is never mistaken for demonstrated carry.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import yaml
 
 from quant_trade.carry.data import (
     load_snapshots_from_json,
@@ -29,6 +28,12 @@ from quant_trade.carry.models import (
     CarryPolicy,
     CarryPosition,
     CarrySnapshot,
+)
+from quant_trade.evidence.canonical_json import atomic_write_json
+from quant_trade.evidence.manifest import (
+    DatasetManifest,
+    build_dataset_manifest,
+    build_inline_manifest,
 )
 from quant_trade.metrics.statistics import return_moments
 from quant_trade.research.bootstrap import bootstrap_confidence_intervals
@@ -46,6 +51,7 @@ class CarryCampaignResult:
     bootstrap: dict[str, Any]
     walk_forward: list[dict[str, Any]]
     per_snapshot_go_fraction: float
+    dataset_manifest: dict[str, Any] = field(default_factory=dict)
 
 
 def carry_campaign_returns(
@@ -93,19 +99,31 @@ def carry_campaign_returns(
     return pd.DataFrame(rows)
 
 
-def _load_snapshots(config: dict[str, Any]) -> list[CarrySnapshot]:
+def _load_snapshots(config: dict[str, Any]) -> tuple[list[CarrySnapshot], DatasetManifest]:
+    """Load snapshots AND bind them: file datasets are hashed by their real
+    bytes; in-memory synthetic datasets by their canonical content."""
     data_cfg = config.get("data", {})
     source = str(data_cfg.get("source", "synthetic"))
     if source == "synthetic":
-        return synthetic_funding_snapshots(**data_cfg.get("synthetic", {}))
+        snapshots = synthetic_funding_snapshots(**data_cfg.get("synthetic", {}))
+        manifest = build_inline_manifest(
+            [s.to_dict() for s in snapshots],
+            data_source="synthetic",
+            source_name="synthetic_funding_snapshots",
+            provenance_notes="deterministic generator; not market data",
+        )
+        return snapshots, manifest
     if source == "json":
-        return load_snapshots_from_json(data_cfg["path"])
+        path = data_cfg["path"]
+        snapshots = load_snapshots_from_json(path)
+        manifest = build_dataset_manifest(path)
+        return snapshots, manifest
     raise ValueError(f"unsupported carry data source {source!r}; use 'synthetic' or 'json'")
 
 
 def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     """Run a pre-registered carry campaign and return the verdict + evidence."""
-    snapshots = _load_snapshots(config)
+    snapshots, manifest = _load_snapshots(config)
     if not snapshots:
         raise ValueError("no snapshots to evaluate")
     data_source = snapshots[0].data_source
@@ -205,16 +223,28 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         bootstrap=bootstrap,
         walk_forward=walk_forward,
         per_snapshot_go_fraction=go_fraction,
+        dataset_manifest=manifest.to_dict(),
     )
 
 
 def write_carry_artifacts(
     output_dir: str | Path, config: dict[str, Any], result: CarryCampaignResult
 ) -> Path:
-    """Persist results.json-style artifacts and a trial-ledger entry."""
+    """Persist REAL-JSON artifacts byte-bound to the dataset, plus a ledger entry.
+
+    - ``results.json`` is canonical JSON written atomically (defect A fix): any
+      consumer using ``json.loads`` — promotion V2 included — can read it.
+    - The trial-ledger ``dataset_sha`` is the SHA-256 of the dataset's actual
+      bytes from the manifest (defect B fix), never a hash of the config.
+    """
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    manifest = result.dataset_manifest
+    dataset_byte_sha = str(manifest.get("byte_sha256", ""))
+    if not dataset_byte_sha:
+        raise ValueError("campaign result carries no dataset manifest; refusing to write evidence")
     results_payload = {
+        "schema_version": 1,
         "experiment_name": config.get("experiment_name", "cash_and_carry"),
         "strategy": "cash_and_carry_funding",
         "data_source": result.data_source,
@@ -225,10 +255,11 @@ def write_carry_artifacts(
         "walk_forward": result.walk_forward,
         "benchmark": {"type": "flat_cash", "annual_return": 0.0},
         "comparison_test": {"excess_return": result.metrics["total_return"]},
+        "dataset_manifest": manifest,
+        "dataset_binding": {"data_sha256": dataset_byte_sha},
     }
-    (out / "results.json").write_text(
-        yaml.safe_dump(results_payload, sort_keys=False), encoding="utf-8"
-    )
+    results_path = atomic_write_json(out / "results.json", results_payload)
+    atomic_write_json(out / "dataset_manifest.json", manifest)
     result.net_return_series.to_csv(out / "net_returns.csv", index=False)
     append_trial_record(
         out,
@@ -238,7 +269,7 @@ def write_carry_artifacts(
             strategy_params=config.get("signal", {}),
             run_id=str(config.get("experiment_name", "carry")),
             status="evaluated" if result.decision != "NOT-RUN" else "discarded",
-            dataset_sha=sha256_hex(config.get("data", {})),
+            dataset_sha=dataset_byte_sha,
             config_sha=sha256_hex(config),
             split_policy="purged_walk_forward",
             feature_version="carry_v1",
@@ -247,4 +278,4 @@ def write_carry_artifacts(
             error=None if result.decision != "NOT-RUN" else "synthetic data; NOT-RUN",
         ),
     )
-    return out / "results.json"
+    return results_path
