@@ -100,7 +100,16 @@ def require_single_identity(records: list[dict[str, Any]]) -> InstrumentIdentity
 
 
 def check_clock_skew(record: dict[str, Any]) -> str | None:
-    """Return a problem string when capture and venue clocks diverge too far."""
+    """Return a problem string when capture and venue clocks diverge too far.
+
+    Only QUOTE events are checked: a quote's exchange timestamp should be
+    near-simultaneous with capture, so a large gap means a broken clock or a
+    stale response. Backfilled settlements and predictions legitimately carry
+    a HISTORICAL exchange timestamp far from capture time — skew between the
+    two is expected there, not diagnostic.
+    """
+    if str(record.get("source_event", "poll")) != "poll":
+        return None
     try:
         captured = parse_utc(str(record.get("captured_at_utc", "")))
         exchange = parse_utc(str(record.get("exchange_timestamp_utc", "")))

@@ -1,0 +1,91 @@
+{
+  "allocations": [
+    {
+      "capital_usd": 100000.0,
+      "entry_id": "cash_usd",
+      "fraction": 1.0,
+      "kind": "cash",
+      "rationale": "residual paper capital; cash absorbs whatever is unallocated",
+      "status": "ELIGIBLE_BASELINE"
+    },
+    {
+      "capital_usd": 0.0,
+      "entry_id": "trading:H1",
+      "fraction": 0.0,
+      "kind": "trading",
+      "rationale": "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+      "status": "NOT_RUN_NO_DATASET"
+    },
+    {
+      "capital_usd": 0.0,
+      "entry_id": "trading:H2",
+      "fraction": 0.0,
+      "kind": "trading",
+      "rationale": "registered dataset missing: data/carry/funding_history_okx.jsonl",
+      "status": "NOT_RUN_NO_DATASET"
+    },
+    {
+      "capital_usd": 0.0,
+      "entry_id": "trading:H3",
+      "fraction": 0.0,
+      "kind": "trading",
+      "rationale": "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+      "status": "NOT_RUN_NO_DATASET"
+    },
+    {
+      "capital_usd": 0.0,
+      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "fraction": 0.0,
+      "kind": "mining",
+      "rationale": "no verifiable AWS Trust & Safety written-approval artifact on file (AWS Service Terms §1.25); human review of terms is mandatory",
+      "status": "POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL"
+    },
+    {
+      "capital_usd": 0.0,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "fraction": 0.0,
+      "kind": "mining",
+      "rationale": "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY"
+    },
+    {
+      "capital_usd": 0.0,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "fraction": 0.0,
+      "kind": "mining",
+      "rationale": "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY"
+    }
+  ],
+  "artifact": "PAPER_CAPITAL_ALLOCATION",
+  "challengers_tracked": 6,
+  "champion": {
+    "eligible": true,
+    "entry_id": "cash_usd",
+    "expected_annual_return": 0.04,
+    "kind": "cash",
+    "rank": 1,
+    "reasons": [
+      "baseline every opportunity must beat"
+    ],
+    "score": 0.04,
+    "status": "ELIGIBLE_BASELINE",
+    "test_only": false
+  },
+  "evaluated_at_utc": "2026-07-24T20:31:39Z",
+  "notes": [
+    "this is a PAPER allocation: no orders, no transfers, no spend",
+    "capital sums exactly to total; cash holds the residual"
+  ],
+  "paper_only": true,
+  "real_money_authorized": false,
+  "safety": {
+    "alibaba_resources_created": false,
+    "aws_resources_created": false,
+    "external_spend_authorized": false,
+    "hardware_control_enabled": false,
+    "miner_execution": false
+  },
+  "schema_version": 1,
+  "total_capital_usd": 100000.0
+}

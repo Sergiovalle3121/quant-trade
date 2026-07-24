@@ -145,3 +145,30 @@ Next: V5-5 evidence bundle validator + mining rental scanner.
   Suite: **580 passed** · ruff/mypy clean.
 
 Next: V5-6 trading scanner + unified opportunity board + paper allocator.
+
+## CP6 — 2026-07-24T21:40Z — V5-6: trading scanner + board + allocator
+
+- `opportunities/trading_scan.py`: executes ONLY hypotheses pre-registered in
+  `docs/PROFIT_HYPOTHESES_V5.md`. Statuses: `NOT_RUN_NO_DATASET` (quotes the
+  committed backfill-attempts log as evidence), `NOT_RUN_DATASET_REJECTED`
+  (fail-closed validation error verbatim), or the campaign's own verdict.
+  NOT_RUN rows stay on the leaderboard — absence of evidence is visible.
+- Semantic fix surfaced by tests: clock-skew checking now applies to POLL
+  events only — backfilled settlements/predictions legitimately carry a
+  historical exchange timestamp far from capture time; polls still fail
+  closed at 120 s.
+- `opportunities/board.py`: unified board (trading + mining + cash). Strict
+  eligibility (trading: real-data PAPER_CANDIDATE; mining: non-TEST_ONLY
+  economic candidate; cash always on the board). Ineligible rows are tracked
+  but never ranked. Champion/challenger scoreboard included. Paper allocator:
+  zero to ineligible rows, equal-weight under a per-opportunity cap (25 %
+  default) to eligible ones, cash absorbs the residual so the total is exact.
+- CLI: `opportunities scan-trading | rank | allocate-paper`. Artifacts
+  generated and committed: `TRADING_OPPORTUNITY_LEADERBOARD.json` (H1–H3 all
+  `NOT_RUN_NO_DATASET` with proxy-403 evidence), `UNIFIED_OPPORTUNITY_BOARD
+  .json` (champion: `cash_usd` — nothing beats cash on current evidence),
+  `PAPER_CAPITAL_ALLOCATION.json` (100 % cash, paper only).
+- 8 new tests (`tests/test_v5_opportunity_board.py`). Suite: **588 passed** ·
+  ruff/mypy clean.
+
+Next: V5-7 freeze, validation matrix, final report, PR update, merge.
