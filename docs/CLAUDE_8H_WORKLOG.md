@@ -194,3 +194,47 @@ Configs: `configs/carry/cash_and_carry_synthetic.yaml`,
 hashprice + bottom-up, dynamic per-period cash flow with difficulty growth /
 halvings, electricity tariffs, pool models) and read-only telemetry/inventory/
 ledger. Hardware control stays disabled.
+
+### CP3 — Mining economics V2 + telemetry (Phase 3 complete) — 2026-07-24T07:40Z
+
+**Task finished:** the mining economics V2 + read-only telemetry track.
+
+New modules under `src/quant_trade/mining/`:
+- `market.py` — attributable `MiningMarketData`; two revenue methods
+  (`direct_hashprice`, `bottom_up_hashprice`) with `compare_hashprice`
+  divergence alerts; fail-closed staleness; read-only adapter + fake + validator.
+- `cashflow.py` — `project_mining_cashflow`: **fixes the constant-cash-flow NPV
+  defect**. Per-day difficulty growth, scheduled halvings (subsidy halves, tx
+  fees don't), price drift/scenarios, uptime/hashrate degradation, energy
+  inflation, repair CAPEX, tax. Reports cash vs accounting profit, NPV, IRR,
+  discounted payback, production cost, break-evens, and the V1
+  `constant_flow_npv` overstatement.
+- `tariffs.py` — flat/TOU/demand-charge/PUE/curtailment/hosting tariffs; CFE
+  receipt template (never a hardcoded universal rate).
+- `pool.py` — PPS/FPPS/PPS+/PPLNS payout economics with fees, stale/reject,
+  variance flag, and counterparty-risk score.
+- `telemetry.py` — read-only inventory/telemetry/alerts/watch-only
+  reconciliation/operating ledger. `AUTHORIZED_TO_START_MINER`,
+  `HARDWARE_CONTROL_ENABLED`, `WALLET_SIGNING_ENABLED` hard-wired `False` (tested);
+  adapter protocol has no control verbs (tested).
+
+**Defect-fix evidence (S21-like rig, 3% monthly difficulty growth, mid-horizon
+halving, 3-year):** dynamic NPV −$5,029 vs V1 constant-flow NPV −$1,068 — a
+**$3,961 overstatement removed**. Production cost $65,745/coin vs $60k price →
+honest NO-GO; no profitability invented.
+
+**Tests executed:** `ruff check .` pass; `python -m mypy src` (2.3.0) pass on 211
+files; `python -m pytest -q` → **399 passed** (+38 mining tests).
+
+Docs: `docs/MINING_ECONOMICS_V2.md`, `docs/MINING_TELEMETRY.md`.
+
+**Result:** `MINING_ECONOMICS: NO-GO / NEEDS-INPUT` (real snapshot + tariff +
+pool required for a GO); `MINING_TELEMETRY: READY` (read-only);
+`MINING_HARDWARE_CONTROL: DISABLED`.
+
+**Note:** PR #39 was manually marked ready-for-review by the repo owner; left as
+they set it (no auto-merge configured), CI kept green.
+
+**Next task:** Phase 4 — realistic execution mandatory for promotable evidence
+(largely done in Phase 1.4), parity report (backtest vs sim paper vs broker
+paper), paper-readiness V3.
