@@ -172,3 +172,24 @@ Next: V5-6 trading scanner + unified opportunity board + paper allocator.
   ruff/mypy clean.
 
 Next: V5-7 freeze, validation matrix, final report, PR update, merge.
+
+## CP7 — 2026-07-24T22:00Z — V5-7: freeze + validation + report
+
+- Feature freeze at `db10d3e`. Final additions before freeze: promotion
+  drill artifact (`PROMOTION_REPRODUCIBILITY_REPORT.json`: reproduced
+  byte-for-byte TRUE on the committed file-backed demo dataset, status
+  REJECTED because the data is honestly synthetic) and the
+  `REJECTED_UNVERIFIABLE_DATASET` status for inline manifests (an inline
+  manifest is unverifiable, not "tampered").
+- Validation matrix: **pytest 590 passed** · ruff clean · mypy clean (245
+  files) · compileall OK · CLI smoke of all carry + opportunities commands.
+- All five `artifacts/v5/` deliverables generated from committed configs.
+- `docs/PROFIT_DISCOVERY_V5_REPORT.md` written with the status block
+  (BASE `f3be7a8` → FINAL `db10d3e`; P0 A–F closed; champion `cash_usd`;
+  100 % cash paper allocation; all safety lines held).
+- Verdict: no profitable opportunity found, none invented — cash beats
+  everything on current evidence; the discovery machinery is ready for the
+  moment real settled-funding history or a policy change arrives.
+
+Sprint close: PR #42 body synced with real counts, CI verified, merged at
+the owner's standing order ("recuerda mergear al final"), nothing left open.
