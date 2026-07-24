@@ -1,0 +1,45 @@
+# AWS hashing-worker evaluation. EXPECTED OUTCOME with this file as-is:
+# BLOCKED_PENDING_WRITTEN_APPROVAL — there is no policy_evidence block, and a
+# written AWS Trust & Safety approval artifact is mandatory (Service Terms
+# §1.25). Free Tier / credits are never eligible. Even with approval, a real
+# measured benchmark of this exact SKU is required — hashrate_hs typed here
+# would be rejected, not trusted.
+
+purpose: hashing_worker
+algorithm: sha256
+
+quote:
+  provider: aws
+  sku: g5.xlarge
+  region: us-east-1
+  purchase_model: spot
+  price_per_hour: 0.30            # fixture value; real Spot prices ONLY from
+  currency: USD                   # DescribeSpotPriceHistory
+  source_kind: fixture
+  source_name: offline_example
+  captured_at_utc: "2026-07-24T00:00:00Z"
+  max_age_hours: 168
+  uses_free_tier_or_credits: false
+
+spec:
+  provider: aws
+  sku: g5.xlarge
+  region: us-east-1
+  architecture: gpu
+  vcpus: 4
+  memory_gb: 16.0
+  accelerator_model: "NVIDIA A10G"
+  accelerator_count: 1
+
+# policy_evidence: {}   # absent on purpose: fail closed
+# benchmark: {}         # absent on purpose: no invented hashrate
+
+revenue:
+  hashprice_usd_per_th_day: 0.05  # point-in-time input, not a forecast
+  pool_fee_rate: 0.01
+  utilization: 0.90
+  interruption_rate_per_hour: 0.05
+  checkpoint_overhead_fraction: 0.10
+
+horizon_hours: 720
+budget_ceiling_usd: 250.0
