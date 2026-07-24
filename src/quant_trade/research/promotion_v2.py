@@ -99,6 +99,11 @@ def _num(payload: dict[str, Any], *keys: str) -> float | None:
         return None
 
 
+def _dict(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    value = payload.get(key)
+    return value if isinstance(value, dict) else {}
+
+
 def _load_results(run_dir: Path) -> dict[str, Any] | None:
     try:
         loaded = json.loads((run_dir / "results.json").read_text(encoding="utf-8"))
@@ -147,13 +152,9 @@ def evaluate_promotion_v2(
     excess = _num(results, "comparison_test", "excess_return")
     fill_rate = _num(results, "execution_test", "quantity_fill_rate")
     incomplete_rate = _num(results, "execution_test", "partial_or_expired_order_rate")
-    robustness = results.get("robustness") if isinstance(results.get("robustness"), dict) else {}
-    bootstrap = results.get("bootstrap") if isinstance(results.get("bootstrap"), dict) else {}
-    execution_policy = (
-        results.get("execution_policy", {})
-        if isinstance(results.get("execution_policy"), dict)
-        else {}
-    )
+    robustness = _dict(results, "robustness")
+    bootstrap = _dict(results, "bootstrap")
+    execution_policy = _dict(results, "execution_policy")
     dataset_sha = None
     binding = results.get("dataset_binding")
     if isinstance(binding, dict):
