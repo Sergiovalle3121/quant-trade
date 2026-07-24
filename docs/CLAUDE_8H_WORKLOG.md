@@ -153,3 +153,44 @@ API drift. Docs added: `docs/STATISTICAL_INTEGRITY_V2.md`.
 (two-leg model, full cost stack, causal funding, execution state machine, risk
 gates, pre-registration), research-only. Synthetic data can never yield GO;
 absent real data stays NOT-RUN.
+
+### CP2 — Cash-and-carry research-only (Phase 2 complete) — 2026-07-24T07:05Z
+
+**Task finished:** the entire cash-and-carry / funding track, research-only.
+
+New package `src/quant_trade/carry/`:
+- `models.py` — `CarrySnapshot` (causal schema: realized funding known at `t`;
+  `predicted_funding_rate` kept separate and never merged), `CarryCostModel`,
+  `CarryPosition`, `CarryPolicy`, `CarryEvaluation`.
+- `economics.py` — `evaluate_carry` with the full cost stack (fees, half-spread,
+  slippage, impact on all four fills; custody/margin/borrow annual; conversion
+  amortized), a reversion-haircut expected carry, break-evens, a liquidation
+  proxy, and fail-closed risk gates.
+- `execution.py` — deterministic two-leg state machine (PLANNED, LEG_1/2_PARTIAL,
+  HEDGED, UNHEDGED_RISK, UNWINDING, CLOSED, REJECTED) with max unhedged notional,
+  timeout, bounded retries, simulated emergency unwind, no phantom fills, and
+  notional/delta reconciliation. **No real orders.**
+- `data.py` + `real_adapter.py` — read-only adapter protocol, JSON fixtures,
+  schema validator (fails closed), deterministic synthetic generator, and a
+  lazy-imported public-endpoint ccxt adapter (no keys, never trades).
+- `research.py` — causal campaign backtest, block bootstrap, purged walk-forward,
+  ledger entry, and a GO / NO-GO / **NOT-RUN** verdict.
+
+**Verdict enforcement:** synthetic data ⇒ NOT-RUN, always (a test asserts it).
+The synthetic campaign shows −1.28% net return, −0.17 Sharpe, 0.000 GO fraction,
+9 walk-forward windows — no invented profitability.
+
+**Tests executed:** `ruff check .` pass; `python -m mypy src` (2.3.0, matching CI)
+pass on 206 files; `python -m pytest -q` → **361 passed** (+28 carry tests).
+
+Docs: `docs/CASH_AND_CARRY_PREREGISTRATION.md`, `docs/CASH_AND_CARRY_RESULTS.md`.
+Configs: `configs/carry/cash_and_carry_synthetic.yaml`,
+`configs/carry/cash_and_carry_real_template.yaml`. Fixture:
+`examples/data/carry/synthetic_funding_snapshots.json`.
+
+**Result:** `TRADING_EDGE (cash-and-carry): NOT-RUN — REAL DATA REQUIRED`.
+
+**Next task:** Phase 3 — mining economics V2 (attributable stale-safe snapshots,
+hashprice + bottom-up, dynamic per-period cash flow with difficulty growth /
+halvings, electricity tariffs, pool models) and read-only telemetry/inventory/
+ledger. Hardware control stays disabled.
