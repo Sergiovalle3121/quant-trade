@@ -195,3 +195,26 @@ Next: V6-6 — common-unit economic board + strict lineage (K/L).
   common-unit inputs. Suite: **629 passed, 4 xfailed** · ruff/mypy clean.
 
 Next: V6-7 — persistent shadow portfolio + honest readiness (N).
+
+## CP7 — 2026-07-25T02:35Z — V6-7: persistent shadow + honest readiness (N)
+
+- `opportunities/shadow.py` (new): persistent shadow sessions — the paper
+  allocation is FROZEN at start (hash-bound; overwrite refused; non-paper
+  allocations rejected), event-driven advance with idempotent resume (seq
+  journal), append-only snapshots, daily reconciliation that REBUILDS
+  equity from the flow journal, and EVALUATED kill switches (stale data,
+  drawdown, exposure, reconciliation) that HALT the session — a halted or
+  stopped session refuses to advance. Scoreboard vs the cash benchmark.
+  CLI: `opportunities shadow-start/advance/status/reconcile/stop`.
+- **N closed** (`paper/readiness.py`): `record_drill` now REQUIRES a raw
+  evidence log; `evidence_sha256` hashes THOSE bytes and readiness
+  re-verifies them at evaluation time (missing/tampered logs are named
+  problems). The parity drill binds its raw comparison dump and no longer
+  compares a record against the same object — the second side is rebuilt
+  through the independent frame-normalization path; the broker-paper leg
+  stays NOT_READY_MISSING_BROKER_EVIDENCE honestly.
+- 1 xfail marker removed (N); readiness tests moved to the raw-log
+  contract. 8 new shadow tests. Suite: **638 passed, 3 xfailed** ·
+  ruff/mypy clean.
+
+Next: V6-8 — mining real-evidence chain (O).

@@ -197,3 +197,106 @@ def allocate_paper(
     path = write_board(output, allocation)
     console.print(f"Allocation: {path}")
     console.print("paper_only=True  real_money=NO-GO  nothing was ordered or spent")
+
+
+@opportunities_app.command("shadow-start")
+def shadow_start_cmd(
+    allocation: Annotated[Path, typer.Option(help="PAPER_CAPITAL_ALLOCATION.json")],
+    state_dir: Annotated[Path, typer.Option(help="Shadow session state directory")],
+    started_at_utc: Annotated[
+        str | None, typer.Option(help="Session start clock (defaults to now UTC)")
+    ] = None,
+    commit_sha: Annotated[str, typer.Option(help="Code commit this session runs")] = "",
+) -> None:
+    """Freeze a paper allocation into a persistent shadow session."""
+    from quant_trade.evidence.canonical_json import load_json
+    from quant_trade.opportunities.shadow import shadow_start
+
+    state = shadow_start(
+        state_dir,
+        load_json(allocation),
+        started_at_utc=started_at_utc or _now_utc(),
+        commit_sha=commit_sha,
+    )
+    console.print(f"Shadow session: [bold green]{state['session_id']}[/bold green]")
+    console.print(f"  frozen allocation sha: {state['frozen_allocation_sha256'][:16]}…")
+    console.print(f"  capital: {state['initial_capital_usd']:,.2f} (paper only)")
+    console.print("no orders are sent anywhere; this is a local simulation")
+
+
+@opportunities_app.command("shadow-advance")
+def shadow_advance_cmd(
+    state_dir: Annotated[Path, typer.Option(help="Shadow session state directory")],
+    events: Annotated[Path, typer.Option(help="JSONL of events (seq/timestamp/yield)")],
+) -> None:
+    """Advance the shadow session over recorded events (idempotent resume)."""
+    import json as _json
+
+    from quant_trade.opportunities.shadow import shadow_advance
+
+    rows = [
+        _json.loads(line)
+        for line in events.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    result = shadow_advance(state_dir, rows)
+    console.print(
+        f"applied={result['applied']} skipped={result['skipped']} "
+        f"equity={result['equity_usd']:,.2f}"
+    )
+
+
+@opportunities_app.command("shadow-status")
+def shadow_status_cmd(
+    state_dir: Annotated[Path, typer.Option(help="Shadow session state directory")],
+    output: Annotated[Path | None, typer.Option(help="Write status JSON here")] = None,
+) -> None:
+    """Report the shadow session's equity, drawdown, scoreboard and switches."""
+    from quant_trade.evidence.canonical_json import atomic_write_json
+    from quant_trade.opportunities.shadow import shadow_status
+
+    status = shadow_status(state_dir)
+    console.print(f"Session {status['session_id']}: [bold]{status['status']}[/bold]")
+    console.print(
+        f"  equity={status['equity_usd']:,.2f} "
+        f"return={status['total_return']:+.4%} drawdown={status['drawdown']:.4%}"
+    )
+    console.print(f"  events processed: {status['events_processed']}")
+    if output is not None:
+        atomic_write_json(output, status)
+        console.print(f"Status: {output}")
+    console.print("real_money=NO-GO  shadow only")
+
+
+@opportunities_app.command("shadow-reconcile")
+def shadow_reconcile_cmd(
+    state_dir: Annotated[Path, typer.Option(help="Shadow session state directory")],
+    now_utc: Annotated[
+        str | None, typer.Option(help="Reconciliation clock (defaults to now UTC)")
+    ] = None,
+) -> None:
+    """Rebuild equity from flows and evaluate every kill switch."""
+    from quant_trade.opportunities.shadow import shadow_reconcile
+
+    report = shadow_reconcile(state_dir, now_utc=now_utc or _now_utc())
+    colour = "green" if report["reconciled"] and not report["kill_switch_engaged"] else "red"
+    console.print(f"Reconciled: [bold {colour}]{report['reconciled']}[/bold {colour}]")
+    for name, engaged in report["kill_switches"].items():
+        console.print(f"  kill_switch[{name}]: {'ENGAGED' if engaged else 'ok'}")
+    raise typer.Exit(
+        code=0 if report["reconciled"] and not report["kill_switch_engaged"] else 1
+    )
+
+
+@opportunities_app.command("shadow-stop")
+def shadow_stop_cmd(
+    state_dir: Annotated[Path, typer.Option(help="Shadow session state directory")],
+    stopped_at_utc: Annotated[
+        str | None, typer.Option(help="Stop clock (defaults to now UTC)")
+    ] = None,
+) -> None:
+    """Stop the shadow session (state is preserved, never deleted)."""
+    from quant_trade.opportunities.shadow import shadow_stop
+
+    state = shadow_stop(state_dir, stopped_at_utc=stopped_at_utc or _now_utc())
+    console.print(f"Session {state['session_id']}: [bold]{state['status']}[/bold]")

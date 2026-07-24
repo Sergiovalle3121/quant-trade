@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -49,11 +50,15 @@ def test_readiness_cli_ready_with_executed_drills(tmp_path):
     for name in REQUIRED_DRILLS:
         if name == "parity":
             continue  # executed for real via --run-parity-drill below
+        log = Path(evidence) / "logs" / f"{name}.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(f"raw drill output for {name}\n")
         record_drill(
             evidence, name=name, result="pass",
             executed_at_utc="2026-07-20T00:00:00Z",
             failure_injected=name in ("kill_switch", "recovery", "orphan_detection"),
             details={"note": "operator drill"},
+            evidence_path=log,
         )
     cfg = _write_config(tmp_path, evidence)
     out = tmp_path / "report.json"

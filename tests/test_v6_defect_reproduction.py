@@ -371,7 +371,6 @@ def test_walk_forward_multi_propagates_gross_cap():
 # --- N. paper readiness/parity accept written evidence ----------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-N: evidence_sha256 is self-referential")
 def test_readiness_evidence_hash_binds_external_logs():
     import inspect
 
