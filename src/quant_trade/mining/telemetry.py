@@ -100,6 +100,12 @@ def load_samples_from_records(records: list[dict[str, Any]]) -> list[TelemetrySa
     return [TelemetrySample(**{k: v for k, v in r.items() if k in known}) for r in records]
 
 
+def load_samples_from_json(path: str | Path) -> list[TelemetrySample]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    records = payload["samples"] if isinstance(payload, dict) else payload
+    return load_samples_from_records(records)
+
+
 def load_samples_from_csv(path: str | Path) -> list[TelemetrySample]:
     with Path(path).open(encoding="utf-8", newline="") as fh:
         rows = list(csv.DictReader(fh))
@@ -272,6 +278,86 @@ class DailyOperatingLedger:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(self.to_records(), indent=2), encoding="utf-8")
         return p
+
+
+@dataclass
+class FacilityRollup:
+    facility: str
+    rig_count: int
+    total_hashrate_ths: float
+    total_power_watts: float
+    max_temperature_c: float
+    alert_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class FleetReport:
+    safety: dict[str, bool]
+    facilities: list[FacilityRollup]
+    rig_alerts: dict[str, list[dict[str, Any]]]
+    total_alerts: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "safety": self.safety,
+            "facilities": [f.to_dict() for f in self.facilities],
+            "rig_alerts": self.rig_alerts,
+            "total_alerts": self.total_alerts,
+        }
+
+
+def fleet_report(
+    inventory: list[RigInventoryItem],
+    samples: dict[str, TelemetrySample],
+    thresholds: AlertThresholds,
+    *,
+    net_daily_by_rig: dict[str, float] | None = None,
+) -> FleetReport:
+    """Combine per-rig alerts and per-facility rollups. Read-only; controls nothing."""
+    net_daily_by_rig = net_daily_by_rig or {}
+    rig_alerts: dict[str, list[dict[str, Any]]] = {}
+    facilities: dict[str, dict[str, Any]] = {}
+    total_alerts = 0
+    for item in inventory:
+        sample = samples.get(item.rig_id)
+        alerts: list[MiningAlert] = []
+        if sample is not None:
+            alerts = evaluate_alerts(
+                sample, item, thresholds,
+                net_daily_profit_usd=net_daily_by_rig.get(item.rig_id),
+            )
+        rig_alerts[item.rig_id] = [a.to_dict() for a in alerts]
+        total_alerts += len(alerts)
+        bucket = facilities.setdefault(
+            item.facility,
+            {"rig_count": 0, "hashrate": 0.0, "power": 0.0, "max_temp": float("-inf"), "alerts": 0},
+        )
+        bucket["rig_count"] += 1
+        bucket["alerts"] += len(alerts)
+        if sample is not None:
+            bucket["hashrate"] += sample.hashrate_ths
+            bucket["power"] += sample.power_watts
+            bucket["max_temp"] = max(bucket["max_temp"], sample.temperature_c)
+    rollups = [
+        FacilityRollup(
+            facility=name,
+            rig_count=int(b["rig_count"]),
+            total_hashrate_ths=float(b["hashrate"]),
+            total_power_watts=float(b["power"]),
+            max_temperature_c=float(b["max_temp"]) if b["max_temp"] != float("-inf") else 0.0,
+            alert_count=int(b["alerts"]),
+        )
+        for name, b in sorted(facilities.items())
+    ]
+    return FleetReport(
+        safety=safety_posture(),
+        facilities=rollups,
+        rig_alerts=rig_alerts,
+        total_alerts=total_alerts,
+    )
 
 
 def safety_posture() -> dict[str, bool]:

@@ -18,7 +18,9 @@ from quant_trade.mining.telemetry import (
     TelemetryAdapter,
     TelemetrySample,
     evaluate_alerts,
+    fleet_report,
     load_samples_from_csv,
+    load_samples_from_json,
     reconcile_payouts,
     redact_serial,
     safety_posture,
@@ -143,3 +145,47 @@ def test_csv_import(tmp_path):
 def test_alert_serializes():
     a = MiningAlert("x", AlertSeverity.INFO, "m")
     assert a.to_dict()["severity"] == "INFO"
+
+
+def test_json_import(tmp_path):
+    import json
+
+    path = tmp_path / "telemetry.json"
+    path.write_text(json.dumps({"samples": [_sample().to_dict()]}), encoding="utf-8")
+    samples = load_samples_from_json(path)
+    assert len(samples) == 1
+    assert samples[0].rig_id == "rig-1"
+
+
+def test_fleet_report_rolls_up_by_facility_and_flags_alerts():
+    inv = [
+        _inv(rig_id="rig-1", facility="site-a"),
+        _inv(rig_id="rig-2", facility="site-a"),
+        _inv(rig_id="rig-3", facility="site-b"),
+    ]
+    samples = {
+        "rig-1": _sample(rig_id="rig-1"),
+        "rig-2": _sample(rig_id="rig-2", temperature_c=95.0),  # over-temp
+        "rig-3": _sample(rig_id="rig-3"),
+    }
+    report = fleet_report(inv, samples, AlertThresholds(), net_daily_by_rig={"rig-3": -2.0})
+    # safety posture is always off
+    assert report.safety == {
+        "authorized_to_start_miner": False,
+        "hardware_control_enabled": False,
+        "wallet_signing_enabled": False,
+    }
+    facilities = {f.facility: f for f in report.facilities}
+    assert facilities["site-a"].rig_count == 2
+    assert facilities["site-b"].rig_count == 1
+    # rig-2 over-temp + rig-3 negative economics -> at least 2 alerts
+    assert report.total_alerts >= 2
+    assert any(a["code"] == "over_temperature" for a in report.rig_alerts["rig-2"])
+    assert any(a["code"] == "negative_economics" for a in report.rig_alerts["rig-3"])
+
+
+def test_fleet_report_serializes():
+    inv = [_inv()]
+    report = fleet_report(inv, {"rig-1": _sample()}, AlertThresholds())
+    d = report.to_dict()
+    assert "facilities" in d and "safety" in d
