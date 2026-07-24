@@ -113,9 +113,7 @@ def evaluate_promotion(
         max_drawdown = float(risk_config.get("max_drawdown", 0.20))
         max_turnover = float(risk_config.get("max_turnover", 3.0))
         min_fill_rate = float(risk_config.get("min_quantity_fill_rate", 0.90))
-        max_incomplete_rate = float(
-            risk_config.get("max_partial_or_expired_order_rate", 0.10)
-        )
+        max_incomplete_rate = float(risk_config.get("max_partial_or_expired_order_rate", 0.10))
         fill_rate = (
             _optional_float(execution.get("quantity_fill_rate"))
             if isinstance(execution, dict)
@@ -126,6 +124,7 @@ def evaluate_promotion(
             if isinstance(execution, dict)
             else None
         )
+        overfitting = results.get("overfitting_evidence")
         add(
             "beats_benchmark_after_costs",
             excess is not None and excess > min_excess,
@@ -143,8 +142,7 @@ def evaluate_promotion(
         )
         add(
             "cost_sensitivity_ok",
-            isinstance(robustness, dict)
-            and robustness.get("cost_sensitivity_pass") is True,
+            isinstance(robustness, dict) and robustness.get("cost_sensitivity_pass") is True,
             "cost sensitivity evidence is missing or failed",
         )
         add(
@@ -155,8 +153,7 @@ def evaluate_promotion(
         add(
             "execution_completion_rate_ok",
             incomplete_rate is not None and incomplete_rate <= max_incomplete_rate,
-            "partial/expired/cancelled OOS order rate must not exceed "
-            f"{max_incomplete_rate:.2%}",
+            f"partial/expired/cancelled OOS order rate must not exceed {max_incomplete_rate:.2%}",
         )
         add(
             "walk_forward_or_oos_exists",
@@ -166,6 +163,30 @@ def evaluate_promotion(
             and bool(test_range[1]),
             "an explicit out-of-sample test range is required",
         )
+        if bool(risk_config.get("require_overfitting_evidence", False)):
+            pbo = (
+                _optional_float(overfitting.get("walk_forward_pbo"))
+                if isinstance(overfitting, dict)
+                else None
+            )
+            windows = (
+                _optional_float(overfitting.get("windows"))
+                if isinstance(overfitting, dict)
+                else None
+            )
+            max_pbo = float(risk_config.get("max_walk_forward_pbo", 0.50))
+            min_windows = int(risk_config.get("min_walk_forward_windows", 4))
+            add(
+                "walk_forward_overfitting_evidence_ok",
+                isinstance(overfitting, dict)
+                and overfitting.get("decision") == "PASS"
+                and pbo is not None
+                and pbo <= max_pbo
+                and windows is not None
+                and windows >= min_windows,
+                "matching walk-forward overfitting evidence must pass with "
+                f"PBO <= {max_pbo:.3f} across at least {min_windows} windows",
+            )
     blocking = [c.message for c in checks if c.status == "fail" and c.blocking]
     warnings = [c.message for c in checks if c.status == "warning"]
     return PromotionReport(
@@ -181,5 +202,3 @@ def evaluate_promotion(
 def save_promotion_report(path: Path, report: PromotionReport) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
-
-

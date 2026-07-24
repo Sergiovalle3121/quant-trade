@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -56,9 +58,7 @@ class MiningRig:
         _non_negative("hardware_cost_usd", self.hardware_cost_usd)
         _positive("useful_life_days", self.useful_life_days)
         _rate("uptime_rate", self.uptime_rate, allow_zero=False)
-        _non_negative(
-            "infrastructure_hourly_cost_usd", self.infrastructure_hourly_cost_usd
-        )
+        _non_negative("infrastructure_hourly_cost_usd", self.infrastructure_hourly_cost_usd)
         _non_negative("daily_operating_cost_usd", self.daily_operating_cost_usd)
         _non_negative("shipping_cost_usd", self.shipping_cost_usd)
         _non_negative("import_cost_usd", self.import_cost_usd)
@@ -116,6 +116,16 @@ class MiningMarketSnapshot:
         _positive("blocks_per_day", self.blocks_per_day)
         _rate("pool_fee_rate", self.pool_fee_rate)
 
+    @property
+    def snapshot_sha256(self) -> str:
+        payload = json.dumps(
+            asdict(self),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
 
 @dataclass(frozen=True)
 class MiningPolicy:
@@ -135,6 +145,10 @@ class MiningPolicy:
     analysis_horizon_days: int = 1095
     require_positive_npv: bool = True
     usd_mxn_rate: float | None = None
+    require_attributable_market_source: bool = True
+    require_fresh_market_snapshot: bool = True
+    max_market_snapshot_age_hours: float = 24.0
+    max_future_clock_skew_minutes: float = 5.0
 
     def __post_init__(self) -> None:
         _non_negative("electricity_usd_per_kwh", self.electricity_usd_per_kwh)
@@ -152,6 +166,8 @@ class MiningPolicy:
             raise ValueError("analysis_horizon_days must be > 0")
         if self.usd_mxn_rate is not None:
             _positive("usd_mxn_rate", self.usd_mxn_rate)
+        _positive("max_market_snapshot_age_hours", self.max_market_snapshot_age_hours)
+        _non_negative("max_future_clock_skew_minutes", self.max_future_clock_skew_minutes)
 
 
 @dataclass(frozen=True)
@@ -191,9 +207,12 @@ class MiningEvaluation:
     npv_usd: float
     irr_annual_rate: float | None
     net_profit_mxn: float | None
+    market_source: str
+    market_captured_at_utc: str
+    market_snapshot_age_hours: float | None
+    market_snapshot_sha256: str
+    evaluated_at_utc: str
     authorized_to_start_miner: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-
-

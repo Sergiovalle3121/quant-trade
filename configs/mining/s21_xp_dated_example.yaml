@@ -46,6 +46,10 @@ policy:
   annual_discount_rate: 0.12
   analysis_horizon_days: 1095
   require_positive_npv: true
+  require_attributable_market_source: true
+  require_fresh_market_snapshot: true
+  max_market_snapshot_age_hours: 24
+  max_future_clock_skew_minutes: 5
   # Informational conversion only; replace with a dated source if required.
   usd_mxn_rate: 18
 

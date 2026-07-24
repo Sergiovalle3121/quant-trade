@@ -99,3 +99,23 @@ def test_promotion_blocks_unexecutable_oos_orders(tmp_path):
     assert "execution_completion_rate_ok" in failed
 
 
+def test_promotion_can_require_walk_forward_overfitting_evidence(tmp_path):
+    _write_results(tmp_path)
+    risk = {
+        **_risk(),
+        "require_overfitting_evidence": True,
+        "max_walk_forward_pbo": 0.50,
+        "min_walk_forward_windows": 4,
+    }
+    missing = evaluate_promotion(_candidate(), tmp_path, risk)
+    assert missing.overall_status == "fail"
+
+    payload = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    payload["overfitting_evidence"] = {
+        "decision": "PASS",
+        "walk_forward_pbo": 0.25,
+        "windows": 6,
+    }
+    (tmp_path / "results.json").write_text(json.dumps(payload), encoding="utf-8")
+    passed = evaluate_promotion(_candidate(), tmp_path, risk)
+    assert passed.overall_status == "pass"

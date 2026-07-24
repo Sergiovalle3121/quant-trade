@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
 from typing import Any
 
 from quant_trade.mining.models import (
@@ -104,12 +105,11 @@ def evaluate_scenario(
     market: MiningMarketSnapshot,
     policy: MiningPolicy,
     scenario: MiningStressScenario,
+    evaluated_at_utc: datetime | None = None,
 ) -> MiningScenarioEvaluation:
     """Evaluate one scenario without network, cloud, or process side effects."""
     scenario_temperature = (
-        None
-        if rig.temperature_c is None
-        else rig.temperature_c + scenario.temperature_add_c
+        None if rig.temperature_c is None else rig.temperature_c + scenario.temperature_add_c
     )
     scenario_rig = replace(
         rig,
@@ -122,19 +122,20 @@ def evaluate_scenario(
     scenario_market = replace(
         market,
         coin_price_usd=market.coin_price_usd * scenario.price_multiplier,
-        network_hashrate_hs=(
-            market.network_hashrate_hs * scenario.network_hashrate_multiplier
-        ),
+        network_hashrate_hs=(market.network_hashrate_hs * scenario.network_hashrate_multiplier),
     )
     scenario_policy = replace(
         policy,
-        electricity_usd_per_kwh=(
-            policy.electricity_usd_per_kwh * scenario.electricity_multiplier
-        ),
+        electricity_usd_per_kwh=(policy.electricity_usd_per_kwh * scenario.electricity_multiplier),
     )
     return MiningScenarioEvaluation(
         scenario=scenario,
-        evaluation=evaluate_mining(scenario_rig, scenario_market, scenario_policy),
+        evaluation=evaluate_mining(
+            scenario_rig,
+            scenario_market,
+            scenario_policy,
+            evaluated_at_utc,
+        ),
     )
 
 
@@ -143,11 +144,19 @@ def evaluate_all_scenarios(
     markets: tuple[MiningMarketSnapshot, ...],
     policy: MiningPolicy,
     scenarios: tuple[MiningStressScenario, ...] | None = None,
+    evaluated_at_utc: datetime | None = None,
 ) -> list[MiningScenarioEvaluation]:
     """Evaluate every compatible pair under a deterministic scenario matrix."""
     selected = scenarios or default_scenarios()
+    evaluated_at = datetime.now(UTC) if evaluated_at_utc is None else evaluated_at_utc
     results = [
-        evaluate_scenario(rig, market, policy, scenario)
+        evaluate_scenario(
+            rig,
+            market,
+            policy,
+            scenario,
+            evaluated_at,
+        )
         for rig in rigs
         for market in markets
         if rig.algorithm.casefold() == market.algorithm.casefold()
@@ -156,4 +165,3 @@ def evaluate_all_scenarios(
     if not results:
         raise ValueError("no compatible rig/market algorithm pairs")
     return results
-

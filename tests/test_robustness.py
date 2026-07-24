@@ -1,5 +1,6 @@
 from quant_trade.backtest.costs import CostModel
 from quant_trade.data.panel import load_canonical_dataset
+from quant_trade.research.benchmarks import run_benchmark
 from quant_trade.research.robustness import (
     cost_sensitivity,
     parameter_sensitivity_grid,
@@ -17,12 +18,8 @@ def test_robustness_functions():
     )
     assert len(grid) == 2
     assert not rolling_metrics(
-        __import__("quant_trade")
-        .research.benchmarks.run_benchmark(data, {"type": "cash"}, 10000, CostModel())
-        .equity_curve
+        run_benchmark(data, {"type": "cash"}, 10000, CostModel()).equity_curve
     ).empty
     assert not subperiod_analysis(
-        __import__("quant_trade")
-        .research.benchmarks.run_benchmark(data, {"type": "cash"}, 10000, CostModel())
-        .equity_curve
+        run_benchmark(data, {"type": "cash"}, 10000, CostModel()).equity_curve
     ).empty
