@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +18,13 @@ from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_mo
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_yaml
 from quant_trade.reporting.research_report import generate_research_summary
 from quant_trade.research.benchmarks import compare_to_benchmark, run_benchmark
-from quant_trade.research.ledger import append_trial
-from quant_trade.research.robustness import cost_sensitivity, rolling_metrics, subperiod_analysis
+from quant_trade.research.ledger import append_trial_record, build_trial_record, sha256_hex
+from quant_trade.research.robustness import (
+    bootstrap_summary,
+    cost_sensitivity,
+    rolling_metrics,
+    subperiod_analysis,
+)
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 
@@ -256,7 +262,30 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     test_returns = r_test.equity_curve["equity"].astype(float).pct_change().dropna()
     moments = return_moments(test_returns)
     psr = probabilistic_sharpe_ratio(test_returns)
+    # Block-bootstrap confidence interval on the OOS returns. Serial dependence
+    # is preserved (stationary bootstrap), so the band is honest for
+    # autocorrelated equity curves. Recorded as promotable evidence.
+    bcfg_boot = rob.get("bootstrap", {}) if isinstance(rob.get("bootstrap", {}), dict) else {}
+    bootstrap_ci = bootstrap_summary(
+        test_returns,
+        method=str(bcfg_boot.get("method", "stationary")),
+        samples=int(bcfg_boot.get("samples", 2000)),
+        block_size=int(bcfg_boot.get("block_size", 20)),
+        seed=int(bcfg_boot.get("seed", 12345)),
+    )
     execution_test = _execution_summary(r_test.order_events, r_test.trades)
+    # Stamp the exact execution policy (and its hash) that produced BOTH the
+    # strategy and benchmark numbers into results.json. A run whose config omits
+    # an execution policy is marked specified=False so promotion can refuse to
+    # treat unlimited-fill evidence as promotable (Phase 4 parity requirement).
+    execution_policy_specified = config.get("execution") is not None
+    execution_policy_hash = sha256_hex(config.get("execution") or {})
+    execution_policy_block = {
+        "specified": bool(execution_policy_specified),
+        "hash": execution_policy_hash,
+        "params": asdict(execution_policy),
+        "applied_to_benchmark": True,
+    }
     results_payload = {
         "experiment_name": config["experiment_name"],
         "strategy": strategy,
@@ -277,24 +306,39 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "train_range": [str(train.timestamp.min()), str(train.timestamp.max())],
         "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
         "robustness": robustness_flags,
+        "bootstrap": bootstrap_ci,
         "dataset_binding": dataset_binding,
         "execution_test": execution_test,
+        "execution_policy": execution_policy_block,
         "overfitting_evidence": overfitting_evidence,
     }
     write_json(out / "results.json", results_payload)
-    append_trial(
+    split_policy = (
+        f"chronological_timestamp:train_fraction={split_cfg.get('train_fraction', 0.7)},"
+        f"embargo_bars={split_cfg.get('embargo_bars', 0)}"
+    )
+    append_trial_record(
         config.get("output_dir", "outputs"),
-        {
-            "source": "multi_asset_research",
-            "experiment_name": config["experiment_name"],
-            "strategy": strategy,
-            "strategy_params": params,
-            "data_sha256": dataset_binding["data_sha256"],
-            "test_sharpe": float(r_test.metrics.get("sharpe", 0.0)),
-            "test_sharpe_per_period": moments["sharpe_per_period"],
-            "test_total_return": float(r_test.metrics.get("total_return", 0.0)),
-            "trade_count": int(len(r_test.trades)),
-        },
+        build_trial_record(
+            source="multi_asset_research",
+            strategy=strategy,
+            strategy_params=params,
+            run_id=run_id,
+            status="evaluated",
+            dataset_sha=str(dataset_binding["data_sha256"]),
+            config_sha=sha256_hex(config),
+            seed=int(bcfg_boot.get("seed", 12345)),
+            split_policy=split_policy,
+            feature_version=str(config.get("feature_version", "v1")),
+            execution_policy_hash=execution_policy_hash,
+            costs=config.get("costs") or {"preset": "conservative_default"},
+            train_range=[str(train.timestamp.min()), str(train.timestamp.max())],
+            test_range=[str(test.timestamp.min()), str(test.timestamp.max())],
+            test_sharpe_per_period=moments["sharpe_per_period"],
+            test_sharpe=float(r_test.metrics.get("sharpe", 0.0)),
+            test_total_return=float(r_test.metrics.get("total_return", 0.0)),
+            trade_count=int(len(r_test.trades)),
+        ),
     )
     generate_research_summary(
         out / "summary.md",

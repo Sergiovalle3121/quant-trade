@@ -1,0 +1,50 @@
+# Cash-and-carry research on REAL data (TEMPLATE — data must be imported first).
+#
+# This config points at a versioned JSON snapshot file with data_source: "real".
+# Until that file exists the campaign cannot run. See
+# docs/CASH_AND_CARRY_PREREGISTRATION.md for the exact import commands.
+#
+# NO KEYS ARE NEEDED OR USED: only public read-only market data. This platform
+# never places orders, paper or otherwise.
+
+experiment_name: cash_and_carry_real
+
+data:
+  source: json
+  # Produce this file with the read-only ccxt adapter (public endpoints only):
+  #   python -c "from quant_trade.carry.data import load_real_adapter, write_snapshots_json; \
+  #     a = load_real_adapter({'exchange': 'binanceusdm'}); \
+  #     write_snapshots_json('data/carry/btc_real_snapshots.json', a.fetch_snapshots('BTC','binanceusdm'))"
+  path: data/carry/btc_real_snapshots.json
+
+signal:
+  entry_threshold: 0.0001
+  trailing_window: 6
+
+position:
+  notional_usd: 100000
+  holding_days: 30
+  perp_leverage: 1.0
+  daily_volatility: 0.02
+
+costs:
+  half_spread_bps: 2.0
+  slippage_bps: 1.0
+  market_impact_bps: 1.0
+  perp_margin_cost_annual: 0.0
+  spot_custody_cost_annual: 0.0
+
+policy:
+  min_net_annual_carry: 0.05
+  min_carry_after_2x_costs: 0.02
+  min_carry_after_3x_costs: 0.0
+  max_abs_basis: 0.02
+  min_liquidation_distance: 0.10
+  max_liquidation_probability: 0.01
+
+walk_forward:
+  train_size: 30
+  test_size: 15
+  step_size: 15
+  purge_bars: 6
+  embargo_bars: 1
