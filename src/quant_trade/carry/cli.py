@@ -182,6 +182,39 @@ def carry_dataset_audit(
     raise typer.Exit(code=0 if report.is_clean else 1)
 
 
+@carry_app.command("promote")
+def carry_promote(
+    config: Annotated[Path, typer.Option(help="The campaign YAML the claim was built from")],
+    claimed: Annotated[Path, typer.Option(help="Directory of claimed campaign artifacts")],
+    rebuild_dir: Annotated[
+        Path | None, typer.Option(help="Where to place the clean-room rebuild")
+    ] = None,
+    report: Annotated[Path | None, typer.Option(help="Write the full report JSON here")] = None,
+) -> None:
+    """Promote a claimed campaign ONLY if a clean-room rebuild matches it byte-for-byte."""
+    from quant_trade.carry.promote import reproduce_campaign
+    from quant_trade.evidence.canonical_json import atomic_write_json
+
+    cfg = _load_config(config)
+    result = reproduce_campaign(cfg, claimed, rebuild_dir=rebuild_dir)
+    colour = "green" if result.status == "PAPER_CANDIDATE" else "red"
+    console.print(f"Promotion: [bold {colour}]{result.status}[/bold {colour}]")
+    console.print(f"  reproduced byte-for-byte: {result.reproduced}")
+    for name, hashes in result.artifact_hashes.items():
+        matched = bool(hashes["claimed"]) and hashes["claimed"] == hashes["rebuilt"]
+        match = "match" if matched else "MISMATCH"
+        console.print(f"  {name}: {match} (claimed {hashes['claimed'][:16] or '-'}…)")
+    if result.error:
+        console.print(f"  error: {result.error}")
+    for failure in result.promotion_failures:
+        console.print(f"  - {failure}")
+    if report is not None:
+        atomic_write_json(report, result.to_dict())
+        console.print(f"Report: {report}")
+    console.print("real_money=NO-GO  promotion can never authorize live trading")
+    raise typer.Exit(code=0 if result.status == "PAPER_CANDIDATE" else 1)
+
+
 @carry_app.command("scenarios")
 def carry_scenarios(
     config: Annotated[Path, typer.Option(help="Cash-and-carry campaign YAML")],

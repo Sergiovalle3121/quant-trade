@@ -94,3 +94,26 @@ Next: V5-3 funding backfill CLI + pre-registered hypotheses + campaign.
   ruff/mypy clean.
 
 Next: V5-4 reproducible promotion (`carry promote`, clean-room rebuild).
+
+## CP4 — 2026-07-24T20:45Z — V5-4: reproducible promotion (fix E)
+
+- Determinism proven first: two independent campaign runs produce
+  byte-identical `results.json` (no wall-clock fields in artifacts).
+- `carry/promote.py` (new): `reproduce_campaign` rebuilds the campaign from
+  config + dataset in a clean room and byte-compares ALL evidence files
+  (`results.json`, `dataset_manifest.json`, `net_returns.csv`). Ordered
+  fail-closed verdicts: `REJECTED_MISSING_EVIDENCE` (no/unreadable claim) →
+  `REJECTED_DATASET_TAMPERED` (dataset bytes no longer hash to the claimed
+  manifest, checked BEFORE any rebuild) → `REJECTED_REBUILD_FAILED` →
+  `REJECTED_NOT_REPRODUCIBLE` (any artifact differs) → only a byte-identical
+  rebuild reaches the artifact-recomputing promotion review (max outcome
+  PAPER_CANDIDATE). The rebuild's trial-ledger entry stays in the scratch
+  dir — a reproduction is a verification, never a new trial.
+- CLI `quant-trade carry promote --config … --claimed … [--report …]`;
+  exit 0 only on full PAPER_CANDIDATE.
+- 6 new tests (`tests/test_v5_promote.py`): byte-for-byte reproduction,
+  tampered results → NOT_REPRODUCIBLE, tampered dataset → rejected before
+  rebuild, missing claim, wrong config cannot reproduce, CLI roundtrip.
+  Suite: **572 passed** · ruff/mypy clean.
+
+Next: V5-5 evidence bundle validator + mining rental scanner.
