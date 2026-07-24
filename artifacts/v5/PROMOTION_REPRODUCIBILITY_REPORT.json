@@ -1,0 +1,28 @@
+{
+  "artifact_hashes": {
+    "dataset_manifest.json": {
+      "claimed": "6231a39a0ed9b8dd547b2b02aed4c45547bd7922b2c06455338468ce8c0ef52e",
+      "rebuilt": "6231a39a0ed9b8dd547b2b02aed4c45547bd7922b2c06455338468ce8c0ef52e"
+    },
+    "net_returns.csv": {
+      "claimed": "f3ae04928b7278c03296a80860c708a63e31724b52d9aa3e4887ae3b28d2c26b",
+      "rebuilt": "f3ae04928b7278c03296a80860c708a63e31724b52d9aa3e4887ae3b28d2c26b"
+    },
+    "results.json": {
+      "claimed": "36d059257d08bd697b65907472cbd381812c9fd5c02093dc7419ad0cc13ab8a4",
+      "rebuilt": "36d059257d08bd697b65907472cbd381812c9fd5c02093dc7419ad0cc13ab8a4"
+    }
+  },
+  "claimed_dir": "/tmp/claude-0/-home-user-quant-trade/8c9145a1-632b-5c11-bda6-8ad8b48bcd9c/scratchpad/claimed_demo",
+  "error": "",
+  "mismatched_artifacts": [],
+  "promotion_failures": [
+    "campaign decision is 'NOT_RUN_INSUFFICIENT_REAL_DATA', not PAPER_CANDIDATE",
+    "data_source is not real",
+    "recomputed PSR 0.097 below 0.95"
+  ],
+  "real_money_authorized": false,
+  "rebuild_dir": "/tmp/claude-0/-home-user-quant-trade/8c9145a1-632b-5c11-bda6-8ad8b48bcd9c/scratchpad/rebuild_demo",
+  "reproduced": true,
+  "status": "REJECTED"
+}

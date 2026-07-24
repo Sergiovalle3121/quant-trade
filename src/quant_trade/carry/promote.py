@@ -70,6 +70,15 @@ def reproduce_campaign(
     # The dataset named by the claim must still hash to the manifest's bytes —
     # a swapped or edited dataset can never quietly re-legitimise a claim.
     manifest = claimed_payload.get("dataset_manifest") or {}
+    if str(manifest.get("path", "")) == "<inline>":
+        # synthetic/inline datasets have no file bytes to re-verify — they can
+        # never be tampered with, but they can never promote either
+        report.status = "REJECTED_UNVERIFIABLE_DATASET"
+        report.error = (
+            "inline (synthetic) dataset manifests cannot be byte-verified; only "
+            "file-backed real datasets are promotable"
+        )
+        return report
     verification = verify_dataset_manifest(manifest)
     if not verification.ok:
         report.status = "REJECTED_DATASET_TAMPERED"

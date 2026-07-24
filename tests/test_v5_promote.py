@@ -80,6 +80,30 @@ def test_wrong_config_cannot_reproduce_the_claim(campaign, tmp_path):
     assert report.status == "REJECTED_NOT_REPRODUCIBLE"
 
 
+def test_inline_synthetic_manifest_is_unverifiable_not_tampered(tmp_path):
+    with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
+        cfg = yaml.safe_load(fh)
+    claimed = tmp_path / "claimed"
+    write_carry_artifacts(claimed, cfg, run_carry_research(cfg))
+    report = reproduce_campaign(cfg, claimed, rebuild_dir=tmp_path / "rebuild")
+    assert report.status == "REJECTED_UNVERIFIABLE_DATASET"
+    assert "synthetic" in report.error
+
+
+def test_demo_file_campaign_reproduces_and_still_rejects(tmp_path):
+    # the committed drill: byte-for-byte reproduction succeeds, promotion
+    # still refuses because the dataset is honestly labelled synthetic
+    with open("configs/carry/cash_and_carry_demo_file.yaml") as fh:
+        cfg = yaml.safe_load(fh)
+    claimed = tmp_path / "claimed"
+    write_carry_artifacts(claimed, cfg, run_carry_research(cfg))
+    report = reproduce_campaign(cfg, claimed, rebuild_dir=tmp_path / "rebuild")
+    assert report.reproduced is True
+    assert report.mismatched_artifacts == []
+    assert report.status == "REJECTED"
+    assert any("not real" in f for f in report.promotion_failures)
+
+
 def test_cli_promote_roundtrip(campaign, tmp_path):
     from typer.testing import CliRunner
 
