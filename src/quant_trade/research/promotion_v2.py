@@ -147,12 +147,15 @@ def evaluate_promotion_v2(
     excess = _num(results, "comparison_test", "excess_return")
     fill_rate = _num(results, "execution_test", "quantity_fill_rate")
     incomplete_rate = _num(results, "execution_test", "partial_or_expired_order_rate")
-    robustness = results.get("robustness") if isinstance(results.get("robustness"), dict) else {}
-    bootstrap = results.get("bootstrap") if isinstance(results.get("bootstrap"), dict) else {}
-    execution_policy = (
-        results.get("execution_policy", {})
-        if isinstance(results.get("execution_policy"), dict)
-        else {}
+    raw_robustness = results.get("robustness")
+    robustness: dict[str, Any] = (
+        raw_robustness if isinstance(raw_robustness, dict) else {}
+    )
+    raw_bootstrap = results.get("bootstrap")
+    bootstrap: dict[str, Any] = raw_bootstrap if isinstance(raw_bootstrap, dict) else {}
+    raw_execution_policy = results.get("execution_policy")
+    execution_policy: dict[str, Any] = (
+        raw_execution_policy if isinstance(raw_execution_policy, dict) else {}
     )
     dataset_sha = None
     binding = results.get("dataset_binding")
