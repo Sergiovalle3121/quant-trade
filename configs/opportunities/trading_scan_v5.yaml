@@ -1,0 +1,92 @@
+# V5 trading opportunity scan — executes ONLY hypotheses pre-registered in
+# docs/PROFIT_HYPOTHESES_V5.md. Expected outcome as-is: every hypothesis is
+# NOT_RUN_NO_DATASET, because the registered real datasets do not exist yet —
+# live backfill from this sandbox records NOT_RUN_NETWORK_BLOCKED (proxy 403;
+# see data/carry/backfill_attempts.jsonl). No thresholds here may be changed
+# after a campaign has run against the same dataset.
+
+hypotheses:
+  - id: H1
+    name: "BTC cash-and-carry funding capture (Bybit)"
+    registered_in: docs/PROFIT_HYPOTHESES_V5.md
+    campaign:
+      experiment_name: h1_bybit_btc_carry
+      data:
+        source: jsonl_observations
+        path: data/carry/funding_history_bybit.jsonl
+      signal:
+        entry_threshold: 0.00003
+        trailing_window: 3
+      position:
+        notional_usd: 100000
+        holding_days: 30
+        perp_leverage: 1.0
+        daily_volatility: 0.02
+      costs:
+        half_spread_bps: 2.0
+        slippage_bps: 1.0
+        market_impact_bps: 1.0
+      policy:
+        min_net_annual_carry: 0.05
+        min_carry_after_2x_costs: 0.02
+        min_carry_after_3x_costs: 0.0
+        max_abs_basis: 0.02
+        min_liquidation_distance: 0.10
+        max_liquidation_probability: 0.01
+      walk_forward:
+        train_size: 30
+        test_size: 15
+        step_size: 15
+        purge_bars: 6
+        embargo_bars: 1
+
+  - id: H2
+    name: "BTC cash-and-carry funding capture (OKX)"
+    registered_in: docs/PROFIT_HYPOTHESES_V5.md
+    campaign:
+      experiment_name: h2_okx_btc_carry
+      data:
+        source: jsonl_observations
+        path: data/carry/funding_history_okx.jsonl
+      signal:
+        entry_threshold: 0.00003
+        trailing_window: 3
+      position:
+        notional_usd: 100000
+        holding_days: 30
+        perp_leverage: 1.0
+        daily_volatility: 0.02
+      costs:
+        half_spread_bps: 2.0
+        slippage_bps: 1.0
+        market_impact_bps: 1.0
+      policy:
+        min_net_annual_carry: 0.05
+        min_carry_after_2x_costs: 0.02
+        min_carry_after_3x_costs: 0.0
+        max_abs_basis: 0.02
+        min_liquidation_distance: 0.10
+        max_liquidation_probability: 0.01
+      walk_forward:
+        train_size: 30
+        test_size: 15
+        step_size: 15
+        purge_bars: 6
+        embargo_bars: 1
+
+  - id: H3
+    name: "Cross-venue funding dispersion (Bybit vs OKX)"
+    registered_in: docs/PROFIT_HYPOTHESES_V5.md
+    # H3 evaluates complete single-identity campaigns from H1 and H2 — it can
+    # only run once BOTH venue datasets exist. Identities are never mixed.
+    requires_datasets:
+      - data/carry/funding_history_bybit.jsonl
+      - data/carry/funding_history_okx.jsonl
+    campaign:
+      experiment_name: h3_cross_venue_dispersion
+      data:
+        source: jsonl_observations
+        path: data/carry/funding_history_bybit.jsonl
+      signal:
+        entry_threshold: 0.00003
+        trailing_window: 3

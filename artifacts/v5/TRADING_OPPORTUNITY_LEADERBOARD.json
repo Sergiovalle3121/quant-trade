@@ -1,0 +1,71 @@
+{
+  "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",
+  "counts_by_status": {
+    "NOT_RUN_NO_DATASET": 3
+  },
+  "evaluated_at_utc": "2026-07-24T20:31:39Z",
+  "notes": [
+    "hypotheses were pre-registered before any campaign ran",
+    "PAPER_CANDIDATE is the maximum status; nothing here places orders",
+    "NOT_RUN rows stay on the board — absence of evidence is visible"
+  ],
+  "real_money_authorized": false,
+  "rows": [
+    {
+      "data_source": "",
+      "dataset_paths": [
+        "data/carry/funding_history_bybit.jsonl"
+      ],
+      "hypothesis_id": "H1",
+      "metrics": {},
+      "name": "BTC cash-and-carry funding capture (Bybit)",
+      "per_snapshot_go_fraction": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "registered_in": "docs/PROFIT_HYPOTHESES_V5.md",
+      "status": "NOT_RUN_NO_DATASET",
+      "walk_forward_windows": 0
+    },
+    {
+      "data_source": "",
+      "dataset_paths": [
+        "data/carry/funding_history_okx.jsonl"
+      ],
+      "hypothesis_id": "H2",
+      "metrics": {},
+      "name": "BTC cash-and-carry funding capture (OKX)",
+      "per_snapshot_go_fraction": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "registered_in": "docs/PROFIT_HYPOTHESES_V5.md",
+      "status": "NOT_RUN_NO_DATASET",
+      "walk_forward_windows": 0
+    },
+    {
+      "data_source": "",
+      "dataset_paths": [
+        "data/carry/funding_history_bybit.jsonl",
+        "data/carry/funding_history_okx.jsonl",
+        "data/carry/funding_history_bybit.jsonl"
+      ],
+      "hypothesis_id": "H3",
+      "metrics": {},
+      "name": "Cross-venue funding dispersion (Bybit vs OKX)",
+      "per_snapshot_go_fraction": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "registered_in": "docs/PROFIT_HYPOTHESES_V5.md",
+      "status": "NOT_RUN_NO_DATASET",
+      "walk_forward_windows": 0
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,221 @@
+{
+  "artifact": "UNIFIED_OPPORTUNITY_BOARD",
+  "cash_yield_annual": 0.04,
+  "challengers": [
+    {
+      "eligible": false,
+      "entry_id": "trading:H1",
+      "expected_annual_return": null,
+      "kind": "trading",
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "score": null,
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "trading:H2",
+      "expected_annual_return": null,
+      "kind": "trading",
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "score": null,
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "trading:H3",
+      "expected_annual_return": null,
+      "kind": "trading",
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "score": null,
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "expected_annual_return": null,
+      "kind": "mining",
+      "rank": null,
+      "reasons": [
+        "no verifiable AWS Trust & Safety written-approval artifact on file (AWS Service Terms §1.25); human review of terms is mandatory",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "score": null,
+      "status": "POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL",
+      "test_only": true
+    },
+    {
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "expected_annual_return": null,
+      "kind": "mining",
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "score": null,
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "expected_annual_return": null,
+      "kind": "mining",
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "score": null,
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "champion": {
+    "eligible": true,
+    "entry_id": "cash_usd",
+    "expected_annual_return": 0.04,
+    "kind": "cash",
+    "rank": 1,
+    "reasons": [
+      "baseline every opportunity must beat"
+    ],
+    "score": 0.04,
+    "status": "ELIGIBLE_BASELINE",
+    "test_only": false
+  },
+  "entries": [
+    {
+      "eligible": true,
+      "entry_id": "cash_usd",
+      "expected_annual_return": 0.04,
+      "kind": "cash",
+      "rank": 1,
+      "reasons": [
+        "baseline every opportunity must beat"
+      ],
+      "score": 0.04,
+      "status": "ELIGIBLE_BASELINE",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "trading:H1",
+      "expected_annual_return": null,
+      "kind": "trading",
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "score": null,
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "trading:H2",
+      "expected_annual_return": null,
+      "kind": "trading",
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "score": null,
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "trading:H3",
+      "expected_annual_return": null,
+      "kind": "trading",
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "score": null,
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "eligible": false,
+      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "expected_annual_return": null,
+      "kind": "mining",
+      "rank": null,
+      "reasons": [
+        "no verifiable AWS Trust & Safety written-approval artifact on file (AWS Service Terms §1.25); human review of terms is mandatory",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "score": null,
+      "status": "POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL",
+      "test_only": true
+    },
+    {
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "expected_annual_return": null,
+      "kind": "mining",
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "score": null,
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "expected_annual_return": null,
+      "kind": "mining",
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "score": null,
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "evaluated_at_utc": "2026-07-24T20:31:39Z",
+  "notes": [
+    "cash is always on the board; beating it is the bar",
+    "blocked/missing/NOT_RUN rows are tracked, never ranked",
+    "a rank is a research output, not an authorization"
+  ],
+  "real_money_authorized": false,
+  "safety": {
+    "alibaba_resources_created": false,
+    "aws_resources_created": false,
+    "external_spend_authorized": false,
+    "hardware_control_enabled": false,
+    "miner_execution": false
+  },
+  "schema_version": 1
+}

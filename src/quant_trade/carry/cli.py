@@ -100,6 +100,55 @@ def carry_collect_once(
     raise typer.Exit(code=1 if summary.errors and not summary.captured else 0)
 
 
+@carry_app.command("backfill")
+def carry_backfill(
+    venue: Annotated[str, typer.Option(help="bybit | okx (public endpoints, no keys)")],
+    symbol: Annotated[str, typer.Option(help="Canonical base symbol, e.g. BTC")] = "BTC",
+    output: Annotated[Path, typer.Option(help="JSONL funding-history store")] = Path(
+        "data/carry/funding_history.jsonl"
+    ),
+    limit: Annotated[int, typer.Option(help="Events per request (venue-capped)")] = 200,
+    fixture: Annotated[
+        Path | None,
+        typer.Option(help="Replay canned raw bytes offline (marked as fixture provenance)"),
+    ] = None,
+    raw_dir: Annotated[
+        Path | None, typer.Option(help="Content-addressed raw payload directory")
+    ] = None,
+) -> None:
+    """Backfill settled funding history from a venue's PUBLIC endpoint.
+
+    Settlements are the only events realized funding P&L may accrue from.
+    A blocked network records NOT_RUN with the verbatim error — never silence.
+    """
+    from quant_trade.carry.backfill import run_backfill
+
+    result = run_backfill(
+        venue,
+        symbol,
+        output,
+        limit=limit,
+        fixture_path=fixture,
+        raw_dir=raw_dir,
+    )
+    colour = "green" if result.status == "OK" else "yellow"
+    console.print(f"Backfill: [bold {colour}]{result.status}[/bold {colour}]")
+    console.print(f"  url: {result.url}")
+    console.print(f"  provenance: {result.provenance}")
+    if result.status == "OK":
+        console.print(
+            f"  parsed={result.events_parsed} appended={result.appended} "
+            f"deduplicated={result.deduplicated}"
+        )
+        console.print(f"  raw: {result.raw_path} (sha256={result.raw_sha256[:16]}…)")
+        console.print(f"  store: {result.store_path}")
+    else:
+        console.print(f"  error: {result.error}")
+    console.print(f"  attempts log: {result.attempts_log}")
+    console.print("read-only backfill: no orders, no keys, no daemon")
+    raise typer.Exit(code=0 if result.status == "OK" else 1)
+
+
 @carry_app.command("dataset-audit")
 def carry_dataset_audit(
     path: Annotated[Path, typer.Option(help="JSONL funding-history store")],
@@ -131,6 +180,39 @@ def carry_dataset_audit(
         atomic_write_json(output, report.to_dict())
         console.print(f"Report: {output}")
     raise typer.Exit(code=0 if report.is_clean else 1)
+
+
+@carry_app.command("promote")
+def carry_promote(
+    config: Annotated[Path, typer.Option(help="The campaign YAML the claim was built from")],
+    claimed: Annotated[Path, typer.Option(help="Directory of claimed campaign artifacts")],
+    rebuild_dir: Annotated[
+        Path | None, typer.Option(help="Where to place the clean-room rebuild")
+    ] = None,
+    report: Annotated[Path | None, typer.Option(help="Write the full report JSON here")] = None,
+) -> None:
+    """Promote a claimed campaign ONLY if a clean-room rebuild matches it byte-for-byte."""
+    from quant_trade.carry.promote import reproduce_campaign
+    from quant_trade.evidence.canonical_json import atomic_write_json
+
+    cfg = _load_config(config)
+    result = reproduce_campaign(cfg, claimed, rebuild_dir=rebuild_dir)
+    colour = "green" if result.status == "PAPER_CANDIDATE" else "red"
+    console.print(f"Promotion: [bold {colour}]{result.status}[/bold {colour}]")
+    console.print(f"  reproduced byte-for-byte: {result.reproduced}")
+    for name, hashes in result.artifact_hashes.items():
+        matched = bool(hashes["claimed"]) and hashes["claimed"] == hashes["rebuilt"]
+        match = "match" if matched else "MISMATCH"
+        console.print(f"  {name}: {match} (claimed {hashes['claimed'][:16] or '-'}…)")
+    if result.error:
+        console.print(f"  error: {result.error}")
+    for failure in result.promotion_failures:
+        console.print(f"  - {failure}")
+    if report is not None:
+        atomic_write_json(report, result.to_dict())
+        console.print(f"Report: {report}")
+    console.print("real_money=NO-GO  promotion can never authorize live trading")
+    raise typer.Exit(code=0 if result.status == "PAPER_CANDIDATE" else 1)
 
 
 @carry_app.command("scenarios")

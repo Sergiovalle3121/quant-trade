@@ -183,6 +183,7 @@ def run_multi_asset_backtest(
     fractional_shares: bool = True,
     rebalance_band: float = 0.0,
     execution_policy: BarExecutionPolicy | None = None,
+    max_gross_exposure: float | None = None,
 ) -> MultiAssetBacktestResult:
     # Omitted costs resolve to a conservative default; a frictionless run must
     # be requested explicitly by passing an all-zero CostModel.
@@ -191,6 +192,16 @@ def run_multi_asset_backtest(
         raise ValueError("initial_cash must be finite and > 0")
     if not math.isfinite(max_weight_per_asset) or max_weight_per_asset <= 0:
         raise ValueError("max_weight_per_asset must be finite and > 0")
+    if max_gross_exposure is not None:
+        if not math.isfinite(max_gross_exposure) or max_gross_exposure <= 0:
+            raise ValueError("max_gross_exposure must be finite and > 0")
+        if allow_leverage:
+            raise ValueError(
+                "max_gross_exposure enforcement together with allow_leverage is "
+                "not implemented; refusing a cap that would be silently ignored"
+            )
+    # The gross cap actually applied when sizing exposure-increasing orders.
+    applied_max_gross = 1.0 if max_gross_exposure is None else max_gross_exposure
     if not math.isfinite(rebalance_band) or rebalance_band < 0:
         raise ValueError("rebalance_band must be >= 0")
     policy = execution_policy or BarExecutionPolicy()
@@ -512,7 +523,7 @@ def run_multi_asset_backtest(
                     valuation_prices,
                     cost_model,
                     fractional_shares,
-                    1.0,
+                    applied_max_gross,
                 )
             open_orders.extend(
                 attempt_orders(submit_orders(increasing_orders, increase_scale))
@@ -539,6 +550,49 @@ def run_multi_asset_backtest(
                 raise RuntimeError(
                     "internal sizing error: gross exposure exceeds equity"
                 )
+        if max_gross_exposure is not None and not allow_leverage:
+            # A gross cap is a standing risk limit, not a rebalance-time
+            # suggestion: when drift pushes exposure above the cap between
+            # rebalances, trim every position proportionally at the next
+            # executable price (this bar's open). Residual overshoot is
+            # bounded by one bar's intra-bar drift.
+            trim_equity = cash + sum(
+                qty[s] * float(valuation_prices[s])
+                for s in symbols
+                if pd.notna(valuation_prices[s])
+            )
+            trim_gross = sum(
+                abs(qty[s] * float(valuation_prices[s]))
+                for s in symbols
+                if pd.notna(valuation_prices[s])
+            )
+            if (
+                math.isfinite(trim_equity)
+                and trim_equity > 0
+                and trim_gross > applied_max_gross * trim_equity * (1.0 + 1e-6)
+            ):
+                shrink = (applied_max_gross * trim_equity) / trim_gross
+                trim_orders: list[BarOrderState] = []
+                for s in sorted(symbols):
+                    price = valuation_prices.get(s, np.nan)
+                    if pd.isna(price) or float(price) <= 0 or abs(qty[s]) < 1e-12:
+                        continue
+                    delta_qty = _scaled_quantity(
+                        qty[s] * (shrink - 1.0), 1.0, fractional_shares
+                    )
+                    if abs(delta_qty) < 1e-12:
+                        continue
+                    order_sequence += 1
+                    trim = BarOrderState(
+                        order_id=f"bt-{order_sequence:08d}",
+                        symbol=s,
+                        signed_quantity=delta_qty,
+                        submitted_bar_index=i,
+                        eligible_bar_index=i,
+                    )
+                    record_order_event(ts, "submitted", trim)
+                    trim_orders.append(trim)
+                open_orders.extend(attempt_orders(trim_orders))
         if funding is not None and ts in funding.index:
             for s in symbols:
                 rate = funding.loc[ts, s] if s in funding.columns else np.nan

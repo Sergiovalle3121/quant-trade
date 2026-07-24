@@ -1,0 +1,39 @@
+# File-backed DEMO campaign for the reproducible-promotion drill.
+#
+# The dataset is committed at examples/data/carry_demo_snapshots.json and is
+# honestly labelled data_source: synthetic — the campaign therefore terminates
+# at NOT_RUN_INSUFFICIENT_REAL_DATA and `carry promote` must land on REJECTED
+# even when the rebuild reproduces every artifact byte-for-byte. That pair of
+# outcomes (reproduced: true, status: REJECTED) is the expected result and is
+# what artifacts/v5/PROMOTION_REPRODUCIBILITY_REPORT.json records.
+experiment_name: cash_and_carry_demo_file
+data:
+  source: json
+  path: examples/data/carry_demo_snapshots.json
+signal:
+  entry_threshold: 0.0001
+  trailing_window: 6
+position:
+  notional_usd: 100000
+  holding_days: 30
+  perp_leverage: 1.0
+  daily_volatility: 0.02
+costs:
+  half_spread_bps: 2.0
+  slippage_bps: 1.0
+  market_impact_bps: 1.0
+  perp_margin_cost_annual: 0.0
+  spot_custody_cost_annual: 0.0
+policy:
+  min_net_annual_carry: 0.05
+  min_carry_after_2x_costs: 0.02
+  min_carry_after_3x_costs: 0.0
+  max_abs_basis: 0.02
+  min_liquidation_distance: 0.1
+  max_liquidation_probability: 0.01
+walk_forward:
+  train_size: 30
+  test_size: 15
+  step_size: 15
+  purge_bars: 6
+  embargo_bars: 1
