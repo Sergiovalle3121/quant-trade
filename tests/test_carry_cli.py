@@ -32,3 +32,13 @@ def test_carry_research_reports_metrics(tmp_path):
     assert result.exit_code == 0
     assert "Total return" in result.output
     assert "Walk-forward windows" in result.output
+
+
+def test_carry_scenarios_command_runs():
+    result = runner.invoke(carry_app, ["scenarios", "--config", CONFIG])
+    assert result.exit_code == 0, result.output
+    assert "Carry stress scenarios" in result.output
+    # the shocked scenarios should appear
+    for name in ("funding_sign_flip", "depeg", "exchange_outage", "extreme_spread"):
+        assert name in result.output
+    assert "no orders were placed" in result.output

@@ -10,7 +10,10 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from quant_trade.carry.data import load_snapshots_from_json, synthetic_funding_snapshots
+from quant_trade.carry.models import CarryCostModel, CarryPolicy, CarryPosition
 from quant_trade.carry.research import run_carry_research, write_carry_artifacts
+from quant_trade.carry.scenarios import evaluate_carry_scenarios
 
 carry_app = typer.Typer(
     help="Research-only cash-and-carry / funding analysis; no orders, no live venues."
@@ -61,4 +64,39 @@ def carry_research(
     console.print(f"Artifacts: {output}")
     if result.data_source == "synthetic":
         console.print("[yellow]Synthetic data cannot produce GO — REAL DATA REQUIRED.[/yellow]")
+    console.print("real_money=NO-GO  no orders were placed")
+
+
+@carry_app.command("scenarios")
+def carry_scenarios(
+    config: Annotated[Path, typer.Option(help="Cash-and-carry campaign YAML")],
+) -> None:
+    """Run the deterministic stress matrix on the latest snapshot (no orders)."""
+    cfg = _load_config(config)
+    data_cfg = cfg.get("data", {})
+    if data_cfg.get("source") == "json":
+        snapshots = load_snapshots_from_json(data_cfg["path"])
+    else:
+        snapshots = synthetic_funding_snapshots(**data_cfg.get("synthetic", {}))
+    if not snapshots:
+        raise typer.BadParameter("no snapshots to evaluate")
+    latest = snapshots[-1]
+    position = CarryPosition(
+        **cfg.get("position", {"notional_usd": 100_000, "holding_days": 30})
+    )
+    costs = CarryCostModel(**cfg.get("costs", {}))
+    policy = CarryPolicy(**cfg.get("policy", {}))
+    evaluations = evaluate_carry_scenarios(latest, position, costs, policy)
+
+    table = Table(title=f"Carry stress scenarios ({latest.data_source} snapshot)")
+    for column in ["Scenario", "Decision", "Net carry", "Reasons"]:
+        table.add_column(column)
+    for ev in evaluations:
+        table.add_row(
+            ev.scenario,
+            ev.decision,
+            f"{ev.net_annual_carry:.3f}",
+            "; ".join(ev.reasons) or "-",
+        )
+    console.print(table)
     console.print("real_money=NO-GO  no orders were placed")

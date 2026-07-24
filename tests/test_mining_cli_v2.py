@@ -51,3 +51,17 @@ def test_hashprice_no_alert_with_loose_tolerance():
     )
     assert result.exit_code == 0
     assert "methods agree within tolerance" in result.output
+
+
+def test_project_scenarios_command_reports_npv_band(tmp_path):
+    out = tmp_path / "scenarios.json"
+    result = runner.invoke(
+        mining_app, ["project-scenarios", "--config", CONFIG, "--output", str(out)]
+    )
+    assert result.exit_code == 0, result.output
+    assert "NPV band" in result.output
+    payload = json.loads(out.read_text())
+    assert {"scenarios", "npv_band"} <= payload.keys()
+    band = payload["npv_band"]
+    assert band["min_npv_usd"] <= band["median_npv_usd"] <= band["max_npv_usd"]
+    assert payload["authorized_to_start_miner"] is False

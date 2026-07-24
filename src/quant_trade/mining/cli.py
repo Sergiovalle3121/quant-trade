@@ -16,6 +16,11 @@ from quant_trade.mining.cloud import publish_report
 from quant_trade.mining.config import load_mining_config, load_projection_config
 from quant_trade.mining.market import bottom_up_hashprice, compare_hashprice
 from quant_trade.mining.profitability import evaluate_all
+from quant_trade.mining.projection_scenarios import (
+    npv_band,
+    project_scenarios,
+    scenario_projection_rows,
+)
 from quant_trade.mining.scenarios import evaluate_all_scenarios
 
 mining_app = typer.Typer(
@@ -194,6 +199,39 @@ def mining_project(
     table.add_row("Production cost / coin", prod_cost)
     console.print(table)
     console.print(f"Projection report: {output}")
+    console.print("authorized_to_start_miner=false hardware_control_enabled=false")
+
+
+@mining_app.command("project-scenarios")
+def mining_project_scenarios(
+    config: Annotated[Path, typer.Option(help="Projection YAML (rig + market + assumptions)")],
+    output: Annotated[Path, typer.Option(help="JSON scenario report")] = Path(
+        "outputs/mining/projection_scenarios.json"
+    ),
+) -> None:
+    """Deterministic NPV bands across a fixed price/difficulty/energy scenario set."""
+    rig, market, assumptions = load_projection_config(config)
+    results = project_scenarios(rig, market, assumptions)
+    rows = scenario_projection_rows(results)
+    band = npv_band(results)
+    report: dict[str, object] = {
+        "scenarios": [row.to_dict() for row in rows],
+        "npv_band": band,
+        **_safety_metadata(),
+    }
+    _write_json_report(report, output)
+
+    table = Table(title="Mining NPV scenario band (execution disabled)")
+    for column in ["Scenario", "NPV", "Decision"]:
+        table.add_column(column)
+    for row in rows:
+        table.add_row(row.scenario, f"${row.npv_usd:,.0f}", row.decision)
+    console.print(table)
+    console.print(
+        f"NPV band: min ${band['min_npv_usd']:,.0f} / median ${band['median_npv_usd']:,.0f} "
+        f"/ max ${band['max_npv_usd']:,.0f}  ({int(band['go_scenarios'])}/"
+        f"{int(band['scenarios'])} GO)"
+    )
     console.print("authorized_to_start_miner=false hardware_control_enabled=false")
 
 
