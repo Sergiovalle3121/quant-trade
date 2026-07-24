@@ -29,3 +29,42 @@ Safety posture held: `REAL_MONEY: NO-GO` · `LIVE_ORDER_SUBMISSION: DISABLED` ·
     funding a position could actually collect (one settlement).
 
 Next: V5-1 instrument identity + poll/settlement event semantics.
+
+## CP1 — 2026-07-24T20:00Z — V5-1: identity + event semantics green (`8bf566e`)
+
+- `carry/instruments.py`: frozen `InstrumentIdentity` (venue|symbol|spot/perp
+  instrument|contract|quote|settlement|interval), `require_single_identity`
+  fails closed on any mixing; `check_clock_skew` (120 s max) fails closed.
+- `carry/store.py`: event taxonomy `poll/backfill/funding_settlement/
+  funding_prediction/open_interest`; polls are QUOTES and never settle;
+  `extract_settlement_events` dedups by venue|symbol|funding_time;
+  `verify_raw_payload` invalidates records on one flipped raw byte; appends
+  serialised under an exclusive `flock` (4-thread test: no dupes/interleave).
+- `carry/research.py`: provenance comes from the DATASET MANIFEST, never the
+  first record — mixed provenance → `NOT_RUN_INSUFFICIENT_REAL_DATA`.
+- Red tests A/B flipped green + 7 adversarial additions. Suite: **547 passed**.
+
+## CP2 — 2026-07-24T20:09Z — V5-2: stateful ledger + applied gross cap
+
+- `carry/ledger_engine.py` (new): explicit account simulation — cash, per-leg
+  quantities, posted margin, per-fill fees, settlement-causal funding accrual
+  in `(t[i-1], t[i]]`, collateral yield, carrying costs, mandatory terminal
+  close, and the identity `final_equity − initial_capital == Σ components`
+  checked to 1e-9 · capital. Entries are gated through the two-leg execution
+  state machine: injected partial fills below `min_fill_rate` ABORT the entry
+  and book the emergency-unwind cost as real money (never assume the hedge).
+- `backtest/multi_asset.py`: `max_gross_exposure` is now ENFORCED, not
+  reported — sizing cap at order time plus a per-bar drift trim (breaches are
+  trimmed proportionally at the next executable price; overshoot bounded by
+  one bar's drift). Combined with `allow_leverage` → refuses (fail closed).
+  On the sample dataset the report-only behaviour drifted to 0.5485 gross
+  under a 0.5 cap; enforced behaviour holds ≤ 0.5006.
+- `research/multi_asset_runner.py`: portfolio `max_gross_exposure` from the
+  config is passed into BOTH train and test engine calls.
+- 10 new tests (`tests/test_v5_ledger_engine.py`): reconciliation to the
+  cent, flat ledger charges nothing, partial-fill abort books unwind cost,
+  settlement-only accrual, multi-settlement bars, walk-forward position
+  continuity (no cash reset), cap binds, cap+leverage refuses, negative
+  funding loses money, determinism. Suite: **557 passed** · ruff/mypy clean.
+
+Next: V5-3 funding backfill CLI + pre-registered hypotheses + campaign.

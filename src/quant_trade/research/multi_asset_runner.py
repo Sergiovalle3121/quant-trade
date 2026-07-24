@@ -168,6 +168,12 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     allow_short = bool(port.get("allow_short", params.get("allow_short", False)))
     rebalance_band = float(port.get("rebalance_band", 0.0))
     execution_policy = _execution_policy(config)
+    # The configured gross cap is APPLIED to the engine, not merely reported
+    # (with leverage the engine fails closed rather than silently ignoring it).
+    max_gross_cfg = port.get("max_gross_exposure")
+    max_gross_arg = (
+        float(max_gross_cfg) if max_gross_cfg is not None and not allow_leverage else None
+    )
     r_train = run_multi_asset_backtest(
         train,
         w_train,
@@ -178,6 +184,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         allow_short=allow_short,
         rebalance_band=rebalance_band,
         execution_policy=execution_policy,
+        max_gross_exposure=max_gross_arg,
     )
     r_test = run_multi_asset_backtest(
         test,
@@ -189,6 +196,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         allow_short=allow_short,
         rebalance_band=rebalance_band,
         execution_policy=execution_policy,
+        max_gross_exposure=max_gross_arg,
     )
     bcfg = dict(config.get("benchmark", {"type": "equal_weight_universe"}))
     b_train = run_benchmark(
