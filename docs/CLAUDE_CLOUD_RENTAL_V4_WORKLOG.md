@@ -86,3 +86,42 @@ head is **461**. This sprint reports only revalidated numbers.
 
 **Next:** Block 1 — evidence contract (canonical JSON, byte-bound dataset
 manifests, lineage, atomic writes) fixing defects A and B.
+
+## CP1 — Blocks 1–3 complete — 2026-07-24T19:20Z
+
+**Branch/SHA:** `claude/cloud-rental-evidence-v4`; Block 1 `27c35f3`, Block 2
+`7b9f8e0`, Block 3 in this commit. PR #41 draft open; CI green per push.
+
+- **Block 1 (defects A, B fixed):** `evidence/canonical_json.py` (deterministic
+  canonical JSON, NaN rejected, atomic writes) + `evidence/manifest.py`
+  (byte-SHA-256 dataset manifests, re-verification fails closed on a one-byte
+  change, explicit YAML→JSON migrator). `write_carry_artifacts` now emits real
+  JSON and binds the ledger to dataset bytes. Defect tests A/B green.
+- **Block 2:** point-in-time collector (`carry/store.py`, `quality.py`,
+  `collector.py`): append-only JSONL with idempotent dedup, quarantined corrupt
+  lines, gap/duplicate/monotonicity audit, fixture + lazy ccxt read-only
+  adapters (no trading verbs — asserted), `collect-once` / `dataset-audit` CLI,
+  `jsonl_observations` campaign source fail-closed on quarantine.
+  Validation after Block 2: **488 passed, 6 xfailed**.
+- **Block 3 (defects C, D fixed):** `carry_campaign_returns` now books the
+  TOTAL economic return — funding P&L, spot-leg and perp-leg mark-to-market
+  (basis convergence P&L), collateral yield, minus turn and carrying costs.
+  `carry/capital.py` adds capital-required breakdown, trajectory margin path
+  (min maintenance distance, breach index, MAE, variation margin), collateral
+  identity invariants, residual delta. The campaign gate now separates
+  **sufficiency** (real data, ≥90 funding events, ≥30 days span, ≥2 walk-forward
+  windows → otherwise `NOT_RUN_INSUFFICIENT_REAL_DATA`) from **economics**
+  (positive net, survives 2×/3× costs, bootstrap lower bound, PSR≥0.95, margin
+  path unbreached, both subperiod halves positive, majority of walk-forward
+  windows positive → `REJECTED` on any failure, else `PAPER_CANDIDATE`).
+  `evaluate_carry_promotion` reopens artifacts (strict JSON, manifest
+  re-verified byte-for-byte, ledger integrity, recomputed PSR, non-empty
+  walk-forward) so the campaign cannot skip promotion review. The defect-C
+  construction (40 snapshots, 0 windows) now lands in
+  `NOT_RUN_INSUFFICIENT_REAL_DATA`.
+
+**Validation (executed):** `ruff` pass · `python -m mypy src` pass (225 files) ·
+`python -m pytest -q` → **501 passed, 4 xfailed** (E×2, G×2 pending Blocks 5–6).
+
+**Next:** Block 4 — cloud_rental package (AWS/Alibaba policy gates, read-only
+quotes, mandatory benchmarks, rental economics, feasibility matrix).

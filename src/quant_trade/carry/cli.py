@@ -45,7 +45,11 @@ def carry_research(
     result = run_carry_research(cfg)
     write_carry_artifacts(output, cfg, result)
 
-    colour = {"GO": "green", "NO-GO": "red", "NOT-RUN": "yellow"}.get(result.decision, "white")
+    colour = {
+        "PAPER_CANDIDATE": "green",
+        "REJECTED": "red",
+        "NOT_RUN_INSUFFICIENT_REAL_DATA": "yellow",
+    }.get(result.decision, "white")
     console.print(f"Decision: [bold {colour}]{result.decision}[/bold {colour}]")
     for reason in result.reasons:
         console.print(f"  - {reason}")
@@ -63,7 +67,9 @@ def carry_research(
     console.print(table)
     console.print(f"Artifacts: {output}")
     if result.data_source == "synthetic":
-        console.print("[yellow]Synthetic data cannot produce GO — REAL DATA REQUIRED.[/yellow]")
+        console.print(
+            "[yellow]Synthetic data can never advance — REAL DATA REQUIRED.[/yellow]"
+        )
     console.print("real_money=NO-GO  no orders were placed")
 
 

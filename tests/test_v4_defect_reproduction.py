@@ -61,7 +61,6 @@ def test_defect_b_changing_dataset_bytes_changes_binding(tmp_path):
 # --- Defect C: a handful of snapshots can reach GO ------------------------
 
 
-@pytest.mark.xfail(reason="defect C: gate lacks min-history/walk-forward/DSR", strict=True)
 def test_defect_c_thin_real_history_never_advances(tmp_path):
     # Forty real-labelled snapshots (~13 days of 8h funding) with constant
     # positive funding: today's gate emits GO with ZERO walk-forward windows.
@@ -86,7 +85,6 @@ def test_defect_c_thin_real_history_never_advances(tmp_path):
 # --- Defect D: carry return series omits basis P&L ------------------------
 
 
-@pytest.mark.xfail(reason="defect D: basis convergence P&L missing", strict=True)
 def test_defect_d_basis_convergence_enters_pnl():
     from quant_trade.carry.models import CarryCostModel
     from quant_trade.carry.research import carry_campaign_returns
