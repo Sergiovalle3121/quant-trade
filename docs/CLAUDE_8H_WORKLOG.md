@@ -316,6 +316,16 @@ deferred follow-ups on draft PR #40:
 - **F** `paper/parity_adapters.py` — parity report now runs on a real
   `MultiAssetBacktestResult`, not just fixtures.
 
+- **G** `quant-trade mining project-scenarios` (NPV band matrix) + `carry
+  scenarios` CLI; top-level CLI smoke test guarding subcommand registration.
+- **H** `quant-trade selection promote-v2` (recompute-from-artifacts gate) and
+  `research ledger-report` (integrity audit) CLI, with an end-to-end test that
+  runs a real experiment then exercises both; `evaluate_promotion_v2` gained an
+  `approval_notes` override.
+- **I** telemetry `load_samples_from_json` + read-only `fleet_report`
+  (per-facility rollups + per-rig alerts + safety posture).
+
 **Validation after extension:** `ruff` pass; `python -m mypy src` (2.3.0) pass on
-218 files; `python -m pytest -q` → **441 passed** (+24 tests). PR #40 CI green on
-each pushed commit.
+218 files; `python -m pytest -q` → **452 passed** (+35 tests). PR #40 CI green on
+each pushed commit. All new CLI is research-only: no orders, hardware control
+disabled, real money NO-GO.
