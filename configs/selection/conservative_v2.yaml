@@ -1,0 +1,33 @@
+# Conservative promotion V2 gate (research -> paper_candidate ONLY).
+#
+# Consumed by quant_trade.research.promotion_v2.PromotionPolicyV2. Every
+# threshold is recomputed from results.json and the trial ledger at evaluation
+# time; stored flags are never trusted. Passing this gate yields at most a
+# paper_candidate. It NEVER authorizes real money.
+
+# --- statistical strength -------------------------------------------------
+min_oos_sharpe: 0.5
+min_net_excess_return: 0.0        # net excess return must be strictly positive
+min_probabilistic_sharpe: 0.95    # recomputed PSR vs 0
+min_deflated_sharpe: 0.95         # recomputed DSR after the full trial count
+min_observations: 60              # OOS return observations
+min_trade_count: 30
+
+# --- risk -----------------------------------------------------------------
+max_drawdown: 0.20
+max_turnover: 3.0
+
+# --- robustness -----------------------------------------------------------
+require_cost_sensitivity_pass: true
+require_subperiod_pass: true              # regime/subperiod stability
+require_bootstrap_positive_lower_bound: true  # block-bootstrap CI lower bound > 0
+
+# --- realistic execution (mandatory) -------------------------------------
+require_execution_policy: true     # unlimited-fill runs are NOT promotable
+min_quantity_fill_rate: 0.90
+max_incomplete_order_rate: 0.10
+
+# --- provenance & governance ---------------------------------------------
+require_dataset_binding: true      # dataset SHA must be recorded
+require_ledger_integrity: true     # ledger must exist and be free of corruption
+require_approval_notes: true       # a human must sign off before paper

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -245,6 +246,18 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         seed=int(bcfg_boot.get("seed", 12345)),
     )
     execution_test = _execution_summary(r_test.order_events, r_test.trades)
+    # Stamp the exact execution policy (and its hash) that produced BOTH the
+    # strategy and benchmark numbers into results.json. A run whose config omits
+    # an execution policy is marked specified=False so promotion can refuse to
+    # treat unlimited-fill evidence as promotable (Phase 4 parity requirement).
+    execution_policy_specified = config.get("execution") is not None
+    execution_policy_hash = sha256_hex(config.get("execution") or {})
+    execution_policy_block = {
+        "specified": bool(execution_policy_specified),
+        "hash": execution_policy_hash,
+        "params": asdict(execution_policy),
+        "applied_to_benchmark": True,
+    }
     results_payload = {
         "experiment_name": config["experiment_name"],
         "strategy": strategy,
@@ -268,13 +281,13 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "bootstrap": bootstrap_ci,
         "dataset_binding": dataset_binding,
         "execution_test": execution_test,
+        "execution_policy": execution_policy_block,
     }
     write_json(out / "results.json", results_payload)
     split_policy = (
         f"chronological_timestamp:train_fraction={split_cfg.get('train_fraction', 0.7)},"
         f"embargo_bars={split_cfg.get('embargo_bars', 0)}"
     )
-    execution_policy_hash = sha256_hex(config.get("execution") or {})
     append_trial_record(
         config.get("output_dir", "outputs"),
         build_trial_record(

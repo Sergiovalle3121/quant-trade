@@ -108,3 +108,48 @@ lockfile; watched for API drift.
 **Next task:** Phase 1.1 — real bootstrap APIs (`iid_bootstrap`,
 `moving_block_bootstrap`, `stationary_bootstrap`, `bootstrap_confidence_intervals`)
 with a deprecated compatibility shim, plus the full statistical test matrix.
+
+### CP1 — Statistical integrity (Phase 1.1–1.4 complete) — 2026-07-24T06:35Z
+
+**Tasks finished:** the entire statistical-integrity track.
+
+- **1.1 Bootstrap** (`research/bootstrap.py`, commit `3267c70`): explicit seeded
+  `iid_bootstrap`, `moving_block_bootstrap` (contiguous blocks, configurable
+  wrap), `stationary_bootstrap` (geometric lengths), and
+  `bootstrap_confidence_intervals`. Per-period, never annualized. Old function
+  is a deprecated shim delegating to the real moving-block bootstrap.
+  `robustness.bootstrap_summary` records a fail-closed CI in `results.json`.
+- **1.2 Purged splits** (`research/splits.py`, commit `95cb0bb`): timestamp-based
+  (fixes the panel boundary leak) + `purged_chronological_split` /
+  `purged_walk_forward_splits` with exact purge/embargo and a `PurgedSplit`
+  audit trail. Single-asset behaviour unchanged.
+- **1.3 Honest ledger** (`research/ledger.py`, commit `651fb58`): hypothesis /
+  attempt / content-fingerprint identity, records failed and discarded trials,
+  surfaces corrupt lines (never silent), integrity report with the conservative
+  independent-trials DSR count. Runner + grid search emit structured records.
+- **1.4 Promotion V2** (`research/promotion_v2.py`, this commit):
+  `configs/selection/conservative_v2.yaml` requiring DSR≥0.95, PSR≥0.95, positive
+  net excess, block-bootstrap CI, mandatory execution policy, fill/incomplete
+  gates, subperiod stability, dataset binding, ledger integrity, and human
+  approval notes. Evidence is **recomputed** from artifacts; a bogus stored DSR
+  flag cannot promote a weak run. Best outcome is `paper_candidate`;
+  `real_money_authorized` is always False. The runner now stamps the execution
+  policy + hash into `results.json` (also serves Phase 4).
+
+**Tests executed:**
+- `ruff check .` → All checks passed
+- `mypy src` → Success: no issues found in 199 source files
+- `python -m pytest -q` → **333 passed** (277 baseline + 56 new: 21 bootstrap,
+  15 purged-split, 10 ledger-integrity, 13 promotion-v2, minus overlap).
+
+**Results:** `STATISTICAL_INTEGRITY: PASS`. The rigor upgrade did not
+manufacture an edge — 0/5 base strategies still clear the V2 gate; equal-weight
+remains unbeaten. That is the intended honest outcome.
+
+**Risks / blockers:** none for this track. pandas 3.0.5 / numpy 2.2.6 caused no
+API drift. Docs added: `docs/STATISTICAL_INTEGRITY_V2.md`.
+
+**Next task:** Phase 2 — cash-and-carry / funding market-neutral research module
+(two-leg model, full cost stack, causal funding, execution state machine, risk
+gates, pre-registration), research-only. Synthetic data can never yield GO;
+absent real data stays NOT-RUN.
