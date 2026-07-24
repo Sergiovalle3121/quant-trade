@@ -57,6 +57,45 @@ def _strategy_help() -> str:
     return "Strategy name: " + ", ".join(sorted(STRATEGY_REGISTRY))
 
 
+@app.command("status")
+def status(
+    outputs_dir: Annotated[
+        Path | None, typer.Option(help="Scan this dir for promotion decision JSONs")
+    ] = None,
+    carry_decision: Annotated[str | None, typer.Option(help="Cash-and-carry verdict")] = None,
+    mining_decision: Annotated[str | None, typer.Option(help="Mining economics verdict")] = None,
+    paper_readiness: Annotated[str | None, typer.Option(help="Paper readiness verdict")] = None,
+    output: Annotated[Path | None, typer.Option(help="Write the scorecard markdown here")] = None,
+) -> None:
+    """Print the consolidated verdict scorecard (safety posture + verdicts)."""
+    from quant_trade.reporting.session_scorecard import (
+        build_session_scorecard,
+        load_promotion_decisions,
+        render_markdown,
+    )
+
+    promotions = load_promotion_decisions(outputs_dir) if outputs_dir is not None else []
+    scorecard = build_session_scorecard(
+        promotions=promotions,
+        carry_decision=carry_decision,
+        mining_decision=mining_decision,
+        paper_readiness=paper_readiness,
+    )
+    for name, value in scorecard.fixed_statuses.items():
+        console.print(f"[bold]{name}[/bold]: {value}")
+    table = Table(title="Verdict scorecard")
+    table.add_column("Signal")
+    table.add_column("Status")
+    table.add_column("Detail")
+    for row in scorecard.rows:
+        table.add_row(row.name, row.status, row.detail)
+    console.print(table)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(render_markdown(scorecard), encoding="utf-8")
+        console.print(f"Scorecard: {output}")
+
+
 def _print_metrics(
     title: str,
     strategy_name: str,
