@@ -74,3 +74,26 @@ cost stress with settlements, independent reconciliation, ledger artifacts).
   ruff/mypy clean.
 
 Next: V6-2 — authentic provenance chain (IngestionReceipt).
+
+## CP2 — 2026-07-25T00:05Z — V6-2: authentic provenance chain (defect D closed)
+
+- `evidence/receipts.py` (new): `IngestionReceipt` (venue, endpoint, params
+  WITHOUT secrets — validated, http status, capture time, adapter, raw_path,
+  raw_sha256, normalized_rows_sha256, source_kind). `resolve_provenance`
+  works ONLY from byte-verified receipts: `live` → real; `fixture/recorded/
+  manual/synthetic/unknown` → test_only forever; no receipt →
+  `unverified_legacy`; tampered raw → dataset `invalid`; mixtures → `mixed`.
+  Self-labels inside records are ignored — reproducibility ≠ authenticity.
+- `carry/backfill.py` writes a receipt per capture (source_kind honest:
+  fixture replay is `fixture`, live is `live`).
+- `carry/research.py`: jsonl provenance resolved from receipts (broken raw
+  evidence refuses to run); JSON files self-labelled "real" downgrade to
+  `unverified_legacy` with an explicit manifest note.
+- `carry/store.py`: the snapshot bridge takes provenance from the CALLER —
+  the `"real"` literal is gone. `CarrySnapshot` accepts the new provenance
+  labels (`DATA_SOURCES`).
+- 2 more xfail markers removed (D×2); 3 legacy tests updated to the honest
+  posture. 7 new receipt tests. Suite: **605 passed, 14 xfailed** ·
+  ruff/mypy clean.
+
+Next: V6-3 — canonical instrument catalog + collector mark/index fixes.

@@ -286,6 +286,33 @@ def run_backfill(
         raw_file.write_bytes(raw)
     result.raw_path = str(raw_file)
 
+    # provenance receipt: capture context + byte binding, written at ingest
+    # time — resolution later works ONLY from verified receipts (V6-D)
+    from quant_trade.evidence.receipts import (
+        IngestionReceipt,
+        append_receipt,
+        normalized_rows_sha256,
+    )
+
+    append_receipt(
+        store.parent / "receipts.jsonl",
+        IngestionReceipt(
+            provider_or_venue=venue,
+            endpoint=url,
+            request_parameters={"symbol": symbol.upper(), "limit": limit},
+            http_status=200,
+            captured_at_utc=captured,
+            adapter_name=f"carry.backfill.{venue}",
+            adapter_version="1",
+            raw_path=str(raw_file),
+            raw_sha256=result.raw_sha256,
+            normalized_rows_sha256=normalized_rows_sha256(
+                [o.to_dict() for o in observations]
+            ),
+            source_kind="fixture" if fixture_path is not None else "live",
+        ),
+    )
+
     appended: AppendResult = append_observations(store, observations)
     result.events_parsed = len(observations)
     result.appended = appended.appended

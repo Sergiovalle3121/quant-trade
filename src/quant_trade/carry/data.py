@@ -50,8 +50,10 @@ def validate_snapshot_record(record: dict[str, Any]) -> list[str]:
             if not isinstance(value, int | float) or not math.isfinite(float(value)):
                 errors.append(f"{numeric} must be a finite number")
     source = record.get("data_source", "synthetic")
-    if source not in ("synthetic", "real"):
-        errors.append("data_source must be 'synthetic' or 'real'")
+    from quant_trade.carry.models import DATA_SOURCES
+
+    if source not in DATA_SOURCES:
+        errors.append(f"data_source must be one of {DATA_SOURCES}")
     # A predicted funding rate must never be aliased to the realized field.
     if (
         "predicted_funding_rate" in record

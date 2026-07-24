@@ -135,7 +135,6 @@ def test_cost_stress_multiplies_every_cost_component(tmp_path):
 # --- D. provenance is self-declared ----------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-D: data_source self-labels are trusted")
 def test_relabelled_synthetic_data_cannot_promote(tmp_path):
     # exactly what our own test helpers do: dataclasses.replace(..., "real").
     # Desired: provenance must come from verified ingestion receipts, so a
@@ -145,7 +144,6 @@ def test_relabelled_synthetic_data_cannot_promote(tmp_path):
     assert result.decision != "PAPER_CANDIDATE"
 
 
-@pytest.mark.xfail(strict=True, reason="V6-D: snapshot bridge hardcodes real")
 def test_observation_bridge_does_not_invent_real_provenance():
     import inspect
 

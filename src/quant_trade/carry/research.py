@@ -197,6 +197,21 @@ def _load_snapshots(
         path = data_cfg["path"]
         snapshots = load_snapshots_from_json(path)
         manifest = build_dataset_manifest(path)
+        # a JSON file's own data_source labels are CLAIMS, not evidence: a
+        # "real" self-label without verified ingestion receipts downgrades to
+        # unverified_legacy — reproducible, auditable, never promotable (V6-D)
+        if manifest.data_source == "real":
+            import dataclasses as _dc
+
+            manifest = _dc.replace(
+                manifest,
+                data_source="unverified_legacy",
+                provenance_notes=(
+                    manifest.provenance_notes
+                    + " | self-labelled real without ingestion receipts: "
+                    "downgraded to unverified_legacy"
+                ).strip(" |"),
+            )
         return snapshots, manifest, None
     if source == "jsonl_observations":
         from quant_trade.carry.data import load_snapshots_from_records
@@ -224,7 +239,23 @@ def _load_snapshots(
                 f"{len(skewed)} record(s) with excessive clock skew or bad "
                 f"timestamps; first: {skewed[0]}"
             )
-        records = observations_to_snapshot_records(stored.records)
+        # provenance comes from VERIFIED ingestion receipts, never from the
+        # records' own labels: each raw_sha256 must match a byte-verified
+        # receipt, and only source_kind="live" resolves to real (V6-D)
+        from quant_trade.evidence.receipts import resolve_provenance
+
+        store_path = Path(path)
+        provenance_report = resolve_provenance(
+            stored.records, store_path.parent / "receipts.jsonl"
+        )
+        if provenance_report.provenance == "invalid":
+            raise ValueError(
+                "raw ingestion evidence is broken: "
+                + "; ".join(provenance_report.problems[:3])
+            )
+        records = observations_to_snapshot_records(
+            stored.records, provenance=provenance_report.provenance
+        )
         if not records:
             raise ValueError("dataset contains no quote observations")
         snapshots = load_snapshots_from_records(records)

@@ -59,8 +59,10 @@ def test_scan_runs_registered_campaign_when_dataset_exists(tmp_path):
     }
     result = scan_trading_opportunities(cfg, evaluated_at_utc=NOW)
     row = result.rows[0]
-    assert row.status in ("PAPER_CANDIDATE", "REJECTED")
-    assert row.data_source == "real"
+    # V6-D: self-labelled "real" without receipts downgrades — the campaign
+    # still RUNS end-to-end but its verdict is honest insufficiency
+    assert row.status == "NOT_RUN_INSUFFICIENT_REAL_DATA"
+    assert row.data_source == "unverified_legacy"
     assert row.walk_forward_windows > 0
     assert row.metrics["sharpe_per_period"] is not None
 
