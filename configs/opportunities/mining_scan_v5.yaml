@@ -1,0 +1,111 @@
+# V5 rented-mining scan — the REAL current posture, honestly stated.
+#
+# Expected outcome as-is: every hashing cell is POLICY_BLOCKED.
+# - AWS: no written Trust & Safety approval artifact exists (Service Terms
+#   §1.25); the terms-vs-blog ambiguity is NOT resolved in favor of hashing.
+# - Alibaba: cryptocurrency mining is listed as a security-violation example;
+#   default BLOCKED_PROVIDER_POLICY.
+# Quotes here are fixtures (offline) — cells are TEST_ONLY regardless.
+# No policy_evidence blocks appear below because none exists; inventing one
+# would be fabricated evidence. Blocked cells still show conditional
+# economics as details when computable, but the block always outranks them.
+
+cells:
+  - purpose: hashing_worker
+    algorithm: sha256
+    coin: BTC
+    quote:
+      provider: aws
+      sku: g5.xlarge
+      region: us-east-1
+      purchase_model: spot
+      price_per_hour: 0.30
+      currency: USD
+      source_kind: fixture
+      source_name: offline_example
+      captured_at_utc: "2026-07-24T00:00:00Z"
+      max_age_hours: 168
+      uses_free_tier_or_credits: false
+    spec:
+      provider: aws
+      sku: g5.xlarge
+      region: us-east-1
+      architecture: gpu
+      vcpus: 4
+      memory_gb: 16.0
+      accelerator_model: "NVIDIA A10G"
+      accelerator_count: 1
+    revenue:
+      hashprice_usd_per_th_day: 0.05
+      pool_fee_rate: 0.01
+      utilization: 0.90
+      interruption_rate_per_hour: 0.05
+      checkpoint_overhead_fraction: 0.10
+    horizon_hours: 720
+    budget_ceiling_usd: 250.0
+
+  - purpose: hashing_worker
+    algorithm: sha256
+    coin: BTC
+    quote:
+      provider: alibaba
+      sku: ecs.gn7i-c32g1.8xlarge
+      region: ap-southeast-1
+      purchase_model: preemptible
+      price_per_hour: 1.10
+      currency: USD
+      source_kind: fixture
+      source_name: offline_example
+      captured_at_utc: "2026-07-24T00:00:00Z"
+      max_age_hours: 168
+      uses_free_tier_or_credits: false
+    spec:
+      provider: alibaba
+      sku: ecs.gn7i-c32g1.8xlarge
+      region: ap-southeast-1
+      architecture: gpu
+      vcpus: 32
+      memory_gb: 188.0
+      accelerator_model: "NVIDIA A10"
+      accelerator_count: 1
+    revenue:
+      hashprice_usd_per_th_day: 0.05
+      pool_fee_rate: 0.01
+      utilization: 0.90
+      interruption_rate_per_hour: 0.03
+      checkpoint_overhead_fraction: 0.10
+    horizon_hours: 720
+    budget_ceiling_usd: 250.0
+
+  - purpose: hashing_worker
+    algorithm: kheavyhash
+    coin: KAS
+    quote:
+      provider: alibaba
+      sku: ecs.gn7i-c32g1.8xlarge
+      region: ap-southeast-1
+      purchase_model: preemptible
+      price_per_hour: 1.10
+      currency: USD
+      source_kind: fixture
+      source_name: offline_example
+      captured_at_utc: "2026-07-24T00:00:00Z"
+      max_age_hours: 168
+      uses_free_tier_or_credits: false
+    spec:
+      provider: alibaba
+      sku: ecs.gn7i-c32g1.8xlarge
+      region: ap-southeast-1
+      architecture: gpu
+      vcpus: 32
+      memory_gb: 188.0
+      accelerator_model: "NVIDIA A10"
+      accelerator_count: 1
+    revenue:
+      hashprice_usd_per_th_day: 0.08
+      pool_fee_rate: 0.01
+      utilization: 0.90
+      interruption_rate_per_hour: 0.03
+      checkpoint_overhead_fraction: 0.10
+    horizon_hours: 720
+    budget_ceiling_usd: 250.0

@@ -117,3 +117,31 @@ Next: V5-4 reproducible promotion (`carry promote`, clean-room rebuild).
   Suite: **572 passed** · ruff/mypy clean.
 
 Next: V5-5 evidence bundle validator + mining rental scanner.
+
+## CP5 — 2026-07-24T21:10Z — V5-5: bundle validator + mining scanner (fix F)
+
+- `cloud_rental/bundle.py` (new): `EvidenceBundleValidator` — exact
+  quote↔spec↔benchmark↔policy identity (provider, SKU, region, accelerator
+  model+count, algorithm, workload); byte-verifies `artifact_sha256` and
+  `snapshot_sha256` against the actual files (unavailable bytes = missing
+  evidence; wrong bytes = broken chain); fixture-sourced quotes/benchmarks →
+  TEST_ONLY forever. Verdict precedence: identity > SHA > missing.
+- `opportunities/` (new package) + `opportunities scan-mining` CLI:
+  provider×region×SKU×algorithm×coin cells; per-cell precedence:
+  incoherent bundle rejects outright → POLICY_BLOCKED (decisive, outranks a
+  missing benchmark, never converted to economics) → MISSING_EVIDENCE →
+  economics; fixture-fed candidates are renamed `TEST_ONLY_*` in the status
+  itself. Every cell appears in the matrix — nothing silently dropped.
+- `configs/opportunities/mining_scan_v5.yaml`: the REAL posture, honestly —
+  no fabricated policy evidence. Scan executed →
+  `artifacts/v5/MINING_RENTAL_MATRIX.json`: AWS
+  `POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL` (Service Terms §1.25,
+  ambiguity NOT resolved in favor of hashing), Alibaba × 2
+  `POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY`. Zero candidates — correct.
+- 8 new tests (`tests/test_v5_bundle_and_mining_scan.py`): TEST_ONLY
+  classification, cross-SKU/region/provider rejection, tampered artifact →
+  SHA break, missing bytes → missing evidence, real-posture scan, policy
+  block outranks missing benchmark, identity break precedes policy, CLI.
+  Suite: **580 passed** · ruff/mypy clean.
+
+Next: V5-6 trading scanner + unified opportunity board + paper allocator.

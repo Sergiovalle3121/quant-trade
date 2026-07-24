@@ -1,0 +1,74 @@
+{
+  "artifact": "MINING_RENTAL_MATRIX",
+  "cells": [
+    {
+      "accelerator_model": "NVIDIA A10G",
+      "algorithm": "sha256",
+      "bundle_status": "REJECTED_MISSING_EVIDENCE",
+      "coin": "BTC",
+      "conditional_economics": null,
+      "identity": "aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "provider": "aws",
+      "reasons": [
+        "no verifiable AWS Trust & Safety written-approval artifact on file (AWS Service Terms §1.25); human review of terms is mandatory",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "region": "us-east-1",
+      "sku": "g5.xlarge",
+      "status": "POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL",
+      "test_only": true
+    },
+    {
+      "accelerator_model": "NVIDIA A10",
+      "algorithm": "sha256",
+      "bundle_status": "REJECTED_MISSING_EVIDENCE",
+      "coin": "BTC",
+      "conditional_economics": null,
+      "identity": "alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "provider": "alibaba",
+      "reasons": [
+        "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "region": "ap-southeast-1",
+      "sku": "ecs.gn7i-c32g1.8xlarge",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "accelerator_model": "NVIDIA A10",
+      "algorithm": "kheavyhash",
+      "bundle_status": "REJECTED_MISSING_EVIDENCE",
+      "coin": "KAS",
+      "conditional_economics": null,
+      "identity": "alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "provider": "alibaba",
+      "reasons": [
+        "Alibaba Cloud lists cryptocurrency mining as a security-violation lock example; blocked by default absent a written contractual exception (a ticket or assumption is not enough)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "region": "ap-southeast-1",
+      "sku": "ecs.gn7i-c32g1.8xlarge",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "counts_by_status": {
+    "POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL": 1,
+    "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY": 2
+  },
+  "evaluated_at_utc": "2026-07-24T20:25:42Z",
+  "notes": [
+    "TEST_ONLY cells exercise the pipeline and can never be real opportunities",
+    "BLOCKED is a legal/operational state; economics never override it",
+    "no miners were run, no resources created, no spend authorized"
+  ],
+  "safety": {
+    "alibaba_resources_created": false,
+    "aws_resources_created": false,
+    "external_spend_authorized": false,
+    "hardware_control_enabled": false,
+    "miner_execution": false
+  },
+  "schema_version": 1
+}
