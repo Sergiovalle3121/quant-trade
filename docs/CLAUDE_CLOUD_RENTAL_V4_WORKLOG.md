@@ -125,3 +125,43 @@ manifests, lineage, atomic writes) fixing defects A and B.
 
 **Next:** Block 4 — cloud_rental package (AWS/Alibaba policy gates, read-only
 quotes, mandatory benchmarks, rental economics, feasibility matrix).
+
+## CP2 — Blocks 4–7 complete (sprint delivered) — 2026-07-24T20:20Z
+
+**Branch/SHA:** `claude/cloud-rental-evidence-v4` @ Block 4 `15afa80`, Block 5
+`88e2947`, Block 6 `ad3cfb3`, report in this commit. PR #41 draft; CI green per
+pushed head.
+
+- **Block 4** (`cloud_rental/`, 23 tests): fail-closed policy gates with the
+  official sources registered (AWS hashing → BLOCKED_PENDING_WRITTEN_APPROVAL;
+  Free Tier/credits categorically blocked; Alibaba hashing →
+  BLOCKED_PROVIDER_POLICY by default; ambiguous → BLOCKED_POLICY_UNKNOWN;
+  control plane evaluable and distinct). Mandatory exact-SKU benchmark
+  evidence (defect F: manual hashrate rejected; no cross-SKU/GPU→ASIC
+  extrapolation; CPU/GPU sha256 → BLOCKED_INCOMPATIBLE_HARDWARE). Quote
+  source-family separation (Spot ≠ Price List ≠ DescribePrice), recomputed
+  freshness (future/expired fail). Rental economics in cancelable hourly flows
+  (multi-year horizons refused), 1×/2×/3× margins, budget ceiling. Read-only
+  price adapters with no creation verbs (asserted). CLI quote/evaluate/compare;
+  4 example configs; `docs/CLOUD_RENTAL_FEASIBILITY.md` with the 4-row matrix.
+- **Block 5** (defect E): freshness recomputed from `captured_at_utc` vs an
+  injectable clock; future snapshots rejected; V1 constant-flow marked
+  `legacy_non_promotable`; new `mining rental-evaluate` with hashprice
+  divergence fail-closed and deployment-model separation.
+- **Block 6** (defect G): drill-evidence readiness (7 executed drills with
+  hash/timestamp/expiry/failure-injection; broker_mode explicit; booleans
+  alone NOT_READY; real executable parity drill; `paper readiness-evidence`
+  CLI).
+- **Block 7:** final matrix run, `docs/CLOUD_RENTAL_V4_IMPLEMENTATION_REPORT.md`
+  with the exact status lines, PR #41 body updated with revalidated numbers.
+
+**Final validation (executed on `ad3cfb3`):** ruff pass · mypy pass (235
+files) · compileall OK · **pytest 538 passed, 0 xfailed** · `git diff --check`
+clean. All seven defects (A–G) reproduced red first, fixed, and green.
+
+**Verdicts:** both providers CANDIDATE for control plane; AWS hashing BLOCKED
+(written approval required); Alibaba hashing BLOCKED (provider policy); real
+funding history NOT-RUN (collector ready); carry NOT-RUN; paper NOT_READY
+(drills must actually run). Safety: REAL_MONEY NO-GO; LIVE_ORDER_SUBMISSION,
+MINER_EXECUTION, MINING_HARDWARE_CONTROL, WALLET_SIGNING all DISABLED;
+AWS/ALIBABA_RESOURCES_CREATED FALSE; EXTERNAL_SPEND_AUTHORIZED FALSE.
