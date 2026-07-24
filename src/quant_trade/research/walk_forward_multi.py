@@ -15,6 +15,7 @@ instead of burning the lookback inside it.
 
 from __future__ import annotations
 
+import math
 import time
 from itertools import product
 from pathlib import Path
@@ -29,6 +30,7 @@ from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_mo
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
 from quant_trade.research.ledger import append_trial
 from quant_trade.research.multi_asset_runner import _cost, _execution_policy
+from quant_trade.research.overfitting import assess_walk_forward_overfitting
 from quant_trade.research.strategy_registry import get_research_signal_model
 from quant_trade.research.walk_forward import _stitch_oos_equity
 
@@ -61,6 +63,16 @@ def _window_result(
         rebalance_band=float(port.get("rebalance_band", 0.0)),
         execution_policy=_execution_policy(config),
     )
+
+
+def _metric_value(metrics: dict[str, Any], name: str) -> float:
+    value = metrics.get(name)
+    if value is None:
+        raise ValueError(f"ranking metric {name!r} is missing from backtest metrics")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"ranking metric {name!r} must be finite")
+    return number
 
 
 def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
@@ -105,31 +117,47 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
         test_from = start + train_size + embargo
         test_ts = dates[test_from : test_from + test_size]
         scored = []
+        train_results: dict[int, Any] = {}
         for i, combo in enumerate(combos):
             train_res = _window_result(data, weights_by_combo[i], train_ts, config)
-            metric = train_res.metrics.get(ranking_metric)
-            scored.append((float(metric) if metric is not None else float("-inf"), i, combo))
+            train_results[i] = train_res
+            metric = _metric_value(train_res.metrics, ranking_metric)
+            scored.append((metric, i, combo))
         best_metric, best_index, best_combo = max(scored, key=lambda item: item[0])
-        test_res = _window_result(data, weights_by_combo[best_index], test_ts, config)
-        moments = return_moments(
-            test_res.equity_curve["equity"].astype(float).pct_change()
-        )
-        append_trial(
-            config.get("output_dir", "outputs"),
-            {
-                "source": "multi_asset_walk_forward",
-                "experiment_name": config.get("experiment_name", "walk_forward_multi"),
-                "strategy": strategy,
-                "strategy_params": {**base_params, **best_combo},
-                "window": window_number,
-                "trials_in_window": len(scored),
-                "data_sha256": dataset_binding["data_sha256"],
-                "test_sharpe": float(test_res.metrics.get("sharpe", 0.0)),
-                "test_sharpe_per_period": moments["sharpe_per_period"],
-                "test_total_return": float(test_res.metrics.get("total_return", 0.0)),
-                "trade_count": int(len(test_res.trades)),
-            },
-        )
+        test_results = {
+            i: _window_result(data, weights_by_combo[i], test_ts, config)
+            for i in range(len(combos))
+        }
+        test_scores = {
+            i: _metric_value(result.metrics, ranking_metric) for i, result in test_results.items()
+        }
+        score_series = pd.Series(test_scores, dtype=float)
+        selected_oos_rank = float(score_series.rank(method="average", pct=True).loc[best_index])
+        test_res = test_results[best_index]
+        selected_test_metric = test_scores[best_index]
+
+        for i, combo in enumerate(combos):
+            combo_result = test_results[i]
+            moments = return_moments(combo_result.equity_curve["equity"].astype(float).pct_change())
+            append_trial(
+                config.get("output_dir", "outputs"),
+                {
+                    "source": "multi_asset_walk_forward",
+                    "experiment_name": config.get("experiment_name", "walk_forward_multi"),
+                    "strategy": strategy,
+                    "strategy_params": {**base_params, **combo},
+                    "window": window_number,
+                    "trials_in_window": len(scored),
+                    "selected_on_train": i == best_index,
+                    "train_ranking_metric": _metric_value(train_results[i].metrics, ranking_metric),
+                    "test_ranking_metric": test_scores[i],
+                    "data_sha256": dataset_binding["data_sha256"],
+                    "test_sharpe": float(combo_result.metrics.get("sharpe", 0.0)),
+                    "test_sharpe_per_period": moments["sharpe_per_period"],
+                    "test_total_return": float(combo_result.metrics.get("total_return", 0.0)),
+                    "trade_count": int(len(combo_result.trades)),
+                },
+            )
         rows.append(
             {
                 "window": window_number,
@@ -139,6 +167,9 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
                 "test_end": str(test_ts[-1]),
                 "selected_params": str(best_combo),
                 "train_metric": best_metric,
+                "selected_test_metric": selected_test_metric,
+                "train_test_metric_degradation": best_metric - selected_test_metric,
+                "selected_oos_rank_percentile": selected_oos_rank,
                 "test_sharpe": test_res.metrics.get("sharpe"),
                 "test_total_return": test_res.metrics.get("total_return"),
                 "test_max_drawdown": test_res.metrics.get("max_drawdown"),
@@ -159,6 +190,23 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
     aggregate["psr"] = probabilistic_sharpe_ratio(oos_returns)
     aggregate["windows"] = len(rows)
     aggregate["positive_window_rate"] = float((frame["test_total_return"] > 0).mean())
+    overfitting_cfg = config.get("overfitting", {}) or {}
+    overfitting = assess_walk_forward_overfitting(
+        frame["selected_oos_rank_percentile"].astype(float),
+        frame["train_test_metric_degradation"].astype(float),
+        parameter_variants=len(combos),
+        max_walk_forward_pbo=float(overfitting_cfg.get("max_walk_forward_pbo", 0.50)),
+        min_windows=int(overfitting_cfg.get("min_windows", 4)),
+    )
+    overfitting_payload = {
+        "schema_version": 1,
+        "strategy": strategy,
+        "ranking_metric": ranking_metric,
+        "dataset_binding": dataset_binding,
+        **overfitting.to_dict(),
+    }
+    aggregate["walk_forward_pbo"] = overfitting.walk_forward_pbo
+    aggregate["overfitting_decision"] = overfitting.decision
 
     run_id = time.strftime("%Y%m%d_%H%M%S")
     out = create_run_dir(
@@ -167,6 +215,7 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
     )
     write_csv(out / "walk_forward_windows.csv", frame)
     write_json(out / "aggregate_metrics.json", aggregate)
+    write_json(out / "overfitting_evidence.json", overfitting_payload)
     write_json(out / "dataset_binding.json", dataset_binding)
     write_csv(out / "oos_equity_curve.csv", stitched)
     write_summary(
@@ -177,6 +226,8 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
             f"Aggregate OOS Sharpe: {aggregate.get('sharpe')}",
             f"Aggregate OOS PSR: {aggregate.get('psr')}",
             f"Positive window rate: {aggregate.get('positive_window_rate')}",
+            f"Walk-forward PBO: {overfitting.walk_forward_pbo:.3f}",
+            f"Overfitting decision: {overfitting.decision}",
             "Every parameter evaluation is recorded in the trial ledger.",
         ],
     )
@@ -184,5 +235,6 @@ def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
         "output_dir": str(out),
         "windows": frame,
         "aggregate_metrics": aggregate,
+        "overfitting_evidence": overfitting_payload,
         "dataset_binding": dataset_binding,
     }

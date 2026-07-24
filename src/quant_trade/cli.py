@@ -318,6 +318,11 @@ def research_walk_forward_multi(
     console.print(f"Windows: {agg.get('windows')}")
     console.print(f"OOS Sharpe: {agg.get('sharpe'):.3f}  PSR: {agg.get('psr'):.3f}")
     console.print(f"Positive window rate: {agg.get('positive_window_rate'):.2%}")
+    console.print(
+        "Walk-forward PBO: "
+        f"{agg.get('walk_forward_pbo'):.3f}  "
+        f"Overfitting: {agg.get('overfitting_decision')}"
+    )
     console.print(f"Output directory: {result['output_dir']}")
 
 
@@ -377,6 +382,9 @@ def selection_promote(
         "max_drawdown": 0.20,
         "max_turnover": 3.0,
         "min_net_excess_return": 0.0,
+        "require_overfitting_evidence": True,
+        "max_walk_forward_pbo": 0.50,
+        "min_walk_forward_windows": 4,
     }
     report = evaluate_promotion(cand, Path(cand.research_run_dir), risk_config)
     if report.overall_status == "pass":
@@ -488,8 +496,9 @@ def paper_export_session(
     (out / "final_state.json").write_text(
         json.dumps(state.to_dict(), indent=2, default=str), encoding="utf-8"
     )
-    console.print(f"Exported {len(snapshots)} snapshots, {len(orders)} orders, "
-                  f"{len(fills)} fills to {out}")
+    console.print(
+        f"Exported {len(snapshots)} snapshots, {len(orders)} orders, {len(fills)} fills to {out}"
+    )
     console.print(f"Total return: {metrics['total_return']:.2%}")
 
 
@@ -792,8 +801,10 @@ def broker_rebalance_plan(
     broker_config: Annotated[Path, typer.Option(help="Broker YAML config")],
     data: Annotated[
         Path | None,
-        typer.Option(help="Canonical OHLCV panel CSV override (offline/testing); "
-                          "default fetches via the loop's provider"),
+        typer.Option(
+            help="Canonical OHLCV panel CSV override (offline/testing); "
+            "default fetches via the loop's provider"
+        ),
     ] = None,
     state_path: Annotated[
         Path | None, typer.Option(help="Override the loop session latest_state.json")
@@ -858,8 +869,14 @@ def broker_rebalance_plan(
     )
     requests, risk_checks, dry_rows, skipped = [], [], [], []
     account = BrokerAccount(
-        bcfg.provider, "local****", "USD", session.cash, session.equity, session.equity,
-        "planning", True,
+        bcfg.provider,
+        "local****",
+        "USD",
+        session.cash,
+        session.equity,
+        session.equity,
+        "planning",
+        True,
     )
     failure: str | None = None
     for order in orders:
@@ -876,8 +893,13 @@ def broker_rebalance_plan(
             failure = f"{order.symbol} {order.side} {order.quantity}: {exc}"
             break
         requests.append(req)
-        risk_checks.append({**risk, "planned_price": prices.get(req.symbol, 0.0),
-                            "planned_notional": req.quantity * prices.get(req.symbol, 0.0)})
+        risk_checks.append(
+            {
+                **risk,
+                "planned_price": prices.get(req.symbol, 0.0),
+                "planned_notional": req.quantity * prices.get(req.symbol, 0.0),
+            }
+        )
         dry_rows.append({"client_order_id": req.client_order_id, "status": "dry_run"})
     if failure is not None:
         _write_json(out / "plan_failure.json", {"failed_order": failure, "bar": str(newest_ts)})
@@ -1137,9 +1159,7 @@ def trials_export_daily_records(
     run_dir: Annotated[Path, typer.Option(help="Paper session run directory")],
     trial_id: Annotated[str, typer.Option(help="Trial ID the records belong to")],
     paper_session_id: Annotated[str, typer.Option(help="Paper session ID")],
-    output_root: Annotated[Path, typer.Option(help="Trials output root")] = Path(
-        "outputs/trials"
-    ),
+    output_root: Annotated[Path, typer.Option(help="Trials output root")] = Path("outputs/trials"),
     benchmark_data: Annotated[
         Path | None, typer.Option(help="Canonical OHLCV CSV for the benchmark leg")
     ] = None,

@@ -76,6 +76,9 @@ class SelectionCriteria:
     min_probabilistic_sharpe: float = 0.0
     require_deflated_sharpe: bool = False
     min_deflated_sharpe: float = 0.5
+    require_walk_forward_overfitting_evidence: bool = False
+    max_walk_forward_pbo: float = 0.50
+    min_walk_forward_windows: int = 4
 
     @classmethod
     def from_yaml(cls, path: Path) -> SelectionCriteria:

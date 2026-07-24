@@ -176,11 +176,18 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
             from quant_trade.mining.profitability import evaluate_all
 
             rigs, markets, policy = load_mining_config(Path(config.mining_config_path))
-            evaluations = evaluate_all(rigs, markets, policy)
+            mining_evaluated_at = datetime.now(UTC)
+            evaluations = evaluate_all(
+                rigs,
+                markets,
+                policy,
+                mining_evaluated_at,
+            )
             go_count = sum(item.decision == "GO" for item in evaluations)
             report: dict[str, Any] = {
                 "evaluations": [item.to_dict() for item in evaluations],
                 "go_count": go_count,
+                "evaluated_at_utc": mining_evaluated_at.replace(microsecond=0).isoformat(),
                 "authorized_to_start_miner": False,
                 "cloud_resources_created": False,
             }
@@ -279,18 +286,14 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
                 lock.release_lock(rec.lock_name, run_id)
         elif config.job_name in {"data_refresh", "research_run"}:
             metrics.append(
-                emit_metric(
-                    "stale_data_warning", 0, dimensions={"job": config.job_name}, emf=emf
-                )
+                emit_metric("stale_data_warning", 0, dimensions={"job": config.job_name}, emf=emf)
             )
         else:
             raise SafetyGateError(f"unknown cloud job: {config.job_name}")
     except Exception as exc:
         status = "failure"
         error = str(exc)
-        metrics.append(
-            emit_metric("job_failure", 1, dimensions={"job": config.job_name}, emf=emf)
-        )
+        metrics.append(emit_metric("job_failure", 1, dimensions={"job": config.job_name}, emf=emf))
         events.append({"event": "cloud_job_failed", "error": error})
         _notify_failure(config, run_id, error)
     duration = monotonic() - start
@@ -337,4 +340,3 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
     if status != "success":
         raise SafetyGateError(error or "cloud job failed")
     return summary
-
