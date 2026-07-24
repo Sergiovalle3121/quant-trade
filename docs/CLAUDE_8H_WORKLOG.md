@@ -238,3 +238,42 @@ they set it (no auto-merge configured), CI kept green.
 **Next task:** Phase 4 — realistic execution mandatory for promotable evidence
 (largely done in Phase 1.4), parity report (backtest vs sim paper vs broker
 paper), paper-readiness V3.
+
+### Merge event — PR #39 squash-merged into main — 2026-07-24T07:45Z
+
+The repo owner marked PR #39 ready and squash-merged it into `main` (as
+`cf97401`) while Phase 3 was still local. Per the merged-PR protocol, the branch
+was restarted from the new `main` and the single unmerged follow-up commit
+(mining V2) was cherry-picked on top — no already-merged history stacked, no
+existing work overwritten (verified `e08fb85` tree == `main` tree). Follow-up
+work now lives on a **new draft PR #40**; the merged PR #39 is final and was not
+reused.
+
+### CP4 — Paper parity + readiness (Phase 4 complete) — 2026-07-24T08:05Z
+
+**Task finished:** the research/paper parity + promotion-gate track.
+
+- **4.1 Realistic execution mandatory** — already enforced in Phase 1.4: the
+  runner stamps the execution policy + hash into `results.json` and applies the
+  same policy to strategy and benchmark; the V2 gate makes a missing policy
+  NOT PROMOTABLE (no unlimited-fill fallback), plus fill-rate/incomplete gates.
+- **4.2 Parity report** (`paper/parity.py`): `compare_executions` /
+  `three_way_parity` compare backtest vs simulated-paper vs broker-paper field
+  by field (weights, quantities, fills, prices, fees, slippage, partials,
+  cancellations, positions, cash, equity, drift) with an explainable status per
+  field. Broker-paper is built from recorded fills — never a live call.
+- **4.3 Readiness V3** (`paper/readiness.py`): fail-closed checks (paper-only
+  broker, exporter, recovery, kill switch, orphan detection, heartbeat,
+  reconciliation) → `READY_FOR_PAPER_TRIAL` / `NOT_READY`, never real money,
+  `trial_days_completed` always 0 (no fabricated elapsed days), plus a generated
+  runbook + manual checklist.
+
+**Tests executed:** `ruff` pass; `python -m mypy src` (2.3.0) pass on 214 files;
+`python -m pytest -q` → **417 passed** (+11 parity/readiness tests).
+
+Doc: `docs/PAPER_READINESS_V3.md`.
+
+**Result:** `PAPER_READINESS: READY` (for a supervised paper trial only).
+
+**Next task:** Phase 5 — final full validation, clean-tree/secrets check, and
+`docs/FINAL_8H_IMPLEMENTATION_REPORT.md`.
