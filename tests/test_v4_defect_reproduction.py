@@ -158,7 +158,6 @@ def test_defect_e_future_snapshot_fails():
 # --- Defect G: paper readiness is declarative -----------------------------
 
 
-@pytest.mark.xfail(reason="defect G: broker_mode defaults to paper", strict=True)
 def test_defect_g_missing_broker_mode_fails():
     config = {
         "exporter_enabled": True,
@@ -174,7 +173,6 @@ def test_defect_g_missing_broker_mode_fails():
     assert "broker_is_paper_only" in report.blocking
 
 
-@pytest.mark.xfail(reason="defect G: booleans accepted without drill artifacts", strict=True)
 def test_defect_g_booleans_without_drill_evidence_are_not_ready():
     config = {
         "broker_mode": "paper",

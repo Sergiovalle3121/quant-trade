@@ -501,6 +501,56 @@ def research_ledger_report(
         console.print(f"[yellow]note:[/yellow] {note}")
 
 
+@paper_app.command("readiness-evidence")
+def paper_readiness_evidence(
+    config: Annotated[Path, typer.Option(help="Readiness YAML (broker, flags, drill dir)")],
+    run_parity: Annotated[
+        bool, typer.Option("--run-parity-drill", help="Execute the parity drill now")
+    ] = False,
+    output: Annotated[Path | None, typer.Option(help="Write the report JSON here")] = None,
+    runbook: Annotated[Path | None, typer.Option(help="Write the runbook markdown here")] = None,
+    evaluated_at_utc: Annotated[
+        str | None, typer.Option(help="Evaluation clock (defaults to now UTC)")
+    ] = None,
+) -> None:
+    """Drill-evidence paper readiness: executed artifacts, never booleans alone."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from quant_trade.evidence.canonical_json import atomic_write_json
+    from quant_trade.paper.readiness import (
+        evaluate_paper_readiness,
+        generate_paper_runbook,
+        run_parity_drill,
+    )
+
+    cfg = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+    now = evaluated_at_utc or _dt.now(_UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if run_parity:
+        evidence_dir = cfg.get("drill_evidence_dir")
+        if not evidence_dir:
+            raise typer.BadParameter("config needs drill_evidence_dir to record the drill")
+        artifact = run_parity_drill(evidence_dir, executed_at_utc=now)
+        console.print(f"parity drill executed and recorded: {artifact}")
+    report = evaluate_paper_readiness(cfg, evaluated_at_utc=now)
+    colour = "green" if report.status == "READY_FOR_PAPER_TRIAL" else "red"
+    console.print(f"Readiness: [bold {colour}]{report.status}[/bold {colour}]")
+    for name, state in report.drill_summary.items():
+        mark = "[green]ok[/green]" if state == "ok" else f"[red]{state}[/red]"
+        console.print(f"  drill {name}: {mark}")
+    if report.blocking:
+        console.print(f"Blocking: {', '.join(report.blocking)}")
+    console.print("real_money_authorized=false  no orders were sent")
+    if output is not None:
+        atomic_write_json(output, report.to_dict())
+        console.print(f"Report: {output}")
+    if runbook is not None:
+        runbook.parent.mkdir(parents=True, exist_ok=True)
+        runbook.write_text(generate_paper_runbook(report), encoding="utf-8")
+        console.print(f"Runbook: {runbook}")
+    raise typer.Exit(code=0 if report.status == "READY_FOR_PAPER_TRIAL" else 1)
+
+
 @paper_app.command("init")
 def paper_init(config: Annotated[Path, typer.Option(help="Paper config YAML")]) -> None:
     from quant_trade.paper.config import load_paper_config
