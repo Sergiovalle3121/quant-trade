@@ -170,19 +170,39 @@ def test_backfill_and_collector_share_one_canonical_identity():
 # --- F. a successful backfill still cannot feed research -------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-F: no historical panel joins quotes+settlements")
 def test_backfilled_settlements_can_power_research_via_panel(tmp_path):
-    from quant_trade.carry.backfill import run_backfill
+    # V6-F closed: recorded pages → receipts → panel → ledger → research.
+    # The pipeline executes end-to-end; fixture provenance keeps it TEST_ONLY.
+    from quant_trade.carry.panel_backfill import run_panel_backfill
 
-    store = tmp_path / "history.jsonl"
-    run_backfill(
-        "bybit", "BTC", store, fixture_path="tests/fixtures/bybit_funding_history.json"
+    fixtures = {
+        "spot": "tests/fixtures/bybit_kline_spot.json",
+        "perp": "tests/fixtures/bybit_kline_perp.json",
+        "mark": "tests/fixtures/bybit_kline_mark.json",
+        "index": "tests/fixtures/bybit_kline_index.json",
+        "funding": "tests/fixtures/bybit_funding_history.json",
+    }
+    result = run_panel_backfill(
+        "bybit",
+        "BTC",
+        tmp_path / "panel",
+        since_ms=1784505600000,
+        until_ms=1784649600000,
+        fixture_pages=fixtures,
     )
+    assert result.status == "OK"
+    assert result.panel_rows > 0
     with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
         cfg = yaml.safe_load(fh)
-    cfg["data"] = {"source": "jsonl_observations", "path": str(store)}
-    result = run_carry_research(cfg)  # today: "no quote observations" ValueError
-    assert result.decision.startswith("NOT_RUN")
+    cfg["data"] = {"source": "panel", "path": str(tmp_path / "panel")}
+    cfg["signal"] = {"entry_threshold": 0.0, "trailing_window": 3}
+    research = run_carry_research(cfg)
+    # backfilled settlements now drive research: counted, accrued, reconciled
+    assert research.metrics["unique_settlement_count"] == 6
+    assert research.ledger_summary["reconciled"] is True
+    # fixture-built panels stay TEST_ONLY — never real, never promotable
+    assert research.data_source == "test_only"
+    assert research.decision == "NOT_RUN_INSUFFICIENT_REAL_DATA"
 
 
 # --- G. the collector stores last as mark ----------------------------------

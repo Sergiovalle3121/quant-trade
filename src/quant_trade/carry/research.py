@@ -173,7 +173,12 @@ def carry_campaign_returns(
 
 def _load_snapshots(
     config: dict[str, Any],
-) -> tuple[list[CarrySnapshot], DatasetManifest, list[tuple[Any, float]] | None]:
+) -> tuple[
+    list[CarrySnapshot],
+    DatasetManifest,
+    list[tuple[Any, float]] | None,
+    list[float] | None,
+]:
     """Load snapshots, bind them by bytes, and surface funding settlements.
 
     The third element is the settled-funding event list for settlement-causal
@@ -192,7 +197,7 @@ def _load_snapshots(
             source_name="synthetic_funding_snapshots",
             provenance_notes="deterministic generator; not market data",
         )
-        return snapshots, manifest, None
+        return snapshots, manifest, None, None
     if source == "json":
         path = data_cfg["path"]
         snapshots = load_snapshots_from_json(path)
@@ -212,7 +217,7 @@ def _load_snapshots(
                     "downgraded to unverified_legacy"
                 ).strip(" |"),
             )
-        return snapshots, manifest, None
+        return snapshots, manifest, None, None
     if source == "jsonl_observations":
         from quant_trade.carry.data import load_snapshots_from_records
         from quant_trade.carry.instruments import check_clock_skew, require_single_identity
@@ -269,16 +274,45 @@ def _load_snapshots(
         manifest = build_file_manifest(
             path, records, provenance_notes="point-in-time collector JSONL"
         )
-        return snapshots, manifest, settlements
+        return snapshots, manifest, settlements, None
+    if source == "panel":
+        # HistoricalCarryPanel (V6-F): klines provide the quotes, funding
+        # accrues at exact settlement instants, and the SIGNAL series is the
+        # most recent settled rate known at each bar — polls drive nothing.
+        from quant_trade.carry.data import load_snapshots_from_records
+        from quant_trade.carry.panel import load_panel, panel_to_research_inputs
+        from quant_trade.evidence.manifest import build_file_manifest
+        from quant_trade.evidence.receipts import resolve_dir_provenance
+
+        panel_dir = Path(data_cfg["path"])
+        rows = load_panel(panel_dir)
+        prov = resolve_dir_provenance(panel_dir / "receipts.jsonl")
+        if prov.provenance == "invalid":
+            raise ValueError(
+                "panel raw evidence is broken: " + "; ".join(prov.problems[:3])
+            )
+        records, settle_pairs, signal = panel_to_research_inputs(
+            rows, provenance=prov.provenance
+        )
+        snapshots = load_snapshots_from_records(records)
+        settlements = [
+            (pd.to_datetime(ts, utc=True), rate) for ts, rate in settle_pairs
+        ]
+        manifest = build_file_manifest(
+            panel_dir / "panel.jsonl",
+            records,
+            provenance_notes="historical carry panel (receipt-resolved provenance)",
+        )
+        return snapshots, manifest, settlements, signal
     raise ValueError(
         f"unsupported carry data source {source!r}; "
-        "use 'synthetic', 'json', or 'jsonl_observations'"
+        "use 'synthetic', 'json', 'jsonl_observations', or 'panel'"
     )
 
 
 def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     """Run a pre-registered carry campaign and return the verdict + evidence."""
-    snapshots, manifest, settlements = _load_snapshots(config)
+    snapshots, manifest, settlements, signal_rates = _load_snapshots(config)
     if not snapshots:
         raise ValueError("no snapshots to evaluate")
     # Provenance comes from the FULL dataset via the manifest ("mixed" when
@@ -309,6 +343,7 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         perp_leverage=position.perp_leverage,
         collateral_yield_annual=collateral_yield_annual,
         settlements=settlements,
+        signal_rates=signal_rates,
     )
     if not ledger.reconciled:
         raise ValueError(
@@ -393,6 +428,7 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
             perp_leverage=position.perp_leverage,
             collateral_yield_annual=collateral_yield_annual,
             settlements=settlements,
+            signal_rates=signal_rates,
         )
         return float(stressed.final_equity / stressed.initial_capital - 1.0)
 

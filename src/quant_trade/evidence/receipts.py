@@ -130,6 +130,23 @@ class ProvenanceReport:
         return asdict(self)
 
 
+def resolve_dir_provenance(
+    receipts_path: str | Path, *, base_dir: str | Path | None = None
+) -> ProvenanceReport:
+    """Provenance of a derived artifact directory from its page receipts.
+
+    Every receipt is one evidence unit: all verified-live → real; any fixture/
+    recorded → test_only (or mixed); any broken raw → invalid; none → the
+    directory is unverified_legacy.
+    """
+    records = [
+        {"raw_sha256": str(r.get("raw_sha256", ""))} for r in load_receipts(receipts_path)
+    ]
+    if not records:
+        return ProvenanceReport(provenance="unverified_legacy")
+    return resolve_provenance(records, receipts_path, base_dir=base_dir)
+
+
 def resolve_provenance(
     records: list[dict[str, Any]],
     receipts_path: str | Path,

@@ -149,6 +149,87 @@ def carry_backfill(
     raise typer.Exit(code=0 if result.status == "OK" else 1)
 
 
+@carry_app.command("backfill-panel")
+def carry_backfill_panel(
+    venue: Annotated[str, typer.Option(help="bybit (public endpoints, no keys)")] = "bybit",
+    symbol: Annotated[str, typer.Option(help="Canonical base symbol, e.g. BTC")] = "BTC",
+    output: Annotated[Path, typer.Option(help="Panel output directory")] = Path(
+        "data/carry/panel/bybit_btc"
+    ),
+    since_ms: Annotated[int, typer.Option(help="Range start (ms epoch, UTC)")] = 0,
+    until_ms: Annotated[int, typer.Option(help="Range end (ms epoch, UTC)")] = 0,
+    interval_minutes: Annotated[int, typer.Option(help="Bar interval")] = 60,
+    fixture_dir: Annotated[
+        Path | None,
+        typer.Option(help="Replay canned raw pages offline (fixture provenance)"),
+    ] = None,
+) -> None:
+    """Paginated klines+funding backfill into an executable HistoricalCarryPanel."""
+    from quant_trade.carry.panel_backfill import run_panel_backfill
+
+    fixtures: dict[str, str | Path] | None = None
+    if fixture_dir is not None:
+        fixtures = {
+            "spot": fixture_dir / "bybit_kline_spot.json",
+            "perp": fixture_dir / "bybit_kline_perp.json",
+            "mark": fixture_dir / "bybit_kline_mark.json",
+            "index": fixture_dir / "bybit_kline_index.json",
+            "funding": fixture_dir / "bybit_funding_history.json",
+        }
+    result = run_panel_backfill(
+        venue,
+        symbol,
+        output,
+        since_ms=since_ms,
+        until_ms=until_ms,
+        interval_minutes=interval_minutes,
+        fixture_pages=fixtures,
+    )
+    colour = "green" if result.status == "OK" else "yellow"
+    console.print(f"Panel backfill: [bold {colour}]{result.status}[/bold {colour}]")
+    console.print(f"  provenance: {result.provenance}")
+    if result.status == "OK":
+        console.print(
+            f"  pages={result.pages_fetched} settlements={result.settlements} "
+            f"panel_rows={result.panel_rows}"
+        )
+        console.print(f"  series: {result.rows_per_series}")
+        console.print(f"  panel: {result.panel_dir}")
+    else:
+        console.print(f"  error: {result.error}")
+    console.print("read-only backfill: no orders, no keys, no daemon")
+    raise typer.Exit(code=0 if result.status == "OK" else 1)
+
+
+@carry_app.command("panel-audit")
+def carry_panel_audit(
+    panel_dir: Annotated[Path, typer.Option(help="Panel directory (panel.jsonl + manifest)")],
+) -> None:
+    """Audit a built panel: coverage, gaps, settlements, provenance."""
+    from quant_trade.evidence.canonical_json import load_json
+    from quant_trade.evidence.receipts import resolve_dir_provenance
+
+    manifest = load_json(panel_dir / "panel_manifest.json")
+    prov = resolve_dir_provenance(panel_dir / "receipts.jsonl")
+    audit = manifest.get("audit", {})
+    table = Table(title="Historical carry panel audit")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    table.add_row("Rows", str(manifest.get("rows")))
+    table.add_row("Settlements", str(audit.get("settlements")))
+    table.add_row("Coverage", f"{float(audit.get('coverage_ratio', 0.0)):.3f}")
+    table.add_row("Missing bars", str(audit.get("missing_bars")))
+    table.add_row("Range", f"{audit.get('time_range_start')} → {audit.get('time_range_end')}")
+    table.add_row("Provenance (receipts)", prov.provenance)
+    console.print(table)
+    clean = bool(audit.get("is_clean")) and prov.provenance != "invalid"
+    colour = "green" if clean else "red"
+    console.print(f"Audit: [bold {colour}]{'CLEAN' if clean else 'PROBLEMS'}[/bold {colour}]")
+    for problem in list(audit.get("problems", [])) + prov.problems[:5]:
+        console.print(f"  - {problem}")
+    raise typer.Exit(code=0 if clean else 1)
+
+
 @carry_app.command("dataset-audit")
 def carry_dataset_audit(
     path: Annotated[Path, typer.Option(help="JSONL funding-history store")],

@@ -120,3 +120,29 @@ Next: V6-3 — canonical instrument catalog + collector mark/index fixes.
   ids. Suite: **607 passed, 12 xfailed** · ruff/mypy clean.
 
 Next: V6-4 — HistoricalCarryPanel (paginated klines+funding backfill).
+
+## CP4 — 2026-07-25T00:55Z — V6-4: HistoricalCarryPanel executable (defect F)
+
+- `carry/panel.py` (new): pure Bybit kline parsers (spot/perp/mark/index,
+  identity fail-closed, positive-price validation); `build_carry_panel`
+  joins the four series point-in-time — rows exist ONLY where every series
+  has a bar (gaps detected, NEVER forward-filled), settlements attached to
+  their exact instants, spread labelled `proxy_ohlcv_close` (never called
+  observed); audit with coverage/gaps; `panel_to_research_inputs` emits the
+  settlement-driven signal series (last SETTLED rate held between events).
+- `carry/panel_backfill.py` (new): paginated end-cursor backfill with
+  repeated-page detection, content-addressed raw pages + one ingestion
+  receipt per page, bounded retries, idempotent re-runs, NOT_RUN attempts
+  log. Live attempt executed: `NOT_RUN_NETWORK_BLOCKED` (proxy 403),
+  recorded in `data/carry/panel/bybit_btc/backfill_attempts.jsonl`.
+- `research.py`: new `source: panel` — provenance resolved from page
+  receipts (`resolve_dir_provenance`), settlements + settlement-driven
+  `signal_rates` flow into the ledger AND the cost stress.
+- CLI: `carry backfill-panel` (with `--fixture-dir` replay) and
+  `carry panel-audit`.
+- E2E proven on recorded pages: raw → receipts → panel → ledger →
+  research → artifacts → promotion (byte-for-byte reproduced, honestly
+  REJECTED because fixtures are TEST_ONLY). Defect F xfail removed.
+- 8 new tests. Suite: **616 passed, 11 xfailed** · ruff/mypy clean.
+
+Next: V6-5 — H1/H2 settlement signals everywhere + real H3 + DSR/PBO gates.
