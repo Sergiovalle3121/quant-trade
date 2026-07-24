@@ -299,3 +299,23 @@ and status lines.
 PAPER_READINESS READY · REAL_MONEY NO-GO · MINING_ECONOMICS NO-GO/NEEDS-INPUT ·
 MINING_TELEMETRY READY · MINING_HARDWARE_CONTROL DISABLED ·
 AWS_RESOURCES_CREATED FALSE.
+
+### CP6 — Post-report extension (Blocks A–F) — continued session
+
+At the repo owner's request, continued using the time budget to close the
+deferred follow-ups on draft PR #40:
+
+- **A** `quant-trade mining project` + `mining hashprice` CLI (dynamic NPV,
+  overstatement, hashprice divergence alert); projection config + tests.
+- **B** `quant-trade carry research` CLI (GO/NO-GO/NOT-RUN).
+- **C** carry stress scenarios (funding flip / depeg / withdrawal freeze /
+  exchange outage / extreme spread) and mining deterministic NPV-band scenario
+  matrix. **Fixed a real NPV/IRR division-by-zero** (daily-space bisection
+  underflow) — now annual-space; regression test added.
+- **D** `rolling_metrics` frequency parameter (no more hardcoded 252).
+- **F** `paper/parity_adapters.py` — parity report now runs on a real
+  `MultiAssetBacktestResult`, not just fixtures.
+
+**Validation after extension:** `ruff` pass; `python -m mypy src` (2.3.0) pass on
+218 files; `python -m pytest -q` → **441 passed** (+24 tests). PR #40 CI green on
+each pushed commit.

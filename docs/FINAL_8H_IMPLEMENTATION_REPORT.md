@@ -62,9 +62,9 @@ cash-and-carry docs/configs/fixtures) are in `main` via PR #39.
 | Check | Command | Result |
 | --- | --- | --- |
 | Lint | `ruff check .` | All checks passed |
-| Types | `python -m mypy src` (mypy 2.3.0, matches CI) | Success, 214 files |
+| Types | `python -m mypy src` (mypy 2.3.0, matches CI) | Success, 218 files |
 | Compile | `python -m compileall -q src tests` | OK |
-| Tests | `python -m pytest -q` | **417 passed** |
+| Tests | `python -m pytest -q` | **441 passed** |
 
 Baseline was 277 passed on `3d66ac6`; the session added ~140 tests across the
 merged and follow-up work (bootstrap, purged splits, ledger integrity, promotion
@@ -145,16 +145,40 @@ contract. `MINING_HARDWARE_CONTROL: DISABLED`;
 - Mining break-evens are reported at day-0 conditions (documented simplification)
   while NPV/IRR use the full varying series.
 
-## Findings not corrected (left for follow-up)
+## Post-report extension (Blocks A–F, same session)
 
-- V1 `mining/profitability.py` still exposes the single-point `_present_value`;
-  V2 `cashflow.py` supersedes it but the CLI has not been repointed.
-- `robustness.rolling_metrics` still annualizes with `252`; acceptable for a
-  daily diagnostic but should take a frequency argument.
-- No Monte-Carlo price bands in the mining projection (deliberately omitted — no
-  justified stochastic model without real data).
-- Parity report compares recorded records; wiring it to run both engines
-  end-to-end is not automated.
+After the initial report the session continued and closed most of the
+"not corrected" list:
+
+- **A — Mining CLI:** `quant-trade mining project` (dynamic NPV/IRR with the
+  constant-flow overstatement surfaced) and `quant-trade mining hashprice`
+  (direct vs bottom-up divergence alert), plus a projection config and
+  regression tests asserting the dynamic path.
+- **B — Carry CLI:** `quant-trade carry research` runs the campaign and prints
+  the GO/NO-GO/NOT-RUN verdict.
+- **C — Scenarios:** `carry/scenarios.py` (funding sign flip, depeg, withdrawal
+  freeze, exchange outage, extreme spread) and `mining/projection_scenarios.py`
+  (deterministic price/difficulty/energy NPV bands). **Fixed a latent NPV/IRR
+  bug** — `_irr` bisected in daily-rate space with a `-0.9` floor, underflowing
+  `(1+r)**horizon` to zero and dividing by zero for a profitable long-horizon
+  rig; now bisects in annual-rate space (regression test added).
+- **D — Frequency fix:** `robustness.rolling_metrics` now takes
+  `periods_per_year` (default 252, backward compatible) instead of a hardcoded
+  252.
+- **F — Parity on real engines:** `paper/parity_adapters.py` builds an
+  `ExecutionRecord` from a real `MultiAssetBacktestResult`, so the parity report
+  runs on actual engine output, not only fixtures.
+
+## Findings still open (deliberate)
+
+- V1 `mining/profitability.py` `_present_value` is retained for backward
+  compatibility; the `evaluate`/`break-even` CLI commands still use it, while the
+  new `project` command uses the dynamic model. Repointing the old commands is a
+  behavior change left for a reviewed follow-up.
+- No Monte-Carlo price bands (deterministic scenario bands are provided instead;
+  a fitted stochastic model is unjustified without real data).
+- The simulated-paper / broker-paper legs of parity still need real paper-run
+  frames; the adapter shape is ready, the live runs are not.
 
 ## External blockers
 
