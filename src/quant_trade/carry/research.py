@@ -118,7 +118,28 @@ def _load_snapshots(config: dict[str, Any]) -> tuple[list[CarrySnapshot], Datase
         snapshots = load_snapshots_from_json(path)
         manifest = build_dataset_manifest(path)
         return snapshots, manifest
-    raise ValueError(f"unsupported carry data source {source!r}; use 'synthetic' or 'json'")
+    if source == "jsonl_observations":
+        from quant_trade.carry.data import load_snapshots_from_records
+        from quant_trade.carry.store import observations_to_snapshot_records, read_store
+        from quant_trade.evidence.manifest import build_file_manifest
+
+        path = data_cfg["path"]
+        stored = read_store(path)
+        if stored.quarantined:
+            raise ValueError(
+                f"collected dataset {path} has {len(stored.quarantined)} quarantined "
+                "line(s); repair or re-collect before running research"
+            )
+        records = observations_to_snapshot_records(stored.records)
+        snapshots = load_snapshots_from_records(records)
+        manifest = build_file_manifest(
+            path, records, provenance_notes="point-in-time collector JSONL"
+        )
+        return snapshots, manifest
+    raise ValueError(
+        f"unsupported carry data source {source!r}; "
+        "use 'synthetic', 'json', or 'jsonl_observations'"
+    )
 
 
 def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:

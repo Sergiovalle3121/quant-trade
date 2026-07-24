@@ -67,8 +67,9 @@ def _snapshot_records(payload: Any) -> list[dict[str, Any]]:
     return records
 
 
-def build_dataset_manifest(
+def build_file_manifest(
     path: str | Path,
+    records: list[dict[str, Any]],
     *,
     timestamp_field: str = "captured_at_utc",
     symbol_field: str = "symbol",
@@ -76,11 +77,15 @@ def build_dataset_manifest(
     source_field: str = "data_source",
     provenance_notes: str = "",
 ) -> DatasetManifest:
-    """Read the dataset file's REAL BYTES and derive the manifest from them."""
+    """Manifest for pre-parsed records whose bytes live at ``path``.
+
+    The byte hash always covers the file's REAL bytes; the structural fields
+    come from the caller-parsed records (JSON list, JSONL bridge, etc.).
+    """
     p = Path(path)
     raw = p.read_bytes()
-    payload = load_json(p)
-    records = _snapshot_records(payload)
+    if not records:
+        raise ValueError("cannot build a manifest for zero records")
     timestamps = sorted(str(r.get(timestamp_field, "")) for r in records)
     symbols = tuple(sorted({str(r.get(symbol_field, "")) for r in records}))
     venues = tuple(sorted({str(r.get(venue_field, "")) for r in records}))
@@ -102,6 +107,30 @@ def build_dataset_manifest(
         data_source=data_source,
         source_name=", ".join(sorted(n for n in source_names if n)) or "unknown",
         captured_at_utc=timestamps[-1],
+        provenance_notes=provenance_notes,
+    )
+
+
+def build_dataset_manifest(
+    path: str | Path,
+    *,
+    timestamp_field: str = "captured_at_utc",
+    symbol_field: str = "symbol",
+    venue_field: str = "exchange",
+    source_field: str = "data_source",
+    provenance_notes: str = "",
+) -> DatasetManifest:
+    """Read a JSON dataset file's REAL BYTES and derive the manifest from them."""
+    p = Path(path)
+    payload = load_json(p)
+    records = _snapshot_records(payload)
+    return build_file_manifest(
+        p,
+        records,
+        timestamp_field=timestamp_field,
+        symbol_field=symbol_field,
+        venue_field=venue_field,
+        source_field=source_field,
         provenance_notes=provenance_notes,
     )
 

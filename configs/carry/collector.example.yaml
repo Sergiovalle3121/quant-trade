@@ -1,0 +1,25 @@
+# Point-in-time funding collector (read-only; one capture per invocation).
+#
+# Run one safe capture:
+#   quant-trade carry collect-once --config configs/carry/collector.example.yaml
+# Audit the accumulated dataset:
+#   quant-trade carry dataset-audit --path data/carry/funding_history.jsonl
+#
+# Scheduling repeated captures (cron/systemd) is an explicit operator choice;
+# nothing here daemonizes. The ccxt adapter uses PUBLIC endpoints only — no API
+# keys, no order methods. For offline tests use adapter: fake + fixture_path.
+
+adapter: ccxt              # "ccxt" (public endpoints) | "fake" (offline fixture)
+# fixture_path: tests/fixtures/carry_observations.json
+
+pairs:
+  - venue: binance
+    symbol: BTC
+  - venue: binance
+    symbol: ETH
+  - venue: okx
+    symbol: BTC
+
+output_path: data/carry/funding_history.jsonl
+timeout_seconds: 10
+max_retries: 2
