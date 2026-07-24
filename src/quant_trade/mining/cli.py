@@ -47,6 +47,19 @@ def _safety_metadata() -> dict[str, bool]:
     }
 
 
+#: The V1 evaluate/break-even/stress commands price a CONSTANT daily cash flow.
+#: The dynamic per-period engine (`mining project`) supersedes them; their
+#: output is retained for comparison but must never feed a promotion decision.
+_LEGACY_MARKER = {"legacy_non_promotable": True, "promotable_engine": "mining project"}
+
+
+def _warn_legacy() -> None:
+    console.print(
+        "[yellow]legacy_non_promotable=true[/yellow]: constant-flow V1 figures; "
+        "use `mining project` (dynamic engine) for any promotable decision"
+    )
+
+
 def _parse_as_of(value: str | None) -> datetime:
     if value is None:
         return datetime.now(UTC)
@@ -82,6 +95,7 @@ def mining_evaluate(
         "evaluations": [item.to_dict() for item in evaluations],
         "go_count": sum(item.decision == "GO" for item in evaluations),
         "evaluated_at_utc": evaluated_at.replace(microsecond=0).isoformat(),
+        **_LEGACY_MARKER,
         **_safety_metadata(),
     }
     _write_json_report(report, output, artifact_uri)
@@ -102,6 +116,7 @@ def mining_evaluate(
     console.print(f"Report: {output}")
     if artifact_uri is not None:
         console.print(f"Cloud report: {artifact_uri}")
+    _warn_legacy()
     console.print("authorized_to_start_miner=false cloud_resources_created=false")
 
 
@@ -144,10 +159,12 @@ def mining_break_even(
     report: dict[str, object] = {
         "break_even": break_even,
         "evaluated_at_utc": evaluated_at.replace(microsecond=0).isoformat(),
+        **_LEGACY_MARKER,
         **_safety_metadata(),
     }
     _write_json_report(report, output)
     console.print(f"Break-even report: {output}")
+    _warn_legacy()
     console.print("authorized_to_start_miner=false cloud_resources_created=false")
 
 
@@ -235,6 +252,86 @@ def mining_project_scenarios(
     console.print("authorized_to_start_miner=false hardware_control_enabled=false")
 
 
+@mining_app.command("rental-evaluate")
+def mining_rental_evaluate(
+    rental_config: Annotated[
+        Path, typer.Option(help="cloud_rental evaluation YAML (provider/SKU/policy)")
+    ],
+    market_config: Annotated[
+        Path, typer.Option(help="Projection YAML whose market block prices revenue")
+    ],
+    output: Annotated[Path | None, typer.Option(help="Write the decision JSON here")] = None,
+    evaluated_at_utc: Annotated[
+        str | None, typer.Option(help="Evaluation clock (defaults to now UTC)")
+    ] = None,
+) -> None:
+    """Evaluate GENERIC CLOUD COMPUTE rental for hashing, fail-closed.
+
+    Deployment models are kept separate: owned hardware uses `mining project`;
+    hosted-ASIC rental providers are a documented extension contract only (not
+    implemented — no external marketplace is called); this command covers
+    generic cloud compute via the cloud_rental policy/benchmark/economics gates.
+    Market freshness is RECOMPUTED from captured_at against the evaluation
+    clock, and a direct-vs-bottom-up hashprice divergence fails closed.
+    """
+    from quant_trade.cloud_rental.catalog import load_rental_config
+    from quant_trade.cloud_rental.feasibility import feasibility_matrix
+    from quant_trade.evidence.canonical_json import atomic_write_json
+    from quant_trade.mining.market import require_fresh
+
+    now = evaluated_at_utc or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _rig, market, _assumptions = load_projection_config(market_config)
+    try:
+        require_fresh(market, evaluated_at_utc=now)
+    except ValueError as exc:
+        console.print(f"[bold red]market snapshot rejected:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+    comparison = compare_hashprice(market)
+    if comparison.diverges:
+        console.print(f"[bold red]ALERT[/bold red]: {comparison.alert}")
+        console.print("hashprice sources disagree; failing closed — no evaluation")
+        raise typer.Exit(code=1)
+    hashprice = bottom_up_hashprice(market)
+
+    loaded = load_rental_config(rental_config)
+    revenue = dict(loaded.get("revenue") or {})
+    revenue["hashprice_usd_per_th_day"] = hashprice
+    loaded["revenue"] = revenue
+    decision = feasibility_matrix([loaded], evaluated_at_utc=now)[0]
+
+    colour = "green" if decision.status.endswith("CANDIDATE") else "red"
+    console.print(
+        f"{decision.provider} / hashing (generic_cloud_compute): "
+        f"[bold {colour}]{decision.status}[/bold {colour}]"
+    )
+    for label, reason in (
+        ("policy", decision.policy_reason),
+        ("benchmark", decision.benchmark_reason),
+        ("economics", decision.economic_reason),
+    ):
+        if reason:
+            console.print(f"  {label}: {reason}")
+    console.print(
+        f"market: {market.source_name} captured_at={market.captured_at_utc} "
+        f"bottom_up_hashprice={hashprice:.4f} USD/TH/day"
+    )
+    if output is not None:
+        atomic_write_json(
+            output,
+            {
+                "deployment_model": "generic_cloud_compute",
+                "market_source": market.source_name,
+                "market_captured_at_utc": market.captured_at_utc,
+                "bottom_up_hashprice_usd_per_th_day": hashprice,
+                **decision.to_dict(),
+            },
+        )
+        console.print(f"Decision: {output}")
+    console.print("deployment_model=generic_cloud_compute miner_execution=false")
+    console.print("authorized_to_start_miner=false cloud_resources_created=false")
+    raise typer.Exit(code=0 if colour == "green" else 1)
+
+
 @mining_app.command("hashprice")
 def mining_hashprice(
     config: Annotated[Path, typer.Option(help="Projection YAML (uses its market block)")],
@@ -283,8 +380,10 @@ def mining_stress(
         "scenarios": [item.to_dict() for item in scenarios],
         "no_go_count": sum(item.evaluation.decision == "NO-GO" for item in scenarios),
         "evaluated_at_utc": evaluated_at.replace(microsecond=0).isoformat(),
+        **_LEGACY_MARKER,
         **_safety_metadata(),
     }
     _write_json_report(report, output)
     console.print(f"Stress report: {output}")
+    _warn_legacy()
     console.print("authorized_to_start_miner=false cloud_resources_created=false")

@@ -114,7 +114,6 @@ def test_defect_d_basis_convergence_enters_pnl():
 # --- Defect E: mining freshness trusts a caller-supplied staleness --------
 
 
-@pytest.mark.xfail(reason="defect E: staleness not recomputed from captured_at", strict=True)
 def test_defect_e_old_snapshot_with_zero_staleness_fails():
     from quant_trade.mining.market import require_fresh
 
@@ -136,7 +135,6 @@ def test_defect_e_old_snapshot_with_zero_staleness_fails():
         require_fresh(stale_but_lying, evaluated_at_utc="2026-07-24T00:00:00Z")
 
 
-@pytest.mark.xfail(reason="defect E: future snapshots not rejected", strict=True)
 def test_defect_e_future_snapshot_fails():
     from quant_trade.mining.market import require_fresh
 

@@ -171,12 +171,44 @@ def load_market_from_json(path: str | Path) -> MiningMarketData:
     return load_market_from_record(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
-def require_fresh(data: MiningMarketData) -> MiningMarketData:
-    """Fail closed on a stale snapshot before it feeds any economic decision."""
-    if data.is_stale:
+def compute_staleness_seconds(data: MiningMarketData, evaluated_at_utc: str) -> float:
+    """Age RECOMPUTED from ``captured_at_utc`` against an explicit clock.
+
+    The snapshot's own ``staleness_seconds`` field is informational only and is
+    deliberately ignored here — a caller-supplied zero can never make an old
+    snapshot look fresh. Naive timestamps are rejected; a future ``captured_at``
+    raises immediately.
+    """
+    from quant_trade.carry.quality import parse_utc
+
+    captured = parse_utc(data.captured_at_utc)
+    now = parse_utc(evaluated_at_utc)
+    age = (now - captured).total_seconds()
+    if age < 0:
+        raise ValueError(
+            f"market snapshot from {data.source_name} is dated in the future "
+            f"({data.captured_at_utc} vs evaluated_at {evaluated_at_utc})"
+        )
+    return age
+
+
+def require_fresh(
+    data: MiningMarketData, *, evaluated_at_utc: str | None = None
+) -> MiningMarketData:
+    """Fail closed on a stale snapshot before it feeds any economic decision.
+
+    Freshness is recomputed from ``captured_at_utc`` against
+    ``evaluated_at_utc`` (defaults to the current UTC wall clock; tests inject
+    a deterministic clock). The stored ``staleness_seconds`` is never trusted.
+    """
+    if evaluated_at_utc is None:
+        evaluated_at_utc = utc_now_iso()
+    age = compute_staleness_seconds(data, evaluated_at_utc)
+    if age > data.max_age_seconds:
         raise ValueError(
             f"market snapshot from {data.source_name} is stale "
-            f"({data.staleness_seconds:.0f}s > {data.max_age_seconds:.0f}s)"
+            f"({age:.0f}s > {data.max_age_seconds:.0f}s, recomputed from "
+            f"captured_at={data.captured_at_utc})"
         )
     return data
 
