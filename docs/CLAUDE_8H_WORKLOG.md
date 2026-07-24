@@ -277,3 +277,25 @@ Doc: `docs/PAPER_READINESS_V3.md`.
 
 **Next task:** Phase 5 — final full validation, clean-tree/secrets check, and
 `docs/FINAL_8H_IMPLEMENTATION_REPORT.md`.
+
+### CP5 — Final validation + report (Phase 5 complete) — 2026-07-24T08:20Z
+
+**Task finished:** final delivery.
+
+Final validation on `e4021de`:
+- `ruff check .` → All checks passed
+- `python -m mypy src` (2.3.0) → Success, 214 files
+- `python -m compileall -q src tests` → OK
+- `python -m pytest -q` → **417 passed**
+
+Cleanliness: working tree clean; `git diff --check` clean; no secrets in new
+modules (scan clean); no `.env` / market data / large outputs added; follow-up
+diff vs `main` is exactly the Phase 3–4 files (+2,181 lines, 16 files).
+
+Deliverable: `docs/FINAL_8H_IMPLEMENTATION_REPORT.md` with all required sections
+and status lines.
+
+**Final statuses:** STATISTICAL_INTEGRITY PASS · TRADING_EDGE NO-GO/NOT-RUN ·
+PAPER_READINESS READY · REAL_MONEY NO-GO · MINING_ECONOMICS NO-GO/NEEDS-INPUT ·
+MINING_TELEMETRY READY · MINING_HARDWARE_CONTROL DISABLED ·
+AWS_RESOURCES_CREATED FALSE.
