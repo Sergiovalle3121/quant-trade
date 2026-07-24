@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from itertools import product
 from typing import Any
 
@@ -8,6 +9,10 @@ import pandas as pd
 from quant_trade.backtest.costs import CostModel
 from quant_trade.backtest.multi_asset import run_multi_asset_backtest
 from quant_trade.execution.bar_model import BarExecutionPolicy
+from quant_trade.research.bootstrap import (
+    bootstrap_confidence_intervals,
+    moving_block_bootstrap,
+)
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 
@@ -101,15 +106,83 @@ def rolling_metrics(
     return e
 
 
+def bootstrap_summary(
+    returns: pd.Series,
+    *,
+    method: str = "stationary",
+    samples: int = 1000,
+    block_size: int = 20,
+    seed: int = 12345,
+    percentiles: tuple[float, ...] = (2.5, 50.0, 97.5),
+) -> dict[str, Any]:
+    """A JSON-serialisable block-bootstrap confidence interval for evidence.
+
+    Emits the per-period total-return and Sharpe percentile bands plus the
+    metadata needed to reproduce them (method, seed, samples, block size,
+    observations). Insufficient data yields ``available: False`` instead of a
+    misleading interval, so promotion gates can fail closed.
+    """
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    meta = {
+        "method": method,
+        "samples": int(samples),
+        "block_size": int(block_size),
+        "seed": int(seed),
+        "observations": int(len(clean)),
+        "annualized": False,
+    }
+    if len(clean) < 2:
+        return {**meta, "available": False, "reason": "insufficient observations"}
+    ci = bootstrap_confidence_intervals(
+        clean,
+        method=method,  # type: ignore[arg-type]
+        samples=samples,
+        seed=seed,
+        block_size=block_size,
+        percentiles=percentiles,
+        nan_policy="drop",
+    )
+    lo, hi = f"p{percentiles[0]:g}", f"p{percentiles[-1]:g}"
+    return {
+        **meta,
+        "available": True,
+        "total_return": {
+            "point_estimate": float(ci.loc["total_return", "point_estimate"]),
+            "lower": float(ci.loc["total_return", lo]),
+            "upper": float(ci.loc["total_return", hi]),
+        },
+        "sharpe_per_period": {
+            "point_estimate": float(ci.loc["sharpe", "point_estimate"]),
+            "lower": float(ci.loc["sharpe", lo]),
+            "upper": float(ci.loc["sharpe", hi]),
+        },
+        # Positive lower bound on total return = the resampled paths stay
+        # profitable across the confidence level, not just at the point estimate.
+        "total_return_lower_positive": bool(ci.loc["total_return", lo] > 0.0),
+    }
+
+
 def simple_bootstrap_or_block_bootstrap(
-    returns: pd.Series, samples: int = 100, block_size: int = 20
+    returns: pd.Series, samples: int = 100, block_size: int = 20, seed: int = 0
 ) -> pd.DataFrame:
-    rows = []
-    clean = returns.dropna().reset_index(drop=True)
-    if clean.empty:
+    """Deprecated. Use :mod:`quant_trade.research.bootstrap` instead.
+
+    The original implementation ignored ``block_size`` and did IID sampling.
+    This shim now delegates to the real moving-block bootstrap so historical
+    callers get correct behaviour, but new code should call the explicit APIs.
+    """
+    warnings.warn(
+        "simple_bootstrap_or_block_bootstrap is deprecated; use "
+        "quant_trade.research.bootstrap.moving_block_bootstrap or "
+        "bootstrap_confidence_intervals",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    if len(clean) < 2:
         return pd.DataFrame(columns=["sample", "total_return"])
-    for i in range(samples):
-        draws = clean.sample(n=len(clean), replace=True, random_state=i).to_numpy()
-        rows.append({"sample": i, "total_return": float((1 + draws).prod() - 1)})
-    return pd.DataFrame(rows)
+    draws = moving_block_bootstrap(
+        clean, samples=samples, block_size=block_size, seed=seed, nan_policy="drop"
+    )
+    return draws[["sample", "total_return"]].copy()
 

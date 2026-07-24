@@ -17,7 +17,12 @@ from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_jso
 from quant_trade.reporting.research_report import generate_research_summary
 from quant_trade.research.benchmarks import compare_to_benchmark, run_benchmark
 from quant_trade.research.ledger import append_trial
-from quant_trade.research.robustness import cost_sensitivity, rolling_metrics, subperiod_analysis
+from quant_trade.research.robustness import (
+    bootstrap_summary,
+    cost_sensitivity,
+    rolling_metrics,
+    subperiod_analysis,
+)
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 
@@ -228,6 +233,17 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
     test_returns = r_test.equity_curve["equity"].astype(float).pct_change().dropna()
     moments = return_moments(test_returns)
     psr = probabilistic_sharpe_ratio(test_returns)
+    # Block-bootstrap confidence interval on the OOS returns. Serial dependence
+    # is preserved (stationary bootstrap), so the band is honest for
+    # autocorrelated equity curves. Recorded as promotable evidence.
+    bcfg_boot = rob.get("bootstrap", {}) if isinstance(rob.get("bootstrap", {}), dict) else {}
+    bootstrap_ci = bootstrap_summary(
+        test_returns,
+        method=str(bcfg_boot.get("method", "stationary")),
+        samples=int(bcfg_boot.get("samples", 2000)),
+        block_size=int(bcfg_boot.get("block_size", 20)),
+        seed=int(bcfg_boot.get("seed", 12345)),
+    )
     execution_test = _execution_summary(r_test.order_events, r_test.trades)
     results_payload = {
         "experiment_name": config["experiment_name"],
@@ -249,6 +265,7 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         "train_range": [str(train.timestamp.min()), str(train.timestamp.max())],
         "test_range": [str(test.timestamp.min()), str(test.timestamp.max())],
         "robustness": robustness_flags,
+        "bootstrap": bootstrap_ci,
         "dataset_binding": dataset_binding,
         "execution_test": execution_test,
     }
