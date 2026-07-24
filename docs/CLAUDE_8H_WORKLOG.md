@@ -194,3 +194,138 @@ Configs: `configs/carry/cash_and_carry_synthetic.yaml`,
 hashprice + bottom-up, dynamic per-period cash flow with difficulty growth /
 halvings, electricity tariffs, pool models) and read-only telemetry/inventory/
 ledger. Hardware control stays disabled.
+
+### CP3 — Mining economics V2 + telemetry (Phase 3 complete) — 2026-07-24T07:40Z
+
+**Task finished:** the mining economics V2 + read-only telemetry track.
+
+New modules under `src/quant_trade/mining/`:
+- `market.py` — attributable `MiningMarketData`; two revenue methods
+  (`direct_hashprice`, `bottom_up_hashprice`) with `compare_hashprice`
+  divergence alerts; fail-closed staleness; read-only adapter + fake + validator.
+- `cashflow.py` — `project_mining_cashflow`: **fixes the constant-cash-flow NPV
+  defect**. Per-day difficulty growth, scheduled halvings (subsidy halves, tx
+  fees don't), price drift/scenarios, uptime/hashrate degradation, energy
+  inflation, repair CAPEX, tax. Reports cash vs accounting profit, NPV, IRR,
+  discounted payback, production cost, break-evens, and the V1
+  `constant_flow_npv` overstatement.
+- `tariffs.py` — flat/TOU/demand-charge/PUE/curtailment/hosting tariffs; CFE
+  receipt template (never a hardcoded universal rate).
+- `pool.py` — PPS/FPPS/PPS+/PPLNS payout economics with fees, stale/reject,
+  variance flag, and counterparty-risk score.
+- `telemetry.py` — read-only inventory/telemetry/alerts/watch-only
+  reconciliation/operating ledger. `AUTHORIZED_TO_START_MINER`,
+  `HARDWARE_CONTROL_ENABLED`, `WALLET_SIGNING_ENABLED` hard-wired `False` (tested);
+  adapter protocol has no control verbs (tested).
+
+**Defect-fix evidence (S21-like rig, 3% monthly difficulty growth, mid-horizon
+halving, 3-year):** dynamic NPV −$5,029 vs V1 constant-flow NPV −$1,068 — a
+**$3,961 overstatement removed**. Production cost $65,745/coin vs $60k price →
+honest NO-GO; no profitability invented.
+
+**Tests executed:** `ruff check .` pass; `python -m mypy src` (2.3.0) pass on 211
+files; `python -m pytest -q` → **399 passed** (+38 mining tests).
+
+Docs: `docs/MINING_ECONOMICS_V2.md`, `docs/MINING_TELEMETRY.md`.
+
+**Result:** `MINING_ECONOMICS: NO-GO / NEEDS-INPUT` (real snapshot + tariff +
+pool required for a GO); `MINING_TELEMETRY: READY` (read-only);
+`MINING_HARDWARE_CONTROL: DISABLED`.
+
+**Note:** PR #39 was manually marked ready-for-review by the repo owner; left as
+they set it (no auto-merge configured), CI kept green.
+
+**Next task:** Phase 4 — realistic execution mandatory for promotable evidence
+(largely done in Phase 1.4), parity report (backtest vs sim paper vs broker
+paper), paper-readiness V3.
+
+### Merge event — PR #39 squash-merged into main — 2026-07-24T07:45Z
+
+The repo owner marked PR #39 ready and squash-merged it into `main` (as
+`cf97401`) while Phase 3 was still local. Per the merged-PR protocol, the branch
+was restarted from the new `main` and the single unmerged follow-up commit
+(mining V2) was cherry-picked on top — no already-merged history stacked, no
+existing work overwritten (verified `e08fb85` tree == `main` tree). Follow-up
+work now lives on a **new draft PR #40**; the merged PR #39 is final and was not
+reused.
+
+### CP4 — Paper parity + readiness (Phase 4 complete) — 2026-07-24T08:05Z
+
+**Task finished:** the research/paper parity + promotion-gate track.
+
+- **4.1 Realistic execution mandatory** — already enforced in Phase 1.4: the
+  runner stamps the execution policy + hash into `results.json` and applies the
+  same policy to strategy and benchmark; the V2 gate makes a missing policy
+  NOT PROMOTABLE (no unlimited-fill fallback), plus fill-rate/incomplete gates.
+- **4.2 Parity report** (`paper/parity.py`): `compare_executions` /
+  `three_way_parity` compare backtest vs simulated-paper vs broker-paper field
+  by field (weights, quantities, fills, prices, fees, slippage, partials,
+  cancellations, positions, cash, equity, drift) with an explainable status per
+  field. Broker-paper is built from recorded fills — never a live call.
+- **4.3 Readiness V3** (`paper/readiness.py`): fail-closed checks (paper-only
+  broker, exporter, recovery, kill switch, orphan detection, heartbeat,
+  reconciliation) → `READY_FOR_PAPER_TRIAL` / `NOT_READY`, never real money,
+  `trial_days_completed` always 0 (no fabricated elapsed days), plus a generated
+  runbook + manual checklist.
+
+**Tests executed:** `ruff` pass; `python -m mypy src` (2.3.0) pass on 214 files;
+`python -m pytest -q` → **417 passed** (+11 parity/readiness tests).
+
+Doc: `docs/PAPER_READINESS_V3.md`.
+
+**Result:** `PAPER_READINESS: READY` (for a supervised paper trial only).
+
+**Next task:** Phase 5 — final full validation, clean-tree/secrets check, and
+`docs/FINAL_8H_IMPLEMENTATION_REPORT.md`.
+
+### CP5 — Final validation + report (Phase 5 complete) — 2026-07-24T08:20Z
+
+**Task finished:** final delivery.
+
+Final validation on `e4021de`:
+- `ruff check .` → All checks passed
+- `python -m mypy src` (2.3.0) → Success, 214 files
+- `python -m compileall -q src tests` → OK
+- `python -m pytest -q` → **417 passed**
+
+Cleanliness: working tree clean; `git diff --check` clean; no secrets in new
+modules (scan clean); no `.env` / market data / large outputs added; follow-up
+diff vs `main` is exactly the Phase 3–4 files (+2,181 lines, 16 files).
+
+Deliverable: `docs/FINAL_8H_IMPLEMENTATION_REPORT.md` with all required sections
+and status lines.
+
+**Final statuses:** STATISTICAL_INTEGRITY PASS · TRADING_EDGE NO-GO/NOT-RUN ·
+PAPER_READINESS READY · REAL_MONEY NO-GO · MINING_ECONOMICS NO-GO/NEEDS-INPUT ·
+MINING_TELEMETRY READY · MINING_HARDWARE_CONTROL DISABLED ·
+AWS_RESOURCES_CREATED FALSE.
+
+### CP6 — Post-report extension (Blocks A–F) — continued session
+
+At the repo owner's request, continued using the time budget to close the
+deferred follow-ups on draft PR #40:
+
+- **A** `quant-trade mining project` + `mining hashprice` CLI (dynamic NPV,
+  overstatement, hashprice divergence alert); projection config + tests.
+- **B** `quant-trade carry research` CLI (GO/NO-GO/NOT-RUN).
+- **C** carry stress scenarios (funding flip / depeg / withdrawal freeze /
+  exchange outage / extreme spread) and mining deterministic NPV-band scenario
+  matrix. **Fixed a real NPV/IRR division-by-zero** (daily-space bisection
+  underflow) — now annual-space; regression test added.
+- **D** `rolling_metrics` frequency parameter (no more hardcoded 252).
+- **F** `paper/parity_adapters.py` — parity report now runs on a real
+  `MultiAssetBacktestResult`, not just fixtures.
+
+- **G** `quant-trade mining project-scenarios` (NPV band matrix) + `carry
+  scenarios` CLI; top-level CLI smoke test guarding subcommand registration.
+- **H** `quant-trade selection promote-v2` (recompute-from-artifacts gate) and
+  `research ledger-report` (integrity audit) CLI, with an end-to-end test that
+  runs a real experiment then exercises both; `evaluate_promotion_v2` gained an
+  `approval_notes` override.
+- **I** telemetry `load_samples_from_json` + read-only `fleet_report`
+  (per-facility rollups + per-rig alerts + safety posture).
+
+**Validation after extension:** `ruff` pass; `python -m mypy src` (2.3.0) pass on
+218 files; `python -m pytest -q` → **452 passed** (+35 tests). PR #40 CI green on
+each pushed commit. All new CLI is research-only: no orders, hardware control
+disabled, real money NO-GO.

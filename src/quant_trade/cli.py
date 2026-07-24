@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from quant_trade.backtest.engine import BacktestEngine
+from quant_trade.carry.cli import carry_app
 from quant_trade.cloud.entrypoint import cloud_app
 from quant_trade.config import get_settings
 from quant_trade.data.cache import list_cache, write_cache
@@ -47,12 +48,52 @@ app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
 app.add_typer(mining_app, name="mining")
+app.add_typer(carry_app, name="carry")
 app.add_typer(stress_app, name="stress")
 console = Console()
 
 
 def _strategy_help() -> str:
     return "Strategy name: " + ", ".join(sorted(STRATEGY_REGISTRY))
+
+
+@app.command("status")
+def status(
+    outputs_dir: Annotated[
+        Path | None, typer.Option(help="Scan this dir for promotion decision JSONs")
+    ] = None,
+    carry_decision: Annotated[str | None, typer.Option(help="Cash-and-carry verdict")] = None,
+    mining_decision: Annotated[str | None, typer.Option(help="Mining economics verdict")] = None,
+    paper_readiness: Annotated[str | None, typer.Option(help="Paper readiness verdict")] = None,
+    output: Annotated[Path | None, typer.Option(help="Write the scorecard markdown here")] = None,
+) -> None:
+    """Print the consolidated verdict scorecard (safety posture + verdicts)."""
+    from quant_trade.reporting.session_scorecard import (
+        build_session_scorecard,
+        load_promotion_decisions,
+        render_markdown,
+    )
+
+    promotions = load_promotion_decisions(outputs_dir) if outputs_dir is not None else []
+    scorecard = build_session_scorecard(
+        promotions=promotions,
+        carry_decision=carry_decision,
+        mining_decision=mining_decision,
+        paper_readiness=paper_readiness,
+    )
+    for name, value in scorecard.fixed_statuses.items():
+        console.print(f"[bold]{name}[/bold]: {value}")
+    table = Table(title="Verdict scorecard")
+    table.add_column("Signal")
+    table.add_column("Status")
+    table.add_column("Detail")
+    for row in scorecard.rows:
+        table.add_row(row.name, row.status, row.detail)
+    console.print(table)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(render_markdown(scorecard), encoding="utf-8")
+        console.print(f"Scorecard: {output}")
 
 
 def _print_metrics(
@@ -391,6 +432,71 @@ def selection_promote(
         raw["status"] = "paper_ready"
     save_promotion_report(candidate_file.parent / f"promotion_{cand.candidate_id}.json", report)
     console.print(f"Promotion status: {report.overall_status}")
+
+
+@selection_app.command("promote-v2")
+def selection_promote_v2(
+    run_dir: Annotated[Path, typer.Option(help="Research run dir containing results.json")],
+    policy: Annotated[Path, typer.Option(help="conservative_v2 policy YAML")] = Path(
+        "configs/selection/conservative_v2.yaml"
+    ),
+    ledger_dir: Annotated[
+        Path | None, typer.Option(help="Trial ledger dir (defaults to run_dir parent)")
+    ] = None,
+    approval_notes: Annotated[str, typer.Option(help="Human approval notes")] = "",
+    output: Annotated[Path | None, typer.Option(help="Where to write the decision JSON")] = None,
+) -> None:
+    """Recompute evidence from artifacts and apply the conservative V2 gate."""
+    from quant_trade.research.promotion_v2 import (
+        PromotionPolicyV2,
+        evaluate_promotion_v2,
+        save_promotion_decision,
+    )
+
+    pol = PromotionPolicyV2.from_yaml(policy)
+    decision = evaluate_promotion_v2(
+        run_dir, pol, ledger_dir=ledger_dir, approval_notes=approval_notes or None
+    )
+    colour = "green" if decision.status == "paper_candidate" else "red"
+    console.print(f"Decision: [bold {colour}]{decision.status}[/bold {colour}]")
+    console.print("real_money_authorized=False (never)")
+    table = Table(title="Conservative V2 gate (recomputed from artifacts)")
+    table.add_column("Gate")
+    table.add_column("Result")
+    for gate in decision.gates:
+        table.add_row(gate.name, "PASS" if gate.passed else "FAIL")
+    console.print(table)
+    if decision.failed_gates:
+        console.print(f"Failed: {', '.join(decision.failed_gates)}")
+    if output is not None:
+        save_promotion_decision(output, decision)
+        console.print(f"Decision report: {output}")
+
+
+@research_app.command("ledger-report")
+def research_ledger_report(
+    outputs_dir: Annotated[Path, typer.Option(help="Directory containing trial_ledger.jsonl")],
+) -> None:
+    """Audit the trial ledger: counts, corruption, and the DSR trial basis."""
+    from quant_trade.research.ledger import ledger_integrity_report
+
+    report = ledger_integrity_report(outputs_dir)
+    status = "INTACT" if report.is_intact else "CORRUPT"
+    colour = "green" if report.is_intact else "red"
+    console.print(f"Ledger: [bold {colour}]{status}[/bold {colour}] ({report.path})")
+    table = Table(title="Trial ledger integrity")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    table.add_row("Valid records", str(report.valid_records))
+    table.add_row("Corrupt lines", str(report.corrupt_lines))
+    table.add_row("Hypotheses", str(report.n_hypotheses))
+    table.add_row("Attempts", str(report.n_attempts))
+    table.add_row("Valid observations", str(report.n_valid_observations))
+    table.add_row("Failed / discarded", f"{report.n_failed} / {report.n_discarded}")
+    table.add_row("Effective DSR trials", str(report.effective_trial_count))
+    console.print(table)
+    for note in report.notes:
+        console.print(f"[yellow]note:[/yellow] {note}")
 
 
 @paper_app.command("init")

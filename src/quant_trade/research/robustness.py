@@ -93,15 +93,28 @@ def subperiod_analysis(equity_curve: pd.DataFrame) -> pd.DataFrame:
 
 
 def rolling_metrics(
-    equity_curve: pd.DataFrame, windows: tuple[int, ...] = (63, 126, 252)
+    equity_curve: pd.DataFrame,
+    windows: tuple[int, ...] = (63, 126, 252),
+    periods_per_year: float = 252.0,
 ) -> pd.DataFrame:
+    """Rolling return/volatility/drawdown.
+
+    ``periods_per_year`` sets the volatility annualization factor
+    (``sqrt(periods_per_year)``). It defaults to 252 (daily) for backward
+    compatibility, but must match the data's real frequency — e.g. 52 for weekly
+    or 1095 for 8-hour funding intervals — otherwise the annualized volatility is
+    wrong.
+    """
     if equity_curve.empty:
         return pd.DataFrame()
+    if periods_per_year <= 0:
+        raise ValueError("periods_per_year must be > 0")
     e = equity_curve[["timestamp", "equity"]].copy()
     ret = e["equity"].pct_change()
+    annualization = periods_per_year**0.5
     for w in windows:
         e[f"rolling_{w}_return"] = e["equity"].pct_change(w)
-        e[f"rolling_{w}_volatility"] = ret.rolling(w).std() * (252**0.5)
+        e[f"rolling_{w}_volatility"] = ret.rolling(w).std() * annualization
         e[f"rolling_{w}_drawdown"] = e["equity"] / e["equity"].rolling(w).max() - 1
     return e
 

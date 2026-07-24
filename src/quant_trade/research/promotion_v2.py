@@ -118,8 +118,13 @@ def evaluate_promotion_v2(
     *,
     ledger_dir: str | Path | None = None,
     candidate: CandidateStrategy | None = None,
+    approval_notes: str | None = None,
 ) -> PromotionDecisionV2:
-    """Recompute all evidence from artifacts and apply the conservative gate."""
+    """Recompute all evidence from artifacts and apply the conservative gate.
+
+    ``approval_notes`` (if given) overrides the candidate's notes, so a caller
+    can supply human sign-off without constructing a full candidate object.
+    """
     run_dir = Path(run_dir)
     ledger_dir = Path(ledger_dir) if ledger_dir is not None else run_dir.parent
     candidate_id = candidate.candidate_id if candidate else run_dir.name
@@ -260,7 +265,11 @@ def evaluate_promotion_v2(
         f"OOS incomplete-order rate must be <= {policy.max_incomplete_order_rate:.0%}",
     )
     if policy.require_approval_notes:
-        has_notes = bool(candidate and candidate.approval_notes.strip())
+        effective_notes = (
+            approval_notes if approval_notes is not None
+            else (candidate.approval_notes if candidate else "")
+        )
+        has_notes = bool(effective_notes.strip())
         add(
             "human_approval_notes",
             has_notes,
