@@ -33,7 +33,8 @@ def _obs(minute: int, *, venue="binance", symbol="BTC", spot=64000.0, perp=64010
 
 
 def _campaign_config(path) -> dict:
-    cfg = yaml.safe_load(open("configs/carry/cash_and_carry_synthetic.yaml"))
+    with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
+        cfg = yaml.safe_load(fh)
     cfg["data"] = {"source": "jsonl_observations", "path": str(path)}
     cfg["signal"] = {"entry_threshold": -1.0, "trailing_window": 1}
     return cfg
@@ -42,7 +43,6 @@ def _campaign_config(path) -> dict:
 # --- P0-A: strict economic identity ---------------------------------------
 
 
-@pytest.mark.xfail(reason="P0-A: mixed instruments share one return series", strict=True)
 def test_p0a_mixed_symbols_fail_closed(tmp_path):
     # Alternating BTC (64k) and ETH (3k) observations in one store: global
     # timestamp ordering would compute 64k->3k "price moves" as basis P&L.
@@ -57,7 +57,6 @@ def test_p0a_mixed_symbols_fail_closed(tmp_path):
         run_carry_research(_campaign_config(store))
 
 
-@pytest.mark.xfail(reason="P0-A: mixed venues share one return series", strict=True)
 def test_p0a_mixed_venues_fail_closed(tmp_path):
     store = tmp_path / "mixed_venues.jsonl"
     rows = []
@@ -73,7 +72,6 @@ def test_p0a_mixed_venues_fail_closed(tmp_path):
 # --- P0-B: polls are not settlements ---------------------------------------
 
 
-@pytest.mark.xfail(reason="P0-B: every poll accrues funding as if settled", strict=True)
 def test_p0b_ninety_polls_are_not_ninety_settlements(tmp_path):
     # 90 polls of the SAME 8h funding rate, five minutes apart. The position
     # can only ever collect that funding ONCE (at the settlement); today each
@@ -89,3 +87,102 @@ def test_p0b_ninety_polls_are_not_ninety_settlements(tmp_path):
         f"90 polls accrued {total_funding:.4f} of funding; at most one settlement "
         "(0.001) fits in the window"
     )
+
+
+# --- adversarial semantics (V5-1) ------------------------------------------
+
+
+def test_settlement_accrues_exactly_once_and_dedups(tmp_path):
+    import dataclasses
+
+    store = tmp_path / "with_settlement.jsonl"
+    rows = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60, rate=0.001) for i in range(24)]
+    settlement = dataclasses.replace(
+        _obs(minute=0, hour=1, rate=0.001), source_event="funding_settlement"
+    )
+    append_observations(store, rows)
+    # append the settlement twice: dedup by funding time keeps one
+    r1 = append_observations(store, [settlement])
+    r2 = append_observations(store, [settlement])
+    assert r1.appended == 1 and r2.appended == 0
+    result = run_carry_research(_campaign_config(store))
+    total_funding = float(result.net_return_series["funding_pnl"].sum())
+    assert abs(total_funding - 0.001) < 1e-12
+
+
+def test_prediction_never_enters_realized_pnl(tmp_path):
+    import dataclasses
+
+    store = tmp_path / "with_prediction.jsonl"
+    rows = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60, rate=0.0) for i in range(24)]
+    prediction = dataclasses.replace(
+        _obs(minute=30, hour=0, rate=0.05), source_event="funding_prediction"
+    )
+    append_observations(store, rows + [prediction])
+    result = run_carry_research(_campaign_config(store))
+    assert float(result.net_return_series["funding_pnl"].sum()) == 0.0
+
+
+def test_raw_tamper_invalidates_observation():
+    import hashlib
+
+    from quant_trade.carry.store import verify_raw_payload
+
+    raw = b'{"fundingRate":"0.0001"}'
+    record = {"raw_sha256": hashlib.sha256(raw).hexdigest()}
+    assert verify_raw_payload(record, raw)
+    assert not verify_raw_payload(record, raw + b" ")
+    assert not verify_raw_payload({"raw_sha256": ""}, raw)
+
+
+def test_concurrent_collectors_do_not_duplicate(tmp_path):
+    import threading
+
+    store = tmp_path / "concurrent.jsonl"
+    rows = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60) for i in range(30)]
+    threads = [
+        threading.Thread(target=append_observations, args=(store, rows)) for _ in range(4)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    from quant_trade.carry.store import read_store
+
+    stored = read_store(store)
+    assert len(stored.records) == 30  # no duplicates, no torn lines
+    assert stored.quarantined == []
+
+
+def test_excessive_clock_skew_fails_closed(tmp_path):
+    import dataclasses
+
+    store = tmp_path / "skewed.jsonl"
+    good = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60) for i in range(10)]
+    skewed = dataclasses.replace(
+        _obs(minute=55, hour=1), captured_at_utc="2026-07-20T03:00:00Z"
+    )
+    append_observations(store, good + [skewed])
+    with pytest.raises(ValueError, match="clock skew"):
+        run_carry_research(_campaign_config(store))
+
+
+def test_mixed_provenance_is_never_real(tmp_path):
+    # A dataset mixing synthetic-labelled and real-labelled records must never
+    # evaluate as real: the manifest labels it "mixed" and sufficiency fails.
+    import dataclasses
+
+    from quant_trade.carry.data import synthetic_funding_snapshots, write_snapshots_json
+
+    snaps = synthetic_funding_snapshots(periods=120, seed=1)
+    half_real = [
+        dataclasses.replace(s, data_source="real") if i % 2 == 0 else s
+        for i, s in enumerate(snaps)
+    ]
+    path = write_snapshots_json(tmp_path / "mixed_prov.json", half_real)
+    with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
+        cfg = yaml.safe_load(fh)
+    cfg["data"] = {"source": "json", "path": str(path)}
+    result = run_carry_research(cfg)
+    assert result.decision == "NOT_RUN_INSUFFICIENT_REAL_DATA"
+    assert result.dataset_manifest["data_source"] == "mixed"

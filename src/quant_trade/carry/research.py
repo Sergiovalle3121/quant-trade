@@ -68,6 +68,7 @@ def carry_campaign_returns(
     entry_threshold: float,
     trailing_window: int,
     collateral_yield_annual: float = 0.0,
+    settlements: list[tuple[Any, float]] | None = None,
 ) -> pd.DataFrame:
     """Causal per-interval TOTAL economic returns of the two-leg position.
 
@@ -83,9 +84,35 @@ def carry_campaign_returns(
     - minus per-turn transaction cost and per-interval carrying cost.
 
     ``net_return`` is the sum of all components per unit of hedge notional.
+
+    Funding accrual semantics: when ``settlements`` is given (collector
+    datasets), funding P&L accrues ONLY from settled funding events falling
+    causally in each bar's interval ``(t[i-1], t[i]]`` — a poll observation
+    never pays. When ``settlements`` is ``None`` (legacy synthetic/json
+    generators emitting one snapshot per funding interval), each snapshot's
+    rate is that interval's settlement, as before. The quoted per-snapshot rate
+    always remains available as SIGNAL input.
     """
     ordered = sorted(snapshots, key=lambda s: s.captured_at_utc)
     funding = [s.realized_funding_rate for s in ordered]
+    bar_times = [pd.to_datetime(s.captured_at_utc, utc=True, errors="coerce") for s in ordered]
+    settled_in_bar: list[float] | None = None
+    if settlements is not None:
+        settled_sorted = sorted(
+            ((pd.to_datetime(ts, utc=True), float(rate)) for ts, rate in settlements),
+            key=lambda x: x[0],
+        )
+        settled_in_bar = []
+        for i in range(len(ordered)):
+            lo = bar_times[i - 1] if i > 0 else None
+            hi = bar_times[i]
+            total = 0.0
+            for ts, rate in settled_sorted:
+                if pd.isna(hi):
+                    continue
+                if (lo is None or ts > lo) and ts <= hi:
+                    total += rate
+            settled_in_bar.append(total)
     spot = [s.spot_price for s in ordered]
     perp = [s.perp_mark_price for s in ordered]
     round_trip = _round_trip_friction(ordered[0], costs) if ordered else 0.0
@@ -103,7 +130,8 @@ def carry_campaign_returns(
         else:
             trailing_mean = sum(funding[i - trailing_window : i]) / trailing_window
             position = 1.0 if trailing_mean > entry_threshold else 0.0
-        funding_pnl = prev_position * funding[i]
+        accrued_rate = settled_in_bar[i] if settled_in_bar is not None else funding[i]
+        funding_pnl = prev_position * accrued_rate
         if prev_position > 0 and i > 0:
             spot_leg = prev_position * (spot[i] - spot[i - 1]) / spot[i - 1]
             perp_leg = prev_position * (perp[i - 1] - perp[i]) / spot[i - 1]
@@ -134,9 +162,17 @@ def carry_campaign_returns(
     return pd.DataFrame(rows)
 
 
-def _load_snapshots(config: dict[str, Any]) -> tuple[list[CarrySnapshot], DatasetManifest]:
-    """Load snapshots AND bind them: file datasets are hashed by their real
-    bytes; in-memory synthetic datasets by their canonical content."""
+def _load_snapshots(
+    config: dict[str, Any],
+) -> tuple[list[CarrySnapshot], DatasetManifest, list[tuple[Any, float]] | None]:
+    """Load snapshots, bind them by bytes, and surface funding settlements.
+
+    The third element is the settled-funding event list for settlement-causal
+    accrual. It is ``None`` for the legacy synthetic/json paths, whose
+    generators emit exactly one snapshot per funding interval (each snapshot IS
+    that interval's settlement); collector JSONL datasets accrue funding ONLY
+    from explicit settlement events.
+    """
     data_cfg = config.get("data", {})
     source = str(data_cfg.get("source", "synthetic"))
     if source == "synthetic":
@@ -147,15 +183,20 @@ def _load_snapshots(config: dict[str, Any]) -> tuple[list[CarrySnapshot], Datase
             source_name="synthetic_funding_snapshots",
             provenance_notes="deterministic generator; not market data",
         )
-        return snapshots, manifest
+        return snapshots, manifest, None
     if source == "json":
         path = data_cfg["path"]
         snapshots = load_snapshots_from_json(path)
         manifest = build_dataset_manifest(path)
-        return snapshots, manifest
+        return snapshots, manifest, None
     if source == "jsonl_observations":
         from quant_trade.carry.data import load_snapshots_from_records
-        from quant_trade.carry.store import observations_to_snapshot_records, read_store
+        from quant_trade.carry.instruments import check_clock_skew, require_single_identity
+        from quant_trade.carry.store import (
+            extract_settlement_events,
+            observations_to_snapshot_records,
+            read_store,
+        )
         from quant_trade.evidence.manifest import build_file_manifest
 
         path = data_cfg["path"]
@@ -165,12 +206,30 @@ def _load_snapshots(config: dict[str, Any]) -> tuple[list[CarrySnapshot], Datase
                 f"collected dataset {path} has {len(stored.quarantined)} quarantined "
                 "line(s); repair or re-collect before running research"
             )
+        # One campaign = one full economic identity. Mixed identities fail
+        # closed — the opportunity scanner is the explicit allocator.
+        require_single_identity(stored.records)
+        skewed = [p for r in stored.records if (p := check_clock_skew(r)) is not None]
+        if skewed:
+            raise ValueError(
+                f"{len(skewed)} record(s) with excessive clock skew or bad "
+                f"timestamps; first: {skewed[0]}"
+            )
         records = observations_to_snapshot_records(stored.records)
+        if not records:
+            raise ValueError("dataset contains no quote observations")
         snapshots = load_snapshots_from_records(records)
+        settlements = [
+            (
+                pd.to_datetime(str(r["exchange_timestamp_utc"]), utc=True),
+                float(r["realized_funding_rate"]),
+            )
+            for r in extract_settlement_events(stored.records)
+        ]
         manifest = build_file_manifest(
             path, records, provenance_notes="point-in-time collector JSONL"
         )
-        return snapshots, manifest
+        return snapshots, manifest, settlements
     raise ValueError(
         f"unsupported carry data source {source!r}; "
         "use 'synthetic', 'json', or 'jsonl_observations'"
@@ -179,10 +238,12 @@ def _load_snapshots(config: dict[str, Any]) -> tuple[list[CarrySnapshot], Datase
 
 def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     """Run a pre-registered carry campaign and return the verdict + evidence."""
-    snapshots, manifest = _load_snapshots(config)
+    snapshots, manifest, settlements = _load_snapshots(config)
     if not snapshots:
         raise ValueError("no snapshots to evaluate")
-    data_source = snapshots[0].data_source
+    # Provenance comes from the FULL dataset via the manifest ("mixed" when
+    # sources disagree) — never inferred from the first record alone.
+    data_source = manifest.data_source
     costs = CarryCostModel(**config.get("costs", {}))
     policy = CarryPolicy(**config.get("policy", {}))
     position = CarryPosition(
@@ -201,6 +262,7 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         entry_threshold=entry_threshold,
         trailing_window=trailing_window,
         collateral_yield_annual=collateral_yield_annual,
+        settlements=settlements,
     )
     net = returns["net_return"].astype(float)
     active = net[returns["position"].shift(fill_value=0.0) > 0]

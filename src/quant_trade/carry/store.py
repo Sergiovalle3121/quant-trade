@@ -18,6 +18,17 @@ from typing import Any
 
 from quant_trade.evidence.canonical_json import canonical_dumps
 
+#: Event semantics. A poll is a QUOTE observation — it never settles funding.
+#: - "poll" / "backfill": quote observation (prices + the currently QUOTED
+#:   funding rate, which is informational/predictive, never a payment);
+#: - "funding_settlement": a settled funding payment. Its
+#:   ``exchange_timestamp_utc`` IS the funding settlement time, so the dedup
+#:   key (venue|symbol|funding_time|funding_settlement) collapses re-captures;
+#: - "funding_prediction": an explicit forecast; never enters realized P&L;
+#: - "open_interest": an OI observation.
+EVENT_TYPES = ("poll", "backfill", "funding_settlement", "funding_prediction", "open_interest")
+QUOTE_EVENTS = ("poll", "backfill")
+
 
 @dataclass(frozen=True)
 class FundingObservation:
@@ -38,10 +49,16 @@ class FundingObservation:
     next_funding_time_utc: str | None = None
     predicted_funding_rate: float | None = None
     open_interest: float | None = None
-    source_event: str = "poll"  # e.g. "poll" | "funding_settlement" | "backfill"
+    source_event: str = "poll"
     source_name: str = "unknown"
     raw_sha256: str = ""  # hash of the preserved raw response
-    schema_version: int = 1
+    perp_last: float | None = None  # last trade; NEVER a substitute for mark
+    spot_instrument_id: str = ""
+    perpetual_instrument_id: str = ""
+    contract_type: str = "linear_perpetual"
+    quote_asset: str = "USDT"
+    settlement_asset: str = ""
+    schema_version: int = 2
 
     def __post_init__(self) -> None:
         if not self.venue.strip() or not self.symbol.strip():
@@ -60,6 +77,14 @@ class FundingObservation:
             raise ValueError("realized_funding_rate must be finite")
         if self.funding_interval_hours <= 0:
             raise ValueError("funding_interval_hours must be > 0")
+        if self.source_event not in EVENT_TYPES:
+            raise ValueError(f"source_event must be one of {EVENT_TYPES}")
+        if self.contract_type not in ("linear_perpetual", "inverse_perpetual"):
+            raise ValueError("contract_type must be linear_perpetual or inverse_perpetual")
+        if self.perp_last is not None and (
+            not math.isfinite(self.perp_last) or self.perp_last <= 0
+        ):
+            raise ValueError("perp_last must be finite and > 0 when provided")
 
     @property
     def dedup_key(self) -> str:
@@ -123,26 +148,37 @@ def append_observations(
 ) -> AppendResult:
     """Idempotently append observations (existing dedup keys are skipped).
 
-    Lines are written in one buffered write followed by flush+fsync so a crash
-    cannot interleave partial lines from this batch with other content.
+    An exclusive ``flock`` on a sidecar lock file serialises concurrent
+    collectors: the read-known-keys + append sequence is atomic with respect
+    to any other process/thread honouring the same lock, so two simultaneous
+    collectors can neither duplicate nor interleave records. Lines are written
+    in one buffered write followed by flush+fsync.
     """
+    import fcntl
+
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    known = existing_dedup_keys(p)
-    fresh: list[FundingObservation] = []
-    seen_batch: set[str] = set()
-    for obs in observations:
-        key = obs.dedup_key
-        if key in known or key in seen_batch:
-            continue
-        seen_batch.add(key)
-        fresh.append(obs)
-    if fresh:
-        payload = "".join(canonical_dumps(o.to_dict()) + "\n" for o in fresh)
-        with p.open("a", encoding="utf-8") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
+    lock_path = p.with_suffix(p.suffix + ".lock")
+    with lock_path.open("a", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            known = existing_dedup_keys(p)
+            fresh: list[FundingObservation] = []
+            seen_batch: set[str] = set()
+            for obs in observations:
+                key = obs.dedup_key
+                if key in known or key in seen_batch:
+                    continue
+                seen_batch.add(key)
+                fresh.append(obs)
+            if fresh:
+                payload = "".join(canonical_dumps(o.to_dict()) + "\n" for o in fresh)
+                with p.open("a", encoding="utf-8") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
     return AppendResult(
         appended=len(fresh),
         deduplicated=len(observations) - len(fresh),
@@ -150,14 +186,52 @@ def append_observations(
     )
 
 
-def observations_to_snapshot_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Bridge collected observations to the CarrySnapshot record schema.
+def verify_raw_payload(record: dict[str, Any], raw_bytes: bytes) -> bool:
+    """True iff the preserved raw payload still hashes to the record's raw_sha256.
 
-    Mid prices become the spot/perp prices; provenance is preserved. The
-    output feeds ``load_snapshots_from_records`` and the campaign runner.
+    A record whose raw evidence no longer matches is invalid — one flipped byte
+    breaks the chain.
+    """
+    import hashlib
+
+    expected = str(record.get("raw_sha256", "")).strip()
+    if not expected:
+        return False
+    return hashlib.sha256(raw_bytes).hexdigest() == expected
+
+
+def extract_settlement_events(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Settled funding events only, deduped by (venue|symbol|funding_time), sorted.
+
+    Polls and predictions never appear here: this is the ONLY input from which
+    realized funding P&L may accrue.
+    """
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for r in records:
+        if str(r.get("source_event", "poll")) != "funding_settlement":
+            continue
+        key = f"{r.get('venue')}|{r.get('symbol')}|{r.get('exchange_timestamp_utc')}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    out.sort(key=lambda r: str(r.get("exchange_timestamp_utc", "")))
+    return out
+
+
+def observations_to_snapshot_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Bridge QUOTE observations to the CarrySnapshot record schema.
+
+    Only quote events (poll/backfill) become price snapshots; settlement and
+    prediction events are excluded here — settlements feed P&L exclusively via
+    :func:`extract_settlement_events`. The quoted funding rate carried on each
+    snapshot is SIGNAL input (the rate currently quoted), never a payment.
     """
     out: list[dict[str, Any]] = []
     for r in records:
+        if str(r.get("source_event", "poll")) not in QUOTE_EVENTS:
+            continue
         spot_mid = (float(r["spot_bid"]) + float(r["spot_ask"])) / 2.0
         out.append(
             {
