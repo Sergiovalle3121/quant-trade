@@ -107,6 +107,20 @@ def test_break_evens_and_production_cost_present():
     assert proj.break_even_coin_price_usd is not None
 
 
+def test_profitable_rig_computes_finite_irr_without_underflow():
+    # A modestly profitable rig over a long horizon must yield a finite IRR
+    # (regression: daily-space bisection underflowed (1+r)**horizon to zero).
+    proj = project_mining_cashflow(
+        _rig(),
+        _market(coin_price_usd=90000.0),
+        ProjectionAssumptions(horizon_days=1095, monthly_difficulty_growth_rate=0.0,
+                              electricity_usd_per_kwh=0.04),
+    )
+    assert proj.npv_usd > 0.0
+    assert proj.irr_annual_rate is not None
+    assert 0.0 < proj.irr_annual_rate < 100.0
+
+
 def test_incompatible_algorithm_raises():
     with pytest.raises(ValueError, match="incompatible"):
         project_mining_cashflow(

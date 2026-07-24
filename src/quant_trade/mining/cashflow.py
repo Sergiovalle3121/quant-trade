@@ -114,17 +114,23 @@ def _npv_of(cashflows: list[float], daily_rate: float, initial_capex: float,
 def _irr(
     cashflows: list[float], initial_capex: float, residual: float, horizon: int
 ) -> float | None:
+    """Annualized IRR by bisection in ANNUAL-rate space.
+
+    Searching annual (not daily) rates keeps the per-day discount factor near 1,
+    so ``(1 + daily) ** horizon`` never underflows to zero for a long horizon.
+    """
     if initial_capex <= 0 or sum(cashflows) + residual <= initial_capex:
         return None
 
-    def f(daily_rate: float) -> float:
-        return _npv_of(cashflows, daily_rate, initial_capex, residual, horizon)
+    def f(annual_rate: float) -> float:
+        daily = (1.0 + annual_rate) ** (1.0 / _DAYS_PER_YEAR) - 1.0
+        return _npv_of(cashflows, daily, initial_capex, residual, horizon)
 
-    low, high = -0.9, 1.0
+    low, high = -0.99, 1.0
     if f(low) <= 0:
         return None
-    while f(high) > 0 and high < 10.0:
-        high *= 1.5
+    while f(high) > 0 and high < 1_000_000.0:
+        high *= 2.0
     if f(high) > 0:
         return None
     for _ in range(200):
@@ -133,8 +139,7 @@ def _irr(
             low = mid
         else:
             high = mid
-    daily = (low + high) / 2
-    return (1.0 + daily) ** _DAYS_PER_YEAR - 1.0
+    return (low + high) / 2
 
 
 def project_mining_cashflow(
