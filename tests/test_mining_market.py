@@ -60,13 +60,21 @@ def test_no_direct_quote_returns_bottom_up_only():
     assert not cmp.diverges
 
 
-def test_stale_snapshot_fails_closed():
-    fresh = _market(staleness_seconds=10.0, max_age_seconds=3600.0)
-    assert require_fresh(fresh) is fresh
-    stale = _market(staleness_seconds=99999.0, max_age_seconds=3600.0)
-    assert stale.is_stale
+def test_stale_snapshot_fails_closed_with_recomputed_age():
+    # freshness is recomputed from captured_at vs the injected clock; the
+    # stored staleness_seconds field is never trusted
+    fresh = _market(captured_at_utc="2024-05-01T00:00:00Z", max_age_seconds=3600.0)
+    assert require_fresh(fresh, evaluated_at_utc="2024-05-01T00:30:00Z") is fresh
     with pytest.raises(ValueError, match="stale"):
-        require_fresh(stale)
+        require_fresh(fresh, evaluated_at_utc="2024-05-01T02:00:00Z")
+    # a lying staleness_seconds=0 cannot rescue an old snapshot
+    lying = _market(captured_at_utc="2023-01-01T00:00:00Z", staleness_seconds=0.0)
+    with pytest.raises(ValueError, match="stale"):
+        require_fresh(lying, evaluated_at_utc="2024-05-01T00:00:00Z")
+    # future-dated snapshots are rejected outright
+    future = _market(captured_at_utc="2030-01-01T00:00:00Z")
+    with pytest.raises(ValueError, match="future"):
+        require_fresh(future, evaluated_at_utc="2024-05-01T00:00:00Z")
 
 
 def test_validation_and_attribution():

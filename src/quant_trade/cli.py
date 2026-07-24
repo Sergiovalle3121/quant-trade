@@ -14,6 +14,7 @@ from rich.table import Table
 from quant_trade.backtest.engine import BacktestEngine
 from quant_trade.carry.cli import carry_app
 from quant_trade.cloud.entrypoint import cloud_app
+from quant_trade.cloud_rental.cli import cloud_rental_app
 from quant_trade.config import get_settings
 from quant_trade.data.cache import list_cache, write_cache
 from quant_trade.data.csv_loader import load_ohlcv_csv
@@ -49,6 +50,7 @@ app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
 app.add_typer(mining_app, name="mining")
 app.add_typer(carry_app, name="carry")
+app.add_typer(cloud_rental_app, name="cloud-rental")
 app.add_typer(stress_app, name="stress")
 console = Console()
 
@@ -497,6 +499,56 @@ def research_ledger_report(
     console.print(table)
     for note in report.notes:
         console.print(f"[yellow]note:[/yellow] {note}")
+
+
+@paper_app.command("readiness-evidence")
+def paper_readiness_evidence(
+    config: Annotated[Path, typer.Option(help="Readiness YAML (broker, flags, drill dir)")],
+    run_parity: Annotated[
+        bool, typer.Option("--run-parity-drill", help="Execute the parity drill now")
+    ] = False,
+    output: Annotated[Path | None, typer.Option(help="Write the report JSON here")] = None,
+    runbook: Annotated[Path | None, typer.Option(help="Write the runbook markdown here")] = None,
+    evaluated_at_utc: Annotated[
+        str | None, typer.Option(help="Evaluation clock (defaults to now UTC)")
+    ] = None,
+) -> None:
+    """Drill-evidence paper readiness: executed artifacts, never booleans alone."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from quant_trade.evidence.canonical_json import atomic_write_json
+    from quant_trade.paper.readiness import (
+        evaluate_paper_readiness,
+        generate_paper_runbook,
+        run_parity_drill,
+    )
+
+    cfg = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+    now = evaluated_at_utc or _dt.now(_UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if run_parity:
+        evidence_dir = cfg.get("drill_evidence_dir")
+        if not evidence_dir:
+            raise typer.BadParameter("config needs drill_evidence_dir to record the drill")
+        artifact = run_parity_drill(evidence_dir, executed_at_utc=now)
+        console.print(f"parity drill executed and recorded: {artifact}")
+    report = evaluate_paper_readiness(cfg, evaluated_at_utc=now)
+    colour = "green" if report.status == "READY_FOR_PAPER_TRIAL" else "red"
+    console.print(f"Readiness: [bold {colour}]{report.status}[/bold {colour}]")
+    for name, state in report.drill_summary.items():
+        mark = "[green]ok[/green]" if state == "ok" else f"[red]{state}[/red]"
+        console.print(f"  drill {name}: {mark}")
+    if report.blocking:
+        console.print(f"Blocking: {', '.join(report.blocking)}")
+    console.print("real_money_authorized=false  no orders were sent")
+    if output is not None:
+        atomic_write_json(output, report.to_dict())
+        console.print(f"Report: {output}")
+    if runbook is not None:
+        runbook.parent.mkdir(parents=True, exist_ok=True)
+        runbook.write_text(generate_paper_runbook(report), encoding="utf-8")
+        console.print(f"Runbook: {runbook}")
+    raise typer.Exit(code=0 if report.status == "READY_FOR_PAPER_TRIAL" else 1)
 
 
 @paper_app.command("init")

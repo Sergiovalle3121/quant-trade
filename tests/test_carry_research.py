@@ -26,9 +26,9 @@ def test_campaign_returns_are_causal_warmup_is_flat():
     assert len(df) == 40
 
 
-def test_synthetic_campaign_is_never_go():
+def test_synthetic_campaign_can_never_advance():
     result = run_carry_research(_config())
-    assert result.decision == "NOT-RUN"
+    assert result.decision == "NOT_RUN_INSUFFICIENT_REAL_DATA"
     assert result.data_source == "synthetic"
     assert any("real" in r.lower() for r in result.reasons)
 
@@ -41,21 +41,26 @@ def test_synthetic_campaign_still_produces_full_evidence(tmp_path):
     out = write_carry_artifacts(tmp_path, _config(), result)
     assert out.exists()
     payload = yaml.safe_load(out.read_text())
-    assert payload["decision"] == "NOT-RUN"
-    # a ledger entry was recorded (as discarded, since NOT-RUN)
+    assert payload["decision"] == "NOT_RUN_INSUFFICIENT_REAL_DATA"
+    # a ledger entry was recorded (as discarded, since NOT_RUN)
     report = ledger_integrity_report(tmp_path)
     assert report.valid_records == 1
     assert report.n_discarded == 1
 
 
-def test_real_labelled_data_can_reach_a_gono_decision(tmp_path):
-    # Fabricate a "real"-labelled snapshot file; the verdict must be GO or NO-GO
-    # (not NOT-RUN), proving the synthetic guard is provenance-based.
+def test_real_labelled_sufficient_data_reaches_an_economic_verdict(tmp_path):
+    # A "real"-labelled snapshot file with sufficient history must reach an
+    # ECONOMIC verdict (REJECTED or PAPER_CANDIDATE) — never the insufficiency
+    # outcome, proving the sufficiency guard is data-based, and never a bare GO.
     snaps = synthetic_funding_snapshots(periods=120, seed=1)
     real = [__import__("dataclasses").replace(s, data_source="real") for s in snaps]
     path = write_snapshots_json(tmp_path / "real.json", real)
     config = _config()
     config["data"] = {"source": "json", "path": str(path)}
     result = run_carry_research(config)
-    assert result.decision in ("GO", "NO-GO")
+    assert result.decision in ("REJECTED", "PAPER_CANDIDATE")
     assert result.data_source == "real"
+    # the economics now include the basis and capital views
+    assert "basis_pnl_total" in result.metrics
+    assert "return_on_capital" in result.metrics
+    assert "total_return_2x_costs" in result.metrics

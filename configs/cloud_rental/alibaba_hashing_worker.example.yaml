@@ -1,0 +1,45 @@
+# Alibaba Cloud hashing-worker evaluation. EXPECTED OUTCOME with this file
+# as-is: BLOCKED_PROVIDER_POLICY — Alibaba Cloud lists cryptocurrency mining as
+# a security-violation example that locks ECS instances. Only an explicit,
+# current, human-reviewed WRITTEN contractual exception could change this
+# (a support ticket or an assumption is not enough), and even then a measured
+# benchmark of the exact SKU plus positive economics would still be required.
+
+purpose: hashing_worker
+algorithm: sha256
+
+quote:
+  provider: alibaba
+  sku: ecs.gn7i-c32g1.8xlarge
+  region: us-west-1
+  purchase_model: preemptible
+  price_per_hour: 1.20            # fixture value; real prices ONLY via DescribePrice
+  currency: USD
+  fx_rate_to_usd: 1.0
+  source_kind: fixture
+  source_name: offline_example
+  captured_at_utc: "2026-07-24T00:00:00Z"
+  max_age_hours: 168
+
+spec:
+  provider: alibaba
+  sku: ecs.gn7i-c32g1.8xlarge
+  region: us-west-1
+  architecture: gpu
+  vcpus: 32
+  memory_gb: 188.0
+  accelerator_model: "NVIDIA A10"
+  accelerator_count: 1
+
+# policy_evidence: {}   # absent on purpose: provider default prohibition stands
+# benchmark: {}         # absent on purpose: no invented hashrate
+
+revenue:
+  hashprice_usd_per_th_day: 0.05
+  pool_fee_rate: 0.01
+  utilization: 0.90
+  interruption_rate_per_hour: 0.08
+  checkpoint_overhead_fraction: 0.10
+
+horizon_hours: 720
+budget_ceiling_usd: 250.0

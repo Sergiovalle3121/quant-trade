@@ -45,7 +45,11 @@ def carry_research(
     result = run_carry_research(cfg)
     write_carry_artifacts(output, cfg, result)
 
-    colour = {"GO": "green", "NO-GO": "red", "NOT-RUN": "yellow"}.get(result.decision, "white")
+    colour = {
+        "PAPER_CANDIDATE": "green",
+        "REJECTED": "red",
+        "NOT_RUN_INSUFFICIENT_REAL_DATA": "yellow",
+    }.get(result.decision, "white")
     console.print(f"Decision: [bold {colour}]{result.decision}[/bold {colour}]")
     for reason in result.reasons:
         console.print(f"  - {reason}")
@@ -63,8 +67,70 @@ def carry_research(
     console.print(table)
     console.print(f"Artifacts: {output}")
     if result.data_source == "synthetic":
-        console.print("[yellow]Synthetic data cannot produce GO — REAL DATA REQUIRED.[/yellow]")
+        console.print(
+            "[yellow]Synthetic data can never advance — REAL DATA REQUIRED.[/yellow]"
+        )
     console.print("real_money=NO-GO  no orders were placed")
+
+
+@carry_app.command("collect-once")
+def carry_collect_once(
+    config: Annotated[Path, typer.Option(help="Collector YAML (pairs, adapter, output)")],
+    output: Annotated[
+        Path | None, typer.Option(help="Override the store path from the config")
+    ] = None,
+) -> None:
+    """One read-only funding capture pass. No loop, no orders, no keys."""
+    from quant_trade.carry.collector import collect_once, load_collector_config
+
+    cfg = load_collector_config(config)
+    if output is not None:
+        import dataclasses as _dc
+
+        cfg = _dc.replace(cfg, output_path=str(output))
+    summary = collect_once(cfg)
+    console.print(
+        f"captured={summary.captured} appended={summary.appended} "
+        f"deduplicated={summary.deduplicated}"
+    )
+    for err in summary.errors:
+        console.print(f"[yellow]error:[/yellow] {err}")
+    console.print(f"store: {summary.output_path}")
+    console.print("read-only collector: no orders, no keys, no daemon")
+    raise typer.Exit(code=1 if summary.errors and not summary.captured else 0)
+
+
+@carry_app.command("dataset-audit")
+def carry_dataset_audit(
+    path: Annotated[Path, typer.Option(help="JSONL funding-history store")],
+    output: Annotated[Path | None, typer.Option(help="Write the audit JSON here")] = None,
+) -> None:
+    """Audit collected funding history: gaps, duplicates, coverage, quarantine."""
+    from quant_trade.carry.quality import audit_dataset
+    from quant_trade.evidence.canonical_json import atomic_write_json
+
+    report = audit_dataset(path)
+    table = Table(title="Funding dataset audit")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    table.add_row("Records", str(report.total_records))
+    table.add_row("Quarantined lines", str(report.quarantined_lines))
+    table.add_row("Pairs", ", ".join(report.pairs) or "-")
+    table.add_row("Range", f"{report.time_range_start} → {report.time_range_end}")
+    table.add_row("Span (days)", f"{report.span_days:.2f}")
+    table.add_row("Funding events", str(report.funding_events))
+    table.add_row("Gaps", str(report.gaps_detected))
+    table.add_row("Duplicates", str(report.duplicate_keys))
+    console.print(table)
+    status = "CLEAN" if report.is_clean else "PROBLEMS"
+    colour = "green" if report.is_clean else "red"
+    console.print(f"Audit: [bold {colour}]{status}[/bold {colour}]")
+    for problem in report.problems:
+        console.print(f"  - {problem}")
+    if output is not None:
+        atomic_write_json(output, report.to_dict())
+        console.print(f"Report: {output}")
+    raise typer.Exit(code=0 if report.is_clean else 1)
 
 
 @carry_app.command("scenarios")

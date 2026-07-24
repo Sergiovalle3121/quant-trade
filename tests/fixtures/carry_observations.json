@@ -1,0 +1,44 @@
+{
+  "observations": [
+    {
+      "venue": "binance",
+      "symbol": "BTC",
+      "captured_at_utc": "2026-07-20T00:00:05Z",
+      "exchange_timestamp_utc": "2026-07-20T00:00:00Z",
+      "spot_bid": 64000.5,
+      "spot_ask": 64001.5,
+      "perp_bid": 64010.0,
+      "perp_ask": 64011.0,
+      "perp_mark": 64010.5,
+      "perp_index": 64001.0,
+      "realized_funding_rate": 0.0001,
+      "funding_interval_hours": 8.0,
+      "next_funding_time_utc": "2026-07-20T08:00:00Z",
+      "predicted_funding_rate": null,
+      "open_interest": 81234.5,
+      "source_event": "poll",
+      "source_name": "fixture:binance",
+      "raw_sha256": "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
+    },
+    {
+      "venue": "okx",
+      "symbol": "BTC",
+      "captured_at_utc": "2026-07-20T00:00:06Z",
+      "exchange_timestamp_utc": "2026-07-20T00:00:00Z",
+      "spot_bid": 63998.0,
+      "spot_ask": 63999.5,
+      "perp_bid": 64005.0,
+      "perp_ask": 64006.5,
+      "perp_mark": 64006.0,
+      "perp_index": 63999.0,
+      "realized_funding_rate": 0.00012,
+      "funding_interval_hours": 8.0,
+      "next_funding_time_utc": "2026-07-20T08:00:00Z",
+      "predicted_funding_rate": null,
+      "open_interest": 40211.0,
+      "source_event": "poll",
+      "source_name": "fixture:okx",
+      "raw_sha256": "9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab"
+    }
+  ]
+}

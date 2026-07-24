@@ -1,0 +1,32 @@
+# AWS control-plane evaluation (collectors, research, dashboards, paper runtime).
+# OFFLINE EXAMPLE: the quote is a fixture, NOT a current price. Capture a real
+# quote with the read-only Price List adapter before drawing conclusions.
+# Evaluation creates no resources and authorizes no spend.
+
+purpose: control_plane
+
+quote:
+  provider: aws
+  sku: t3.small
+  region: us-east-1
+  purchase_model: on_demand
+  price_per_hour: 0.0208          # fixture value; refresh from the Price List API
+  currency: USD
+  source_kind: fixture
+  source_name: offline_example    # replace with aws_price_list_query when captured
+  captured_at_utc: "2026-07-24T00:00:00Z"
+  max_age_hours: 168              # examples tolerate a week; real quotes should not
+  extras_per_hour_usd:
+    ebs_gp3_30gb: 0.0033
+    public_ipv4: 0.005
+
+spec:
+  provider: aws
+  sku: t3.small
+  region: us-east-1
+  architecture: cpu
+  vcpus: 2
+  memory_gb: 2.0
+
+horizon_hours: 720                # one month, cancelable
+budget_ceiling_usd: 50.0

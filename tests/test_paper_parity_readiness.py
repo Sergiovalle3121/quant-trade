@@ -97,12 +97,33 @@ def test_three_way_parity_structure():
     assert "simulated_paper_vs_broker_paper" in result
 
 
-# --- readiness ------------------------------------------------------------
+# --- readiness (drill-evidence based) --------------------------------------
+
+from quant_trade.paper.readiness import (  # noqa: E402
+    REQUIRED_DRILLS,
+    record_drill,
+    run_parity_drill,
+)
+
+NOW = "2026-07-24T12:00:00Z"
 
 
-def _ready_config(**overrides) -> dict:
+def _record_all_drills(evidence_dir, executed_at: str = "2026-07-20T00:00:00Z") -> None:
+    for name in REQUIRED_DRILLS:
+        record_drill(
+            evidence_dir,
+            name=name,
+            result="pass",
+            executed_at_utc=executed_at,
+            failure_injected=name in ("kill_switch", "recovery", "orphan_detection"),
+            details={"note": "test drill"},
+        )
+
+
+def _ready_config(evidence_dir=None, **overrides) -> dict:
     base = dict(
         broker_mode="paper",
+        broker_endpoint="https://paper-api.alpaca.markets",
         live_trading=False,
         exporter_enabled=True,
         recovery_enabled=True,
@@ -111,38 +132,106 @@ def _ready_config(**overrides) -> dict:
         heartbeat_interval_seconds=30,
         reconciliation_enabled=True,
     )
+    if evidence_dir is not None:
+        base["drill_evidence_dir"] = str(evidence_dir)
     base.update(overrides)
     return base
 
 
-def test_full_config_is_ready_but_zero_days():
-    report = evaluate_paper_readiness(_ready_config())
-    assert report.status == READY
+def test_full_config_with_executed_drills_is_ready(tmp_path):
+    _record_all_drills(tmp_path)
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
+    )
+    assert report.status == READY, report.blocking
     assert report.blocking == []
     assert report.real_money_authorized is False
     assert report.trial_days_completed == 0  # never fabricated
 
 
-def test_missing_kill_switch_is_not_ready():
-    report = evaluate_paper_readiness(_ready_config(kill_switch_enabled=False))
+def test_missing_single_drill_is_not_ready(tmp_path):
+    _record_all_drills(tmp_path)
+    (tmp_path / "drill_kill_switch.json").unlink()
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
+    )
     assert report.status == NOT_READY
-    assert "kill_switch_enabled" in report.blocking
+    assert "drill_kill_switch_executed" in report.blocking
 
 
-def test_live_trading_blocks_readiness():
-    report = evaluate_paper_readiness(_ready_config(live_trading=True))
+def test_expired_drill_is_not_ready(tmp_path):
+    _record_all_drills(tmp_path, executed_at="2026-01-01T00:00:00Z")  # months old
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
+    )
+    assert report.status == NOT_READY
+    assert any(name.startswith("drill_") for name in report.blocking)
+
+
+def test_failed_drill_result_is_not_ready(tmp_path):
+    _record_all_drills(tmp_path)
+    record_drill(
+        tmp_path, name="recovery", result="fail",
+        executed_at_utc="2026-07-20T00:00:00Z", failure_injected=True,
+        details={"note": "recovery lost state"},
+    )
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
+    )
+    assert report.status == NOT_READY
+    assert "drill_recovery_executed" in report.blocking
+
+
+def test_no_failure_injection_is_not_ready(tmp_path):
+    _record_all_drills(tmp_path)
+    record_drill(
+        tmp_path, name="kill_switch", result="pass",
+        executed_at_utc="2026-07-20T00:00:00Z", failure_injected=False,  # no-op run
+        details={"note": "switch toggled with nothing running"},
+    )
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
+    )
+    assert report.status == NOT_READY
+    assert "no-op" in report.drill_summary["kill_switch"]
+
+
+def test_live_trading_blocks_readiness(tmp_path):
+    _record_all_drills(tmp_path)
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path, live_trading=True), evaluated_at_utc=NOW
+    )
     assert report.status == NOT_READY
     assert "broker_is_paper_only" in report.blocking
 
 
-def test_zero_heartbeat_blocks():
-    report = evaluate_paper_readiness(_ready_config(heartbeat_interval_seconds=0))
+def test_zero_heartbeat_blocks(tmp_path):
+    _record_all_drills(tmp_path)
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path, heartbeat_interval_seconds=0),
+        evaluated_at_utc=NOW,
+    )
     assert "heartbeat_configured" in report.blocking
 
 
-def test_runbook_lists_checks_and_real_money_nogo():
-    report = evaluate_paper_readiness(_ready_config())
+def test_parity_drill_actually_executes_and_records(tmp_path):
+    path = run_parity_drill(tmp_path, executed_at_utc="2026-07-20T00:00:00Z")
+    import json
+
+    payload = json.loads(path.read_text())
+    assert payload["drill"] == "parity"
+    assert payload["result"] == "pass"
+    assert payload["details"]["identical_run_reconciled"] is True
+    assert payload["details"]["perturbed_run_diverged"] is True
+    assert payload["evidence_sha256"]
+
+
+def test_runbook_lists_checks_and_real_money_nogo(tmp_path):
+    _record_all_drills(tmp_path)
+    report = evaluate_paper_readiness(
+        _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
+    )
     runbook = generate_paper_runbook(report)
     assert "Real money: **NO-GO**" in runbook
-    assert "kill_switch_enabled" in runbook
-    assert "Pre-flight checklist" in runbook
+    assert "kill_switch" in runbook
+    assert "executed drills, not booleans" in runbook
