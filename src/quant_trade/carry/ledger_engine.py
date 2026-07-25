@@ -46,6 +46,7 @@ class LedgerTotals:
     conversion_costs: float = 0.0
     unwind_costs: float = 0.0
     carrying_costs: float = 0.0
+    borrow_costs: float = 0.0
 
     @property
     def net_pnl(self) -> float:
@@ -58,6 +59,7 @@ class LedgerTotals:
             - self.conversion_costs
             - self.unwind_costs
             - self.carrying_costs
+            - self.borrow_costs
         )
 
     def to_dict(self) -> dict[str, float]:
@@ -70,6 +72,7 @@ class LedgerTotals:
             "conversion_costs": self.conversion_costs,
             "unwind_costs": self.unwind_costs,
             "carrying_costs": self.carrying_costs,
+            "borrow_costs": self.borrow_costs,
             "net_pnl": self.net_pnl,
         }
 
@@ -124,6 +127,7 @@ def run_carry_ledger(
     signal_rates: list[float] | None = None,
     fill_fraction: float = 1.0,
     min_fill_rate: float = 0.9,
+    cash_reserve_fraction: float = 0.05,
 ) -> LedgerResult:
     """Simulate the campaign as an explicit account. Fail closed on bad hedges.
 
@@ -135,23 +139,26 @@ def run_carry_ledger(
     """
     if not snapshots:
         raise ValueError("no snapshots")
-    ordered = sorted(snapshots, key=lambda s: s.captured_at_utc)
+    if not 0 <= cash_reserve_fraction < 1:
+        raise ValueError("cash_reserve_fraction must be in [0, 1)")
+    ordered = list(snapshots)
     times = [pd.to_datetime(s.captured_at_utc, utc=True) for s in ordered]
+    if any(current <= previous for previous, current in zip(times, times[1:], strict=False)):
+        raise ValueError("snapshots must be strictly ordered with unique timestamps")
     funding_quotes = [s.realized_funding_rate for s in ordered]
     signals = signal_rates if signal_rates is not None else funding_quotes
     if len(signals) != len(ordered):
         raise ValueError("signal_rates length must match snapshots")
-    intervals_per_year = ordered[0].funding_intervals_per_year
-    per_bar_yield = collateral_yield_annual / intervals_per_year
-    per_bar_carry_cost = (
-        costs.spot_custody_cost_annual + costs.perp_margin_cost_annual
-    ) / intervals_per_year
     per_fill_fraction = _round_trip_friction(ordered[0], costs) / 4.0  # one leg, one way
 
-    settled_sorted = sorted(
-        ((pd.to_datetime(ts, utc=True), float(r)) for ts, r in (settlements or [])),
-        key=lambda x: x[0],
-    )
+    settled_sorted = [
+        (pd.to_datetime(ts, utc=True), float(rate)) for ts, rate in (settlements or [])
+    ]
+    if any(
+        current[0] <= previous[0]
+        for previous, current in zip(settled_sorted, settled_sorted[1:], strict=False)
+    ):
+        raise ValueError("settlements must be strictly ordered with unique timestamps")
 
     # --- the balance sheet: cash is mutated flow-by-flow --------------------
     cash = initial_capital
@@ -168,8 +175,17 @@ def run_carry_ledger(
     max_margin = 0.0
     rows: list[dict[str, Any]] = []
 
-    def notional() -> float:
-        return initial_capital / (1.0 + 1.0 / perp_leverage)
+    def notional(spot_mark: float, perp_mark: float) -> float:
+        # Reserve margin plus the full four-fill round-trip friction and
+        # one-time conversion cost before entering. Costs can never make cash
+        # accidentally negative.
+        perp_to_spot = perp_mark / spot_mark
+        reserved_cost_fraction = (
+            2.0 * per_fill_fraction * (1.0 + perp_to_spot)
+            + costs.conversion_withdrawal_cost
+            + cash_reserve_fraction
+        )
+        return initial_capital / (1.0 + perp_to_spot / perp_leverage + reserved_cost_fraction)
 
     def close_position(ts: Any, spot: float, perp: float) -> float:
         nonlocal position, exits
@@ -186,6 +202,19 @@ def run_carry_ledger(
         exits += 1
         return exit_fees
 
+    def position_flow(ts: Any, kind: str, amount: float) -> None:
+        """Settle a position flow without allowing an accidental cash deficit."""
+        assert position is not None
+        if amount < 0 and cash + amount < 0:
+            required = -(cash + amount)
+            released = min(required, position.margin_posted)
+            if released > 0:
+                position.margin_posted -= released
+                flow(ts, "margin_to_cash", released)
+        if cash + amount < -1e-12 * max(1.0, initial_capital):
+            raise ValueError("position losses exhausted cash and posted margin")
+        flow(ts, kind, amount)
+
     for i, snap in enumerate(ordered):
         spot, perp = snap.spot_price, snap.perp_mark_price
         bar = {
@@ -200,6 +229,7 @@ def run_carry_ledger(
             "basis_pnl": 0.0,
             "collateral_yield": 0.0,
             "carry_cost": 0.0,
+            "borrow_cost": 0.0,
             "fees": 0.0,
             "net_return": 0.0,
         }
@@ -211,27 +241,38 @@ def run_carry_ledger(
             perp_pnl = -position.perp_qty * (perp - prev_perp)  # variation margin
             totals.spot_leg_pnl += spot_pnl
             totals.perp_leg_pnl += perp_pnl
-            flow(times[i], "variation_margin", perp_pnl)
+            position_flow(times[i], "variation_margin", perp_pnl)
             # settled funding causally in (t[i-1], t[i]]
             lo = times[i - 1] if i > 0 else None
             if settlements is not None:
                 settled = sum(
-                    r
-                    for ts, r in settled_sorted
-                    if (lo is None or ts > lo) and ts <= times[i]
+                    r for ts, r in settled_sorted if (lo is None or ts > lo) and ts <= times[i]
                 )
             else:
                 # legacy generators: one snapshot per interval == its settlement
                 settled = funding_quotes[i]
             funding_pnl = settled * position.perp_qty * perp
             totals.funding_settled += funding_pnl
-            flow(times[i], "funding_settlement", funding_pnl)
-            cy = per_bar_yield * position.margin_posted
+            position_flow(times[i], "funding_settlement", funding_pnl)
+            elapsed_years = (
+                (times[i] - times[i - 1]).total_seconds() / (365.25 * 24.0 * 3600.0)
+                if i > 0
+                else 0.0
+            )
+            cy = collateral_yield_annual * elapsed_years * position.margin_posted
             totals.collateral_yield += cy
             flow(times[i], "collateral_yield", cy)
-            cc = per_bar_carry_cost * position.spot_qty * spot
+            cc = (
+                (costs.spot_custody_cost_annual + costs.perp_margin_cost_annual)
+                * elapsed_years
+                * position.spot_qty
+                * spot
+            )
             totals.carrying_costs += cc
-            flow(times[i], "carrying_cost", -cc)
+            position_flow(times[i], "carrying_cost", -cc)
+            borrow = max(0.0, snap.borrow_rate_annual) * elapsed_years * position.spot_qty * spot
+            totals.borrow_costs += borrow
+            position_flow(times[i], "borrow_cost", -borrow)
             bar.update(
                 position=1.0,
                 funding_pnl=funding_pnl,
@@ -240,12 +281,18 @@ def run_carry_ledger(
                 basis_pnl=spot_pnl + perp_pnl,
                 collateral_yield=cy,
                 carry_cost=cc,
-                net_return=(funding_pnl + spot_pnl + perp_pnl + cy - cc)
-                / initial_capital,
+                borrow_cost=borrow,
+                net_return=(funding_pnl + spot_pnl + perp_pnl + cy - cc) / initial_capital,
             )
 
         # --- signal (decoupled from quoted rates when settlements drive it)
-        if i < trailing_window:
+        if settlements is not None:
+            known_settlements = [rate for ts, rate in settled_sorted if ts <= times[i]]
+            want_position = (
+                len(known_settlements) >= trailing_window
+                and sum(known_settlements[-trailing_window:]) / trailing_window > entry_threshold
+            )
+        elif i < trailing_window:
             want_position = False
         else:
             trailing = sum(signals[i - trailing_window : i]) / trailing_window
@@ -253,7 +300,7 @@ def run_carry_ledger(
 
         # --- transitions ---------------------------------------------------
         if want_position and position is None:
-            target_notional = notional()
+            target_notional = notional(spot, perp)
             spot_qty = target_notional / spot
             plan = TwoLegPlan(
                 symbol=snap.symbol,
@@ -291,6 +338,8 @@ def run_carry_ledger(
                     flow(times[i], "conversion_withdrawal", -conv)
                 totals.trading_fees += entry_fees
                 totals.conversion_costs += conv
+                if cash < -1e-12 * max(1.0, initial_capital):
+                    raise ValueError("entry sizing consumed more cash than available")
                 position = _Position(qty, qty, spot, perp, margin)
                 max_margin = max(max_margin, margin)
                 entries += 1
@@ -311,6 +360,17 @@ def run_carry_ledger(
     if position is not None:
         close_position(times[-1], ordered[-1].spot_price, ordered[-1].perp_mark_price)
         rows[-1]["equity"] = cash
+
+    # The authoritative economic series is derived only from marked equity.
+    # It therefore contains every fee, funding payment, borrow charge,
+    # conversion and unwind that changed the balance sheet.
+    previous_equity = initial_capital
+    for row in rows:
+        equity = float(row["equity"])
+        if previous_equity <= 0 or equity < 0:
+            raise ValueError("equity must remain non-negative to derive net returns")
+        row["net_return"] = equity / previous_equity - 1.0
+        previous_equity = equity
 
     # --- reconciliation: two independent accounting paths ------------------
     # LEFT: the balance sheet (cash mutated flow-by-flow; positions closed).

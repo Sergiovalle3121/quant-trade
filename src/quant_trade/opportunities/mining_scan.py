@@ -108,9 +108,7 @@ def scan_mining_cells(
         spec = load_spec(cell["spec"])
         benchmark = load_benchmark(cell["benchmark"]) if cell.get("benchmark") else None
         policy = (
-            load_policy_evidence(cell["policy_evidence"])
-            if cell.get("policy_evidence")
-            else None
+            load_policy_evidence(cell["policy_evidence"]) if cell.get("policy_evidence") else None
         )
         algorithm = str(cell.get("algorithm", "sha256"))
         coin = str(cell.get("coin", "BTC"))
@@ -123,6 +121,8 @@ def scan_mining_cells(
             policy_evidence=policy,
             workload=purpose,
             algorithm=algorithm,
+            quote_artifact_path=resolve(cell.get("quote_artifact")),
+            spec_artifact_path=resolve(cell.get("spec_artifact")),
             benchmark_artifact_path=resolve(cell.get("benchmark_artifact")),
             policy_snapshot_path=resolve(cell.get("policy_snapshot")),
             require_benchmark=purpose is WorkloadPurpose.HASHING_WORKER,
@@ -157,8 +157,10 @@ def scan_mining_cells(
             )
         extra_reasons: list[str] = []
         from quant_trade.cloud_rental.market import (
+            algorithm_unit,
             check_algorithm_hardware,
             load_market_snapshot,
+            verify_market_snapshot_bytes,
         )
 
         hardware_problem = check_algorithm_hardware(algorithm, spec.architecture)
@@ -169,11 +171,35 @@ def scan_mining_cells(
         if snapshot_ref:
             snapshot_path = resolve(str(snapshot_ref))
             if snapshot_path is not None and snapshot_path.exists():
-                snapshot = load_market_snapshot(snapshot_path)
-                stale = snapshot.freshness_problems(evaluated_at_utc=evaluated_at_utc)
-                if stale:
-                    extra_reasons.extend(stale)
+                snapshot = None
+                market_problems: list[str] = []
+                try:
+                    snapshot = load_market_snapshot(snapshot_path)
+                except (TypeError, ValueError) as exc:
+                    extra_reasons.append(f"market snapshot identity invalid: {exc}")
                 else:
+                    contract = algorithm_unit(algorithm)
+                    market_problems = verify_market_snapshot_bytes(
+                        snapshot, resolve(cell.get("market_snapshot_artifact"))
+                    )
+                    if snapshot.algorithm_id != algorithm:
+                        market_problems.append(
+                            f"market algorithm {snapshot.algorithm_id!r} != requested {algorithm!r}"
+                        )
+                    if snapshot.coin.upper() != coin.upper():
+                        market_problems.append(
+                            f"market coin {snapshot.coin!r} != requested {coin!r}"
+                        )
+                    if snapshot.network != contract["network"]:
+                        market_problems.append(
+                            f"market network {snapshot.network!r} != registered "
+                            f"{contract['network']!r}"
+                        )
+                    market_problems.extend(
+                        snapshot.freshness_problems(evaluated_at_utc=evaluated_at_utc)
+                    )
+                    extra_reasons.extend(market_problems)
+                if snapshot is not None and not market_problems:
                     revenue = RevenueAssumptions(
                         hashprice_usd_per_th_day=snapshot.hashprice_usd_per_unit_day,
                         pool_fee_rate=snapshot.pool_fee_rate,
@@ -211,10 +237,7 @@ def scan_mining_cells(
             # legal/operational block is decisive — it outranks missing
             # benchmarks and is never converted into an economic verdict
             status = f"POLICY_BLOCKED:{decision.status}"
-        elif (
-            status == "BLOCKED_MISSING_BENCHMARK"
-            or bundle.status == "REJECTED_MISSING_EVIDENCE"
-        ):
+        elif status == "BLOCKED_MISSING_BENCHMARK" or bundle.status == "REJECTED_MISSING_EVIDENCE":
             status = "MISSING_EVIDENCE"
         elif bundle.test_only and status.startswith("ECONOMIC_CANDIDATE"):
             # fixture-fed pipelines exercise the machinery; they are never

@@ -27,9 +27,7 @@ FIXTURES = {
 
 
 def _series(kind: str):
-    return parse_bybit_kline_page(
-        Path(FIXTURES[kind]).read_bytes(), symbol="BTC", kind=kind
-    )
+    return parse_bybit_kline_page(Path(FIXTURES[kind]).read_bytes(), symbol="BTC", kind=kind)
 
 
 def _settlements():
@@ -122,7 +120,11 @@ def test_e2e_recorded_pages_to_promotion(tmp_path):
     from quant_trade.carry.research import run_carry_research, write_carry_artifacts
 
     result = run_panel_backfill(
-        "bybit", "BTC", tmp_path / "panel", since_ms=SINCE, until_ms=UNTIL,
+        "bybit",
+        "BTC",
+        tmp_path / "panel",
+        since_ms=SINCE,
+        until_ms=UNTIL,
         fixture_pages=FIXTURES,
     )
     assert result.status == "OK"
@@ -155,10 +157,128 @@ def test_backfill_is_idempotent_and_receipted(tmp_path):
     assert prov.provenance == "test_only"
     # re-run: content-addressed raw pages do not duplicate on disk
     raw_count = len(list((out / "raw").iterdir()))
-    run_panel_backfill(
-        "bybit", "BTC", out, since_ms=SINCE, until_ms=UNTIL, fixture_pages=FIXTURES
-    )
+    run_panel_backfill("bybit", "BTC", out, since_ms=SINCE, until_ms=UNTIL, fixture_pages=FIXTURES)
     assert len(list((out / "raw").iterdir())) == raw_count
+
+
+def test_funding_backfill_paginates_until_requested_lower_bound(tmp_path):
+    funding = json.loads(Path(FIXTURES["funding"]).read_text())
+    rows = funding["result"]["list"]
+    funding_urls: list[str] = []
+
+    def paged(url: str) -> bytes:
+        if "funding/history" not in url:
+            kind = (
+                "mark"
+                if "mark-price-kline" in url
+                else "index"
+                if "index-price-kline" in url
+                else "perp"
+                if "category=linear" in url
+                else "spot"
+            )
+            return Path(FIXTURES[kind]).read_bytes()
+        funding_urls.append(url)
+        page = dict(funding)
+        page["result"] = dict(funding["result"])
+        page["result"]["list"] = rows[:-1] if len(funding_urls) == 1 else rows[-1:]
+        return json.dumps(page).encode()
+
+    result = run_panel_backfill(
+        "bybit",
+        "BTC",
+        tmp_path / "panel",
+        since_ms=SINCE,
+        until_ms=UNTIL,
+        fetcher=paged,
+    )
+    assert result.status == "OK"
+    assert result.funding_pages_fetched == 2
+    assert result.settlements == 6
+    assert len(funding_urls) == 2
+    assert "endTime=1784649600000" in funding_urls[0]
+    assert "endTime=1784534399999" in funding_urls[1]
+
+
+def test_funding_receipt_reuses_the_parsers_exact_capture_clock(tmp_path):
+    from quant_trade.carry.backfill import parse_bybit_funding_history
+    from quant_trade.carry.panel_backfill import _archive_page
+    from quant_trade.evidence.receipts import load_receipts, verify_receipt_bytes
+
+    raw = Path(FIXTURES["funding"]).read_bytes()
+    captured = "2026-07-25T06:00:00Z"
+    rows = [
+        event.to_dict()
+        for event in parse_bybit_funding_history(
+            raw,
+            symbol="BTC",
+            captured_at_utc=captured,
+            source_name="bybit:public",
+        )
+    ]
+    _archive_page(
+        tmp_path,
+        venue="bybit",
+        endpoint="https://api.bybit.com/v5/market/funding/history",
+        params={
+            "kind": "funding",
+            "symbol": "BTC",
+            "source_name": "bybit:public",
+        },
+        raw=raw,
+        rows=rows,
+        source_kind="live",
+        captured_at_utc=captured,
+    )
+    receipt = load_receipts(tmp_path / "receipts.jsonl")[0]
+    assert receipt["captured_at_utc"] == captured
+    assert verify_receipt_bytes(receipt, base_dir=tmp_path) == []
+
+
+def test_clean_rebuild_slices_full_raw_pages_to_the_requested_range(tmp_path):
+    from quant_trade.carry.panel import verify_panel_bundle
+
+    narrow_since = SINCE + 10 * 3_600_000
+    narrow_until = UNTIL - 10 * 3_600_000
+    out = tmp_path / "narrow"
+    result = run_panel_backfill(
+        "bybit",
+        "BTC",
+        out,
+        since_ms=narrow_since,
+        until_ms=narrow_until,
+        fixture_pages=FIXTURES,
+    )
+    assert result.status == "OK"
+    rows, audit = verify_panel_bundle(out)
+    assert audit.is_clean
+    assert audit.provenance == "test_only"
+    assert rows[0]["start_ms"] == narrow_since
+    assert rows[-1]["start_ms"] == narrow_until
+
+
+def test_panel_audit_cli_invokes_clean_rebuild_and_rejects_tamper(tmp_path):
+    from typer.testing import CliRunner
+
+    from quant_trade.cli import app
+
+    out = tmp_path / "tampered"
+    run_panel_backfill(
+        "bybit",
+        "BTC",
+        out,
+        since_ms=SINCE,
+        until_ms=UNTIL,
+        fixture_pages=FIXTURES,
+    )
+    with (out / "panel.jsonl").open("ab") as handle:
+        handle.write(b" ")
+    result = CliRunner().invoke(
+        app,
+        ["carry", "panel-audit", "--panel-dir", str(out)],
+    )
+    assert result.exit_code == 1
+    assert "panel bytes do not match" in result.output
 
 
 def test_blocked_network_records_not_run(tmp_path):
@@ -166,7 +286,11 @@ def test_blocked_network_records_not_run(tmp_path):
         raise OSError("Tunnel connection failed: 403 Forbidden")
 
     result = run_panel_backfill(
-        "bybit", "BTC", tmp_path / "panel", since_ms=SINCE, until_ms=UNTIL,
+        "bybit",
+        "BTC",
+        tmp_path / "panel",
+        since_ms=SINCE,
+        until_ms=UNTIL,
         fetcher=blocked,
     )
     assert result.status == "NOT_RUN_NETWORK_BLOCKED"

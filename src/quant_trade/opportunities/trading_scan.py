@@ -149,14 +149,14 @@ def _scan_cross_venue(hyp: dict[str, Any], resolve: Any) -> TradingOpportunityRo
     elif row.data_source != "real":
         row.status = "NOT_RUN_INSUFFICIENT_REAL_DATA"
         row.reasons = [
-            f"panel provenance is {row.data_source!r}; only receipt-verified "
-            "live data counts"
+            f"panel provenance is {row.data_source!r}; only receipt-verified live data counts"
         ]
     else:
-        row.status = "RESEARCH_CANDIDATE"
+        row.status = "NOT_RUN_STATISTICAL_CAMPAIGN_REQUIRED"
         row.reasons = [
-            "cross-venue dispersion computed on real panels; promotion requires "
-            "the full statistical gate set and must beat max(H1, H2, cash)"
+            "cross-venue dispersion computed on real panels but H3 has not run "
+            "the same full CSCV/DSR/bootstrap/walk-forward campaign as H1/H2; "
+            "promotion is technically blocked"
         ]
     return row
 
@@ -213,9 +213,7 @@ def scan_trading_opportunities(
             row.status = "NOT_RUN_NO_DATASET"
             row.reasons = [f"registered dataset missing: {p}" for p in missing]
             for p in missing:
-                evidence = _last_backfill_evidence(
-                    resolve(p).parent / "backfill_attempts.jsonl"
-                )
+                evidence = _last_backfill_evidence(resolve(p).parent / "backfill_attempts.jsonl")
                 if evidence:
                     row.reasons.append(evidence)
                     break

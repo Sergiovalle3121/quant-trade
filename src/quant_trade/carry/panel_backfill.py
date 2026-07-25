@@ -43,6 +43,7 @@ from quant_trade.evidence.receipts import (
     IngestionReceipt,
     append_receipt,
     normalized_rows_sha256,
+    receipt_relative_path,
 )
 
 _KIND_ENDPOINTS = {
@@ -60,6 +61,7 @@ class PanelBackfillResult:
     venue: str
     symbol: str
     pages_fetched: int = 0
+    funding_pages_fetched: int = 0
     rows_per_series: dict[str, int] = field(default_factory=dict)
     settlements: int = 0
     panel_rows: int = 0
@@ -92,6 +94,7 @@ def _archive_page(
     raw: bytes,
     rows: list[dict[str, Any]],
     source_kind: str,
+    captured_at_utc: str,
 ) -> str:
     raw_dir = out_dir / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -99,17 +102,21 @@ def _archive_page(
     raw_file = raw_dir / f"{sha}.json"
     if not raw_file.exists():
         raw_file.write_bytes(raw)
+    receipts_path = out_dir / "receipts.jsonl"
     append_receipt(
-        out_dir / "receipts.jsonl",
+        receipts_path,
         IngestionReceipt(
             provider_or_venue=venue,
             endpoint=endpoint,
             request_parameters=params,
             http_status=200,
-            captured_at_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            # This exact value was passed to parsers that embed capture time
+            # in normalized funding rows. Replacing it with a later wall-clock
+            # value would make a clean reparse hash differently.
+            captured_at_utc=captured_at_utc,
             adapter_name="carry.panel_backfill.bybit",
             adapter_version="1",
-            raw_path=str(raw_file),
+            raw_path=receipt_relative_path(raw_file, receipts_path),
             raw_sha256=sha,
             normalized_rows_sha256=normalized_rows_sha256(rows),
             source_kind=source_kind,
@@ -139,11 +146,16 @@ def run_panel_backfill(
     out.mkdir(parents=True, exist_ok=True)
     source_kind = "fixture" if fixture_pages is not None else "live"
     result = PanelBackfillResult(
-        status="OK", venue=venue, symbol=symbol.upper(), panel_dir=str(out),
+        status="OK",
+        venue=venue,
+        symbol=symbol.upper(),
+        panel_dir=str(out),
         provenance=source_kind,
     )
-    active_fetch = fetcher if fetcher is not None else (
-        lambda u: fetch_public_bytes(u, timeout_seconds=timeout_seconds)
+    active_fetch = (
+        fetcher
+        if fetcher is not None
+        else (lambda u: fetch_public_bytes(u, timeout_seconds=timeout_seconds))
     )
     interval = str(interval_minutes)
     captured = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -170,23 +182,30 @@ def run_panel_backfill(
                 try:
                     raw = active_fetch(url)
                 except Exception as exc:  # noqa: BLE001 - verbatim error IS the evidence
-                    return log_not_run(
-                        "NOT_RUN_NETWORK_BLOCKED", f"{type(exc).__name__}: {exc}"
-                    )
+                    return log_not_run("NOT_RUN_NETWORK_BLOCKED", f"{type(exc).__name__}: {exc}")
             try:
                 page_rows = parse_bybit_kline_page(raw, symbol=symbol, kind=kind)
             except (ValueError, KeyError) as exc:
-                return log_not_run(
-                    "NOT_RUN_PARSE_REJECTED", f"{kind}: {type(exc).__name__}: {exc}"
-                )
+                return log_not_run("NOT_RUN_PARSE_REJECTED", f"{kind}: {type(exc).__name__}: {exc}")
             sha = _archive_page(
                 out,
                 venue=venue,
                 endpoint=url.split("?")[0],
-                params={"kind": kind, "end": end_cursor, "interval": interval},
+                params={
+                    "kind": kind,
+                    "symbol": symbol.upper(),
+                    "source_name": (
+                        f"fixture:{Path(fixture_pages[kind]).name}"
+                        if fixture_pages is not None
+                        else "bybit:public"
+                    ),
+                    "end": end_cursor,
+                    "interval": interval,
+                },
                 raw=raw,
                 rows=page_rows,
                 source_kind=source_kind,
+                captured_at_utc=captured,
             )
             result.pages_fetched += 1
             if sha in seen_pages or not page_rows:
@@ -202,42 +221,82 @@ def run_panel_backfill(
         series[kind] = [rows[k] for k in sorted(rows)]
         result.rows_per_series[kind] = len(series[kind])
 
-    # funding history (settlements) — same receipt discipline
-    if fixture_pages is not None:
-        funding_raw = Path(fixture_pages["funding"]).read_bytes()
-    else:
-        try:
-            funding_raw = active_fetch(build_backfill_url(venue, symbol, 200))
-        except Exception as exc:  # noqa: BLE001
-            return log_not_run("NOT_RUN_NETWORK_BLOCKED", f"{type(exc).__name__}: {exc}")
-    try:
-        funding_events = parse_bybit_funding_history(
-            funding_raw, symbol=symbol, captured_at_utc=captured
-        )
-    except (ValueError, KeyError) as exc:
-        return log_not_run("NOT_RUN_PARSE_REJECTED", f"funding: {type(exc).__name__}: {exc}")
-    _archive_page(
-        out,
-        venue=venue,
-        endpoint=build_backfill_url(venue, symbol, 200).split("?")[0],
-        params={"kind": "funding"},
-        raw=funding_raw,
-        rows=[e.to_dict() for e in funding_events],
-        source_kind=source_kind,
+    # Funding history is paginated over the exact requested range.
+    funding_source_name = (
+        f"fixture:{Path(fixture_pages['funding']).name}"
+        if fixture_pages is not None
+        else "bybit:public"
     )
     import calendar
 
-    settlements = [
-        {
-            "settled_at_ms": int(
-                calendar.timegm(
-                    time.strptime(e.exchange_timestamp_utc, "%Y-%m-%dT%H:%M:%SZ")
-                )
+    settlement_by_time: dict[int, float] = {}
+    seen_funding_pages: set[str] = set()
+    funding_cursor = until_ms
+    for _page in range(MAX_PAGES_PER_SERIES):
+        funding_url = build_backfill_url(venue, symbol, 200) + f"&endTime={funding_cursor}"
+        if fixture_pages is not None:
+            funding_raw = Path(fixture_pages["funding"]).read_bytes()
+        else:
+            try:
+                funding_raw = active_fetch(funding_url)
+            except Exception as exc:  # noqa: BLE001
+                return log_not_run("NOT_RUN_NETWORK_BLOCKED", f"{type(exc).__name__}: {exc}")
+        funding_sha = sha256_of_bytes(funding_raw)
+        if funding_sha in seen_funding_pages:
+            break
+        seen_funding_pages.add(funding_sha)
+        try:
+            funding_events = parse_bybit_funding_history(
+                funding_raw,
+                symbol=symbol,
+                captured_at_utc=captured,
+                source_name=funding_source_name,
             )
-            * 1000,
-            "rate": e.realized_funding_rate,
-        }
-        for e in funding_events
+        except (ValueError, KeyError) as exc:
+            return log_not_run(
+                "NOT_RUN_PARSE_REJECTED",
+                f"funding: {type(exc).__name__}: {exc}",
+            )
+        _archive_page(
+            out,
+            venue=venue,
+            endpoint=funding_url.split("?")[0],
+            params={
+                "kind": "funding",
+                "symbol": symbol.upper(),
+                "source_name": funding_source_name,
+                "end": funding_cursor,
+                "limit": 200,
+            },
+            raw=funding_raw,
+            rows=[event.to_dict() for event in funding_events],
+            source_kind=source_kind,
+            captured_at_utc=captured,
+        )
+        result.funding_pages_fetched += 1
+        event_times: list[int] = []
+        for event in funding_events:
+            settled_at = int(
+                calendar.timegm(time.strptime(event.exchange_timestamp_utc, "%Y-%m-%dT%H:%M:%SZ"))
+                * 1000
+            )
+            event_times.append(settled_at)
+            if not since_ms <= settled_at <= until_ms:
+                continue
+            previous = settlement_by_time.get(settled_at)
+            if previous is not None and previous != event.realized_funding_rate:
+                return log_not_run(
+                    "NOT_RUN_PARSE_REJECTED",
+                    f"funding conflict at {event.exchange_timestamp_utc}",
+                )
+            settlement_by_time[settled_at] = event.realized_funding_rate
+        if not event_times or min(event_times) <= since_ms or fixture_pages is not None:
+            break
+        funding_cursor = min(event_times) - 1
+
+    settlements = [
+        {"settled_at_ms": settled_at, "rate": rate}
+        for settled_at, rate in sorted(settlement_by_time.items())
     ]
     result.settlements = len(settlements)
 
@@ -250,8 +309,22 @@ def run_panel_backfill(
         index=series["index"],
         settlements=settlements,
         interval_minutes=interval_minutes,
+        requested_since_ms=since_ms,
+        requested_until_ms=until_ms,
     )
-    write_panel(out, panel_rows, audit)
+    audit.provenance = "test_only" if source_kind == "fixture" else "real"
+    write_panel(
+        out,
+        panel_rows,
+        audit,
+        build_context={
+            "venue": venue,
+            "symbol": symbol.upper(),
+            "interval_minutes": interval_minutes,
+            "requested_since_ms": since_ms,
+            "requested_until_ms": until_ms,
+        },
+    )
     result.panel_rows = len(panel_rows)
     result.audit = audit.to_dict()
     return result

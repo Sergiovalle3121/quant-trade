@@ -7,7 +7,11 @@ from quant_trade.paper.models import PaperOrder
 
 
 def paper_order_to_broker_order_request(
-    paper_order: PaperOrder, config: BrokerConfig
+    paper_order: PaperOrder,
+    config: BrokerConfig,
+    *,
+    reference_price: float | None = None,
+    reference_timestamp_utc: str | None = None,
 ) -> BrokerOrderRequest:
     if paper_order.order_type != "market":
         raise BrokerSafetyError("only market orders can be mapped initially")
@@ -26,6 +30,8 @@ def paper_order_to_broker_order_request(
         time_in_force="day",
         client_order_id=f"qt-{paper_order.order_id}"[:48],
         dry_run=config.dry_run_default,
+        reference_price=reference_price,
+        reference_timestamp_utc=reference_timestamp_utc,
         strategy_id=None,
         reason=paper_order.reason or "mapped from simulated paper order",
     )

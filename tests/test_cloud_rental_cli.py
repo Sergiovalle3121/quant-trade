@@ -31,7 +31,7 @@ def test_evaluate_aws_hashing_is_blocked_pending_approval():
         cloud_rental_app, ["evaluate", "--config", AWS_HW, "--evaluated-at-utc", NOW]
     )
     assert result.exit_code == 1  # blocked
-    assert "BLOCKED_PENDING_WRITTEN_APPROVAL" in result.output
+    assert "BLOCKED_PROVIDER_TERMS" in result.output
 
 
 def test_evaluate_alibaba_hashing_is_blocked_by_policy():
@@ -49,17 +49,27 @@ def test_compare_builds_the_four_row_matrix(tmp_path):
         cloud_rental_app,
         [
             "compare",
-            "--config", AWS_CP, "--config", AWS_HW,
-            "--config", ALI_CP, "--config", ALI_HW,
-            "--output", str(out_json), "--markdown", str(out_md),
-            "--evaluated-at-utc", NOW,
+            "--config",
+            AWS_CP,
+            "--config",
+            AWS_HW,
+            "--config",
+            ALI_CP,
+            "--config",
+            ALI_HW,
+            "--output",
+            str(out_json),
+            "--markdown",
+            str(out_md),
+            "--evaluated-at-utc",
+            NOW,
         ],
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(out_json.read_text())
     statuses = {(r["provider"], r["purpose"]): r["status"] for r in payload["rows"]}
     assert statuses[("aws", "control_plane")] == "PAPER_CONTROL_PLANE_CANDIDATE"
-    assert statuses[("aws", "hashing_worker")] == "BLOCKED_PENDING_WRITTEN_APPROVAL"
+    assert statuses[("aws", "hashing_worker")] == "BLOCKED_PROVIDER_TERMS"
     assert statuses[("alibaba", "control_plane")] == "PAPER_CONTROL_PLANE_CANDIDATE"
     assert statuses[("alibaba", "hashing_worker")] == "BLOCKED_PROVIDER_POLICY"
     assert payload["safety"]["external_spend_authorized"] is False

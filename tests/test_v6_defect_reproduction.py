@@ -226,9 +226,7 @@ def test_signal_uses_last_n_unique_settlements(tmp_path):
     from quant_trade.carry.backfill import run_backfill
 
     store = tmp_path / "history.jsonl"
-    run_backfill(
-        "bybit", "BTC", store, fixture_path="tests/fixtures/bybit_funding_history.json"
-    )
+    run_backfill("bybit", "BTC", store, fixture_path="tests/fixtures/bybit_funding_history.json")
     # append optimistic polls quoting a rate far above what actually settled
     polls = _poll_store(tmp_path, n=30)
     merged = tmp_path / "merged.jsonl"
@@ -246,9 +244,7 @@ def test_signal_uses_last_n_unique_settlements(tmp_path):
 
 
 def test_h3_is_cross_venue_or_absent():
-    cfg = yaml.safe_load(
-        Path("configs/opportunities/trading_scan_v5.yaml").read_text()
-    )
+    cfg = yaml.safe_load(Path("configs/opportunities/trading_scan_v5.yaml").read_text())
     h3 = next(h for h in cfg["hypotheses"] if h["id"] == "H3")
     campaign = h3.get("campaign") or {}
     # a cross-venue dispersion hypothesis cannot be a single-venue campaign
@@ -312,16 +308,20 @@ def test_board_scores_share_one_unit():
         cash_yield_annual=0.04,
         evaluated_at_utc="2026-07-24T23:00:00Z",
         trading_lineage=lineage_for_rows(
-            trading_rows, artifact="TRADING_OPPORTUNITY_LEADERBOARD",
-            path="<memory>", evaluated_at_utc="2026-07-24T23:00:00Z",
+            trading_rows,
+            artifact="TRADING_OPPORTUNITY_LEADERBOARD",
+            path="<memory>",
+            evaluated_at_utc="2026-07-24T23:00:00Z",
         ),
         mining_lineage=lineage_for_rows(
-            mining_cells, artifact="MINING_RENTAL_MATRIX",
-            path="<memory>", evaluated_at_utc="2026-07-24T23:00:00Z",
+            mining_cells,
+            artifact="MINING_RENTAL_MATRIX",
+            path="<memory>",
+            evaluated_at_utc="2026-07-24T23:00:00Z",
         ),
     )
     units = {e.get("score_unit") for e in board["entries"] if e["eligible"]}
-    assert units == {"annualized_net_return_on_capital"}
+    assert units == {"net_return_on_committed_capital_30d"}
 
 
 # --- L. the board trusts arbitrary artifacts --------------------------------
@@ -388,9 +388,7 @@ def test_readiness_evidence_hash_binds_external_logs():
 def test_market_inputs_require_sourced_snapshots():
     # V6-O closed: no inline revenue anywhere; every cell references a
     # sourced market_snapshot, and the scanner REJECTS inline revenue.
-    cells = yaml.safe_load(
-        Path("configs/opportunities/mining_scan_v5.yaml").read_text()
-    )["cells"]
+    cells = yaml.safe_load(Path("configs/opportunities/mining_scan_v5.yaml").read_text())["cells"]
     assert all("revenue" not in c for c in cells)
     assert all(c.get("market_snapshot") for c in cells)
     from quant_trade.opportunities.mining_scan import scan_mining_cells
@@ -435,24 +433,17 @@ def test_algorithm_units_are_dimensional():
             captured_at_utc="2026-07-25T03:00:00Z",
             raw_sha256="ab" * 32,
         )
-    assert "INCOMPATIBLE_OR_UNBENCHMARKED" in (
-        check_algorithm_hardware("sha256", "gpu") or ""
-    )
+    assert "INCOMPATIBLE_OR_UNBENCHMARKED" in (check_algorithm_hardware("sha256", "gpu") or "")
     assert check_algorithm_hardware("kheavyhash", "gpu") is None
 
 
 def _matrix_rows() -> list[dict]:
     """The defect matrix rows — kept in the test so the artifact stays honest."""
-    return [
-        {"defect": letter, "status": "REPRODUCED_RED_TEST"}
-        for letter in "ABCDEFGHIJKLMNO"
-    ]
+    return [{"defect": letter, "status": "REPRODUCED_RED_TEST"} for letter in "ABCDEFGHIJKLMNO"]
 
 
 def test_defect_matrix_artifact_matches_the_red_tests():
-    matrix = json.loads(
-        Path("artifacts/v6/DEFECT_REPRODUCTION_MATRIX.json").read_text()
-    )
+    matrix = json.loads(Path("artifacts/v6/DEFECT_REPRODUCTION_MATRIX.json").read_text())
     letters = {row["defect"] for row in matrix["defects"]}
     assert letters == set("ABCDEFGHIJKLMNO")
 
@@ -477,8 +468,12 @@ def test_benchmark_importer_reconstructs_from_raw_log():
     assert rebuilt["shares_accepted"] == 10
     assert rebuilt["shares_rejected"] == 1
     ok = verify_benchmark_against_log(
-        {"hashrate_hs": 1.0e9, "duration_seconds": 3600, "shares_accepted": 10,
-         "shares_rejected": 1},
+        {
+            "hashrate_hs": 1.0e9,
+            "duration_seconds": 3600,
+            "shares_accepted": 10,
+            "shares_rejected": 1,
+        },
         raw,
     )
     assert ok == []

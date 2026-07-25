@@ -1,0 +1,9 @@
+{
+  "annual_yield": 0.04,
+  "captured_at_utc": "2026-07-24T00:00:00Z",
+  "evidence_class": "RECORDED_RESPONSE",
+  "raw_artifact": "tests/fixtures/cash_baseline_v7.raw.json",
+  "raw_sha256": "4d258de86011484bc99085f813f8a832e89653b8beb5c35526c0ef46448f5462",
+  "source_name": "offline_recorded_response",
+  "source_url": "https://example.invalid/recorded-cash-baseline"
+}

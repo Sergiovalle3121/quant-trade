@@ -10,6 +10,21 @@ from quant_trade.cloud_rental.feasibility import (
     feasibility_matrix,
     matrix_markdown,
 )
+from quant_trade.cloud_rental.hashpower_marketplace import (
+    MarketplaceDeliveryEvidence,
+    MarketplaceOrderbookEvidence,
+    evaluate_marketplace_evidence,
+    load_marketplace_delivery,
+    load_marketplace_orderbook,
+)
+from quant_trade.cloud_rental.market import (
+    ALGORITHM_UNIT_REGISTRY_VERSION,
+    AlgorithmUnitDefinition,
+    MarketSnapshot,
+    algorithm_unit,
+    native_hashrate_units,
+    verify_market_snapshot_bytes,
+)
 from quant_trade.cloud_rental.models import (
     SAFETY_POSTURE,
     BenchmarkEvidence,
@@ -20,6 +35,7 @@ from quant_trade.cloud_rental.models import (
     InstanceSpecification,
     ProviderPolicyEvidence,
     PurchaseModel,
+    RentalType,
     WorkloadPurpose,
 )
 from quant_trade.cloud_rental.policy import OFFICIAL_POLICY_SOURCES, evaluate_provider_policy
@@ -27,6 +43,11 @@ from quant_trade.cloud_rental.policy import OFFICIAL_POLICY_SOURCES, evaluate_pr
 __all__ = [
     "SAFETY_POSTURE",
     "OFFICIAL_POLICY_SOURCES",
+    "ALGORITHM_UNIT_REGISTRY_VERSION",
+    "AlgorithmUnitDefinition",
+    "MarketSnapshot",
+    "MarketplaceDeliveryEvidence",
+    "MarketplaceOrderbookEvidence",
     "BenchmarkEvidence",
     "CloudProvider",
     "ComputeQuote",
@@ -35,11 +56,18 @@ __all__ = [
     "InstanceSpecification",
     "ProviderPolicyEvidence",
     "PurchaseModel",
+    "RentalType",
     "RevenueAssumptions",
     "WorkloadPurpose",
     "compute_rental_economics",
+    "algorithm_unit",
     "evaluate_feasibility",
     "evaluate_provider_policy",
+    "evaluate_marketplace_evidence",
     "feasibility_matrix",
     "matrix_markdown",
+    "native_hashrate_units",
+    "load_marketplace_delivery",
+    "load_marketplace_orderbook",
+    "verify_market_snapshot_bytes",
 ]

@@ -12,9 +12,11 @@ from __future__ import annotations
 import json
 import math
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from quant_trade.evidence.canonical_json import canonical_dumps
 
@@ -153,9 +155,42 @@ def existing_dedup_keys(path: str | Path) -> set[str]:
     return keys
 
 
-def append_observations(
-    path: str | Path, observations: list[FundingObservation]
-) -> AppendResult:
+@contextmanager
+def _exclusive_file_lock(handle: BinaryIO) -> Iterator[None]:
+    """Hold a blocking, process-wide lock on the sidecar file.
+
+    ``fcntl`` is unavailable on Windows.  Locking one persistent byte with
+    ``msvcrt`` gives the same critical-section semantics there, while POSIX
+    keeps using ``flock``.  The byte is metadata only and is never interpreted.
+    """
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+            os.fsync(handle.fileno())
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        try:
+            yield
+        finally:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        from importlib import import_module
+
+        fcntl = import_module("fcntl")
+        flock = fcntl.__dict__["flock"]
+        flock(handle.fileno(), fcntl.__dict__["LOCK_EX"])
+        try:
+            yield
+        finally:
+            flock(handle.fileno(), fcntl.__dict__["LOCK_UN"])
+
+
+def append_observations(path: str | Path, observations: list[FundingObservation]) -> AppendResult:
     """Idempotently append observations (existing dedup keys are skipped).
 
     An exclusive ``flock`` on a sidecar lock file serialises concurrent
@@ -164,31 +199,25 @@ def append_observations(
     collectors can neither duplicate nor interleave records. Lines are written
     in one buffered write followed by flush+fsync.
     """
-    import fcntl
-
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     lock_path = p.with_suffix(p.suffix + ".lock")
-    with lock_path.open("a", encoding="utf-8") as lock_handle:
-        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
-        try:
-            known = existing_dedup_keys(p)
-            fresh: list[FundingObservation] = []
-            seen_batch: set[str] = set()
-            for obs in observations:
-                key = obs.dedup_key
-                if key in known or key in seen_batch:
-                    continue
-                seen_batch.add(key)
-                fresh.append(obs)
-            if fresh:
-                payload = "".join(canonical_dumps(o.to_dict()) + "\n" for o in fresh)
-                with p.open("a", encoding="utf-8") as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-        finally:
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+    with lock_path.open("a+b") as lock_handle, _exclusive_file_lock(lock_handle):
+        known = existing_dedup_keys(p)
+        fresh: list[FundingObservation] = []
+        seen_batch: set[str] = set()
+        for obs in observations:
+            key = obs.dedup_key
+            if key in known or key in seen_batch:
+                continue
+            seen_batch.add(key)
+            fresh.append(obs)
+        if fresh:
+            payload = "".join(canonical_dumps(o.to_dict()) + "\n" for o in fresh)
+            with p.open("a", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
     return AppendResult(
         appended=len(fresh),
         deduplicated=len(observations) - len(fresh),

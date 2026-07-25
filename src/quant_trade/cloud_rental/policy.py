@@ -1,22 +1,13 @@
 """Fail-closed provider-policy gates for rented compute.
 
-Facts this module encodes (sources below; every decision demands a
-human-reviewed, attributable, unexpired snapshot — a URL alone proves nothing):
+V7 separates permission to run an ordinary control plane from permission to
+hash. AWS Service Terms §1.25 (current 2026-07-09) prohibit cryptocurrency
+mining, and Alibaba documents mining as grounds for a security lock.
 
-- **AWS**: mining is not categorically banned, but AWS Service Terms §1.25 and
-  AWS's own guidance require written approval for crypto-mining workloads, and
-  mining on Free Tier / promotional credits is prohibited. Without a verifiable
-  written-approval artifact: ``BLOCKED_PENDING_WRITTEN_APPROVAL``.
-- **Alibaba Cloud**: cryptocurrency mining is listed as a security-violation
-  example that gets ECS instances locked. Default: ``BLOCKED_PROVIDER_POLICY``.
-  Only an explicit, current, human-reviewed contractual exception could lift it.
-- Control-plane / research / paper workloads are ordinary compute and can be
-  evaluated offline — evaluation still creates no resources.
-
-Absent, ambiguous, expired, or unattributable policy evidence is always
-``BLOCKED_POLICY_UNKNOWN`` (or the provider's stricter default). BLOCKED is a
-legal/operational state and is never collapsed into an economic NO-GO.
-This module is not legal advice; human review of the terms is mandatory.
+A boolean, review flag, generic ticket, historical blog post, or declarative
+``written_approval`` record cannot unlock hashing. A future implementation may
+validate an exact-scope contractual amendment, but V7 still will not execute a
+mining workload. This module is not legal advice.
 """
 
 from __future__ import annotations
@@ -49,8 +40,7 @@ OFFICIAL_POLICY_SOURCES: dict[str, list[dict[str, str]]] = {
         },
         {
             "url": (
-                "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/"
-                "price-changes.html"
+                "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/price-changes.html"
             ),
             "establishes": "Price List as the on-demand price source",
         },
@@ -72,9 +62,7 @@ OFFICIAL_POLICY_SOURCES: dict[str, list[dict[str, str]]] = {
                 "https://www.alibabacloud.com/help/en/ecs/developer-reference/"
                 "api-behavior-when-an-instance-is-locked-for-security-reasons"
             ),
-            "establishes": (
-                "cryptocurrency mining listed as a security-violation lock example"
-            ),
+            "establishes": ("cryptocurrency mining listed as a security-violation lock example"),
         },
         {
             "url": (
@@ -99,6 +87,8 @@ class PolicyGateResult:
     status: FeasibilityStatus
     reason: str
     evidence_summary: dict[str, Any] | None = None
+    control_plane_allowed: bool = False
+    hashing_allowed: bool = False
 
 
 def _evidence_is_usable(
@@ -135,82 +125,73 @@ def evaluate_provider_policy(
                 if usable
                 else f"prohibitive evidence on file but unusable ({why}); failing closed"
             )
-            return PolicyGateResult(FeasibilityStatus.BLOCKED_PROVIDER_POLICY, reason)
+            return PolicyGateResult(
+                FeasibilityStatus.BLOCKED_PROVIDER_POLICY,
+                reason,
+                control_plane_allowed=False,
+                hashing_allowed=False,
+            )
         return PolicyGateResult(
             FeasibilityStatus.ELIGIBLE_FOR_OFFLINE_EVALUATION,
             "ordinary compute workload; offline evaluation only — no resources are created",
+            control_plane_allowed=True,
+            hashing_allowed=False,
         )
 
     # HASHING_WORKER from here on.
     if uses_free_tier_or_credits:
         return PolicyGateResult(
-            FeasibilityStatus.BLOCKED_PROVIDER_POLICY,
+            (
+                FeasibilityStatus.BLOCKED_PROVIDER_TERMS
+                if provider is CloudProvider.AWS
+                else FeasibilityStatus.BLOCKED_PROVIDER_POLICY
+            ),
             "mining on Free Tier or promotional credits is prohibited; "
             "no credit-funded evaluation is permitted",
+            control_plane_allowed=True,
+            hashing_allowed=False,
         )
 
     if provider is CloudProvider.AWS:
-        if evidence is None:
-            return PolicyGateResult(
-                FeasibilityStatus.BLOCKED_PENDING_WRITTEN_APPROVAL,
-                "no verifiable AWS Trust & Safety written-approval artifact on file "
-                "(AWS Service Terms §1.25); human review of terms is mandatory",
-            )
-        usable, why = _evidence_is_usable(evidence, evaluated_at_utc)
-        if not usable:
-            return PolicyGateResult(
-                FeasibilityStatus.BLOCKED_PENDING_WRITTEN_APPROVAL,
-                f"written-approval artifact unusable: {why}",
-            )
-        if evidence.policy_status == "written_approval":
-            return PolicyGateResult(
-                FeasibilityStatus.ELIGIBLE_FOR_OFFLINE_EVALUATION,
-                "written approval on file and reviewed; offline evaluation only — "
-                "no instance is created and no spend is authorized",
-                evidence.to_dict(),
-            )
-        if evidence.policy_status == "prohibited_default":
-            return PolicyGateResult(
-                FeasibilityStatus.BLOCKED_PROVIDER_POLICY,
-                "reviewed AWS evidence records a prohibition for this account/workload",
+        evidence_note = ""
+        if evidence is not None:
+            usable, why = _evidence_is_usable(evidence, evaluated_at_utc)
+            evidence_note = (
+                " The supplied record is current but cannot override the terms."
+                if usable
+                else f" The supplied record is unusable ({why})."
             )
         return PolicyGateResult(
-            FeasibilityStatus.BLOCKED_POLICY_UNKNOWN,
-            f"AWS policy evidence status {evidence.policy_status!r} is not a written approval",
+            FeasibilityStatus.BLOCKED_PROVIDER_TERMS,
+            "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency "
+            "mining; an older blog, generic approval, YAML flag, or human_reviewed "
+            f"boolean does not prevail.{evidence_note}",
+            evidence.to_dict() if evidence is not None else None,
+            control_plane_allowed=True,
+            hashing_allowed=False,
         )
 
     if provider is CloudProvider.ALIBABA:
-        if evidence is None:
-            return PolicyGateResult(
-                FeasibilityStatus.BLOCKED_PROVIDER_POLICY,
-                "Alibaba Cloud lists cryptocurrency mining as a security-violation "
-                "lock example; blocked by default absent a written contractual "
-                "exception (a ticket or assumption is not enough)",
-            )
-        usable, why = _evidence_is_usable(evidence, evaluated_at_utc)
-        if not usable:
-            return PolicyGateResult(
-                FeasibilityStatus.BLOCKED_PROVIDER_POLICY,
-                f"contractual-exception artifact unusable: {why}; provider default stands",
-            )
-        if evidence.policy_status == "written_approval":
-            return PolicyGateResult(
-                FeasibilityStatus.ELIGIBLE_FOR_OFFLINE_EVALUATION,
-                "explicit written contractual exception on file and reviewed; offline "
-                "evaluation only — no instance is created and no spend is authorized",
-                evidence.to_dict(),
-            )
-        if evidence.policy_status == "unknown":
-            return PolicyGateResult(
-                FeasibilityStatus.BLOCKED_POLICY_UNKNOWN,
-                "Alibaba policy evidence is ambiguous; failing closed",
+        evidence_note = ""
+        if evidence is not None:
+            usable, why = _evidence_is_usable(evidence, evaluated_at_utc)
+            evidence_note = (
+                " The supplied record is current but cannot enable hashing in V7."
+                if usable
+                else f" The supplied record is unusable ({why})."
             )
         return PolicyGateResult(
             FeasibilityStatus.BLOCKED_PROVIDER_POLICY,
-            "reviewed Alibaba evidence confirms the default prohibition",
+            "Alibaba Cloud documents cryptocurrency mining as a security-lock "
+            f"condition; tickets, flags, and human review do not unlock hashing.{evidence_note}",
+            evidence.to_dict() if evidence is not None else None,
+            control_plane_allowed=True,
+            hashing_allowed=False,
         )
 
     return PolicyGateResult(
         FeasibilityStatus.BLOCKED_POLICY_UNKNOWN,
         f"no policy model for provider {provider!r}; failing closed",
+        control_plane_allowed=False,
+        hashing_allowed=False,
     )

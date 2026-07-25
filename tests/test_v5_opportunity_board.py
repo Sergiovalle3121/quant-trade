@@ -20,20 +20,33 @@ from quant_trade.opportunities.trading_scan import (
 
 NOW = "2026-07-24T21:30:00Z"
 
+
+def _real_cash() -> dict:
+    return {
+        "annual_yield": 0.04,
+        "evidence_class": "REAL",
+        "raw_artifact": "tests/fixtures/cash_baseline_v7.raw.json",
+        "raw_sha256": "4d258de86011484bc99085f813f8a832e89653b8beb5c35526c0ef46448f5462",
+    }
+
+
 def _lineages(trading_rows, mining_cells, at=NOW):
     from quant_trade.opportunities.board import lineage_for_rows
 
     return {
         "trading_lineage": lineage_for_rows(
-            trading_rows, artifact="TRADING_OPPORTUNITY_LEADERBOARD",
-            path="<memory>", evaluated_at_utc=at,
+            trading_rows,
+            artifact="TRADING_OPPORTUNITY_LEADERBOARD",
+            path="<memory>",
+            evaluated_at_utc=at,
         ),
         "mining_lineage": lineage_for_rows(
-            mining_cells, artifact="MINING_RENTAL_MATRIX",
-            path="<memory>", evaluated_at_utc=at,
+            mining_cells,
+            artifact="MINING_RENTAL_MATRIX",
+            path="<memory>",
+            evaluated_at_utc=at,
         ),
     }
-
 
 
 def _campaign_for(dataset_path: str) -> dict:
@@ -87,9 +100,7 @@ def test_scan_rejects_bad_dataset_without_dying(tmp_path):
 
     # settlement-only store: no quote observations -> fail-closed rejection
     store = tmp_path / "settlements_only.jsonl"
-    run_backfill(
-        "bybit", "BTC", store, fixture_path="tests/fixtures/bybit_funding_history.json"
-    )
+    run_backfill("bybit", "BTC", store, fixture_path="tests/fixtures/bybit_funding_history.json")
     cfg = {
         "hypotheses": [
             {
@@ -113,9 +124,7 @@ def test_scan_rejects_bad_dataset_without_dying(tmp_path):
 
 
 def _mining_cells():
-    return json.loads(Path("artifacts/v5/MINING_RENTAL_MATRIX.json").read_text())[
-        "cells"
-    ]
+    return json.loads(Path("artifacts/v5/MINING_RENTAL_MATRIX.json").read_text())["cells"]
 
 
 def test_board_with_no_eligible_candidates_crowns_cash():
@@ -127,6 +136,7 @@ def test_board_with_no_eligible_candidates_crowns_cash():
         trading_rows=trading_rows,
         mining_cells=mining_cells,
         cash_yield_annual=0.04,
+        cash_evidence=_real_cash(),
         evaluated_at_utc=NOW,
         **_lineages(trading_rows, mining_cells),
     )
@@ -160,6 +170,7 @@ def test_board_ranks_eligible_candidate_above_cash_and_allocates_capped():
         trading_rows=trading_rows,
         mining_cells=mining_cells,
         cash_yield_annual=0.04,
+        cash_evidence=_real_cash(),
         evaluated_at_utc=NOW,
         **_lineages(trading_rows, mining_cells),
     )
@@ -173,6 +184,29 @@ def test_board_ranks_eligible_candidate_above_cash_and_allocates_capped():
     assert total == pytest.approx(100_000.0)
     assert allocation["paper_only"] is True
     assert allocation["real_money_authorized"] is False
+
+
+def test_manual_cash_baseline_cannot_promote_a_candidate():
+    trading_rows = [
+        {
+            "hypothesis_id": "H1",
+            "status": "PAPER_CANDIDATE",
+            "data_source": "real",
+            "metrics": {"total_return": 0.05, "span_days": 60.0},
+            "reasons": [],
+        }
+    ]
+    board = build_opportunity_board(
+        trading_rows=trading_rows,
+        mining_cells=[],
+        cash_yield_annual=0.04,
+        evaluated_at_utc=NOW,
+        **_lineages(trading_rows, []),
+    )
+    candidate = next(entry for entry in board["entries"] if entry["kind"] == "trading")
+    assert candidate["eligible"] is False
+    assert "cash baseline" in candidate["reasons"][0]
+    assert board["cash_evidence"]["evidence_class"] == "MANUAL_UNVERIFIED"
 
 
 def test_test_only_mining_candidate_is_never_eligible():

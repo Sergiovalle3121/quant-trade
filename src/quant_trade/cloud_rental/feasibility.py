@@ -58,6 +58,8 @@ def evaluate_feasibility(
             status=str(policy.status),
             policy_reason=policy.reason,
             safety=dict(SAFETY_POSTURE),
+            control_plane_allowed=policy.control_plane_allowed,
+            hashing_allowed=policy.hashing_allowed,
         )
 
     # 2. Quote freshness (recomputed, never trusted).
@@ -70,6 +72,8 @@ def evaluate_feasibility(
             policy_reason=policy.reason,
             economic_reason="; ".join(freshness_problems),
             safety=dict(SAFETY_POSTURE),
+            control_plane_allowed=policy.control_plane_allowed,
+            hashing_allowed=policy.hashing_allowed,
         )
 
     # 3. Control-plane style workloads: cost summary against budget only.
@@ -93,6 +97,8 @@ def evaluate_feasibility(
             ),
             details={"all_in_cost_per_hour_usd": hourly, "horizon_cost_usd": horizon_cost},
             safety=dict(SAFETY_POSTURE),
+            control_plane_allowed=policy.control_plane_allowed,
+            hashing_allowed=policy.hashing_allowed,
         )
 
     # 4. Hashing worker: measured benchmark of THIS SKU is mandatory.
@@ -112,6 +118,8 @@ def evaluate_feasibility(
             policy_reason=policy.reason,
             benchmark_reason="; ".join(gate.problems),
             safety=dict(SAFETY_POSTURE),
+            control_plane_allowed=policy.control_plane_allowed,
+            hashing_allowed=policy.hashing_allowed,
         )
     assert benchmark is not None
 
@@ -140,6 +148,8 @@ def evaluate_feasibility(
         ),
         details=econ.to_dict(),
         safety=dict(SAFETY_POSTURE),
+        control_plane_allowed=policy.control_plane_allowed,
+        hashing_allowed=policy.hashing_allowed,
     )
 
 
@@ -150,9 +160,7 @@ def feasibility_matrix(
     rows: list[FeasibilityDecision] = []
     for cfg in evaluations:
         revenue_cfg = cfg.get("revenue") or {}
-        revenue = (
-            RevenueAssumptions(**revenue_cfg) if revenue_cfg else None
-        )
+        revenue = RevenueAssumptions(**revenue_cfg) if revenue_cfg else None
         rows.append(
             evaluate_feasibility(
                 purpose=cfg["purpose"],

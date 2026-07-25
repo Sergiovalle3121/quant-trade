@@ -80,7 +80,18 @@ def _benchmark(artifact_sha: str, **overrides):
 @pytest.fixture()
 def artifact(tmp_path):
     path = tmp_path / "bench_artifact.json"
-    payload = b'{"benchmark_log": "offline fixture artifact"}'
+    events = [
+        {"event": "config", "algorithm": "sha256"},
+        *[{"event": "sample", "hashrate": 1.0e9, "t": i} for i in range(8)],
+        *[{"event": "share", "accepted": True} for _ in range(1000)],
+        *[{"event": "share", "accepted": False} for _ in range(10)],
+        {
+            "event": "end",
+            "duration_seconds": 3600.0,
+            "warmup_seconds": 300.0,
+        },
+    ]
+    payload = ("\n".join(json.dumps(event) for event in events) + "\n").encode()
     path.write_bytes(payload)
     return path, sha256_of_bytes(payload)
 
@@ -155,6 +166,58 @@ def test_tampered_benchmark_artifact_breaks_the_sha_chain(artifact):
     assert any("do NOT hash" in p for p in result.problems)
 
 
+def test_semantically_tampered_benchmark_is_rejected_even_with_matching_sha(
+    tmp_path,
+):
+    path = tmp_path / "bench.jsonl"
+    payload = (
+        b'{"event":"sample","hashrate":2000000000}\n'
+        b'{"event":"end","duration_seconds":3600,"warmup_seconds":300}\n'
+    )
+    path.write_bytes(payload)
+    result = EvidenceBundleValidator().validate(
+        spec=_spec(),
+        quote=_quote(),
+        benchmark=_benchmark(sha256_of_bytes(payload)),
+        algorithm="sha256",
+        benchmark_artifact_path=path,
+    )
+    assert result.status == "REJECTED_SHA_MISMATCH"
+    assert any("semantic verification failed" in p for p in result.problems)
+
+
+def test_live_quote_and_spec_require_actual_bound_bytes(tmp_path):
+    raw = tmp_path / "raw.json"
+    raw.write_bytes(b'{"recorded":"response"}')
+    sha = sha256_of_bytes(raw.read_bytes())
+    result = EvidenceBundleValidator().validate(
+        spec=_spec(raw_sha256=sha),
+        quote=_quote(
+            source_kind="spot_price_history",
+            raw_sha256=sha,
+        ),
+        benchmark=None,
+        quote_artifact_path=raw,
+        spec_artifact_path=raw,
+        require_benchmark=False,
+    )
+    assert result.status == "VALID"
+
+    raw.write_bytes(b'{"recorded":"tampered"}')
+    result = EvidenceBundleValidator().validate(
+        spec=_spec(raw_sha256=sha),
+        quote=_quote(
+            source_kind="spot_price_history",
+            raw_sha256=sha,
+        ),
+        benchmark=None,
+        quote_artifact_path=raw,
+        spec_artifact_path=raw,
+        require_benchmark=False,
+    )
+    assert result.status == "REJECTED_SHA_MISMATCH"
+
+
 def test_missing_artifact_bytes_are_missing_evidence(artifact):
     _, sha = artifact
     result = EvidenceBundleValidator().validate(
@@ -180,10 +243,7 @@ def test_v5_scan_config_reflects_the_real_blocked_posture(tmp_path):
     assert len(result.cells) == 3
     by_provider = {c.provider: c for c in result.cells}
     # AWS: Service Terms §1.25 — no written approval exists, hashing blocked
-    assert (
-        by_provider["aws"].status
-        == "POLICY_BLOCKED:BLOCKED_PENDING_WRITTEN_APPROVAL"
-    )
+    assert by_provider["aws"].status == "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS"
     assert "1.25" in " ".join(by_provider["aws"].reasons)
     # Alibaba: mining is a security-violation example — provider policy block
     assert by_provider["alibaba"].status == "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY"

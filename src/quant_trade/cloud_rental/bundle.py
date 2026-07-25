@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from quant_trade.cloud_rental.market import verify_benchmark_against_log
 from quant_trade.cloud_rental.models import (
     BenchmarkEvidence,
     ComputeQuote,
@@ -66,6 +67,8 @@ class EvidenceBundleValidator:
         policy_evidence: ProviderPolicyEvidence | None = None,
         workload: WorkloadPurpose = WorkloadPurpose.HASHING_WORKER,
         algorithm: str = "",
+        quote_artifact_path: str | Path | None = None,
+        spec_artifact_path: str | Path | None = None,
         benchmark_artifact_path: str | Path | None = None,
         policy_snapshot_path: str | Path | None = None,
         require_benchmark: bool = True,
@@ -118,14 +121,12 @@ class EvidenceBundleValidator:
             if algorithm:
                 identity(
                     benchmark.algorithm == algorithm,
-                    f"benchmark algorithm {benchmark.algorithm!r} != requested "
-                    f"{algorithm!r}",
+                    f"benchmark algorithm {benchmark.algorithm!r} != requested {algorithm!r}",
                 )
         if policy_evidence is not None:
             identity(
                 policy_evidence.provider == spec.provider,
-                f"policy provider {policy_evidence.provider} != spec provider "
-                f"{spec.provider}",
+                f"policy provider {policy_evidence.provider} != spec provider {spec.provider}",
             )
             identity(
                 policy_evidence.workload == workload,
@@ -137,23 +138,31 @@ class EvidenceBundleValidator:
         if benchmark is not None:
             if benchmark_artifact_path is None:
                 result.missing_problems.append(
-                    "benchmark artifact bytes unavailable; artifact_sha256 cannot "
-                    "be byte-verified"
+                    "benchmark artifact bytes unavailable; artifact_sha256 cannot be byte-verified"
                 )
             elif not Path(benchmark_artifact_path).exists():
                 result.missing_problems.append(
                     f"benchmark artifact missing on disk: {benchmark_artifact_path}"
                 )
-            elif sha256_of_file(benchmark_artifact_path) != benchmark.artifact_sha256:
-                result.sha_problems.append(
-                    "benchmark artifact bytes do NOT hash to the claimed "
-                    "artifact_sha256 — evidence chain broken"
-                )
+            else:
+                benchmark_path = Path(benchmark_artifact_path)
+                if sha256_of_file(benchmark_path) != benchmark.artifact_sha256:
+                    result.sha_problems.append(
+                        "benchmark artifact bytes do NOT hash to the claimed "
+                        "artifact_sha256 — evidence chain broken"
+                    )
+                else:
+                    rebuilt_problems = verify_benchmark_against_log(
+                        benchmark.to_dict(), benchmark_path.read_bytes()
+                    )
+                    result.sha_problems.extend(
+                        f"benchmark semantic verification failed: {problem}"
+                        for problem in rebuilt_problems
+                    )
         if policy_evidence is not None:
             if policy_snapshot_path is None:
                 result.missing_problems.append(
-                    "policy snapshot bytes unavailable; snapshot_sha256 cannot "
-                    "be byte-verified"
+                    "policy snapshot bytes unavailable; snapshot_sha256 cannot be byte-verified"
                 )
             elif not Path(policy_snapshot_path).exists():
                 result.missing_problems.append(
@@ -168,20 +177,52 @@ class EvidenceBundleValidator:
         # --- completeness -------------------------------------------------
         if benchmark is None and require_benchmark:
             result.missing_problems.append(
-                "no benchmark evidence for this exact SKU (a typed-in hashrate "
-                "is not evidence)"
+                "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
             )
-        # live quotes and specs must be byte-bound too (V6-O); fixtures are
-        # TEST_ONLY anyway and declare themselves
-        if quote.source_kind != "fixture":
-            if not quote.raw_sha256.strip():
+
+        # Live quotes/specs must be bound to bytes that the validator opens
+        # itself. A caller-supplied digest without the claimed artifact is not
+        # evidence. Fixture artifacts remain optional because the whole bundle
+        # is already TEST_ONLY, but are verified when supplied.
+        def verify_raw_binding(
+            *,
+            label: str,
+            claimed_sha256: str,
+            artifact_path: str | Path | None,
+            required: bool,
+        ) -> None:
+            if not claimed_sha256.strip():
+                if required:
+                    result.missing_problems.append(
+                        f"live {label} carries no raw byte binding (raw_sha256)"
+                    )
+                return
+            if artifact_path is None:
                 result.missing_problems.append(
-                    "live quote carries no raw byte binding (raw_sha256)"
+                    f"{label} artifact bytes unavailable; raw_sha256 cannot be byte-verified"
                 )
-            if not spec.raw_sha256.strip():
-                result.missing_problems.append(
-                    "live spec carries no raw byte binding (raw_sha256)"
+                return
+            path = Path(artifact_path)
+            if not path.exists():
+                result.missing_problems.append(f"{label} artifact missing on disk: {artifact_path}")
+            elif sha256_of_file(path) != claimed_sha256:
+                result.sha_problems.append(
+                    f"{label} artifact bytes do NOT hash to the claimed raw_sha256"
                 )
+
+        is_live = quote.source_kind != "fixture"
+        verify_raw_binding(
+            label="quote",
+            claimed_sha256=quote.raw_sha256,
+            artifact_path=quote_artifact_path,
+            required=is_live,
+        )
+        verify_raw_binding(
+            label="spec",
+            claimed_sha256=spec.raw_sha256,
+            artifact_path=spec_artifact_path,
+            required=is_live,
+        )
 
         # --- provenance ---------------------------------------------------
         result.test_only = quote.source_kind == "fixture" or (

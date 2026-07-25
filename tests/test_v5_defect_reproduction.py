@@ -13,8 +13,16 @@ from quant_trade.carry.research import run_carry_research
 from quant_trade.carry.store import FundingObservation, append_observations
 
 
-def _obs(minute: int, *, venue="binance", symbol="BTC", spot=64000.0, perp=64010.0,
-         rate=0.001, hour: int = 0) -> FundingObservation:
+def _obs(
+    minute: int,
+    *,
+    venue="binance",
+    symbol="BTC",
+    spot=64000.0,
+    perp=64010.0,
+    rate=0.001,
+    hour: int = 0,
+) -> FundingObservation:
     ts = f"2026-07-20T{hour:02d}:{minute:02d}:00Z"
     return FundingObservation(
         venue=venue,
@@ -77,9 +85,7 @@ def test_p0b_ninety_polls_are_not_ninety_settlements(tmp_path):
     # can only ever collect that funding ONCE (at the settlement); today each
     # observation accrues it again (~89x overcount).
     store = tmp_path / "polls.jsonl"
-    rows = [
-        _obs(minute=(i * 5) % 60, hour=(i * 5) // 60, rate=0.001) for i in range(90)
-    ]
+    rows = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60, rate=0.001) for i in range(90)]
     append_observations(store, rows)
     result = run_carry_research(_campaign_config(store))
     total_funding = float(result.net_return_series["funding_pnl"].sum())
@@ -97,19 +103,24 @@ def test_settlement_accrues_exactly_once_and_dedups(tmp_path):
 
     store = tmp_path / "with_settlement.jsonl"
     rows = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60, rate=0.001) for i in range(24)]
-    settlement = dataclasses.replace(
+    entry_signal = dataclasses.replace(
         _obs(minute=0, hour=1, rate=0.001), source_event="funding_settlement"
     )
+    settlement = dataclasses.replace(
+        _obs(minute=40, hour=1, rate=0.001), source_event="funding_settlement"
+    )
     append_observations(store, rows)
-    # append the settlement twice: dedup by funding time keeps one
-    r1 = append_observations(store, [settlement])
+    # The first unique settlement can only trigger a future position. Append
+    # the second twice: dedup by funding time keeps one payable event.
+    r1 = append_observations(store, [entry_signal, settlement])
     r2 = append_observations(store, [settlement])
-    assert r1.appended == 1 and r2.appended == 0
+    assert r1.appended == 2 and r2.appended == 0
     result = run_carry_research(_campaign_config(store))
     total_funding = float(result.net_return_series["funding_pnl"].sum())
     # the ledger accrues funding on the PERP NOTIONAL (≈ half the capital at
     # 1x leverage), and the duplicated settlement must count exactly ONCE:
-    # one 0.001 settlement on ~0.5 capital ≈ 0.0005, never ~0.001 (twice)
+    # one payable 0.001 settlement on ~0.5 capital ≈ 0.0005, never ~0.001
+    # (twice). The signal settlement itself is observed before entry.
     assert total_funding > 0.0
     assert total_funding < 0.001 * 0.75, "duplicated settlement was double-counted"
     assert total_funding == pytest.approx(0.001 * 0.5, rel=0.05)
@@ -145,9 +156,7 @@ def test_concurrent_collectors_do_not_duplicate(tmp_path):
 
     store = tmp_path / "concurrent.jsonl"
     rows = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60) for i in range(30)]
-    threads = [
-        threading.Thread(target=append_observations, args=(store, rows)) for _ in range(4)
-    ]
+    threads = [threading.Thread(target=append_observations, args=(store, rows)) for _ in range(4)]
     for t in threads:
         t.start()
     for t in threads:
@@ -164,9 +173,7 @@ def test_excessive_clock_skew_fails_closed(tmp_path):
 
     store = tmp_path / "skewed.jsonl"
     good = [_obs(minute=(i * 5) % 60, hour=(i * 5) // 60) for i in range(10)]
-    skewed = dataclasses.replace(
-        _obs(minute=55, hour=1), captured_at_utc="2026-07-20T03:00:00Z"
-    )
+    skewed = dataclasses.replace(_obs(minute=55, hour=1), captured_at_utc="2026-07-20T03:00:00Z")
     append_observations(store, good + [skewed])
     with pytest.raises(ValueError, match="clock skew"):
         run_carry_research(_campaign_config(store))
@@ -181,8 +188,7 @@ def test_mixed_provenance_is_never_real(tmp_path):
 
     snaps = synthetic_funding_snapshots(periods=120, seed=1)
     half_real = [
-        dataclasses.replace(s, data_source="real") if i % 2 == 0 else s
-        for i, s in enumerate(snaps)
+        dataclasses.replace(s, data_source="real") if i % 2 == 0 else s for i, s in enumerate(snaps)
     ]
     path = write_snapshots_json(tmp_path / "mixed_prov.json", half_real)
     with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:

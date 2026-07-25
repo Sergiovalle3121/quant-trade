@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -39,9 +40,32 @@ from quant_trade.metrics.statistics import sharpe_variance_across_trials
 
 LEDGER_FILENAME = "trial_ledger.jsonl"
 SCHEMA_VERSION = 2
+TRIAL_REGISTRY_ENV = "QUANT_TRADE_TRIAL_REGISTRY"
+CHAIN_GENESIS = "GENESIS"
+_APPEND_LOCK = threading.RLock()
 
 
-def ledger_path(outputs_dir: str | Path) -> Path:
+def ledger_path(
+    outputs_dir: str | Path | None,
+    *,
+    registry_path: str | Path | None = None,
+) -> Path:
+    """Resolve the authoritative ledger without breaking output-local callers.
+
+    Existing callers keep an output-local ledger. A stable global registry can
+    be selected explicitly with ``registry_path`` or process-wide through
+    ``QUANT_TRADE_TRIAL_REGISTRY``; in either case changing ``outputs_dir``
+    cannot reset the trial count. A configured directory receives the standard
+    filename, while a ``.jsonl`` path is used as-is.
+    """
+    configured = registry_path or os.environ.get(TRIAL_REGISTRY_ENV)
+    if configured:
+        path = Path(configured)
+        return path if path.suffix.lower() == ".jsonl" else path / LEDGER_FILENAME
+    if outputs_dir is None:
+        raise ValueError(
+            f"outputs_dir is required unless registry_path or {TRIAL_REGISTRY_ENV} is configured"
+        )
     return Path(outputs_dir) / LEDGER_FILENAME
 
 
@@ -54,6 +78,75 @@ def _canonical_json(obj: Any) -> str:
 
 def sha256_hex(obj: Any) -> str:
     return hashlib.sha256(_canonical_json(obj).encode("utf-8")).hexdigest()
+
+
+def _entry_hash(record: dict[str, Any]) -> str:
+    payload = {key: value for key, value in record.items() if key != "entry_hash"}
+    return sha256_hex(payload)
+
+
+def _reference_hash(record: dict[str, Any]) -> str:
+    value = record.get("entry_hash")
+    return str(value) if value else sha256_hex(record)
+
+
+def _last_nonempty_record(path: Path) -> dict[str, Any] | None:
+    """Read only the final JSONL record so chained appends stay O(1)."""
+    if not path.exists() or path.stat().st_size == 0:
+        return None
+    with path.open("rb") as handle:
+        position = handle.seek(0, os.SEEK_END)
+        raw = bytearray()
+        while position > 0:
+            position -= 1
+            handle.seek(position)
+            value = handle.read(1)
+            if value in (b"\n", b"\r"):
+                if raw:
+                    break
+                continue
+            raw.extend(value)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(bytes(reversed(raw)).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"trial registry ends with an invalid JSON record: {path}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"trial registry ends with a non-object JSON record: {path}")
+    return parsed
+
+
+def _chain_errors(records: list[dict[str, Any]], line_numbers: list[int]) -> list[tuple[int, str]]:
+    """Validate every chained suffix while accepting an unchained legacy prefix."""
+    errors: list[tuple[int, str]] = []
+    chain_started = False
+    for index, record in enumerate(records):
+        line_number = line_numbers[index]
+        fields = ("sequence", "previous_hash", "entry_hash")
+        present = [field in record for field in fields]
+        if not any(present):
+            if chain_started:
+                errors.append((line_number, "unchained record appears after hash chain started"))
+            continue
+        chain_started = True
+        if not all(present):
+            errors.append((line_number, "hash-chain fields are incomplete"))
+            continue
+        expected_sequence = index + 1
+        if record.get("sequence") != expected_sequence:
+            errors.append(
+                (
+                    line_number,
+                    f"sequence is {record.get('sequence')!r}, expected {expected_sequence}",
+                )
+            )
+        expected_previous = CHAIN_GENESIS if index == 0 else _reference_hash(records[index - 1])
+        if record.get("previous_hash") != expected_previous:
+            errors.append((line_number, "previous_hash does not match prior record"))
+        if record.get("entry_hash") != _entry_hash(record):
+            errors.append((line_number, "entry_hash does not match record content"))
+    return errors
 
 
 def compute_hypothesis_id(
@@ -229,18 +322,61 @@ def build_trial_record(
 # --- writing --------------------------------------------------------------
 
 
-def append_trial(outputs_dir: str | Path, entry: dict[str, Any]) -> Path:
-    """Append a raw entry (legacy flat schema stays supported)."""
-    path = ledger_path(outputs_dir)
+def append_trial(
+    outputs_dir: str | Path | None,
+    entry: dict[str, Any],
+    *,
+    registry_path: str | Path | None = None,
+) -> Path:
+    """Append one hash-chained entry (legacy flat rows remain readable).
+
+    The process-local lock makes thread-level tail/derive/append atomic. Full
+    history validation remains the responsibility of
+    :func:`ledger_integrity_report`; append validates the immediate tail so
+    large registries do not degrade quadratically.
+    """
+    path = ledger_path(outputs_dir, registry_path=registry_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    record = {"recorded_at_utc": datetime.now(UTC).isoformat(), **entry}
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, sort_keys=True, default=str) + "\n")
+    with _APPEND_LOCK:
+        tail = _last_nonempty_record(path)
+        if tail is None:
+            sequence = 1
+            previous_hash = CHAIN_GENESIS
+        elif all(key in tail for key in ("sequence", "previous_hash", "entry_hash")):
+            if tail.get("entry_hash") != _entry_hash(tail):
+                raise ValueError(f"cannot append after a tampered registry tail: {path}")
+            try:
+                sequence = int(tail["sequence"]) + 1
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"registry tail has an invalid sequence: {path}") from exc
+            previous_hash = _reference_hash(tail)
+        else:
+            # One full read is required only when migrating an old unchained
+            # ledger. Every append after this first chain link is O(1).
+            read = _read_ledger_file(path)
+            if read.corrupt_lines or read.chain_errors:
+                raise ValueError(f"cannot append to corrupt or tampered trial registry: {path}")
+            sequence = len(read.records) + 1
+            previous_hash = _reference_hash(read.records[-1])
+        record = {
+            "recorded_at_utc": datetime.now(UTC).isoformat(),
+            **entry,
+            "sequence": sequence,
+            "previous_hash": previous_hash,
+        }
+        record["entry_hash"] = _entry_hash(record)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True, default=str) + "\n")
     return path
 
 
-def append_trial_record(outputs_dir: str | Path, record: TrialRecord) -> Path:
-    return append_trial(outputs_dir, record.to_entry())
+def append_trial_record(
+    outputs_dir: str | Path | None,
+    record: TrialRecord,
+    *,
+    registry_path: str | Path | None = None,
+) -> Path:
+    return append_trial(outputs_dir, record.to_entry(), registry_path=registry_path)
 
 
 # --- reading --------------------------------------------------------------
@@ -250,15 +386,16 @@ def append_trial_record(outputs_dir: str | Path, record: TrialRecord) -> Path:
 class LedgerReadResult:
     records: list[dict[str, Any]]
     corrupt_lines: list[tuple[int, str]]  # (1-based line number, raw text)
+    record_line_numbers: list[int] = field(default_factory=list)
+    chain_errors: list[tuple[int, str]] = field(default_factory=list)
 
 
-def read_ledger(outputs_dir: str | Path) -> LedgerReadResult:
-    """Read every line, keeping corrupt lines instead of dropping them silently."""
-    path = ledger_path(outputs_dir)
+def _read_ledger_file(path: Path) -> LedgerReadResult:
     if not path.exists():
-        return LedgerReadResult(records=[], corrupt_lines=[])
+        return LedgerReadResult(records=[], corrupt_lines=[], record_line_numbers=[])
     records: list[dict[str, Any]] = []
     corrupt: list[tuple[int, str]] = []
+    record_lines: list[int] = []
     for i, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         line = raw.strip()
         if not line:
@@ -270,24 +407,49 @@ def read_ledger(outputs_dir: str | Path) -> LedgerReadResult:
             continue
         if isinstance(parsed, dict):
             records.append(parsed)
+            record_lines.append(i)
         else:
             corrupt.append((i, raw))
-    return LedgerReadResult(records=records, corrupt_lines=corrupt)
+    chain_errors = _chain_errors(records, record_lines)
+    return LedgerReadResult(
+        records=records,
+        corrupt_lines=corrupt,
+        record_line_numbers=record_lines,
+        chain_errors=chain_errors,
+    )
 
 
-def read_trials(outputs_dir: str | Path) -> list[dict[str, Any]]:
+def read_ledger(
+    outputs_dir: str | Path | None,
+    *,
+    registry_path: str | Path | None = None,
+) -> LedgerReadResult:
+    """Read every line and surface parse errors plus valid-JSON chain tampering."""
+    path = ledger_path(outputs_dir, registry_path=registry_path)
+    return _read_ledger_file(path)
+
+
+def read_trials(
+    outputs_dir: str | Path | None,
+    *,
+    registry_path: str | Path | None = None,
+) -> list[dict[str, Any]]:
     """Lenient read (skips corrupt lines). For integrity decisions use
     :func:`ledger_integrity_report`, which never hides corruption."""
-    return read_ledger(outputs_dir).records
+    return read_ledger(outputs_dir, registry_path=registry_path).records
 
 
-def ledger_stats(outputs_dir: str | Path) -> tuple[int, float]:
+def ledger_stats(
+    outputs_dir: str | Path | None,
+    *,
+    registry_path: str | Path | None = None,
+) -> tuple[int, float]:
     """(trial count, cross-trial variance of per-period test Sharpes).
 
     Counts every recorded evaluation, not just the winners — using only
     surviving runs would understate the search and inflate the deflated Sharpe.
     """
-    trials = read_trials(outputs_dir)
+    trials = read_trials(outputs_dir, registry_path=registry_path)
     sharpes = [
         float(t["test_sharpe_per_period"])
         for t in trials
@@ -307,6 +469,9 @@ class LedgerIntegrityReport:
     valid_records: int
     corrupt_lines: int
     corrupt_line_numbers: list[int]
+    hash_chained_records: int
+    chain_errors: int
+    chain_error_line_numbers: list[int]
     structured_records: int
     legacy_records: int
     n_hypotheses: int
@@ -327,7 +492,11 @@ class LedgerIntegrityReport:
         return asdict(self)
 
 
-def ledger_integrity_report(outputs_dir: str | Path) -> LedgerIntegrityReport:
+def ledger_integrity_report(
+    outputs_dir: str | Path | None,
+    *,
+    registry_path: str | Path | None = None,
+) -> LedgerIntegrityReport:
     """Audit the ledger: counts, corruption, and a conservative DSR trial count.
 
     Effective-trial policy: we count every recorded evaluation with a usable
@@ -338,10 +507,11 @@ def ledger_integrity_report(outputs_dir: str | Path) -> LedgerIntegrityReport:
     an approval gate. When trial correlation cannot be estimated we therefore
     use the full count rather than an unvalidated shrinkage estimator.
     """
-    path = ledger_path(outputs_dir)
-    read = read_ledger(outputs_dir)
+    path = ledger_path(outputs_dir, registry_path=registry_path)
+    read = read_ledger(outputs_dir, registry_path=registry_path)
     records = read.records
     corrupt = read.corrupt_lines
+    chain_errors = read.chain_errors
 
     structured = [r for r in records if r.get("schema_version")]
     legacy = [r for r in records if not r.get("schema_version")]
@@ -374,10 +544,21 @@ def ledger_integrity_report(outputs_dir: str | Path) -> LedgerIntegrityReport:
             f"{len(corrupt)} corrupt line(s) at {[n for n, _ in corrupt]}; "
             "ledger is not trustworthy until repaired"
         )
+    if chain_errors:
+        notes.append(
+            f"{len(chain_errors)} hash-chain error(s) at "
+            f"{[n for n, _ in chain_errors]}; valid JSON was modified, reordered, "
+            "deleted, or inserted"
+        )
     if legacy:
         notes.append(
             f"{len(legacy)} legacy row(s) without hypothesis identity are counted "
             "as trials but cannot be grouped by hypothesis"
+        )
+    unchained = sum(1 for record in records if not record.get("entry_hash"))
+    if unchained:
+        notes.append(
+            f"{unchained} backward-compatible unchained legacy row(s); new appends are hash-chained"
         )
     if n_valid_observations < 2:
         notes.append(
@@ -392,6 +573,9 @@ def ledger_integrity_report(outputs_dir: str | Path) -> LedgerIntegrityReport:
         valid_records=len(records),
         corrupt_lines=len(corrupt),
         corrupt_line_numbers=[n for n, _ in corrupt],
+        hash_chained_records=len(records) - unchained,
+        chain_errors=len(chain_errors),
+        chain_error_line_numbers=[n for n, _ in chain_errors],
         structured_records=len(structured),
         legacy_records=len(legacy),
         n_hypotheses=len(hypotheses),
@@ -411,6 +595,6 @@ def ledger_integrity_report(outputs_dir: str | Path) -> LedgerIntegrityReport:
             "independent trials (no correlation shrinkage); conservative for an "
             "approval gate when correlation cannot be estimated"
         ),
-        is_intact=(len(corrupt) == 0),
+        is_intact=(len(corrupt) == 0 and len(chain_errors) == 0),
         notes=notes,
     )

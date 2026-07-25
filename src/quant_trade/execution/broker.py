@@ -64,6 +64,8 @@ class BrokerOrderRequest:
     dry_run: bool = True
     limit_price: float | None = None
     stop_price: float | None = None
+    reference_price: float | None = None
+    reference_timestamp_utc: str | None = None
     strategy_id: str | None = None
     reason: str | None = None
 
