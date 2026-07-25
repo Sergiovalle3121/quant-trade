@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -36,8 +38,17 @@ def validate_alpaca_paper_endpoint(base_url: str) -> str:
 
 
 def validate_order_safety(
-    order: BrokerOrderRequest, risk_limits: BrokerConfig, account: BrokerAccount
+    order: BrokerOrderRequest,
+    risk_limits: BrokerConfig,
+    account: BrokerAccount,
+    *,
+    evaluated_at_utc: str | None = None,
 ) -> dict[str, Any]:
+    if (
+        not math.isfinite(risk_limits.max_reference_age_seconds)
+        or risk_limits.max_reference_age_seconds <= 0
+    ):
+        raise BrokerSafetyError("max_reference_age_seconds must be finite and positive")
     symbol = order.symbol.upper().strip()
     if order.side not in {"buy", "sell"}:
         raise BrokerSafetyError("order side must be buy or sell")
@@ -57,7 +68,36 @@ def validate_order_safety(
         raise BrokerSafetyError("shorting is not allowed")
     if risk_limits.universe and symbol not in {s.upper() for s in risk_limits.universe}:
         raise BrokerSafetyError(f"symbol {symbol} is outside configured universe")
-    price = order.limit_price or 1.0
+    if order.order_type == "market":
+        if order.reference_price is None or order.reference_timestamp_utc is None:
+            raise BrokerSafetyError("market order requires a fresh reference price")
+        price = float(order.reference_price)
+        if not math.isfinite(price) or price <= 0:
+            raise BrokerSafetyError("market order reference price must be finite and positive")
+        try:
+            reference_at = datetime.fromisoformat(
+                order.reference_timestamp_utc.replace("Z", "+00:00")
+            )
+            evaluated_at = (
+                datetime.fromisoformat(evaluated_at_utc.replace("Z", "+00:00"))
+                if evaluated_at_utc
+                else datetime.now(UTC)
+            )
+        except ValueError as exc:
+            raise BrokerSafetyError("invalid reference price timestamp") from exc
+        if reference_at.tzinfo is None or evaluated_at.tzinfo is None:
+            raise BrokerSafetyError("reference price timestamps must be timezone-aware")
+        age_seconds = (evaluated_at - reference_at).total_seconds()
+        if age_seconds < 0:
+            raise BrokerSafetyError("market order reference price is from the future")
+        if age_seconds > risk_limits.max_reference_age_seconds:
+            raise BrokerSafetyError("market order reference price is stale")
+    else:
+        if order.limit_price is None:
+            raise BrokerSafetyError("limit order requires limit_price")
+        price = float(order.limit_price)
+        if not math.isfinite(price) or price <= 0:
+            raise BrokerSafetyError("limit_price must be finite and positive")
     notional = abs(order.quantity * price)
     if notional > risk_limits.max_notional_per_order:
         raise BrokerSafetyError("order notional exceeds max_notional_per_order")
@@ -65,7 +105,12 @@ def validate_order_safety(
         raise BrokerSafetyError("order exceeds max_symbol_weight")
     if order.side == "buy" and account.cash - notional < account.equity * risk_limits.min_cash_pct:
         raise BrokerSafetyError("order violates min cash buffer")
-    return {"passed": True, "symbol": symbol, "notional": notional}
+    return {
+        "passed": True,
+        "symbol": symbol,
+        "notional": notional,
+        "valuation_price": price,
+    }
 
 
 def redact_secret(value: Any) -> Any:

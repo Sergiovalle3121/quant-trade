@@ -923,7 +923,17 @@ def broker_plan(
         quantity=1.0,
         reason="phase6 dry-run plan sample",
     )
-    req = paper_order_to_broker_order_request(paper_order, bcfg)
+    reference_at = datetime.now(UTC).isoformat()
+    # This legacy sample plan has no market-data input. Value it at the
+    # configured per-order ceiling, which is conservative and explicit; a
+    # missing reference is never replaced with the former fictitious $1.
+    planning_reference_price = bcfg.max_notional_per_order / paper_order.quantity
+    req = paper_order_to_broker_order_request(
+        paper_order,
+        bcfg,
+        reference_price=planning_reference_price,
+        reference_timestamp_utc=reference_at,
+    )
     account = BrokerAccount(
         bcfg.provider,
         "local****",
@@ -1047,8 +1057,19 @@ def broker_rebalance_plan(
                 continue
             order.quantity = whole
         try:
-            req = paper_order_to_broker_order_request(order, bcfg)
-            risk = validate_order_safety(req, bcfg, account)
+            reference_timestamp = newest_ts.isoformat()
+            req = paper_order_to_broker_order_request(
+                order,
+                bcfg,
+                reference_price=prices.get(order.symbol),
+                reference_timestamp_utc=reference_timestamp,
+            )
+            risk = validate_order_safety(
+                req,
+                bcfg,
+                account,
+                evaluated_at_utc=reference_timestamp,
+            )
         except BrokerSafetyError as exc:
             failure = f"{order.symbol} {order.side} {order.quantity}: {exc}"
             break

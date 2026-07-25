@@ -63,9 +63,7 @@ def scan_mining(
         console.print(f"  {status}: {count}")
     path = write_mining_matrix(output, result)
     console.print(f"Matrix: {path}")
-    console.print(
-        "no miners were run, no cloud resources created, no spend authorized"
-    )
+    console.print("no miners were run, no cloud resources created, no spend authorized")
 
 
 @opportunities_app.command("scan-trading")
@@ -116,6 +114,10 @@ def rank(
     cash_yield_annual: Annotated[
         float, typer.Option(help="Annual cash/collateral yield baseline")
     ] = 0.04,
+    cash_evidence: Annotated[
+        Path | None,
+        typer.Option(help="Byte-bound cash baseline evidence JSON"),
+    ] = None,
     evaluated_at_utc: Annotated[
         str | None, typer.Option(help="Evaluation clock (defaults to now UTC)")
     ] = None,
@@ -130,6 +132,7 @@ def rank(
         trading_rows=trading_payload.get("rows", []),
         mining_cells=mining_payload.get("cells", []),
         cash_yield_annual=cash_yield_annual,
+        cash_evidence=load_json(cash_evidence) if cash_evidence is not None else None,
         evaluated_at_utc=evaluated_at_utc or _now_utc(),
         # lineage from the artifacts' EMBEDDED hashes: an edited row can no
         # longer rank (V6-L) — the board recomputes and compares
@@ -283,9 +286,7 @@ def shadow_reconcile_cmd(
     console.print(f"Reconciled: [bold {colour}]{report['reconciled']}[/bold {colour}]")
     for name, engaged in report["kill_switches"].items():
         console.print(f"  kill_switch[{name}]: {'ENGAGED' if engaged else 'ok'}")
-    raise typer.Exit(
-        code=0 if report["reconciled"] and not report["kill_switch_engaged"] else 1
-    )
+    raise typer.Exit(code=0 if report["reconciled"] and not report["kill_switch_engaged"] else 1)
 
 
 @opportunities_app.command("shadow-stop")

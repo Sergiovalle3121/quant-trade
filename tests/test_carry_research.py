@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import yaml
 
+from quant_trade.carry import research as research_module
 from quant_trade.carry.data import synthetic_funding_snapshots, write_snapshots_json
 from quant_trade.carry.models import CarryCostModel
 from quant_trade.carry.research import (
@@ -67,3 +70,56 @@ def test_self_labelled_real_json_downgrades_to_unverified_legacy(tmp_path):
     assert result.ledger_summary["reconciled"] is True
     assert "return_on_capital" in result.metrics
     assert "total_return_2x_costs" in result.metrics
+
+
+def test_sufficient_campaign_without_cscv_cannot_be_candidate(monkeypatch):
+    original = research_module._load_snapshots
+
+    def force_verified_manifest(config):
+        snapshots, manifest, settlements, signal = original(config)
+        return (
+            snapshots,
+            dataclasses.replace(manifest, data_source="real"),
+            settlements,
+            signal,
+        )
+
+    monkeypatch.setattr(research_module, "_load_snapshots", force_verified_manifest)
+    config = _config()
+    config["gate"] = {
+        "min_funding_events": 1,
+        "min_span_days": 0,
+        "min_walk_forward_windows": 0,
+        "min_probabilistic_sharpe": 0,
+    }
+    result = run_carry_research(config)
+    assert result.decision == "REJECTED"
+    assert result.cscv["available"] is False
+    assert any("CSCV rank-based PBO unavailable" in reason for reason in result.reasons)
+
+
+def test_carry_builds_cscv_from_preregistered_signal_variants():
+    config = _config()
+    config["statistics"] = {
+        "cscv": {
+            "partitions": 4,
+            "max_pbo": 1.0,
+            "variants": [
+                {
+                    "id": "primary",
+                    "entry_threshold": config["signal"]["entry_threshold"],
+                    "trailing_window": config["signal"]["trailing_window"],
+                },
+                {
+                    "id": "higher_threshold",
+                    "entry_threshold": 0.0002,
+                    "trailing_window": config["signal"]["trailing_window"],
+                },
+            ],
+        }
+    }
+    result = run_carry_research(config)
+    assert result.cscv["available"] is True
+    assert result.cscv["method"] == "cscv_rank_based"
+    assert result.cscv["parameter_variants"] == 2
+    assert result.cscv["combinations"] == 6

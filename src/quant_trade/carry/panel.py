@@ -33,8 +33,11 @@ from quant_trade.carry.instruments import (
 )
 from quant_trade.evidence.canonical_json import (
     atomic_write_json,
+    atomic_write_text,
     canonical_dumps,
+    load_json,
     sha256_of_bytes,
+    sha256_of_file,
 )
 
 #: Official public kline endpoints (documented, unauthenticated).
@@ -45,9 +48,7 @@ BYBIT_INDEX_KLINE_URL = "https://api.bybit.com/v5/market/index-price-kline"
 KLINE_KINDS = ("spot", "perp", "mark", "index")
 
 
-def parse_bybit_kline_page(
-    raw: bytes, *, symbol: str, kind: str
-) -> list[dict[str, Any]]:
+def parse_bybit_kline_page(raw: bytes, *, symbol: str, kind: str) -> list[dict[str, Any]]:
     """Pure parser for one Bybit v5 kline page (any of the four kinds)."""
     if kind not in KLINE_KINDS:
         raise ValueError(f"kind must be one of {KLINE_KINDS}")
@@ -96,6 +97,8 @@ class PanelAudit:
     provenance: str = "unverified_legacy"
     time_range_start: str = ""
     time_range_end: str = ""
+    requested_range_start: str = ""
+    requested_range_end: str = ""
     problems: list[str] = field(default_factory=list)
 
     @property
@@ -122,6 +125,8 @@ def build_carry_panel(
     index: list[dict[str, Any]],
     settlements: list[dict[str, Any]],
     interval_minutes: int = 60,
+    requested_since_ms: int | None = None,
+    requested_until_ms: int | None = None,
 ) -> tuple[list[dict[str, Any]], PanelAudit]:
     """Join the four kline series + settlements into point-in-time panel rows.
 
@@ -131,9 +136,7 @@ def build_carry_panel(
     """
     meta = instrument_metadata(venue, symbol)
     by_kind = {"spot": spot, "perp": perp, "mark": mark, "index": index}
-    indexed = {
-        kind: {row["start_ms"]: row for row in rows} for kind, rows in by_kind.items()
-    }
+    indexed = {kind: {row["start_ms"]: row for row in rows} for kind, rows in by_kind.items()}
     all_ts = sorted(set.intersection(*(set(m) for m in indexed.values())))
     union_ts = sorted(set.union(*(set(m) for m in indexed.values())))
     audit = PanelAudit()
@@ -142,36 +145,47 @@ def build_carry_panel(
         return [], audit
 
     step_ms = interval_minutes * 60_000
-    expected = range(all_ts[0], all_ts[-1] + step_ms, step_ms)
+    expected_start = all_ts[0] if requested_since_ms is None else requested_since_ms
+    expected_end = all_ts[-1] if requested_until_ms is None else requested_until_ms
+    audit.requested_range_start = _iso(expected_start)
+    audit.requested_range_end = _iso(expected_end)
+    if expected_end < expected_start or (expected_end - expected_start) % step_ms:
+        audit.problems.append("requested range is not aligned to the panel interval")
+    expected = range(expected_start, expected_end + step_ms, step_ms)
     expected_set = set(expected)
     missing = sorted(expected_set - set(all_ts))
     audit.expected_bars = len(expected_set)
     audit.missing_bars = len(missing)
     audit.gap_ranges = [_iso(ms) for ms in missing[:20]]
-    audit.coverage_ratio = (
-        1.0 - len(missing) / len(expected_set) if expected_set else 0.0
-    )
+    audit.coverage_ratio = 1.0 - len(missing) / len(expected_set) if expected_set else 0.0
     if set(union_ts) - expected_set:
         audit.problems.append("bars exist outside the expected interval grid")
 
-    settle_sorted = sorted(
-        (
-            {
-                "settled_at_ms": int(s["settled_at_ms"]),
-                "rate": float(s["rate"]),
-            }
-            for s in settlements
-        ),
-        key=lambda s: s["settled_at_ms"],
-    )
+    settlement_by_time: dict[int, float] = {}
+    for settlement in settlements:
+        settled_at = int(settlement["settled_at_ms"])
+        rate = float(settlement["rate"])
+        if settled_at in settlement_by_time:
+            raise ValueError(f"duplicate funding settlement at {settled_at}")
+        settlement_by_time[settled_at] = rate
+    settle_sorted = [
+        {"settled_at_ms": settled_at, "rate": rate}
+        for settled_at, rate in sorted(settlement_by_time.items())
+    ]
+    funding_step_ms = int(float(meta["funding_interval_hours"]) * 3_600_000)
+    for previous, current in zip(settle_sorted, settle_sorted[1:], strict=False):
+        if current["settled_at_ms"] - previous["settled_at_ms"] > funding_step_ms:
+            audit.problems.append(
+                "funding settlement gap exceeds the declared interval at "
+                f"{_iso(int(previous['settled_at_ms']))}"
+            )
     rows: list[dict[str, Any]] = []
     prev_ts: int | None = None
     for ts in all_ts:
         in_bar = [
             s
             for s in settle_sorted
-            if (prev_ts is None or s["settled_at_ms"] > prev_ts)
-            and s["settled_at_ms"] <= ts
+            if (prev_ts is None or s["settled_at_ms"] > prev_ts) and s["settled_at_ms"] <= ts
         ]
         last_known = [s for s in settle_sorted if s["settled_at_ms"] <= ts]
         rows.append(
@@ -205,13 +219,19 @@ def build_carry_panel(
     return rows, audit
 
 
-def write_panel(panel_dir: str | Path, rows: list[dict[str, Any]], audit: PanelAudit) -> Path:
+def write_panel(
+    panel_dir: str | Path,
+    rows: list[dict[str, Any]],
+    audit: PanelAudit,
+    *,
+    build_context: dict[str, Any] | None = None,
+) -> Path:
     out = Path(panel_dir)
     out.mkdir(parents=True, exist_ok=True)
     panel_path = out / "panel.jsonl"
     payload = "".join(canonical_dumps(r) + "\n" for r in rows)
-    panel_path.write_text(payload, encoding="utf-8")
-    atomic_write_json(
+    atomic_write_text(panel_path, payload)
+    manifest_path = atomic_write_json(
         out / "panel_manifest.json",
         {
             "artifact": "HISTORICAL_CARRY_PANEL",
@@ -219,20 +239,155 @@ def write_panel(panel_dir: str | Path, rows: list[dict[str, Any]], audit: PanelA
             "rows": len(rows),
             "byte_sha256": sha256_of_bytes(payload.encode("utf-8")),
             "audit": audit.to_dict(),
+            "build_context": build_context or {},
         },
+    )
+    atomic_write_text(
+        out / "panel_manifest.sha256",
+        sha256_of_file(manifest_path) + "\n",
     )
     return panel_path
 
 
-def load_panel(panel_dir: str | Path) -> list[dict[str, Any]]:
-    panel_path = Path(panel_dir) / "panel.jsonl"
+def _deduplicate_rebuilt_rows(
+    rows: list[dict[str, Any]], *, identity_key: str
+) -> list[dict[str, Any]]:
+    deduplicated: dict[Any, dict[str, Any]] = {}
+    for row in rows:
+        key = row[identity_key]
+        previous = deduplicated.get(key)
+        if previous is not None and canonical_dumps(previous) != canonical_dumps(row):
+            raise ValueError(f"conflicting normalized rows for {identity_key}={key}")
+        deduplicated[key] = row
+    return [deduplicated[key] for key in sorted(deduplicated)]
+
+
+def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], PanelAudit]:
+    """Rebuild raw pages and require byte-identical panel, manifest, and audit."""
+    root = Path(panel_dir)
+    panel_path = root / "panel.jsonl"
+    manifest_path = root / "panel_manifest.json"
+    manifest_hash_path = root / "panel_manifest.sha256"
     if not panel_path.exists():
         raise ValueError(f"panel not found: {panel_path}")
-    return [
-        json.loads(line)
-        for line in panel_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
+    if not manifest_path.exists():
+        raise ValueError(f"panel manifest not found: {manifest_path}")
+    if not manifest_hash_path.exists():
+        raise ValueError(f"panel manifest hash not found: {manifest_hash_path}")
+    if manifest_hash_path.read_text(encoding="utf-8").strip() != sha256_of_file(manifest_path):
+        raise ValueError("panel_manifest.json bytes do not match panel_manifest.sha256")
+    panel_bytes = panel_path.read_bytes()
+    manifest = load_json(manifest_path)
+    if not isinstance(manifest, dict):
+        raise ValueError("panel manifest must be a JSON object")
+    if manifest.get("byte_sha256") != sha256_of_bytes(panel_bytes):
+        raise ValueError("panel bytes do not match panel_manifest.json")
+    rows = [json.loads(line) for line in panel_bytes.decode("utf-8").splitlines() if line.strip()]
+    if int(manifest.get("rows", -1)) != len(rows):
+        raise ValueError("panel row count does not match panel_manifest.json")
+    audit_payload = manifest.get("audit")
+    if not isinstance(audit_payload, dict) or not audit_payload.get("is_clean"):
+        raise ValueError("panel manifest audit is missing or not clean")
+
+    from quant_trade.evidence.receipts import (
+        load_receipts,
+        rebuild_normalized_rows,
+        resolve_dir_provenance,
+    )
+
+    receipts_path = root / "receipts.jsonl"
+    provenance = resolve_dir_provenance(receipts_path)
+    if provenance.provenance in ("invalid", "mixed", "unverified_legacy"):
+        raise ValueError(
+            "panel receipts are not a complete verified evidence chain: "
+            + "; ".join(provenance.problems[:3])
+        )
+    rebuilt_by_kind: dict[str, list[dict[str, Any]]] = {kind: [] for kind in KLINE_KINDS}
+    funding_rows: list[dict[str, Any]] = []
+    for receipt in load_receipts(receipts_path):
+        params = receipt.get("request_parameters", {})
+        kind = str(params.get("kind", "")) if isinstance(params, dict) else ""
+        raw_path = (root / str(receipt["raw_path"])).resolve()
+        normalized = rebuild_normalized_rows(receipt, raw_path.read_bytes())
+        if kind == "funding":
+            funding_rows.extend(normalized)
+        elif kind in rebuilt_by_kind:
+            rebuilt_by_kind[kind].extend(normalized)
+        else:
+            raise ValueError(f"unsupported panel receipt kind {kind!r}")
+    canonical_series = {
+        kind: _deduplicate_rebuilt_rows(series, identity_key="start_ms")
+        for kind, series in rebuilt_by_kind.items()
+    }
+    settlement_by_identity: dict[tuple[str, str, str], float] = {}
+    for row in funding_rows:
+        identity = (
+            str(row["venue"]),
+            str(row["symbol"]),
+            str(row["exchange_timestamp_utc"]),
+        )
+        rate = float(row["realized_funding_rate"])
+        previous = settlement_by_identity.get(identity)
+        if previous is not None and previous != rate:
+            raise ValueError(f"conflicting funding settlement {identity}")
+        settlement_by_identity[identity] = rate
+
+    import calendar
+
+    settlements = [
+        {
+            "settled_at_ms": int(
+                calendar.timegm(time.strptime(identity[2], "%Y-%m-%dT%H:%M:%SZ")) * 1000
+            ),
+            "rate": rate,
+        }
+        for identity, rate in sorted(settlement_by_identity.items(), key=lambda item: item[0][2])
     ]
+    context = manifest.get("build_context")
+    if not isinstance(context, dict) or not context:
+        raise ValueError("panel manifest lacks byte-rebuild build_context")
+    requested_since_ms = int(context["requested_since_ms"])
+    requested_until_ms = int(context["requested_until_ms"])
+    # Receipts bind the complete raw response page, while the presented panel
+    # is the exact requested slice. Apply the same range predicate used by the
+    # backfill before byte-comparing the clean rebuild.
+    canonical_series = {
+        kind: [
+            row
+            for row in series
+            if requested_since_ms <= int(row["start_ms"]) <= requested_until_ms
+        ]
+        for kind, series in canonical_series.items()
+    }
+    settlements = [
+        row
+        for row in settlements
+        if requested_since_ms <= int(row["settled_at_ms"]) <= requested_until_ms
+    ]
+    rebuilt, rebuilt_audit = build_carry_panel(
+        venue=str(context["venue"]),
+        symbol=str(context["symbol"]),
+        spot=canonical_series["spot"],
+        perp=canonical_series["perp"],
+        mark=canonical_series["mark"],
+        index=canonical_series["index"],
+        settlements=settlements,
+        interval_minutes=int(context["interval_minutes"]),
+        requested_since_ms=requested_since_ms,
+        requested_until_ms=requested_until_ms,
+    )
+    rebuilt_audit.provenance = provenance.provenance
+    rebuilt_payload = "".join(canonical_dumps(row) + "\n" for row in rebuilt).encode()
+    if rebuilt_payload != panel_bytes:
+        raise ValueError("clean-room raw-to-panel rebuild is not byte-identical")
+    if rebuilt_audit.to_dict() != audit_payload:
+        raise ValueError("rebuilt panel audit does not match panel_manifest.json")
+    return rows, rebuilt_audit
+
+
+def load_panel(panel_dir: str | Path) -> list[dict[str, Any]]:
+    rows, _audit = verify_panel_bundle(panel_dir)
+    return rows
 
 
 def panel_to_research_inputs(

@@ -19,6 +19,14 @@ class CloudProvider(StrEnum):
     ALIBABA = "alibaba"
 
 
+class RentalType(StrEnum):
+    """Commercial form of rented mining capacity."""
+
+    COMPUTE_RENTAL = "COMPUTE_RENTAL"
+    HASHPOWER_MARKETPLACE = "HASHPOWER_MARKETPLACE"
+    MANAGED_ASIC_LEASE = "MANAGED_ASIC_LEASE"
+
+
 class WorkloadPurpose(StrEnum):
     CONTROL_PLANE = "control_plane"
     RESEARCH_BATCH = "research_batch"
@@ -28,19 +36,21 @@ class WorkloadPurpose(StrEnum):
 
 class PurchaseModel(StrEnum):
     ON_DEMAND = "on_demand"
-    SPOT = "spot"                      # AWS Spot (DescribeSpotPriceHistory)
-    PREEMPTIBLE = "preemptible"        # Alibaba preemptible (DescribePrice SpotStrategy)
+    SPOT = "spot"  # AWS Spot (DescribeSpotPriceHistory)
+    PREEMPTIBLE = "preemptible"  # Alibaba preemptible (DescribePrice SpotStrategy)
     RESERVED_COMPARISON_ONLY = "reserved_comparison_only"
 
 
 class FeasibilityStatus(StrEnum):
     ELIGIBLE_FOR_OFFLINE_EVALUATION = "ELIGIBLE_FOR_OFFLINE_EVALUATION"
+    BLOCKED_PROVIDER_TERMS = "BLOCKED_PROVIDER_TERMS"
     BLOCKED_PENDING_WRITTEN_APPROVAL = "BLOCKED_PENDING_WRITTEN_APPROVAL"
     BLOCKED_PROVIDER_POLICY = "BLOCKED_PROVIDER_POLICY"
     BLOCKED_POLICY_UNKNOWN = "BLOCKED_POLICY_UNKNOWN"
     BLOCKED_MISSING_BENCHMARK = "BLOCKED_MISSING_BENCHMARK"
     BLOCKED_INCOMPATIBLE_HARDWARE = "BLOCKED_INCOMPATIBLE_HARDWARE"
     ECONOMIC_NO_GO = "ECONOMIC_NO_GO"
+    DISCOVERY_ONLY = "DISCOVERY_ONLY"
     PAPER_CONTROL_PLANE_CANDIDATE = "PAPER_CONTROL_PLANE_CANDIDATE"
     ECONOMIC_CANDIDATE_PAPER_ONLY = "ECONOMIC_CANDIDATE_PAPER_ONLY"
 
@@ -94,6 +104,7 @@ class ComputeQuote:
     source_kind: str  # "price_list" | "spot_price_history" | "describe_price" | "fixture"
     source_name: str
     captured_at_utc: str
+    rental_type: RentalType = RentalType.COMPUTE_RENTAL
     source_url: str = ""
     zone: str = ""
     operating_system: str = "Linux"
@@ -104,12 +115,16 @@ class ComputeQuote:
     extras_per_hour_usd: dict[str, float] | None = None  # disk, ip, egress, logging
     uses_free_tier_or_credits: bool = False
     raw_sha256: str = ""  # SHA-256 of the raw price response (byte binding, V6-O)
+    minimum_billing_seconds: int = 60
+    billing_granularity_seconds: int = 1
 
     def __post_init__(self) -> None:
         if not self.sku.strip() or not self.source_name.strip():
             raise ValueError("sku and source_name are required")
         if not self.captured_at_utc.strip():
             raise ValueError("captured_at_utc is required")
+        if not isinstance(self.rental_type, RentalType):
+            raise ValueError("rental_type must be a RentalType")
         _non_negative("price_per_hour", self.price_per_hour)
         if self.fx_rate_to_usd <= 0 or not math.isfinite(self.fx_rate_to_usd):
             raise ValueError("fx_rate_to_usd must be finite and > 0")
@@ -117,6 +132,10 @@ class ComputeQuote:
             raise ValueError("vat_rate must be in [0, 1)")
         if self.max_age_hours <= 0:
             raise ValueError("max_age_hours must be > 0")
+        if self.minimum_billing_seconds <= 0:
+            raise ValueError("minimum_billing_seconds must be > 0")
+        if self.billing_granularity_seconds <= 0:
+            raise ValueError("billing_granularity_seconds must be > 0")
         valid_kinds = {"price_list", "spot_price_history", "describe_price", "fixture"}
         if self.source_kind not in valid_kinds:
             raise ValueError(f"source_kind must be one of {sorted(valid_kinds)}")
@@ -127,10 +146,7 @@ class ComputeQuote:
                 "spot_price_history"
             ):
                 raise ValueError("AWS Spot quotes must come from DescribeSpotPriceHistory")
-            if (
-                self.purchase_model is PurchaseModel.ON_DEMAND
-                and self.source_kind != "price_list"
-            ):
+            if self.purchase_model is PurchaseModel.ON_DEMAND and self.source_kind != "price_list":
                 raise ValueError("AWS on-demand quotes must come from the Price List API")
         if self.provider is CloudProvider.ALIBABA and self.source_kind not in (
             "describe_price",
@@ -169,8 +185,8 @@ class BenchmarkEvidence:
     source: str
     artifact_sha256: str
     image_digest: str = ""
-    miner_name: str = ""      # metadata of the offline benchmark artifact only
-    miner_version: str = ""   # never an instruction to run anything
+    miner_name: str = ""  # metadata of the offline benchmark artifact only
+    miner_version: str = ""  # never an instruction to run anything
     reproducibility_notes: str = ""
 
     def __post_init__(self) -> None:
@@ -245,6 +261,8 @@ class FeasibilityDecision:
     economic_reason: str = ""
     details: dict[str, Any] | None = None
     safety: dict[str, bool] | None = None
+    control_plane_allowed: bool = False
+    hashing_allowed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

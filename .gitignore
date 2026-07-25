@@ -2,9 +2,11 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.pytest-v7-*
 .ruff_cache/
 .mypy_cache/
 .venv/
+.venv*/
 .env
 .env.*
 !.env.example

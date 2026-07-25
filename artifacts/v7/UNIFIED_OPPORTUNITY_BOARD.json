@@ -1,0 +1,298 @@
+{
+  "artifact": "UNIFIED_ECONOMIC_BOARD",
+  "cash_evidence": {
+    "annual_yield": 0.04,
+    "byte_verified": true,
+    "captured_at_utc": "2026-07-24T00:00:00Z",
+    "evidence_class": "RECORDED_RESPONSE",
+    "promotable_as_real": false,
+    "raw_artifact": "tests/fixtures/cash_baseline_v7.raw.json",
+    "raw_sha256": "4d258de86011484bc99085f813f8a832e89653b8beb5c35526c0ef46448f5462",
+    "source_name": "offline_recorded_response",
+    "source_url": "https://example.invalid/recorded-cash-baseline"
+  },
+  "cash_evidence_promotable": false,
+  "cash_return_comparison_horizon": 0.003226608141027265,
+  "cash_yield_annual": 0.04,
+  "challengers": [
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "trading:H1",
+      "kind": "trading",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "trading:H2",
+      "kind": "trading",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "trading:H3",
+      "kind": "trading",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/panel/okx_btc"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "kind": "mining",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS",
+      "test_only": true
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "kind": "mining",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "kind": "mining",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "market snapshot missing: ../../data/mining/market/kas_kheavyhash.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "champion": {
+    "capacity_usd": null,
+    "eligible": true,
+    "entry_id": "cash_usd",
+    "kind": "cash",
+    "liquidity_score": 1.0,
+    "rank": 1,
+    "reasons": [
+      "byte-bound cash baseline prorated to the 30d comparison horizon"
+    ],
+    "risk_score": 1.0,
+    "score": 0.003226608141027265,
+    "score_unit": "net_return_on_committed_capital_30d",
+    "status": "ELIGIBLE_BASELINE",
+    "test_only": false
+  },
+  "comparison_horizon_days": 30.0,
+  "entries": [
+    {
+      "capacity_usd": null,
+      "eligible": true,
+      "entry_id": "cash_usd",
+      "kind": "cash",
+      "liquidity_score": 1.0,
+      "rank": 1,
+      "reasons": [
+        "byte-bound cash baseline prorated to the 30d comparison horizon"
+      ],
+      "risk_score": 1.0,
+      "score": 0.003226608141027265,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "ELIGIBLE_BASELINE",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "trading:H1",
+      "kind": "trading",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_bybit.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "trading:H2",
+      "kind": "trading",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/funding_history_okx.jsonl",
+        "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "trading:H3",
+      "kind": "trading",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "registered dataset missing: data/carry/panel/okx_btc"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "NOT_RUN_NO_DATASET",
+      "test_only": false
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "kind": "mining",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS",
+      "test_only": true
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "kind": "mining",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "capacity_usd": null,
+      "eligible": false,
+      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "kind": "mining",
+      "liquidity_score": 1.0,
+      "rank": null,
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "market snapshot missing: ../../data/mining/market/kas_kheavyhash.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "risk_score": 1.0,
+      "score": null,
+      "score_unit": "net_return_on_committed_capital_30d",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "lineage": {
+    "mining": {
+      "artifact": "MINING_RENTAL_MATRIX",
+      "evaluated_at_utc": "2026-07-25T06:00:00Z",
+      "path": "artifacts/v7/MINING_RENTAL_MATRIX.json",
+      "rows_sha256": "4342d7bee66c5d08bba5a54cdd5ca8cbc9d52f91255f43ac818e058c75b213fa"
+    },
+    "trading": {
+      "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",
+      "evaluated_at_utc": "2026-07-25T06:00:00Z",
+      "path": "artifacts/v7/TRADING_LEADERBOARD.json",
+      "rows_sha256": "2958bf266c1b37b7fd8c5d6101de8477bb561dbaeeb46d68b386119f5ee67411"
+    }
+  },
+  "notes": [
+    "every ranked score is net return on committed capital",
+    "short opportunities are never annualized as automatically repeatable",
+    "rows without a common-unit return are tracked, never ranked",
+    "blocked/missing/NOT_RUN rows are tracked, never ranked",
+    "a rank is a research output, not an authorization"
+  ],
+  "real_money_authorized": false,
+  "safety": {
+    "alibaba_resources_created": false,
+    "aws_resources_created": false,
+    "external_spend_authorized": false,
+    "hardware_control_enabled": false,
+    "miner_execution": false
+  },
+  "schema_version": 2,
+  "score_unit": "net_return_on_committed_capital_30d"
+}

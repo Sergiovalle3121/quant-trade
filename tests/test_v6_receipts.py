@@ -23,11 +23,11 @@ def _receipt(raw_file: Path, kind: str) -> IngestionReceipt:
         request_parameters={"symbol": "BTCUSDT", "limit": 200},
         http_status=200,
         captured_at_utc="2026-07-24T23:00:00Z",
-        adapter_name="carry.backfill.bybit",
+        adapter_name="evidence.json.identity",
         adapter_version="1",
-        raw_path=str(raw_file),
+        raw_path=raw_file.name,
         raw_sha256=sha256_of_bytes(raw_file.read_bytes()),
-        normalized_rows_sha256=normalized_rows_sha256([{"a": 1}]),
+        normalized_rows_sha256=normalized_rows_sha256([json.loads(raw_file.read_bytes())]),
         source_kind=kind,
     )
 
@@ -66,9 +66,7 @@ def test_tampered_raw_invalidates_the_dataset(tmp_path):
 
 
 def test_records_without_receipts_are_unverified_legacy(tmp_path):
-    report = resolve_provenance(
-        [{"raw_sha256": "deadbeef"}, {}], tmp_path / "receipts.jsonl"
-    )
+    report = resolve_provenance([{"raw_sha256": "deadbeef"}, {}], tmp_path / "receipts.jsonl")
     assert report.provenance == "unverified_legacy"
     assert report.records_unverified == 2
 

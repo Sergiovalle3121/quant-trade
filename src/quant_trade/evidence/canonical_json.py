@@ -44,7 +44,11 @@ def _stringify_unknown(value: Any) -> str:
 def pretty_dumps(obj: Any) -> str:
     """Human-readable variant (still real JSON, still NaN-free, sorted keys)."""
     return json.dumps(
-        obj, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False,
+        obj,
+        sort_keys=True,
+        indent=2,
+        ensure_ascii=False,
+        allow_nan=False,
         default=_stringify_unknown,
     )
 
@@ -71,7 +75,7 @@ def atomic_write_text(path: str | Path, text: str) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from quant_trade.research.ledger import (
     append_trial,
     append_trial_record,
@@ -113,6 +115,47 @@ def test_corrupt_lines_are_surfaced_not_dropped(tmp_path):
     assert any("corrupt" in note for note in report.notes)
 
 
+def test_valid_json_tamper_breaks_hash_chain(tmp_path):
+    append_trial_record(tmp_path, _record(tmp_path))
+    append_trial_record(tmp_path, _record(tmp_path, strategy_params={"lookback_days": 63}))
+    path = ledger_path(tmp_path)
+    lines = path.read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    first["strategy_params"]["lookback_days"] = 999
+    lines[0] = json.dumps(first, sort_keys=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    report = ledger_integrity_report(tmp_path)
+    assert report.is_intact is False
+    assert report.chain_errors >= 1
+    assert report.chain_error_line_numbers
+
+
+def test_global_registry_count_survives_output_directory_changes(tmp_path):
+    registry = tmp_path / "global" / "all_trials.jsonl"
+    append_trial_record(
+        tmp_path / "output_a", _record(tmp_path, run_id="a"), registry_path=registry
+    )
+    append_trial_record(
+        tmp_path / "output_b", _record(tmp_path, run_id="b"), registry_path=registry
+    )
+    assert ledger_path(tmp_path / "ignored", registry_path=registry) == registry
+    assert len(read_trials(tmp_path / "output_c", registry_path=registry)) == 2
+    report = ledger_integrity_report(tmp_path / "output_d", registry_path=registry)
+    assert report.valid_records == 2
+    assert report.hash_chained_records == 2
+    assert report.is_intact
+
+
+def test_global_registry_can_be_selected_by_environment(tmp_path, monkeypatch):
+    registry = tmp_path / "global.jsonl"
+    monkeypatch.setenv("QUANT_TRADE_TRIAL_REGISTRY", str(registry))
+    append_trial_record(tmp_path / "one", _record(tmp_path, run_id="one"))
+    append_trial_record(tmp_path / "two", _record(tmp_path, run_id="two"))
+    assert ledger_stats(tmp_path / "three")[0] == 2
+    assert ledger_path(tmp_path / "four") == registry
+
+
 # --- integrity counts -----------------------------------------------------
 
 
@@ -127,8 +170,12 @@ def test_integrity_counts_hypotheses_attempts_observations(tmp_path):
     )
     append_trial_record(
         tmp_path,
-        _record(tmp_path, status="discarded", test_sharpe_per_period=None,
-                strategy_params={"lookback_days": 999}),
+        _record(
+            tmp_path,
+            status="discarded",
+            test_sharpe_per_period=None,
+            strategy_params={"lookback_days": 999},
+        ),
     )
     report = ledger_integrity_report(tmp_path)
     assert report.n_hypotheses == 3

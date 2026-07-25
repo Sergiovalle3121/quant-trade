@@ -1,0 +1,62 @@
+{
+  "algorithms": [
+    {
+      "algorithm_id": "etchash",
+      "asic_only": false,
+      "coin": "ETC",
+      "coin_examples": [
+        "ETC"
+      ],
+      "currency": "USD",
+      "device_capacity_source": "exact_sku_benchmark",
+      "hashes_per_unit": "1000000",
+      "hashrate_unit": "MH/s",
+      "native_unit": "MH/s",
+      "network": "ethereum-classic-mainnet",
+      "normalized_hashes_per_second": "1000000",
+      "period": "day",
+      "registry_version": "1",
+      "revenue_model": "hashprice_usd_per_mh_day"
+    },
+    {
+      "algorithm_id": "kheavyhash",
+      "asic_only": false,
+      "coin": "KAS",
+      "coin_examples": [
+        "KAS"
+      ],
+      "currency": "USD",
+      "device_capacity_source": "exact_sku_benchmark",
+      "hashes_per_unit": "1000000000",
+      "hashrate_unit": "GH/s",
+      "native_unit": "GH/s",
+      "network": "kaspa-mainnet",
+      "normalized_hashes_per_second": "1000000000",
+      "period": "day",
+      "registry_version": "1",
+      "revenue_model": "hashprice_usd_per_gh_day"
+    },
+    {
+      "algorithm_id": "sha256",
+      "asic_only": true,
+      "coin": "BTC",
+      "coin_examples": [
+        "BTC"
+      ],
+      "currency": "USD",
+      "device_capacity_source": "exact_sku_benchmark",
+      "hashes_per_unit": "1000000000000",
+      "hashrate_unit": "TH/s",
+      "native_unit": "TH/s",
+      "network": "bitcoin-mainnet",
+      "normalized_hashes_per_second": "1000000000000",
+      "period": "day",
+      "registry_version": "1",
+      "revenue_model": "hashprice_usd_per_th_day"
+    }
+  ],
+  "artifact": "MINING_UNIT_AUDIT",
+  "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "schema_version": 2,
+  "universal_th_divisor_present": false
+}

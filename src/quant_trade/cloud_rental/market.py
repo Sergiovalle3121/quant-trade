@@ -20,34 +20,81 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import asdict, dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from quant_trade.carry.quality import parse_utc
+from quant_trade.evidence.canonical_json import sha256_of_file
 
-#: Per-algorithm dimensional metadata. Fail closed on unknown algorithms.
-ALGORITHM_UNITS: dict[str, dict[str, Any]] = {
-    "sha256": {
-        "hashrate_unit": "TH/s",
-        "normalized_hashes_per_second": 1e12,
-        "revenue_model": "hashprice_usd_per_th_day",
-        "asic_only": True,
-        "coin_examples": ("BTC",),
-    },
-    "kheavyhash": {
-        "hashrate_unit": "GH/s",
-        "normalized_hashes_per_second": 1e9,
-        "revenue_model": "hashprice_usd_per_gh_day",
-        "asic_only": False,
-        "coin_examples": ("KAS",),
-    },
-    "etchash": {
-        "hashrate_unit": "MH/s",
-        "normalized_hashes_per_second": 1e6,
-        "revenue_model": "hashprice_usd_per_mh_day",
-        "asic_only": False,
-        "coin_examples": ("ETC",),
-    },
+ALGORITHM_UNIT_REGISTRY_VERSION = "1"
+
+
+@dataclass(frozen=True)
+class AlgorithmUnitDefinition:
+    """Versioned dimensional contract for one mining algorithm."""
+
+    algorithm_id: str
+    coin: str
+    network: str
+    native_unit: str
+    hashes_per_unit: Decimal
+    device_capacity_source: str
+    revenue_model: str
+    period: str = "day"
+    currency: str = "USD"
+    asic_only: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "registry_version": ALGORITHM_UNIT_REGISTRY_VERSION,
+            "algorithm_id": self.algorithm_id,
+            "coin": self.coin,
+            "network": self.network,
+            "native_unit": self.native_unit,
+            # Backward-compatible name used by V6 callers.
+            "hashrate_unit": self.native_unit,
+            "hashes_per_unit": self.hashes_per_unit,
+            "normalized_hashes_per_second": self.hashes_per_unit,
+            "device_capacity_source": self.device_capacity_source,
+            "revenue_model": self.revenue_model,
+            "period": self.period,
+            "currency": self.currency,
+            "asic_only": self.asic_only,
+            "coin_examples": (self.coin,),
+        }
+
+
+#: Per-algorithm dimensional metadata. Decimal prevents binary-float unit drift.
+ALGORITHM_UNITS: dict[str, AlgorithmUnitDefinition] = {
+    "sha256": AlgorithmUnitDefinition(
+        algorithm_id="sha256",
+        coin="BTC",
+        network="bitcoin-mainnet",
+        native_unit="TH/s",
+        hashes_per_unit=Decimal("1000000000000"),
+        device_capacity_source="exact_sku_benchmark",
+        revenue_model="hashprice_usd_per_th_day",
+        asic_only=True,
+    ),
+    "kheavyhash": AlgorithmUnitDefinition(
+        algorithm_id="kheavyhash",
+        coin="KAS",
+        network="kaspa-mainnet",
+        native_unit="GH/s",
+        hashes_per_unit=Decimal("1000000000"),
+        device_capacity_source="exact_sku_benchmark",
+        revenue_model="hashprice_usd_per_gh_day",
+    ),
+    "etchash": AlgorithmUnitDefinition(
+        algorithm_id="etchash",
+        coin="ETC",
+        network="ethereum-classic-mainnet",
+        native_unit="MH/s",
+        hashes_per_unit=Decimal("1000000"),
+        device_capacity_source="exact_sku_benchmark",
+        revenue_model="hashprice_usd_per_mh_day",
+    ),
 }
 
 
@@ -58,7 +105,16 @@ def algorithm_unit(algorithm_id: str) -> dict[str, Any]:
             f"unknown algorithm {algorithm_id!r}; refusing to guess its hashrate "
             f"unit (known: {sorted(ALGORITHM_UNITS)})"
         )
-    return dict(meta)
+    return meta.to_dict()
+
+
+def native_hashrate_units(algorithm_id: str, hashrate_hs: float) -> Decimal:
+    """Convert physical H/s into the algorithm's declared native unit."""
+    if not math.isfinite(hashrate_hs) or hashrate_hs <= 0:
+        raise ValueError("hashrate_hs must be finite and > 0")
+    hashes_per_unit = algorithm_unit(algorithm_id)["hashes_per_unit"]
+    assert isinstance(hashes_per_unit, Decimal)
+    return Decimal(str(hashrate_hs)) / hashes_per_unit
 
 
 def check_algorithm_hardware(algorithm_id: str, architecture: str) -> str | None:
@@ -86,6 +142,7 @@ class MarketSnapshot:
     source_url: str
     captured_at_utc: str
     raw_sha256: str
+    network: str = ""
     network_difficulty: float = 0.0
     pool_fee_rate: float = 0.01
     fx_source: str = "USD"
@@ -94,11 +151,21 @@ class MarketSnapshot:
     max_age_hours: float = 24.0
 
     def __post_init__(self) -> None:
-        expected_unit = algorithm_unit(self.algorithm_id)["hashrate_unit"]
+        unit_contract = algorithm_unit(self.algorithm_id)
+        expected_unit = unit_contract["hashrate_unit"]
         if self.hashrate_unit != expected_unit:
             raise ValueError(
                 f"{self.algorithm_id} is priced in {expected_unit}, not "
                 f"{self.hashrate_unit!r} — cross-unit pricing is forbidden"
+            )
+        if self.coin.upper() != str(unit_contract["coin"]).upper():
+            raise ValueError(
+                f"{self.algorithm_id} is registered for {unit_contract['coin']}, not {self.coin!r}"
+            )
+        if self.network != unit_contract["network"]:
+            raise ValueError(
+                f"{self.algorithm_id} is registered for network "
+                f"{unit_contract['network']}, not {self.network!r}"
             )
         for name in ("hashprice_usd_per_unit_day", "coin_price_usd"):
             value = getattr(self, name)
@@ -132,10 +199,7 @@ class MarketSnapshot:
         if age_h < 0:
             return ["market snapshot is dated in the future"]
         if age_h > self.max_age_hours:
-            return [
-                f"market snapshot {age_h:.1f}h old exceeds max age "
-                f"{self.max_age_hours:.0f}h"
-            ]
+            return [f"market snapshot {age_h:.1f}h old exceeds max age {self.max_age_hours:.0f}h"]
         return []
 
     def to_dict(self) -> dict[str, Any]:
@@ -146,6 +210,21 @@ def load_market_snapshot(path: str | Path) -> MarketSnapshot:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     known = {f for f in MarketSnapshot.__dataclass_fields__}
     return MarketSnapshot(**{k: v for k, v in payload.items() if k in known})
+
+
+def verify_market_snapshot_bytes(
+    snapshot: MarketSnapshot, raw_artifact_path: str | Path | None
+) -> list[str]:
+    """Open and hash the raw response claimed by a normalized snapshot."""
+    if raw_artifact_path is None:
+        return ["market raw response bytes unavailable; raw_sha256 cannot be byte-verified"]
+    path = Path(raw_artifact_path)
+    if not path.exists():
+        return [f"market raw response missing on disk: {raw_artifact_path}"]
+    actual = sha256_of_file(path)
+    if actual != snapshot.raw_sha256:
+        return ["market raw response bytes do NOT hash to the snapshot raw_sha256"]
+    return []
 
 
 def parse_benchmark_log(raw: bytes) -> dict[str, Any]:
@@ -212,9 +291,7 @@ def verify_benchmark_against_log(
             f"{rebuilt['hashrate_hs']:.3e} by more than {tolerance:.0%}"
         )
     for field_name in ("duration_seconds", "shares_accepted", "shares_rejected"):
-        if field_name in claimed and float(claimed[field_name]) != float(
-            rebuilt[field_name]
-        ):
+        if field_name in claimed and float(claimed[field_name]) != float(rebuilt[field_name]):
             problems.append(
                 f"claimed {field_name}={claimed[field_name]} does not match the "
                 f"log's {rebuilt[field_name]}"

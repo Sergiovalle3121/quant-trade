@@ -18,6 +18,7 @@ outcomes:
 from __future__ import annotations
 
 import dataclasses
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,7 @@ from quant_trade.evidence.manifest import (
 from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_moments
 from quant_trade.research.bootstrap import bootstrap_confidence_intervals
 from quant_trade.research.ledger import append_trial_record, build_trial_record, sha256_hex
+from quant_trade.research.overfitting import cscv_probability_of_backtest_overfitting
 from quant_trade.research.splits import purged_walk_forward_splits
 
 
@@ -56,6 +58,7 @@ class CarryCampaignResult:
     net_return_series: pd.DataFrame
     metrics: dict[str, Any]
     bootstrap: dict[str, Any]
+    cscv: dict[str, Any]
     walk_forward: list[dict[str, Any]]
     per_snapshot_go_fraction: float
     dataset_manifest: dict[str, Any] = field(default_factory=dict)
@@ -212,8 +215,7 @@ def _load_snapshots(
                 manifest,
                 data_source="unverified_legacy",
                 provenance_notes=(
-                    manifest.provenance_notes
-                    + " | self-labelled real without ingestion receipts: "
+                    manifest.provenance_notes + " | self-labelled real without ingestion receipts: "
                     "downgraded to unverified_legacy"
                 ).strip(" |"),
             )
@@ -250,13 +252,10 @@ def _load_snapshots(
         from quant_trade.evidence.receipts import resolve_provenance
 
         store_path = Path(path)
-        provenance_report = resolve_provenance(
-            stored.records, store_path.parent / "receipts.jsonl"
-        )
+        provenance_report = resolve_provenance(stored.records, store_path.parent / "receipts.jsonl")
         if provenance_report.provenance == "invalid":
             raise ValueError(
-                "raw ingestion evidence is broken: "
-                + "; ".join(provenance_report.problems[:3])
+                "raw ingestion evidence is broken: " + "; ".join(provenance_report.problems[:3])
             )
         records = observations_to_snapshot_records(
             stored.records, provenance=provenance_report.provenance
@@ -301,16 +300,10 @@ def _load_snapshots(
         rows = load_panel(panel_dir)
         prov = resolve_dir_provenance(panel_dir / "receipts.jsonl")
         if prov.provenance == "invalid":
-            raise ValueError(
-                "panel raw evidence is broken: " + "; ".join(prov.problems[:3])
-            )
-        records, settle_pairs, signal = panel_to_research_inputs(
-            rows, provenance=prov.provenance
-        )
+            raise ValueError("panel raw evidence is broken: " + "; ".join(prov.problems[:3]))
+        records, settle_pairs, signal = panel_to_research_inputs(rows, provenance=prov.provenance)
         snapshots = load_snapshots_from_records(records)
-        settlements = [
-            (pd.to_datetime(ts, utc=True), rate) for ts, rate in settle_pairs
-        ]
+        settlements = [(pd.to_datetime(ts, utc=True), rate) for ts, rate in settle_pairs]
         manifest = build_file_manifest(
             panel_dir / "panel.jsonl",
             records,
@@ -321,6 +314,127 @@ def _load_snapshots(
         f"unsupported carry data source {source!r}; "
         "use 'synthetic', 'json', 'jsonl_observations', or 'panel'"
     )
+
+
+def _carry_cscv_evidence(
+    config: dict[str, Any],
+    snapshots: list[CarrySnapshot],
+    costs: CarryCostModel,
+    *,
+    entry_threshold: float,
+    trailing_window: int,
+    perp_leverage: float,
+    collateral_yield_annual: float,
+    settlements: list[tuple[Any, float]] | None,
+    signal_rates: list[float] | None,
+) -> dict[str, Any]:
+    """Run preregistered carry variants into a genuine CSCV return matrix."""
+    cscv_cfg = config.get("statistics", {}).get("cscv", {})
+    if not isinstance(cscv_cfg, dict) or not cscv_cfg:
+        return {
+            "available": False,
+            "method": "cscv_rank_based",
+            "reason": "no preregistered statistics.cscv configuration",
+        }
+    variants = cscv_cfg.get("variants")
+    if not isinstance(variants, list) or len(variants) < 2:
+        return {
+            "available": False,
+            "method": "cscv_rank_based",
+            "reason": "CSCV requires at least two preregistered carry variants",
+        }
+
+    normalized: list[dict[str, Any]] = []
+    primary_present = False
+    for index, raw_variant in enumerate(variants):
+        if not isinstance(raw_variant, dict):
+            return {
+                "available": False,
+                "method": "cscv_rank_based",
+                "reason": f"CSCV variant {index} is not a mapping",
+            }
+        unknown = set(raw_variant) - {"id", "entry_threshold", "trailing_window"}
+        if unknown:
+            return {
+                "available": False,
+                "method": "cscv_rank_based",
+                "reason": (f"CSCV variant {index} has unsupported keys: {sorted(unknown)}"),
+            }
+        threshold = float(raw_variant.get("entry_threshold", entry_threshold))
+        window = int(raw_variant.get("trailing_window", trailing_window))
+        if not math.isfinite(threshold) or window <= 0:
+            return {
+                "available": False,
+                "method": "cscv_rank_based",
+                "reason": (
+                    f"CSCV variant {index} needs a finite threshold and trailing_window > 0"
+                ),
+            }
+        normalized.append(
+            {
+                "id": str(raw_variant.get("id", f"variant_{index}")),
+                "entry_threshold": threshold,
+                "trailing_window": window,
+            }
+        )
+        primary_present |= threshold == entry_threshold and window == trailing_window
+    variant_ids = [str(variant["id"]) for variant in normalized]
+    if any(not value.strip() for value in variant_ids) or len(set(variant_ids)) != len(variant_ids):
+        return {
+            "available": False,
+            "method": "cscv_rank_based",
+            "reason": "CSCV variant ids must be non-empty and unique",
+        }
+    if not primary_present:
+        return {
+            "available": False,
+            "method": "cscv_rank_based",
+            "reason": "CSCV variants do not include the campaign's primary signal",
+        }
+
+    from quant_trade.carry.ledger_engine import run_carry_ledger
+
+    columns: list[list[float]] = []
+    for variant in normalized:
+        ledger = run_carry_ledger(
+            snapshots,
+            costs,
+            entry_threshold=float(variant["entry_threshold"]),
+            trailing_window=int(variant["trailing_window"]),
+            initial_capital=1.0,
+            perp_leverage=perp_leverage,
+            collateral_yield_annual=collateral_yield_annual,
+            settlements=settlements,
+            signal_rates=signal_rates,
+        )
+        if not ledger.reconciled:
+            return {
+                "available": False,
+                "method": "cscv_rank_based",
+                "reason": f"CSCV variant {variant['id']} ledger did not reconcile",
+            }
+        columns.append(ledger.bars["net_return"].astype(float).tolist())
+
+    matrix = pd.DataFrame(
+        {variant["id"]: values for variant, values in zip(normalized, columns, strict=True)}
+    )
+    try:
+        evidence = cscv_probability_of_backtest_overfitting(
+            matrix.to_numpy(),
+            partitions=int(cscv_cfg.get("partitions", 8)),
+            max_pbo=float(cscv_cfg.get("max_pbo", 0.50)),
+        )
+    except (TypeError, ValueError) as exc:
+        return {
+            "available": False,
+            "method": "cscv_rank_based",
+            "reason": f"CSCV matrix rejected: {exc}",
+        }
+    return {
+        "available": True,
+        **evidence.to_dict(),
+        "variants": normalized,
+    }
 
 
 def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
@@ -339,9 +453,7 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     signal_cfg = config.get("signal", {})
     entry_threshold = float(signal_cfg.get("entry_threshold", 0.0001))
     trailing_window = int(signal_cfg.get("trailing_window", 6))
-    collateral_yield_annual = float(
-        config.get("capital", {}).get("collateral_yield_annual", 0.0)
-    )
+    collateral_yield_annual = float(config.get("capital", {}).get("collateral_yield_annual", 0.0))
 
     # THE promotable P&L path: the stateful, reconciled ledger (V6-A). The
     # legacy aggregate arithmetic remains available only as a diagnostic.
@@ -368,6 +480,17 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     active = net[returns["position"] > 0]
     moments = return_moments(net)
     total_return = float(ledger.final_equity / ledger.initial_capital - 1.0)
+    cscv = _carry_cscv_evidence(
+        config,
+        snapshots,
+        costs,
+        entry_threshold=entry_threshold,
+        trailing_window=trailing_window,
+        perp_leverage=position.perp_leverage,
+        collateral_yield_annual=collateral_yield_annual,
+        settlements=settlements,
+        signal_rates=signal_rates,
+    )
 
     # per-snapshot economic GO fraction (diagnostic, not the campaign verdict)
     go = [evaluate_carry(s, position, costs, policy).decision == "GO" for s in snapshots]
@@ -377,16 +500,21 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     bootstrap: dict[str, Any]
     if len(net.dropna()) >= 2:
         ci = bootstrap_confidence_intervals(
-            net.dropna(), method="stationary", samples=1000, seed=12345, block_size=10
+            net.dropna(),
+            method="stationary",
+            samples=1000,
+            seed=12345,
+            block_size=10,
+            percentiles=(5.0, 50.0, 95.0),
         )
         bootstrap = {
             "available": True,
             "method": "stationary",
             "total_return": {
-                "lower": float(ci.loc["total_return", "p2.5"]),
-                "upper": float(ci.loc["total_return", "p97.5"]),
+                "lower": float(ci.loc["total_return", "p5"]),
+                "upper": float(ci.loc["total_return", "p95"]),
             },
-            "total_return_lower_positive": bool(ci.loc["total_return", "p2.5"] > 0),
+            "total_return_lower_positive": bool(ci.loc["total_return", "p5"] > 0),
         }
     else:
         bootstrap = {"available": False, "reason": "insufficient observations"}
@@ -455,12 +583,8 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         perp_leverage=position.perp_leverage,
         maintenance_margin_rate=snapshots[0].maintenance_margin_rate,
     )
-    capital = capital_required(
-        position.notional_usd, perp_leverage=position.perp_leverage
-    )
-    return_on_capital = (
-        total_return * position.notional_usd / capital.total_capital_usd
-    )
+    capital = capital_required(position.notional_usd, perp_leverage=position.perp_leverage)
+    return_on_capital = total_return * position.notional_usd / capital.total_capital_usd
 
     # subperiod stability: both halves of the series
     halves = [net.iloc[: len(net) // 2], net.iloc[len(net) // 2 :]]
@@ -518,10 +642,11 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
 
     # --- verdict (fail closed; sufficiency before economics) ---------------
     gate_cfg = config.get("gate", {})
-    min_events = int(gate_cfg.get("min_funding_events", 90))
-    min_span = float(gate_cfg.get("min_span_days", 30.0))
-    min_windows = int(gate_cfg.get("min_walk_forward_windows", 2))
+    min_events = int(gate_cfg.get("min_funding_events", 1000))
+    min_span = float(gate_cfg.get("min_span_days", 730.0))
+    min_windows = int(gate_cfg.get("min_walk_forward_windows", 5))
     min_psr = float(gate_cfg.get("min_probabilistic_sharpe", 0.95))
+    min_dsr = float(gate_cfg.get("min_deflated_sharpe", 0.95))
 
     insufficiency: list[str] = []
     if data_source != "real":
@@ -545,6 +670,16 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         reasons = insufficiency
     else:
         psr = probabilistic_sharpe_ratio(net.dropna())
+        from quant_trade.metrics.statistics import deflated_sharpe_ratio
+        from quant_trade.research.ledger import ledger_stats
+
+        trial_registry = config.get("trial_registry_path")
+        if trial_registry:
+            prior_trials, sharpe_variance = ledger_stats(None, registry_path=trial_registry)
+        else:
+            prior_trials, sharpe_variance = 0, 0.0
+        effective_trials = max(1, prior_trials + 1)
+        dsr = deflated_sharpe_ratio(net.dropna(), effective_trials, sharpe_variance)
         rejection: list[str] = []
         if total_return <= 0:
             rejection.append("campaign net carry is not positive")
@@ -558,6 +693,22 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
             rejection.append("no snapshot passed the per-snapshot economic gate")
         if psr < min_psr:
             rejection.append(f"probabilistic Sharpe {psr:.3f} below {min_psr}")
+        if dsr < min_dsr:
+            rejection.append(
+                f"deflated Sharpe {dsr:.3f} below {min_dsr} "
+                f"across {effective_trials} global trial(s)"
+            )
+        if not cscv.get("available"):
+            rejection.append(
+                "CSCV rank-based PBO unavailable: " + str(cscv.get("reason", "missing evidence"))
+            )
+        elif cscv.get("method") != "cscv_rank_based":
+            rejection.append("CSCV PBO evidence uses an unsupported method")
+        elif cscv.get("decision") != "PASS":
+            rejection.append(
+                f"CSCV rank-based PBO {float(cscv.get('pbo', 1.0)):.3f} "
+                "did not pass its preregistered threshold"
+            )
         if margin_path.breached:
             rejection.append("perp margin path breached maintenance along the trajectory")
         if ledger.aborted_entries > 0:
@@ -567,12 +718,12 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
             )
         if any(h <= 0 for h in half_returns):
             rejection.append("a subperiod half is not positive; regime stability unproven")
-        negative_windows = [
-            w for w in walk_forward if float(w.get("test_total_return", 0.0)) <= 0
-        ]
+        negative_windows = [w for w in walk_forward if float(w.get("test_total_return", 0.0)) <= 0]
         if len(negative_windows) * 2 > len(walk_forward):
             rejection.append("a majority of walk-forward windows are not positive")
         metrics["probabilistic_sharpe"] = psr
+        metrics["deflated_sharpe"] = dsr
+        metrics["effective_trials"] = effective_trials
         decision = "PAPER_CANDIDATE" if not rejection else "REJECTED"
         reasons = rejection
         if decision == "PAPER_CANDIDATE":
@@ -588,6 +739,7 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
         net_return_series=returns,
         metrics=metrics,
         bootstrap=bootstrap,
+        cscv=cscv,
         walk_forward=walk_forward,
         per_snapshot_go_fraction=go_fraction,
         dataset_manifest=manifest.to_dict(),
@@ -624,9 +776,7 @@ def evaluate_carry_promotion(
             "real_money_authorized": False,
         }
     if payload.get("decision") != "PAPER_CANDIDATE":
-        failures.append(
-            f"campaign decision is {payload.get('decision')!r}, not PAPER_CANDIDATE"
-        )
+        failures.append(f"campaign decision is {payload.get('decision')!r}, not PAPER_CANDIDATE")
     if payload.get("data_source") != "real":
         failures.append("data_source is not real")
     manifest = payload.get("dataset_manifest") or {}
@@ -647,9 +797,7 @@ def evaluate_carry_promotion(
     if sharpe_pp is None or observations is None or skew is None or kurt is None:
         failures.append("persisted return moments incomplete; PSR cannot be recomputed")
     else:
-        psr = psr_from_moments(
-            float(sharpe_pp), int(observations), float(skew), float(kurt), 0.0
-        )
+        psr = psr_from_moments(float(sharpe_pp), int(observations), float(skew), float(kurt), 0.0)
         statistics["psr"] = psr
         if psr < 0.95:
             failures.append(f"recomputed PSR {psr:.3f} below 0.95")
@@ -694,22 +842,43 @@ def evaluate_carry_promotion(
     else:
         failures.append("net_returns.csv missing; DSR cannot be recomputed")
 
-    windows = payload.get("walk_forward") or []
-    if len(windows) < 4:
+    cscv = payload.get("cscv") or {}
+    if not cscv.get("available"):
+        failures.append("CSCV PBO evidence is unavailable")
+    elif cscv.get("method") != "cscv_rank_based":
         failures.append(
-            f"PBO needs >= 4 walk-forward windows; only {len(windows)} available"
+            "PBO evidence is not CSCV rank-based; walk-forward loss fractions "
+            "cannot be relabelled as PBO"
         )
     else:
-        negative = sum(
-            1 for w in windows if float(w.get("test_total_return", 0.0)) <= 0.0
-        )
-        pbo_estimate = negative / len(windows)
-        statistics["pbo_estimate"] = pbo_estimate
-        statistics["pbo_method"] = "walk_forward_negative_window_fraction"
-        if pbo_estimate > 0.5:
-            failures.append(
-                f"PBO estimate {pbo_estimate:.2f} above the pre-registered 0.50 limit"
-            )
+        try:
+            pbo_cscv = float(cscv["pbo"])
+        except (KeyError, TypeError, ValueError):
+            failures.append("CSCV PBO result is missing or non-numeric")
+        else:
+            raw_logits = cscv.get("logits")
+            if not isinstance(raw_logits, list | tuple):
+                logits = []
+            else:
+                try:
+                    logits = [float(value) for value in raw_logits]
+                except (TypeError, ValueError):
+                    logits = []
+            if not logits or any(not math.isfinite(value) for value in logits):
+                failures.append("CSCV PBO logits are missing or non-finite")
+                recomputed_pbo = None
+            else:
+                recomputed_pbo = sum(value <= 0.0 for value in logits) / len(logits)
+                if abs(recomputed_pbo - pbo_cscv) > 1e-12:
+                    failures.append("persisted CSCV PBO does not match its rank-logit evidence")
+            statistics["pbo_cscv"] = recomputed_pbo
+            statistics["pbo_method"] = "cscv_rank_based"
+            if not 0.0 <= pbo_cscv <= 1.0:
+                failures.append("CSCV PBO result must be in [0, 1]")
+            elif pbo_cscv >= 0.50:
+                failures.append(
+                    f"CSCV rank-based PBO {pbo_cscv:.2f} is not below the pre-registered 0.50 limit"
+                )
 
     ledger_summary = payload.get("ledger") or {}
     if not ledger_summary.get("reconciled"):
@@ -748,6 +917,7 @@ def write_carry_artifacts(
         "reasons": result.reasons,
         "test_metrics": result.metrics,
         "bootstrap": result.bootstrap,
+        "cscv": result.cscv,
         "walk_forward": result.walk_forward,
         "benchmark": {"type": "flat_cash", "annual_return": 0.0},
         "comparison_test": {"excess_return": result.metrics["total_return"]},
@@ -774,25 +944,23 @@ def write_carry_artifacts(
     with (out / "funding_cashflows.jsonl").open("w", encoding="utf-8") as handle:
         for entry in result.ledger_cashflows:
             handle.write(canonical_dumps(entry) + "\n")
+    trial_record = build_trial_record(
+        source="cash_and_carry_research",
+        strategy="cash_and_carry_funding",
+        strategy_params=config.get("signal", {}),
+        run_id=str(config.get("experiment_name", "carry")),
+        status="discarded" if result.decision.startswith("NOT_RUN") else "evaluated",
+        dataset_sha=dataset_byte_sha,
+        config_sha=sha256_hex(config),
+        split_policy="purged_walk_forward",
+        feature_version="carry_v1",
+        test_sharpe_per_period=result.metrics.get("sharpe_per_period"),
+        test_total_return=result.metrics.get("total_return"),
+        error=("; ".join(result.reasons) if result.decision.startswith("NOT_RUN") else None),
+    )
     append_trial_record(
         out,
-        build_trial_record(
-            source="cash_and_carry_research",
-            strategy="cash_and_carry_funding",
-            strategy_params=config.get("signal", {}),
-            run_id=str(config.get("experiment_name", "carry")),
-            status="discarded" if result.decision.startswith("NOT_RUN") else "evaluated",
-            dataset_sha=dataset_byte_sha,
-            config_sha=sha256_hex(config),
-            split_policy="purged_walk_forward",
-            feature_version="carry_v1",
-            test_sharpe_per_period=result.metrics.get("sharpe_per_period"),
-            test_total_return=result.metrics.get("total_return"),
-            error=(
-                "; ".join(result.reasons)
-                if result.decision.startswith("NOT_RUN")
-                else None
-            ),
-        ),
+        trial_record,
+        registry_path=config.get("trial_registry_path"),
     )
     return results_path

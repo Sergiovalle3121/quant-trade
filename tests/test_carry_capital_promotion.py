@@ -100,6 +100,12 @@ def _paper_candidate_artifacts(tmp_path, *, tamper: bool = False):
             {"test_total_return": 0.012},
             {"test_total_return": 0.009},
         ],
+        "cscv": {
+            "available": True,
+            "method": "cscv_rank_based",
+            "pbo": 0.0,
+            "logits": [1.1, 0.8, 1.4, 0.6, 0.9, 1.2],
+        },
         "test_metrics": {
             "sharpe_per_period": 0.25,
             "observations": 200,
@@ -115,14 +121,18 @@ def _paper_candidate_artifacts(tmp_path, *, tamper: bool = False):
     import pandas as pd
 
     rng = np.random.default_rng(7)
-    pd.DataFrame(
-        {"net_return": rng.normal(0.001, 0.002, 200)}
-    ).to_csv(tmp_path / "net_returns.csv", index=False)
+    pd.DataFrame({"net_return": rng.normal(0.001, 0.002, 200)}).to_csv(
+        tmp_path / "net_returns.csv", index=False
+    )
     append_trial_record(
         tmp_path,
         build_trial_record(
-            source="test", strategy="carry", strategy_params={}, run_id="r",
-            dataset_sha=str(manifest["byte_sha256"]), test_sharpe_per_period=0.25,
+            source="test",
+            strategy="carry",
+            strategy_params={},
+            run_id="r",
+            dataset_sha=str(manifest["byte_sha256"]),
+            test_sharpe_per_period=0.25,
         ),
     )
     if tamper:
@@ -166,6 +176,37 @@ def test_promotion_review_rejects_weak_psr(tmp_path):
     review = evaluate_carry_promotion(results)
     assert review["status"] == "REJECTED"
     assert any("PSR" in f for f in review["failures"])
+
+
+def test_promotion_review_rejects_missing_or_approximate_pbo(tmp_path):
+    results = _paper_candidate_artifacts(tmp_path)
+    payload = json.loads(results.read_text())
+    del payload["cscv"]
+    atomic_write_json(results, payload)
+    review = evaluate_carry_promotion(results)
+    assert review["status"] == "REJECTED"
+    assert any("CSCV PBO" in failure for failure in review["failures"])
+
+    payload["cscv"] = {
+        "available": True,
+        "method": "walk_forward_negative_window_fraction",
+        "pbo": 0.0,
+    }
+    atomic_write_json(results, payload)
+    review = evaluate_carry_promotion(results)
+    assert review["status"] == "REJECTED"
+    assert any("cannot be relabelled as PBO" in failure for failure in review["failures"])
+
+
+def test_promotion_review_recomputes_pbo_from_rank_logits(tmp_path):
+    results = _paper_candidate_artifacts(tmp_path)
+    payload = json.loads(results.read_text())
+    payload["cscv"]["pbo"] = 0.0
+    payload["cscv"]["logits"] = [-1.0, -0.5, 0.8, 1.2]
+    atomic_write_json(results, payload)
+    review = evaluate_carry_promotion(results)
+    assert review["status"] == "REJECTED"
+    assert any("does not match" in failure for failure in review["failures"])
 
 
 def test_promotion_review_rejects_yaml_results(tmp_path):

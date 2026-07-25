@@ -22,6 +22,7 @@ from quant_trade.cloud_rental import (
 )
 from quant_trade.cloud_rental.alibaba_readonly import AlibabaReadOnlyPriceAdapter
 from quant_trade.cloud_rental.aws_readonly import AwsReadOnlyPriceAdapter
+from quant_trade.cloud_rental.benchmarks import validate_benchmark_for_quote
 from quant_trade.cloud_rental.catalog import check_quote_freshness
 
 NOW = "2026-07-24T12:00:00Z"
@@ -104,9 +105,11 @@ def test_aws_hashing_without_written_approval_is_blocked():
         policy_evidence=None,
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_PENDING_WRITTEN_APPROVAL)
+    assert decision.status == str(FeasibilityStatus.BLOCKED_PROVIDER_TERMS)
     assert "1.25" in decision.policy_reason
     assert decision.economic_reason == ""  # legal block never becomes economic
+    assert decision.control_plane_allowed is True
+    assert decision.hashing_allowed is False
 
 
 def test_aws_free_tier_or_credits_is_blocked_even_with_approval():
@@ -118,7 +121,7 @@ def test_aws_free_tier_or_credits_is_blocked_even_with_approval():
         policy_evidence=_approval(),
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_PROVIDER_POLICY)
+    assert decision.status == str(FeasibilityStatus.BLOCKED_PROVIDER_TERMS)
     assert "Free Tier" in decision.policy_reason
 
 
@@ -132,10 +135,10 @@ def test_alibaba_hashing_blocked_by_default():
         evaluated_at_utc=NOW,
     )
     assert decision.status == str(FeasibilityStatus.BLOCKED_PROVIDER_POLICY)
-    assert "security-violation" in decision.policy_reason
+    assert "security-lock" in decision.policy_reason
 
 
-def test_alibaba_ambiguous_evidence_is_policy_unknown():
+def test_alibaba_ambiguous_evidence_cannot_unlock_hashing():
     ambiguous = ProviderPolicyEvidence(
         provider=CloudProvider.ALIBABA,
         workload=WorkloadPurpose.HASHING_WORKER,
@@ -154,7 +157,8 @@ def test_alibaba_ambiguous_evidence_is_policy_unknown():
         policy_evidence=ambiguous,
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_POLICY_UNKNOWN)
+    assert decision.status == str(FeasibilityStatus.BLOCKED_PROVIDER_POLICY)
+    assert decision.hashing_allowed is False
 
 
 def test_expired_approval_fails_closed():
@@ -176,7 +180,7 @@ def test_expired_approval_fails_closed():
         policy_evidence=stale,
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_PENDING_WRITTEN_APPROVAL)
+    assert decision.status == str(FeasibilityStatus.BLOCKED_PROVIDER_TERMS)
     assert "expired" in decision.policy_reason
 
 
@@ -185,8 +189,9 @@ def test_control_plane_is_evaluable_and_distinct_from_hashing():
         decision = evaluate_feasibility(
             purpose=WorkloadPurpose.CONTROL_PLANE,
             quote=_quote(provider=provider, price_per_hour=0.10),
-            spec=_spec(provider=provider, architecture="cpu", accelerator_count=0,
-                       accelerator_model=""),
+            spec=_spec(
+                provider=provider, architecture="cpu", accelerator_count=0, accelerator_model=""
+            ),
             benchmark=None,
             policy_evidence=None,
             horizon_hours=720.0,
@@ -195,63 +200,56 @@ def test_control_plane_is_evaluable_and_distinct_from_hashing():
         )
         assert decision.status == str(FeasibilityStatus.PAPER_CONTROL_PLANE_CANDIDATE)
         assert "no resources are created" in decision.policy_reason
+        assert decision.control_plane_allowed is True
+        assert decision.hashing_allowed is False
 
 
 # --- benchmark gates (defect F) -------------------------------------------
 
 
 def test_manual_hashrate_without_benchmark_is_rejected():
-    decision = evaluate_feasibility(
-        purpose=WorkloadPurpose.HASHING_WORKER,
-        quote=_quote(),
-        spec=_spec(),
-        benchmark=_benchmark(),
-        policy_evidence=_approval(),
-        manual_hashrate_declared=True,  # a 100 TH/s number typed into YAML
+    decision = validate_benchmark_for_quote(
+        _benchmark(),
+        _spec(),
+        "sha256",
         evaluated_at_utc=NOW,
+        manual_hashrate_declared=True,  # a 100 TH/s number typed into YAML
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_MISSING_BENCHMARK)
-    assert "not evidence" in decision.benchmark_reason
+    assert decision.status is FeasibilityStatus.BLOCKED_MISSING_BENCHMARK
+    assert "not evidence" in " ".join(decision.problems)
 
 
 def test_cpu_gpu_sha256_without_benchmark_is_incompatible_hardware():
-    decision = evaluate_feasibility(
-        purpose=WorkloadPurpose.HASHING_WORKER,
-        quote=_quote(),
-        spec=_spec(architecture="gpu"),
-        benchmark=None,
-        policy_evidence=_approval(),
-        algorithm="sha256",
+    decision = validate_benchmark_for_quote(
+        None,
+        _spec(architecture="gpu"),
+        "sha256",
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_INCOMPATIBLE_HARDWARE)
+    assert decision.status is FeasibilityStatus.BLOCKED_INCOMPATIBLE_HARDWARE
 
 
 def test_benchmark_from_another_sku_is_not_reusable():
     foreign = _benchmark(sku="g5.xlarge")
-    decision = evaluate_feasibility(
-        purpose=WorkloadPurpose.HASHING_WORKER,
-        quote=_quote(),
-        spec=_spec(),
-        benchmark=foreign,
-        policy_evidence=_approval(),
+    decision = validate_benchmark_for_quote(
+        foreign,
+        _spec(),
+        "sha256",
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_MISSING_BENCHMARK)
-    assert "not transferable" in decision.benchmark_reason
+    assert decision.status is FeasibilityStatus.BLOCKED_MISSING_BENCHMARK
+    assert "not transferable" in " ".join(decision.problems)
 
 
 def test_stale_benchmark_is_rejected():
     old = _benchmark(captured_at_utc="2025-01-01T00:00:00Z")
-    decision = evaluate_feasibility(
-        purpose=WorkloadPurpose.HASHING_WORKER,
-        quote=_quote(),
-        spec=_spec(),
-        benchmark=old,
-        policy_evidence=_approval(),
+    decision = validate_benchmark_for_quote(
+        old,
+        _spec(),
+        "sha256",
         evaluated_at_utc=NOW,
     )
-    assert decision.status == str(FeasibilityStatus.BLOCKED_MISSING_BENCHMARK)
+    assert decision.status is FeasibilityStatus.BLOCKED_MISSING_BENCHMARK
 
 
 # --- quote validation -----------------------------------------------------
@@ -281,19 +279,14 @@ def test_aws_spot_and_on_demand_sources_cannot_mix():
 
 def test_gpu_sha256_economics_is_a_massive_no_go():
     # A measured ~20 GH/s GPU benchmark vs a $10/h SKU: revenue is microscopic.
-    decision = evaluate_feasibility(
-        purpose=WorkloadPurpose.HASHING_WORKER,
-        quote=_quote(),
-        spec=_spec(),
-        benchmark=_benchmark(),
-        policy_evidence=_approval(),
-        revenue=RevenueAssumptions(hashprice_usd_per_th_day=0.05),
-        evaluated_at_utc=NOW,
+    decision = compute_rental_economics(
+        _quote(),
+        _benchmark(),
+        RevenueAssumptions(hashprice_usd_per_th_day=0.05),
     )
-    assert decision.status == str(FeasibilityStatus.ECONOMIC_NO_GO)
-    details = decision.details or {}
-    assert details["margin_per_hour_usd"] < 0
-    assert details["revenue_per_useful_hour_usd"] < 0.001  # fractions of a cent
+    assert decision.economically_positive is False
+    assert decision.margin_per_hour_usd < 0
+    assert decision.revenue_per_useful_hour_usd < 0.001  # fractions of a cent
 
 
 def test_no_multi_year_npv_for_rentals():
@@ -335,9 +328,16 @@ def test_interruption_and_fees_reduce_revenue():
 
 def test_adapters_have_no_creation_verbs():
     forbidden = {
-        "run_instances", "create_instance", "create_instances", "terminate_instances",
-        "start_instances", "stop_instances", "request_spot_instances",
-        "create_fleet", "deploy", "apply",
+        "run_instances",
+        "create_instance",
+        "create_instances",
+        "terminate_instances",
+        "start_instances",
+        "stop_instances",
+        "request_spot_instances",
+        "create_fleet",
+        "deploy",
+        "apply",
     }
     for adapter in (AwsReadOnlyPriceAdapter, AlibabaReadOnlyPriceAdapter):
         assert forbidden.isdisjoint(dir(adapter)), adapter.__name__
@@ -353,8 +353,9 @@ def test_feasibility_matrix_four_rows_and_markdown():
             {
                 "purpose": WorkloadPurpose.CONTROL_PLANE,
                 "quote": _quote(provider=provider, price_per_hour=0.10),
-                "spec": _spec(provider=provider, architecture="cpu",
-                              accelerator_count=0, accelerator_model=""),
+                "spec": _spec(
+                    provider=provider, architecture="cpu", accelerator_count=0, accelerator_model=""
+                ),
                 "benchmark": None,
                 "policy_evidence": None,
                 "horizon_hours": 720.0,
@@ -376,17 +377,13 @@ def test_feasibility_matrix_four_rows_and_markdown():
     assert statuses[("aws", "control_plane")] == str(
         FeasibilityStatus.PAPER_CONTROL_PLANE_CANDIDATE
     )
-    assert statuses[("aws", "hashing_worker")] == str(
-        FeasibilityStatus.BLOCKED_PENDING_WRITTEN_APPROVAL
-    )
+    assert statuses[("aws", "hashing_worker")] == str(FeasibilityStatus.BLOCKED_PROVIDER_TERMS)
     assert statuses[("alibaba", "control_plane")] == str(
         FeasibilityStatus.PAPER_CONTROL_PLANE_CANDIDATE
     )
-    assert statuses[("alibaba", "hashing_worker")] == str(
-        FeasibilityStatus.BLOCKED_PROVIDER_POLICY
-    )
+    assert statuses[("alibaba", "hashing_worker")] == str(FeasibilityStatus.BLOCKED_PROVIDER_POLICY)
     markdown = matrix_markdown(rows)
-    assert "BLOCKED_PENDING_WRITTEN_APPROVAL" in markdown
+    assert "BLOCKED_PROVIDER_TERMS" in markdown
     assert "BLOCKED_PROVIDER_POLICY" in markdown
     # every decision carries the safety posture
     for row in rows:

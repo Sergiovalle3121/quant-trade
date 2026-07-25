@@ -29,6 +29,7 @@ class BrokerConfig:
     max_gross_exposure: float = 1.0
     max_symbol_weight: float = 0.25
     min_cash_pct: float = 0.02
+    max_reference_age_seconds: float = 300.0
     audit_dir: str = "audits/broker"
     state_dir: str = "state/broker"
     real_money_enabled: bool = False

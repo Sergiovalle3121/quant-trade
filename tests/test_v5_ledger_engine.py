@@ -36,8 +36,11 @@ def test_ledger_reconciles_to_the_cent():
 
 def test_ledger_charges_margin_and_carry_only_when_positioned():
     flat = run_carry_ledger(
-        _snaps(funding=-0.01), COSTS, entry_threshold=0.5,  # never enters
-        trailing_window=3, initial_capital=100_000.0,
+        _snaps(funding=-0.01),
+        COSTS,
+        entry_threshold=0.5,  # never enters
+        trailing_window=3,
+        initial_capital=100_000.0,
     )
     assert flat.entries == 0
     assert flat.max_margin_used == 0.0
@@ -48,8 +51,13 @@ def test_ledger_charges_margin_and_carry_only_when_positioned():
 
 def test_partial_fills_abort_entry_and_book_unwind_cost():
     result = run_carry_ledger(
-        _snaps(), COSTS, entry_threshold=0.0, trailing_window=3,
-        initial_capital=100_000.0, fill_fraction=0.5, min_fill_rate=0.9,
+        _snaps(),
+        COSTS,
+        entry_threshold=0.0,
+        trailing_window=3,
+        initial_capital=100_000.0,
+        fill_fraction=0.5,
+        min_fill_rate=0.9,
     )
     assert result.entries == 0
     assert result.aborted_entries >= 1
@@ -61,15 +69,24 @@ def test_funding_settled_uses_settlement_events_only():
     snaps = _snaps(n=30, funding=0.0)  # quoted rate zero: signal off wouldn't enter
     snaps = [dataclasses.replace(s, realized_funding_rate=0.001) for s in snaps]
     times = [pd.to_datetime(s.captured_at_utc, utc=True) for s in snaps]
-    settlements = [(times[10], 0.002), (times[11], 0.002)]
+    settlements = [
+        (times[2], 0.001),
+        (times[3], 0.001),
+        (times[4], 0.001),
+        (times[10], 0.002),
+        (times[11], 0.002),
+    ]
     result = run_carry_ledger(
-        snaps, COSTS, entry_threshold=0.0, trailing_window=3,
-        initial_capital=100_000.0, settlements=settlements,
+        snaps,
+        COSTS,
+        entry_threshold=0.0,
+        trailing_window=3,
+        initial_capital=100_000.0,
+        settlements=settlements,
     )
     # only the two settlement events pay, at perp notional
     assert result.totals.funding_settled == pytest.approx(
-        sum(rate * result.max_margin_used * 1.0 for rate in [0.002, 0.002])
-        / (1.0 / 1.0),
+        sum(rate * result.max_margin_used * 1.0 for rate in [0.002, 0.002]) / (1.0 / 1.0),
         rel=0.2,
     )
     assert result.totals.funding_settled > 0
@@ -82,14 +99,23 @@ def test_multiple_settlements_in_one_bar_all_count():
     times = [pd.to_datetime(s.captured_at_utc, utc=True) for s in snaps]
     # three settlements (00:00/08:00-style) all inside the interval before bar 6
     inside = times[6]
+    signal_history = [
+        (times[0], 0.001),
+        (times[1], 0.001),
+        (times[2], 0.001),
+    ]
     trio = [
         (inside - pd.Timedelta(hours=6), 0.001),
         (inside - pd.Timedelta(hours=3), 0.001),
         (inside, 0.001),
     ]
     result = run_carry_ledger(
-        snaps, COSTS, entry_threshold=0.0, trailing_window=3,
-        initial_capital=100_000.0, settlements=trio,
+        snaps,
+        COSTS,
+        entry_threshold=0.0,
+        trailing_window=3,
+        initial_capital=100_000.0,
+        settlements=signal_history + trio,
     )
     paying = result.bars[result.bars["funding_pnl"] > 0]
     assert len(paying) == 1  # one bar...
@@ -137,9 +163,7 @@ def test_max_gross_exposure_caps_the_engine():
     data = load_canonical_dataset("examples/data/sample_multi_asset_ohlcv.csv")
     model = get_research_signal_model("equal_weight_quarterly")
     weights = model.generate(data, {})
-    capped = run_multi_asset_backtest(
-        data, weights, 10_000, CostModel(), max_gross_exposure=0.5
-    )
+    capped = run_multi_asset_backtest(data, weights, 10_000, CostModel(), max_gross_exposure=0.5)
     gross = capped.equity_curve["gross_exposure"].astype(float)
     # trims execute at the next bar's open, so end-of-bar gross can overshoot
     # the cap only by one bar's intra-bar drift — never walk away from it
@@ -163,8 +187,12 @@ def test_max_gross_with_leverage_is_enforced_not_refused():
     model = get_research_signal_model("equal_weight_quarterly")
     weights = model.generate(data, {})
     capped = run_multi_asset_backtest(
-        data, weights, 10_000, CostModel(),
-        allow_leverage=True, max_gross_exposure=0.5,
+        data,
+        weights,
+        10_000,
+        CostModel(),
+        allow_leverage=True,
+        max_gross_exposure=0.5,
     )
     gross = capped.equity_curve["gross_exposure"].astype(float)
     assert float(gross.max()) <= 0.5 * 1.005, "the cap must bind under leverage"
@@ -172,16 +200,22 @@ def test_max_gross_with_leverage_is_enforced_not_refused():
 
 def test_negative_funding_ledger_loses_money():
     result = run_carry_ledger(
-        _snaps(funding=0.001), COSTS, entry_threshold=0.0, trailing_window=3,
+        _snaps(funding=0.001),
+        COSTS,
+        entry_threshold=0.0,
+        trailing_window=3,
         initial_capital=100_000.0,
         settlements=None,
     )
     negative = run_carry_ledger(
         [dataclasses.replace(s, realized_funding_rate=0.001) for s in _snaps()],
-        COSTS, entry_threshold=0.0, trailing_window=3, initial_capital=100_000.0,
+        COSTS,
+        entry_threshold=0.0,
+        trailing_window=3,
+        initial_capital=100_000.0,
         settlements=[
-            (pd.to_datetime(s.captured_at_utc, utc=True), -0.002)
-            for s in _snaps()[5:]
+            *[(pd.to_datetime(s.captured_at_utc, utc=True), 0.001) for s in _snaps()[2:5]],
+            *[(pd.to_datetime(s.captured_at_utc, utc=True), -0.002) for s in _snaps()[5:]],
         ],
     )
     assert negative.totals.funding_settled < 0

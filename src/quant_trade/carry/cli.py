@@ -36,9 +36,7 @@ def _load_config(path: Path) -> dict[str, Any]:
 @carry_app.command("research")
 def carry_research(
     config: Annotated[Path, typer.Option(help="Cash-and-carry campaign YAML")],
-    output: Annotated[Path, typer.Option(help="Artifact output directory")] = Path(
-        "outputs/carry"
-    ),
+    output: Annotated[Path, typer.Option(help="Artifact output directory")] = Path("outputs/carry"),
 ) -> None:
     """Run a pre-registered carry campaign and print the GO/NO-GO/NOT-RUN verdict."""
     cfg = _load_config(config)
@@ -67,9 +65,7 @@ def carry_research(
     console.print(table)
     console.print(f"Artifacts: {output}")
     if result.data_source == "synthetic":
-        console.print(
-            "[yellow]Synthetic data can never advance — REAL DATA REQUIRED.[/yellow]"
-        )
+        console.print("[yellow]Synthetic data can never advance — REAL DATA REQUIRED.[/yellow]")
     console.print("real_money=NO-GO  no orders were placed")
 
 
@@ -206,12 +202,19 @@ def carry_panel_audit(
     panel_dir: Annotated[Path, typer.Option(help="Panel directory (panel.jsonl + manifest)")],
 ) -> None:
     """Audit a built panel: coverage, gaps, settlements, provenance."""
+    from quant_trade.carry.panel import verify_panel_bundle
     from quant_trade.evidence.canonical_json import load_json
     from quant_trade.evidence.receipts import resolve_dir_provenance
 
     manifest = load_json(panel_dir / "panel_manifest.json")
     prov = resolve_dir_provenance(panel_dir / "receipts.jsonl")
     audit = manifest.get("audit", {})
+    verification_problem = ""
+    try:
+        _rows, verified_audit = verify_panel_bundle(panel_dir)
+        audit = verified_audit.to_dict()
+    except ValueError as exc:
+        verification_problem = str(exc)
     table = Table(title="Historical carry panel audit")
     table.add_column("Metric")
     table.add_column("Value", justify="right")
@@ -219,13 +222,18 @@ def carry_panel_audit(
     table.add_row("Settlements", str(audit.get("settlements")))
     table.add_row("Coverage", f"{float(audit.get('coverage_ratio', 0.0)):.3f}")
     table.add_row("Missing bars", str(audit.get("missing_bars")))
-    table.add_row("Range", f"{audit.get('time_range_start')} → {audit.get('time_range_end')}")
+    table.add_row("Range", f"{audit.get('time_range_start')} to {audit.get('time_range_end')}")
     table.add_row("Provenance (receipts)", prov.provenance)
     console.print(table)
-    clean = bool(audit.get("is_clean")) and prov.provenance != "invalid"
+    clean = (
+        not verification_problem and bool(audit.get("is_clean")) and prov.provenance != "invalid"
+    )
     colour = "green" if clean else "red"
     console.print(f"Audit: [bold {colour}]{'CLEAN' if clean else 'PROBLEMS'}[/bold {colour}]")
-    for problem in list(audit.get("problems", [])) + prov.problems[:5]:
+    problems = ([verification_problem] if verification_problem else []) + list(
+        audit.get("problems", [])
+    )
+    for problem in problems + prov.problems[:5]:
         console.print(f"  - {problem}")
     raise typer.Exit(code=0 if clean else 1)
 
@@ -310,9 +318,7 @@ def carry_scenarios(
     if not snapshots:
         raise typer.BadParameter("no snapshots to evaluate")
     latest = snapshots[-1]
-    position = CarryPosition(
-        **cfg.get("position", {"notional_usd": 100_000, "holding_days": 30})
-    )
+    position = CarryPosition(**cfg.get("position", {"notional_usd": 100_000, "holding_days": 30}))
     costs = CarryCostModel(**cfg.get("costs", {}))
     policy = CarryPolicy(**cfg.get("policy", {}))
     evaluations = evaluate_carry_scenarios(latest, position, costs, policy)

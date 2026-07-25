@@ -12,12 +12,15 @@ from quant_trade.execution.broker import (
     BrokerOrderRequest,
     BrokerPosition,
 )
+from quant_trade.execution.exceptions import BrokerSafetyError
 from quant_trade.paper.models import PaperOrder
 
 
 class SimulatedBroker:
     def __init__(self) -> None:
         self.orders: dict[str, Any] = {}
+        self._orders_by_client_id: dict[str, BrokerOrder] = {}
+        self._request_fingerprints: dict[str, tuple[Any, ...]] = {}
 
     def get_account(self) -> BrokerAccount:
         return BrokerAccount(
@@ -39,6 +42,22 @@ class SimulatedBroker:
                 order.reason = "quantity must be positive"
             self.orders[order.order_id] = order
             return order
+        if not order.client_order_id:
+            raise BrokerSafetyError("client_order_id is required for idempotency")
+        fingerprint = (
+            order.symbol,
+            order.side,
+            order.quantity,
+            order.order_type,
+            order.time_in_force,
+            order.limit_price,
+            order.stop_price,
+        )
+        prior = self._orders_by_client_id.get(order.client_order_id)
+        if prior is not None:
+            if self._request_fingerprints[order.client_order_id] != fingerprint:
+                raise BrokerSafetyError("client_order_id was already used for a different order")
+            return prior
         status = "dry_run" if order.dry_run else "accepted"
         result = BrokerOrder(
             str(uuid.uuid4()),
@@ -53,6 +72,8 @@ class SimulatedBroker:
             True,
         )
         self.orders[result.broker_order_id] = result
+        self._orders_by_client_id[order.client_order_id] = result
+        self._request_fingerprints[order.client_order_id] = fingerprint
         return result
 
     def cancel_order(self, order_id: str) -> None:

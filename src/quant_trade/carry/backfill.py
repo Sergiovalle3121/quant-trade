@@ -73,10 +73,7 @@ def _derive_interval_hours(times_ms: list[float]) -> float:
     if len(times_ms) < 2:
         return 8.0
     ordered = sorted(times_ms)
-    diffs = sorted(
-        abs(b - a) / 3_600_000.0
-        for a, b in zip(ordered[:-1], ordered[1:], strict=True)
-    )
+    diffs = sorted(abs(b - a) / 3_600_000.0 for a, b in zip(ordered[:-1], ordered[1:], strict=True))
     median = diffs[len(diffs) // 2]
     return median if median > 0 else 8.0
 
@@ -136,8 +133,7 @@ def parse_okx_funding_history(
     payload = json.loads(raw.decode("utf-8"))
     if str(payload.get("code", "")) != "0":
         raise ValueError(
-            f"okx error response code={payload.get('code')!r} "
-            f"msg={payload.get('msg')!r}"
+            f"okx error response code={payload.get('code')!r} msg={payload.get('msg')!r}"
         )
     expected = okx_perp_instrument(symbol)
     raw_sha = sha256_of_bytes(raw)
@@ -260,8 +256,10 @@ def run_backfill(
     if fixture_path is not None:
         raw = Path(fixture_path).read_bytes()
     else:
-        active_fetcher = fetcher if fetcher is not None else (
-            lambda u: fetch_public_bytes(u, timeout_seconds=timeout_seconds)
+        active_fetcher = (
+            fetcher
+            if fetcher is not None
+            else (lambda u: fetch_public_bytes(u, timeout_seconds=timeout_seconds))
         )
         try:
             raw = active_fetcher(url)
@@ -295,23 +293,27 @@ def run_backfill(
         IngestionReceipt,
         append_receipt,
         normalized_rows_sha256,
+        receipt_relative_path,
     )
 
+    receipts_path = store.parent / "receipts.jsonl"
     append_receipt(
-        store.parent / "receipts.jsonl",
+        receipts_path,
         IngestionReceipt(
             provider_or_venue=venue,
             endpoint=url,
-            request_parameters={"symbol": symbol.upper(), "limit": limit},
+            request_parameters={
+                "symbol": symbol.upper(),
+                "limit": limit,
+                "source_name": source_name,
+            },
             http_status=200,
             captured_at_utc=captured,
             adapter_name=f"carry.backfill.{venue}",
             adapter_version="1",
-            raw_path=str(raw_file),
+            raw_path=receipt_relative_path(raw_file, receipts_path),
             raw_sha256=result.raw_sha256,
-            normalized_rows_sha256=normalized_rows_sha256(
-                [o.to_dict() for o in observations]
-            ),
+            normalized_rows_sha256=normalized_rows_sha256([o.to_dict() for o in observations]),
             source_kind="fixture" if fixture_path is not None else "live",
         ),
     )

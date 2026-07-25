@@ -11,6 +11,7 @@ hypotheses:
     registered_in: docs/PROFIT_HYPOTHESES_V5.md
     campaign:
       experiment_name: h1_bybit_btc_carry
+      trial_registry_path: artifacts/v7/TRIAL_REGISTRY.jsonl
       data:
         source: jsonl_observations
         path: data/carry/funding_history_bybit.jsonl
@@ -39,12 +40,30 @@ hypotheses:
         step_size: 15
         purge_bars: 6
         embargo_bars: 1
+      statistics:
+        cscv:
+          partitions: 8
+          max_pbo: 0.50
+          variants:
+            - id: primary
+              entry_threshold: 0.00003
+              trailing_window: 3
+            - id: conservative
+              entry_threshold: 0.00005
+              trailing_window: 6
+      gate:
+        min_funding_events: 1000
+        min_span_days: 730
+        min_walk_forward_windows: 5
+        min_probabilistic_sharpe: 0.95
+        min_deflated_sharpe: 0.95
 
   - id: H2
     name: "BTC cash-and-carry funding capture (OKX)"
     registered_in: docs/PROFIT_HYPOTHESES_V5.md
     campaign:
       experiment_name: h2_okx_btc_carry
+      trial_registry_path: artifacts/v7/TRIAL_REGISTRY.jsonl
       data:
         source: jsonl_observations
         path: data/carry/funding_history_okx.jsonl
@@ -73,6 +92,23 @@ hypotheses:
         step_size: 15
         purge_bars: 6
         embargo_bars: 1
+      statistics:
+        cscv:
+          partitions: 8
+          max_pbo: 0.50
+          variants:
+            - id: primary
+              entry_threshold: 0.00003
+              trailing_window: 3
+            - id: conservative
+              entry_threshold: 0.00005
+              trailing_window: 6
+      gate:
+        min_funding_events: 1000
+        min_span_days: 730
+        min_walk_forward_windows: 5
+        min_probabilistic_sharpe: 0.95
+        min_deflated_sharpe: 0.95
 
   - id: H3
     name: "Perp-perp cross-venue funding dispersion (Bybit vs OKX)"

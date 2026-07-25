@@ -21,6 +21,7 @@ from quant_trade.cloud_rental.models import (
     InstanceSpecification,
     ProviderPolicyEvidence,
     PurchaseModel,
+    RentalType,
     WorkloadPurpose,
 )
 
@@ -39,6 +40,8 @@ def _build(cls: type, raw: dict[str, Any]) -> Any:
         kwargs["provider"] = CloudProvider(str(kwargs["provider"]))
     if "purchase_model" in kwargs:
         kwargs["purchase_model"] = PurchaseModel(str(kwargs["purchase_model"]))
+    if "rental_type" in kwargs:
+        kwargs["rental_type"] = RentalType(str(kwargs["rental_type"]))
     if "workload" in kwargs:
         kwargs["workload"] = WorkloadPurpose(str(kwargs["workload"]))
     return cls(**kwargs)
@@ -67,9 +70,7 @@ def load_rental_config(path: str | Path) -> dict[str, Any]:
         "purpose": WorkloadPurpose(str(payload.get("purpose", "control_plane"))),
         "quote": load_quote(payload["quote"]),
         "spec": load_spec(payload["spec"]),
-        "benchmark": (
-            load_benchmark(payload["benchmark"]) if payload.get("benchmark") else None
-        ),
+        "benchmark": (load_benchmark(payload["benchmark"]) if payload.get("benchmark") else None),
         "policy_evidence": (
             load_policy_evidence(payload["policy_evidence"])
             if payload.get("policy_evidence")

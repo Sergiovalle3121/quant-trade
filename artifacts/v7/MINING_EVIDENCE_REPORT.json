@@ -1,0 +1,46 @@
+{
+  "artifact": "MINING_EVIDENCE_REPORT",
+  "cells": [
+    {
+      "identity": "aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "reasons": [
+        "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS",
+      "test_only": true
+    },
+    {
+      "identity": "alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "identity": "alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "market snapshot missing: ../../data/mining/market/kas_kheavyhash.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "compute_rental": "POLICY_BLOCKED_AND_MISSING_BYTE_VERIFIED_EVIDENCE",
+  "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "hashpower_marketplace": "DISCOVERY_ONLY_IMPORTER_READY_NO_DELIVERY_HISTORY_OR_ECONOMIC_ENGINE",
+  "managed_asic_lease": "DISCOVERY_ONLY_NO_CONTRACT_OR_DELIVERY_HISTORY",
+  "real_delivery_evidence_count": 0,
+  "real_exact_sku_benchmark_count": 0,
+  "real_market_snapshot_count": 0,
+  "real_quote_count": 0,
+  "schema_version": 2
+}
