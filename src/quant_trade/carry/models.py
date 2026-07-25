@@ -32,6 +32,20 @@ def _positive(name: str, value: float) -> None:
         raise ValueError(f"{name} must be finite and > 0")
 
 
+#: Provenance labels a snapshot may carry. Only receipt-verified live capture
+#: is "real"; anything self-labelled real without receipts is downgraded to
+#: "unverified_legacy" and can never promote. "test_only" marks
+#: fixture/recorded provenance; "mixed"/"invalid" are dataset-level verdicts.
+DATA_SOURCES = (
+    "synthetic",
+    "real",
+    "unverified_legacy",
+    "test_only",
+    "mixed",
+    "invalid",
+)
+
+
 @dataclass(frozen=True)
 class CarrySnapshot:
     """A point-in-time, causal observation of one spot/perp pair on one venue.
@@ -77,8 +91,8 @@ class CarrySnapshot:
         _non_negative("taker_fee_bps", self.taker_fee_bps)
         _finite("borrow_rate_annual", self.borrow_rate_annual)
         _non_negative("staleness_seconds", self.staleness_seconds)
-        if self.data_source not in ("synthetic", "real"):
-            raise ValueError("data_source must be 'synthetic' or 'real'")
+        if self.data_source not in DATA_SOURCES:
+            raise ValueError(f"data_source must be one of {DATA_SOURCES}")
 
     @property
     def funding_intervals_per_year(self) -> float:
@@ -113,6 +127,10 @@ class CarryCostModel:
     perp_margin_cost_annual: float = 0.0
     # one-time frictions amortized over the holding period (fraction of notional)
     conversion_withdrawal_cost: float = 0.0
+    # stress-side multiplier applied to the VENUE's taker fee (the snapshot's
+    # taker_fee_bps) inside the friction stack, so 2x/3x cost scenarios scale
+    # every per-fill component — not just the model-side ones
+    fee_multiplier: float = 1.0
 
     def __post_init__(self) -> None:
         for name in ("half_spread_bps", "slippage_bps", "market_impact_bps"):
@@ -123,6 +141,8 @@ class CarryCostModel:
             "conversion_withdrawal_cost",
         ):
             _non_negative(name, getattr(self, name))
+        if self.fee_multiplier < 1.0:
+            raise ValueError("fee_multiplier must be >= 1.0 (stress can only add cost)")
 
 
 @dataclass(frozen=True)

@@ -91,28 +91,42 @@ def record_drill(
     details: dict[str, Any],
     executed_at_utc: str,
     failure_injected: bool = False,
+    evidence_path: str | Path | None = None,
 ) -> Path:
-    """Record one EXECUTED drill as a hashed, timestamped evidence artifact.
+    """Record one EXECUTED drill bound to its RAW evidence log (V6-N).
 
-    This is the only supported way to produce readiness evidence: run the
-    drill (kill the process, trip the kill switch, reconcile the books…), then
-    record what actually happened. Recording a drill that was not run is
-    falsification — the artifact carries the operator-supplied details and its
-    own content hash so review can catch inconsistencies.
+    ``evidence_path`` must point at the raw log the drill actually produced
+    (session output, reconciliation dump, kill-switch trace). The recorded
+    ``evidence_sha256`` is the hash OF THOSE BYTES — recomputed again at
+    evaluation time — so a drill record without a log, or whose log later
+    changes, stops being evidence. A self-referential record hash proved
+    nothing and is gone.
     """
     if result not in ("pass", "fail"):
         raise ValueError("result must be 'pass' or 'fail'")
     if name not in REQUIRED_DRILLS:
         raise ValueError(f"unknown drill {name!r}; expected one of {REQUIRED_DRILLS}")
+    if evidence_path is None:
+        raise ValueError(
+            "evidence_path is required: a drill without its raw log is a claim, "
+            "not evidence"
+        )
+    log_path = Path(evidence_path)
+    if not log_path.exists() or log_path.stat().st_size == 0:
+        raise ValueError(f"raw evidence log missing or empty: {log_path}")
+    from quant_trade.evidence.canonical_json import sha256_of_file
+
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "drill": name,
         "result": result,
         "executed_at_utc": executed_at_utc,
         "failure_injected": bool(failure_injected),
         "details": details,
+        "evidence_path": str(log_path),
+        "evidence_sha256": sha256_of_file(log_path),
     }
-    payload["evidence_sha256"] = sha256_of_text(canonical_dumps(payload))
+    payload["record_sha256"] = sha256_of_text(canonical_dumps(payload))
     return atomic_write_json(Path(evidence_dir) / f"drill_{name}.json", payload)
 
 
@@ -191,8 +205,24 @@ def evaluate_paper_readiness(
         problems: list[str] = []
         if record.get("result") != "pass":
             problems.append("recorded result is not 'pass'")
-        if not str(record.get("evidence_sha256", "")).strip():
-            problems.append("artifact carries no evidence hash")
+        # V6-N: the evidence hash must bind an EXTERNAL raw log whose bytes
+        # still hash to the recorded value — recomputed here, every time
+        raw_log = str(record.get("evidence_path", "")).strip()
+        claimed_sha = str(record.get("evidence_sha256", "")).strip()
+        if not raw_log or not claimed_sha:
+            problems.append(
+                "no raw evidence log bound; a record hash of itself is not evidence"
+            )
+        else:
+            from quant_trade.evidence.canonical_json import sha256_of_file
+
+            log_path = Path(raw_log)
+            if not log_path.exists():
+                problems.append(f"raw evidence log missing on disk: {raw_log}")
+            elif sha256_of_file(log_path) != claimed_sha:
+                problems.append(
+                    "raw evidence log bytes no longer hash to evidence_sha256"
+                )
         try:
             age_days = (
                 parse_utc(now) - parse_utc(str(record.get("executed_at_utc", "")))
@@ -253,23 +283,50 @@ def run_parity_drill(evidence_dir: str | Path, *, executed_at_utc: str) -> Path:
         data, weights, 10_000,
         CostModel(percentage_commission=0.01, slippage_bps=20, spread_bps=10),
     )
+    from quant_trade.paper.parity_adapters import execution_record_from_frames
+
+    # the second record is REBUILT from the raw trade/equity frames through
+    # the independent frame-normalization path — never the same object twice
+    replayed = execution_record_from_frames(
+        source="frame_replay",
+        trades=cheap.trades,
+        positions=cheap.positions,
+        equity_curve=cheap.equity_curve,
+    )
     same = compare_executions(
-        execution_record_from_backtest(cheap, source="backtest"),
-        execution_record_from_backtest(cheap, source="simulated_paper"),
+        execution_record_from_backtest(cheap, source="backtest"), replayed
     )
     different = compare_executions(
         execution_record_from_backtest(cheap, source="backtest"),
         execution_record_from_backtest(pricey, source="simulated_paper"),
     )
     passed = same.reconciled and not different.reconciled
+    log_dir = Path(evidence_dir) / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    raw_log = atomic_write_json(
+        log_dir / "parity_drill_raw.json",
+        {
+            "executed_at_utc": executed_at_utc,
+            "comparison": "backtest vs frame-replayed record; cost-perturbed must diverge",
+            "same": same.to_dict() if hasattr(same, "to_dict") else str(same),
+            "different": (
+                different.to_dict() if hasattr(different, "to_dict") else str(different)
+            ),
+            "note": (
+                "broker-paper leg absent: NOT_READY_MISSING_BROKER_EVIDENCE until a "
+                "verified paper session exists; no secrets are read or requested"
+            ),
+        },
+    )
     return record_drill(
         evidence_dir,
         name="parity",
         result="pass" if passed else "fail",
         executed_at_utc=executed_at_utc,
         failure_injected=False,
+        evidence_path=raw_log,
         details={
-            "identical_run_reconciled": same.reconciled,
+            "replayed_run_reconciled": same.reconciled,
             "perturbed_run_diverged": not different.reconciled,
             "equity_drift_perturbed": different.equity_drift,
         },

@@ -107,7 +107,12 @@ def test_settlement_accrues_exactly_once_and_dedups(tmp_path):
     assert r1.appended == 1 and r2.appended == 0
     result = run_carry_research(_campaign_config(store))
     total_funding = float(result.net_return_series["funding_pnl"].sum())
-    assert abs(total_funding - 0.001) < 1e-12
+    # the ledger accrues funding on the PERP NOTIONAL (≈ half the capital at
+    # 1x leverage), and the duplicated settlement must count exactly ONCE:
+    # one 0.001 settlement on ~0.5 capital ≈ 0.0005, never ~0.001 (twice)
+    assert total_funding > 0.0
+    assert total_funding < 0.001 * 0.75, "duplicated settlement was double-counted"
+    assert total_funding == pytest.approx(0.001 * 0.5, rel=0.05)
 
 
 def test_prediction_never_enters_realized_pnl(tmp_path):

@@ -62,6 +62,12 @@ def _window_result(
         allow_short=bool(port.get("allow_short", False)),
         rebalance_band=float(port.get("rebalance_band", 0.0)),
         execution_policy=_execution_policy(config),
+        # same cap in every window as in the headline run (V6-M)
+        max_gross_exposure=(
+            float(port["max_gross_exposure"])
+            if port.get("max_gross_exposure") is not None
+            else None
+        ),
     )
 
 

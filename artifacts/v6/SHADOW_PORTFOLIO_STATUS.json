@@ -1,0 +1,44 @@
+{
+  "artifact": "SHADOW_PORTFOLIO_STATUS",
+  "commit_sha": "1232918",
+  "drawdown": 0.0,
+  "equity_usd": 100000.0,
+  "events_processed": 0,
+  "frozen_allocation_sha256": "7cdb5a68de44980271acaec02978f1c67d41fa10d2597bb9720732cf6e6f2ca5",
+  "initial_capital_usd": 100000.0,
+  "last_reconcile": {
+    "data_age_hours": 0.0,
+    "drawdown": 0.0,
+    "equity_rebuilt_usd": 100000.0,
+    "equity_reported_usd": 100000.0,
+    "evaluated_at_utc": "2026-07-25T03:30:00Z",
+    "kill_switch_engaged": false,
+    "kill_switches": {
+      "drawdown": false,
+      "exposure": false,
+      "reconciliation": false,
+      "stale_data": false
+    },
+    "reconciled": true,
+    "reconciliation_error_usd": 0.0,
+    "session_id": "shadow-7cdb5a68de449802"
+  },
+  "real_money_authorized": false,
+  "safety": {
+    "alibaba_resources_created": false,
+    "aws_resources_created": false,
+    "external_spend_authorized": false,
+    "hardware_control_enabled": false,
+    "miner_execution": false
+  },
+  "schema_version": 1,
+  "scoreboard": {
+    "active_return": 0.0,
+    "cash_benchmark_usd": 100000.0,
+    "shadow_equity_usd": 100000.0
+  },
+  "session_id": "shadow-7cdb5a68de449802",
+  "started_at_utc": "2026-07-25T03:30:00Z",
+  "status": "RUNNING",
+  "total_return": 0.0
+}

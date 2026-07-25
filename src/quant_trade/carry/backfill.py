@@ -26,6 +26,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from quant_trade.carry.instruments import canonical_instrument_id, canonical_spot_id
 from quant_trade.carry.store import (
     AppendResult,
     FundingObservation,
@@ -114,7 +115,8 @@ def parse_bybit_funding_history(
                 source_event="funding_settlement",
                 source_name=source_name,
                 raw_sha256=raw_sha,
-                perpetual_instrument_id=f"bybit:{expected}",
+                perpetual_instrument_id=canonical_instrument_id("bybit", expected),
+                spot_instrument_id=canonical_spot_id("bybit", expected),
                 contract_type="linear_perpetual",
                 quote_asset="USDT",
                 settlement_asset="USDT",
@@ -163,7 +165,8 @@ def parse_okx_funding_history(
                 source_event="funding_settlement",
                 source_name=source_name,
                 raw_sha256=raw_sha,
-                perpetual_instrument_id=f"okx:{expected}",
+                perpetual_instrument_id=canonical_instrument_id("okx", expected),
+                spot_instrument_id=canonical_spot_id("okx", expected),
                 contract_type="linear_perpetual",
                 quote_asset="USDT",
                 settlement_asset="USDT",
@@ -285,6 +288,33 @@ def run_backfill(
     if not raw_file.exists():
         raw_file.write_bytes(raw)
     result.raw_path = str(raw_file)
+
+    # provenance receipt: capture context + byte binding, written at ingest
+    # time — resolution later works ONLY from verified receipts (V6-D)
+    from quant_trade.evidence.receipts import (
+        IngestionReceipt,
+        append_receipt,
+        normalized_rows_sha256,
+    )
+
+    append_receipt(
+        store.parent / "receipts.jsonl",
+        IngestionReceipt(
+            provider_or_venue=venue,
+            endpoint=url,
+            request_parameters={"symbol": symbol.upper(), "limit": limit},
+            http_status=200,
+            captured_at_utc=captured,
+            adapter_name=f"carry.backfill.{venue}",
+            adapter_version="1",
+            raw_path=str(raw_file),
+            raw_sha256=result.raw_sha256,
+            normalized_rows_sha256=normalized_rows_sha256(
+                [o.to_dict() for o in observations]
+            ),
+            source_kind="fixture" if fixture_path is not None else "live",
+        ),
+    )
 
     appended: AppendResult = append_observations(store, observations)
     result.events_parsed = len(observations)

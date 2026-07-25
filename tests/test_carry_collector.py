@@ -86,11 +86,14 @@ def test_observation_validation_rejects_crossed_books():
         _obs(spot_bid=99999.0, spot_ask=1.0)
 
 
-def test_bridge_to_snapshot_records_marks_real_and_uses_mid(tmp_path):
+def test_bridge_never_invents_provenance_and_uses_mid(tmp_path):
     store = tmp_path / "history.jsonl"
     append_observations(store, [_obs()])
     records = observations_to_snapshot_records(read_store(store).records)
-    assert records[0]["data_source"] == "real"
+    # V6-D: without a verified receipt the bridge must NOT claim real
+    assert records[0]["data_source"] == "unverified_legacy"
+    real = observations_to_snapshot_records(read_store(store).records, provenance="real")
+    assert real[0]["data_source"] == "real"  # only the caller's verified verdict
     assert records[0]["spot_price"] == pytest.approx((64000.5 + 64001.5) / 2)
     assert records[0]["exchange"] == "binance"
 

@@ -171,6 +171,17 @@ class EvidenceBundleValidator:
                 "no benchmark evidence for this exact SKU (a typed-in hashrate "
                 "is not evidence)"
             )
+        # live quotes and specs must be byte-bound too (V6-O); fixtures are
+        # TEST_ONLY anyway and declare themselves
+        if quote.source_kind != "fixture":
+            if not quote.raw_sha256.strip():
+                result.missing_problems.append(
+                    "live quote carries no raw byte binding (raw_sha256)"
+                )
+            if not spec.raw_sha256.strip():
+                result.missing_problems.append(
+                    "live spec carries no raw byte binding (raw_sha256)"
+                )
 
         # --- provenance ---------------------------------------------------
         result.test_only = quote.source_kind == "fixture" or (

@@ -1,0 +1,17 @@
+{
+  "data_age_hours": 0.0,
+  "drawdown": 0.0,
+  "equity_rebuilt_usd": 100000.0,
+  "equity_reported_usd": 100000.0,
+  "evaluated_at_utc": "2026-07-25T03:30:00Z",
+  "kill_switch_engaged": false,
+  "kill_switches": {
+    "drawdown": false,
+    "exposure": false,
+    "reconciliation": false,
+    "stale_data": false
+  },
+  "reconciled": true,
+  "reconciliation_error_usd": 0.0,
+  "session_id": "shadow-7cdb5a68de449802"
+}

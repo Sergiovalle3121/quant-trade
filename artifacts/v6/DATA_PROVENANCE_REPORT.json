@@ -1,0 +1,26 @@
+{
+  "artifact": "DATA_PROVENANCE_REPORT",
+  "evaluated_at_utc": "2026-07-25T03:30:00Z",
+  "notes": [
+    "no live capture has succeeded from this sandbox (proxy 403); every NOT_RUN carries its verbatim error in the corresponding attempts log",
+    "the committed demo/fixture datasets resolve to test_only or unverified_legacy and can never promote"
+  ],
+  "policy": "provenance resolves ONLY from byte-verified ingestion receipts; self-labels are ignored; fixtures are TEST_ONLY forever; legacy JSON is unverified_legacy and non-promotable",
+  "real_raw_data_captured": 0,
+  "real_settlements_verified": 0,
+  "schema_version": 1,
+  "surfaces": [
+    {
+      "path": "data/carry",
+      "problems": [],
+      "provenance": "unverified_legacy",
+      "receipts": 0
+    },
+    {
+      "path": "data/carry/panel/bybit_btc",
+      "problems": [],
+      "provenance": "unverified_legacy",
+      "receipts": 0
+    }
+  ]
+}

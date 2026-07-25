@@ -1,20 +1,32 @@
-"""Stateful two-leg carry ledger: explicit position lifecycle, reconciled P&L.
+"""Stateful two-leg carry ledger: explicit balance sheet, reconciled P&L.
 
-Replaces optimistic aggregate arithmetic with an account simulation that a
-reviewer can audit line by line: cash, spot/perp quantities, posted margin,
-variation margin, settled funding, per-leg fees on every fill, forced terminal
-close, and an accounting identity that must balance to the cent —
+This is the ONLY promotable P&L path for carry (V6-A). The account is a real
+balance sheet, not aggregate arithmetic:
 
-    final_equity - initial_capital == Σ(all P&L components)
+- ``cash`` is mutated flow-by-flow: spot purchases and sales, posted and
+  released margin, per-fill fees, one-time conversion/withdrawal costs,
+  cash-settled funding, per-bar variation margin on the linear perp,
+  collateral yield, carrying costs, and emergency-unwind costs;
+- ``spot_qty``/``margin_posted`` are the non-cash accounts; per-bar equity is
+  ``cash + spot_qty·spot + margin_posted`` (the perp needs no unrealized term
+  because variation margin cash-settles each bar);
+- category totals (funding, legs, fees, …) are accumulated in SEPARATE
+  variables from the cash mutations, so reconciliation compares two
+  independent accounting paths:
 
-The engine consumes the SAME snapshots and settlement events as the campaign
-runner and the two-leg execution state machine gates every entry, so a partial
-hedge or fill-rate failure aborts the trade instead of assuming it happened.
+      final balance-sheet equity  vs  initial equity + Σ category totals
+
+  and a category bookkeeping error cannot silently match the cash path.
+
+Entries are gated through the two-leg execution state machine: a partial
+hedge below ``min_fill_rate`` aborts and books the emergency-unwind cost as
+real money. Funding accrues ONLY from settlement events causally inside each
+bar. A mandatory terminal close realizes everything back to cash.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
@@ -31,6 +43,7 @@ class LedgerTotals:
     perp_leg_pnl: float = 0.0
     collateral_yield: float = 0.0
     trading_fees: float = 0.0
+    conversion_costs: float = 0.0
     unwind_costs: float = 0.0
     carrying_costs: float = 0.0
 
@@ -42,6 +55,7 @@ class LedgerTotals:
             + self.perp_leg_pnl
             + self.collateral_yield
             - self.trading_fees
+            - self.conversion_costs
             - self.unwind_costs
             - self.carrying_costs
         )
@@ -53,6 +67,7 @@ class LedgerTotals:
             "perp_leg_pnl": self.perp_leg_pnl,
             "collateral_yield": self.collateral_yield,
             "trading_fees": self.trading_fees,
+            "conversion_costs": self.conversion_costs,
             "unwind_costs": self.unwind_costs,
             "carrying_costs": self.carrying_costs,
             "net_pnl": self.net_pnl,
@@ -71,6 +86,7 @@ class LedgerResult:
     max_margin_used: float
     reconciled: bool
     reconciliation_error: float
+    cashflows: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -105,20 +121,26 @@ def run_carry_ledger(
     perp_leverage: float = 1.0,
     collateral_yield_annual: float = 0.0,
     settlements: list[tuple[Any, float]] | None = None,
+    signal_rates: list[float] | None = None,
     fill_fraction: float = 1.0,
     min_fill_rate: float = 0.9,
 ) -> LedgerResult:
     """Simulate the campaign as an explicit account. Fail closed on bad hedges.
 
-    ``fill_fraction`` lets stress tests inject partial fills; entries whose
-    two-leg execution cannot reach HEDGED (fill fraction below
-    ``min_fill_rate``) are aborted and counted, never assumed.
+    ``signal_rates`` decouples the SIGNAL series from the quoted per-snapshot
+    rates (e.g. a settlement-derived series); when ``None`` the quoted rates
+    are used. ``fill_fraction`` lets stress tests inject partial fills;
+    entries whose two-leg execution cannot reach HEDGED are aborted, never
+    assumed.
     """
     if not snapshots:
         raise ValueError("no snapshots")
     ordered = sorted(snapshots, key=lambda s: s.captured_at_utc)
     times = [pd.to_datetime(s.captured_at_utc, utc=True) for s in ordered]
     funding_quotes = [s.realized_funding_rate for s in ordered]
+    signals = signal_rates if signal_rates is not None else funding_quotes
+    if len(signals) != len(ordered):
+        raise ValueError("signal_rates length must match snapshots")
     intervals_per_year = ordered[0].funding_intervals_per_year
     per_bar_yield = collateral_yield_annual / intervals_per_year
     per_bar_carry_cost = (
@@ -131,7 +153,15 @@ def run_carry_ledger(
         key=lambda x: x[0],
     )
 
+    # --- the balance sheet: cash is mutated flow-by-flow --------------------
     cash = initial_capital
+    journal: list[dict[str, Any]] = []
+
+    def flow(ts: Any, kind: str, amount: float) -> None:
+        nonlocal cash
+        cash += amount
+        journal.append({"timestamp": str(ts), "type": kind, "amount": amount})
+
     totals = LedgerTotals()
     position: _Position | None = None
     entries = exits = aborted = 0
@@ -141,25 +171,47 @@ def run_carry_ledger(
     def notional() -> float:
         return initial_capital / (1.0 + 1.0 / perp_leverage)
 
+    def close_position(ts: Any, spot: float, perp: float) -> float:
+        nonlocal position, exits
+        assert position is not None
+        exit_fees = (
+            position.spot_qty * spot * per_fill_fraction
+            + position.perp_qty * perp * per_fill_fraction
+        )
+        flow(ts, "spot_sale", position.spot_qty * spot)
+        flow(ts, "margin_release", position.margin_posted)
+        flow(ts, "exit_fees", -exit_fees)
+        totals.trading_fees += exit_fees
+        position = None
+        exits += 1
+        return exit_fees
+
     for i, snap in enumerate(ordered):
         spot, perp = snap.spot_price, snap.perp_mark_price
-        # --- mark-to-market of an open position --------------------------
         bar = {
             "timestamp": times[i],
+            "symbol": snap.symbol,
+            "funding": funding_quotes[i],
+            "signal_rate": signals[i],
             "position": 0.0,
             "funding_pnl": 0.0,
             "spot_leg_pnl": 0.0,
             "perp_leg_pnl": 0.0,
+            "basis_pnl": 0.0,
+            "collateral_yield": 0.0,
+            "carry_cost": 0.0,
             "fees": 0.0,
             "net_return": 0.0,
         }
+        # --- mark-to-market + cash flows of an open position --------------
         if position is not None:
             prev_spot = position.spot_entry if i == 0 else rows[-1]["_spot_mark"]
             prev_perp = position.perp_entry if i == 0 else rows[-1]["_perp_mark"]
-            spot_pnl = position.spot_qty * (spot - prev_spot)
-            perp_pnl = -position.perp_qty * (perp - prev_perp)
+            spot_pnl = position.spot_qty * (spot - prev_spot)  # unrealized (asset)
+            perp_pnl = -position.perp_qty * (perp - prev_perp)  # variation margin
             totals.spot_leg_pnl += spot_pnl
             totals.perp_leg_pnl += perp_pnl
+            flow(times[i], "variation_margin", perp_pnl)
             # settled funding causally in (t[i-1], t[i]]
             lo = times[i - 1] if i > 0 else None
             if settlements is not None:
@@ -173,26 +225,33 @@ def run_carry_ledger(
                 settled = funding_quotes[i]
             funding_pnl = settled * position.perp_qty * perp
             totals.funding_settled += funding_pnl
+            flow(times[i], "funding_settlement", funding_pnl)
             cy = per_bar_yield * position.margin_posted
             totals.collateral_yield += cy
+            flow(times[i], "collateral_yield", cy)
             cc = per_bar_carry_cost * position.spot_qty * spot
             totals.carrying_costs += cc
+            flow(times[i], "carrying_cost", -cc)
             bar.update(
                 position=1.0,
                 funding_pnl=funding_pnl,
                 spot_leg_pnl=spot_pnl,
                 perp_leg_pnl=perp_pnl,
-                net_return=(funding_pnl + spot_pnl + perp_pnl + cy - cc) / initial_capital,
+                basis_pnl=spot_pnl + perp_pnl,
+                collateral_yield=cy,
+                carry_cost=cc,
+                net_return=(funding_pnl + spot_pnl + perp_pnl + cy - cc)
+                / initial_capital,
             )
 
-        # --- signal ------------------------------------------------------
+        # --- signal (decoupled from quoted rates when settlements drive it)
         if i < trailing_window:
             want_position = False
         else:
-            trailing = sum(funding_quotes[i - trailing_window : i]) / trailing_window
+            trailing = sum(signals[i - trailing_window : i]) / trailing_window
             want_position = trailing > entry_threshold
 
-        # --- transitions --------------------------------------------------
+        # --- transitions ---------------------------------------------------
         if want_position and position is None:
             target_notional = notional()
             spot_qty = target_notional / spot
@@ -218,54 +277,47 @@ def run_carry_ledger(
             )
             if execution.state is not TwoLegState.HEDGED or achieved < min_fill_rate:
                 aborted += 1
-                # the state machine's emergency-unwind cost is real money
                 totals.unwind_costs += execution.unwind_cost_usd
-                cash -= execution.unwind_cost_usd
+                flow(times[i], "emergency_unwind", -execution.unwind_cost_usd)
             else:
                 qty = min(execution.spot_filled, execution.perp_filled)
                 entry_fees = qty * spot * per_fill_fraction + qty * perp * per_fill_fraction
+                conv = costs.conversion_withdrawal_cost * qty * spot
                 margin = qty * perp / perp_leverage
+                flow(times[i], "spot_purchase", -qty * spot)
+                flow(times[i], "margin_posted", -margin)
+                flow(times[i], "entry_fees", -entry_fees)
+                if conv > 0:
+                    flow(times[i], "conversion_withdrawal", -conv)
                 totals.trading_fees += entry_fees
-                cash -= entry_fees
+                totals.conversion_costs += conv
                 position = _Position(qty, qty, spot, perp, margin)
                 max_margin = max(max_margin, margin)
                 entries += 1
+                bar["fees"] = entry_fees + conv
         elif not want_position and position is not None:
-            exit_fees = (
-                position.spot_qty * spot * per_fill_fraction
-                + position.perp_qty * perp * per_fill_fraction
-            )
-            totals.trading_fees += exit_fees
-            cash -= exit_fees
-            position = None
-            exits += 1
+            bar["fees"] = close_position(times[i], spot, perp)
 
+        # --- balance-sheet equity at end of bar ---------------------------
+        equity = cash
+        if position is not None:
+            equity += position.spot_qty * spot + position.margin_posted
+        bar["equity"] = equity
         bar["_spot_mark"] = spot
         bar["_perp_mark"] = perp
         rows.append(bar)
 
-    # --- mandatory terminal close ----------------------------------------
+    # --- mandatory terminal close -----------------------------------------
     if position is not None:
-        last = ordered[-1]
-        exit_fees = (
-            position.spot_qty * last.spot_price * per_fill_fraction
-            + position.perp_qty * last.perp_mark_price * per_fill_fraction
-        )
-        totals.trading_fees += exit_fees
-        cash -= exit_fees
-        position = None
-        exits += 1
+        close_position(times[-1], ordered[-1].spot_price, ordered[-1].perp_mark_price)
+        rows[-1]["equity"] = cash
 
-    final_equity = (
-        initial_capital
-        + totals.funding_settled
-        + totals.spot_leg_pnl
-        + totals.perp_leg_pnl
-        + totals.collateral_yield
-        - totals.trading_fees
-        - totals.unwind_costs
-        - totals.carrying_costs
-    )
+    # --- reconciliation: two independent accounting paths ------------------
+    # LEFT: the balance sheet (cash mutated flow-by-flow; positions closed).
+    # RIGHT: initial equity + independently accumulated category totals.
+    # NOTE: spot MTM is not a cash flow while held, but the terminal/exit
+    # sale realizes exactly the accumulated MTM, so both paths must agree.
+    final_equity = cash
     reconciliation_error = abs((final_equity - initial_capital) - totals.net_pnl)
     frame = pd.DataFrame(rows).drop(columns=["_spot_mark", "_perp_mark"])
     return LedgerResult(
@@ -279,4 +331,5 @@ def run_carry_ledger(
         max_margin_used=max_margin,
         reconciled=reconciliation_error <= 1e-9 * max(1.0, initial_capital),
         reconciliation_error=reconciliation_error,
+        cashflows=journal,
     )

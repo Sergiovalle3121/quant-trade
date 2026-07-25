@@ -62,10 +62,14 @@ class MiningScanResult:
     safety: dict[str, bool]
 
     def to_dict(self) -> dict[str, Any]:
+        from quant_trade.evidence.receipts import normalized_rows_sha256
+
         return {
             "artifact": "MINING_RENTAL_MATRIX",
-            "schema_version": 1,
+            "schema_version": 2,
             "evaluated_at_utc": self.evaluated_at_utc,
+            # tamper anchor: recomputed by the board before any ranking
+            "rows_sha256": normalized_rows_sha256([c.to_dict() for c in self.cells]),
             "cells": [c.to_dict() for c in self.cells],
             "counts_by_status": self.counts_by_status,
             "safety": self.safety,
@@ -144,7 +148,51 @@ def scan_mining_cells(
             results.append(row)
             continue
 
-        revenue_cfg = cell.get("revenue") or {}
+        # V6-O: inline revenue numbers are NOT evidence — a hashprice must
+        # arrive as a sourced, fresh, byte-bound market snapshot.
+        if cell.get("revenue"):
+            raise ValueError(
+                f"cell {row.identity}: inline 'revenue' is not evidence; provide "
+                "a sourced market_snapshot instead"
+            )
+        extra_reasons: list[str] = []
+        from quant_trade.cloud_rental.market import (
+            check_algorithm_hardware,
+            load_market_snapshot,
+        )
+
+        hardware_problem = check_algorithm_hardware(algorithm, spec.architecture)
+        if hardware_problem:
+            extra_reasons.append(hardware_problem)
+        revenue = None
+        snapshot_ref = cell.get("market_snapshot")
+        if snapshot_ref:
+            snapshot_path = resolve(str(snapshot_ref))
+            if snapshot_path is not None and snapshot_path.exists():
+                snapshot = load_market_snapshot(snapshot_path)
+                stale = snapshot.freshness_problems(evaluated_at_utc=evaluated_at_utc)
+                if stale:
+                    extra_reasons.extend(stale)
+                else:
+                    revenue = RevenueAssumptions(
+                        hashprice_usd_per_th_day=snapshot.hashprice_usd_per_unit_day,
+                        pool_fee_rate=snapshot.pool_fee_rate,
+                    )
+                    if snapshot.source_divergence is not None:
+                        extra_reasons.append(
+                            f"market source divergence "
+                            f"{snapshot.source_divergence:.1%} (two sources)"
+                        )
+            else:
+                extra_reasons.append(
+                    f"market snapshot missing: {snapshot_ref} (no sourced "
+                    "hashprice, economics cannot be computed)"
+                )
+        else:
+            extra_reasons.append(
+                "no market_snapshot registered; economics require sourced, "
+                "byte-bound market evidence"
+            )
         decision = evaluate_feasibility(
             purpose=purpose,
             quote=quote,
@@ -153,7 +201,7 @@ def scan_mining_cells(
             policy_evidence=policy,
             algorithm=algorithm,
             manual_hashrate_declared=bool(cell.get("manual_hashrate_hs")),
-            revenue=RevenueAssumptions(**revenue_cfg) if revenue_cfg else None,
+            revenue=revenue,
             horizon_hours=float(cell.get("horizon_hours", 24.0 * 30)),
             budget_ceiling_usd=float(cell.get("budget_ceiling_usd", 1000.0)),
             evaluated_at_utc=evaluated_at_utc,
@@ -179,6 +227,7 @@ def scan_mining_cells(
                 decision.policy_reason,
                 decision.benchmark_reason,
                 decision.economic_reason,
+                *extra_reasons,
                 *bundle.problems,
             )
             if r

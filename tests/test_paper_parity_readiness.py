@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from quant_trade.paper.parity import (
     ExecutionRecord,
     ParityTolerances,
@@ -110,6 +112,9 @@ NOW = "2026-07-24T12:00:00Z"
 
 def _record_all_drills(evidence_dir, executed_at: str = "2026-07-20T00:00:00Z") -> None:
     for name in REQUIRED_DRILLS:
+        log = Path(evidence_dir) / "logs" / f"{name}.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(f"raw drill output for {name}\n")
         record_drill(
             evidence_dir,
             name=name,
@@ -117,6 +122,7 @@ def _record_all_drills(evidence_dir, executed_at: str = "2026-07-20T00:00:00Z") 
             executed_at_utc=executed_at,
             failure_injected=name in ("kill_switch", "recovery", "orphan_detection"),
             details={"note": "test drill"},
+            evidence_path=log,
         )
 
 
@@ -170,10 +176,12 @@ def test_expired_drill_is_not_ready(tmp_path):
 
 def test_failed_drill_result_is_not_ready(tmp_path):
     _record_all_drills(tmp_path)
+    log = tmp_path / "logs" / "recovery_fail.log"
+    log.write_text("recovery drill raw output: state lost\n")
     record_drill(
         tmp_path, name="recovery", result="fail",
         executed_at_utc="2026-07-20T00:00:00Z", failure_injected=True,
-        details={"note": "recovery lost state"},
+        details={"note": "recovery lost state"}, evidence_path=log,
     )
     report = evaluate_paper_readiness(
         _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
@@ -184,10 +192,12 @@ def test_failed_drill_result_is_not_ready(tmp_path):
 
 def test_no_failure_injection_is_not_ready(tmp_path):
     _record_all_drills(tmp_path)
+    log = tmp_path / "logs" / "kill_switch_noop.log"
+    log.write_text("kill switch drill raw output\n")
     record_drill(
         tmp_path, name="kill_switch", result="pass",
         executed_at_utc="2026-07-20T00:00:00Z", failure_injected=False,  # no-op run
-        details={"note": "switch toggled with nothing running"},
+        details={"note": "switch toggled with nothing running"}, evidence_path=log,
     )
     report = evaluate_paper_readiness(
         _ready_config(evidence_dir=tmp_path), evaluated_at_utc=NOW
@@ -221,7 +231,9 @@ def test_parity_drill_actually_executes_and_records(tmp_path):
     payload = json.loads(path.read_text())
     assert payload["drill"] == "parity"
     assert payload["result"] == "pass"
-    assert payload["details"]["identical_run_reconciled"] is True
+    assert payload["details"]["replayed_run_reconciled"] is True
+    # V6-N: the record binds an EXTERNAL raw log whose bytes must verify
+    assert payload["evidence_path"].endswith("parity_drill_raw.json")
     assert payload["details"]["perturbed_run_diverged"] is True
     assert payload["evidence_sha256"]
 

@@ -18,6 +18,108 @@ from quant_trade.carry.quality import parse_utc
 
 MAX_CLOCK_SKEW_SECONDS = 120.0
 
+_KNOWN_QUOTES = ("USDT", "USDC", "USD")
+
+
+def parse_symbol(symbol: str) -> tuple[str, str]:
+    """Normalize any symbol spelling to (base, quote).
+
+    Accepts the venue-native spellings ("BTCUSDT", "BTC-USDT-SWAP"), the ccxt
+    unified form ("BTC/USDT:USDT"), and the bare canonical base ("BTC").
+    """
+    s = symbol.strip().upper()
+    if not s:
+        raise ValueError("symbol is required")
+    if "/" in s:  # ccxt unified BASE/QUOTE[:SETTLE]
+        base, rest = s.split("/", 1)
+        quote = rest.split(":", 1)[0]
+        return base, quote
+    if ":" in s:  # canonical ids round-trip: "venue:BASE-QUOTE:linear-perp|spot"
+        parts = s.split(":")
+        if len(parts) == 3 and parts[2] in ("LINEAR-PERP", "SPOT"):
+            s = parts[1]
+    if s.endswith("-SWAP"):  # okx native BASE-QUOTE-SWAP
+        parts = s.split("-")
+        if len(parts) == 3:
+            return parts[0], parts[1]
+    if "-" in s:  # plain BASE-QUOTE
+        parts = s.split("-")
+        if len(parts) == 2 and parts[1] in _KNOWN_QUOTES:
+            return parts[0], parts[1]
+    for quote in _KNOWN_QUOTES:  # concatenated native (bybit/binance)
+        if s.endswith(quote) and len(s) > len(quote):
+            return s[: -len(quote)], quote
+    return s, "USDT"  # bare canonical base
+
+
+def canonical_instrument_id(venue: str, symbol: str) -> str:
+    """ONE canonical id per economic pair, whatever the adapter's spelling.
+
+    The backfill's ``bybit:BTCUSDT`` and the ccxt collector's
+    ``BTC/USDT:USDT`` are the SAME perpetual — deriving different ids per
+    adapter split one instrument into two and made its history unusable.
+    """
+    if not venue.strip():
+        raise ValueError("venue is required")
+    base, quote = parse_symbol(symbol)
+    return f"{venue.strip().lower()}:{base}-{quote}:linear-perp"
+
+
+def canonical_spot_id(venue: str, symbol: str) -> str:
+    base, quote = parse_symbol(symbol)
+    return f"{venue.strip().lower()}:{base}-{quote}:spot"
+
+
+#: Static seed metadata from public venue documentation (funding interval and
+#: native spellings). A live InstrumentCatalog refresh can extend this; the
+#: seed keeps identities canonical offline.
+INSTRUMENT_SEED_METADATA: dict[tuple[str, str], dict[str, Any]] = {
+    ("bybit", "BTC"): {
+        "native_spot_symbol": "BTCUSDT",
+        "native_perp_symbol": "BTCUSDT",
+        "funding_interval_hours": 8.0,
+        "contract_type": "linear_perpetual",
+        "quote_asset": "USDT",
+        "settlement_asset": "USDT",
+    },
+    ("bybit", "ETH"): {
+        "native_spot_symbol": "ETHUSDT",
+        "native_perp_symbol": "ETHUSDT",
+        "funding_interval_hours": 8.0,
+        "contract_type": "linear_perpetual",
+        "quote_asset": "USDT",
+        "settlement_asset": "USDT",
+    },
+    ("okx", "BTC"): {
+        "native_spot_symbol": "BTC-USDT",
+        "native_perp_symbol": "BTC-USDT-SWAP",
+        "funding_interval_hours": 8.0,
+        "contract_type": "linear_perpetual",
+        "quote_asset": "USDT",
+        "settlement_asset": "USDT",
+    },
+    ("okx", "ETH"): {
+        "native_spot_symbol": "ETH-USDT",
+        "native_perp_symbol": "ETH-USDT-SWAP",
+        "funding_interval_hours": 8.0,
+        "contract_type": "linear_perpetual",
+        "quote_asset": "USDT",
+        "settlement_asset": "USDT",
+    },
+}
+
+
+def instrument_metadata(venue: str, symbol: str) -> dict[str, Any]:
+    """Seed metadata for a canonical pair; fails closed on unknown pairs."""
+    base, _ = parse_symbol(symbol)
+    meta = INSTRUMENT_SEED_METADATA.get((venue.strip().lower(), base))
+    if meta is None:
+        raise ValueError(
+            f"no instrument metadata for {venue}:{base}; refusing to guess "
+            "funding interval or contract terms"
+        )
+    return dict(meta)
+
 
 @dataclass(frozen=True)
 class InstrumentIdentity:
@@ -63,16 +165,21 @@ class InstrumentIdentity:
         venue = str(record.get("venue", "")).strip()
         symbol = str(record.get("symbol", "")).strip()
         quote = str(record.get("quote_asset", "USDT")).strip()
+        # every spelling — venue-native, ccxt unified, canonical, bare base —
+        # normalizes through the canonical id, so one economic pair can never
+        # split into per-adapter identities (V6-E)
+        spot_raw = str(record.get("spot_instrument_id") or symbol)
+        perp_raw = str(record.get("perpetual_instrument_id") or symbol)
         return cls(
             venue=venue,
-            canonical_symbol=symbol,
-            spot_instrument_id=str(record.get("spot_instrument_id") or f"{symbol}/{quote}"),
-            perpetual_instrument_id=str(
-                record.get("perpetual_instrument_id") or f"{symbol}/{quote}:{quote}"
+            canonical_symbol=parse_symbol(symbol)[0] if symbol else symbol,
+            spot_instrument_id=canonical_spot_id(venue, spot_raw) if venue else spot_raw,
+            perpetual_instrument_id=(
+                canonical_instrument_id(venue, perp_raw) if venue else perp_raw
             ),
-            contract_type=str(record.get("contract_type", "linear_perpetual")),
+            contract_type=str(record.get("contract_type") or "linear_perpetual"),
             quote_asset=quote,
-            settlement_asset=str(record.get("settlement_asset", quote)),
+            settlement_asset=str(record.get("settlement_asset") or quote),
             funding_interval_hours=float(record.get("funding_interval_hours", 8.0)),
         )
 

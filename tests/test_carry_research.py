@@ -48,19 +48,22 @@ def test_synthetic_campaign_still_produces_full_evidence(tmp_path):
     assert report.n_discarded == 1
 
 
-def test_real_labelled_sufficient_data_reaches_an_economic_verdict(tmp_path):
-    # A "real"-labelled snapshot file with sufficient history must reach an
-    # ECONOMIC verdict (REJECTED or PAPER_CANDIDATE) — never the insufficiency
-    # outcome, proving the sufficiency guard is data-based, and never a bare GO.
+def test_self_labelled_real_json_downgrades_to_unverified_legacy(tmp_path):
+    # V6-D: a "real" label typed into a JSON file is a CLAIM, not evidence.
+    # Without verified ingestion receipts the dataset is unverified_legacy —
+    # the full pipeline still runs (metrics, walk-forward, ledger), but the
+    # verdict is honest insufficiency, never an economic candidacy.
     snaps = synthetic_funding_snapshots(periods=120, seed=1)
     real = [__import__("dataclasses").replace(s, data_source="real") for s in snaps]
     path = write_snapshots_json(tmp_path / "real.json", real)
     config = _config()
     config["data"] = {"source": "json", "path": str(path)}
     result = run_carry_research(config)
-    assert result.decision in ("REJECTED", "PAPER_CANDIDATE")
-    assert result.data_source == "real"
-    # the economics now include the basis and capital views
+    assert result.decision == "NOT_RUN_INSUFFICIENT_REAL_DATA"
+    assert result.data_source == "unverified_legacy"
+    assert "downgraded" in result.dataset_manifest["provenance_notes"]
+    # the economics still computed end-to-end on the downgraded data
     assert "basis_pnl_total" in result.metrics
+    assert result.ledger_summary["reconciled"] is True
     assert "return_on_capital" in result.metrics
     assert "total_return_2x_costs" in result.metrics

@@ -230,13 +230,19 @@ def extract_settlement_events(records: list[dict[str, Any]]) -> list[dict[str, A
     return out
 
 
-def observations_to_snapshot_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def observations_to_snapshot_records(
+    records: list[dict[str, Any]], *, provenance: str = "unverified_legacy"
+) -> list[dict[str, Any]]:
     """Bridge QUOTE observations to the CarrySnapshot record schema.
 
     Only quote events (poll/backfill) become price snapshots; settlement and
     prediction events are excluded here — settlements feed P&L exclusively via
     :func:`extract_settlement_events`. The quoted funding rate carried on each
     snapshot is SIGNAL input (the rate currently quoted), never a payment.
+
+    ``provenance`` is stamped by the CALLER after resolving verified
+    ingestion receipts — this bridge never invents a data source, and a
+    record's own self-label is ignored (reproducibility is not authenticity).
     """
     out: list[dict[str, Any]] = []
     for r in records:
@@ -254,7 +260,7 @@ def observations_to_snapshot_records(records: list[dict[str, Any]]) -> list[dict
                 "realized_funding_rate": float(r["realized_funding_rate"]),
                 "funding_interval_hours": float(r.get("funding_interval_hours", 8.0)),
                 "predicted_funding_rate": r.get("predicted_funding_rate"),
-                "data_source": "real",
+                "data_source": provenance,
                 "source_name": str(r.get("source_name", "collector")),
             }
         )

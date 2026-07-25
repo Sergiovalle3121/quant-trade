@@ -19,8 +19,16 @@ from typing import Any
 
 from quant_trade.evidence.canonical_json import sha256_of_bytes
 
-#: Every artifact a campaign writes that must rebuild byte-identically.
-COMPARED_ARTIFACTS = ("results.json", "dataset_manifest.json", "net_returns.csv")
+#: Every artifact a campaign writes that must rebuild byte-identically —
+#: including the ledger's reconciliation, equity curve and cash-flow journal.
+COMPARED_ARTIFACTS = (
+    "results.json",
+    "dataset_manifest.json",
+    "net_returns.csv",
+    "reconciliation.json",
+    "equity_curve.csv",
+    "funding_cashflows.jsonl",
+)
 
 
 @dataclass

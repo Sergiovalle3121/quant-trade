@@ -20,6 +20,21 @@ from quant_trade.opportunities.trading_scan import (
 
 NOW = "2026-07-24T21:30:00Z"
 
+def _lineages(trading_rows, mining_cells, at=NOW):
+    from quant_trade.opportunities.board import lineage_for_rows
+
+    return {
+        "trading_lineage": lineage_for_rows(
+            trading_rows, artifact="TRADING_OPPORTUNITY_LEADERBOARD",
+            path="<memory>", evaluated_at_utc=at,
+        ),
+        "mining_lineage": lineage_for_rows(
+            mining_cells, artifact="MINING_RENTAL_MATRIX",
+            path="<memory>", evaluated_at_utc=at,
+        ),
+    }
+
+
 
 def _campaign_for(dataset_path: str) -> dict:
     with open("configs/carry/cash_and_carry_synthetic.yaml") as fh:
@@ -59,8 +74,10 @@ def test_scan_runs_registered_campaign_when_dataset_exists(tmp_path):
     }
     result = scan_trading_opportunities(cfg, evaluated_at_utc=NOW)
     row = result.rows[0]
-    assert row.status in ("PAPER_CANDIDATE", "REJECTED")
-    assert row.data_source == "real"
+    # V6-D: self-labelled "real" without receipts downgrades — the campaign
+    # still RUNS end-to-end but its verdict is honest insufficiency
+    assert row.status == "NOT_RUN_INSUFFICIENT_REAL_DATA"
+    assert row.data_source == "unverified_legacy"
     assert row.walk_forward_windows > 0
     assert row.metrics["sharpe_per_period"] is not None
 
@@ -104,11 +121,14 @@ def _mining_cells():
 def test_board_with_no_eligible_candidates_crowns_cash():
     cfg = load_trading_scan_config("configs/opportunities/trading_scan_v5.yaml")
     trading = scan_trading_opportunities(cfg, evaluated_at_utc=NOW)
+    trading_rows = [r.to_dict() for r in trading.rows]
+    mining_cells = _mining_cells()
     board = build_opportunity_board(
-        trading_rows=[r.to_dict() for r in trading.rows],
-        mining_cells=_mining_cells(),
+        trading_rows=trading_rows,
+        mining_cells=mining_cells,
         cash_yield_annual=0.04,
         evaluated_at_utc=NOW,
+        **_lineages(trading_rows, mining_cells),
     )
     assert board["champion"]["entry_id"] == "cash_usd"
     eligible = [e for e in board["entries"] if e["eligible"]]
@@ -124,7 +144,7 @@ def test_board_ranks_eligible_candidate_above_cash_and_allocates_capped():
             "hypothesis_id": "H1",
             "status": "PAPER_CANDIDATE",
             "data_source": "real",
-            "metrics": {"sharpe_per_period": 0.9},
+            "metrics": {"sharpe_per_period": 0.9, "total_return": 0.05, "span_days": 60.0},
             "reasons": [],
         },
         {
@@ -135,11 +155,13 @@ def test_board_ranks_eligible_candidate_above_cash_and_allocates_capped():
             "reasons": ["registered dataset missing"],
         },
     ]
+    mining_cells = _mining_cells()
     board = build_opportunity_board(
         trading_rows=trading_rows,
-        mining_cells=_mining_cells(),
+        mining_cells=mining_cells,
         cash_yield_annual=0.04,
         evaluated_at_utc=NOW,
+        **_lineages(trading_rows, mining_cells),
     )
     assert board["champion"]["entry_id"] == "trading:H1"
     allocation = allocate_paper_capital(board, 100_000.0)
@@ -175,6 +197,7 @@ def test_test_only_mining_candidate_is_never_eligible():
         mining_cells=cells,
         cash_yield_annual=0.04,
         evaluated_at_utc=NOW,
+        **_lineages([], cells),
     )
     assert board["champion"]["entry_id"] == "cash_usd"
     assert all(not e["eligible"] for e in board["entries"] if e["kind"] == "mining")
@@ -186,6 +209,7 @@ def test_allocation_with_no_candidates_is_all_cash():
         mining_cells=[],
         cash_yield_annual=0.04,
         evaluated_at_utc=NOW,
+        **_lineages([], []),
     )
     allocation = allocate_paper_capital(board, 50_000.0)
     assert allocation["allocations"][0]["entry_id"] == "cash_usd"
@@ -219,6 +243,24 @@ def test_cli_scan_rank_allocate_roundtrip(tmp_path):
     assert scan.exit_code == 0, scan.output
     assert "NOT_RUN_NO_DATASET" in scan.output
 
+    # the board demands lineage-hashed artifacts scanned at the SAME clock,
+    # so the mining matrix is regenerated alongside the leaderboard
+    matrix = tmp_path / "MINING_RENTAL_MATRIX.json"
+    mined = runner.invoke(
+        app,
+        [
+            "opportunities",
+            "scan-mining",
+            "--config",
+            "configs/opportunities/mining_scan_v5.yaml",
+            "--output",
+            str(matrix),
+            "--evaluated-at-utc",
+            NOW,
+        ],
+    )
+    assert mined.exit_code == 0, mined.output
+
     ranked = runner.invoke(
         app,
         [
@@ -227,7 +269,7 @@ def test_cli_scan_rank_allocate_roundtrip(tmp_path):
             "--trading",
             str(leaderboard),
             "--mining",
-            "artifacts/v5/MINING_RENTAL_MATRIX.json",
+            str(matrix),
             "--output",
             str(board),
             "--evaluated-at-utc",

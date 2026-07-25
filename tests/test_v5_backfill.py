@@ -34,7 +34,7 @@ def test_bybit_parser_yields_settlements_with_bound_raw_bytes():
     assert events[0].exchange_timestamp_utc == "2026-07-21T16:00:00Z"
     assert events[0].realized_funding_rate == pytest.approx(0.00013)
     assert events[0].funding_interval_hours == pytest.approx(8.0)
-    assert events[0].perpetual_instrument_id == "bybit:BTCUSDT"
+    assert events[0].perpetual_instrument_id == "bybit:BTC-USDT:linear-perp"
     # every record is byte-bound to the exact raw response
     for e in events:
         assert verify_raw_payload(e.to_dict(), raw)
@@ -59,7 +59,7 @@ def test_okx_parser_prefers_realized_rate_and_checks_identity():
     assert events[0].realized_funding_rate == pytest.approx(0.00018)
     # empty realizedRate falls back to fundingRate
     assert events[2].realized_funding_rate == pytest.approx(0.00010)
-    assert events[0].perpetual_instrument_id == "okx:BTC-USDT-SWAP"
+    assert events[0].perpetual_instrument_id == "okx:BTC-USDT:linear-perp"
     with pytest.raises(ValueError, match="identity mismatch"):
         parse_okx_funding_history(raw, symbol="SOL", captured_at_utc=CAPTURED)
     bad = json.dumps({"code": "50011", "msg": "rate limit"}).encode()

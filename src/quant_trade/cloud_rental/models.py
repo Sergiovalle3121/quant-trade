@@ -63,6 +63,7 @@ class InstanceSpecification:
     accelerator_model: str = ""  # e.g. "NVIDIA H100"
     accelerator_count: int = 0
     source_url: str = ""
+    raw_sha256: str = ""  # SHA-256 of the raw spec response (byte binding, V6-O)
 
     def __post_init__(self) -> None:
         if not self.sku.strip():
@@ -102,6 +103,7 @@ class ComputeQuote:
     max_age_hours: float = 24.0
     extras_per_hour_usd: dict[str, float] | None = None  # disk, ip, egress, logging
     uses_free_tier_or_credits: bool = False
+    raw_sha256: str = ""  # SHA-256 of the raw price response (byte binding, V6-O)
 
     def __post_init__(self) -> None:
         if not self.sku.strip() or not self.source_name.strip():

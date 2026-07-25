@@ -94,16 +94,30 @@ def _paper_candidate_artifacts(tmp_path, *, tamper: bool = False):
         "decision": "PAPER_CANDIDATE",
         "data_source": "real",
         "dataset_manifest": manifest,
-        "walk_forward": [{"test_total_return": 0.01}],
+        "walk_forward": [
+            {"test_total_return": 0.01},
+            {"test_total_return": 0.008},
+            {"test_total_return": 0.012},
+            {"test_total_return": 0.009},
+        ],
         "test_metrics": {
             "sharpe_per_period": 0.25,
             "observations": 200,
             "skewness": 0.0,
             "kurtosis": 3.0,
         },
+        "ledger": {"reconciled": True, "net_pnl": 0.01},
     }
     results = tmp_path / "results.json"
     atomic_write_json(results, payload)
+    # V6 completeness: the persisted return series backs the recomputed DSR
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(7)
+    pd.DataFrame(
+        {"net_return": rng.normal(0.001, 0.002, 200)}
+    ).to_csv(tmp_path / "net_returns.csv", index=False)
     append_trial_record(
         tmp_path,
         build_trial_record(

@@ -1,0 +1,42 @@
+{
+  "artifact_hashes": {
+    "dataset_manifest.json": {
+      "claimed": "6231a39a0ed9b8dd547b2b02aed4c45547bd7922b2c06455338468ce8c0ef52e",
+      "rebuilt": "6231a39a0ed9b8dd547b2b02aed4c45547bd7922b2c06455338468ce8c0ef52e"
+    },
+    "equity_curve.csv": {
+      "claimed": "76bf4bb7d8f5c1006d2686c555ca4a3ac1a4ba818aad3d306940be2690227579",
+      "rebuilt": "76bf4bb7d8f5c1006d2686c555ca4a3ac1a4ba818aad3d306940be2690227579"
+    },
+    "funding_cashflows.jsonl": {
+      "claimed": "bf4b1b5056c0556d5730f39ba0107931825a8e90fa87a23b00d9b7a38b36d508",
+      "rebuilt": "bf4b1b5056c0556d5730f39ba0107931825a8e90fa87a23b00d9b7a38b36d508"
+    },
+    "net_returns.csv": {
+      "claimed": "ae6fadadb2b69474694ee181a3746fb270391048f6ab86c8258bfbb09216d482",
+      "rebuilt": "ae6fadadb2b69474694ee181a3746fb270391048f6ab86c8258bfbb09216d482"
+    },
+    "reconciliation.json": {
+      "claimed": "fb904c11896af2acd04c6ab6864740d435f560c0d3e902b752b15794501840fa",
+      "rebuilt": "fb904c11896af2acd04c6ab6864740d435f560c0d3e902b752b15794501840fa"
+    },
+    "results.json": {
+      "claimed": "a18f8c015c3bc3dc8799ceb86225423b09bf638919b800ef96b06586733ea6e7",
+      "rebuilt": "a18f8c015c3bc3dc8799ceb86225423b09bf638919b800ef96b06586733ea6e7"
+    }
+  },
+  "claimed_dir": "/tmp/claude-0/-home-user-quant-trade/8c9145a1-632b-5c11-bda6-8ad8b48bcd9c/scratchpad/claimed_v6",
+  "error": "",
+  "mismatched_artifacts": [],
+  "promotion_failures": [
+    "campaign decision is 'NOT_RUN_INSUFFICIENT_REAL_DATA', not PAPER_CANDIDATE",
+    "data_source is not real",
+    "recomputed PSR 0.937 below 0.95",
+    "recomputed DSR 0.937 below 0.95 (1 trial(s) counted conservatively)",
+    "PBO estimate 0.60 above the pre-registered 0.50 limit"
+  ],
+  "real_money_authorized": false,
+  "rebuild_dir": "/tmp/claude-0/-home-user-quant-trade/8c9145a1-632b-5c11-bda6-8ad8b48bcd9c/scratchpad/rebuild_v6",
+  "reproduced": true,
+  "status": "REJECTED"
+}

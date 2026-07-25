@@ -101,22 +101,48 @@ class FixtureFundingAdapter:
 class CcxtFundingAdapter:
     """Public-endpoint ccxt observation adapter (lazy import; never trades).
 
-    Reads spot ticker, perp ticker, and the funding rate; preserves the raw
-    responses' hash for lineage. No API keys are read or required, and no
+    Reads spot ticker, perp ticker, and the funding-rate info; preserves the
+    raw responses' hash for lineage. No API keys are read or required, and no
     order/cancel/withdraw method exists on this class.
+
+    Semantics (V6-G): the mark price comes ONLY from the venue's mark-price
+    field on the funding-rate payload; the last trade stays ``perp_last`` and
+    is NEVER substituted for mark. A missing mark fails the observation
+    closed. Clients are cached per venue and closed on :meth:`close`.
     """
 
     def __init__(self, timeout_seconds: float, user_agent: str) -> None:
         self._timeout_ms = int(timeout_seconds * 1000)
         self._user_agent = user_agent
+        self._clients: dict[str, Any] = {}
 
-    def observe(self, venue: str, symbol: str) -> FundingObservation:
+    def _client(self, venue: str) -> Any:
         import ccxt  # lazy: requires the `crypto` extra
 
-        client = getattr(ccxt, venue)(
-            {"enableRateLimit": True, "timeout": self._timeout_ms}
+        if venue not in self._clients:
+            client = getattr(ccxt, venue)(
+                {"enableRateLimit": True, "timeout": self._timeout_ms}
+            )
+            client.userAgent = self._user_agent
+            self._clients[venue] = client
+        return self._clients[venue]
+
+    def close(self) -> None:
+        for client in self._clients.values():
+            closer = getattr(client, "close", None)
+            if callable(closer):
+                closer()
+        self._clients.clear()
+
+    def observe(self, venue: str, symbol: str) -> FundingObservation:
+        from quant_trade.carry.instruments import (
+            canonical_instrument_id,
+            canonical_spot_id,
+            instrument_metadata,
         )
-        client.userAgent = self._user_agent
+
+        meta = instrument_metadata(venue, symbol)
+        client = self._client(venue)
         spot_symbol = f"{symbol}/USDT"
         perp_symbol = f"{symbol}/USDT:USDT"
         spot = client.fetch_ticker(spot_symbol)
@@ -132,24 +158,43 @@ class CcxtFundingAdapter:
             if exchange_ms
             else captured
         )
+        mark = funding.get("markPrice")
+        if mark is None:
+            raise ValueError(
+                f"{venue}:{symbol}: funding payload carries no markPrice; the "
+                "last trade is NOT a mark and will not be substituted"
+            )
+        index = funding.get("indexPrice")
+        if index is None:
+            raise ValueError(
+                f"{venue}:{symbol}: funding payload carries no indexPrice; "
+                "spot last is NOT an index and will not be substituted"
+            )
         return FundingObservation(
             venue=venue,
             symbol=symbol,
             captured_at_utc=captured,
             exchange_timestamp_utc=exchange_ts,
-            spot_bid=float(spot.get("bid") or spot["last"]),
-            spot_ask=float(spot.get("ask") or spot["last"]),
-            perp_bid=float(perp.get("bid") or perp["last"]),
-            perp_ask=float(perp.get("ask") or perp["last"]),
-            perp_mark=float(perp["last"]),
-            perp_index=float(funding.get("indexPrice") or spot["last"]),
+            spot_bid=float(spot["bid"]),
+            spot_ask=float(spot["ask"]),
+            perp_bid=float(perp["bid"]),
+            perp_ask=float(perp["ask"]),
+            perp_mark=float(mark),
+            perp_index=float(index),
+            perp_last=float(perp["last"]) if perp.get("last") else None,
             realized_funding_rate=float(funding["fundingRate"]),
+            funding_interval_hours=float(meta["funding_interval_hours"]),
             next_funding_time_utc=str(funding.get("fundingDatetime") or "") or None,
             predicted_funding_rate=None,
             open_interest=None,
             source_event="poll",
             source_name=f"ccxt:{venue}",
             raw_sha256=raw_sha,
+            spot_instrument_id=canonical_spot_id(venue, symbol),
+            perpetual_instrument_id=canonical_instrument_id(venue, symbol),
+            contract_type=str(meta["contract_type"]),
+            quote_asset=str(meta["quote_asset"]),
+            settlement_asset=str(meta["settlement_asset"]),
         )
 
 
