@@ -385,33 +385,60 @@ def test_readiness_evidence_hash_binds_external_logs():
 # --- O. mining accepts declared evidence ------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="V6-O: inline hashprice with no source")
 def test_market_inputs_require_sourced_snapshots():
+    # V6-O closed: no inline revenue anywhere; every cell references a
+    # sourced market_snapshot, and the scanner REJECTS inline revenue.
     cells = yaml.safe_load(
         Path("configs/opportunities/mining_scan_v5.yaml").read_text()
     )["cells"]
-    # desired: revenue comes from a market snapshot artifact with source and
-    # freshness, never an inline number
-    assert all("hashprice_usd_per_th_day" not in (c.get("revenue") or {}) for c in cells)
+    assert all("revenue" not in c for c in cells)
+    assert all(c.get("market_snapshot") for c in cells)
+    from quant_trade.opportunities.mining_scan import scan_mining_cells
+
+    forged = dict(cells[0])
+    forged["revenue"] = {"hashprice_usd_per_th_day": 99.0}
+    with pytest.raises(ValueError, match="inline 'revenue' is not evidence"):
+        scan_mining_cells([forged], evaluated_at_utc="2026-07-25T03:00:00Z")
 
 
-@pytest.mark.xfail(strict=True, reason="V6-O: quote/spec carry no raw byte binding")
 def test_quotes_and_specs_are_byte_bound():
+    # V6-O closed: quote/spec carry raw byte bindings, and the bundle
+    # validator demands them on LIVE (non-fixture) evidence.
     from quant_trade.cloud_rental.models import ComputeQuote, InstanceSpecification
 
     assert "raw_sha256" in ComputeQuote.__dataclass_fields__
     assert "raw_sha256" in InstanceSpecification.__dataclass_fields__
 
 
-@pytest.mark.xfail(strict=True, reason="V6-O: KHeavyHash priced with a SHA-256 unit")
 def test_algorithm_units_are_dimensional():
-    cells = yaml.safe_load(
-        Path("configs/opportunities/mining_scan_v5.yaml").read_text()
-    )["cells"]
-    kas = [c for c in cells if c.get("coin") == "KAS"]
-    assert all((c.get("revenue") or {}).get("hashrate_unit") for c in kas), (
-        "algorithms must declare their own hashrate unit; USD/TH/day is SHA-256-only"
+    # V6-O closed: each algorithm owns its unit; USD/TH/day is SHA-256-only,
+    # and SHA-256 on rented GPUs is INCOMPATIBLE_OR_UNBENCHMARKED.
+    from quant_trade.cloud_rental.market import (
+        MarketSnapshot,
+        algorithm_unit,
+        check_algorithm_hardware,
     )
+
+    assert algorithm_unit("kheavyhash")["hashrate_unit"] == "GH/s"
+    assert algorithm_unit("sha256")["hashrate_unit"] == "TH/s"
+    with pytest.raises(ValueError, match="unknown algorithm"):
+        algorithm_unit("magichash")
+    with pytest.raises(ValueError, match="cross-unit"):
+        MarketSnapshot(
+            algorithm_id="kheavyhash",
+            coin="KAS",
+            hashrate_unit="TH/s",  # SHA-256's unit on a KHeavyHash snapshot
+            hashprice_usd_per_unit_day=0.08,
+            coin_price_usd=0.1,
+            source_name="test",
+            source_url="https://example.invalid",
+            captured_at_utc="2026-07-25T03:00:00Z",
+            raw_sha256="ab" * 32,
+        )
+    assert "INCOMPATIBLE_OR_UNBENCHMARKED" in (
+        check_algorithm_hardware("sha256", "gpu") or ""
+    )
+    assert check_algorithm_hardware("kheavyhash", "gpu") is None
 
 
 def _matrix_rows() -> list[dict]:
@@ -428,3 +455,32 @@ def test_defect_matrix_artifact_matches_the_red_tests():
     )
     letters = {row["defect"] for row in matrix["defects"]}
     assert letters == set("ABCDEFGHIJKLMNO")
+
+
+def test_benchmark_importer_reconstructs_from_raw_log():
+    # V6-O: claimed benchmark numbers must match the raw log's reconstruction
+    from quant_trade.cloud_rental.market import (
+        parse_benchmark_log,
+        verify_benchmark_against_log,
+    )
+
+    lines = [
+        json.dumps({"event": "config", "miner": "example", "sku": "g5.xlarge"}),
+        *[json.dumps({"event": "sample", "hashrate": 1.0e9, "t": i}) for i in range(8)],
+        *[json.dumps({"event": "share", "accepted": True}) for _ in range(10)],
+        json.dumps({"event": "share", "accepted": False}),
+        json.dumps({"event": "end", "duration_seconds": 3600, "warmup_seconds": 300}),
+    ]
+    raw = ("\n".join(lines) + "\n").encode()
+    rebuilt = parse_benchmark_log(raw)
+    assert rebuilt["hashrate_hs"] == pytest.approx(1.0e9)
+    assert rebuilt["shares_accepted"] == 10
+    assert rebuilt["shares_rejected"] == 1
+    ok = verify_benchmark_against_log(
+        {"hashrate_hs": 1.0e9, "duration_seconds": 3600, "shares_accepted": 10,
+         "shares_rejected": 1},
+        raw,
+    )
+    assert ok == []
+    inflated = verify_benchmark_against_log({"hashrate_hs": 5.0e9}, raw)
+    assert any("differs from the log" in p for p in inflated)

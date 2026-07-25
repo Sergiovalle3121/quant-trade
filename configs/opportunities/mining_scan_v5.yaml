@@ -10,6 +10,11 @@
 # would be fabricated evidence. Blocked cells still show conditional
 # economics as details when computable, but the block always outranks them.
 
+# V6: revenue numbers are NEVER inline — each cell references a sourced,
+# fresh, byte-bound market_snapshot JSON. None exist yet (network blocked),
+# so economics stay uncomputable: an honest MISSING note on every cell.
+# SHA-256 cells on GPU SKUs are additionally INCOMPATIBLE_OR_UNBENCHMARKED.
+
 cells:
   - purpose: hashing_worker
     algorithm: sha256
@@ -35,12 +40,7 @@ cells:
       memory_gb: 16.0
       accelerator_model: "NVIDIA A10G"
       accelerator_count: 1
-    revenue:
-      hashprice_usd_per_th_day: 0.05
-      pool_fee_rate: 0.01
-      utilization: 0.90
-      interruption_rate_per_hour: 0.05
-      checkpoint_overhead_fraction: 0.10
+    market_snapshot: ../../data/mining/market/btc_sha256.json
     horizon_hours: 720
     budget_ceiling_usd: 250.0
 
@@ -68,12 +68,7 @@ cells:
       memory_gb: 188.0
       accelerator_model: "NVIDIA A10"
       accelerator_count: 1
-    revenue:
-      hashprice_usd_per_th_day: 0.05
-      pool_fee_rate: 0.01
-      utilization: 0.90
-      interruption_rate_per_hour: 0.03
-      checkpoint_overhead_fraction: 0.10
+    market_snapshot: ../../data/mining/market/btc_sha256.json
     horizon_hours: 720
     budget_ceiling_usd: 250.0
 
@@ -101,11 +96,6 @@ cells:
       memory_gb: 188.0
       accelerator_model: "NVIDIA A10"
       accelerator_count: 1
-    revenue:
-      hashprice_usd_per_th_day: 0.08
-      pool_fee_rate: 0.01
-      utilization: 0.90
-      interruption_rate_per_hour: 0.03
-      checkpoint_overhead_fraction: 0.10
+    market_snapshot: ../../data/mining/market/kas_kheavyhash.json
     horizon_hours: 720
     budget_ceiling_usd: 250.0

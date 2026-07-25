@@ -218,3 +218,30 @@ Next: V6-7 — persistent shadow portfolio + honest readiness (N).
   ruff/mypy clean.
 
 Next: V6-8 — mining real-evidence chain (O).
+
+## CP8 — 2026-07-25T03:20Z — V6-8: mining real-evidence chain (O closed)
+
+- `cloud_rental/market.py` (new): `MarketSnapshot` — hashprice arrives ONLY
+  as a sourced, fresh, byte-bound snapshot (source name+URL, capture time,
+  raw SHA, dual-source divergence, recomputed freshness); the scanner
+  REJECTS inline `revenue` outright. Per-algorithm dimensional units
+  (`ALGORITHM_UNITS`): KHeavyHash is GH/s, cross-unit pricing raises,
+  unknown algorithms fail closed, and SHA-256 on rented GPUs is
+  `INCOMPATIBLE_OR_UNBENCHMARKED` (BTC needs permitted ASIC capacity —
+  which no current provider policy allows). Benchmark importer
+  (`parse_benchmark_log` + `verify_benchmark_against_log`): claimed numbers
+  must match the raw log's reconstruction.
+- `ComputeQuote`/`InstanceSpecification` gained `raw_sha256`; the bundle
+  validator demands byte bindings on LIVE (non-fixture) quote/spec.
+- `mining_scan_v5.yaml`: inline revenue removed; every cell references a
+  market snapshot (none exist yet — honest MISSING notes on every cell;
+  policy blocks still outrank everything).
+- **Documented gap (not hidden):** live AWS/Alibaba capture CLIs remain
+  unwired to the read-only adapters; the evidence CONTRACTS are enforced
+  end-to-end and the matrix records the gap explicitly.
+- All 3 remaining xfail markers removed — **defects A–O: 15/15 closed** in
+  `DEFECT_REPRODUCTION_MATRIX.json`. Suite: **642 passed, 0 xfailed** ·
+  ruff/mypy clean.
+
+Next: V6-9 — freeze, artifact regeneration, report, PR sync (NO merge —
+this sprint's rule is draft unless the owner orders otherwise).
