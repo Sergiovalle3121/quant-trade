@@ -1,0 +1,11 @@
+{
+  "allocation_artifact": "PAPER_CAPITAL_ALLOCATION",
+  "artifact": "SHADOW_STATUS",
+  "broker_paper_claimed": false,
+  "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "events_processed": 0,
+  "real_money_authorized": false,
+  "reason": "100% cash; starting a shadow deployment would add no economic evidence",
+  "schema_version": 2,
+  "status": "NOT_STARTED_NO_ELIGIBLE_NON_CASH_CANDIDATE"
+}

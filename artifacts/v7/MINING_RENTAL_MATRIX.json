@@ -1,0 +1,80 @@
+{
+  "artifact": "MINING_RENTAL_MATRIX",
+  "cells": [
+    {
+      "accelerator_model": "NVIDIA A10G",
+      "algorithm": "sha256",
+      "bundle_status": "REJECTED_MISSING_EVIDENCE",
+      "coin": "BTC",
+      "conditional_economics": null,
+      "identity": "aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
+      "provider": "aws",
+      "reasons": [
+        "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "region": "us-east-1",
+      "sku": "g5.xlarge",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS",
+      "test_only": true
+    },
+    {
+      "accelerator_model": "NVIDIA A10",
+      "algorithm": "sha256",
+      "bundle_status": "REJECTED_MISSING_EVIDENCE",
+      "coin": "BTC",
+      "conditional_economics": null,
+      "identity": "alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
+      "provider": "alibaba",
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
+        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "region": "ap-southeast-1",
+      "sku": "ecs.gn7i-c32g1.8xlarge",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    },
+    {
+      "accelerator_model": "NVIDIA A10",
+      "algorithm": "kheavyhash",
+      "bundle_status": "REJECTED_MISSING_EVIDENCE",
+      "coin": "KAS",
+      "conditional_economics": null,
+      "identity": "alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
+      "provider": "alibaba",
+      "reasons": [
+        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
+        "market snapshot missing: ../../data/mining/market/kas_kheavyhash.json (no sourced hashprice, economics cannot be computed)",
+        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
+      ],
+      "region": "ap-southeast-1",
+      "sku": "ecs.gn7i-c32g1.8xlarge",
+      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
+      "test_only": true
+    }
+  ],
+  "counts_by_status": {
+    "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY": 2,
+    "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS": 1
+  },
+  "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "notes": [
+    "TEST_ONLY cells exercise the pipeline and can never be real opportunities",
+    "BLOCKED is a legal/operational state; economics never override it",
+    "no miners were run, no resources created, no spend authorized"
+  ],
+  "rows_sha256": "4342d7bee66c5d08bba5a54cdd5ca8cbc9d52f91255f43ac818e058c75b213fa",
+  "safety": {
+    "alibaba_resources_created": false,
+    "aws_resources_created": false,
+    "external_spend_authorized": false,
+    "hardware_control_enabled": false,
+    "miner_execution": false
+  },
+  "schema_version": 2
+}

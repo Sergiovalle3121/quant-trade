@@ -1,0 +1,29 @@
+{
+  "artifact": "PROMOTION_REPRODUCIBILITY",
+  "artifact_sha256": {
+    "DATA_PROVENANCE_REPORT.json": "df28288ea414afeecb4e958dd121420e3faa15b0c961e8aa939ccbba8d6348c4",
+    "DEFECT_REPRODUCTION_MATRIX.json": "dda65721090f4f468e3dbd1fe15586a77c1b8f0002490df79f580e103988f18b",
+    "MINING_EVIDENCE_REPORT.json": "3e26fc60c76db6e199d677a3ac63c99a6c8779a5349c616d9ebe1575dcc201fc",
+    "MINING_POLICY_MATRIX.json": "a3234b08b90f3be29f74d1b32f3da0270bc5abd55775ec381ff72d4acc9e99de",
+    "MINING_RENTAL_MATRIX.json": "8b20c4562957a662f0d0bc3c2622a545cbf7eeed83049ff1fc2d07cb6a23205d",
+    "MINING_UNIT_AUDIT.json": "270d7ea566e32630d98827658df425e97bb9bab69ac750e845c3adb830ea06ed",
+    "PAPER_ALLOCATION.json": "cf36d71d4090880494af4bf69461da0895aafdbe3f1d459cbd2ed1786b7fc853",
+    "SHADOW_STATUS.json": "418bbf25b95e330489fd21dc286e3c7b0011bf94a649de67a4faa3467edb641a",
+    "TRADING_LEADERBOARD.json": "3961580bdb7d609d1c28c43b72fa34ce7ac7c13961bc26f4ad9608f3417b1b3c",
+    "UNIFIED_OPPORTUNITY_BOARD.json": "00f5ca98bf4407869be1681309da79d78935c7d1d5aa5ea48826a7d679720e6b"
+  },
+  "base_sha": "98daabe6585bfa80d7706a61c8742d5da8ac9ea3",
+  "command": "make v7-artifacts SOURCE_COMMIT_SHA=<code-commit-sha>",
+  "deterministic_fields": "all fields",
+  "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "paper_candidate_count": 0,
+  "real_evidence_promotable": false,
+  "safety": {
+    "cloud_resources_created": 0,
+    "external_spend_usd": 0,
+    "live_orders": 0,
+    "miners_started": 0
+  },
+  "schema_version": 2,
+  "source_commit_sha": "7f4003c8cd322fc8a50fb7a9bb7010573278d0e5"
+}
