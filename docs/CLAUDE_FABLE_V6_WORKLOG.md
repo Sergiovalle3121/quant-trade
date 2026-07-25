@@ -245,3 +245,24 @@ Next: V6-8 — mining real-evidence chain (O).
 
 Next: V6-9 — freeze, artifact regeneration, report, PR sync (NO merge —
 this sprint's rule is draft unless the owner orders otherwise).
+
+## CP9 — 2026-07-25T03:45Z — V6-9: freeze + delivery
+
+- All 9 `artifacts/v6/` deliverables regenerated at one clock
+  (2026-07-25T03:30Z): leaderboard (H1–H3 NOT_RUN_NO_DATASET), mining
+  matrix (all POLICY_BLOCKED, market snapshots missing by honest design),
+  UNIFIED_ECONOMIC_BOARD (champion `cash_usd`, lineage-verified),
+  PAPER_CAPITAL_ALLOCATION (100 % cash), SHADOW_PORTFOLIO_STATUS (session
+  RUNNING, reconciled, kill switches ok), PROMOTION_REPRODUCIBILITY_REPORT
+  (reproduced byte-for-byte over 6 artifacts; REJECTED with DSR 0.937 and
+  PBO 0.60 gates demonstrably firing), HISTORICAL_CARRY_PANEL_AUDIT (live
+  NOT_BUILT_NETWORK_BLOCKED + TEST_ONLY recorded-response audit),
+  DATA_PROVENANCE_REPORT (0 real records; receipts policy), defect matrix
+  (15/15 closed).
+- `docs/PROFIT_HYPOTHESES_V6.md` re-registered (settlement-held signal
+  semantics, real H3, executed gates) — stricter only, never looser.
+- `docs/ECONOMIC_INTEGRITY_V6_REPORT.md` with the full status block.
+- Final validation: **pytest 642 passed / 0 xfailed** · ruff clean · mypy
+  clean (251 files) · compileall OK · diff-check OK.
+- PR #43 body synced. Left as DRAFT per this sprint's explicit rule — no
+  auto-merge unless the owner orders it during the session.
