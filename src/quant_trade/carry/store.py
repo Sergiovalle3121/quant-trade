@@ -164,20 +164,23 @@ def _exclusive_file_lock(handle: BinaryIO) -> Iterator[None]:
     keeps using ``flock``.  The byte is metadata only and is never interpreted.
     """
     if os.name == "nt":
-        import msvcrt
+        from importlib import import_module
+
+        msvcrt = import_module("msvcrt")
+        locking = msvcrt.__dict__["locking"]
 
         handle.seek(0, os.SEEK_END)
         if handle.tell() == 0:
             handle.write(b"\0")
-            handle.flush()
-            os.fsync(handle.fileno())
+        handle.flush()
+        os.fsync(handle.fileno())
         handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        locking(handle.fileno(), msvcrt.__dict__["LK_LOCK"], 1)
         try:
             yield
         finally:
             handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            locking(handle.fileno(), msvcrt.__dict__["LK_UNLCK"], 1)
     else:
         from importlib import import_module
 
