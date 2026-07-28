@@ -5,11 +5,11 @@
       "bootstrap_p05": null,
       "break_even": {
         "annual_carrying_fraction": 0.045,
-        "required_annualized_funding_1x": 0.15571666666666664,
-        "required_funding_rate_per_8h_1x": 0.00014220700152207,
-        "required_funding_rate_per_8h_2x": 0.00028441400304414,
-        "required_funding_rate_per_8h_3x": 0.00042662100456621006,
-        "round_trip_cost_fraction": 0.0091
+        "required_annualized_funding_1x": 0.11799999999999998,
+        "required_funding_rate_per_8h_1x": 0.00010776255707762555,
+        "required_funding_rate_per_8h_2x": 0.0002155251141552511,
+        "required_funding_rate_per_8h_3x": 0.00032328767123287675,
+        "round_trip_cost_fraction": 0.006
       },
       "capacity_notional_usd": null,
       "cost_components": null,
@@ -37,18 +37,18 @@
       "total_costs": null,
       "what_would_have_to_change": [
         "Acquire the dataset. Nothing about this hypothesis has been measured, so no economic change is implied by its current state.",
-        "Once acquired, average settled funding must exceed 0.00014221 per 8h settlement (15.57% annualised) merely to cover frictions at 1x costs."
+        "Once acquired, average settled funding must exceed 0.00010776 per 8h settlement (11.80% annualised) merely to cover frictions at 1x costs."
       ]
     },
     {
       "bootstrap_p05": null,
       "break_even": {
         "annual_carrying_fraction": 0.045,
-        "required_annualized_funding_1x": 0.15328333333333333,
-        "required_funding_rate_per_8h_1x": 0.00013998477929984778,
-        "required_funding_rate_per_8h_2x": 0.00027996955859969555,
-        "required_funding_rate_per_8h_3x": 0.00041995433789954336,
-        "round_trip_cost_fraction": 0.0089
+        "required_annualized_funding_1x": 0.11678333333333332,
+        "required_funding_rate_per_8h_1x": 0.00010665144596651446,
+        "required_funding_rate_per_8h_2x": 0.0002133028919330289,
+        "required_funding_rate_per_8h_3x": 0.00031995433789954337,
+        "round_trip_cost_fraction": 0.005900000000000001
       },
       "capacity_notional_usd": null,
       "cost_components": null,
@@ -76,18 +76,18 @@
       "total_costs": null,
       "what_would_have_to_change": [
         "Acquire the dataset. Nothing about this hypothesis has been measured, so no economic change is implied by its current state.",
-        "Once acquired, average settled funding must exceed 0.00013998 per 8h settlement (15.33% annualised) merely to cover frictions at 1x costs."
+        "Once acquired, average settled funding must exceed 0.00010665 per 8h settlement (11.68% annualised) merely to cover frictions at 1x costs."
       ]
     },
     {
       "bootstrap_p05": null,
       "break_even": {
         "annual_carrying_fraction": 0.045,
-        "required_annualized_funding_1x": 0.17396666666666666,
-        "required_funding_rate_per_8h_1x": 0.00015887366818873668,
-        "required_funding_rate_per_8h_2x": 0.00031774733637747335,
-        "required_funding_rate_per_8h_3x": 0.00047662100456621003,
-        "round_trip_cost_fraction": 0.0106
+        "required_annualized_funding_1x": 0.1253,
+        "required_funding_rate_per_8h_1x": 0.00011442922374429223,
+        "required_funding_rate_per_8h_2x": 0.00022885844748858446,
+        "required_funding_rate_per_8h_3x": 0.00034328767123287674,
+        "round_trip_cost_fraction": 0.0066
       },
       "capacity_notional_usd": null,
       "cost_components": null,
@@ -116,7 +116,7 @@
       "total_costs": null,
       "what_would_have_to_change": [
         "Acquire the dataset. Nothing about this hypothesis has been measured, so no economic change is implied by its current state.",
-        "Once acquired, average settled funding must exceed 0.00015887 per 8h settlement (17.40% annualised) merely to cover frictions at 1x costs."
+        "Once acquired, average settled funding must exceed 0.00011443 per 8h settlement (12.53% annualised) merely to cover frictions at 1x costs."
       ]
     }
   ],

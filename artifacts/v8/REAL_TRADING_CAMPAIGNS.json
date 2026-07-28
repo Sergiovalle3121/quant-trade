@@ -25,7 +25,7 @@
           "total_capital_usd": 166666.6666666667
         },
         "funding_interval_hours": 8.0,
-        "interpretation": "The strategy must receive at least 0.00014221 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
+        "interpretation": "The strategy must receive at least 0.00010776 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
         "reference_holding_days": 30.0,
         "reference_notional_usd": 100000.0,
         "scenarios": {
@@ -39,19 +39,19 @@
               "latency_and_partial_fill": 0.0002,
               "market_impact": 0.0004,
               "perp_margin_maintenance_drag": 0.005,
-              "perp_taker_fee": 0.0022,
+              "perp_taker_fee": 0.0011,
               "slippage": 0.0004,
-              "spot_taker_fee": 0.004
+              "spot_taker_fee": 0.002
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 1.0,
-            "required_annualized_funding": 0.15571666666666664,
-            "required_funding_rate_per_interval": 0.00014220700152207,
-            "required_total_funding_fraction": 0.0127986301369863,
-            "round_trip_fraction": 0.0091,
+            "required_annualized_funding": 0.11799999999999998,
+            "required_funding_rate_per_interval": 0.00010776255707762555,
+            "required_total_funding_fraction": 0.0096986301369863,
+            "round_trip_fraction": 0.006,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.0127986301369863,
+            "total_cost_over_holding": 0.0096986301369863,
             "venue": "bybit"
           },
           "2x": {
@@ -64,19 +64,19 @@
               "latency_and_partial_fill": 0.0004,
               "market_impact": 0.0008,
               "perp_margin_maintenance_drag": 0.01,
-              "perp_taker_fee": 0.0044,
+              "perp_taker_fee": 0.0022,
               "slippage": 0.0008,
-              "spot_taker_fee": 0.008
+              "spot_taker_fee": 0.004
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 2.0,
-            "required_annualized_funding": 0.3114333333333333,
-            "required_funding_rate_per_interval": 0.00028441400304414,
-            "required_total_funding_fraction": 0.0255972602739726,
-            "round_trip_fraction": 0.0182,
+            "required_annualized_funding": 0.23599999999999996,
+            "required_funding_rate_per_interval": 0.0002155251141552511,
+            "required_total_funding_fraction": 0.0193972602739726,
+            "round_trip_fraction": 0.012,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.0255972602739726,
+            "total_cost_over_holding": 0.0193972602739726,
             "venue": "bybit"
           },
           "3x": {
@@ -89,19 +89,19 @@
               "latency_and_partial_fill": 0.0006000000000000001,
               "market_impact": 0.0012000000000000001,
               "perp_margin_maintenance_drag": 0.015,
-              "perp_taker_fee": 0.0066,
+              "perp_taker_fee": 0.0033,
               "slippage": 0.0012000000000000001,
-              "spot_taker_fee": 0.012
+              "spot_taker_fee": 0.006
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 3.0,
-            "required_annualized_funding": 0.46715,
-            "required_funding_rate_per_interval": 0.00042662100456621006,
-            "required_total_funding_fraction": 0.03839589041095891,
-            "round_trip_fraction": 0.0273,
+            "required_annualized_funding": 0.35400000000000004,
+            "required_funding_rate_per_interval": 0.00032328767123287675,
+            "required_total_funding_fraction": 0.029095890410958905,
+            "round_trip_fraction": 0.018000000000000002,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.03839589041095891,
+            "total_cost_over_holding": 0.029095890410958905,
             "venue": "bybit"
           }
         }
@@ -117,13 +117,14 @@
           "latency_and_partial_fill": 0.0002,
           "market_impact": 0.0004,
           "perp_margin_maintenance_drag": 0.005,
-          "perp_taker_fee": 0.0022,
+          "perp_taker_fee": 0.0011,
           "slippage": 0.0004,
-          "spot_taker_fee": 0.004
+          "spot_taker_fee": 0.002
         },
         "components": [
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "spot",
             "name": "spot_taker_fee",
             "note": "published retail spot taker rate; VIP tiers are cheaper",
             "promotable": false,
@@ -133,6 +134,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "perp",
             "name": "perp_taker_fee",
             "note": "published retail linear-perp taker rate",
             "promotable": false,
@@ -142,6 +144,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "half_spread",
             "note": "BTC/USDT is among the deepest books; 1bp is pessimistic",
             "promotable": false,
@@ -151,6 +154,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "slippage",
             "note": "beyond the touch, at research size",
             "promotable": false,
@@ -160,6 +164,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "market_impact",
             "note": "temporary impact at research size",
             "promotable": false,
@@ -169,6 +174,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "latency_and_partial_fill",
             "note": "adverse selection between the two legs of the hedge",
             "promotable": false,
@@ -178,6 +184,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "collateral_opportunity_cost",
             "note": "margin and spot inventory are immobilised and earn nothing",
             "promotable": false,
@@ -187,6 +194,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "perp_margin_maintenance_drag",
             "note": "buffer capital held against variation margin calls",
             "promotable": false,
@@ -196,6 +204,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "conversion_and_withdrawal",
             "note": "fiat/stable conversion in and out of the position",
             "promotable": false,
@@ -205,6 +214,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "emergency_unwind_reserve",
             "note": "priced allowance for unwinding both legs into a stressed book",
             "promotable": false,
@@ -214,9 +224,10 @@
           }
         ],
         "multiplier": 1.0,
-        "per_fill_bps": 19.0,
+        "per_fill_bps": 11.25,
         "promotable": false,
-        "round_trip_fraction": 0.0091,
+        "round_trip_bps": 45.0,
+        "round_trip_fraction": 0.006,
         "venue": "bybit",
         "weakest_evidence_class": "ASSUMPTION_UNVERIFIED"
       },
@@ -261,7 +272,7 @@
           "total_capital_usd": 166666.6666666667
         },
         "funding_interval_hours": 8.0,
-        "interpretation": "The strategy must receive at least 0.00013998 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
+        "interpretation": "The strategy must receive at least 0.00010665 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
         "reference_holding_days": 30.0,
         "reference_notional_usd": 100000.0,
         "scenarios": {
@@ -275,19 +286,19 @@
               "latency_and_partial_fill": 0.0002,
               "market_impact": 0.0004,
               "perp_margin_maintenance_drag": 0.005,
-              "perp_taker_fee": 0.002,
+              "perp_taker_fee": 0.001,
               "slippage": 0.0004,
-              "spot_taker_fee": 0.004
+              "spot_taker_fee": 0.002
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 1.0,
-            "required_annualized_funding": 0.15328333333333333,
-            "required_funding_rate_per_interval": 0.00013998477929984778,
-            "required_total_funding_fraction": 0.0125986301369863,
-            "round_trip_fraction": 0.0089,
+            "required_annualized_funding": 0.11678333333333332,
+            "required_funding_rate_per_interval": 0.00010665144596651446,
+            "required_total_funding_fraction": 0.009598630136986301,
+            "round_trip_fraction": 0.005900000000000001,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.0125986301369863,
+            "total_cost_over_holding": 0.009598630136986301,
             "venue": "okx"
           },
           "2x": {
@@ -300,19 +311,19 @@
               "latency_and_partial_fill": 0.0004,
               "market_impact": 0.0008,
               "perp_margin_maintenance_drag": 0.01,
-              "perp_taker_fee": 0.004,
+              "perp_taker_fee": 0.002,
               "slippage": 0.0008,
-              "spot_taker_fee": 0.008
+              "spot_taker_fee": 0.004
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 2.0,
-            "required_annualized_funding": 0.30656666666666665,
-            "required_funding_rate_per_interval": 0.00027996955859969555,
-            "required_total_funding_fraction": 0.0251972602739726,
-            "round_trip_fraction": 0.0178,
+            "required_annualized_funding": 0.23356666666666664,
+            "required_funding_rate_per_interval": 0.0002133028919330289,
+            "required_total_funding_fraction": 0.019197260273972602,
+            "round_trip_fraction": 0.011800000000000001,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.0251972602739726,
+            "total_cost_over_holding": 0.019197260273972602,
             "venue": "okx"
           },
           "3x": {
@@ -325,19 +336,19 @@
               "latency_and_partial_fill": 0.0006000000000000001,
               "market_impact": 0.0012000000000000001,
               "perp_margin_maintenance_drag": 0.015,
-              "perp_taker_fee": 0.006,
+              "perp_taker_fee": 0.003,
               "slippage": 0.0012000000000000001,
-              "spot_taker_fee": 0.012
+              "spot_taker_fee": 0.006
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 3.0,
-            "required_annualized_funding": 0.45985,
-            "required_funding_rate_per_interval": 0.00041995433789954336,
-            "required_total_funding_fraction": 0.037795890410958904,
-            "round_trip_fraction": 0.0267,
+            "required_annualized_funding": 0.35035,
+            "required_funding_rate_per_interval": 0.00031995433789954337,
+            "required_total_funding_fraction": 0.028795890410958903,
+            "round_trip_fraction": 0.0177,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.037795890410958904,
+            "total_cost_over_holding": 0.028795890410958903,
             "venue": "okx"
           }
         }
@@ -353,13 +364,14 @@
           "latency_and_partial_fill": 0.0002,
           "market_impact": 0.0004,
           "perp_margin_maintenance_drag": 0.005,
-          "perp_taker_fee": 0.002,
+          "perp_taker_fee": 0.001,
           "slippage": 0.0004,
-          "spot_taker_fee": 0.004
+          "spot_taker_fee": 0.002
         },
         "components": [
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "spot",
             "name": "spot_taker_fee",
             "note": "published retail spot taker rate; VIP tiers are cheaper",
             "promotable": false,
@@ -369,6 +381,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "perp",
             "name": "perp_taker_fee",
             "note": "published retail linear-perp taker rate",
             "promotable": false,
@@ -378,6 +391,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "half_spread",
             "note": "BTC/USDT is among the deepest books; 1bp is pessimistic",
             "promotable": false,
@@ -387,6 +401,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "slippage",
             "note": "beyond the touch, at research size",
             "promotable": false,
@@ -396,6 +411,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "market_impact",
             "note": "temporary impact at research size",
             "promotable": false,
@@ -405,6 +421,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "latency_and_partial_fill",
             "note": "adverse selection between the two legs of the hedge",
             "promotable": false,
@@ -414,6 +431,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "collateral_opportunity_cost",
             "note": "margin and spot inventory are immobilised and earn nothing",
             "promotable": false,
@@ -423,6 +441,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "perp_margin_maintenance_drag",
             "note": "buffer capital held against variation margin calls",
             "promotable": false,
@@ -432,6 +451,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "conversion_and_withdrawal",
             "note": "fiat/stable conversion in and out of the position",
             "promotable": false,
@@ -441,6 +461,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "emergency_unwind_reserve",
             "note": "priced allowance for unwinding both legs into a stressed book",
             "promotable": false,
@@ -450,9 +471,10 @@
           }
         ],
         "multiplier": 1.0,
-        "per_fill_bps": 18.5,
+        "per_fill_bps": 11.0,
         "promotable": false,
-        "round_trip_fraction": 0.0089,
+        "round_trip_bps": 44.0,
+        "round_trip_fraction": 0.005900000000000001,
         "venue": "okx",
         "weakest_evidence_class": "ASSUMPTION_UNVERIFIED"
       },
@@ -498,7 +520,7 @@
           "total_capital_usd": 166666.6666666667
         },
         "funding_interval_hours": 8.0,
-        "interpretation": "The strategy must receive at least 0.00015887 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
+        "interpretation": "The strategy must receive at least 0.00011443 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
         "reference_holding_days": 30.0,
         "reference_notional_usd": 100000.0,
         "scenarios": {
@@ -513,19 +535,19 @@
               "latency_and_partial_fill": 0.0002,
               "market_impact": 0.0004,
               "perp_margin_maintenance_drag": 0.005,
-              "perp_taker_fee": 0.0022,
-              "slippage": 0.0004,
-              "spot_taker_fee": 0.004
+              "perp_taker_fee": 0.0011,
+              "perp_taker_fee_second_leg": 0.0011,
+              "slippage": 0.0004
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 1.0,
-            "required_annualized_funding": 0.17396666666666666,
-            "required_funding_rate_per_interval": 0.00015887366818873668,
-            "required_total_funding_fraction": 0.0142986301369863,
-            "round_trip_fraction": 0.0106,
+            "required_annualized_funding": 0.1253,
+            "required_funding_rate_per_interval": 0.00011442922374429223,
+            "required_total_funding_fraction": 0.0102986301369863,
+            "round_trip_fraction": 0.0066,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.0142986301369863,
+            "total_cost_over_holding": 0.0102986301369863,
             "venue": "bybit"
           },
           "2x": {
@@ -539,19 +561,19 @@
               "latency_and_partial_fill": 0.0004,
               "market_impact": 0.0008,
               "perp_margin_maintenance_drag": 0.01,
-              "perp_taker_fee": 0.0044,
-              "slippage": 0.0008,
-              "spot_taker_fee": 0.008
+              "perp_taker_fee": 0.0022,
+              "perp_taker_fee_second_leg": 0.0022,
+              "slippage": 0.0008
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 2.0,
-            "required_annualized_funding": 0.3479333333333333,
-            "required_funding_rate_per_interval": 0.00031774733637747335,
-            "required_total_funding_fraction": 0.0285972602739726,
-            "round_trip_fraction": 0.0212,
+            "required_annualized_funding": 0.2506,
+            "required_funding_rate_per_interval": 0.00022885844748858446,
+            "required_total_funding_fraction": 0.0205972602739726,
+            "round_trip_fraction": 0.0132,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.0285972602739726,
+            "total_cost_over_holding": 0.0205972602739726,
             "venue": "bybit"
           },
           "3x": {
@@ -565,19 +587,19 @@
               "latency_and_partial_fill": 0.0006000000000000001,
               "market_impact": 0.0012000000000000001,
               "perp_margin_maintenance_drag": 0.015,
-              "perp_taker_fee": 0.0066,
-              "slippage": 0.0012000000000000001,
-              "spot_taker_fee": 0.012
+              "perp_taker_fee": 0.0033,
+              "perp_taker_fee_second_leg": 0.0033,
+              "slippage": 0.0012000000000000001
             },
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 3.0,
-            "required_annualized_funding": 0.5219,
-            "required_funding_rate_per_interval": 0.00047662100456621003,
-            "required_total_funding_fraction": 0.042895890410958905,
-            "round_trip_fraction": 0.0318,
+            "required_annualized_funding": 0.3759,
+            "required_funding_rate_per_interval": 0.00034328767123287674,
+            "required_total_funding_fraction": 0.030895890410958908,
+            "round_trip_fraction": 0.0198,
             "settlements_over_holding": 90.0,
-            "total_cost_over_holding": 0.042895890410958905,
+            "total_cost_over_holding": 0.030895890410958908,
             "venue": "bybit"
           }
         }
@@ -594,22 +616,24 @@
           "latency_and_partial_fill": 0.0002,
           "market_impact": 0.0004,
           "perp_margin_maintenance_drag": 0.005,
-          "perp_taker_fee": 0.0022,
-          "slippage": 0.0004,
-          "spot_taker_fee": 0.004
+          "perp_taker_fee": 0.0011,
+          "perp_taker_fee_second_leg": 0.0011,
+          "slippage": 0.0004
         },
         "components": [
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
-            "name": "spot_taker_fee",
-            "note": "published retail spot taker rate; VIP tiers are cheaper",
+            "leg": "perp",
+            "name": "perp_taker_fee_second_leg",
+            "note": "second perpetual leg; no spot fee is paid in a perp/perp structure",
             "promotable": false,
             "source": "https://api.bybit.com/v5/market/instruments-info (+ published fee schedule)",
             "unit": "bps_per_fill",
-            "value": 10.0
+            "value": 5.5
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "perp",
             "name": "perp_taker_fee",
             "note": "published retail linear-perp taker rate",
             "promotable": false,
@@ -619,6 +643,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "half_spread",
             "note": "BTC/USDT is among the deepest books; 1bp is pessimistic",
             "promotable": false,
@@ -628,6 +653,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "slippage",
             "note": "beyond the touch, at research size",
             "promotable": false,
@@ -637,6 +663,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "market_impact",
             "note": "temporary impact at research size",
             "promotable": false,
@@ -646,6 +673,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "latency_and_partial_fill",
             "note": "adverse selection between the two legs of the hedge",
             "promotable": false,
@@ -655,6 +683,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "collateral_opportunity_cost",
             "note": "margin and spot inventory are immobilised and earn nothing",
             "promotable": false,
@@ -664,6 +693,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "perp_margin_maintenance_drag",
             "note": "buffer capital held against variation margin calls",
             "promotable": false,
@@ -673,6 +703,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "conversion_and_withdrawal",
             "note": "fiat/stable conversion in and out of the position",
             "promotable": false,
@@ -682,6 +713,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "emergency_unwind_reserve",
             "note": "priced allowance for unwinding both legs into a stressed book",
             "promotable": false,
@@ -691,6 +723,7 @@
           },
           {
             "evidence_class": "ASSUMPTION_UNVERIFIED",
+            "leg": "both",
             "name": "cross_venue_transfer",
             "note": "on-chain/internal transfer, confirmation delay and the unhedged window while capital moves between venues",
             "promotable": false,
@@ -700,9 +733,10 @@
           }
         ],
         "multiplier": 1.0,
-        "per_fill_bps": 19.0,
+        "per_fill_bps": 9.0,
         "promotable": false,
-        "round_trip_fraction": 0.0106,
+        "round_trip_bps": 36.0,
+        "round_trip_fraction": 0.0066,
         "venue": "bybit",
         "weakest_evidence_class": "ASSUMPTION_UNVERIFIED"
       },
