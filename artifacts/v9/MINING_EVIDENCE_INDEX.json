@@ -1,0 +1,132 @@
+{
+  "artifact": "MINING_EVIDENCE_INDEX",
+  "blocked_hosts": [
+    {
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "api.bybit.com",
+      "outcome": "BLOCKED_EGRESS_POLICY"
+    },
+    {
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "api.bytick.com",
+      "outcome": "BLOCKED_EGRESS_POLICY"
+    },
+    {
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "api.bybit.nl",
+      "outcome": "BLOCKED_EGRESS_POLICY"
+    },
+    {
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "www.okx.com",
+      "outcome": "BLOCKED_EGRESS_POLICY"
+    },
+    {
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "aws.okx.com",
+      "outcome": "BLOCKED_EGRESS_POLICY"
+    },
+    {
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "my.okx.com",
+      "outcome": "BLOCKED_EGRESS_POLICY"
+    }
+  ],
+  "canary_manifest": {
+    "artifact": "MINING_CANARY_MANIFEST",
+    "aws_alibaba_hashing": "PROHIBITED",
+    "blocking_reasons": [
+      "the marketplace could not be read; no quote exists to price anything from"
+    ],
+    "btc_moved": 0.0,
+    "cloud_hashing_authorized": false,
+    "deposit_authorized": false,
+    "human_steps": [
+      "Review MINING_EVIDENCE_GATE and the shadow journal independently.",
+      "Fund and place any order manually on the venue's own interface.",
+      "This repository has no purchase, deposit or withdrawal code path to enable."
+    ],
+    "manifest_sha256": "03e8ade47b78e9d925eb8c129606e7cbaaa80d2ceeb3c9a450c2ba75955fb2d7",
+    "notes": [
+      "The budget is derived from the venue's minimum order amount, its fees and the pool's payout minimum. No arbitrarily small 'test amount' is assumed to work."
+    ],
+    "orders_placed": 0,
+    "purchase_authorized": false,
+    "requires_human_authorisation": true,
+    "schema_version": 1,
+    "status": "BLOCKED_EVIDENCE",
+    "terms": {
+      "budget_derivation": {
+        "binding_constraint": "marketplace_min_order_amount",
+        "derivation": "min order amount + fixed order fee + deposit fee + withdrawal fee + buyer fee on spend, raised to the pool payout minimum when that binds; no arbitrary 'small test amount' is assumed to work",
+        "fee_floor_btc": 9e-05,
+        "max_budget_btc": 0.00109,
+        "spend_floor_btc": 0.001
+      },
+      "future_api_key_requirements": [
+        "read-only plus order placement; withdrawal permission must be absent",
+        "IP-restricted to the operator's own host",
+        "held by the operator, never sent to or stored in this repository"
+      ],
+      "max_budget_btc": 0.00109,
+      "max_budget_usd": 65.4,
+      "max_duration_hours": 24.0,
+      "max_loss_btc": 0.00109,
+      "orders": 1,
+      "pool_name": "<operator's own pool account>",
+      "price_ceiling_btc": 0.001,
+      "price_chasing_authorized": false,
+      "refill_authorized": false,
+      "speed_limit": 1.0,
+      "stop_conditions": [
+        "cancel if the delivered ratio stays below the modelled ratio for two consecutive accounting intervals",
+        "cancel if the market price rises above the price ceiling",
+        "cancel if the modelled margin over holding BTC disappears",
+        "cancel if the pool stops reporting accepted hashrate",
+        "never reprice upward to stay in the book"
+      ],
+      "worker": "<operator's own worker>"
+    },
+    "wallet_signing_authorized": false,
+    "withdrawal_authorized": false
+  },
+  "ceiling_rule": "without parsed pool payout records the route cannot exceed SHADOW_MARKET_ONLY, whatever the marketplace arithmetic says",
+  "deposit_authorized": false,
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "gates": {
+    "forbid_assumption_class_inputs": true,
+    "forbid_injected_wall_clock": true,
+    "max_evidence_age_seconds": 21600.0,
+    "min_shadow_days": 14.0,
+    "min_shadow_snapshots": 2000,
+    "require_beats_holding_btc": true,
+    "require_beats_holding_cash": true,
+    "require_payout_above_minimum": true,
+    "require_pool_payout_evidence": true,
+    "require_quote_economics_agreement": true
+  },
+  "market_quotes": 0,
+  "marketplace_blocked": true,
+  "note": "Marketplace prices are a quote; pool payouts are the product. Without the second, the route cannot exceed SHADOW_MARKET_ONLY however attractive the arithmetic looks.",
+  "permitted_states": [
+    "BLOCKED_EVIDENCE",
+    "SHADOW_MARKET_ONLY",
+    "SHADOW_COLLECTING",
+    "SHADOW_CANDIDATE"
+  ],
+  "pool_adapter_attached": false,
+  "pool_observed_days": 0.0,
+  "pool_paid_records": 0,
+  "pool_payout_records": 0,
+  "purchase_authorized": false,
+  "quote_economics_agree": null,
+  "reasons": [
+    "the marketplace could not be read; no quote exists to price anything from"
+  ],
+  "schema_version": 1,
+  "shadow_days": 0.0,
+  "shadow_snapshots": 0,
+  "stale_evidence": [],
+  "status": "BLOCKED_EVIDENCE",
+  "withdrawal_authorized": false
+}

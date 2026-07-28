@@ -1,0 +1,270 @@
+{
+  "artifact": "REGENERATION_MANIFEST",
+  "artifact_sha256": {
+    "BLOCKERS.json": "22a476136cee4699e8d4f656cf17ef186b6a87a0a1c8d3799153c669f9339037",
+    "CANARY_READINESS_V9.json": "2bc1299ecf0e447b01091c8a3ce434f1336921119df5af382cdf5d38f2a5442e",
+    "DATA_AND_COST_EVIDENCE_INDEX.json": "571fd8f2b55be3edad92750baa3a4fc322581d908bd9abc06740c2ee527dcede",
+    "GLOBAL_TRIAL_LEDGER_SUMMARY.json": "4b6585deb8c8768a207a24c8b115a8675724f78df6eb5686fbb2161230757f22",
+    "H3_LEDGER_RECONCILIATION.json": "cdaad287e6d8f260588e54870c41faec7bbbcc3055e7794cec50dfa3adf1d414",
+    "HOLDOUT_VERDICT.json": "ecc4c06449e9cee35a4314064e2c83aa6d2573e1f2e9c776ba214b963cb83ddb",
+    "MINING_CASHFLOW.json": "4ca302fa7ce9169f0099b69e2e8671d5b42b94a997e7fbbea413ece76698d167",
+    "MINING_EVIDENCE_INDEX.json": "332a7d767342c4a3084886bff93fb9d987e15128671765902bf0f4820af7f009",
+    "MINING_SHADOW_STATUS.json": "6cce4aa4fd9fb034550a719820567620b2f19a603a8f6af85701c265fbed0726",
+    "OOS_CAMPAIGN_RESULTS.json": "5db1c353b1d81b15e1b64d1413f2043c599e260596e69000a42ef0bf51027cfa",
+    "PAPER_DAEMON_STATUS.json": "32ecb39a05d66278f3fa5afc0e9c84a4b751b520c34a1e03c86b2912dfaec137",
+    "PROFIT_CLAIM_GUARD.json": "caa18b0ca4be42b909ac85e12941b6ba9238e39efab285b492c5838eae0b3dca",
+    "SMALL_CAPITAL_FEASIBILITY.json": "94df139b35436cab3d4387ba842105540e09867c364a37a3ee01ef84381f5e58",
+    "UNIT_CONVERSION_AUDIT.json": "5d0c484ee5e01e2a1f4d140e651dcc1c8d630ef0a9c75cb274fbc4a2b64fc07a"
+  },
+  "base_sha": "3818c2d127a17ae26e86b3c75087d04f88681048",
+  "determinism": "Fixed evaluation clock, seeded resampling, no wall-clock reads, and no artifact read back from this generator's own output. The network probe and any captured buy/info are INPUTS under .recorded.json names. Regenerating on the same inputs is byte-identical.",
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evidence_root": "data/v9_evidence",
+  "mining_state": "BLOCKED_EVIDENCE",
+  "preregistration": {
+    "artifact": "V9_PREREGISTRATION",
+    "cost_treatment": {
+      "components": [
+        "spot taker fee",
+        "perp taker fee",
+        "spread cost",
+        "slippage",
+        "borrow or margin funding",
+        "transfer and withdrawal frictions"
+      ],
+      "fee_floor_applied_per_fill": true,
+      "fills_per_round_trip": {
+        "single_leg": 2,
+        "two_leg": 4
+      },
+      "multipliers": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "note": "V8 charged the sum of all per-fill frictions four times, applying the spot fee to perp fills; the leg field fixes the attribution.",
+      "per_leg_attribution": true
+    },
+    "data_splits": {
+      "holdout_fraction": 0.2,
+      "holdout_position": "most_recent",
+      "scheme": "chronological",
+      "selection_rule": "each window selects on data ending at test_start - purge - embargo and is scored on the test block only; the holdout is sealed before any evaluation and revealed once",
+      "train_fraction": 0.5,
+      "walk_forward": {
+        "embargo_bars": 1,
+        "purge_bars": 6,
+        "step_size": 240,
+        "test_size": 240,
+        "train_size": 720
+      },
+      "walk_forward_fraction": 0.3
+    },
+    "falsifiers": [
+      {
+        "falsifiers": [
+          "realised funding net of the full cost stack is below break-even in the majority of walk-forward windows",
+          "the holdout return is negative",
+          "any window liquidates",
+          "the edge does not survive 2x costs"
+        ],
+        "hypothesis_id": "H1"
+      },
+      {
+        "falsifiers": [
+          "the basis premium does not exceed the round-trip cost at any horizon",
+          "the holdout return is negative",
+          "capacity at the minimum venue is below the executable minimum"
+        ],
+        "hypothesis_id": "H2"
+      },
+      {
+        "falsifiers": [
+          "equity-derived returns are negative once both venues' fees and margin are charged",
+          "min(Bybit, OKX) capacity cannot support the minimum executable size",
+          "the flow reconciliation does not balance"
+        ],
+        "hypothesis_id": "H3"
+      },
+      {
+        "falsifiers": [
+          "no pool payout record shows coins received for accepted hashrate",
+          "the realised payout rate is below the modelled rate",
+          "the campaign does not beat holding BTC",
+          "the campaign does not beat holding cash"
+        ],
+        "hypothesis_id": "MINING"
+      }
+    ],
+    "gates_relaxed_from_v8": [],
+    "mining_gates": {
+      "forbid_assumption_class_inputs": true,
+      "forbid_injected_wall_clock": true,
+      "max_evidence_age_seconds": 21600.0,
+      "min_shadow_days": 14.0,
+      "min_shadow_snapshots": 2000,
+      "require_beats_holding_btc": true,
+      "require_beats_holding_cash": true,
+      "require_payout_above_minimum": true,
+      "require_pool_payout_evidence": true,
+      "require_quote_economics_agreement": true
+    },
+    "note": "No V8 gate was relaxed. Ten were added, each closing a hole a V8 artifact went through.",
+    "promotion_gates": {
+      "forbid_caller_supplied_pnl": true,
+      "forbid_injected_wall_clock": true,
+      "max_cscv_pbo": 0.5,
+      "min_deflated_sharpe": 0.95,
+      "min_probabilistic_sharpe": 0.95,
+      "min_span_days": 730.0,
+      "min_unique_settlements": 1000,
+      "min_walk_forward_windows": 5,
+      "report_3x_costs": true,
+      "require_beats_buy_and_hold": true,
+      "require_beats_cash": true,
+      "require_bootstrap_p05_positive": true,
+      "require_equity_derived_returns": true,
+      "require_executable_at_capital": true,
+      "require_hash_chained_trial_ledger": true,
+      "require_majority_positive_walk_forward": true,
+      "require_nonzero_cross_trial_sharpe_variance": true,
+      "require_observed_at_timestamps": true,
+      "require_per_venue_cost_bundles": true,
+      "require_per_window_oos_selection": true,
+      "require_positive_at_2x_costs": true,
+      "require_positive_holdout": true,
+      "require_promotable_cost_evidence": true,
+      "require_real_provenance": true,
+      "require_reconciled_ledger": true,
+      "require_untouched_holdout": true,
+      "require_zero_liquidations": true
+    },
+    "registered_at_commit": "3818c2d127a17ae26e86b3c75087d04f88681048",
+    "registered_at_utc": "2026-07-28T14:00:00Z",
+    "schema_version": 1,
+    "v8_errata": [
+      {
+        "artifact": "CANARY_READINESS.json",
+        "correction": "every limit must be present, numeric, positive and ordered per_trade <= daily <= total; reconciliation must be exactly True; an engaged kill switch disqualifies",
+        "defect": "the gate failed open: a missing value counted as satisfied, a bool passed the numeric check, and the three loss limits were never compared to each other, so reconciled=false with an engaged kill switch and limits of {-1, 0, 'bad'} still returned ready",
+        "erratum_id": "E1",
+        "magnitude": "a readiness verdict that was structurally unreachable became reachable",
+        "v8_claim": "READY_PENDING_HUMAN_AUTHORISATION",
+        "v9_module": "quant_trade.v9.canary"
+      },
+      {
+        "artifact": "PAPER_STATUS.json",
+        "correction": "a fill must resolve to a live order; equity is derived from the position ledger and cannot be passed in",
+        "defect": "a paper_fill could be booked with no matching paper_order, and the caller supplied the resulting return directly",
+        "erratum_id": "E2",
+        "magnitude": "paper P&L was an input, not a measurement",
+        "v8_claim": "paper fills and equity as reported",
+        "v9_module": "quant_trade.v9.paper_engine"
+      },
+      {
+        "artifact": "revenue-run output",
+        "correction": "CANDIDATE_READY_PAPER_NOT_STARTED",
+        "defect": "a candidate that existed was reported as absent",
+        "erratum_id": "E3",
+        "magnitude": "the difference between 'nothing qualified' and 'we have not started'",
+        "v8_claim": "PAPER_STATUS=NOT_STARTED_NO_CANDIDATE with H1 a candidate",
+        "v9_module": "quant_trade.v9.candidate_bridge"
+      },
+      {
+        "artifact": "TRADING_LEADERBOARD.json",
+        "correction": "DSR takes the real cross-trial Sharpe variance and trial count from a mandatory hash-chained ledger; a null or empty ledger raises",
+        "defect": "the deflated Sharpe was computed with sharpe_variance=0 and a trial count of one, which makes the deflation term vanish; the reported DSR was the PSR under another name",
+        "erratum_id": "E4",
+        "magnitude": "at a fixed candidate Sharpe: DSR 0.9996 at 1 trial, 0.7527 at 5, 0.1867 at 20, 0.0110 at 100 — V8 always reported the 1-trial figure",
+        "v8_claim": "deflated Sharpe reported alongside PSR",
+        "v9_module": "quant_trade.v9.trial_ledger"
+      },
+      {
+        "artifact": "REAL_TRADING_CAMPAIGNS.json",
+        "correction": "each window selects on strictly prior data ending at test_start - purge - embargo and is scored on the test block only",
+        "defect": "variant selection ran on the full sample, then reported performance on windows drawn from that same sample; the OOS series had been seen at selection time",
+        "erratum_id": "E5",
+        "magnitude": "the previously reported OOS series was in-sample",
+        "v8_claim": "walk-forward out-of-sample results",
+        "v9_module": "quant_trade.v9.oos"
+      },
+      {
+        "artifact": "REAL_TRADING_CAMPAIGNS.json (H3)",
+        "correction": "a per-venue book with cash, margin posted, positions and capital in transit; each bar's return is equity_t/equity_{t-1} - 1 with a flow reconciliation that must balance, and capacity is min(Bybit, OKX)",
+        "defect": "summing leg returns assumes both legs are the same size and that margin and in-transit capital are free",
+        "erratum_id": "E6",
+        "magnitude": "returns and capacity were both overstated by an unquantified amount",
+        "v8_claim": "dispersion returns as the sum of per-leg percentage moves",
+        "v9_module": "quant_trade.v9.h3_ledger"
+      },
+      {
+        "artifact": "COST_MODEL / campaign inputs",
+        "correction": "CostEvidenceBundle carries raw bytes, sha256, effective window and an evidence class; a REAL class without bytes is rejected and two venues sharing one bundle is detected",
+        "defect": "costs were literals with no provenance, no expiry and no venue binding, so one venue's schedule could be applied to another",
+        "erratum_id": "E7",
+        "magnitude": "cost inputs were unfalsifiable",
+        "v8_claim": "fee constants applied per venue",
+        "v9_module": "quant_trade.v9.cost_evidence"
+      },
+      {
+        "artifact": "CAPITAL / paper launch",
+        "correction": "a feasibility curve from $100 to $10,000 that finds the largest position each balance can actually place, or returns INSUFFICIENT_EXECUTABLE_CAPITAL and names the binding constraint",
+        "defect": "that figure was the capital a $100k reference position happened to immobilise, presented as a floor",
+        "erratum_id": "E8",
+        "magnitude": "the executable floor under the modelled venue rules is $75, not $166,667 — three orders of magnitude. Below it the 0.001 BTC lot step binds, not capital. At $75-$100 a $0.10 per-fill floor raises break-even funding to 0.0000741 per 8h against 0.0000489 at every larger rung: a 52% penalty invisible in a bps-only cost model",
+        "v8_claim": "$166,667 minimum capital",
+        "v9_module": "quant_trade.v9.small_capital"
+      },
+      {
+        "artifact": "MINING_MARKETPLACE_SCAN.json",
+        "correction": "public/buy/info is the unit authority, the limit is documented as a request rather than supply, and the fill ratio comes from the bid's position in the order book",
+        "defect": "SHA-256 is quoted in BTC per PH/s per day; converting without the unit multiplier misprices hashrate by 1,000x, min/max speed limit was read as available supply, and a bid was assumed to fill",
+        "erratum_id": "E9",
+        "magnitude": "a factor of 1,000 on the cost of hashrate",
+        "v8_claim": "hashrate priced as units x price x days in USD",
+        "v9_module": "quant_trade.v9.mining_units"
+      },
+      {
+        "artifact": "MINING_CASHFLOW",
+        "correction": "sixteen corrections listed in mining_cashflow.B4_CORRECTIONS, each with its own test; the ledger is BTC with USD as a parallel view",
+        "defect": "spend did not follow delivery, the buyer fee was applied to deposited rather than spent funds, the fixed order fee and deposit fee were absent, unspent budget was consumed rather than refunded, balances reset per order, and the ledger was USD",
+        "erratum_id": "E10",
+        "magnitude": "every fee and the currency of the whole calculation",
+        "v8_claim": "a USD purchase with a single buyer fee",
+        "v9_module": "quant_trade.v9.mining_cashflow"
+      },
+      {
+        "artifact": "all campaign artifacts",
+        "correction": "NOT_MEASURED, with an operator runbook and a verifying import path",
+        "defect": "no campaign was ever measured — egress to every venue was refused — so 'no edge' asserted a result that had not been obtained",
+        "erratum_id": "E11",
+        "magnitude": "a claim about the market replaced by a claim about the data",
+        "v8_claim": "NO_EDGE_FOUND",
+        "v9_module": "quant_trade.v9.acquisition"
+      }
+    ]
+  },
+  "preregistration_hash": "c62076bd4c08ef6e5f1158178845621405065719f83c98354db43b15c7eb0a4d",
+  "regeneration_command": "python -m quant_trade.v9.artifacts --source-commit-sha <sha>",
+  "safety": {
+    "aws_alibaba_hashing": "PROHIBITED",
+    "cloud_resource_creation": "DISABLED",
+    "cloud_resources_created": 0,
+    "deposit_execution": "DISABLED",
+    "external_spend": "DISABLED",
+    "funds_moved_usd": 0.0,
+    "hashrate_purchased": 0,
+    "live_broker_execution": "DISABLED",
+    "live_order_submission": "DISABLED",
+    "mining_purchase_execution": "DISABLED",
+    "orders_submitted": 0,
+    "secrets_requested": 0,
+    "secrets_stored": 0,
+    "wallet_signing": "DISABLED",
+    "withdrawal_execution": "DISABLED"
+  },
+  "schema_version": 1,
+  "source_commit_sha": "73844a095a45cc366fee16db81a407776b79faed",
+  "trading_state": "NOT_MEASURED",
+  "v8_errata_count": 11
+}

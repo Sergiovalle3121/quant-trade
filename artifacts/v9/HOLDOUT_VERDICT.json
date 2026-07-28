@@ -1,0 +1,17 @@
+{
+  "artifact": "HOLDOUT_VERDICT",
+  "contract": [
+    "the holdout is the most recent 20% and is sealed by hash before any evaluation touches it",
+    "it may be revealed exactly once, and the reveal is recorded",
+    "a negative holdout rejects: full-sample performance never rescues it",
+    "selection never reads it, in any window"
+  ],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "preregistration_hash": "c62076bd4c08ef6e5f1158178845621405065719f83c98354db43b15c7eb0a4d",
+  "reason": "there is no series to split, so no holdout has been sealed and none has been revealed",
+  "revealed": false,
+  "reveals_used": 0,
+  "schema_version": 1,
+  "sealed": false,
+  "state": "NOT_MEASURED"
+}

@@ -1,0 +1,54 @@
+{
+  "artifact": "PROFIT_CLAIM_GUARD",
+  "banned_patterns": [
+    "\\bprofitable\\b",
+    "\\bprofitability proven\\b",
+    "\\brevenue[- ]producing\\b",
+    "\\bgenerates? (?:money|income|revenue|profit)\\b",
+    "\\bmakes? money\\b",
+    "\\bguaranteed returns?\\b",
+    "\\brisk[- ]free\\b",
+    "\\bwill earn\\b",
+    "\\bis earning\\b"
+  ],
+  "clean": true,
+  "contexts_checked": [
+    "fixture",
+    "in_sample_backtest",
+    "incomplete_paper",
+    "mining_without_payout",
+    "monte_carlo",
+    "negative_holdout",
+    "synthetic",
+    "unsettled_pnl"
+  ],
+  "findings": [],
+  "note": "A profit claim is only supportable by realized money reconciled against external balances. No V9 artifact carries that evidence, so every match is a finding regardless of intent.",
+  "realized_profit_state_present": false,
+  "scanned_sources": [
+    "BLOCKERS.json",
+    "CANARY_READINESS_V9.json",
+    "DATA_AND_COST_EVIDENCE_INDEX.json",
+    "GLOBAL_TRIAL_LEDGER_SUMMARY.json",
+    "H3_LEDGER_RECONCILIATION.json",
+    "HOLDOUT_VERDICT.json",
+    "MINING_CASHFLOW.json",
+    "MINING_EVIDENCE_INDEX.json",
+    "MINING_SHADOW_STATUS.json",
+    "OOS_CAMPAIGN_RESULTS.json",
+    "PAPER_DAEMON_STATUS.json",
+    "SMALL_CAPITAL_FEASIBILITY.json",
+    "UNIT_CONVERSION_AUDIT.json"
+  ],
+  "schema_version": 1,
+  "unsupportable_contexts": [
+    "fixture",
+    "synthetic",
+    "in_sample_backtest",
+    "negative_holdout",
+    "incomplete_paper",
+    "unsettled_pnl",
+    "mining_without_payout",
+    "monte_carlo"
+  ]
+}

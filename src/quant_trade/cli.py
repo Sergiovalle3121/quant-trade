@@ -33,6 +33,7 @@ from quant_trade.research.runner import run_experiment
 from quant_trade.research.walk_forward import run_walk_forward
 from quant_trade.strategies import STRATEGY_REGISTRY, get_strategy
 from quant_trade.v8.cli import v8_app
+from quant_trade.v9.cli import v9_app
 
 app = typer.Typer(help="Research-only quantitative trading tooling.")
 data_app = typer.Typer(help="Historical data ingestion and validation.")
@@ -56,6 +57,7 @@ app.add_typer(cloud_rental_app, name="cloud-rental")
 app.add_typer(opportunities_app, name="opportunities")
 app.add_typer(stress_app, name="stress")
 app.add_typer(v8_app, name="v8")
+app.add_typer(v9_app, name="v9")
 console = Console()
 
 

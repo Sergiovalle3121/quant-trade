@@ -1,0 +1,28 @@
+{
+  "artifact": "PAPER_DAEMON_STATUS",
+  "clock_source": null,
+  "commands": [
+    "quant-trade v9 paper-start --state-dir <dir> --manifest <manifest.json>",
+    "quant-trade v9 paper-run --state-dir <dir> --ticks <ticks.jsonl>",
+    "quant-trade v9 paper-status --state-dir <dir>",
+    "quant-trade v9 paper-resume --state-dir <dir>",
+    "quant-trade v9 paper-stop --state-dir <dir>",
+    "quant-trade v9 paper-report --state-dir <dir>"
+  ],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "events_processed": 0,
+  "guarantees": [
+    "equity is derived from the position ledger; a caller cannot supply a return, a P&L or a cash yield",
+    "runtime accumulates from timestamps persisted at each advance; an injected clock marks the session unpromotable forever",
+    "the journal is appended before the checkpoint moves, so a crash between the two replays to the same state",
+    "one writer at a time, enforced by a lease token"
+  ],
+  "live_order_submission": "DISABLED",
+  "orders_submitted_live": 0,
+  "reason": "no campaign reached BACKTEST_CANDIDATE, because no campaign was measured; a session started here would produce an equity curve that means nothing",
+  "schema_version": 1,
+  "sessions": 0,
+  "state": "NOT_MEASURED",
+  "status": "NOT_STARTED_NO_CANDIDATE",
+  "wall_clock_seconds": 0.0
+}

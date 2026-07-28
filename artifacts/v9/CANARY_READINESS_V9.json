@@ -1,0 +1,136 @@
+{
+  "all_problems": [
+    "paper session is NOT_STARTED_NO_CANDIDATE, not PAPER_RUNNING",
+    "0.00h of wall-clock runtime < required 72.0h",
+    "0 events < required 500",
+    "the session's wall clock is not derived from persisted, verifiable time; a caller-supplied duration cannot support a canary",
+    "no reconciliation on record",
+    "owner budget is NoneType, not a number",
+    "exchange and jurisdiction are not confirmed (got False; only True counts)",
+    "loss limits must be an object, got NoneType",
+    "no confirmed secure credential delivery mechanism (got False; only True counts)"
+  ],
+  "artifact": "CANARY_READINESS_V9",
+  "blocking_conditions": [
+    "paper_result_sufficient",
+    "reconciliation_clean",
+    "owner_budget_explicit",
+    "exchange_and_jurisdiction_confirmed",
+    "loss_limits_configured",
+    "credentials_delivery_secure"
+  ],
+  "canary_authorized": false,
+  "conditions": [
+    {
+      "condition_id": "paper_result_sufficient",
+      "description": "A supervised paper session has run long enough on verifiable wall-clock time, without a tripped breaker or a liquidation.",
+      "kind": "MACHINE_CHECKABLE",
+      "observed": {
+        "clock_is_persisted": null,
+        "events_processed": 0,
+        "kill_switch_engaged": null,
+        "liquidations": null,
+        "session_status": "NOT_STARTED_NO_CANDIDATE",
+        "wall_clock_hours": 0.0
+      },
+      "problems": [
+        "paper session is NOT_STARTED_NO_CANDIDATE, not PAPER_RUNNING",
+        "0.00h of wall-clock runtime < required 72.0h",
+        "0 events < required 500",
+        "the session's wall clock is not derived from persisted, verifiable time; a caller-supplied duration cannot support a canary"
+      ],
+      "required": {
+        "clock_is_persisted": true,
+        "events_processed": 500,
+        "kill_switch_engaged": false,
+        "liquidations": 0,
+        "session_status": "PAPER_RUNNING",
+        "wall_clock_hours": 72.0
+      },
+      "satisfied": false
+    },
+    {
+      "condition_id": "reconciliation_clean",
+      "description": "The paper session reconciles exactly, with zero problems.",
+      "kind": "MACHINE_CHECKABLE",
+      "observed": "no reconciliation on record",
+      "problems": [
+        "no reconciliation on record"
+      ],
+      "required": {
+        "problems": [],
+        "reconciled": true
+      },
+      "satisfied": false
+    },
+    {
+      "condition_id": "owner_budget_explicit",
+      "description": "The owner has stated explicitly how much money may be at risk.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": null,
+      "problems": [
+        "owner budget is NoneType, not a number"
+      ],
+      "required": "a finite amount strictly greater than zero",
+      "satisfied": false
+    },
+    {
+      "condition_id": "exchange_and_jurisdiction_confirmed",
+      "description": "The venue and its legal jurisdiction are confirmed by a human.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": false,
+      "problems": [
+        "exchange and jurisdiction are not confirmed (got False; only True counts)"
+      ],
+      "required": true,
+      "satisfied": false
+    },
+    {
+      "condition_id": "loss_limits_configured",
+      "description": "Per-trade, daily and total loss limits are present, numeric, strictly positive and mutually consistent.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": null,
+      "problems": [
+        "loss limits must be an object, got NoneType"
+      ],
+      "required": {
+        "daily": ">= per_trade",
+        "per_trade": "> 0",
+        "total": ">= daily"
+      },
+      "satisfied": false
+    },
+    {
+      "condition_id": "credentials_delivery_secure",
+      "description": "A secure mechanism exists for delivering venue credentials directly to the execution host. No key, seed phrase or wallet is ever requested, printed or stored by this tooling.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": false,
+      "problems": [
+        "no confirmed secure credential delivery mechanism (got False; only True counts)"
+      ],
+      "required": true,
+      "satisfied": false
+    }
+  ],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "notes": [
+    "Every condition fails closed: a value must be positively verified to count, and an unparseable input is a failure rather than a skipped check.",
+    "Clearing all six still does not authorise real money. It means a human may now make that decision deliberately.",
+    "30 days of paper is the recommended standard for stronger economic evidence; the 72h floor is a minimum, not a target, and neither may be simulated or accelerated."
+  ],
+  "real_money_authorized": false,
+  "safety": {
+    "cloud_resource_creation": "DISABLED",
+    "deposit_execution": "DISABLED",
+    "external_spend": "DISABLED",
+    "live_broker_execution": "DISABLED",
+    "live_order_submission": "DISABLED",
+    "mining_purchase_execution": "DISABLED",
+    "no_credentials_requested_or_stored": true,
+    "wallet_signing": "DISABLED",
+    "withdrawal_execution": "DISABLED"
+  },
+  "schema_version": 2,
+  "status": "BLOCKED",
+  "unblocked": false
+}
