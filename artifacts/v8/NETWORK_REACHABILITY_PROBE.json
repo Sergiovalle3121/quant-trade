@@ -1,0 +1,79 @@
+{
+  "any_reachable": false,
+  "artifact": "V8_NETWORK_REACHABILITY_PROBE",
+  "attempted_at_utc": "2026-07-28T06:12:09Z",
+  "blocked_venues": [
+    "bybit",
+    "okx"
+  ],
+  "policy": "Only venue-published official domains are attempted. Proxies, VPN exits, mirrors and third-party redistributors are never used to route around a regional or organisational restriction.",
+  "probes": [
+    {
+      "attempted_at_utc": "2026-07-28T06:12:09Z",
+      "elapsed_ms": 608,
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "api.bybit.com",
+      "http_status": null,
+      "outcome": "BLOCKED_EGRESS_POLICY",
+      "role": "primary documented API domain",
+      "url": "https://api.bybit.com/v5/market/time",
+      "venue": "bybit"
+    },
+    {
+      "attempted_at_utc": "2026-07-28T06:12:09Z",
+      "elapsed_ms": 412,
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "api.bytick.com",
+      "http_status": null,
+      "outcome": "BLOCKED_EGRESS_POLICY",
+      "role": "venue-published alternative domain",
+      "url": "https://api.bytick.com/v5/market/time",
+      "venue": "bybit"
+    },
+    {
+      "attempted_at_utc": "2026-07-28T06:12:09Z",
+      "elapsed_ms": 390,
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "api.bybit.nl",
+      "http_status": null,
+      "outcome": "BLOCKED_EGRESS_POLICY",
+      "role": "venue-published Netherlands entity domain",
+      "url": "https://api.bybit.nl/v5/market/time",
+      "venue": "bybit"
+    },
+    {
+      "attempted_at_utc": "2026-07-28T06:12:09Z",
+      "elapsed_ms": 394,
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "www.okx.com",
+      "http_status": null,
+      "outcome": "BLOCKED_EGRESS_POLICY",
+      "role": "primary documented API domain",
+      "url": "https://www.okx.com/api/v5/public/time",
+      "venue": "okx"
+    },
+    {
+      "attempted_at_utc": "2026-07-28T06:12:09Z",
+      "elapsed_ms": 391,
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "aws.okx.com",
+      "http_status": null,
+      "outcome": "BLOCKED_EGRESS_POLICY",
+      "role": "venue-published alternative API domain",
+      "url": "https://aws.okx.com/api/v5/public/time",
+      "venue": "okx"
+    },
+    {
+      "attempted_at_utc": "2026-07-28T06:12:09Z",
+      "elapsed_ms": 388,
+      "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+      "host": "my.okx.com",
+      "http_status": null,
+      "outcome": "BLOCKED_EGRESS_POLICY",
+      "role": "venue-published regional app domain",
+      "url": "https://my.okx.com/api/v5/public/time",
+      "venue": "okx"
+    }
+  ],
+  "reachable_venues": []
+}

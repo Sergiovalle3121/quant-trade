@@ -233,6 +233,21 @@ def rebuild_normalized_rows(record: dict[str, Any], raw: bytes) -> list[dict[str
         from quant_trade.carry.panel import parse_bybit_kline_page
 
         return parse_bybit_kline_page(raw, symbol=symbol, kind=kind)
+    if adapter.startswith("v8.backfill."):
+        # v8.backfill.<venue>.<kind>. The V8 parsers are pure and identify the
+        # instrument from the receipt's own request parameters, so a rebuild
+        # never has to guess what was requested.
+        from quant_trade.v8.venues import parse_instruments, series_spec
+
+        _, _, venue, kind = adapter.split(".", 3)
+        instrument = str(params.get("instrument", "")) or symbol
+        if not instrument:
+            raise ValueError("v8 receipt is missing its instrument identity")
+        if kind == "instruments":
+            return parse_instruments(venue, raw, symbol=instrument)
+        if kind == "server_time":
+            return []
+        return series_spec(venue, kind).parse(raw, symbol=instrument, kind=kind)
     raise ValueError(f"unsupported receipt adapter {adapter!r}")
 
 

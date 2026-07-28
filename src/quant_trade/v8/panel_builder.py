@@ -60,9 +60,16 @@ def build_panel_from_evidence(
     provenance: str = "real",
     panel_dir: str | Path | None = None,
 ) -> PanelBuildResult:
-    """Join the backfilled series into a panel and write it with its audit."""
+    """Join the backfilled series into a panel and write it with its audit.
+
+    The panel lands in the evidence directory itself by default, next to
+    ``receipts.jsonl`` and ``raw/``. That is not incidental: V7's
+    ``verify_panel_bundle`` resolves a panel's provenance from the receipts
+    sitting beside it, so a panel written anywhere else would verify as
+    ``unverified_legacy`` and could never promote.
+    """
     root = Path(evidence_dir)
-    out = Path(panel_dir) if panel_dir is not None else root / "panel"
+    out = Path(panel_dir) if panel_dir is not None else root
     result = PanelBuildResult(status="OK", venue=venue, symbol=symbol.upper(), panel_dir=str(out))
     series = {kind: _read_series(root, kind) for kind in ("spot", "perp", "mark", "index")}
     settlements_raw = _read_series(root, "funding")
