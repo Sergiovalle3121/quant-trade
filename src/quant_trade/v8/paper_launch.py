@@ -130,7 +130,7 @@ def build_paper_candidate_manifest(
         raise ValueError("capital_usd must be > 0")
 
     selected = campaign.holdout.get("selected")
-    parameters = next(
+    parameters: dict[str, Any] = next(
         (v["parameters"] for v in campaign.variants_evaluated if v.get("variant_id") == selected),
         {},
     )

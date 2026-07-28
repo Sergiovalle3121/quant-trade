@@ -1,0 +1,81 @@
+{
+  "allocation": {
+    "cash_weight": 1.0,
+    "non_cash_weight": 0.0,
+    "paper_only": true,
+    "real_money_authorized": false
+  },
+  "artifact": "UNIFIED_OPPORTUNITY_BOARD",
+  "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "note": "Cash holds the entire allocation whenever no opportunity has cleared its gates. An unmeasured opportunity receives zero weight; it is not treated as a small positive.",
+  "rows": [
+    {
+      "allocation_weight": 0.0,
+      "blocking_reasons": [
+        "bybit: no panel at data/v8_evidence/bybit_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "capacity_notional_usd": null,
+      "expected_return_over_horizon": null,
+      "horizon_days": null,
+      "kind": "TRADING",
+      "measured": false,
+      "opportunity_id": "trading:H1",
+      "status": "NOT_RUN_NO_EVIDENCE"
+    },
+    {
+      "allocation_weight": 0.0,
+      "blocking_reasons": [
+        "okx: no panel at data/v8_evidence/okx_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "capacity_notional_usd": null,
+      "expected_return_over_horizon": null,
+      "horizon_days": null,
+      "kind": "TRADING",
+      "measured": false,
+      "opportunity_id": "trading:H2",
+      "status": "NOT_RUN_NO_EVIDENCE"
+    },
+    {
+      "allocation_weight": 0.0,
+      "blocking_reasons": [
+        "bybit: no panel at data/v8_evidence/bybit_btc_usdt",
+        "okx: no panel at data/v8_evidence/okx_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "capacity_notional_usd": null,
+      "expected_return_over_horizon": null,
+      "horizon_days": null,
+      "kind": "TRADING",
+      "measured": false,
+      "opportunity_id": "trading:H3",
+      "status": "NOT_RUN_NO_EVIDENCE"
+    },
+    {
+      "allocation_weight": 0.0,
+      "blocking_reasons": [
+        "https://api2.nicehash.com/main/api/v2/public/simplemultialgo/info: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>"
+      ],
+      "capacity_notional_usd": null,
+      "expected_return_over_horizon": null,
+      "horizon_days": null,
+      "kind": "MINING_MARKETPLACE",
+      "measured": false,
+      "opportunity_id": "mining:nicehash",
+      "status": "BLOCKED_NETWORK"
+    },
+    {
+      "allocation_weight": 1.0,
+      "blocking_reasons": [],
+      "capacity_notional_usd": null,
+      "expected_return_over_horizon": 0.04,
+      "horizon_days": 365.0,
+      "kind": "CASH",
+      "measured": true,
+      "opportunity_id": "cash",
+      "status": "AVAILABLE"
+    }
+  ],
+  "schema_version": 1
+}

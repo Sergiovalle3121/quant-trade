@@ -33,6 +33,7 @@ import json
 import shutil
 import tarfile
 import tempfile
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -154,7 +155,7 @@ def _deterministic_tar_gz(members: list[tuple[str, bytes]]) -> bytes:
 
 
 def build_evidence_pack(
-    sources: dict[str, str | Path],
+    sources: Mapping[str, str | Path],
     out_dir: str | Path,
     *,
     pack_id: str,

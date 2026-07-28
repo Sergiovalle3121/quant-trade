@@ -1,0 +1,143 @@
+{
+  "artifact": "NO_EDGE_DIAGNOSIS",
+  "candidates": [
+    {
+      "bootstrap_p05": null,
+      "break_even": {
+        "annual_carrying_fraction": 0.045,
+        "required_annualized_funding_1x": 0.15571666666666664,
+        "required_funding_rate_per_8h_1x": 0.00014220700152207,
+        "required_funding_rate_per_8h_2x": 0.00028441400304414,
+        "required_funding_rate_per_8h_3x": 0.00042662100456621006,
+        "round_trip_cost_fraction": 0.0091
+      },
+      "capacity_notional_usd": null,
+      "cost_components": null,
+      "cscv_pbo": null,
+      "deflated_sharpe": null,
+      "gross_components": null,
+      "gross_return": null,
+      "holdout_net_return": null,
+      "hypothesis_id": "H1",
+      "max_drawdown": null,
+      "measured": false,
+      "minimum_capital_usd": 166666.6666666667,
+      "net_return": null,
+      "net_return_2x_costs": null,
+      "net_return_3x_costs": null,
+      "probabilistic_sharpe": null,
+      "promotion_reasons": [],
+      "rejection_reasons": [
+        "bybit: no panel at data/v8_evidence/bybit_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "sharpe_per_period": null,
+      "status": "NOT_RUN_NO_EVIDENCE",
+      "title": "Bybit BTC spot/perp cash-and-carry",
+      "total_costs": null,
+      "what_would_have_to_change": [
+        "Acquire the dataset. Nothing about this hypothesis has been measured, so no economic change is implied by its current state.",
+        "Once acquired, average settled funding must exceed 0.00014221 per 8h settlement (15.57% annualised) merely to cover frictions at 1x costs."
+      ]
+    },
+    {
+      "bootstrap_p05": null,
+      "break_even": {
+        "annual_carrying_fraction": 0.045,
+        "required_annualized_funding_1x": 0.15328333333333333,
+        "required_funding_rate_per_8h_1x": 0.00013998477929984778,
+        "required_funding_rate_per_8h_2x": 0.00027996955859969555,
+        "required_funding_rate_per_8h_3x": 0.00041995433789954336,
+        "round_trip_cost_fraction": 0.0089
+      },
+      "capacity_notional_usd": null,
+      "cost_components": null,
+      "cscv_pbo": null,
+      "deflated_sharpe": null,
+      "gross_components": null,
+      "gross_return": null,
+      "holdout_net_return": null,
+      "hypothesis_id": "H2",
+      "max_drawdown": null,
+      "measured": false,
+      "minimum_capital_usd": 166666.6666666667,
+      "net_return": null,
+      "net_return_2x_costs": null,
+      "net_return_3x_costs": null,
+      "probabilistic_sharpe": null,
+      "promotion_reasons": [],
+      "rejection_reasons": [
+        "okx: no panel at data/v8_evidence/okx_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "sharpe_per_period": null,
+      "status": "NOT_RUN_NO_EVIDENCE",
+      "title": "OKX BTC spot/swap cash-and-carry on settled realizedRate",
+      "total_costs": null,
+      "what_would_have_to_change": [
+        "Acquire the dataset. Nothing about this hypothesis has been measured, so no economic change is implied by its current state.",
+        "Once acquired, average settled funding must exceed 0.00013998 per 8h settlement (15.33% annualised) merely to cover frictions at 1x costs."
+      ]
+    },
+    {
+      "bootstrap_p05": null,
+      "break_even": {
+        "annual_carrying_fraction": 0.045,
+        "required_annualized_funding_1x": 0.17396666666666666,
+        "required_funding_rate_per_8h_1x": 0.00015887366818873668,
+        "required_funding_rate_per_8h_2x": 0.00031774733637747335,
+        "required_funding_rate_per_8h_3x": 0.00047662100456621003,
+        "round_trip_cost_fraction": 0.0106
+      },
+      "capacity_notional_usd": null,
+      "cost_components": null,
+      "cscv_pbo": null,
+      "deflated_sharpe": null,
+      "gross_components": null,
+      "gross_return": null,
+      "holdout_net_return": null,
+      "hypothesis_id": "H3",
+      "max_drawdown": null,
+      "measured": false,
+      "minimum_capital_usd": 166666.6666666667,
+      "net_return": null,
+      "net_return_2x_costs": null,
+      "net_return_3x_costs": null,
+      "probabilistic_sharpe": null,
+      "promotion_reasons": [],
+      "rejection_reasons": [
+        "bybit: no panel at data/v8_evidence/bybit_btc_usdt",
+        "okx: no panel at data/v8_evidence/okx_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "sharpe_per_period": null,
+      "status": "NOT_RUN_NO_EVIDENCE",
+      "title": "Bybit/OKX BTC funding dispersion, full venue-switching cost",
+      "total_costs": null,
+      "what_would_have_to_change": [
+        "Acquire the dataset. Nothing about this hypothesis has been measured, so no economic change is implied by its current state.",
+        "Once acquired, average settled funding must exceed 0.00015887 per 8h settlement (17.40% annualised) merely to cover frictions at 1x costs."
+      ]
+    }
+  ],
+  "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "interpretation": "A candidate with measured=false has no economic verdict. Its break-even numbers are still exact — they follow from the cost stack and holding period, not from price history — so they define the bar the missing data would have to clear.",
+  "next_preregistered_experiment": {
+    "experiment_id": "V9-E1",
+    "falsifier": "If 730 days of receipt-verified evidence on both venues yields no hypothesis clearing the gates, cash-and-carry on these venues is abandoned as a source of edge at this capital scale.",
+    "frozen_parameters": "unchanged from the V8 pre-registration; freeze hash b21483449a7e1e1917f59458012fd236353d536d5ca19412af4627f86e659678",
+    "preconditions": [
+      "outbound HTTPS to api.bybit.com and www.okx.com permitted by the egress policy, or an operator-supplied evidence pack imported and verified",
+      "venue fee schedules captured from the venue, upgrading the cost stack from ASSUMPTION_UNVERIFIED to REAL"
+    ],
+    "rationale": "H1-H3 were never measured. Registering new hypotheses before the registered ones have been tested would be starting a second search while the first is still open.",
+    "title": "Complete the blocked acquisition, then re-run H1-H3 unchanged"
+  },
+  "preregistration_hash": "b21483449a7e1e1917f59458012fd236353d536d5ca19412af4627f86e659678",
+  "schema_version": 1,
+  "summary": {
+    "measured": 0,
+    "promoted": 0,
+    "unmeasured": 3
+  }
+}

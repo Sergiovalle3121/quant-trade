@@ -1,7 +1,7 @@
 {
   "any_reachable": false,
   "artifact": "V8_NETWORK_REACHABILITY_PROBE",
-  "attempted_at_utc": "2026-07-28T06:12:09Z",
+  "attempted_at_utc": "2026-07-28T06:54:02Z",
   "blocked_venues": [
     "bybit",
     "okx"
@@ -9,8 +9,8 @@
   "policy": "Only venue-published official domains are attempted. Proxies, VPN exits, mirrors and third-party redistributors are never used to route around a regional or organisational restriction.",
   "probes": [
     {
-      "attempted_at_utc": "2026-07-28T06:12:09Z",
-      "elapsed_ms": 608,
+      "attempted_at_utc": "2026-07-28T06:54:02Z",
+      "elapsed_ms": 401,
       "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
       "host": "api.bybit.com",
       "http_status": null,
@@ -20,8 +20,8 @@
       "venue": "bybit"
     },
     {
-      "attempted_at_utc": "2026-07-28T06:12:09Z",
-      "elapsed_ms": 412,
+      "attempted_at_utc": "2026-07-28T06:54:02Z",
+      "elapsed_ms": 356,
       "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
       "host": "api.bytick.com",
       "http_status": null,
@@ -31,8 +31,8 @@
       "venue": "bybit"
     },
     {
-      "attempted_at_utc": "2026-07-28T06:12:09Z",
-      "elapsed_ms": 390,
+      "attempted_at_utc": "2026-07-28T06:54:02Z",
+      "elapsed_ms": 353,
       "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
       "host": "api.bybit.nl",
       "http_status": null,
@@ -42,8 +42,8 @@
       "venue": "bybit"
     },
     {
-      "attempted_at_utc": "2026-07-28T06:12:09Z",
-      "elapsed_ms": 394,
+      "attempted_at_utc": "2026-07-28T06:54:02Z",
+      "elapsed_ms": 442,
       "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
       "host": "www.okx.com",
       "http_status": null,
@@ -53,8 +53,8 @@
       "venue": "okx"
     },
     {
-      "attempted_at_utc": "2026-07-28T06:12:09Z",
-      "elapsed_ms": 391,
+      "attempted_at_utc": "2026-07-28T06:54:02Z",
+      "elapsed_ms": 333,
       "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
       "host": "aws.okx.com",
       "http_status": null,
@@ -64,8 +64,8 @@
       "venue": "okx"
     },
     {
-      "attempted_at_utc": "2026-07-28T06:12:09Z",
-      "elapsed_ms": 388,
+      "attempted_at_utc": "2026-07-28T06:54:02Z",
+      "elapsed_ms": 373,
       "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
       "host": "my.okx.com",
       "http_status": null,

@@ -158,8 +158,8 @@ def test_canary_artifact_never_authorises_real_money() -> None:
 
 
 def test_backfill_sends_no_authentication_headers() -> None:
-    from quant_trade.v8.backfill import USER_AGENT
     import quant_trade.v8.backfill as backfill
+    from quant_trade.v8.backfill import USER_AGENT
 
     source = Path(inspect.getfile(backfill)).read_text(encoding="utf-8")
     assert "Authorization" not in source

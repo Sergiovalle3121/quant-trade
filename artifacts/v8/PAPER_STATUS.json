@@ -1,0 +1,37 @@
+{
+  "artifact": "PAPER_STATUS",
+  "candidate_id": "",
+  "clock": "wall_clock",
+  "drawdown": 0.0,
+  "duration_note": "wall-clock 0.0s; simulated span 0.00d. These are different clocks and are never summed.",
+  "equity_usd": 0.0,
+  "events_processed": 0,
+  "heartbeat_at_utc": "",
+  "last_event_at_utc": "",
+  "manifest_sha256": "",
+  "notes": [
+    "no paper session was started; a session on an unvalidated hypothesis would produce an equity curve that means nothing",
+    "the portfolio therefore remains 100% cash"
+  ],
+  "paper_fills": 0,
+  "paper_orders": 0,
+  "reason": "no hypothesis reached PAPER_CANDIDATE; H1=NOT_RUN_NO_EVIDENCE; H2=NOT_RUN_NO_EVIDENCE; H3=NOT_RUN_NO_EVIDENCE",
+  "reconciliation": {},
+  "resume_command": "",
+  "safety": {
+    "credentials_required": false,
+    "deposits_enabled": false,
+    "order_routing_enabled": false,
+    "real_money_authorized": false,
+    "venue_connectivity": "market_data_read_only",
+    "withdrawals_enabled": false
+  },
+  "schema_version": 1,
+  "session_id": "",
+  "signals_emitted": 0,
+  "simulated_span_days": 0.0,
+  "started_at_utc": "",
+  "state_dir": "",
+  "status": "NOT_STARTED_NO_CANDIDATE",
+  "wall_clock_seconds": 0.0
+}
