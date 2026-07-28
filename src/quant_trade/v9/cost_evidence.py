@@ -345,38 +345,37 @@ def assumption_bundle(venue: str, *, captured_at_utc: str) -> CostEvidenceBundle
     class and therefore cannot promote anything.
     """
     perp_taker = {"bybit": 5.5, "okx": 5.0}[venue]
-    common = {
-        "fee_tier": "published_retail",
-        "currency": "USDT",
-        "minimum_fee": 0.0,
-        "effective_from_utc": "2020-01-01T00:00:00Z",
-        "expires_at_utc": "2099-01-01T00:00:00Z",
-        "source_url": FEE_ENDPOINTS[venue]["public_reference"],
-        "raw_sha256": "",
-        "parser_version": "v9.1",
-        "evidence_class": "ASSUMPTION",
-        "captured_at_utc": captured_at_utc,
-    }
     instrument = "BTCUSDT" if venue == "bybit" else "BTC-USDT"
+
+    def retail(leg: str, symbol: str, maker: float, taker: float) -> FeeSchedule:
+        return FeeSchedule(
+            venue=venue,
+            instrument=symbol,
+            leg=leg,
+            maker_bps=maker,
+            taker_bps=taker,
+            fee_tier="published_retail",
+            currency="USDT",
+            minimum_fee=0.0,
+            effective_from_utc="2020-01-01T00:00:00Z",
+            expires_at_utc="2099-01-01T00:00:00Z",
+            source_url=FEE_ENDPOINTS[venue]["public_reference"],
+            raw_sha256="",
+            parser_version="v9.1",
+            evidence_class="ASSUMPTION",
+            captured_at_utc=captured_at_utc,
+        )
+
     return CostEvidenceBundle(
         venue=venue,
         captured_at_utc=captured_at_utc,
         schedules=(
-            FeeSchedule(
-                venue=venue,
-                instrument=instrument,
-                leg=LEG_SPOT,
-                maker_bps=10.0,
-                taker_bps=10.0,
-                **common,
-            ),
-            FeeSchedule(
-                venue=venue,
-                instrument=instrument if venue == "bybit" else "BTC-USDT-SWAP",
-                leg=LEG_PERP,
-                maker_bps=perp_taker / 2.0,
-                taker_bps=perp_taker,
-                **common,
+            retail(LEG_SPOT, instrument, 10.0, 10.0),
+            retail(
+                LEG_PERP,
+                instrument if venue == "bybit" else "BTC-USDT-SWAP",
+                perp_taker / 2.0,
+                perp_taker,
             ),
         ),
         notes=[
