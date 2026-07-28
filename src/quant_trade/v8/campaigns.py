@@ -130,7 +130,11 @@ def _evidence_dirs(spec: HypothesisSpec, evidence_root: str | Path) -> dict[str,
 
 
 def _cost_stack_for(spec: HypothesisSpec, venue: str) -> CostStack:
-    return conservative_cost_stack(venue, cross_venue=len(spec.venues) > 1)
+    # A cross-venue hypothesis is perp/perp: both legs are perpetuals, so no
+    # spot taker fee is ever paid and pricing one would charge for a leg the
+    # strategy does not have.
+    cross_venue = len(spec.venues) > 1
+    return conservative_cost_stack(venue, cross_venue=cross_venue, spot_leg=not cross_venue)
 
 
 def _break_even_for(spec: HypothesisSpec, stack: CostStack) -> dict[str, Any]:
@@ -243,8 +247,16 @@ def _to_cost_model(stack: CostStack, multiplier: float = 1.0):
 
 
 def _taker_fee_bps(stack: CostStack) -> float:
-    by_name = {c.name: c.value for c in stack.components}
-    return by_name.get("spot_taker_fee", 10.0) + by_name.get("perp_taker_fee", 5.0)
+    """The BLENDED per-fill taker fee for the V7 ledger.
+
+    V7 charges one ``taker_fee_bps`` on every one of the four fills. A carry
+    pays the spot fee on two of them and the perp fee on the other two, so the
+    equivalent uniform rate is their average. Summing them would charge the
+    spot fee on the perp fills and vice versa, inflating the round trip by
+    roughly 70%.
+    """
+    leg_fees = [c.value for c in stack.components if c.unit == "bps_per_fill" and c.leg != "both"]
+    return sum(leg_fees) / len(leg_fees) if leg_fees else 0.0
 
 
 def _run_ledger(

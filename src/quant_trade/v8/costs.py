@@ -34,6 +34,13 @@ PROMOTABLE_COST_EVIDENCE = "REAL"
 #: Units a cost component may be expressed in.
 COST_UNITS = ("bps_per_fill", "annual_fraction", "one_off_fraction", "usd_flat")
 
+#: Which of a round trip's fills a per-fill friction applies to.
+COST_LEGS = ("spot", "perp", "both")
+
+#: A delta-neutral carry round trip is four fills: buy spot + sell perp on
+#: entry, sell spot + buy perp on exit. Two of them are spot, two are perp.
+ROUND_TRIP_FILLS = 4
+
 
 @dataclass(frozen=True)
 class CostComponent:
@@ -45,16 +52,29 @@ class CostComponent:
     evidence_class: str
     source: str
     note: str = ""
+    #: Which fills this friction is charged on. A venue's spot taker fee
+    #: applies to the two spot fills only; its perp taker fee to the two perp
+    #: fills only; spread/slippage/impact to all four. Charging every fee on
+    #: every fill inflates the round trip by ~70% — conservative in sign, but
+    #: wrong enough to abandon a strategy that would have worked.
+    leg: str = "both"
 
     def __post_init__(self) -> None:
         if self.unit not in COST_UNITS:
             raise ValueError(f"unit must be one of {COST_UNITS}")
         if self.evidence_class not in COST_EVIDENCE_CLASSES:
             raise ValueError(f"evidence_class must be one of {COST_EVIDENCE_CLASSES}")
+        if self.leg not in COST_LEGS:
+            raise ValueError(f"leg must be one of {COST_LEGS}")
         if not math.isfinite(self.value) or self.value < 0:
             raise ValueError(f"{self.name}: cost must be finite and >= 0")
         if not self.source.strip():
             raise ValueError(f"{self.name}: every cost needs a source")
+
+    @property
+    def fills_per_round_trip(self) -> int:
+        """4 for frictions on every fill, 2 for a single leg's own fee."""
+        return 4 if self.leg == "both" else 2
 
     @property
     def promotable(self) -> bool:
@@ -71,7 +91,10 @@ class CostStack:
     """Every friction a delta-neutral spot/perp carry pays, priced.
 
     The four fills of a round trip are: buy spot, sell perp (entry), sell
-    spot, buy perp (exit). Per-fill frictions are charged on each of them.
+    spot, buy perp (exit). Frictions that apply to any fill — spread,
+    slippage, impact, latency — are charged on all four. A venue's *spot*
+    taker fee is charged on the two spot fills and its *perp* taker fee on
+    the two perp fills, because a spot order does not pay a perp fee.
     """
 
     venue: str
@@ -94,12 +117,36 @@ class CostStack:
 
     @property
     def per_fill_bps(self) -> float:
-        return self._sum("bps_per_fill")
+        """Cost of a single fill: shared frictions plus that leg's own fee.
+
+        Leg fees are averaged rather than summed, because one fill pays one
+        of them. Summing charges the spot fee on perp fills and vice versa.
+        """
+        shared = sum(
+            c.value for c in self.components if c.unit == "bps_per_fill" and c.leg == "both"
+        )
+        leg_fees = [
+            c.value for c in self.components if c.unit == "bps_per_fill" and c.leg != "both"
+        ]
+        blended = sum(leg_fees) / len(leg_fees) if leg_fees else 0.0
+        return (shared + blended) * self.multiplier
+
+    @property
+    def round_trip_bps(self) -> float:
+        """Total per-fill friction over a round trip, charged per leg."""
+        return (
+            sum(
+                c.value * c.fills_per_round_trip
+                for c in self.components
+                if c.unit == "bps_per_fill"
+            )
+            * self.multiplier
+        )
 
     @property
     def round_trip_fraction(self) -> float:
-        """Four fills plus one-off frictions, as a fraction of notional."""
-        return self.per_fill_bps / 10_000.0 * 4.0 + self._sum("one_off_fraction")
+        """A full round trip plus one-off frictions, as a fraction of notional."""
+        return self.round_trip_bps / 10_000.0 + self._sum("one_off_fraction")
 
     @property
     def annual_carrying_fraction(self) -> float:
@@ -122,7 +169,9 @@ class CostStack:
         out: dict[str, float] = {}
         for component in self.components:
             if component.unit == "bps_per_fill":
-                out[component.name] = component.value / 10_000.0 * 4.0 * self.multiplier
+                out[component.name] = (
+                    component.value / 10_000.0 * component.fills_per_round_trip * self.multiplier
+                )
             elif component.unit == "one_off_fraction":
                 out[component.name] = component.value * self.multiplier
             elif component.unit == "annual_fraction":
@@ -136,6 +185,7 @@ class CostStack:
             "venue": self.venue,
             "multiplier": self.multiplier,
             "per_fill_bps": self.per_fill_bps,
+            "round_trip_bps": self.round_trip_bps,
             "round_trip_fraction": self.round_trip_fraction,
             "annual_carrying_fraction": self.annual_carrying_fraction,
             "promotable": self.promotable,
@@ -145,7 +195,15 @@ class CostStack:
         }
 
 
-def _bps(name: str, value: float, source: str, *, evidence: str, note: str = "") -> CostComponent:
+def _bps(
+    name: str,
+    value: float,
+    source: str,
+    *,
+    evidence: str,
+    note: str = "",
+    leg: str = "both",
+) -> CostComponent:
     return CostComponent(
         name=name,
         value=value,
@@ -153,6 +211,7 @@ def _bps(name: str, value: float, source: str, *, evidence: str, note: str = "")
         evidence_class=evidence,
         source=source,
         note=note,
+        leg=leg,
     )
 
 
@@ -169,6 +228,7 @@ def conservative_cost_stack(
     *,
     evidence_class: str = "ASSUMPTION_UNVERIFIED",
     cross_venue: bool = False,
+    spot_leg: bool = True,
 ) -> CostStack:
     """A deliberately pessimistic stack for one venue.
 
@@ -177,25 +237,36 @@ def conservative_cost_stack(
     stack overstates cost — which is the only safe direction for an
     unverified input: it can reject a strategy that would have worked, but it
     can never promote one that would not.
+
+    ``spot_leg=False`` prices a perp/perp structure (H3's cross-venue funding
+    dispersion), where both legs are perpetuals and no spot taker fee is ever
+    paid. Leaving a spot fee in that stack would price a leg the strategy
+    does not have.
     """
     source = FEE_SCHEDULE_SOURCES[venue]
     # Published retail taker fees: Bybit linear perp 0.055%, OKX perp 0.050%;
-    # spot taker 0.100% on both. Applied as taker on every fill because a
-    # carry that must be delta-neutral cannot rely on resting maker fills.
+    # spot taker 0.100% on both. Taker on every fill, because a hedge that
+    # must stay delta-neutral cannot wait for a resting maker fill.
     perp_taker_bps = {"bybit": 5.5, "okx": 5.0}[venue]
     components = [
         _bps(
-            "spot_taker_fee",
-            10.0,
+            "spot_taker_fee" if spot_leg else "perp_taker_fee_second_leg",
+            10.0 if spot_leg else perp_taker_bps,
             source,
             evidence=evidence_class,
-            note="published retail spot taker rate; VIP tiers are cheaper",
+            leg="spot" if spot_leg else "perp",
+            note=(
+                "published retail spot taker rate; VIP tiers are cheaper"
+                if spot_leg
+                else "second perpetual leg; no spot fee is paid in a perp/perp structure"
+            ),
         ),
         _bps(
             "perp_taker_fee",
             perp_taker_bps,
             source,
             evidence=evidence_class,
+            leg="perp",
             note="published retail linear-perp taker rate",
         ),
         _bps(

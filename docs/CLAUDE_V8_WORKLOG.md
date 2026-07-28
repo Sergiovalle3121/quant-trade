@@ -93,7 +93,7 @@ strategy but never promote one.
 
 The by-product is the number that survives the blocked network: break-even
 funding is a property of the cost stack and holding period, not of price
-history. H1 needs `0.00014221` per 8h settlement — 15.57% annualised — purely
+history. H1 needs `0.00010776` per 8h settlement — 11.80% annualised — purely
 to cover frictions.
 
 `v8/holdout.py`: made the holdout mechanically unreachable until selection is
@@ -168,7 +168,31 @@ files — the repo maintains a curated format-check list. Reverted the unrelated
 reformatting and added `.github/v8-python-files.txt` plus a CI step, so V8 files
 are format-checked without churning V7's.
 
-## Checkpoint 7 — regression, docs, PR (7:15–8:00)
+## Checkpoint 7 — a real defect found while CI ran (7:15–7:40)
+
+Re-derived the round trip by hand rather than trusting the code, and the code
+was wrong. `round_trip_fraction` multiplied the *sum* of all per-fill
+frictions by four, which charges the spot taker fee on the perp fills and the
+perp taker fee on the spot fills: 76 bps where the truth is 45. The same
+mistake had leaked into the V7 ledger projection, where `_taker_fee_bps`
+summed the two fees and handed the total to a model that applies one rate to
+every fill.
+
+The error was conservative in sign, which is why nothing failed — but a
+break-even 70% too high can abandon a strategy that would have worked, and
+that is exactly as bad as the optimistic direction. Added a `leg` field to
+`CostComponent` ("spot" | "perp" | "both"), made the round trip charge leg
+fees on two fills and shared frictions on four, and made the V7 projection
+pass the *blended* rate.
+
+H3 gained a `spot_leg=False` stack in the same change: it is perp/perp, so a
+spot taker fee prices a leg the strategy does not have.
+
+Headline effect: H1 break-even falls from 15.57% to 11.80% annualised. Four
+new tests pin the leg semantics, including one that asserts the conservative
+stack is 45 bps and not 76.
+
+## Checkpoint 8 — regression, docs, PR (7:40–8:00)
 
 Full suite, lint, types, `git diff --check`, double regeneration, PR, CI.
 
@@ -184,6 +208,6 @@ from "measured and rejected".
 What V8 does not deliver: a single real settlement. The economic question is
 exactly as open as it was at V7, and I want to be blunt that no amount of the
 above substitutes for it. The one durable economic contribution from a blocked
-sprint is the break-even bar — 15.57% annualised for H1 at 1× costs — which at
+sprint is the break-even bar — 11.80% annualised for H1 at 1× costs — which at
 least tells the next attempt what it is looking for, and is high enough that
 "funding is usually positive" is not an answer.

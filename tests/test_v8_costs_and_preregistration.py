@@ -66,26 +66,85 @@ def test_one_unverified_component_taints_the_stack() -> None:
     assert not tainted.promotable
 
 
-def test_round_trip_charges_four_fills() -> None:
+def test_shared_frictions_are_charged_on_all_four_fills() -> None:
     stack = CostStack(
         venue="bybit",
         components=(
             CostComponent(
-                name="fee",
+                name="slippage",
                 value=10.0,
                 unit="bps_per_fill",
                 evidence_class="REAL",
                 source="test",
+                leg="both",
             ),
         ),
     )
-    assert stack.round_trip_fraction == pytest.approx(4 * 10.0 / 10_000.0)
+    assert stack.round_trip_bps == pytest.approx(40.0)
+    assert stack.round_trip_fraction == pytest.approx(40.0 / 10_000.0)
+
+
+def test_a_leg_fee_is_charged_on_its_own_two_fills_only() -> None:
+    """A spot order does not pay a perp fee. Charging both on all four fills
+    inflates the round trip by ~70% and can abandon a viable strategy."""
+    stack = CostStack(
+        venue="bybit",
+        components=(
+            CostComponent(
+                name="spot_taker_fee",
+                value=10.0,
+                unit="bps_per_fill",
+                evidence_class="REAL",
+                source="test",
+                leg="spot",
+            ),
+            CostComponent(
+                name="perp_taker_fee",
+                value=5.5,
+                unit="bps_per_fill",
+                evidence_class="REAL",
+                source="test",
+                leg="perp",
+            ),
+        ),
+    )
+    assert stack.round_trip_bps == pytest.approx(2 * 10.0 + 2 * 5.5)
+    # The equivalent uniform per-fill rate is the average, not the sum.
+    assert stack.per_fill_bps == pytest.approx(7.75)
+
+
+def test_the_conservative_stack_prices_a_real_round_trip() -> None:
+    stack = conservative_cost_stack("bybit")
+    # 2 spot fills x 10bps + 2 perp fills x 5.5bps + 4 fills x 3.5bps shared
+    assert stack.round_trip_bps == pytest.approx(45.0)
+    assert stack.round_trip_fraction == pytest.approx(0.0060)
+
+
+def test_a_perp_perp_structure_pays_no_spot_fee() -> None:
+    """H3 has two perpetual legs; pricing a spot fee prices a leg it lacks."""
+    stack = conservative_cost_stack("bybit", cross_venue=True, spot_leg=False)
+    names = {c.name for c in stack.components}
+    assert "spot_taker_fee" not in names
+    assert stack.round_trip_bps == pytest.approx(4 * 5.5 + 4 * 3.5)
+
+
+def test_an_unknown_leg_is_rejected() -> None:
+    with pytest.raises(ValueError, match="leg must be one of"):
+        CostComponent(
+            name="x",
+            value=1.0,
+            unit="bps_per_fill",
+            evidence_class="REAL",
+            source="test",
+            leg="sideways",
+        )
 
 
 def test_cost_multiplier_scales_every_component() -> None:
     stack = conservative_cost_stack("bybit")
     doubled = stack.scaled(2.0)
     assert doubled.round_trip_fraction == pytest.approx(stack.round_trip_fraction * 2)
+    assert doubled.round_trip_bps == pytest.approx(stack.round_trip_bps * 2)
     assert doubled.annual_carrying_fraction == pytest.approx(stack.annual_carrying_fraction * 2)
 
 

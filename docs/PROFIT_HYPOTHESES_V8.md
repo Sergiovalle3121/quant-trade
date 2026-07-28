@@ -123,18 +123,21 @@ above the venue's published *retail* rate, so they overstate cost — an
 overstated cost can reject a strategy that would have worked, but cannot promote
 one that would not.
 
-Priced per round trip (four fills): spot taker, perp taker, half-spread,
-slippage, market impact, latency/partial-fill adverse selection. Priced
-continuously: collateral opportunity cost, perp maintenance drag. Priced once:
-conversion/withdrawal, emergency-unwind reserve, and (H3) cross-venue transfer.
+Charged **per leg** across the round trip's four fills (buy spot + sell perp on
+entry, sell spot + buy perp on exit): the spot taker fee on the two spot fills,
+the perp taker fee on the two perp fills, and half-spread, slippage, market
+impact and latency/partial-fill adverse selection on all four. H3 is perp/perp
+and pays no spot fee at all. Priced continuously: collateral opportunity cost,
+perp maintenance drag. Priced once: conversion/withdrawal, emergency-unwind
+reserve, and (H3) cross-venue transfer.
 
 Break-even at 1× costs, 30-day hold, 8h settlements:
 
-| Hypothesis | Break-even per settlement | Annualised |
-|---|---|---|
-| H1 | `0.00014221` | 15.57% |
-| H2 | `0.00013998` | 15.33% |
-| H3 | `0.00015887` | 17.40% |
+| Hypothesis | Round trip | Break-even per settlement | Annualised |
+|---|---|---|---|
+| H1 | 45 bps | `0.00010776` | 11.80% |
+| H2 | 44 bps | `0.00010665` | 11.68% |
+| H3 | 36 bps + transfer | `0.00011443` | 12.53% |
 
 ## Environment fact recorded at registration
 

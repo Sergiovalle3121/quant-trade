@@ -185,24 +185,37 @@ funding interval. Costs at the conservative retail stack.
 
 | Hypothesis | Round-trip cost | Annual carry cost | Break-even per 8h settlement | Annualised |
 |---|---|---|---|---|
-| H1 (Bybit) | 0.910% of notional | 4.50%/yr | `0.00014221` | 15.57% |
-| H2 (OKX) | 0.890% | 4.50%/yr | `0.00013998` | 15.33% |
-| H3 (cross-venue) | 1.060% | 4.50%/yr | `0.00015887` | 17.40% |
+| H1 (Bybit) | 45 bps (0.600% of notional) | 4.50%/yr | `0.00010776` | 11.80% |
+| H2 (OKX) | 44 bps (0.590%) | 4.50%/yr | `0.00010665` | 11.68% |
+| H3 (cross-venue) | 36 bps (0.660% incl. transfer) | 4.50%/yr | `0.00011443` | 12.53% |
 
 Under the 2× and 3× cost scenarios those rates scale linearly: H1 needs
-`0.00028441` at 2× and `0.00042662` at 3×.
+`0.00021553` at 2× and `0.00032329` at 3×.
+
+The round trip is charged **per leg**, which is worth spelling out because
+getting it wrong is easy and expensive in both directions. A carry round trip
+is four fills — buy spot and sell perp on entry, sell spot and buy perp on
+exit — of which two are spot and two are perp. The spot taker fee applies to
+the spot fills only and the perp taker fee to the perp fills only; spread,
+slippage, impact and latency apply to all four. H1 is therefore
+`2 x 10 + 2 x 5.5 + 4 x 3.5 = 45 bps`, not `4 x 15.5 = 76 bps`. H3 has no spot
+leg at all — both legs are perpetuals — so it pays `4 x 5.5 + 4 x 3.5 = 36 bps`
+plus the cross-venue transfer.
 
 Capital actually immobilised for the reference position is **$166,667** —
 $100,000 of spot inventory, $33,333 of initial margin and $33,333 of
 maintenance buffer, for a capital efficiency of 0.60. A model that ignores the
 buffer invents leverage the position could not have survived.
 
-Whether settled BTC funding clears `0.00014221` per 8h on average, over 730
+Whether settled BTC funding clears `0.00010776` per 8h on average, over 730
 days, after a conservative cost stack, is *precisely* the question the blocked
 dataset would answer. This report does not assume it in either direction. What
-can be said is that the bar is not trivially low: 15.6% annualised is
+can be said is that the bar is not trivially low: 11.8% annualised is
 materially above a typical stablecoin lending rate, so a naive "funding is
-usually positive, therefore carry works" intuition is not sufficient.
+usually positive, therefore carry works" intuition is not sufficient. It is
+also the number a VIP fee tier moves most — the two taker fees are 31 of the
+45 round-trip basis points, so a desk paying 3 bps spot / 2 bps perp would face
+roughly `0.00008` per settlement instead.
 
 ## Statistical machinery: executed, not documented
 
