@@ -1,0 +1,19 @@
+{
+  "artifact": "GLOBAL_TRIAL_LEDGER_SUMMARY",
+  "chain_intact": true,
+  "chain_problems": [],
+  "deflation_note": "The deflated Sharpe requires this ledger. With trial_registry=None or a zero cross-trial variance it degenerates into the probabilistic Sharpe, which is what V8 reported under the DSR label.",
+  "distinct_trials": 0,
+  "duplicate_reproductions": 0,
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evaluated_trials": 0,
+  "failed_trials": 0,
+  "multiplicity_rule": "A byte-identical reproduction of code, config, data and seed is the same trial. Any other difference is a new draw from the search and raises the bar the winner must clear.",
+  "path": "data/v9_evidence/trials.jsonl",
+  "schema_version": 1,
+  "sharpe_variance": 0.0,
+  "sharpes": [],
+  "state": "NOT_MEASURED",
+  "total_records": 0,
+  "v8_defect_closed": "E4"
+}

@@ -1,0 +1,28 @@
+{
+  "anti_forgery": [
+    "elapsed days accumulate from persisted wall-clock stamps, so a replay advances the snapshot count and not the window",
+    "the journal is hash-chained: an edited or removed record is detectable",
+    "downtime is recorded as a gap and excluded from observed time",
+    "the bidding policy is frozen at start; changing it restarts the window",
+    "an injected clock marks the window unpromotable forever"
+  ],
+  "artifact": "MINING_SHADOW_STATUS",
+  "blocking_reasons": [
+    "the marketplace host is refused at CONNECT, so no snapshot can be captured and the window has not opened"
+  ],
+  "btc_spent": 0.0,
+  "collector_running": false,
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "gaps": 0,
+  "observed_days": 0.0,
+  "orders_placed": 0,
+  "purchase_authorized": false,
+  "schema_version": 1,
+  "snapshots": 0,
+  "status": "BLOCKED_EVIDENCE",
+  "thresholds": {
+    "gap_threshold_seconds": 1800.0,
+    "min_shadow_days": 14.0,
+    "min_shadow_snapshots": 2000
+  }
+}

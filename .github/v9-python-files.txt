@@ -16,10 +16,12 @@ src/quant_trade/v9/oos.py
 src/quant_trade/v9/paper_engine.py
 src/quant_trade/v9/paper_session.py
 src/quant_trade/v9/preregistration.py
+src/quant_trade/v9/safety.py
 src/quant_trade/v9/small_capital.py
 src/quant_trade/v9/trial_ledger.py
 tests/test_v9_artifacts.py
 tests/test_v9_cost_evidence.py
+tests/test_v9_fault_injection.py
 tests/test_v9_h3_and_margin.py
 tests/test_v9_mining.py
 tests/test_v9_oos_and_trials.py

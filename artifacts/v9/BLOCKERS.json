@@ -1,0 +1,58 @@
+{
+  "artifact": "BLOCKERS",
+  "blockers": [
+    {
+      "blocker_id": "B-EGRESS",
+      "consequence": "no market data, so every trading hypothesis is NOT_MEASURED",
+      "evidence": [
+        "api.bybit.com (BLOCKED_EGRESS_POLICY)",
+        "api.bytick.com (BLOCKED_EGRESS_POLICY)",
+        "api.bybit.nl (BLOCKED_EGRESS_POLICY)",
+        "www.okx.com (BLOCKED_EGRESS_POLICY)",
+        "aws.okx.com (BLOCKED_EGRESS_POLICY)",
+        "my.okx.com (BLOCKED_EGRESS_POLICY)"
+      ],
+      "owner": "environment operator",
+      "resolution": "run the acquisition runbook in DATA_AND_COST_EVIDENCE_INDEX on a host with egress and import the resulting pack, which verifies byte-for-byte before extracting",
+      "severity": "blocking",
+      "summary": "outbound HTTPS to every venue-published domain is refused at CONNECT by the environment's egress policy",
+      "workarounds_refused": "proxies, VPN exits, mirrors and third-party redistributors were not used; routing around an organisational restriction is out of scope and would invalidate the provenance anyway"
+    },
+    {
+      "blocker_id": "B-COST-EVIDENCE",
+      "consequence": "no campaign could promote even if data existed",
+      "evidence": [
+        "weakest class: None"
+      ],
+      "owner": "repository owner",
+      "resolution": "capture your own fee schedule read-only and import it with `quant-trade v9 cost-import`; the repository never sees the key",
+      "severity": "blocking",
+      "summary": "the only fee schedules available are ASSUMPTION-class retail defaults; no account-specific schedule has been captured"
+    },
+    {
+      "blocker_id": "B-POOL-EVIDENCE",
+      "consequence": "the mining route is capped at SHADOW_MARKET_ONLY",
+      "evidence": [
+        "pool hosts refused at CONNECT"
+      ],
+      "owner": "repository owner",
+      "resolution": "attach a read-only pool adapter on a host with egress",
+      "severity": "blocking",
+      "summary": "no pool payout record exists, so delivery and payment are unobserved"
+    },
+    {
+      "blocker_id": "B-PAPER-DURATION",
+      "consequence": "canary readiness is unreachable",
+      "evidence": [
+        "sessions: 0"
+      ],
+      "owner": "repository owner",
+      "resolution": "start a session once a candidate exists and let it run",
+      "severity": "blocking",
+      "summary": "no paper session has run; a promotable session needs 72 real hours and 500 events, which cannot be simulated forward"
+    }
+  ],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "note": "Every blocker here is external to the code. None of them is resolvable by changing a threshold, and none has been worked around.",
+  "schema_version": 1
+}

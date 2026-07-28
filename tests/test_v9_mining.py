@@ -31,6 +31,7 @@ from quant_trade.v9.mining_evidence import (
     MiningEvidenceError,
     PoolEvidence,
     PoolPayoutRecord,
+    derive_canary_budget,
     evaluate_mining_evidence,
     mining_canary_manifest,
     parse_pool_payouts,
@@ -827,10 +828,54 @@ def test_canary_manifest_authorises_nothing() -> None:
     assert manifest["deposit_authorized"] is False
     assert manifest["withdrawal_authorized"] is False
     assert manifest["wallet_signing_authorized"] is False
+    assert manifest["cloud_hashing_authorized"] is False
     assert manifest["aws_alibaba_hashing"] == "PROHIBITED"
     assert manifest["orders_placed"] == 0
     assert manifest["btc_moved"] == 0.0
     assert manifest["requires_human_authorisation"] is True
+    assert manifest["terms"]["orders"] == 1
+    assert manifest["terms"]["refill_authorized"] is False
+    assert manifest["terms"]["price_chasing_authorized"] is False
+    assert manifest["manifest_sha256"]
+
+
+def test_canary_manifest_hash_changes_when_a_term_is_loosened() -> None:
+    gate = evaluate_mining_evidence(
+        market_quotes=25, market_blocked=False, pool=real_pool_evidence()
+    )
+    tight = mining_canary_manifest(gate, price_ceiling_btc=0.001)
+    loose = mining_canary_manifest(gate, price_ceiling_btc=0.010)
+    assert tight["manifest_sha256"] != loose["manifest_sha256"]
+
+
+def test_the_canary_budget_comes_from_the_venue_terms() -> None:
+    budget = derive_canary_budget(
+        min_order_amount_btc=0.001,
+        order_creation_fee_btc=0.00001,
+        deposit_fee_btc=0.00002,
+        withdrawal_fee_btc=0.00003,
+        buyer_fee_rate_on_spend=0.03,
+        pool_minimum_payout_btc=0.0,
+    )
+    expected_fees = 0.00001 + 0.00002 + 0.00003 + 0.001 * 0.03
+    assert budget["binding_constraint"] == "marketplace_min_order_amount"
+    assert math.isclose(budget["fee_floor_btc"], expected_fees, rel_tol=1e-12)
+    assert math.isclose(budget["max_budget_btc"], 0.001 + expected_fees, rel_tol=1e-12)
+
+
+def test_a_high_payout_minimum_raises_the_canary_budget() -> None:
+    common = {
+        "min_order_amount_btc": 0.001,
+        "order_creation_fee_btc": 0.00001,
+        "deposit_fee_btc": 0.00002,
+        "withdrawal_fee_btc": 0.00003,
+        "buyer_fee_rate_on_spend": 0.03,
+    }
+    low = derive_canary_budget(pool_minimum_payout_btc=0.0, **common)
+    high = derive_canary_budget(pool_minimum_payout_btc=0.05, **common)
+    assert high["binding_constraint"] == "pool_payout_minimum"
+    assert high["max_budget_btc"] > low["max_budget_btc"]
+    assert high["max_budget_btc"] >= 0.05
 
 
 # --- shadow collector -------------------------------------------------------

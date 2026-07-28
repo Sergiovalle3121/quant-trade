@@ -344,6 +344,12 @@ class PaperSession:
         self.status = str(checkpoint.get("status", SESSION_RUNNING))
         if self.status == SESSION_STOPPED:
             self.status = SESSION_RUNNING
+        if self.breakers:
+            # A halt outlives the process that halted it. Restarting is not a
+            # way to clear a tripped breaker: the condition that stopped the
+            # session is a fact about the run, and the recorded breakers
+            # rebuild the halt even if the status field were lost or edited.
+            self.status = SESSION_HALTED
         self._write_checkpoint()
 
     def _restore(self, checkpoint: dict[str, Any]) -> None:
@@ -385,7 +391,11 @@ class PaperSession:
         self._order_counter = int(checkpoint.get("order_counter", 0))
 
     def stop(self) -> None:
-        self.status = SESSION_STOPPED
+        # Stopping a halted session does not un-halt it. HALTED is terminal:
+        # overwriting it with STOPPED would let a restart resume a session
+        # whose kill switch had fired.
+        if self.status != SESSION_HALTED:
+            self.status = SESSION_STOPPED
         self._append_journal(
             {
                 "seq": self._next_sequence(),

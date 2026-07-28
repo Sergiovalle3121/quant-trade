@@ -1,0 +1,42 @@
+{
+  "artifact": "OOS_CAMPAIGN_RESULTS",
+  "campaigns": [
+    {
+      "hypothesis_id": "H1",
+      "measured": false,
+      "reason": "no settled funding series exists: every Bybit and OKX domain is refused at CONNECT by the environment's egress policy",
+      "state": "NOT_MEASURED",
+      "title": "cash-and-carry funding capture, BTC perp vs spot"
+    },
+    {
+      "hypothesis_id": "H2",
+      "measured": false,
+      "reason": "no mark or index series exists for either venue",
+      "state": "NOT_MEASURED",
+      "title": "term-structure basis premium across horizons"
+    },
+    {
+      "hypothesis_id": "H3",
+      "measured": false,
+      "reason": "requires both venues simultaneously; neither is reachable, and a single-venue substitute would not be the hypothesis",
+      "state": "NOT_MEASURED",
+      "title": "cross-venue dispersion, Bybit against OKX"
+    }
+  ],
+  "cost_evidence_class": null,
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "preregistration_hash": "c62076bd4c08ef6e5f1158178845621405065719f83c98354db43b15c7eb0a4d",
+  "schema_version": 1,
+  "split_scheme": {
+    "holdout_fraction": 0.2,
+    "selection_rule": "each window selects on data ending at test_start - purge - embargo and is scored on its test block only",
+    "train_fraction": 0.5,
+    "walk_forward_fraction": 0.3
+  },
+  "states_permitted": [
+    "NOT_MEASURED",
+    "MEASURED_REJECTED",
+    "BACKTEST_CANDIDATE"
+  ],
+  "why_not_a_negative_result": "NOT_MEASURED is not a negative finding. Nothing about these hypotheses has been tested, so a claim that no edge exists would assert a result that was never obtained. The distinction is kept in the vocabulary itself: the negative-result token is not a legal V9 state and appears in no artifact."
+}

@@ -28,8 +28,22 @@ from typing import Any
 
 from quant_trade.v9.margin import InstrumentRisk, capital_requirement
 
-#: The capital ladder the report walks.
-DEFAULT_CAPITAL_LADDER = (100.0, 250.0, 500.0, 1_000.0, 2_500.0, 5_000.0, 10_000.0)
+#: The capital ladder the report walks. The rungs below $100 are there to
+#: bracket the floor rather than to be recommended: a curve whose lowest rung
+#: is executable reports its own starting point as the minimum, which is not a
+#: measurement of anything.
+DEFAULT_CAPITAL_LADDER = (
+    25.0,
+    50.0,
+    75.0,
+    100.0,
+    250.0,
+    500.0,
+    1_000.0,
+    2_500.0,
+    5_000.0,
+    10_000.0,
+)
 
 STATUS_EXECUTABLE = "EXECUTABLE"
 STATUS_INSUFFICIENT = "INSUFFICIENT_EXECUTABLE_CAPITAL"

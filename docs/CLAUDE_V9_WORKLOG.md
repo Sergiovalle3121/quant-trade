@@ -121,15 +121,27 @@ not download it" with a runbook is a next step; without one it is a status.
 
 **Small capital, honestly.** V8's "$166,667 minimum capital" was not a minimum
 — it was the capital a $100k reference position happened to immobilise. The
-feasibility curve now walks $100 → $10,000 and, for each rung, either finds the
+feasibility curve now walks $25 → $10,000 and, for each rung, either finds the
 largest position that clears lot step, minimum notional, margin and fee floors,
 or returns `INSUFFICIENT_EXECUTABLE_CAPITAL` and names the binding constraint.
 Returns are on total immobilised capital, not on notional, and outcomes are
 P05/P50/P95 with a ruin probability from a block bootstrap of the OOS series.
 
-One number worth recording: a $0.10 per-fill fee floor raises the break-even
-funding rate at $100 to 0.0000694 per 8h against 0.0000500 at $10,000 — a 39%
-penalty arising purely from the floor, invisible in any bps-only cost model.
+The ladder deliberately starts below the expected floor: a curve whose lowest
+rung is executable reports its own starting point as the minimum, which
+measures nothing. Bracketed, the answer under the modelled venue rules at a
+$60,000 reference price is **$75**, not $166,667 — three orders of magnitude
+out. Below $75 the binding constraint is the 0.001 BTC lot step, not capital.
+
+The fee floor is the other number worth recording. At $75–$100 the largest
+placeable position is 0.001 BTC ($60 notional), which puts all four fills under
+a $0.10 per-fill floor: break-even funding is 0.0000741 per 8h against
+0.0000489 at every larger rung — a 52% penalty arising purely from the floor
+and invisible in any bps-only cost model.
+
+Both figures rest on `ASSUMPTION`-class venue rules and an assumed reference
+price, and the artifact says so in its own fields. They are properties of the
+rules, not of market history, which is why they survive a blocked sprint.
 
 ---
 

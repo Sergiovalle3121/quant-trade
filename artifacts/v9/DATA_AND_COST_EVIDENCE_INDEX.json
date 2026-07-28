@@ -1,0 +1,209 @@
+{
+  "artifact": "DATA_AND_COST_EVIDENCE_INDEX",
+  "blocked_hosts": [],
+  "cost_evidence": {
+    "bundles": {
+      "bybit": {
+        "bundle_sha256": "ac7dac389b1c3730acf433faf0dbaba04743b1b963c3242594c203a341781e68",
+        "captured_at_utc": "2026-07-28T20:00:00Z",
+        "notes": [
+          "published retail rates, typed from documentation and not captured from the venue; conservative in direction and non-promotable by class"
+        ],
+        "promotable": false,
+        "schedules": [
+          {
+            "captured_at_utc": "2026-07-28T20:00:00Z",
+            "currency": "USDT",
+            "effective_from_utc": "2020-01-01T00:00:00Z",
+            "evidence_class": "ASSUMPTION",
+            "expires_at_utc": "2099-01-01T00:00:00Z",
+            "fee_tier": "published_retail",
+            "instrument": "BTCUSDT",
+            "leg": "spot",
+            "maker_bps": 10.0,
+            "minimum_fee": 0.0,
+            "parser_version": "v9.1",
+            "promotable": false,
+            "raw_sha256": "",
+            "server_timestamp_utc": "",
+            "source_url": "https://api.bybit.com/v5/market/instruments-info",
+            "taker_bps": 10.0,
+            "venue": "bybit"
+          },
+          {
+            "captured_at_utc": "2026-07-28T20:00:00Z",
+            "currency": "USDT",
+            "effective_from_utc": "2020-01-01T00:00:00Z",
+            "evidence_class": "ASSUMPTION",
+            "expires_at_utc": "2099-01-01T00:00:00Z",
+            "fee_tier": "published_retail",
+            "instrument": "BTCUSDT",
+            "leg": "perp",
+            "maker_bps": 2.75,
+            "minimum_fee": 0.0,
+            "parser_version": "v9.1",
+            "promotable": false,
+            "raw_sha256": "",
+            "server_timestamp_utc": "",
+            "source_url": "https://api.bybit.com/v5/market/instruments-info",
+            "taker_bps": 5.5,
+            "venue": "bybit"
+          }
+        ],
+        "venue": "bybit",
+        "weakest_evidence_class": "ASSUMPTION"
+      },
+      "okx": {
+        "bundle_sha256": "17cb045362e36461efbf1d6203564597227bd2f3d159f8bc14e021a344cf2b77",
+        "captured_at_utc": "2026-07-28T20:00:00Z",
+        "notes": [
+          "published retail rates, typed from documentation and not captured from the venue; conservative in direction and non-promotable by class"
+        ],
+        "promotable": false,
+        "schedules": [
+          {
+            "captured_at_utc": "2026-07-28T20:00:00Z",
+            "currency": "USDT",
+            "effective_from_utc": "2020-01-01T00:00:00Z",
+            "evidence_class": "ASSUMPTION",
+            "expires_at_utc": "2099-01-01T00:00:00Z",
+            "fee_tier": "published_retail",
+            "instrument": "BTC-USDT",
+            "leg": "spot",
+            "maker_bps": 10.0,
+            "minimum_fee": 0.0,
+            "parser_version": "v9.1",
+            "promotable": false,
+            "raw_sha256": "",
+            "server_timestamp_utc": "",
+            "source_url": "https://www.okx.com/api/v5/public/instruments",
+            "taker_bps": 10.0,
+            "venue": "okx"
+          },
+          {
+            "captured_at_utc": "2026-07-28T20:00:00Z",
+            "currency": "USDT",
+            "effective_from_utc": "2020-01-01T00:00:00Z",
+            "evidence_class": "ASSUMPTION",
+            "expires_at_utc": "2099-01-01T00:00:00Z",
+            "fee_tier": "published_retail",
+            "instrument": "BTC-USDT-SWAP",
+            "leg": "perp",
+            "maker_bps": 2.5,
+            "minimum_fee": 0.0,
+            "parser_version": "v9.1",
+            "promotable": false,
+            "raw_sha256": "",
+            "server_timestamp_utc": "",
+            "source_url": "https://www.okx.com/api/v5/public/instruments",
+            "taker_bps": 5.0,
+            "venue": "okx"
+          }
+        ],
+        "venue": "okx",
+        "weakest_evidence_class": "ASSUMPTION"
+      }
+    },
+    "promotable": false,
+    "venues": [
+      "bybit",
+      "okx"
+    ]
+  },
+  "cost_evidence_promotable": false,
+  "errors": [],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "import_command": "quant-trade v8 evidence-verify --pack <archive.tar.gz> --manifest <EVIDENCE_PACK_MANIFEST.json> --import-to data/v9_evidence",
+  "measured": false,
+  "network_probe": {
+    "any_reachable": false,
+    "attempted_at_utc": "2026-07-28T19:39:01Z",
+    "blocked_venues": [
+      "bybit",
+      "okx"
+    ],
+    "hosts": [
+      {
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "api.bybit.com",
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "venue": "bybit"
+      },
+      {
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "api.bytick.com",
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "venue": "bybit"
+      },
+      {
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "api.bybit.nl",
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "venue": "bybit"
+      },
+      {
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "www.okx.com",
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "venue": "okx"
+      },
+      {
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "aws.okx.com",
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "venue": "okx"
+      },
+      {
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "my.okx.com",
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "venue": "okx"
+      }
+    ],
+    "policy": "Only venue-published official domains are attempted. Proxies, VPN exits, mirrors and third-party redistributors are never used to route around a regional or organisational restriction."
+  },
+  "note": "Market data and cost evidence are indexed together because a campaign needs both and is blocked by whichever is missing. Here both are missing: egress is refused, and the only fee schedules available are ASSUMPTION-class retail defaults.",
+  "notes": [
+    "A blocked acquisition is NOT_MEASURED, never a negative result: nothing about the hypothesis has been tested.",
+    "The import path verifies byte-for-byte before extracting, so an operator-supplied pack is checkable rather than trusted."
+  ],
+  "operator_commands": [
+    "# 1. Confirm the venues are reachable from this host.",
+    "quant-trade v8 probe-network",
+    "",
+    "# 2. Capture 730+ days of public market data per venue (resumable).",
+    "quant-trade v8 evidence-backfill --venue bybit --symbol BTC --since 2024-07-28T00:00:00Z --until 2026-07-28T00:00:00Z --evidence-root data/v9_evidence",
+    "quant-trade v8 evidence-backfill --venue okx --symbol BTC --since 2024-07-28T00:00:00Z --until 2026-07-28T00:00:00Z --evidence-root data/v9_evidence",
+    "",
+    "# 3. Confirm the capture meets the pre-registered sufficiency floor.",
+    "quant-trade v8 evidence-validate --venue bybit --evidence-root data/v9_evidence",
+    "quant-trade v8 evidence-validate --venue okx --evidence-root data/v9_evidence",
+    "",
+    "# 4. Capture your account's own fee schedule (read-only key; NO withdraw).",
+    "#    Run the venue call yourself and keep only the response bytes.",
+    "quant-trade v9 cost-import --venue bybit --raw <bybit-fee-rate.json> \\",
+    "    --effective-from <iso> --expires-at <iso>",
+    "quant-trade v9 cost-import --venue okx --raw <okx-trade-fee.json> \\",
+    "    --effective-from <iso> --expires-at <iso>",
+    "",
+    "# 5. Build a content-addressed pack and hand it back.",
+    "quant-trade v8 evidence-pack --evidence-root data/v9_evidence --out-dir data/v9_packs"
+  ],
+  "preregistration_hash": "c62076bd4c08ef6e5f1158178845621405065719f83c98354db43b15c7eb0a4d",
+  "schema_version": 1,
+  "state": "NOT_MEASURED",
+  "venues": {
+    "bybit": {
+      "directory": "data/v9_evidence/bybit_btc_usdt",
+      "present": false,
+      "reason": "no evidence directory: acquisition never completed",
+      "venue": "bybit"
+    },
+    "okx": {
+      "directory": "data/v9_evidence/okx_btc_usdt",
+      "present": false,
+      "reason": "no evidence directory: acquisition never completed",
+      "venue": "okx"
+    }
+  }
+}

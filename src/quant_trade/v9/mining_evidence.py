@@ -308,19 +308,111 @@ def evaluate_mining_evidence(
     return gate
 
 
-def mining_canary_manifest(
-    gate: MiningEvidenceGate, *, notes: list[str] | None = None
+def derive_canary_budget(
+    *,
+    min_order_amount_btc: float,
+    order_creation_fee_btc: float,
+    deposit_fee_btc: float,
+    withdrawal_fee_btc: float,
+    buyer_fee_rate_on_spend: float,
+    pool_minimum_payout_btc: float,
 ) -> dict[str, Any]:
-    """What a human would need to authorise, stated as refusals.
+    """The smallest budget the venue's own terms allow, not an arbitrary one.
+
+    Every term pushes the floor up: the order cannot be smaller than the
+    marketplace minimum, the fixed and deposit fees are paid on top of it, the
+    buyer fee rides on the spend, and there is no point renting less hashrate
+    than would eventually clear the pool's payout minimum. Naming a round
+    number like "$50 to try it" ignores all six and usually lands below the
+    point where anything can be withdrawn.
+    """
+    spend_floor = min_order_amount_btc
+    fee_floor = (
+        order_creation_fee_btc
+        + deposit_fee_btc
+        + withdrawal_fee_btc
+        + spend_floor * buyer_fee_rate_on_spend
+    )
+    budget = spend_floor + fee_floor
+    binding = "marketplace_min_order_amount"
+    if pool_minimum_payout_btc > budget:
+        # Renting less than the payout minimum can produce coins that can
+        # never be withdrawn, which is a loss dressed as a balance.
+        budget = pool_minimum_payout_btc + fee_floor
+        binding = "pool_payout_minimum"
+    return {
+        "max_budget_btc": budget,
+        "spend_floor_btc": spend_floor,
+        "fee_floor_btc": fee_floor,
+        "binding_constraint": binding,
+        "derivation": (
+            "min order amount + fixed order fee + deposit fee + withdrawal fee "
+            "+ buyer fee on spend, raised to the pool payout minimum when that "
+            "binds; no arbitrary 'small test amount' is assumed to work"
+        ),
+    }
+
+
+def mining_canary_manifest(
+    gate: MiningEvidenceGate,
+    *,
+    budget: dict[str, Any] | None = None,
+    max_loss_btc: float | None = None,
+    price_ceiling_btc: float | None = None,
+    speed_limit: float | None = None,
+    max_duration_hours: float | None = None,
+    pool_name: str = "",
+    worker: str = "",
+    btc_usd_reference: float | None = None,
+    notes: list[str] | None = None,
+) -> dict[str, Any]:
+    """What a human would need to authorise, stated as refusals and bounds.
 
     Every authorisation flag is false and stays false. The manifest exists so
-    that the boundary is written down as data rather than implied by the
-    absence of a code path.
+    the boundary is written down as data rather than implied by the absence of
+    a code path, and so the *shape* of a first purchase is fixed in advance:
+    one order, no refill, a hard price ceiling and no chasing the market up.
+    Its own hash goes in the artifact, so a manifest that gets loosened later
+    is a different manifest.
     """
-    return {
+    from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
+
+    terms: dict[str, Any] = {
+        "orders": 1,
+        "refill_authorized": False,
+        "max_budget_btc": (budget or {}).get("max_budget_btc"),
+        "max_budget_usd": (
+            (budget or {}).get("max_budget_btc", 0.0) * btc_usd_reference
+            if btc_usd_reference and budget
+            else None
+        ),
+        "budget_derivation": budget or {},
+        "max_loss_btc": max_loss_btc,
+        "price_ceiling_btc": price_ceiling_btc,
+        "price_chasing_authorized": False,
+        "speed_limit": speed_limit,
+        "max_duration_hours": max_duration_hours,
+        "pool_name": pool_name,
+        "worker": worker,
+        "stop_conditions": [
+            "cancel if the delivered ratio stays below the modelled ratio for "
+            "two consecutive accounting intervals",
+            "cancel if the market price rises above the price ceiling",
+            "cancel if the modelled margin over holding BTC disappears",
+            "cancel if the pool stops reporting accepted hashrate",
+            "never reprice upward to stay in the book",
+        ],
+        "future_api_key_requirements": [
+            "read-only plus order placement; withdrawal permission must be absent",
+            "IP-restricted to the operator's own host",
+            "held by the operator, never sent to or stored in this repository",
+        ],
+    }
+    manifest = {
         "artifact": "MINING_CANARY_MANIFEST",
         "schema_version": 1,
         "status": gate.status,
+        "terms": terms,
         "purchase_authorized": False,
         "deposit_authorized": False,
         "withdrawal_authorized": False,
@@ -338,6 +430,8 @@ def mining_canary_manifest(
         ],
         "notes": list(notes or []),
     }
+    manifest["manifest_sha256"] = sha256_of_text(canonical_dumps(manifest))
+    return manifest
 
 
 __all__ = [
@@ -352,6 +446,7 @@ __all__ = [
     "MiningEvidenceGate",
     "PoolEvidence",
     "PoolPayoutRecord",
+    "derive_canary_budget",
     "evaluate_mining_evidence",
     "mining_canary_manifest",
     "parse_pool_payouts",

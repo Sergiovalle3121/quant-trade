@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -124,7 +125,10 @@ def test_a_missing_dataset_is_not_measured_not_no_edge(tmp_path: Path) -> None:
     )
     assert status.state == ACQUISITION_NOT_MEASURED
     assert not status.to_dict()["measured"]
-    assert any("NOT_MEASURED, never NO_EDGE_FOUND" in n for n in status.notes)
+    assert any("NOT_MEASURED, never a negative result" in n for n in status.notes)
+    # The forbidden token must not appear anywhere in the handoff, including
+    # in prose explaining why it is not used.
+    assert "NO_EDGE_FOUND" not in json.dumps(status.to_dict())
 
 
 def test_the_handoff_carries_runnable_commands(tmp_path: Path) -> None:

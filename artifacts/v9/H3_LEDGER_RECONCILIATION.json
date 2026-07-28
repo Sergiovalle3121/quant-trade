@@ -1,0 +1,18 @@
+{
+  "artifact": "H3_LEDGER_RECONCILIATION",
+  "bars": 0,
+  "contract": [
+    "each venue keeps its own book: cash, margin posted, position, and capital in transit between venues",
+    "each bar's return is equity_t / equity_{t-1} - 1, derived from the books rather than summed from per-leg percentage moves",
+    "every bar reconciles: opening equity + flows - costs = closing equity",
+    "capacity is min(Bybit, OKX) and the binding venue is named",
+    "a single liquidation blocks promotion outright"
+  ],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "flow_reconciliation_error": null,
+  "liquidations": 0,
+  "reason": "no two-venue series exists; both venues are blocked",
+  "schema_version": 1,
+  "state": "NOT_MEASURED",
+  "v8_defect_closed": "E6"
+}

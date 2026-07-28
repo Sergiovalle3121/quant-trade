@@ -300,8 +300,8 @@ def evaluate_acquisition(
         "--manifest <EVIDENCE_PACK_MANIFEST.json> --import-to data/v9_evidence"
     )
     status.notes = [
-        "A blocked acquisition is NOT_MEASURED, never NO_EDGE_FOUND: nothing "
-        "about the hypothesis has been tested.",
+        "A blocked acquisition is NOT_MEASURED, never a negative result: "
+        "nothing about the hypothesis has been tested.",
         "The import path verifies byte-for-byte before extracting, so an "
         "operator-supplied pack is checkable rather than trusted.",
     ]

@@ -1,0 +1,162 @@
+{
+  "artifact": "MINING_CASHFLOW",
+  "corrections_applied": [
+    "withdrawal fee is charged once per payout, not per order or per day",
+    "buyer fee is proportional to BTC spent, never to BTC deposited",
+    "spend is proportional to hashrate actually accepted, not to speed ordered",
+    "order creation costs a fixed fee per order, independent of size",
+    "deposits are charged a fee on the way in",
+    "unspent order balance is refunded, not consumed",
+    "cancellation refunds the unspent balance minus the cancellation fee",
+    "price, amount and speed limit are three independent order parameters",
+    "the minimum order amount is denominated in BTC, not in hashrate",
+    "orders have a maximum duration the venue enforces",
+    "a bid below the market price stops receiving hashrate until repriced",
+    "the pool fee is taken from mined coins before anything reaches the buyer",
+    "a balance below the pool's payout minimum is not spendable",
+    "balances accumulate across orders instead of resetting each time",
+    "the ledger is kept in BTC with USD as a parallel view of the same rows",
+    "the benchmark is holding BTC and holding cash, not zero"
+  ],
+  "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evidence_class": "SYNTHETIC",
+  "fees": {
+    "buyer_fee_rate_on_spend": 0.03,
+    "cancellation_fee_btc": 1e-05,
+    "deposit_fee_btc": 2e-05,
+    "order_creation_fee_btc": 1e-05,
+    "refund_rate_on_cancellation": 1.0,
+    "triggers": {
+      "buyer_fee_rate_on_spend": "proportional to BTC spent on delivered speed",
+      "cancellation_fee_btc": "once, only if the order is cancelled early",
+      "deposit_fee_btc": "once, per deposit into the marketplace wallet",
+      "order_creation_fee_btc": "once, when an order is created",
+      "withdrawal_fee_btc": "once, per payout out of the pool"
+    },
+    "withdrawal_fee_btc": 3e-05
+  },
+  "inputs_are_synthetic": true,
+  "interpretation": "These numbers demonstrate the fee arithmetic on synthetic inputs. They say nothing about whether renting hashrate is worthwhile: the difficulty, the price, the delivery ratio and the pool terms were all chosen, not observed.",
+  "ledger": {
+    "annualization_note": "Deliberately not annualized. This is a 1.000-day opportunity and there is no evidence it repeats.",
+    "btc_usd_end": 60000.0,
+    "btc_usd_start": 60000.0,
+    "currency_note": "Spend and income are both BTC, so the campaign is a bet on hashrate against difficulty; the USD columns are a view of the same BTC rows and do not add a separate currency P&L.",
+    "deposited_btc": 0.05,
+    "horizon_days": 1.0,
+    "mined_gross_btc": 0.0004805664670807997,
+    "net_btc": -0.0009055000000000174,
+    "net_usd_at_end_rate": -54.33000000000104,
+    "net_usd_at_start_rate": -54.33000000000104,
+    "paid_out_btc": 0,
+    "pool_balance_btc": 0.00047095513773918367,
+    "problems": [
+      "pool balance 0.00047096 BTC is below the 0.00050000 BTC payout minimum: the coins are mined but not spendable"
+    ],
+    "rows": [
+      {
+        "btc": -0.05,
+        "event": "deposit",
+        "note": "capital moved into the marketplace wallet",
+        "usd": -3000.0
+      },
+      {
+        "btc": -2e-05,
+        "event": "deposit_fee",
+        "note": "charged once per deposit",
+        "usd": -1.2000000000000002
+      },
+      {
+        "btc": -1e-05,
+        "event": "order_creation_fee",
+        "note": "fixed, per order",
+        "usd": -0.6000000000000001
+      },
+      {
+        "btc": -0.00085,
+        "event": "hashrate_spend",
+        "note": "85.0% of requested speed-hours delivered",
+        "usd": -51.0
+      },
+      {
+        "btc": -2.549999999999999e-05,
+        "event": "buyer_fee",
+        "note": "3.00% of BTC spent, not of BTC deposited",
+        "usd": -1.5299999999999994
+      },
+      {
+        "btc": 0.009114499999999985,
+        "event": "refund_unspent",
+        "note": "budget the order never spent",
+        "usd": 546.8699999999991
+      },
+      {
+        "btc": 0.0004805664670807997,
+        "event": "mined_gross",
+        "note": "before the pool's cut",
+        "usd": 28.833988024847983
+      },
+      {
+        "btc": -9.611329341615994e-06,
+        "event": "pool_fee",
+        "note": "2.00%, FPPS",
+        "usd": -0.5766797604969597
+      }
+    ],
+    "stranded_btc": 0.00047095513773918367,
+    "total_spend_btc": 0.000915111329341616,
+    "versus_holding_btc_btc": -0.0009055000000000174,
+    "versus_holding_btc_usd": -54.33000000000084,
+    "versus_holding_cash_usd": -54.65876712328827,
+    "wallet_btc": 0.049094499999999985,
+    "withdrawals": 0,
+    "withdrawn_btc": 0.0
+  },
+  "order": {
+    "algorithm": "SHA256",
+    "amount_btc": 0.01,
+    "duration_hours": 24.0,
+    "market": "EU",
+    "parameter_semantics": "price is a bid, amount is an escrowed budget, speed limit is the maximum speed requested; none of the three implies the others",
+    "price_btc_per_speed_unit_day": 0.001,
+    "speed_limit": 1.0,
+    "speed_unit": "PH"
+  },
+  "outcome": {
+    "buyer_fee_btc": 2.549999999999999e-05,
+    "cancellation_fee_btc": 0.0,
+    "creation_fee_btc": 1e-05,
+    "delivered_ratio": 0.8500000000000001,
+    "ended_because": "duration_elapsed",
+    "gross_mined_btc": 0.0004805664670807997,
+    "hours_delivering": 24.0,
+    "hours_outbid": 0.0,
+    "hours_run": 24.0,
+    "net_mined_btc": 0.00047095513773918367,
+    "notes": [],
+    "order": {
+      "algorithm": "SHA256",
+      "amount_btc": 0.01,
+      "duration_hours": 24.0,
+      "market": "EU",
+      "parameter_semantics": "price is a bid, amount is an escrowed budget, speed limit is the maximum speed requested; none of the three implies the others",
+      "price_btc_per_speed_unit_day": 0.001,
+      "speed_limit": 1.0,
+      "speed_unit": "PH"
+    },
+    "pool_fee_btc": 9.611329341615994e-06,
+    "refunded_btc": 0.009114499999999985,
+    "repriced_to_btc": null,
+    "spent_btc": 0.00085,
+    "total_cost_btc": 0.0008855
+  },
+  "pool": {
+    "minimum_payout_btc": 0.0005,
+    "payout_evidence_class": "SYNTHETIC",
+    "payout_scheme": "FPPS",
+    "pool_fee_rate": 0.02,
+    "pool_name": "synthetic-pool"
+  },
+  "schema_version": 1,
+  "state": "NOT_MEASURED"
+}
