@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 import pytest
+from v8_venue_fakes import FakeVenue
 
 from quant_trade.v8.backfill import (
     STATUS_OK,
@@ -25,7 +26,6 @@ from quant_trade.v8.backfill import (
 from quant_trade.v9.mining_shadow import BiddingPolicy, MarketSnapshot, ShadowCollector
 from quant_trade.v9.paper_engine import CLOCK_INJECTED_TEST, MarketTick, PaperEngineError
 from quant_trade.v9.paper_session import PaperSession, SessionConfig
-from tests.v8_venue_fakes import FakeVenue
 
 # --- fixtures ----------------------------------------------------------------
 
