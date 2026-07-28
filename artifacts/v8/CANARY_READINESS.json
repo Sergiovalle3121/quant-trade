@@ -1,0 +1,95 @@
+{
+  "artifact": "CANARY_READINESS",
+  "blocking_conditions": [
+    "paper_result_sufficient",
+    "reconciliation_clean",
+    "owner_budget_explicit",
+    "exchange_and_jurisdiction_confirmed",
+    "loss_limits_configured",
+    "credentials_delivery_secure"
+  ],
+  "canary_authorized": false,
+  "conditions": [
+    {
+      "blocker": "no paper session has produced a sufficient supervised result",
+      "condition_id": "paper_result_sufficient",
+      "description": "A supervised paper session has run long enough, on wall-clock time, to be evidence rather than a smoke test.",
+      "kind": "MACHINE_CHECKABLE",
+      "observed": {
+        "events_processed": 0,
+        "session_status": "NOT_STARTED_NO_CANDIDATE",
+        "wall_clock_hours": 0.0
+      },
+      "required": {
+        "events_processed": 500,
+        "session_status": "RUNNING",
+        "wall_clock_hours": 72.0
+      },
+      "satisfied": false
+    },
+    {
+      "blocker": "no clean reconciliation on record",
+      "condition_id": "reconciliation_clean",
+      "description": "The paper session reconciles with no errors.",
+      "kind": "MACHINE_CHECKABLE",
+      "observed": "no reconciliation on record",
+      "required": "a reconciliation with zero problems",
+      "satisfied": false
+    },
+    {
+      "blocker": "no explicit owner budget",
+      "condition_id": "owner_budget_explicit",
+      "description": "The owner has stated, explicitly, how much money may be at risk. An agent cannot infer or assume this.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": null,
+      "required": "a positive amount stated by the owner",
+      "satisfied": false
+    },
+    {
+      "blocker": "exchange and jurisdiction not confirmed",
+      "condition_id": "exchange_and_jurisdiction_confirmed",
+      "description": "The venue and the legal jurisdiction it will be traded from are confirmed by a human.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": false,
+      "required": true,
+      "satisfied": false
+    },
+    {
+      "blocker": "loss limits are not fully configured",
+      "condition_id": "loss_limits_configured",
+      "description": "Per-trade, daily and total loss limits are configured.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": null,
+      "required": [
+        "per_trade",
+        "daily",
+        "total"
+      ],
+      "satisfied": false
+    },
+    {
+      "blocker": "no confirmed secure credential delivery mechanism",
+      "condition_id": "credentials_delivery_secure",
+      "description": "A secure mechanism exists for delivering venue credentials directly to the execution host. No key, seed phrase or wallet is ever requested, printed or stored by this tooling.",
+      "kind": "REQUIRES_HUMAN_DECISION",
+      "observed": false,
+      "required": true,
+      "satisfied": false
+    }
+  ],
+  "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "notes": [
+    "Clearing every condition still does not authorise real money: it only means a human may now make that decision deliberately.",
+    "Four of the six conditions are human decisions by construction and cannot be satisfied by any amount of further engineering."
+  ],
+  "real_money_authorized": false,
+  "safety": {
+    "no_credentials_requested_or_stored": true,
+    "no_deposits": true,
+    "no_orders_submitted": true,
+    "no_withdrawals": true
+  },
+  "schema_version": 1,
+  "status": "BLOCKED",
+  "unblocked": false
+}

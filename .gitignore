@@ -50,3 +50,23 @@ data/lake/manifests/
 
 # Real market data inputs are never committed; evidence keeps sha256 + metrics only.
 data/real_input/
+
+# V8 evidence store. The ATTEMPT LOGS, receipts and manifests are committed —
+# they are our own records of what was requested and what the venue answered,
+# and they are what makes a blocked acquisition verifiable rather than a
+# claim. The raw venue responses and the panels derived from them are NOT
+# committed: whether Bybit/OKX market data may be redistributed is a licensing
+# question this repository has not resolved, and the pack manifest records
+# that stance as UNRESOLVED.
+#
+# This is not a reproducibility fig leaf. `quant-trade v8 evidence-pack`
+# builds a content-addressed bundle and `evidence-verify` re-parses every
+# archived response and byte-compares the rebuilt series, so an operator who
+# does hold redistribution rights can move the bytes and a third party can
+# check them.
+data/v8_evidence/*/raw/
+data/v8_evidence/*/series/
+data/v8_evidence/*/panel.jsonl
+data/v8_evidence/*/panel_manifest.json
+data/v8_evidence/*/panel_manifest.sha256
+data/v8_packs/

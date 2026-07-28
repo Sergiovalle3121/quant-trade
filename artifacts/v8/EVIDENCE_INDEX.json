@@ -1,0 +1,148 @@
+{
+  "acquisition_blocker": {
+    "blocked_venues": [
+      "bybit",
+      "okx"
+    ],
+    "policy": "Only venue-published official domains are attempted. Proxies, VPN exits, mirrors and third-party redistributors are never used to route around a regional or organisational restriction.",
+    "probes": [
+      {
+        "attempted_at_utc": "2026-07-28T06:54:02Z",
+        "elapsed_ms": 401,
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "api.bybit.com",
+        "http_status": null,
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "role": "primary documented API domain",
+        "url": "https://api.bybit.com/v5/market/time",
+        "venue": "bybit"
+      },
+      {
+        "attempted_at_utc": "2026-07-28T06:54:02Z",
+        "elapsed_ms": 356,
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "api.bytick.com",
+        "http_status": null,
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "role": "venue-published alternative domain",
+        "url": "https://api.bytick.com/v5/market/time",
+        "venue": "bybit"
+      },
+      {
+        "attempted_at_utc": "2026-07-28T06:54:02Z",
+        "elapsed_ms": 353,
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "api.bybit.nl",
+        "http_status": null,
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "role": "venue-published Netherlands entity domain",
+        "url": "https://api.bybit.nl/v5/market/time",
+        "venue": "bybit"
+      },
+      {
+        "attempted_at_utc": "2026-07-28T06:54:02Z",
+        "elapsed_ms": 442,
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "www.okx.com",
+        "http_status": null,
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "role": "primary documented API domain",
+        "url": "https://www.okx.com/api/v5/public/time",
+        "venue": "okx"
+      },
+      {
+        "attempted_at_utc": "2026-07-28T06:54:02Z",
+        "elapsed_ms": 333,
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "aws.okx.com",
+        "http_status": null,
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "role": "venue-published alternative API domain",
+        "url": "https://aws.okx.com/api/v5/public/time",
+        "venue": "okx"
+      },
+      {
+        "attempted_at_utc": "2026-07-28T06:54:02Z",
+        "elapsed_ms": 373,
+        "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+        "host": "my.okx.com",
+        "http_status": null,
+        "outcome": "BLOCKED_EGRESS_POLICY",
+        "role": "venue-published regional app domain",
+        "url": "https://my.okx.com/api/v5/public/time",
+        "venue": "okx"
+      }
+    ],
+    "reachable_venues": []
+  },
+  "artifact": "EVIDENCE_INDEX",
+  "datasets": [
+    {
+      "announced_rate_rows": 0,
+      "directory": "bybit_btc_usdt",
+      "interval_changes": 0,
+      "panel_rows": 0,
+      "present": true,
+      "problems": [
+        "spot: no rows",
+        "perp: no rows",
+        "mark: no rows",
+        "index: no rows",
+        "funding: no settlements",
+        "no ingestion receipts: provenance is unverifiable"
+      ],
+      "provenance": "unverified_legacy",
+      "raw_bytes": 0,
+      "raw_pages": 0,
+      "realized_rate_rows": 0,
+      "receipt_chain_clean": true,
+      "receipts": 0,
+      "span_days": 0.0,
+      "symbol": "BTC-USDT",
+      "unique_settlements": 0,
+      "validation_clean": false,
+      "venue": "bybit"
+    },
+    {
+      "announced_rate_rows": 0,
+      "directory": "okx_btc_usdt",
+      "interval_changes": 0,
+      "panel_rows": 0,
+      "present": true,
+      "problems": [
+        "spot: no rows",
+        "perp: no rows",
+        "mark: no rows",
+        "index: no rows",
+        "funding: no settlements",
+        "no ingestion receipts: provenance is unverifiable"
+      ],
+      "provenance": "unverified_legacy",
+      "raw_bytes": 0,
+      "raw_pages": 0,
+      "realized_rate_rows": 0,
+      "receipt_chain_clean": true,
+      "receipts": 0,
+      "span_days": 0.0,
+      "symbol": "BTC-USDT",
+      "unique_settlements": 0,
+      "validation_clean": false,
+      "venue": "okx"
+    }
+  ],
+  "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "evidence_root": "data/v8_evidence",
+  "rebuild_command": "quant-trade v8 evidence-backfill --venue <bybit|okx> --symbol BTC --since <iso> --until <iso> && quant-trade v8 evidence-pack",
+  "requirements": {
+    "min_span_days": 730.0,
+    "min_unique_settlements": 1000,
+    "required_provenance": "real (receipt-verified live capture)"
+  },
+  "schema_version": 1,
+  "totals": {
+    "raw_bytes": 0,
+    "raw_pages": 0,
+    "unique_settlements": 0,
+    "venues_with_evidence": 2
+  }
+}

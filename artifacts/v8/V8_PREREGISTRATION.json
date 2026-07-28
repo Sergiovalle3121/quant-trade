@@ -1,0 +1,318 @@
+{
+  "artifact": "V8_PREREGISTRATION",
+  "freeze_hash": "b21483449a7e1e1917f59458012fd236353d536d5ca19412af4627f86e659678",
+  "gates": {
+    "max_cscv_pbo": 0.5,
+    "min_deflated_sharpe": 0.95,
+    "min_probabilistic_sharpe": 0.95,
+    "min_span_days": 730.0,
+    "min_unique_settlements": 1000,
+    "min_walk_forward_windows": 5,
+    "report_3x_costs": true,
+    "require_beats_buy_and_hold": true,
+    "require_beats_cash": true,
+    "require_bootstrap_p05_positive": true,
+    "require_majority_positive_walk_forward": true,
+    "require_positive_at_2x_costs": true,
+    "require_promotable_cost_evidence": true,
+    "require_real_provenance": true,
+    "require_reconciled_ledger": true,
+    "require_untouched_holdout": true,
+    "require_zero_liquidations": true
+  },
+  "hypotheses": [
+    {
+      "benchmarks": [
+        "cash",
+        "buy_and_hold_btc"
+      ],
+      "capacity_notes": "Sized against observed bar volume; capacity is the notional that keeps modelled impact within the priced allowance.",
+      "cost_treatment": "conservative_cost_stack('bybit'); 1x/2x/3x reported",
+      "falsifiers": [
+        "net marked-equity return <= 0 over the campaign",
+        "net return <= 0 at 2x costs",
+        "bootstrap P05 of total return <= 0",
+        "a majority of walk-forward windows negative",
+        "any liquidation or maintenance-margin breach along the path",
+        "does not beat holding cash",
+        "does not beat buy-and-hold BTC"
+      ],
+      "hypothesis_id": "H1",
+      "instruments": [
+        "bybit:BTC-USDT:spot",
+        "bybit:BTC-USDT:linear-perp"
+      ],
+      "periodicity": "1h bars; funding accrues only at settlement instants",
+      "priority": "PRIMARY",
+      "signal": "Trailing mean of the SETTLED funding series, held constant between settlements. Enter when it exceeds entry_threshold, else hold flat. Announced/predicted rates carry no entry authority.",
+      "thesis": "Long BTCUSDT spot, short BTCUSDT linear perpetual on Bybit, held delta-neutral, earns positive net carry from settled funding after the full cost stack.",
+      "title": "Bybit BTC spot/perp cash-and-carry",
+      "variant_count": 4,
+      "variants": [
+        {
+          "parameters": {
+            "entry_threshold": 5e-05,
+            "trailing_window": 3
+          },
+          "variant_id": "H1-t5-w3"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 5e-05,
+            "trailing_window": 6
+          },
+          "variant_id": "H1-t5-w6"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 0.0001,
+            "trailing_window": 3
+          },
+          "variant_id": "H1-t10-w3"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 0.0001,
+            "trailing_window": 6
+          },
+          "variant_id": "H1-t10-w6"
+        }
+      ],
+      "venues": [
+        "bybit"
+      ]
+    },
+    {
+      "benchmarks": [
+        "cash",
+        "buy_and_hold_btc"
+      ],
+      "capacity_notes": "Sized against observed bar volume; capacity is the notional that keeps modelled impact within the priced allowance.",
+      "cost_treatment": "conservative_cost_stack('okx'); 1x/2x/3x reported",
+      "falsifiers": [
+        "net marked-equity return <= 0 over the campaign",
+        "net return <= 0 at 2x costs",
+        "bootstrap P05 of total return <= 0",
+        "a majority of walk-forward windows negative",
+        "any liquidation or maintenance-margin breach along the path",
+        "does not beat holding cash",
+        "does not beat buy-and-hold BTC"
+      ],
+      "hypothesis_id": "H2",
+      "instruments": [
+        "okx:BTC-USDT:spot",
+        "okx:BTC-USDT:linear-perp"
+      ],
+      "periodicity": "1h bars; funding accrues only at settlement instants",
+      "priority": "PRIMARY",
+      "signal": "Trailing mean of the settled realizedRate series, held constant between settlements. fundingRate is used only where OKX published no realizedRate, and every such row is counted and reported.",
+      "thesis": "The same delta-neutral carry on OKX (BTC-USDT spot vs BTC-USDT-SWAP), driven strictly by the settled realizedRate rather than the announced fundingRate.",
+      "title": "OKX BTC spot/swap cash-and-carry on settled realizedRate",
+      "variant_count": 4,
+      "variants": [
+        {
+          "parameters": {
+            "entry_threshold": 5e-05,
+            "trailing_window": 3
+          },
+          "variant_id": "H2-t5-w3"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 5e-05,
+            "trailing_window": 6
+          },
+          "variant_id": "H2-t5-w6"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 0.0001,
+            "trailing_window": 3
+          },
+          "variant_id": "H2-t10-w3"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 0.0001,
+            "trailing_window": 6
+          },
+          "variant_id": "H2-t10-w6"
+        }
+      ],
+      "venues": [
+        "okx"
+      ]
+    },
+    {
+      "benchmarks": [
+        "cash",
+        "buy_and_hold_btc",
+        "H1",
+        "H2"
+      ],
+      "capacity_notes": "Capacity is the minimum of the two venues' capacity, further reduced by the capital that must sit idle in transit.",
+      "cost_treatment": "conservative_cost_stack(venue, cross_venue=True) on both legs; 1x/2x/3x reported",
+      "falsifiers": [
+        "net marked-equity return <= 0 over the campaign",
+        "net return <= 0 at 2x costs",
+        "bootstrap P05 of total return <= 0",
+        "a majority of walk-forward windows negative",
+        "any liquidation or maintenance-margin breach along the path",
+        "does not beat holding cash",
+        "does not beat buy-and-hold BTC",
+        "does not beat max(H1, H2)",
+        "either venue panel is missing or fails validation"
+      ],
+      "hypothesis_id": "H3",
+      "instruments": [
+        "bybit:BTC-USDT:linear-perp",
+        "okx:BTC-USDT:linear-perp"
+      ],
+      "periodicity": "1h bars aligned across venues; settled funding per venue",
+      "priority": "PRIMARY",
+      "signal": "Trailing mean of the settled funding SPREAD (bybit minus okx), held between settlements. Enter when |spread| exceeds entry_threshold.",
+      "thesis": "When settled funding on the two venues diverges, long the lower-funding perpetual and short the higher-funding perpetual, collecting the spread. Requires both venue panels; must beat max(H1, H2, cash) after the complete cost of operating on two venues, including capital transfer and the unhedged window.",
+      "title": "Bybit/OKX BTC funding dispersion, full venue-switching cost",
+      "variant_count": 4,
+      "variants": [
+        {
+          "parameters": {
+            "entry_threshold": 5e-05,
+            "trailing_window": 3
+          },
+          "variant_id": "H3-t5-w3"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 5e-05,
+            "trailing_window": 6
+          },
+          "variant_id": "H3-t5-w6"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 0.0001,
+            "trailing_window": 3
+          },
+          "variant_id": "H3-t10-w3"
+        },
+        {
+          "parameters": {
+            "entry_threshold": 0.0001,
+            "trailing_window": 6
+          },
+          "variant_id": "H3-t10-w6"
+        }
+      ],
+      "venues": [
+        "bybit",
+        "okx"
+      ]
+    },
+    {
+      "benchmarks": [
+        "cash",
+        "buy_and_hold_btc",
+        "buy_and_hold_eth"
+      ],
+      "capacity_notes": "Spot-only, no leverage; capacity bounded by daily volume.",
+      "cost_treatment": "conservative_cost_stack('bybit') on spot legs only; 1x/2x/3x",
+      "falsifiers": [
+        "net return <= 0 after costs",
+        "does not beat buy-and-hold on the same instruments",
+        "turnover exceeds the registered ceiling"
+      ],
+      "hypothesis_id": "H6",
+      "instruments": [
+        "bybit:BTC-USDT:spot",
+        "bybit:ETH-USDT:spot"
+      ],
+      "periodicity": "daily rebalance, weekly signal",
+      "priority": "ADDITIONAL",
+      "signal": "Sign of the trailing return over `lookback_days`, vol-targeted to 10% annual",
+      "thesis": "A slow time-series momentum signal on BTC and ETH, sized to a constant volatility target, earns a positive risk-adjusted return after costs at low turnover.",
+      "title": "Low-turnover BTC/ETH time-series momentum with volatility targeting",
+      "variant_count": 2,
+      "variants": [
+        {
+          "parameters": {
+            "lookback_days": 90,
+            "vol_target_annual": 0.1
+          },
+          "variant_id": "H6-lb90"
+        },
+        {
+          "parameters": {
+            "lookback_days": 180,
+            "vol_target_annual": 0.1
+          },
+          "variant_id": "H6-lb180"
+        }
+      ],
+      "venues": [
+        "bybit"
+      ]
+    },
+    {
+      "benchmarks": [
+        "cash",
+        "buy_and_hold_btc",
+        "buy_and_hold_eth"
+      ],
+      "capacity_notes": "Spot-only, unlevered; capacity bounded by daily volume.",
+      "cost_treatment": "conservative_cost_stack('bybit') on every rotation; 1x/2x/3x",
+      "falsifiers": [
+        "net return <= 0 after costs",
+        "does not beat the better of buy-and-hold BTC / ETH",
+        "uses leverage"
+      ],
+      "hypothesis_id": "H7",
+      "instruments": [
+        "bybit:BTC-USDT:spot",
+        "bybit:ETH-USDT:spot",
+        "cash"
+      ],
+      "periodicity": "weekly rebalance",
+      "priority": "ADDITIONAL",
+      "signal": "Hold the higher trailing-`lookback_days` return of BTC/ETH; cash when both negative",
+      "thesis": "Rotating between BTC, ETH and cash on relative trailing strength, without leverage and at low turnover, beats holding either asset.",
+      "title": "Low-turnover BTC/ETH/cash relative rotation, unlevered",
+      "variant_count": 2,
+      "variants": [
+        {
+          "parameters": {
+            "lookback_days": 60
+          },
+          "variant_id": "H7-lb60"
+        },
+        {
+          "parameters": {
+            "lookback_days": 120
+          },
+          "variant_id": "H7-lb120"
+        }
+      ],
+      "venues": [
+        "bybit"
+      ]
+    }
+  ],
+  "max_additional_variants": 8,
+  "registered_at_commit": "596c2accd5c535f3c537a4439a96b94e521e4018",
+  "registered_at_utc": "2026-07-28T06:30:00Z",
+  "schema_version": 1,
+  "splits": {
+    "holdout_fraction": 0.2,
+    "holdout_position": "most_recent",
+    "scheme": "chronological",
+    "train_fraction": 0.5,
+    "walk_forward": {
+      "embargo_bars": 1,
+      "purge_bars": 6,
+      "step_size": 240,
+      "test_size": 240,
+      "train_size": 720
+    },
+    "walk_forward_fraction": 0.3
+  }
+}

@@ -18,6 +18,8 @@ jobs:
         run: ruff check .
       - name: V7 format check
         run: xargs ruff format --check < .github/v7-python-files.txt
+      - name: V8 format check
+        run: xargs ruff format --check < .github/v8-python-files.txt
       - name: Mypy
         run: mypy src
       - name: Diff whitespace check

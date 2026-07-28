@@ -249,6 +249,42 @@ def write_panel(
     return panel_path
 
 
+#: Receipt kinds that are provenance rather than panel inputs. They are
+#: verified as part of the chain but produce no bars.
+NON_PANEL_RECEIPT_KINDS = ("instruments", "server_time")
+
+
+def _rebuild_settlements(funding_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse reparsed funding rows into deduplicated settlements.
+
+    Two normalized shapes reach here: V7's ``FundingObservation`` (identified
+    by venue/symbol/ISO timestamp) and V8's backfill row (an explicit
+    ``settled_at_ms``). Both collapse to the same settlement list, and in both
+    a stamp reported with two different rates is fatal rather than
+    last-write-wins.
+    """
+    import calendar
+
+    by_stamp: dict[int, float] = {}
+    for row in funding_rows:
+        if "settled_at_ms" in row:
+            stamp = int(row["settled_at_ms"])
+            rate = float(row["rate"])
+        else:
+            stamp = int(
+                calendar.timegm(
+                    time.strptime(str(row["exchange_timestamp_utc"]), "%Y-%m-%dT%H:%M:%SZ")
+                )
+                * 1000
+            )
+            rate = float(row["realized_funding_rate"])
+        previous = by_stamp.get(stamp)
+        if previous is not None and previous != rate:
+            raise ValueError(f"conflicting funding settlement at {stamp}")
+        by_stamp[stamp] = rate
+    return [{"settled_at_ms": stamp, "rate": rate} for stamp, rate in sorted(by_stamp.items())]
+
+
 def _deduplicate_rebuilt_rows(
     rows: list[dict[str, Any]], *, identity_key: str
 ) -> list[dict[str, Any]]:
@@ -307,6 +343,11 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
     for receipt in load_receipts(receipts_path):
         params = receipt.get("request_parameters", {})
         kind = str(params.get("kind", "")) if isinstance(params, dict) else ""
+        if kind in NON_PANEL_RECEIPT_KINDS:
+            # Contract metadata and server-clock captures are provenance, not
+            # panel inputs: they belong in the receipt chain but contribute no
+            # bars, so the rebuild skips them instead of failing.
+            continue
         raw_path = (root / str(receipt["raw_path"])).resolve()
         normalized = rebuild_normalized_rows(receipt, raw_path.read_bytes())
         if kind == "funding":
@@ -319,30 +360,7 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
         kind: _deduplicate_rebuilt_rows(series, identity_key="start_ms")
         for kind, series in rebuilt_by_kind.items()
     }
-    settlement_by_identity: dict[tuple[str, str, str], float] = {}
-    for row in funding_rows:
-        identity = (
-            str(row["venue"]),
-            str(row["symbol"]),
-            str(row["exchange_timestamp_utc"]),
-        )
-        rate = float(row["realized_funding_rate"])
-        previous = settlement_by_identity.get(identity)
-        if previous is not None and previous != rate:
-            raise ValueError(f"conflicting funding settlement {identity}")
-        settlement_by_identity[identity] = rate
-
-    import calendar
-
-    settlements = [
-        {
-            "settled_at_ms": int(
-                calendar.timegm(time.strptime(identity[2], "%Y-%m-%dT%H:%M:%SZ")) * 1000
-            ),
-            "rate": rate,
-        }
-        for identity, rate in sorted(settlement_by_identity.items(), key=lambda item: item[0][2])
-    ]
+    settlements = _rebuild_settlements(funding_rows)
     context = manifest.get("build_context")
     if not isinstance(context, dict) or not context:
         raise ValueError("panel manifest lacks byte-rebuild build_context")

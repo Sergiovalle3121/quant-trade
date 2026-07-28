@@ -1,0 +1,73 @@
+{
+  "artifact": "TRADING_LEADERBOARD",
+  "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "note": "Unmeasured rows are listed last and are never ranked. A campaign that did not run has no economic position, favourable or otherwise.",
+  "rows": [
+    {
+      "blocking_reasons": [
+        "bybit: no panel at data/v8_evidence/bybit_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "bootstrap_p05": null,
+      "capacity_notional_usd": null,
+      "cscv_pbo": null,
+      "deflated_sharpe": null,
+      "hypothesis_id": "H1",
+      "max_drawdown": null,
+      "measured": false,
+      "net_return": null,
+      "net_return_2x_costs": null,
+      "net_return_3x_costs": null,
+      "probabilistic_sharpe": null,
+      "rank": null,
+      "sharpe_per_period": null,
+      "status": "NOT_RUN_NO_EVIDENCE",
+      "title": "Bybit BTC spot/perp cash-and-carry"
+    },
+    {
+      "blocking_reasons": [
+        "okx: no panel at data/v8_evidence/okx_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "bootstrap_p05": null,
+      "capacity_notional_usd": null,
+      "cscv_pbo": null,
+      "deflated_sharpe": null,
+      "hypothesis_id": "H2",
+      "max_drawdown": null,
+      "measured": false,
+      "net_return": null,
+      "net_return_2x_costs": null,
+      "net_return_3x_costs": null,
+      "probabilistic_sharpe": null,
+      "rank": null,
+      "sharpe_per_period": null,
+      "status": "NOT_RUN_NO_EVIDENCE",
+      "title": "OKX BTC spot/swap cash-and-carry on settled realizedRate"
+    },
+    {
+      "blocking_reasons": [
+        "bybit: no panel at data/v8_evidence/bybit_btc_usdt",
+        "okx: no panel at data/v8_evidence/okx_btc_usdt",
+        "no dataset was acquired, so nothing was measured — this is an acquisition failure, not an economic verdict on the hypothesis"
+      ],
+      "bootstrap_p05": null,
+      "capacity_notional_usd": null,
+      "cscv_pbo": null,
+      "deflated_sharpe": null,
+      "hypothesis_id": "H3",
+      "max_drawdown": null,
+      "measured": false,
+      "net_return": null,
+      "net_return_2x_costs": null,
+      "net_return_3x_costs": null,
+      "probabilistic_sharpe": null,
+      "rank": null,
+      "sharpe_per_period": null,
+      "status": "NOT_RUN_NO_EVIDENCE",
+      "title": "Bybit/OKX BTC funding dispersion, full venue-switching cost"
+    }
+  ],
+  "schema_version": 1,
+  "winner": null
+}
