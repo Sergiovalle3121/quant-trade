@@ -1,0 +1,50 @@
+# LOCAL paper loop: equal weight, quarterly rebalance.
+# Copy of loop_ew_quarterly_prod.yaml with cloud dependencies removed so the
+# loop runs entirely offline on one machine (no AWS, no boto3, no S3).
+# Like the prod file, this must NOT set rebalance_frequency — the quarterly
+# cadence is the strategy's own default.
+# Paper-only; no broker connectivity exists in the loop.
+# Run with: quant-trade paper loop --config configs/paper/loop_ew_quarterly_local.yaml --max-cycles 1
+# Paths use forward slashes: valid for pathlib on Windows and safe in YAML
+# (a backslash after a double quote would be an invalid escape sequence).
+mode: paper_loop
+session_name: ew_quarterly_local
+strategy: equal_weight_quarterly
+strategy_params:
+  max_weight_per_asset: 0.25
+universe:
+  symbols: [SPY, QQQ, IWM, TLT, GLD]
+initial_cash: 100000
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0005
+  slippage_bps: 5.0
+  spread_bps: 2.0
+risk_limits:
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+  # Wide enough that market beta does not halt the session (a fully-invested
+  # 5-ETF portfolio can move 3-6% in a bad day); plumbing faults, not market
+  # moves, are what these breakers exist to catch here.
+  max_daily_loss_pct: 0.06
+  max_total_drawdown_pct: 0.30
+  max_turnover_per_rebalance: 1.5
+  min_cash_pct: 0.01
+  max_orders_per_day: 20
+  allow_short: false
+  allow_leverage: false
+  kill_switch_enabled: true
+provider:
+  name: yfinance
+  interval: 1d
+  history_bars: 400
+# Absolute so the run does not depend on cwd (Path() resolves relative dirs
+# against the process cwd, not against this file). State root becomes
+# <state_dir>/<session_name>.
+state_dir: D:/dev/quant-trade/state/paper_loop
+# Local filesystem, not s3://. backend_for_uri() dispatches on the "s3://"
+# prefix only, so these fall through to LocalStorageBackend -> Path(uri).
+# A missing kill-switch file reads as "not active" and the loop proceeds.
+kill_switch_uri: D:/dev/quant-trade/state/paper_loop/ew_quarterly_local/kill_switch.json
+heartbeat_uri: D:/dev/quant-trade/state/paper_loop/ew_quarterly_local/heartbeat.json
+emit_cloudwatch_metrics: false
