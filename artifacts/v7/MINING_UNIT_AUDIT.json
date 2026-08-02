@@ -57,6 +57,8 @@
   ],
   "artifact": "MINING_UNIT_AUDIT",
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
-  "schema_version": 2,
-  "universal_th_divisor_present": false
+  "evidence_class": "NOT_MEASURED",
+  "schema_version": 3,
+  "universal_th_divisor_present": null,
+  "universal_th_divisor_state": "NOT_MEASURED"
 }

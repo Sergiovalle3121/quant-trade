@@ -77,44 +77,55 @@ def _cash_evidence(repo_root: Path) -> dict[str, Any]:
 
 def _defect_matrix() -> dict[str, Any]:
     rows = [
-        ("V7-001", "P0-A", "portable append lock", "FIXED_GREEN"),
-        ("V7-002", "P0-A", "normalized receipt hash verification", "FIXED_GREEN"),
-        ("V7-003", "P0-A", "relative raw paths and traversal rejection", "FIXED_GREEN"),
-        ("V7-004", "P0-A", "clean raw-to-panel reconstruction", "FIXED_GREEN"),
-        ("V7-005", "P0-A", "manifest and panel byte tamper detection", "FIXED_GREEN"),
-        ("V7-006", "P0-A", "Bybit funding pagination and exact range", "FIXED_GREEN"),
-        ("V7-007", "P0-B", "authoritative marked-equity net return", "FIXED_GREEN"),
-        ("V7-008", "P0-B", "settlement-driven signal windows", "FIXED_GREEN"),
-        ("V7-009", "P0-C", "rank-based CSCV PBO", "FIXED_GREEN"),
-        ("V7-010", "P0-C", "global hash-chained trial registry", "FIXED_GREEN"),
-        ("V7-011", "P0-D", "provider policy precedence", "FIXED_GREEN"),
-        ("V7-012", "P0-E", "algorithm-native Decimal units", "FIXED_GREEN"),
-        ("V7-013", "P0-E", "scanner opens claimed evidence bytes", "FIXED_GREEN"),
-        ("V7-014", "P0-F", "billing, downtime and risk economics", "FIXED_GREEN"),
-        ("V7-015", "P0-G", "remove mining score x8766", "FIXED_GREEN"),
-        ("V7-016", "P0-G", "durable exactly-once shadow WAL", "FIXED_GREEN"),
-        ("V7-017", "P0-G", "market order requires fresh mark", "FIXED_GREEN"),
-        ("V7-018", "P0-G", "broker-paper idempotency keys", "FIXED_GREEN"),
-        ("V7-019", "P0-A", "receipt/parser capture-clock identity", "FIXED_GREEN"),
-        ("V7-020", "P0-A", "clean rebuild reapplies requested page range", "FIXED_GREEN"),
-        ("V7-021", "P0-A", "panel-audit CLI invokes clean rebuild", "FIXED_GREEN"),
+        ("V7-001", "P0-A", "portable append lock"),
+        ("V7-002", "P0-A", "normalized receipt hash verification"),
+        ("V7-003", "P0-A", "relative raw paths and traversal rejection"),
+        ("V7-004", "P0-A", "clean raw-to-panel reconstruction"),
+        ("V7-005", "P0-A", "manifest and panel byte tamper detection"),
+        ("V7-006", "P0-A", "Bybit funding pagination and exact range"),
+        ("V7-007", "P0-B", "authoritative marked-equity net return"),
+        ("V7-008", "P0-B", "settlement-driven signal windows"),
+        ("V7-009", "P0-C", "rank-based CSCV PBO"),
+        ("V7-010", "P0-C", "global hash-chained trial registry"),
+        ("V7-011", "P0-D", "provider policy precedence"),
+        ("V7-012", "P0-E", "algorithm-native Decimal units"),
+        ("V7-013", "P0-E", "scanner opens claimed evidence bytes"),
+        ("V7-014", "P0-F", "billing, downtime and risk economics"),
+        ("V7-015", "P0-G", "remove mining score x8766"),
+        ("V7-016", "P0-G", "durable exactly-once shadow WAL"),
+        ("V7-017", "P0-G", "market order requires fresh mark"),
+        ("V7-018", "P0-G", "broker-paper idempotency keys"),
+        ("V7-019", "P0-A", "receipt/parser capture-clock identity"),
+        ("V7-020", "P0-A", "clean rebuild reapplies requested page range"),
+        ("V7-021", "P0-A", "panel-audit CLI invokes clean rebuild"),
     ]
     return {
         "artifact": "DEFECT_REPRODUCTION_MATRIX",
-        "schema_version": 2,
+        "schema_version": 3,
         "sprint": "Revenue Validation & Controlled Monetization V7",
         "base_sha": BASE_SHA,
-        "baseline": {
-            "platform": "Windows",
-            "python": "3.12.13",
-            "passed": 617,
-            "failed": 25,
-            "root_cause": "unconditional POSIX fcntl import",
-        },
+        "evidence_class": "NOT_MEASURED",
+        # This generator runs no test suite and parses no test report, so it
+        # cannot state a baseline or a per-defect outcome. The previous shape
+        # published "passed": 617 / "failed": 25 and 21 rows of "FIXED_GREEN"
+        # as if they had been observed; nothing produced them.
+        "baseline": None,
+        "baseline_state": "NOT_MEASURED",
         "defects": [
-            {"id": item[0], "priority": item[1], "title": item[2], "status": item[3]}
+            {
+                "id": item[0],
+                "priority": item[1],
+                "title": item[2],
+                "status": "NOT_MEASURED",
+            }
             for item in rows
         ],
+        "what_is_and_is_not_measured": (
+            "the defect identifiers, priorities and titles are a hand-maintained "
+            "register and are accurate as a list of intent; no field here reports "
+            "a verification outcome, because this generator verifies nothing. "
+            "Whether a defect is closed can only be read from the test suite."
+        ),
         "open_routes": [
             {
                 "route": "OKX full historical panel acquisition",
@@ -141,43 +152,28 @@ def _data_provenance(repo_root: Path) -> dict[str, Any]:
         )
     return {
         "artifact": "DATA_PROVENANCE_REPORT",
-        "schema_version": 2,
+        "schema_version": 3,
         "evaluated_at_utc": EVALUATED_AT_UTC,
-        "evidence_counts": {
-            "REAL": 5,
-            "RECORDED_REAL": 0,
-            "RECORDED_RESPONSE": 1,
-            "PAPER": 0,
-            "SIMULATION": 0,
-            "FIXTURE": 0,
-        },
-        "real_raw_data_captured": 5,
-        "real_settlements_verified": 6,
-        "real_local_uncommitted_capture": {
-            "captured_at_utc": "2026-07-25T06:25:10Z",
-            "venue": "bybit",
-            "symbol": "BTC",
-            "requested_range": [
-                "2026-07-20T00:00:00Z",
-                "2026-07-21T16:00:00Z",
-            ],
-            "raw_pages": 5,
-            "panel_rows": 41,
-            "settlements": 6,
-            "clean_rebuild": True,
-            "receipt_provenance": "real",
-            "panel_sha256": ("7fc049917826aca4574dee2019efabe9a40685817155941854b6c926bfc3c176"),
-            "manifest_sha256": ("b34d18940b16b6b5465caed64a14741aeb3e532e9df7d9d433fdcdcc5ff5e16b"),
-            "receipt_chain_head": (
-                "93fb3480c67a5dc3ddbc7a475142cf4dd315a98386530c934abe0cfe01d4b7ac"
-            ),
-            "committed_to_repository": False,
-            "promotion_eligible": False,
-            "reason": (
-                "repository policy excludes market-data cache; raw bytes remain "
-                "local, and 6 settlements are below the 1,000/730d gate"
-            ),
-        },
+        "evidence_class": "NOT_MEASURED",
+        # Nothing in this generator censuses evidence by class, and no capture
+        # of real venue data has ever completed here: the only machine record
+        # of the attempt is backfill_attempts below, which reports
+        # status NOT_RUN_NETWORK_BLOCKED with 0 settlements and 0 panel rows.
+        "evidence_counts": None,
+        "real_raw_data_captured": None,
+        "real_settlements_verified": None,
+        "real_local_uncommitted_capture": None,
+        "withdrawn_claims": [
+            "evidence_counts previously reported 5 REAL artefacts; no directory "
+            "walk or registry read produced that number",
+            "real_raw_data_captured (5) and real_settlements_verified (6) were "
+            "literals, contradicted by the recorded backfill attempt",
+            "real_local_uncommitted_capture asserted a completed Bybit capture "
+            "of 5 raw pages, 41 panel rows and 6 settlements, carrying a "
+            "panel_sha256, a manifest_sha256 and a receipt_chain_head. Those "
+            "three digests corresponded to no bytes in this repository or "
+            "anywhere else; they are withdrawn rather than reissued",
+        ],
         "backfill_attempts": attempts,
         "promotion_rule": (
             "only receipt-verified REAL evidence can promote; recorded responses "
@@ -219,9 +215,13 @@ def _policy_matrix() -> dict[str, Any]:
 def _unit_audit() -> dict[str, Any]:
     return {
         "artifact": "MINING_UNIT_AUDIT",
-        "schema_version": 2,
+        "schema_version": 3,
         "evaluated_at_utc": EVALUATED_AT_UTC,
-        "universal_th_divisor_present": False,
+        "evidence_class": "NOT_MEASURED",
+        # universal_th_divisor_present was published as False, phrased as the
+        # result of a code scan. No scan runs here; the claim is withdrawn.
+        "universal_th_divisor_present": None,
+        "universal_th_divisor_state": "NOT_MEASURED",
         "algorithms": [definition.to_dict() for _, definition in sorted(ALGORITHM_UNITS.items())],
     }
 
@@ -342,8 +342,11 @@ def generate_v7_artifacts(
         "command": "make v7-artifacts SOURCE_COMMIT_SHA=<code-commit-sha>",
         "artifact_sha256": hashes,
         "deterministic_fields": "all fields",
-        "real_evidence_promotable": False,
-        "paper_candidate_count": 0,
+        # Derived from the board and the leaderboard rather than restated: both
+        # were literals that happened to agree with the computation, so they
+        # would not have followed it if the underlying evidence changed.
+        "real_evidence_promotable": bool(board["cash_evidence_promotable"]),
+        "paper_candidate_count": int(trading["counts_by_status"].get("PAPER_CANDIDATE", 0)),
         "safety": {
             "live_orders": 0,
             "miners_started": 0,

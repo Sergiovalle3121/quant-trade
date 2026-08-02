@@ -13,36 +13,16 @@
     }
   ],
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
-  "evidence_counts": {
-    "FIXTURE": 0,
-    "PAPER": 0,
-    "REAL": 5,
-    "RECORDED_REAL": 0,
-    "RECORDED_RESPONSE": 1,
-    "SIMULATION": 0
-  },
+  "evidence_class": "NOT_MEASURED",
+  "evidence_counts": null,
   "promotion_rule": "only receipt-verified REAL evidence can promote; recorded responses and fixtures remain non-promotable; local evidence whose raw bytes are absent from the repository cannot reproduce a promotion",
-  "real_local_uncommitted_capture": {
-    "captured_at_utc": "2026-07-25T06:25:10Z",
-    "clean_rebuild": true,
-    "committed_to_repository": false,
-    "manifest_sha256": "b34d18940b16b6b5465caed64a14741aeb3e532e9df7d9d433fdcdcc5ff5e16b",
-    "panel_rows": 41,
-    "panel_sha256": "7fc049917826aca4574dee2019efabe9a40685817155941854b6c926bfc3c176",
-    "promotion_eligible": false,
-    "raw_pages": 5,
-    "reason": "repository policy excludes market-data cache; raw bytes remain local, and 6 settlements are below the 1,000/730d gate",
-    "receipt_chain_head": "93fb3480c67a5dc3ddbc7a475142cf4dd315a98386530c934abe0cfe01d4b7ac",
-    "receipt_provenance": "real",
-    "requested_range": [
-      "2026-07-20T00:00:00Z",
-      "2026-07-21T16:00:00Z"
-    ],
-    "settlements": 6,
-    "symbol": "BTC",
-    "venue": "bybit"
-  },
-  "real_raw_data_captured": 5,
-  "real_settlements_verified": 6,
-  "schema_version": 2
+  "real_local_uncommitted_capture": null,
+  "real_raw_data_captured": null,
+  "real_settlements_verified": null,
+  "schema_version": 3,
+  "withdrawn_claims": [
+    "evidence_counts previously reported 5 REAL artefacts; no directory walk or registry read produced that number",
+    "real_raw_data_captured (5) and real_settlements_verified (6) were literals, contradicted by the recorded backfill attempt",
+    "real_local_uncommitted_capture asserted a completed Bybit capture of 5 raw pages, 41 panel rows and 6 settlements, carrying a panel_sha256, a manifest_sha256 and a receipt_chain_head. Those three digests corresponded to no bytes in this repository or anywhere else; they are withdrawn rather than reissued"
+  ]
 }
