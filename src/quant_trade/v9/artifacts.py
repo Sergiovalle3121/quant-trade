@@ -50,7 +50,6 @@ from quant_trade.v9.mining_evidence import (
     STATUS_BLOCKED as MINING_BLOCKED,
 )
 from quant_trade.v9.mining_evidence import (
-    derive_canary_budget,
     evaluate_mining_evidence,
     mining_canary_manifest,
 )
@@ -283,7 +282,11 @@ def _h3_reconciliation() -> dict[str, Any]:
             "capacity is min(Bybit, OKX) and the binding venue is named",
             "a single liquidation blocks promotion outright",
         ],
-        "v8_defect_closed": "E6",
+        # Cross-reference to the V8 erratum this artifact answers. It is not a
+        # closure verdict: nothing here re-runs V8 or checks that the defect is
+        # gone, so the field names the erratum and stops there.
+        "v8_erratum_addressed": "E6",
+        "v8_erratum_closure_state": STATE_NOT_MEASURED,
     }
 
 
@@ -353,7 +356,8 @@ def _small_capital(bundles: BundleSet) -> dict[str, Any]:
         "margin schedule and fee floors. The RETURN columns are absent, because "
         "there is no out-of-sample series to resample."
     )
-    payload["v8_defect_closed"] = "E8"
+    payload["v8_erratum_addressed"] = "E8"
+    payload["v8_erratum_closure_state"] = STATE_NOT_MEASURED
     return payload
 
 
@@ -386,7 +390,8 @@ def _unit_conversion_audit(spec: Any) -> dict[str, Any]:
         "worked_examples": worked,
         "btc_usd_reference": REFERENCE_BTC_USD,
         "btc_usd_evidence_class": "ASSUMPTION",
-        "v8_defect_closed": "E9",
+        "v8_erratum_addressed": "E9",
+        "v8_erratum_closure_state": STATE_NOT_MEASURED,
         "note": (
             "SHA-256 is quoted in PH/s. Skipping the conversion overstates the "
             "cost of hashrate by exactly 1,000x, which is large enough to turn "
@@ -493,18 +498,20 @@ def _mining_evidence_index(probe: dict[str, Any], spec: Any) -> dict[str, Any]:
         market_blocked=spec is None,
         pool=None,
     )
-    budget = derive_canary_budget(
-        min_order_amount_btc=0.001,
-        order_creation_fee_btc=0.00001,
-        deposit_fee_btc=0.00002,
-        withdrawal_fee_btc=0.00003,
-        buyer_fee_rate_on_spend=0.03,
-        pool_minimum_payout_btc=0.0005,
-    )
+    # No budget can be derived while the marketplace is unreadable. This call
+    # site used to invoke derive_canary_budget() with six invented fee
+    # literals and publish the result as terms derived from the venue's own
+    # minimum order amount and fees - inside the same artifact that reports
+    # market_quotes 0 and "no quote exists to price anything from". The venue
+    # has supplied nothing, so the budget stays absent rather than imagined.
+    budget = None
     manifest = mining_canary_manifest(
         gate,
         budget=budget,
-        max_loss_btc=budget["max_budget_btc"],
+        max_loss_btc=None,
+        # Operator-chosen safety ceilings, not venue terms: they cap what a
+        # first purchase could ever be, and are assumptions until a real
+        # quote exists to check them against.
         price_ceiling_btc=0.001,
         speed_limit=1.0,
         max_duration_hours=24.0,
@@ -512,9 +519,10 @@ def _mining_evidence_index(probe: dict[str, Any], spec: Any) -> dict[str, Any]:
         worker="<operator's own worker>",
         btc_usd_reference=REFERENCE_BTC_USD,
         notes=[
-            "The budget is derived from the venue's minimum order amount, its "
-            "fees and the pool's payout minimum. No arbitrarily small 'test "
-            "amount' is assumed to work.",
+            "No budget is stated. Deriving one needs the venue's minimum order "
+            "amount, its fees and the pool's payout minimum, none of which has "
+            "been read. The ceilings below are operator-chosen limits, class "
+            "ASSUMPTION; they bound a purchase, they do not price one.",
         ],
     )
     payload = gate.to_dict()
@@ -528,6 +536,9 @@ def _mining_evidence_index(probe: dict[str, Any], spec: Any) -> dict[str, Any]:
             "pool_payout_records": 0,
             "gates": dict(sorted(MINING_GATES.items())),
             "canary_manifest": manifest,
+            # This artifact mixes a measured blocking result with unmeasured
+            # ceilings; say so rather than letting the reader assume one class.
+            "canary_manifest_evidence_class": "ASSUMPTION",
             "blocked_hosts": [
                 {"host": p.get("host"), "outcome": p.get("outcome"), "error": p.get("error")}
                 for p in probe.get("probes", []) or []
@@ -692,7 +703,8 @@ def generate_v9_artifacts(
     ledger_summary = ledger.summary()
     ledger_summary["evaluated_at_utc"] = EVALUATED_AT_UTC
     ledger_summary["state"] = STATE_NOT_MEASURED
-    ledger_summary["v8_defect_closed"] = "E4"
+    ledger_summary["v8_erratum_addressed"] = "E4"
+    ledger_summary["v8_erratum_closure_state"] = STATE_NOT_MEASURED
     ledger_summary["deflation_note"] = (
         "The deflated Sharpe requires this ledger. With trial_registry=None or a "
         "zero cross-trial variance it degenerates into the probabilistic Sharpe, "
