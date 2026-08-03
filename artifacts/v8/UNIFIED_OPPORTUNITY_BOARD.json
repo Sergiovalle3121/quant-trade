@@ -7,7 +7,7 @@
   },
   "artifact": "UNIFIED_OPPORTUNITY_BOARD",
   "evaluated_at_utc": "2026-07-28T08:00:00Z",
-  "note": "Cash holds the entire allocation whenever no opportunity has cleared its gates. An unmeasured opportunity receives zero weight; it is not treated as a small positive.",
+  "note": "Cash holds the entire allocation whenever no opportunity has cleared its gates. An unmeasured opportunity receives zero weight; it is not treated as a small positive. Cash is the residual, not an exception to that rule: its yield is a RECORDED_RESPONSE, so no row on this board is measured.",
   "rows": [
     {
       "allocation_weight": 0.0,
@@ -69,10 +69,11 @@
       "allocation_weight": 1.0,
       "blocking_reasons": [],
       "capacity_notional_usd": null,
+      "evidence_class": "RECORDED_RESPONSE",
       "expected_return_over_horizon": 0.04,
       "horizon_days": 365.0,
       "kind": "CASH",
-      "measured": true,
+      "measured": false,
       "opportunity_id": "cash",
       "status": "AVAILABLE"
     }

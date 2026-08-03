@@ -46,9 +46,9 @@
       "Fund and place any order manually on the venue's own interface.",
       "This repository has no purchase, deposit or withdrawal code path to enable."
     ],
-    "manifest_sha256": "03e8ade47b78e9d925eb8c129606e7cbaaa80d2ceeb3c9a450c2ba75955fb2d7",
+    "manifest_sha256": "df190696d6cf982de5a5464129a33367c88f4b549f2a9a41f32255619ef73a97",
     "notes": [
-      "The budget is derived from the venue's minimum order amount, its fees and the pool's payout minimum. No arbitrarily small 'test amount' is assumed to work."
+      "No budget is stated. Deriving one needs the venue's minimum order amount, its fees and the pool's payout minimum, none of which has been read. The ceilings below are operator-chosen limits, class ASSUMPTION; they bound a purchase, they do not price one."
     ],
     "orders_placed": 0,
     "purchase_authorized": false,
@@ -56,22 +56,16 @@
     "schema_version": 1,
     "status": "BLOCKED_EVIDENCE",
     "terms": {
-      "budget_derivation": {
-        "binding_constraint": "marketplace_min_order_amount",
-        "derivation": "min order amount + fixed order fee + deposit fee + withdrawal fee + buyer fee on spend, raised to the pool payout minimum when that binds; no arbitrary 'small test amount' is assumed to work",
-        "fee_floor_btc": 9e-05,
-        "max_budget_btc": 0.00109,
-        "spend_floor_btc": 0.001
-      },
+      "budget_derivation": {},
       "future_api_key_requirements": [
         "read-only plus order placement; withdrawal permission must be absent",
         "IP-restricted to the operator's own host",
         "held by the operator, never sent to or stored in this repository"
       ],
-      "max_budget_btc": 0.00109,
-      "max_budget_usd": 65.4,
+      "max_budget_btc": null,
+      "max_budget_usd": null,
       "max_duration_hours": 24.0,
-      "max_loss_btc": 0.00109,
+      "max_loss_btc": null,
       "orders": 1,
       "pool_name": "<operator's own pool account>",
       "price_ceiling_btc": 0.001,
@@ -90,6 +84,7 @@
     "wallet_signing_authorized": false,
     "withdrawal_authorized": false
   },
+  "canary_manifest_evidence_class": "ASSUMPTION",
   "ceiling_rule": "without parsed pool payout records the route cannot exceed SHADOW_MARKET_ONLY, whatever the marketplace arithmetic says",
   "deposit_authorized": false,
   "evaluated_at_utc": "2026-07-28T20:00:00Z",

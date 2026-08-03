@@ -751,7 +751,7 @@ def generate_v9_artifacts(
         "preregistration_hash": freeze_hash(),
         "preregistration": preregistration().to_dict(),
         "v8_errata_count": len(V8_ERRATA),
-        "evidence_root": str(evidence),
+        "evidence_root": evidence.as_posix(),
         "trading_state": STATE_NOT_MEASURED,
         "mining_state": MINING_BLOCKED,
         "artifact_sha256": dict(sorted(hashes.items())),

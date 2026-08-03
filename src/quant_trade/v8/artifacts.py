@@ -117,9 +117,13 @@ def _evidence_index(evidence_root: Path, probe: dict[str, Any]) -> dict[str, Any
         entry: dict[str, Any] = {
             "venue": venue,
             "symbol": "BTC-USDT",
-            "directory": str(directory.relative_to(evidence_root))
+            # as_posix(), never str(): str() emits the platform separator, so
+            # regenerating on Windows rewrites data/v8_evidence as
+            # data\v8_evidence and silently forks the artifact from the one CI
+            # produces. v7_artifacts.py has always done this correctly.
+            "directory": directory.relative_to(evidence_root).as_posix()
             if directory.is_relative_to(evidence_root)
-            else str(directory),
+            else directory.as_posix(),
             "present": directory.exists(),
         }
         if not directory.exists():
@@ -166,7 +170,7 @@ def _evidence_index(evidence_root: Path, probe: dict[str, Any]) -> dict[str, Any
         "artifact": "EVIDENCE_INDEX",
         "schema_version": V8_SCHEMA_VERSION,
         "evaluated_at_utc": EVALUATED_AT_UTC,
-        "evidence_root": str(evidence_root),
+        "evidence_root": evidence_root.as_posix(),
         "datasets": datasets,
         "totals": {
             "raw_pages": total_pages,
@@ -589,7 +593,7 @@ def generate_v8_artifacts(
         "base_sha": BASE_SHA,
         "source_commit_sha": commit,
         "preregistration_hash": freeze_hash(),
-        "evidence_root": str(evidence),
+        "evidence_root": evidence.as_posix(),
         "outcome": outcome,
         "artifact_sha256": dict(sorted(hashes.items())),
         "regeneration_command": ("python -m quant_trade.v8.artifacts --source-commit-sha <sha>"),

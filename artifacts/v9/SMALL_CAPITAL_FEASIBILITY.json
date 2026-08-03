@@ -238,7 +238,8 @@
   ],
   "schema_version": 1,
   "state": "NOT_MEASURED",
-  "v8_defect_closed": "E8",
+  "v8_erratum_addressed": "E8",
+  "v8_erratum_closure_state": "NOT_MEASURED",
   "venue": "bybit",
   "what_is_and_is_not_measured": "The executable-capital floor and the binding constraint at each rung are real: they follow from the venue's lot step, minimum notional, margin schedule and fee floors. The RETURN columns are absent, because there is no out-of-sample series to resample."
 }

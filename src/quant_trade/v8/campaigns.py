@@ -487,8 +487,8 @@ def run_campaign(
     for venue, directory in directories.items():
         panel = directory / "panel.jsonl"
         if not panel.exists():
-            missing.append(f"{venue}: no panel at {directory}")
-            per_venue[venue] = {"available": False, "directory": str(directory)}
+            missing.append(f"{venue}: no panel at {directory.as_posix()}")
+            per_venue[venue] = {"available": False, "directory": directory.as_posix()}
             continue
         context_path = directory / "backfill_result.json"
         context: dict[str, Any] = {}
@@ -513,7 +513,7 @@ def run_campaign(
         )
         per_venue[venue] = {
             "available": True,
-            "directory": str(directory),
+            "directory": directory.as_posix(),
             "provenance": validation.provenance,
             "raw_pages": validation.raw_pages,
             "receipts": validation.receipts,

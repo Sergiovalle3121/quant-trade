@@ -36,11 +36,12 @@
   ],
   "compute_rental": "POLICY_BLOCKED_AND_MISSING_BYTE_VERIFIED_EVIDENCE",
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "evidence_class": "NOT_MEASURED",
   "hashpower_marketplace": "DISCOVERY_ONLY_IMPORTER_READY_NO_DELIVERY_HISTORY_OR_ECONOMIC_ENGINE",
   "managed_asic_lease": "DISCOVERY_ONLY_NO_CONTRACT_OR_DELIVERY_HISTORY",
   "real_delivery_evidence_count": 0,
   "real_exact_sku_benchmark_count": 0,
   "real_market_snapshot_count": 0,
   "real_quote_count": 0,
-  "schema_version": 2
+  "schema_version": 3
 }

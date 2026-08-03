@@ -14,5 +14,6 @@
   "reason": "no two-venue series exists; both venues are blocked",
   "schema_version": 1,
   "state": "NOT_MEASURED",
-  "v8_defect_closed": "E6"
+  "v8_erratum_addressed": "E6",
+  "v8_erratum_closure_state": "NOT_MEASURED"
 }
