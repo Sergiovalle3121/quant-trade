@@ -9,8 +9,8 @@ Regeneration: `make v7-artifacts SOURCE_COMMIT_SHA=<code-commit-sha>`
 V7 found no promotable non-cash opportunity. This is the fail-closed result,
 not a missing winner:
 
-- receipt-verified `REAL` raw pages captured locally: **5**;
-- verified real funding settlements captured locally: **6**;
+- receipt-verified `REAL` raw pages captured locally: **none measured**;
+- verified real funding settlements captured locally: **none measured**;
 - trading `PAPER_CANDIDATE` rows: **0**;
 - real cloud quotes / exact-SKU benchmarks / market snapshots: **0 / 0 / 0**;
 - eligible mining candidates: **0**;
@@ -121,9 +121,10 @@ The following work is not silently represented as complete:
    not implemented; the route is capped at `DISCOVERY_ONLY`.
 3. Exact compute benchmark metadata still needs real image/driver/runtime,
    binary/flags, stale-share, dev-fee and interruption-history evidence.
-4. A short Bybit capture succeeded locally, but repository policy excludes raw
-   market cache. Promotion remains blocked until an approved evidence store
-   preserves the raw bytes/receipts and the full preregistered range is
-   acquired.
+4. No Bybit capture has completed. The recorded attempt is
+   `NOT_RUN_NETWORK_BLOCKED` against a 403 at CONNECT, so there are no raw
+   bytes or receipts to preserve. Promotion remains blocked until egress is
+   available, an approved evidence store holds the raw bytes/receipts, and the
+   full preregistered range is acquired.
 
 These blocks leave all affected routes at zero allocation.
