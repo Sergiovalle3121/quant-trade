@@ -284,7 +284,7 @@ class PageArchive:
             }
             self._index[request_key] = record
             self.index_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.index_path.open("a", encoding="utf-8") as handle:
+            with self.index_path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(canonical_dumps(record) + "\n")
         return sha
 
@@ -295,7 +295,7 @@ class PageArchive:
 
 def _append_attempt(path: Path, record: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(canonical_dumps(record) + "\n")
 
 
@@ -633,7 +633,9 @@ def run_backfill(
         if rows_by_ts:
             ordered = [rows_by_ts[k] for k in sorted(rows_by_ts)]
             (series_dir / f"{kind}.jsonl").write_text(
-                "".join(canonical_dumps(r) + "\n" for r in ordered), encoding="utf-8"
+                "".join(canonical_dumps(r) + "\n" for r in ordered),
+                encoding="utf-8",
+                newline="\n",
             )
         if series_result.status != STATUS_OK:
             result.status = series_result.status

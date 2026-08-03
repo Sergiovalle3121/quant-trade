@@ -1,0 +1,23 @@
+# Line-ending policy.
+#
+# This repository verifies evidence by byte-exact SHA-256: sha256_of_file()
+# reads in binary (src/quant_trade/evidence/canonical_json.py), the canonical
+# writer is hardwired to newline="\n", and LF-era digests are pinned in
+# configs/opportunities/cash_baseline_v7.json and artifacts/v7/. A clone that
+# lets core.autocrlf=true rewrite LF to CRLF therefore breaks the project's own
+# verification gates. The policy is declared here so it travels with the repo
+# instead of depending on each machine's git config.
+
+# Default: LF in the repository and in the working tree, on every platform.
+* text=auto eol=lf
+
+# Windows shells need CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Byte-exact evidence: never apply EOL conversion in either direction. These
+# files have SHA-256 digests pinned against their exact bytes, so git must
+# treat them as opaque.
+artifacts/** -text
+tests/fixtures/** -text
