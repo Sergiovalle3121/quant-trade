@@ -14,9 +14,6 @@ import pytest
 from quant_trade.carry.economics import evaluate_carry
 from quant_trade.carry.models import CarryCostModel, CarryPolicy, CarryPosition, CarrySnapshot
 from quant_trade.metrics.statistics import expected_max_sharpe, psr_from_moments
-from quant_trade.mining.cashflow import ProjectionAssumptions, project_mining_cashflow
-from quant_trade.mining.market import MiningMarketData
-from quant_trade.mining.models import MiningRig
 from quant_trade.research.bootstrap import bootstrap_confidence_intervals
 
 
@@ -46,28 +43,6 @@ def test_golden_deflated_sharpe():
     dsr = psr_from_moments(0.15, 250, 0.1, 3.5, benchmark_sharpe=threshold)
     assert threshold == pytest.approx(0.32191787, abs=1e-6)
     assert dsr == pytest.approx(0.00332290, abs=1e-6)
-
-
-def test_golden_mining_npv_overstatement():
-    rig = MiningRig(
-        name="g", algorithm="sha256", hashrate_hs=2.0e14, power_watts=3500.0,
-        hardware_cost_usd=5000.0, useful_life_days=1095.0, uptime_rate=0.95,
-        residual_value_usd=200.0,
-    )
-    market = MiningMarketData(
-        coin="BTC", algorithm="sha256", coin_price_usd=60000.0, network_hashrate_hs=6.0e20,
-        difficulty=8.0e13, block_subsidy_coin=3.125, tx_fee_revenue_coin_per_block=0.15,
-        blocks_per_day=144.0, captured_at_utc="2024-05-01T00:00:00Z", source_name="g",
-        pool_fee_rate=0.01,
-    )
-    proj = project_mining_cashflow(
-        rig, market,
-        ProjectionAssumptions(horizon_days=1095, monthly_difficulty_growth_rate=0.03,
-                              halving_day_indices=(500,), electricity_usd_per_kwh=0.06),
-    )
-    assert proj.npv_usd == pytest.approx(-5029.125757, abs=1e-3)
-    assert proj.constant_flow_npv_usd == pytest.approx(-1068.273963, abs=1e-3)
-    assert proj.total_coin_mined == pytest.approx(0.0804800841, abs=1e-9)
 
 
 def test_golden_carry_net_annual_carry():

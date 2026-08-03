@@ -11,12 +11,10 @@ from __future__ import annotations
 import dataclasses
 import json
 
-import pytest
 import yaml
 
 from quant_trade.carry.data import synthetic_funding_snapshots, write_snapshots_json
 from quant_trade.carry.research import run_carry_research, write_carry_artifacts
-from quant_trade.mining.market import MiningMarketData
 from quant_trade.paper.readiness import evaluate_paper_readiness
 from quant_trade.research.ledger import read_trials
 
@@ -111,48 +109,15 @@ def test_defect_d_basis_convergence_enters_pnl():
     assert frame["basis_pnl"].abs().sum() > 0, "converging basis must produce basis P&L"
 
 
-# --- Defect E: mining freshness trusts a caller-supplied staleness --------
-
-
-def test_defect_e_old_snapshot_with_zero_staleness_fails():
-    from quant_trade.mining.market import require_fresh
-
-    stale_but_lying = MiningMarketData(
-        coin="BTC",
-        algorithm="sha256",
-        coin_price_usd=60000.0,
-        network_hashrate_hs=6.0e20,
-        difficulty=8.0e13,
-        block_subsidy_coin=3.125,
-        tx_fee_revenue_coin_per_block=0.15,
-        blocks_per_day=144.0,
-        captured_at_utc="2023-01-01T00:00:00Z",  # years old
-        source_name="test",
-        max_age_seconds=3600.0,
-        staleness_seconds=0.0,  # caller claims it is fresh
-    )
-    with pytest.raises(ValueError, match="stale"):
-        require_fresh(stale_but_lying, evaluated_at_utc="2026-07-24T00:00:00Z")
-
-
-def test_defect_e_future_snapshot_fails():
-    from quant_trade.mining.market import require_fresh
-
-    from_the_future = MiningMarketData(
-        coin="BTC",
-        algorithm="sha256",
-        coin_price_usd=60000.0,
-        network_hashrate_hs=6.0e20,
-        difficulty=8.0e13,
-        block_subsidy_coin=3.125,
-        tx_fee_revenue_coin_per_block=0.15,
-        blocks_per_day=144.0,
-        captured_at_utc="2030-01-01T00:00:00Z",
-        source_name="test",
-        staleness_seconds=0.0,
-    )
-    with pytest.raises(ValueError, match="future"):
-        require_fresh(from_the_future, evaluated_at_utc="2026-07-24T00:00:00Z")
+# --- Defect E: freshness trusted a caller-supplied staleness --------------
+#
+# Retired with the mining package. The defect was real and its shape is not
+# mining-specific: a snapshot carried both a captured_at_utc and a
+# staleness_seconds field, and the checker believed the field instead of
+# recomputing the age from the timestamp, so a caller could declare stale data
+# fresh. Any collector that reports its own freshness can reproduce it. Worth
+# re-establishing against whatever ingests low-cap crypto data, where gaps and
+# stale quotes are the norm rather than the exception.
 
 
 # --- Defect G: paper readiness is declarative -----------------------------

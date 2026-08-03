@@ -1,9 +1,15 @@
 """Consolidated, honest verdict scorecard.
 
 One place that states the non-negotiable safety posture and rolls up whatever
-verdicts exist (strategy promotions, cash-and-carry, mining) — so an optimistic
+verdicts exist (strategy promotions, cash-and-carry) — so an optimistic
 simulation is never mistaken for demonstrated profitability. Nothing here trades
 or authorizes anything; it only summarises.
+
+The MINING_TELEMETRY row used to be appended unconditionally, so a repository
+with no mining telemetry still published a telemetry status forever. It is gone
+with the module that produced it. The mining entry in FIXED_STATUSES stays: it
+is a negative assertion, it remains true, and mining code still exists in
+cloud_rental and under v8/v9.
 """
 
 from __future__ import annotations
@@ -60,8 +66,6 @@ def build_session_scorecard(
     statistical_integrity: str = "PASS",
     promotions: list[dict[str, Any]] | None = None,
     carry_decision: str | None = None,
-    mining_decision: str | None = None,
-    mining_telemetry: str = "READY",
     paper_readiness: str | None = None,
 ) -> SessionScorecard:
     """Assemble the scorecard from whatever verdicts are available."""
@@ -71,9 +75,6 @@ def build_session_scorecard(
     ]
     if carry_decision is not None:
         rows.append(ScorecardRow("TRADING_EDGE_CASH_AND_CARRY", carry_decision))
-    if mining_decision is not None:
-        rows.append(ScorecardRow("MINING_ECONOMICS", mining_decision))
-    rows.append(ScorecardRow("MINING_TELEMETRY", mining_telemetry))
     if paper_readiness is not None:
         rows.append(ScorecardRow("PAPER_READINESS", paper_readiness))
     return SessionScorecard(fixed_statuses=dict(FIXED_STATUSES), rows=rows)

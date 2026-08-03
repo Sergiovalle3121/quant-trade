@@ -24,7 +24,6 @@ from quant_trade.data.requests import HistoricalDataRequest
 from quant_trade.data.validation import validate_ohlcv
 from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
-from quant_trade.mining.cli import mining_app
 from quant_trade.opportunities.cli import opportunities_app
 from quant_trade.ops.cli import ops_app
 from quant_trade.research.experiment_config import load_experiment_config
@@ -51,7 +50,6 @@ app.add_typer(broker_app, name="broker")
 app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
-app.add_typer(mining_app, name="mining")
 app.add_typer(carry_app, name="carry")
 app.add_typer(cloud_rental_app, name="cloud-rental")
 app.add_typer(opportunities_app, name="opportunities")
@@ -71,7 +69,6 @@ def status(
         Path | None, typer.Option(help="Scan this dir for promotion decision JSONs")
     ] = None,
     carry_decision: Annotated[str | None, typer.Option(help="Cash-and-carry verdict")] = None,
-    mining_decision: Annotated[str | None, typer.Option(help="Mining economics verdict")] = None,
     paper_readiness: Annotated[str | None, typer.Option(help="Paper readiness verdict")] = None,
     output: Annotated[Path | None, typer.Option(help="Write the scorecard markdown here")] = None,
 ) -> None:
@@ -86,7 +83,6 @@ def status(
     scorecard = build_session_scorecard(
         promotions=promotions,
         carry_decision=carry_decision,
-        mining_decision=mining_decision,
         paper_readiness=paper_readiness,
     )
     for name, value in scorecard.fixed_statuses.items():
