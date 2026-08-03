@@ -1,141 +1,137 @@
 {
   "artifact": "DEFECT_REPRODUCTION_MATRIX",
   "base_sha": "98daabe6585bfa80d7706a61c8742d5da8ac9ea3",
-  "baseline": {
-    "failed": 25,
-    "passed": 617,
-    "platform": "Windows",
-    "python": "3.12.13",
-    "root_cause": "unconditional POSIX fcntl import"
-  },
+  "baseline": null,
+  "baseline_state": "NOT_MEASURED",
   "defects": [
     {
       "id": "V7-001",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "portable append lock"
     },
     {
       "id": "V7-002",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "normalized receipt hash verification"
     },
     {
       "id": "V7-003",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "relative raw paths and traversal rejection"
     },
     {
       "id": "V7-004",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "clean raw-to-panel reconstruction"
     },
     {
       "id": "V7-005",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "manifest and panel byte tamper detection"
     },
     {
       "id": "V7-006",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "Bybit funding pagination and exact range"
     },
     {
       "id": "V7-007",
       "priority": "P0-B",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "authoritative marked-equity net return"
     },
     {
       "id": "V7-008",
       "priority": "P0-B",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "settlement-driven signal windows"
     },
     {
       "id": "V7-009",
       "priority": "P0-C",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "rank-based CSCV PBO"
     },
     {
       "id": "V7-010",
       "priority": "P0-C",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "global hash-chained trial registry"
     },
     {
       "id": "V7-011",
       "priority": "P0-D",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "provider policy precedence"
     },
     {
       "id": "V7-012",
       "priority": "P0-E",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "algorithm-native Decimal units"
     },
     {
       "id": "V7-013",
       "priority": "P0-E",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "scanner opens claimed evidence bytes"
     },
     {
       "id": "V7-014",
       "priority": "P0-F",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "billing, downtime and risk economics"
     },
     {
       "id": "V7-015",
       "priority": "P0-G",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "remove mining score x8766"
     },
     {
       "id": "V7-016",
       "priority": "P0-G",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "durable exactly-once shadow WAL"
     },
     {
       "id": "V7-017",
       "priority": "P0-G",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "market order requires fresh mark"
     },
     {
       "id": "V7-018",
       "priority": "P0-G",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "broker-paper idempotency keys"
     },
     {
       "id": "V7-019",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "receipt/parser capture-clock identity"
     },
     {
       "id": "V7-020",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "clean rebuild reapplies requested page range"
     },
     {
       "id": "V7-021",
       "priority": "P0-A",
-      "status": "FIXED_GREEN",
+      "status": "NOT_MEASURED",
       "title": "panel-audit CLI invokes clean rebuild"
     }
   ],
+  "evidence_class": "NOT_MEASURED",
   "open_routes": [
     {
       "route": "OKX full historical panel acquisition",
@@ -146,6 +142,7 @@
       "status": "DISCOVERY_ONLY_IMPORTER_ONLY_ECONOMICS_NOT_IMPLEMENTED"
     }
   ],
-  "schema_version": 2,
-  "sprint": "Revenue Validation & Controlled Monetization V7"
+  "schema_version": 3,
+  "sprint": "Revenue Validation & Controlled Monetization V7",
+  "what_is_and_is_not_measured": "the defect identifiers, priorities and titles are a hand-maintained register and are accurate as a list of intent; no field here reports a verification outcome, because this generator verifies nothing. Whether a defect is closed can only be read from the test suite."
 }

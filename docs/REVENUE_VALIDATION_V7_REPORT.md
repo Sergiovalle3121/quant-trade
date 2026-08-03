@@ -21,12 +21,16 @@ not a missing winner:
 The 4% cash input is a byte-verified `RECORDED_RESPONSE`, not `REAL` evidence.
 It exercises ranking deterministically but cannot promote a non-cash row.
 
-The public Bybit capture produced a clean 41-row panel for
-`2026-07-20T00:00:00Z` through `2026-07-21T16:00:00Z`. Its panel SHA-256 is
-`7fc049917826aca4574dee2019efabe9a40685817155941854b6c926bfc3c176`.
-Raw market cache is intentionally not committed, so the repository campaign
-still reports H1/H2 as `NOT_RUN_NO_DATASET`. The local capture is not eligible
-for promotion and is also far below the 730-day/1,000-settlement gate.
+No public Bybit capture has completed. An earlier revision of this report
+described a clean 41-row panel for `2026-07-20T00:00:00Z` through
+`2026-07-21T16:00:00Z` and quoted a panel SHA-256 for it; that digest
+corresponded to no bytes, here or anywhere, and the claim is withdrawn rather
+than reissued. The only machine record of the attempt is
+`data/carry/panel/bybit_btc/backfill_attempts.jsonl`, which reports
+`status: NOT_RUN_NETWORK_BLOCKED` with 0 pages fetched, 0 panel rows and 0
+settlements, against `URLError: Tunnel connection failed: 403 Forbidden`.
+Raw market cache is intentionally not committed, and the repository campaign
+reports H1/H2 as `NOT_RUN_NO_DATASET`.
 
 ## Implemented controls
 

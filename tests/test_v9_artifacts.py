@@ -208,7 +208,15 @@ def test_the_mining_route_is_blocked_and_authorises_nothing(generated) -> None:
     assert manifest["withdrawal_authorized"] is False
     assert manifest["aws_alibaba_hashing"] == "PROHIBITED"
     assert manifest["terms"]["orders"] == 1
-    assert manifest["terms"]["max_budget_btc"] > 0
+    # A budget can only be stated once the venue's own terms have been read.
+    # The marketplace is blocked, so there is nothing to price a purchase from;
+    # asserting a positive budget here pinned six invented fee literals in
+    # place and would have turned the suite red on correcting them.
+    assert index["marketplace_blocked"] is True
+    assert manifest["terms"]["max_budget_btc"] is None
+    assert manifest["terms"]["max_budget_usd"] is None
+    assert manifest["terms"]["budget_derivation"] == {}
+    assert index["canary_manifest_evidence_class"] == "ASSUMPTION"
     shadow = json.loads((out / "MINING_SHADOW_STATUS.json").read_text())
     assert shadow["orders_placed"] == 0
     assert shadow["btc_spent"] == 0.0

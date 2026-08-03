@@ -44,7 +44,12 @@ from quant_trade.v8.campaigns import (
 )
 from quant_trade.v8.canary import evaluate_canary_readiness
 from quant_trade.v8.paper_launch import not_started_report
-from quant_trade.v8.preregistration import PROMOTION_GATES, freeze_hash, preregistration
+from quant_trade.v8.preregistration import (
+    ADDITIONAL_HYPOTHESES,
+    PROMOTION_GATES,
+    freeze_hash,
+    preregistration,
+)
 from quant_trade.v8.validation import validate_evidence_dir
 
 #: Fixed evaluation clock. Regeneration must not depend on when it runs.
@@ -200,11 +205,18 @@ def _campaigns_artifact(campaigns: list[CampaignResult]) -> dict[str, Any]:
         "campaigns": [c.to_dict() for c in campaigns],
         "executed_count": sum(1 for c in campaigns if c.ran),
         "promoted_count": sum(1 for c in campaigns if c.promoted),
+        # Read from the frozen preregistration and from the campaigns rather
+        # than restated: both were literals standing in for a register and an
+        # execution record, and would not have followed either if it moved.
         "additional_hypotheses": {
             "unlocked": unlocked,
             "reason": unlock_reason,
-            "registered": ["H6", "H7"],
-            "executed": [],
+            "registered": [spec.hypothesis_id for spec in ADDITIONAL_HYPOTHESES],
+            "executed": sorted(
+                c.hypothesis_id
+                for c in campaigns
+                if c.ran and c.hypothesis_id in {s.hypothesis_id for s in ADDITIONAL_HYPOTHESES}
+            ),
         },
     }
 
@@ -466,20 +478,27 @@ def _unified_board(campaigns: list[CampaignResult], mining: dict[str, Any]) -> d
             "blocking_reasons": mining.get("errors", [])[:3],
         }
     )
+    promoted = [r for r in rows if r["status"] == STATUS_PAPER_CANDIDATE]
+    # The cash yield is the byte-verified RECORDED_RESPONSE carried over from
+    # V7, not something V8 measures: V8 never loads or hashes the fixture, so
+    # it cannot claim otherwise. It previously published measured: true, which
+    # made cash the only "measured" row on the board and was what earned it the
+    # whole allocation - against this artifact's own note that an unmeasured
+    # opportunity receives zero weight.
     rows.append(
         {
             "opportunity_id": "cash",
             "kind": "CASH",
             "status": "AVAILABLE",
-            "measured": True,
+            "measured": False,
+            "evidence_class": "RECORDED_RESPONSE",
             "expected_return_over_horizon": 0.04,
             "horizon_days": 365.0,
             "capacity_notional_usd": None,
-            "allocation_weight": 1.0,
+            "allocation_weight": 1.0 if not promoted else 0.0,
             "blocking_reasons": [],
         }
     )
-    promoted = [r for r in rows if r["status"] == STATUS_PAPER_CANDIDATE]
     return {
         "artifact": "UNIFIED_OPPORTUNITY_BOARD",
         "schema_version": V8_SCHEMA_VERSION,
@@ -494,7 +513,9 @@ def _unified_board(campaigns: list[CampaignResult], mining: dict[str, Any]) -> d
         "note": (
             "Cash holds the entire allocation whenever no opportunity has "
             "cleared its gates. An unmeasured opportunity receives zero weight; "
-            "it is not treated as a small positive."
+            "it is not treated as a small positive. Cash is the residual, not "
+            "an exception to that rule: its yield is a RECORDED_RESPONSE, so no "
+            "row on this board is measured."
         ),
     }
 
