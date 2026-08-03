@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from quant_trade.carry.quality import parse_utc
-from quant_trade.cloud_rental.models import SAFETY_POSTURE
 from quant_trade.evidence.canonical_json import (
     atomic_write_json,
     canonical_dumps,
     load_json,
     sha256_of_text,
 )
+from quant_trade.evidence.safety_posture import SAFETY_POSTURE
 
 DEFAULT_MAX_DRAWDOWN = 0.15
 DEFAULT_STALE_HOURS = 48.0

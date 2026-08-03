@@ -168,63 +168,6 @@ def run_job(config_path: Path | str, job_name: str | None = None) -> JobSummary:
     try:
         if config.job_name == "health_check":
             run_health_check(config)
-        elif config.job_name == "mining_evaluation":
-            if not config.mining_config_path:
-                raise SafetyGateError("mining_evaluation requires mining_config_path")
-            assert_not_killed(config)
-            from quant_trade.mining.config import load_mining_config
-            from quant_trade.mining.profitability import evaluate_all
-
-            rigs, markets, policy = load_mining_config(Path(config.mining_config_path))
-            mining_evaluated_at = datetime.now(UTC)
-            evaluations = evaluate_all(
-                rigs,
-                markets,
-                policy,
-                mining_evaluated_at,
-            )
-            go_count = sum(item.decision == "GO" for item in evaluations)
-            report: dict[str, Any] = {
-                "evaluations": [item.to_dict() for item in evaluations],
-                "go_count": go_count,
-                "evaluated_at_utc": mining_evaluated_at.replace(microsecond=0).isoformat(),
-                "authorized_to_start_miner": False,
-                "cloud_resources_created": False,
-            }
-            filename = "mining_profitability_report.json"
-            storage.write_json(f"{_base_uri(config, run_id)}/{filename}", report)
-            extra_artifacts.append(filename)
-            best_stressed = max(item.stressed_net_profit_usd for item in evaluations)
-            metrics.extend(
-                [
-                    emit_metric(
-                        "mining_go_count",
-                        float(go_count),
-                        dimensions={"job": config.job_name},
-                        emf=emf,
-                    ),
-                    emit_metric(
-                        "mining_best_stressed_profit_usd",
-                        best_stressed,
-                        "None",
-                        dimensions={"job": config.job_name},
-                        emf=emf,
-                    ),
-                    emit_metric(
-                        "mining_authorized_to_start",
-                        0,
-                        dimensions={"job": config.job_name},
-                        emf=emf,
-                    ),
-                ]
-            )
-            events.append(
-                {
-                    "event": "mining_evaluation_completed",
-                    "go_count": go_count,
-                    "authorized_to_start_miner": False,
-                }
-            )
         elif config.job_name == "heartbeat":
             metrics.append(
                 emit_metric(

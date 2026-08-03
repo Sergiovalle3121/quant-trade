@@ -49,7 +49,7 @@ def test_load_promotion_decisions(tmp_path):
 
 
 def test_render_markdown_has_safety_and_verdicts():
-    sc = build_session_scorecard(carry_decision="NOT-RUN", mining_decision="NO-GO")
+    sc = build_session_scorecard(carry_decision="NOT-RUN")
     md = render_markdown(sc)
     assert "REAL_MONEY: NO-GO" in md
     assert "TRADING_EDGE_CASH_AND_CARRY" in md
@@ -61,8 +61,7 @@ def test_status_cli_prints_safety_posture(tmp_path):
     out = tmp_path / "scorecard.md"
     result = runner.invoke(
         app,
-        ["status", "--carry-decision", "NOT-RUN", "--mining-decision", "NO-GO",
-         "--output", str(out)],
+        ["status", "--carry-decision", "NOT-RUN", "--output", str(out)],
     )
     assert result.exit_code == 0, result.output
     assert "REAL_MONEY" in result.output

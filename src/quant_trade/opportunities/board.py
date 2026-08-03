@@ -19,9 +19,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from quant_trade.cloud_rental.models import SAFETY_POSTURE
 from quant_trade.evidence.canonical_json import atomic_write_json, sha256_of_file
 from quant_trade.evidence.receipts import normalized_rows_sha256
+from quant_trade.evidence.safety_posture import SAFETY_POSTURE
 
 COMPARISON_HORIZON_DAYS = 30.0
 COMMON_UNIT = "net_return_on_committed_capital_30d"

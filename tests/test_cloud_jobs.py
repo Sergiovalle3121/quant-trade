@@ -19,44 +19,33 @@ def test_broker_plan_no_network():
     assert run_job("configs/cloud/local_dry_run.yaml", "broker_plan").status == "success"
 
 
-def test_mining_evaluation_job_writes_offline_cloud_artifact(tmp_path, monkeypatch):
-    from quant_trade.cloud import jobs
+def test_an_unknown_job_name_is_refused(tmp_path):
+    """The dispatcher must reject what it cannot run, not succeed silently.
 
+    This replaces the two mining_evaluation tests. They covered the shared
+    dispatcher through a mining example, so deleting them outright would have
+    dropped coverage of a path that stays: heartbeat, kill-switch and artifact
+    plumbing all run around this branch.
+    """
     cloud_config = tmp_path / "cloud.yaml"
     payload = {
         "environment": "local",
-        "deployment_name": "mining-test",
-        "job_name": "mining_evaluation",
+        "deployment_name": "dispatch-test",
+        "job_name": "no_such_job",
         "mode": "dry_run",
         "allow_live_trading": False,
         "real_money_enabled": False,
-        "mining_config_path": "configs/mining/aws_profitability_example.yaml",
         "artifact_uri": str(tmp_path / "artifacts"),
         "state_uri": str(tmp_path / "state"),
         "heartbeat_uri": str(tmp_path / "state" / "heartbeat.json"),
         "kill_switch_uri": str(tmp_path / "state" / "kill_switch.json"),
     }
     cloud_config.write_text(yaml.safe_dump(payload), encoding="utf-8")
-    monkeypatch.setattr(jobs, "new_run_id", lambda: "fixed-run")
 
-    summary = run_job(cloud_config)
+    with pytest.raises(SafetyGateError, match="unknown cloud job"):
+        run_job(cloud_config)
 
-    assert summary.status == "success"
-    report_path = (
-        tmp_path
-        / "artifacts"
-        / "cloud"
-        / "mining-test"
-        / "mining_evaluation"
-        / "fixed-run"
-        / "mining_profitability_report.json"
+    assert (tmp_path / "state" / "heartbeat.json").exists(), (
+        "the heartbeat must be written even when the job itself fails"
     )
-    report = yaml.safe_load(report_path.read_text(encoding="utf-8"))
-    assert report["authorized_to_start_miner"] is False
-    assert report["cloud_resources_created"] is False
-
-
-def test_mining_evaluation_requires_config():
-    with pytest.raises(SafetyGateError, match="mining_config_path"):
-        run_job("configs/cloud/local_dry_run.yaml", "mining_evaluation")
 

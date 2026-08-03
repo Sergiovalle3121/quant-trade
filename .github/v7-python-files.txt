@@ -35,7 +35,6 @@ tests/test_carry_research.py
 tests/test_cloud_rental.py
 tests/test_cloud_rental_cli.py
 tests/test_ledger_integrity.py
-tests/test_mining_rental_cli.py
 tests/test_overfitting_evidence.py
 tests/test_v5_bundle_and_mining_scan.py
 tests/test_v5_defect_reproduction.py

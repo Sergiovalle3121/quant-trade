@@ -13,6 +13,8 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any
 
+from quant_trade.evidence.safety_posture import SAFETY_POSTURE as SAFETY_POSTURE
+
 
 class CloudProvider(StrEnum):
     AWS = "aws"
@@ -268,10 +270,6 @@ class FeasibilityDecision:
         return asdict(self)
 
 
-SAFETY_POSTURE: dict[str, bool] = {
-    "aws_resources_created": False,
-    "alibaba_resources_created": False,
-    "external_spend_authorized": False,
-    "miner_execution": False,
-    "hardware_control_enabled": False,
-}
+# SAFETY_POSTURE now lives in quant_trade.evidence.safety_posture and is
+# re-exported at the top of this module, so retiring this package does not take
+# the opportunity board and the shadow portfolio down with it.
