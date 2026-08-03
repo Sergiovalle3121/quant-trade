@@ -239,7 +239,7 @@ class GlobalTrialLedger:
         return {
             "artifact": "GLOBAL_TRIAL_LEDGER_SUMMARY",
             "schema_version": 1,
-            "path": str(self.path),
+            "path": self.path.as_posix(),
             **stats.to_dict(),
             "multiplicity_rule": (
                 "A byte-identical reproduction of code, config, data and seed is "

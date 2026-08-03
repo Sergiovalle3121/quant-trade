@@ -247,7 +247,7 @@ def evaluate_acquisition(
     sufficient_venues = 0
     for venue in venues:
         directory = evidence_dir_for(evidence_root, venue, "BTC")
-        entry: dict[str, Any] = {"venue": venue, "directory": str(directory)}
+        entry: dict[str, Any] = {"venue": venue, "directory": directory.as_posix()}
         if not directory.exists():
             entry["present"] = False
             entry["reason"] = "no evidence directory: acquisition never completed"

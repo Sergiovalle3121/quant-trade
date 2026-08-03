@@ -17,7 +17,8 @@
     "PH": 1000000000000000.0,
     "TH": 1000000000000.0
   },
-  "v8_defect_closed": "E9",
+  "v8_erratum_addressed": "E9",
+  "v8_erratum_closure_state": "NOT_MEASURED",
   "worked_examples": [
     {
       "canonical_unit": "TH/s",

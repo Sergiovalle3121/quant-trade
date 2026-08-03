@@ -15,5 +15,6 @@
   "sharpes": [],
   "state": "NOT_MEASURED",
   "total_records": 0,
-  "v8_defect_closed": "E4"
+  "v8_erratum_addressed": "E4",
+  "v8_erratum_closure_state": "NOT_MEASURED"
 }
