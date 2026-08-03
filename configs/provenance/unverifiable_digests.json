@@ -1,0 +1,12 @@
+{
+  "purpose": "Digests the provenance guard cannot resolve because the bytes are deliberately not committed. Registering one is a visible act: it states which bytes are missing and why, so an unresolvable digest is never permitted in silence. A digest that is simply wrong does not belong here - it belongs deleted.",
+  "digests": [
+    {
+      "sha256": "b7d6ec8ad2a6b80360057ed14e1fed0233c48b6b7f6d530a0bd3151205184745",
+      "names": "the 20-year 5-ETF daily panel behind docs/REAL_DATA_VERDICT.md",
+      "expected_at": "data/real_input/ (gitignored)",
+      "why_not_committed": "repository policy excludes market-data cache; the panel was delivered by file upload and never committed",
+      "consequence": "the selection arithmetic in docs/real_data_evidence/ re-derives from committed artefacts, but the backtests behind it cannot be reproduced here without obtaining a CSV that hashes to this value"
+    }
+  ]
+}

@@ -145,6 +145,9 @@ def _data_provenance(repo_root: Path) -> dict[str, Any]:
         lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
         attempts.append(
             {
+                # This entry is read from disk, so it carries its own class:
+                # the report as a whole measures nothing, but these counts do.
+                "evidence_class": "MEASURED",
                 "path": path.relative_to(repo_root).as_posix(),
                 "records": len(lines),
                 "last_record": lines[-1] if lines else "",
@@ -204,8 +207,11 @@ def _policy_matrix() -> dict[str, Any]:
             )
     return {
         "artifact": "MINING_POLICY_MATRIX",
-        "schema_version": 2,
+        "schema_version": 3,
         "evaluated_at_utc": EVALUATED_AT_UTC,
+        # Provider terms read from published policy pages, none of which is
+        # snapshotted here (every row says source_snapshot_evidence MISSING).
+        "evidence_class": "ASSUMPTION",
         "rows": rows,
         "legal_advice": False,
         "miner_execution_authorized": False,
@@ -229,8 +235,11 @@ def _unit_audit() -> dict[str, Any]:
 def _mining_evidence(matrix: dict[str, Any]) -> dict[str, Any]:
     return {
         "artifact": "MINING_EVIDENCE_REPORT",
-        "schema_version": 2,
+        "schema_version": 3,
         "evaluated_at_utc": EVALUATED_AT_UTC,
+        # The counters below are zero because nothing was ever collected, not
+        # because a collection ran and found nothing.
+        "evidence_class": "NOT_MEASURED",
         "real_quote_count": 0,
         "real_exact_sku_benchmark_count": 0,
         "real_market_snapshot_count": 0,

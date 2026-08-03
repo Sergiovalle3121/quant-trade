@@ -1,6 +1,7 @@
 {
   "artifact": "MINING_POLICY_MATRIX",
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "evidence_class": "ASSUMPTION",
   "legal_advice": false,
   "miner_execution_authorized": false,
   "rows": [
@@ -113,5 +114,5 @@
       "status": "BLOCKED_PROVIDER_POLICY"
     }
   ],
-  "schema_version": 2
+  "schema_version": 3
 }

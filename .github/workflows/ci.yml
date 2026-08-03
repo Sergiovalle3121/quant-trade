@@ -27,6 +27,39 @@ jobs:
       - name: Diff whitespace check
         run: git diff --check
 
+  # A committed artifact must be exactly what its generator emits. V7 had this
+  # check and V8/V9 did not, which is how honest generators and lying artifacts
+  # coexisted in main without anything going red. Running it on Linux is also
+  # the reference for path serialisation: a generator that emits a platform
+  # separator produces a diff here.
+  artifact-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Regenerate every artifact set in place
+        run: |
+          set -euo pipefail
+          v7=$(python -c "import json;print(json.load(open('artifacts/v7/PROMOTION_REPRODUCIBILITY.json'))['source_commit_sha'])")
+          v8=$(python -c "import json;print(json.load(open('artifacts/v8/REGENERATION_MANIFEST.json'))['source_commit_sha'])")
+          v9=$(python -c "import json;print(json.load(open('artifacts/v9/REGENERATION_MANIFEST.json'))['source_commit_sha'])")
+          python -m quant_trade.v7_artifacts --repo-root . --output-dir artifacts/v7 --source-commit-sha "$v7"
+          quant-trade v8 revenue-run --repo-root . --evidence-root data/v8_evidence --out-dir artifacts/v8 --source-commit-sha "$v8"
+          quant-trade v9 artifacts --repo-root . --evidence-root data/v9_evidence --out-dir artifacts/v9 --source-commit-sha "$v9"
+      - name: Fail if any committed artifact drifted from its generator
+        run: |
+          if ! git diff --exit-code -- artifacts/; then
+            echo "::error::A committed artifact does not match what its generator emits."
+            echo "::error::Regenerate artifacts/ in the same commit as the source change."
+            exit 1
+          fi
+      - name: Provenance guard report
+        run: python -m quant_trade.evidence.provenance_guard --repo-root .
+
   test:
     runs-on: ubuntu-latest
     strategy:
