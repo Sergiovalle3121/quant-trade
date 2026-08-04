@@ -64,7 +64,13 @@ def _write_run(outputs, results: dict, name: str = "exp_123"):
     return run_dir
 
 
-def _seed_clean_ledger(outputs, n: int = 4):
+#: A clean ledger is now a pre-registered one. An undeclared trial is refused by
+#: the trial_is_preregistered gate, so "valid candidate" implies "declared in
+#: advance" - which is the point of the gate rather than an inconvenience.
+SEAL = "a" * 64
+
+
+def _seed_clean_ledger(outputs, n: int = 4, *, seal: str = SEAL):
     for i in range(n):
         append_trial_record(
             outputs,
@@ -75,6 +81,7 @@ def _seed_clean_ledger(outputs, n: int = 4):
                 run_id="r",
                 dataset_sha="deadbeef",
                 test_sharpe_per_period=0.04 + 0.01 * i,
+                preregistration_seal=seal,
             ),
         )
 
@@ -176,12 +183,32 @@ def test_deflated_sharpe_below_threshold_fails(tmp_path):
                 run_id="r",
                 dataset_sha="deadbeef",
                 test_sharpe_per_period=float(rng.normal(0, 0.5)),
+                # Sealed so this test isolates the DSR failure instead of
+                # passing for two reasons at once.
+                preregistration_seal=SEAL,
             ),
         )
     decision = evaluate_promotion_v2(run_dir, POLICY, candidate=_candidate())
     assert decision.status == "rejected"
+    assert "trial_is_preregistered" not in decision.failed_gates
     assert "deflated_sharpe" in decision.failed_gates
     assert decision.recomputed["recomputed_dsr"] < 0.95
+
+
+def test_an_undeclared_trial_cannot_promote(tmp_path):
+    """The hard rule: a result found without declaring the search first.
+
+    Everything else about this candidate is valid. The only thing missing is a
+    pre-registration seal on its trials, and that alone is disqualifying -
+    because deflated Sharpe corrects for a trial count that nothing else forces
+    to be honest.
+    """
+    run_dir = _write_run(tmp_path, _valid_results())
+    _seed_clean_ledger(tmp_path, seal="")
+    decision = evaluate_promotion_v2(run_dir, POLICY, candidate=_candidate())
+    assert decision.status == "rejected"
+    assert "trial_is_preregistered" in decision.failed_gates
+    assert decision.real_money_authorized is False
 
 
 def test_corrupt_ledger_blocks_promotion(tmp_path):

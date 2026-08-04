@@ -21,7 +21,11 @@ import yaml
 
 from quant_trade.metrics.statistics import expected_max_sharpe, psr_from_moments
 from quant_trade.research.candidate import CandidateStrategy
-from quant_trade.research.ledger import LedgerIntegrityReport, ledger_integrity_report
+from quant_trade.research.ledger import (
+    LedgerIntegrityReport,
+    ledger_integrity_report,
+    read_trials,
+)
 
 
 @dataclass(frozen=True)
@@ -181,6 +185,21 @@ def evaluate_promotion_v2(
         )
 
     # --- gates (all fail closed) ------------------------------------------
+    # An undeclared trial cannot promote. Deflated Sharpe corrects for how many
+    # attempts were made, so it is only meaningful when the attempt count is
+    # honest - and a search that reports only its winner produces a ledger
+    # indistinguishable from one that predicted it. The seal is what makes the
+    # count auditable, so its absence is disqualifying rather than a warning.
+    sealed_trials = [
+        r for r in read_trials(ledger_dir) if str(r.get("preregistration_seal", "")).strip()
+    ]
+    add(
+        "trial_is_preregistered",
+        bool(sealed_trials),
+        "at least one trial in the ledger must carry a pre-registration seal; "
+        "an experiment declared only after its result is not evidence",
+    )
+
     if policy.require_dataset_binding:
         add("dataset_binding_present", bool(dataset_sha), "dataset SHA must be recorded")
     if policy.require_ledger_integrity:
