@@ -14,7 +14,6 @@ from rich.table import Table
 from quant_trade.backtest.engine import BacktestEngine
 from quant_trade.carry.cli import carry_app
 from quant_trade.cloud.entrypoint import cloud_app
-from quant_trade.cloud_rental.cli import cloud_rental_app
 from quant_trade.config import get_settings
 from quant_trade.data.cache import list_cache, write_cache
 from quant_trade.data.csv_loader import load_ohlcv_csv
@@ -51,7 +50,6 @@ app.add_typer(cloud_app, name="cloud")
 app.add_typer(ops_app, name="ops")
 app.add_typer(datalake_app, name="datalake")
 app.add_typer(carry_app, name="carry")
-app.add_typer(cloud_rental_app, name="cloud-rental")
 app.add_typer(opportunities_app, name="opportunities")
 app.add_typer(stress_app, name="stress")
 app.add_typer(v8_app, name="v8")

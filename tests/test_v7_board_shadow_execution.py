@@ -34,17 +34,11 @@ def _real_cash() -> dict:
     }
 
 
-def _lineages(mining_cells: list[dict]) -> dict:
+def _lineages() -> dict:
     return {
         "trading_lineage": lineage_for_rows(
             [],
             artifact="TRADING_OPPORTUNITY_LEADERBOARD",
-            path="<memory>",
-            evaluated_at_utc=NOW,
-        ),
-        "mining_lineage": lineage_for_rows(
-            mining_cells,
-            artifact="MINING_RENTAL_MATRIX",
             path="<memory>",
             evaluated_at_utc=NOW,
         ),
@@ -67,34 +61,22 @@ def _allocation() -> dict:
     }
 
 
-def test_mining_score_does_not_multiply_short_horizon_by_hours_per_year() -> None:
-    cells = [
-        {
-            "identity": "rental",
-            "status": "ECONOMIC_CANDIDATE_PAPER_ONLY",
-            "test_only": False,
-            "conditional_economics": {
-                "horizon_net_usd": 10.0,
-                "horizon_cost_usd": 100.0,
-                "horizon_hours": 720.0,
-                "margin_per_hour_usd": 1.0,
-                "all_in_cost_per_hour_usd": 10.0,
-            },
-            "reasons": [],
-        }
-    ]
-    board = build_opportunity_board(
-        trading_rows=[],
-        mining_cells=cells,
-        cash_yield_annual=0.04,
-        cash_evidence=_real_cash(),
-        evaluated_at_utc=NOW,
-        **_lineages(cells),
-    )
-    mining = next(entry for entry in board["entries"] if entry["kind"] == "mining")
-    assert mining["score"] == pytest.approx(0.10)
-    assert mining["score"] < 1.0
-    assert board["score_unit"] == "net_return_on_committed_capital_30d"
+# test_mining_score_does_not_multiply_short_horizon_by_hours_per_year retired
+# with _mining_score. The x8766 defect it pinned (V7-015) stays recorded in the
+# defect register, and the rule it enforced - one 30d common unit, no
+# short-horizon annualisation - is asserted for the surviving kinds below.
+
+
+def test_board_refuses_rows_scanned_at_a_different_clock() -> None:
+    """The single-scan replacement for the retired two-clock reconciliation."""
+    with pytest.raises(ValueError, match="re-scan"):
+        build_opportunity_board(
+            trading_rows=[],
+            cash_yield_annual=0.04,
+            cash_evidence=_real_cash(),
+            evaluated_at_utc="2026-07-25T09:00:00Z",  # not the scan's clock
+            **_lineages(),
+        )
 
 
 def test_allocator_rejects_below_cash_and_weights_risk_and_capacity() -> None:
@@ -130,7 +112,7 @@ def test_allocator_rejects_below_cash_and_weights_risk_and_capacity() -> None:
             },
             {
                 "entry_id": "blocked",
-                "kind": "mining",
+                "kind": "trading",
                 "status": "POLICY_BLOCKED",
                 "eligible": False,
                 "score": 9.0,
