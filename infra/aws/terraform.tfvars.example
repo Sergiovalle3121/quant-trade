@@ -4,3 +4,7 @@ image_uri               = "123456789012.dkr.ecr.us-east-1.amazonaws.com/quant-tr
 artifact_bucket_name    = "replace-with-unique-quant-trade-paper-bucket"
 alert_email             = "you@example.com"
 enable_paper_submission = false
+# ~$6/mo ARM instance; the 240s idempotent cycle needs nothing bigger. Requires
+# an image built with --platform linux/arm64 (the base image is multi-arch).
+# See docs/CLOUD_DEPLOYMENT_PLAN.md for the full sizing and cost table.
+instance_type           = "t4g.micro"
