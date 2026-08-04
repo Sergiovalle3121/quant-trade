@@ -1,20 +1,21 @@
 {
   "artifact": "REGENERATION_MANIFEST",
   "artifact_sha256": {
-    "BLOCKERS.json": "4fc98fc86f1c1578eba99fc4adf25f861664a8d26bc4847e578e9e87820d8f0b",
-    "CANARY_READINESS_V9.json": "2bc1299ecf0e447b01091c8a3ce434f1336921119df5af382cdf5d38f2a5442e",
+    "BLOCKERS.json": "b1398f448e2ef08a663252d87b23c60d53140a16d44b26116c295aa4f039d67b",
+    "CANARY_READINESS_V9.json": "c73197841c3f587ed8091b4ef8ae715d54580ce91c94cc808924bce7ba8a9d43",
     "DATA_AND_COST_EVIDENCE_INDEX.json": "571fd8f2b55be3edad92750baa3a4fc322581d908bd9abc06740c2ee527dcede",
     "GLOBAL_TRIAL_LEDGER_SUMMARY.json": "e41f8aa5c7435289c077a96400f6d0705b50a18e0b1e48ae8d52b7bfeeb039a6",
     "H3_LEDGER_RECONCILIATION.json": "30bc49cb0fb603aa2112cbd935f122b12f5cbfaa028b4e42370ac37ec0121f71",
     "HOLDOUT_VERDICT.json": "ecc4c06449e9cee35a4314064e2c83aa6d2573e1f2e9c776ba214b963cb83ddb",
-    "OOS_CAMPAIGN_RESULTS.json": "5db1c353b1d81b15e1b64d1413f2043c599e260596e69000a42ef0bf51027cfa",
+    "OOS_CAMPAIGN_RESULTS.json": "2840d3bb545c07c1d2b2fa577bace4d2d0b0ce4c09e5cf630fad8c740c381493",
     "PAPER_DAEMON_STATUS.json": "32ecb39a05d66278f3fa5afc0e9c84a4b751b520c34a1e03c86b2912dfaec137",
-    "PROFIT_CLAIM_GUARD.json": "4876d5387855dd5c83c9cf4bf182402c74c22663a6dbc1ff98bd950ef1741bcc",
-    "SMALL_CAPITAL_FEASIBILITY.json": "fc0c89a5954f29a791855fb99fb5e8555712b8352b032fd2611515a1732b8411"
+    "PROFIT_CLAIM_GUARD.json": "1cc83614c4bad994d1085d7229e20154850bba86a1ae46a6fa2c51ba60b4f8cf",
+    "SMALL_CAPITAL_FEASIBILITY.json": "6cdb7951a2ac4c1b28809559e8bdc5d259463bdae71a3aaa317d6dc673c6b918"
   },
   "base_sha": "3818c2d127a17ae26e86b3c75087d04f88681048",
   "determinism": "Fixed evaluation clock, seeded resampling, no wall-clock reads, and no artifact read back from this generator's own output. The network probe and any captured buy/info are INPUTS under .recorded.json names. Regenerating on the same inputs is byte-identical.",
   "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evidence_class": "MEASURED",
   "evidence_root": "data/v9_evidence",
   "preregistration": {
     "artifact": "V9_PREREGISTRATION",

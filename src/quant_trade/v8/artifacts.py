@@ -167,6 +167,9 @@ def _evidence_index(evidence_root: Path, probe: dict[str, Any]) -> dict[str, Any
     return {
         "artifact": "EVIDENCE_INDEX",
         "schema_version": V8_SCHEMA_VERSION,
+        # An index computed by walking the evidence directories: its zeros are
+        # measured zeros, which is the whole point of publishing them.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "evidence_root": evidence_root.as_posix(),
         "datasets": datasets,
@@ -202,6 +205,10 @@ def _campaigns_artifact(campaigns: list[CampaignResult]) -> dict[str, Any]:
     return {
         "artifact": "REAL_TRADING_CAMPAIGNS",
         "schema_version": V8_SCHEMA_VERSION,
+        # The counts and statuses here are computed by running the campaign
+        # machinery over the evidence on disk; a campaign's own NOT_RUN status
+        # covers its subtree, and the cost stack declares itself ASSUMPTION.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "preregistration_hash": freeze_hash(),
         "campaigns": [c.to_dict() for c in campaigns],
@@ -298,11 +305,16 @@ def _diagnosis(campaigns: list[CampaignResult]) -> dict[str, Any]:
             "net_return_2x_costs": economics.get("net_return_2x_costs"),
             "net_return_3x_costs": economics.get("net_return_3x_costs"),
             "holdout_net_return": economics.get("holdout_net_return"),
-            "minimum_capital_usd": campaign.break_even.get("capital", {}).get("total_capital_usd"),
+            # Derived from the ASSUMPTION-class capital footprint; it lives in
+            # the stamped break_even block below so its class travels with it.
             "capacity_notional_usd": campaign.capacity.get("capacity_notional_usd"),
             "promotion_reasons": [g["gate"] for g in campaign.gate_results if g.get("passed")],
             "rejection_reasons": campaign.blocking_reasons,
             "break_even": {
+                "evidence_class": "ASSUMPTION",
+                "minimum_capital_usd": campaign.break_even.get("capital", {}).get(
+                    "total_capital_usd"
+                ),
                 "required_funding_rate_per_8h_1x": break_even.get("1x", {}).get(
                     "required_funding_rate_per_interval"
                 ),
@@ -328,6 +340,9 @@ def _diagnosis(campaigns: list[CampaignResult]) -> dict[str, Any]:
     return {
         "artifact": "NO_EDGE_DIAGNOSIS",
         "schema_version": V8_SCHEMA_VERSION,
+        # Computed over the campaigns' real statuses; the break-even blocks
+        # inside each candidate declare themselves ASSUMPTION.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "preregistration_hash": freeze_hash(),
         "candidates": entries,
@@ -491,6 +506,9 @@ def _unified_board(campaigns: list[CampaignResult]) -> dict[str, Any]:
     return {
         "artifact": "UNIFIED_OPPORTUNITY_BOARD",
         "schema_version": V8_SCHEMA_VERSION,
+        # Rows derive from the campaigns' real statuses; the cash row carries
+        # its own RECORDED_RESPONSE class.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "rows": rows,
         "allocation": {
@@ -544,9 +562,17 @@ def generate_v8_artifacts(
     canary = evaluate_canary_readiness(
         evaluated_at_utc=EVALUATED_AT_UTC, paper_status=paper
     ).to_dict()
+    # The evaluation genuinely ran over its stated inputs; the thresholds it
+    # applied sit under "required", which is declaration-shaped by name.
+    canary["evidence_class"] = "MEASURED"
 
     payloads: dict[str, Any] = {
-        "V8_PREREGISTRATION.json": preregistration().to_dict() | {"freeze_hash": freeze_hash()},
+        # The artifact wrapper may carry keys the sealed content does not:
+        # freeze_hash covers to_dict() alone, so stamping the wrapper DECLARED
+        # does not move the frozen hash. A registration asserts intent, not
+        # facts about the world.
+        "V8_PREREGISTRATION.json": preregistration().to_dict()
+        | {"freeze_hash": freeze_hash(), "evidence_class": "DECLARED"},
         "EVIDENCE_INDEX.json": _evidence_index(evidence, probe),
         "REAL_TRADING_CAMPAIGNS.json": _campaigns_artifact(campaigns),
         "TRADING_LEADERBOARD.json": _leaderboard(campaigns),
@@ -564,6 +590,8 @@ def generate_v8_artifacts(
     manifest = {
         "artifact": "REGENERATION_MANIFEST",
         "schema_version": V8_SCHEMA_VERSION,
+        # File hashes computed from bytes this run wrote.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "base_sha": BASE_SHA,
         "source_commit_sha": commit,

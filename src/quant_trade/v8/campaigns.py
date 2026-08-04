@@ -148,13 +148,19 @@ def _break_even_for(spec: HypothesisSpec, stack: CostStack) -> dict[str, Any]:
         )
         scenarios[f"{multiplier:g}x"] = analysis.to_dict()
     return {
+        # Reference sizes and the capital footprint are chosen inputs, like
+        # the cost stack they combine with.
+        "evidence_class": "ASSUMPTION",
         "reference_notional_usd": REFERENCE_NOTIONAL_USD,
         "reference_holding_days": REFERENCE_HOLDING_DAYS,
         "funding_interval_hours": 8.0,
         "scenarios": scenarios,
-        "capital": capital_requirement(
-            notional_usd=REFERENCE_NOTIONAL_USD, perp_leverage=REFERENCE_PERP_LEVERAGE
-        ),
+        "capital": {
+            "evidence_class": "ASSUMPTION",
+            **capital_requirement(
+                notional_usd=REFERENCE_NOTIONAL_USD, perp_leverage=REFERENCE_PERP_LEVERAGE
+            ),
+        },
         "interpretation": (
             "The strategy must receive at least "
             f"{scenarios['1x']['required_funding_rate_per_interval']:.8f} per 8h "

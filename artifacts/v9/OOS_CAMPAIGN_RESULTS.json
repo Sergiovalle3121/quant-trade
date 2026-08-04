@@ -25,6 +25,7 @@
   ],
   "cost_evidence_class": null,
   "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evidence_class": "DECLARED",
   "preregistration_hash": "c62076bd4c08ef6e5f1158178845621405065719f83c98354db43b15c7eb0a4d",
   "schema_version": 1,
   "split_scheme": {

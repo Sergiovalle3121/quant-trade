@@ -183,6 +183,10 @@ class CostStack:
     def to_dict(self) -> dict[str, Any]:
         return {
             "venue": self.venue,
+            # The stack is arithmetic over retail-default fee schedules: chosen
+            # numbers, not observed ones. Declaring that here is what lets it
+            # sit inside a NOT_RUN campaign without reading as a measurement.
+            "evidence_class": "ASSUMPTION",
             "multiplier": self.multiplier,
             "per_fill_bps": self.per_fill_bps,
             "round_trip_bps": self.round_trip_bps,
@@ -365,7 +369,10 @@ class BreakEven:
     components: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        # Derived entirely from the ASSUMPTION-class cost stack, so it carries
+        # the same class: a break-even computed from chosen inputs is a chosen
+        # number wearing arithmetic.
+        return {"evidence_class": "ASSUMPTION", **asdict(self)}
 
 
 def break_even_funding(

@@ -244,6 +244,9 @@ def generate_v7_artifacts(
     reproducibility = {
         "artifact": "PROMOTION_REPRODUCIBILITY",
         "schema_version": 2,
+        # File hashes computed from bytes, flags derived from the board and
+        # the leaderboard: everything here is produced by this run.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "base_sha": BASE_SHA,
         "source_commit_sha": source_commit_sha,

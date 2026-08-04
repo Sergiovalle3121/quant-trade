@@ -126,7 +126,7 @@ def test_the_diagnosis_quantifies_break_even_even_without_data(generated) -> Non
         assert break_even["required_funding_rate_per_8h_3x"] == pytest.approx(
             break_even["required_funding_rate_per_8h_1x"] * 3
         )
-        assert candidate["minimum_capital_usd"] > 0
+        assert candidate["break_even"]["minimum_capital_usd"] > 0
         assert candidate["what_would_have_to_change"]
 
 

@@ -42,6 +42,7 @@
     }
   ],
   "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evidence_class": "DECLARED",
   "note": "Every blocker here is external to the code. None of them is resolvable by changing a threshold, and none has been worked around.",
   "schema_version": 1
 }

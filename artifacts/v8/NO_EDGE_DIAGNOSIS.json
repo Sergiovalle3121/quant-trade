@@ -5,6 +5,8 @@
       "bootstrap_p05": null,
       "break_even": {
         "annual_carrying_fraction": 0.045,
+        "evidence_class": "ASSUMPTION",
+        "minimum_capital_usd": 166666.6666666667,
         "required_annualized_funding_1x": 0.11799999999999998,
         "required_funding_rate_per_8h_1x": 0.00010776255707762555,
         "required_funding_rate_per_8h_2x": 0.0002155251141552511,
@@ -21,7 +23,6 @@
       "hypothesis_id": "H1",
       "max_drawdown": null,
       "measured": false,
-      "minimum_capital_usd": 166666.6666666667,
       "net_return": null,
       "net_return_2x_costs": null,
       "net_return_3x_costs": null,
@@ -44,6 +45,8 @@
       "bootstrap_p05": null,
       "break_even": {
         "annual_carrying_fraction": 0.045,
+        "evidence_class": "ASSUMPTION",
+        "minimum_capital_usd": 166666.6666666667,
         "required_annualized_funding_1x": 0.11678333333333332,
         "required_funding_rate_per_8h_1x": 0.00010665144596651446,
         "required_funding_rate_per_8h_2x": 0.0002133028919330289,
@@ -60,7 +63,6 @@
       "hypothesis_id": "H2",
       "max_drawdown": null,
       "measured": false,
-      "minimum_capital_usd": 166666.6666666667,
       "net_return": null,
       "net_return_2x_costs": null,
       "net_return_3x_costs": null,
@@ -83,6 +85,8 @@
       "bootstrap_p05": null,
       "break_even": {
         "annual_carrying_fraction": 0.045,
+        "evidence_class": "ASSUMPTION",
+        "minimum_capital_usd": 166666.6666666667,
         "required_annualized_funding_1x": 0.1253,
         "required_funding_rate_per_8h_1x": 0.00011442922374429223,
         "required_funding_rate_per_8h_2x": 0.00022885844748858446,
@@ -99,7 +103,6 @@
       "hypothesis_id": "H3",
       "max_drawdown": null,
       "measured": false,
-      "minimum_capital_usd": 166666.6666666667,
       "net_return": null,
       "net_return_2x_costs": null,
       "net_return_3x_costs": null,
@@ -121,6 +124,7 @@
     }
   ],
   "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "evidence_class": "MEASURED",
   "interpretation": "A candidate with measured=false has no economic verdict. Its break-even numbers are still exact — they follow from the cost stack and holding period, not from price history — so they define the bar the missing data would have to clear.",
   "next_preregistered_experiment": {
     "experiment_id": "V9-E1",

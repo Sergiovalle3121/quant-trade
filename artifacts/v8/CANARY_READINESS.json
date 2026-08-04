@@ -78,6 +78,7 @@
     }
   ],
   "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "evidence_class": "MEASURED",
   "notes": [
     "Clearing every condition still does not authorise real money: it only means a human may now make that decision deliberately.",
     "Four of the six conditions are human decisions by construction and cannot be satisfied by any amount of further engineering."

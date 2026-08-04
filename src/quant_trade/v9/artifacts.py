@@ -185,6 +185,10 @@ def _oos_campaign_results(bundles: BundleSet) -> dict[str, Any]:
     return {
         "artifact": "OOS_CAMPAIGN_RESULTS",
         "schema_version": V9_SCHEMA_VERSION,
+        # A register of what each hypothesis would be run through and why none
+        # has been: declared intent, with each campaign's own NOT_MEASURED
+        # state speaking for itself.
+        "evidence_class": "DECLARED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "preregistration_hash": freeze_hash(),
         "campaigns": hypotheses,
@@ -313,6 +317,10 @@ def _small_capital(bundles: BundleSet) -> dict[str, Any]:
         fee_floor_usd=0.10,
     )
     payload = curve.to_dict()
+    # The whole curve is venue-rule arithmetic on an assumed reference price;
+    # the strategy-level state below stays NOT_MEASURED, which is about the
+    # missing return series, not about these inputs.
+    payload["evidence_class"] = "ASSUMPTION"
     payload["evaluated_at_utc"] = EVALUATED_AT_UTC
     payload["preregistration_hash"] = freeze_hash()
     payload["reference_price_evidence_class"] = "ASSUMPTION"
@@ -338,6 +346,9 @@ def _blockers(probe: dict[str, Any], bundles: BundleSet) -> dict[str, Any]:
     return {
         "artifact": "BLOCKERS",
         "schema_version": V9_SCHEMA_VERSION,
+        # A curated register of what blocks the work: declared, with each
+        # entry quoting its measured evidence verbatim.
+        "evidence_class": "DECLARED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "blockers": [
             {
@@ -438,6 +449,9 @@ def generate_v9_artifacts(
     canary = evaluate_canary_readiness_v9(
         evaluated_at_utc=EVALUATED_AT_UTC, paper_status=paper
     ).to_dict()
+    # The evaluation genuinely ran over its stated inputs; the thresholds it
+    # applied sit under "required", which is declaration-shaped by name.
+    canary["evidence_class"] = "MEASURED"
 
     payloads: dict[str, Any] = {
         "DATA_AND_COST_EVIDENCE_INDEX.json": _evidence_index(evidence, probe, bundles),
@@ -454,7 +468,9 @@ def generate_v9_artifacts(
     # The claim guard runs over everything else, then becomes an artifact
     # itself — it must not scan its own output, which would be circular.
     guard = guard_artifacts(payloads)
-    payloads["PROFIT_CLAIM_GUARD.json"] = guard.to_dict()
+    # The guard scanned real payload bytes at generation time: its verdict is
+    # a measurement of this artifact set, and says so.
+    payloads["PROFIT_CLAIM_GUARD.json"] = {"evidence_class": "MEASURED", **guard.to_dict()}
 
     hashes: dict[str, str] = {}
     for name, payload in payloads.items():
@@ -464,6 +480,9 @@ def generate_v9_artifacts(
     manifest = {
         "artifact": "REGENERATION_MANIFEST",
         "schema_version": V9_SCHEMA_VERSION,
+        # File hashes computed from bytes this run wrote; the embedded sealed
+        # pre-registration is declaration-shaped by key and covers itself.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": EVALUATED_AT_UTC,
         "base_sha": BASE_SHA,
         "source_commit_sha": commit,

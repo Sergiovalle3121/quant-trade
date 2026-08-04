@@ -56,7 +56,46 @@ from pathlib import Path
 from typing import Any
 
 #: Declared evidence grades. MEASURED is the only one that asserts observation.
-EVIDENCE_CLASSES = ("MEASURED", "SYNTHETIC", "ASSUMPTION", "NOT_MEASURED")
+#: The set spans every vocabulary the repository has used across versions —
+#: a declaration in V7's vocabulary is still a declaration — plus DECLARED,
+#: for content that states policy or intent and asserts nothing about the
+#: world (gates, registered hypotheses, sealed pre-registrations).
+EVIDENCE_CLASSES = (
+    "MEASURED",
+    "SYNTHETIC",
+    "ASSUMPTION",
+    "NOT_MEASURED",
+    "DECLARED",
+    "REAL",
+    "REAL_PUBLIC_RETAIL",
+    "REAL_ACCOUNT_SPECIFIC",
+    "RECORDED_REAL",
+    "RECORDED_RESPONSE",
+    "RECORDED_TEST",
+    "FIXTURE",
+    "PAPER",
+    "SIMULATION",
+    "MANUAL_UNVERIFIED",
+)
+
+#: Keys whose entire subtree is declaration-shaped: policy, thresholds and
+#: registered intent, not claims about what happened. The sealed V9
+#: pre-registration embedded in the regeneration manifest is the motivating
+#: case - its bytes cannot carry a new evidence_class without moving the
+#: frozen hash, and it needs none, because a registration asserts nothing.
+DECLARED_SUBTREES = frozenset(
+    {
+        "preregistration",
+        "gates",
+        "falsifiers",
+        "data_splits",
+        "cost_treatment",
+        "split_scheme",
+        "states_permitted",
+        "required",
+        "requirements",
+    }
+)
 
 #: State-ish values that declare "nothing was measured here". A block carrying
 #: one of these covers its descendants for R1, and triggers R4b for positives.
@@ -95,6 +134,8 @@ CONTENT_HASH_KEYS = frozenset(
         "data_sha256",
         "raw_sha256",
         "config_sha256",
+        "bundle_sha256",
+        "frozen_parameters",
     }
 )
 
@@ -104,6 +145,19 @@ VERB_KEY = re.compile(
     r"|confirmed|validated|audited|checked|count)(?:$|_)"
 )
 
+
+def _is_verb_claim(key: str) -> bool:
+    """Whether a key's NAME claims a verification outcome.
+
+    Timestamp keys are exempt even when they contain a verb stem:
+    ``captured_at_utc`` states when an attempt happened, not that a capture
+    succeeded - the attempt's own status says how it went.
+    """
+    if key.endswith(("_at_utc", "_at")):
+        return False
+    return bool(VERB_KEY.search(key))
+
+
 #: Structural or narrative keys. They carry no standalone factual claim.
 STRUCTURAL_KEYS = frozenset(
     {
@@ -112,6 +166,9 @@ STRUCTURAL_KEYS = frozenset(
         "evaluated_at_utc",
         "attempted_at_utc",
         "generated_at_utc",
+        "captured_at_utc",
+        "registered_at_utc",
+        "scanned_at_utc",
         "base_sha",
         "source_commit_sha",
         "command",
@@ -256,8 +313,9 @@ def scan_payload(
             here = _declaration_of(node) or cover
             for key, value in node.items():
                 child = f"{path}.{key}" if path else str(key)
-                _leaf(key, value, child, here)
-                walk(value, child, here)
+                child_cover = "DECLARED" if key in DECLARED_SUBTREES else here
+                _leaf(key, value, child, child_cover)
+                walk(value, child, child_cover)
         elif isinstance(node, list):
             for index, value in enumerate(node):
                 child = f"{path}[{index}]"
@@ -270,7 +328,7 @@ def scan_payload(
 
     def _leaf(key: str, value: Any, path: str, cover: str | None) -> None:
         if isinstance(value, (dict, list)) and not (
-            VERB_KEY.search(key) and _is_positive_claim(value)
+            _is_verb_claim(key) and _is_positive_claim(value)
         ):
             return
         if isinstance(value, str):
@@ -284,12 +342,12 @@ def scan_payload(
                             f"digest {digest[:12]}... resolves to no bytes in the repository",
                         )
                     )
-        if key in STRUCTURAL_KEYS and not VERB_KEY.search(key):
+        if key in STRUCTURAL_KEYS and not _is_verb_claim(key):
             return
         if isinstance(value, (int, float, str, bool)):
             scalars.setdefault(key, set()).add(value)
 
-        verb = bool(VERB_KEY.search(key))
+        verb = bool(_is_verb_claim(key))
         positive = _is_positive_claim(value)
         declared = cover is not None
         measured = cover in ("MEASURED",)
@@ -332,15 +390,22 @@ def scan_payload(
     walk(payload, "", None)
 
     for key, values in scalars.items():
-        if len(values) > 1 and not VERB_KEY.search(key):
+        if not _is_verb_claim(key):
             continue
-        if len(values) > 1:
+        # Only a zero-versus-nonzero split on an outcome-shaped key is a
+        # contradiction. Distinct positive values are ordinary variation
+        # (each hypothesis has its own variant_count); distinct strings are
+        # ordinary list content. The fabrication signature this exists for is
+        # "settlements: 6" beside a recorded "settlements: 0".
+        numeric = {v for v in values if isinstance(v, (int, float)) and not isinstance(v, bool)}
+        if len(numeric) > 1 and any(v == 0 for v in numeric) and any(v != 0 for v in numeric):
             findings.append(
                 Finding(
                     "R4a-contradiction",
                     source,
                     key,
-                    f"{key!r} carries conflicting values {sorted(map(repr, values))}",
+                    f"{key!r} carries both zero and nonzero values "
+                    f"{sorted(map(repr, numeric))}: one of them is not a measurement",
                 )
             )
     return findings
@@ -407,6 +472,25 @@ def repository_digests(
     return frozenset(digests)
 
 
+def computed_content_digests() -> frozenset[str]:
+    """Digests of canonical in-memory content, recomputed here from code.
+
+    The sealed pre-registration hashes hash a canonical dump, not a file, so
+    ``repository_digests`` never produces them - yet they legitimately appear
+    as values and in prose (four docs cite the V8 freeze hash). Recomputing
+    them at scan time keeps the author out of the loop: a cited hash resolves
+    only if the sealed content still hashes to it.
+    """
+    digests: set[str] = set()
+    for module_name in ("quant_trade.v8.preregistration", "quant_trade.v9.preregistration"):
+        try:
+            module = __import__(module_name, fromlist=["freeze_hash"])
+            digests.add(str(module.freeze_hash()))
+        except Exception:  # noqa: BLE001 - a missing module simply contributes nothing
+            continue
+    return frozenset(digests)
+
+
 def registered_unverifiable(repo_root: Path) -> frozenset[str]:
     """Digests explicitly registered as pointing at deliberately-absent bytes."""
     path = repo_root / UNVERIFIABLE_REGISTER
@@ -431,7 +515,11 @@ def guard_repository(
 ) -> GuardReport:
     """Run every rule over the committed artifacts and the prose beside them."""
     report = GuardReport()
-    known = repository_digests(repo_root) | registered_unverifiable(repo_root)
+    known = (
+        repository_digests(repo_root)
+        | registered_unverifiable(repo_root)
+        | computed_content_digests()
+    )
 
     for rel in artifact_dirs:
         base = repo_root / rel
