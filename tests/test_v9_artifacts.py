@@ -276,7 +276,9 @@ def test_blockers_are_external_and_carry_verbatim_evidence(generated) -> None:
     out, _ = generated
     blockers = json.loads((out / "BLOCKERS.json").read_text())
     ids = {b["blocker_id"] for b in blockers["blockers"]}
-    assert {"B-EGRESS", "B-COST-EVIDENCE", "B-POOL-EVIDENCE"} <= ids
+    # B-POOL-EVIDENCE retired with the mining route it blocked.
+    assert {"B-EGRESS", "B-COST-EVIDENCE"} <= ids
+    assert "B-POOL-EVIDENCE" not in ids
     egress = next(b for b in blockers["blockers"] if b["blocker_id"] == "B-EGRESS")
     assert any("403" in e or "BLOCKED" in e for e in egress["evidence"])
     assert "proxies" in egress["workarounds_refused"]
@@ -339,6 +341,15 @@ def test_v9_adds_gates_for_each_defect_it_found() -> None:
         assert v9[added] is True
 
 
+#: Errata whose correcting module was retired with the mining route. The
+#: erratum itself is sealed history and stays; the module it once pointed at
+#: survives only in git history (5474c97). See docs/MINING_RETIREMENT.md.
+RETIRED_ERRATA_MODULES = {
+    "quant_trade.v9.mining_units",
+    "quant_trade.v9.mining_cashflow",
+}
+
+
 def test_the_errata_are_specific_and_traceable() -> None:
     assert len(V8_ERRATA) >= 11
     ids = [e.erratum_id for e in V8_ERRATA]
@@ -346,8 +357,9 @@ def test_the_errata_are_specific_and_traceable() -> None:
     for erratum in V8_ERRATA:
         assert erratum.v9_module.startswith("quant_trade.v9.")
         assert erratum.defect and erratum.correction and erratum.magnitude
-        importlib_name = erratum.v9_module
-        __import__(importlib_name)
+        if erratum.v9_module in RETIRED_ERRATA_MODULES:
+            continue
+        __import__(erratum.v9_module)
 
 
 def test_the_freeze_hash_moves_when_a_gate_moves(monkeypatch) -> None:
@@ -384,7 +396,7 @@ def test_the_artifacts_command_regenerates(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["trading_state"] == "NOT_MEASURED"
-    assert payload["mining_state"] == "BLOCKED_EVIDENCE"
+    assert "mining_state" not in payload, "the retired route must not report a state"
 
 
 def test_the_acquisition_command_hands_back_a_runbook(tmp_path: Path) -> None:

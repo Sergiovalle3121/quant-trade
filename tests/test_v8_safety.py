@@ -158,15 +158,13 @@ def test_backfill_sends_no_authentication_headers() -> None:
 
 
 def test_cloud_hashing_remains_blocked() -> None:
-    """AWS/Alibaba may be a control plane; they may never hash."""
-    from quant_trade.cloud_rental.models import CloudProvider, WorkloadPurpose
-    from quant_trade.cloud_rental.policy import evaluate_provider_policy
+    """AWS/Alibaba may be a control plane; they may never hash.
 
-    for provider in (CloudProvider.AWS, CloudProvider.ALIBABA):
-        verdict = evaluate_provider_policy(
-            provider,
-            WorkloadPurpose.HASHING_WORKER,
-            None,
-            evaluated_at_utc="2026-07-28T00:00:00Z",
-        )
-        assert verdict.status.startswith("BLOCKED"), (provider, verdict.status)
+    The policy engine that evaluated this per provider retired with
+    cloud_rental. The prohibition outlives it as a fixed execution flag, and
+    this asserts the flag rather than the engine.
+    """
+    from quant_trade.v9.safety import EXECUTION_FLAGS
+
+    assert EXECUTION_FLAGS["AWS_ALIBABA_HASHING"] == "PROHIBITED"
+    assert EXECUTION_FLAGS["CLOUD_RESOURCE_CREATION"] == "DISABLED"
