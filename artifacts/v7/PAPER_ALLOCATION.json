@@ -40,18 +40,19 @@
     "eligible": true,
     "entry_id": "cash_usd",
     "kind": "cash",
-    "liquidity_score": 1.0,
+    "liquidity_score": null,
     "rank": 1,
     "reasons": [
       "byte-bound cash baseline prorated to the 30d comparison horizon"
     ],
-    "risk_score": 1.0,
+    "risk_score": null,
     "score": 0.003226608141027265,
     "score_unit": "net_return_on_committed_capital_30d",
     "status": "ELIGIBLE_BASELINE",
     "test_only": false
   },
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "evidence_class": "MEASURED",
   "lineage": {
     "trading": {
       "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",

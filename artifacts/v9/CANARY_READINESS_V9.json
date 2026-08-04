@@ -113,6 +113,7 @@
     }
   ],
   "evaluated_at_utc": "2026-07-28T20:00:00Z",
+  "evidence_class": "MEASURED",
   "notes": [
     "Every condition fails closed: a value must be positively verified to count, and an unparseable input is a failure rather than a skipped check.",
     "Clearing all six still does not authorise real money. It means a human may now make that decision deliberately.",

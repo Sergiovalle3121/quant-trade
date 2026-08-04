@@ -1,5 +1,6 @@
 {
   "artifact": "V8_PREREGISTRATION",
+  "evidence_class": "DECLARED",
   "freeze_hash": "b21483449a7e1e1917f59458012fd236353d536d5ca19412af4627f86e659678",
   "gates": {
     "max_cscv_pbo": 0.5,

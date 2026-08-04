@@ -22,6 +22,7 @@
     "synthetic",
     "unsettled_pnl"
   ],
+  "evidence_class": "MEASURED",
   "findings": [],
   "note": "A profit claim is only supportable by realized money reconciled against external balances. No V9 artifact carries that evidence, so every match is a finding regardless of intent.",
   "realized_profit_state_present": false,

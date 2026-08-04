@@ -38,8 +38,11 @@ class BoardEntry:
     reasons: list[str] = field(default_factory=list)
     test_only: bool = False
     capacity_usd: float | None = None
-    risk_score: float = 1.0
-    liquidity_score: float = 1.0
+    # None until the row is eligible: a neutral 1.0 under a NOT_RUN row reads
+    # as an assessment that never happened. The allocator treats None as the
+    # same neutral prior, so the arithmetic is unchanged.
+    risk_score: float | None = None
+    liquidity_score: float | None = None
     rank: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -226,9 +229,15 @@ def build_opportunity_board(
                 score=score if eligible else None,
                 reasons=reasons,
                 capacity_usd=_capacity(row.get("capacity_usd", metrics.get("capacity_usd"))),
-                risk_score=_bounded_score(row.get("risk_score", metrics.get("risk_score"))),
-                liquidity_score=_bounded_score(
-                    row.get("liquidity_score", metrics.get("liquidity_score"))
+                risk_score=(
+                    _bounded_score(row.get("risk_score", metrics.get("risk_score")))
+                    if eligible
+                    else None
+                ),
+                liquidity_score=(
+                    _bounded_score(row.get("liquidity_score", metrics.get("liquidity_score")))
+                    if eligible
+                    else None
                 ),
             )
         )
@@ -249,6 +258,9 @@ def build_opportunity_board(
     return {
         "artifact": "UNIFIED_ECONOMIC_BOARD",
         "schema_version": 2,
+        # Ranked over lineage-verified rows and a byte-verified cash baseline;
+        # each ineligible entry's own status covers its subtree.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": evaluated_at_utc,
         "score_unit": COMMON_UNIT,
         "comparison_horizon_days": COMPARISON_HORIZON_DAYS,
@@ -392,6 +404,9 @@ def allocate_paper_capital(
     return {
         "artifact": "PAPER_CAPITAL_ALLOCATION",
         "schema_version": 2,
+        # Computed from the board it was given; the capital figure is the
+        # caller's parameter and the fractions are arithmetic over it.
+        "evidence_class": "MEASURED",
         "evaluated_at_utc": board.get("evaluated_at_utc", ""),
         "total_capital_usd": total_capital_usd,
         "paper_only": True,

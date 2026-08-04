@@ -1,18 +1,19 @@
 {
   "artifact": "REGENERATION_MANIFEST",
   "artifact_sha256": {
-    "CANARY_READINESS.json": "36a38a4d47f5c5331f2c058c6d1e6b6925edb6c1b4758f98c816a8999be2065c",
-    "EVIDENCE_INDEX.json": "ffcfd7cc17efea038dc3474cfa1eaf11c2bb575633636115e6f3c2b23e42d0d0",
-    "NO_EDGE_DIAGNOSIS.json": "d7c5b6e7f16fc927095a55d04e71d4fffa89067e49dc0c71de124da0e7ccb75b",
+    "CANARY_READINESS.json": "f9d97c5183c88c1b320268f6295851da13e94bfae1eab0688bcd9a93d98fe1a2",
+    "EVIDENCE_INDEX.json": "b1205b8125b2de583daf2f1e99eabb1008d5bf554a646558e026df00230f91d4",
+    "NO_EDGE_DIAGNOSIS.json": "b00f5b0bc3c1dcba785bb14bb889eaf3b994cf2ff29058f41eba8b7b5c399233",
     "PAPER_STATUS.json": "9e5e71ea01cebd2c141721897f19763fb97fcb47fba2599ae9c738f4e59f4a9c",
-    "REAL_TRADING_CAMPAIGNS.json": "253fde5b587c7d876d193f3316cf184f1865c1e8e62aeca0963caaa4eb7173a9",
+    "REAL_TRADING_CAMPAIGNS.json": "ffbe7f322cbddf02eb52a33fd342e64f17202043c844793cf06472966fa4720a",
     "TRADING_LEADERBOARD.json": "9c07523888a85c90e81e18f293943f52beb8ed135818d6192e9fc5cf5b32b414",
-    "UNIFIED_OPPORTUNITY_BOARD.json": "69e24209d73b9985db78f15f71731f22e249aa16ab1ed3963fec77a123318e5f",
-    "V8_PREREGISTRATION.json": "7b45e73f4b90cb4e5a2ebf6c1a93b44ca01d1e2f798308cb26c362810657003a"
+    "UNIFIED_OPPORTUNITY_BOARD.json": "408afcacdcc6ec8d067810910181ddc842a9edba5f222350b9820f716fe790c6",
+    "V8_PREREGISTRATION.json": "22e43b69c6222c9188f5d80da2fa75c040b726ca1d3a9fd11f148dc4313fae47"
   },
   "base_sha": "596c2accd5c535f3c537a4439a96b94e521e4018",
   "determinism": "Fixed evaluation clock, seeded bootstraps, no wall-clock reads, and the network probe read from its recorded artifact rather than re-run. Regenerating on the same evidence is byte-identical.",
   "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "evidence_class": "MEASURED",
   "evidence_root": "data/v8_evidence",
   "outcome": "NO_EDGE_FOUND",
   "preregistration_hash": "b21483449a7e1e1917f59458012fd236353d536d5ca19412af4627f86e659678",

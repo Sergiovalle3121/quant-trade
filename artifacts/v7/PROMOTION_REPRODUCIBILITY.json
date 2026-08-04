@@ -3,15 +3,16 @@
   "artifact_sha256": {
     "DATA_PROVENANCE_REPORT.json": "4e5ec03a8f67e8ac67056e4bd6e60c4326860b3b1436d2c9f9b8d9449bb5b54e",
     "DEFECT_REPRODUCTION_MATRIX.json": "a71afd66478942df66f0cb724931ed79d0839c7634581c9d80fd0b68924fac17",
-    "PAPER_ALLOCATION.json": "c50917dd87a71f0e05881676077bfc51a7685e5389154699749d8793e92ef2ef",
+    "PAPER_ALLOCATION.json": "15c29322ae62a102df3020d5889e42cbbea8b0ea153b2e67f02374b6bd43f5d0",
     "SHADOW_STATUS.json": "418bbf25b95e330489fd21dc286e3c7b0011bf94a649de67a4faa3467edb641a",
-    "TRADING_LEADERBOARD.json": "3961580bdb7d609d1c28c43b72fa34ce7ac7c13961bc26f4ad9608f3417b1b3c",
-    "UNIFIED_OPPORTUNITY_BOARD.json": "6566448416c1ceef55a1a5b99fd8b6d1c9ba62e166f0aefe4b2db3980c24973d"
+    "TRADING_LEADERBOARD.json": "03b3fed5b56e75d4e30d6ffed56f9bdccf409ea726e3c6bb1a5eccbda9311384",
+    "UNIFIED_OPPORTUNITY_BOARD.json": "4a919b79709074b3a04eb7ebba7ed001a604dadab51d5e0eb717273671f68b85"
   },
   "base_sha": "98daabe6585bfa80d7706a61c8742d5da8ac9ea3",
   "command": "make v7-artifacts SOURCE_COMMIT_SHA=<code-commit-sha>",
   "deterministic_fields": "all fields",
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "evidence_class": "MEASURED",
   "paper_candidate_count": 0,
   "real_evidence_promotable": false,
   "safety": {

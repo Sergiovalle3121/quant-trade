@@ -55,6 +55,8 @@ class TradingScanResult:
         return {
             "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",
             "schema_version": 2,
+            # The scan ran: statuses, counts and the rows hash are its output.
+            "evidence_class": "MEASURED",
             "evaluated_at_utc": self.evaluated_at_utc,
             # the tamper anchor: the board recomputes this from the rows it
             # receives and refuses to rank when it no longer matches

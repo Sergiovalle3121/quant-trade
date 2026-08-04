@@ -19,11 +19,13 @@
       "break_even": {
         "capital": {
           "capital_efficiency": 0.6,
+          "evidence_class": "ASSUMPTION",
           "perp_buffer_usd": 33333.333333333336,
           "perp_initial_margin_usd": 33333.333333333336,
           "spot_capital_usd": 100000.0,
           "total_capital_usd": 166666.6666666667
         },
+        "evidence_class": "ASSUMPTION",
         "funding_interval_hours": 8.0,
         "interpretation": "The strategy must receive at least 0.00010776 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
         "reference_holding_days": 30.0,
@@ -43,6 +45,7 @@
               "slippage": 0.0004,
               "spot_taker_fee": 0.002
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 1.0,
@@ -68,6 +71,7 @@
               "slippage": 0.0008,
               "spot_taker_fee": 0.004
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 2.0,
@@ -93,6 +97,7 @@
               "slippage": 0.0012000000000000001,
               "spot_taker_fee": 0.006
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 3.0,
@@ -223,6 +228,7 @@
             "value": 0.001
           }
         ],
+        "evidence_class": "ASSUMPTION",
         "multiplier": 1.0,
         "per_fill_bps": 11.25,
         "promotable": false,
@@ -266,11 +272,13 @@
       "break_even": {
         "capital": {
           "capital_efficiency": 0.6,
+          "evidence_class": "ASSUMPTION",
           "perp_buffer_usd": 33333.333333333336,
           "perp_initial_margin_usd": 33333.333333333336,
           "spot_capital_usd": 100000.0,
           "total_capital_usd": 166666.6666666667
         },
+        "evidence_class": "ASSUMPTION",
         "funding_interval_hours": 8.0,
         "interpretation": "The strategy must receive at least 0.00010665 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
         "reference_holding_days": 30.0,
@@ -290,6 +298,7 @@
               "slippage": 0.0004,
               "spot_taker_fee": 0.002
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 1.0,
@@ -315,6 +324,7 @@
               "slippage": 0.0008,
               "spot_taker_fee": 0.004
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 2.0,
@@ -340,6 +350,7 @@
               "slippage": 0.0012000000000000001,
               "spot_taker_fee": 0.006
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 3.0,
@@ -470,6 +481,7 @@
             "value": 0.001
           }
         ],
+        "evidence_class": "ASSUMPTION",
         "multiplier": 1.0,
         "per_fill_bps": 11.0,
         "promotable": false,
@@ -514,11 +526,13 @@
       "break_even": {
         "capital": {
           "capital_efficiency": 0.6,
+          "evidence_class": "ASSUMPTION",
           "perp_buffer_usd": 33333.333333333336,
           "perp_initial_margin_usd": 33333.333333333336,
           "spot_capital_usd": 100000.0,
           "total_capital_usd": 166666.6666666667
         },
+        "evidence_class": "ASSUMPTION",
         "funding_interval_hours": 8.0,
         "interpretation": "The strategy must receive at least 0.00011443 per 8h settlement, on average, purely to cover its own frictions over a 30-day hold. Whether settled BTC funding clears that bar is precisely the question the blocked dataset would answer; it is not assumed here in either direction.",
         "reference_holding_days": 30.0,
@@ -539,6 +553,7 @@
               "perp_taker_fee_second_leg": 0.0011,
               "slippage": 0.0004
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 1.0,
@@ -565,6 +580,7 @@
               "perp_taker_fee_second_leg": 0.0022,
               "slippage": 0.0008
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 2.0,
@@ -591,6 +607,7 @@
               "perp_taker_fee_second_leg": 0.0033,
               "slippage": 0.0012000000000000001
             },
+            "evidence_class": "ASSUMPTION",
             "funding_interval_hours": 8.0,
             "holding_days": 30.0,
             "multiplier": 3.0,
@@ -732,6 +749,7 @@
             "value": 0.0015
           }
         ],
+        "evidence_class": "ASSUMPTION",
         "multiplier": 1.0,
         "per_fill_bps": 9.0,
         "promotable": false,
@@ -773,6 +791,7 @@
     }
   ],
   "evaluated_at_utc": "2026-07-28T08:00:00Z",
+  "evidence_class": "MEASURED",
   "executed_count": 0,
   "preregistration_hash": "b21483449a7e1e1917f59458012fd236353d536d5ca19412af4627f86e659678",
   "promoted_count": 0,

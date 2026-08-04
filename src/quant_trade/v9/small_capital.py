@@ -80,7 +80,9 @@ class CapitalScenario:
         return self.status == STATUS_EXECUTABLE
 
     def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
+        # Venue-rule arithmetic on an assumed reference price: every number in
+        # a scenario is chosen or derived from chosen inputs, never observed.
+        payload = {"evidence_class": "ASSUMPTION", **asdict(self)}
         payload["executable"] = self.executable
         return payload
 
