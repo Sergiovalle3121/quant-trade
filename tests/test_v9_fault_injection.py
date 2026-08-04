@@ -2,10 +2,14 @@
 
 Each test drives a specific failure into a component that has to survive it —
 transport faults into the backfill, corruption and crashes into the paper
-session and the shadow collector — and asserts that the survivor is either
-correct or honestly broken. A component that quietly loses an event, silently
-resumes at the wrong place, or promotes recorded bytes to live provenance
-would pass a happy-path test and fail here.
+session — and asserts that the survivor is either correct or honestly broken.
+A component that quietly loses an event, silently resumes at the wrong place,
+or promotes recorded bytes to live provenance would pass a happy-path test and
+fail here.
+
+The shadow-collector durability section retired with the mining route; its
+integrity pattern is recorded in docs/COLLECTOR_INTEGRITY_PATTERN.md for the
+day a token-data collector needs the same defences.
 """
 
 from __future__ import annotations
@@ -23,7 +27,6 @@ from quant_trade.v8.backfill import (
     evidence_dir_for,
     run_backfill,
 )
-from quant_trade.v9.mining_shadow import BiddingPolicy, MarketSnapshot, ShadowCollector
 from quant_trade.v9.paper_engine import CLOCK_INJECTED_TEST, MarketTick, PaperEngineError
 from quant_trade.v9.paper_session import PaperSession, SessionConfig
 
@@ -380,118 +383,3 @@ def test_an_injected_clock_marks_the_session_forever(tmp_path: Path) -> None:
     revived = PaperSession(tmp_path, clock=Clock())
     revived.resume()
     assert revived.status_report()["clock_source"] == CLOCK_INJECTED_TEST
-
-
-# --- shadow collector durability ---------------------------------------------
-
-
-def shadow_policy() -> BiddingPolicy:
-    return BiddingPolicy(
-        name="p50-frozen",
-        bid_percentile=0.5,
-        max_price_btc=0.005,
-        speed_limit=1.0,
-        amount_btc=0.01,
-        duration_hours=24.0,
-    )
-
-
-def shadow_snapshot(index: int) -> MarketSnapshot:
-    return MarketSnapshot(
-        captured_at_ms=1_750_000_000_000 + index * 600_000,
-        algorithm="SHA256",
-        market="EU",
-        best_price_btc=0.001,
-        orderbook_depth=5,
-        raw_sha256="0" * 64,
-        evidence_class="RECORDED_TEST",
-        source_url="https://api2.nicehash.com/main/api/v2/hashpower/orderBook",
-    )
-
-
-class StepClock:
-    def __init__(self, start: float = 1_750_000_000.0) -> None:
-        self.now = start
-
-    def __call__(self) -> float:
-        return self.now
-
-    def advance(self, seconds: float) -> None:
-        self.now += seconds
-
-
-def test_a_crash_mid_capture_leaves_a_verifiable_chain(tmp_path: Path) -> None:
-    clock = StepClock()
-    collector = ShadowCollector(tmp_path, clock=clock)
-    collector.start(shadow_policy())
-    for i in range(4):
-        clock.advance(600.0)
-        collector.capture(shadow_snapshot(i))
-    collector.release()
-
-    # A crash truncates the tail of the last write.
-    text = collector.journal_path.read_text(encoding="utf-8")
-    collector.journal_path.write_text(text[: len(text) - 25], encoding="utf-8")
-
-    revived = ShadowCollector(tmp_path, clock=clock)
-    revived.resume()
-    ok, problems = revived.verify_chain()
-    # The surviving prefix is intact; the truncated record simply is not there.
-    assert ok, problems
-    assert revived.stats.snapshots == 3
-
-
-def test_a_checkpoint_that_disagrees_with_the_journal_loses(tmp_path: Path) -> None:
-    """The journal is the authority; a stale or edited checkpoint cannot win."""
-    clock = StepClock()
-    collector = ShadowCollector(tmp_path, clock=clock)
-    collector.start(shadow_policy())
-    for i in range(5):
-        clock.advance(600.0)
-        collector.capture(shadow_snapshot(i))
-    collector.release()
-
-    checkpoint = json.loads(collector.checkpoint_path.read_text(encoding="utf-8"))
-    checkpoint["stats"]["snapshots"] = 9_999
-    checkpoint["stats"]["observed_seconds"] = 86_400.0 * 30
-    collector.checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
-
-    revived = ShadowCollector(tmp_path, clock=clock)
-    revived.resume()
-    assert revived.stats.snapshots == 5
-    assert revived.stats.observed_seconds == pytest.approx(4 * 600.0)
-
-
-def test_a_restarted_collector_keeps_its_window(tmp_path: Path) -> None:
-    clock = StepClock()
-    collector = ShadowCollector(tmp_path, clock=clock)
-    collector.start(shadow_policy())
-    for i in range(6):
-        clock.advance(600.0)
-        collector.capture(shadow_snapshot(i))
-    observed = collector.stats.observed_seconds
-    collector.release()
-
-    revived = ShadowCollector(tmp_path, clock=clock)
-    revived.start(shadow_policy())
-    clock.advance(600.0)
-    revived.capture(shadow_snapshot(6))
-    assert revived.stats.snapshots == 7
-    assert revived.stats.observed_seconds > observed
-
-
-def test_downtime_across_a_restart_is_recorded_as_a_gap(tmp_path: Path) -> None:
-    clock = StepClock()
-    collector = ShadowCollector(tmp_path, clock=clock)
-    collector.start(shadow_policy())
-    clock.advance(600.0)
-    collector.capture(shadow_snapshot(0))
-    collector.release()
-
-    clock.advance(6 * 3600.0)  # the collector was down for six hours
-    revived = ShadowCollector(tmp_path, clock=clock)
-    revived.start(shadow_policy())
-    revived.capture(shadow_snapshot(1))
-    assert revived.stats.gaps == 1
-    assert revived.stats.gap_seconds == pytest.approx(6 * 3600.0)
-    assert revived.stats.observed_seconds == pytest.approx(0.0)

@@ -116,20 +116,10 @@ def test_only_official_venue_and_marketplace_hosts_appear() -> None:
     assert found <= allowed, sorted(found - allowed)
 
 
-def test_mining_artifacts_never_authorise_a_purchase() -> None:
-    from quant_trade.v8.hashrate_market import MarketplaceScan, MiningOpportunity
-
-    scan = MarketplaceScan(provider="nicehash", status="DISCOVERY_ONLY", scanned_at_utc="x")
-    payload = scan.to_dict()
-    assert payload["purchase_authorized"] is False
-    assert payload["deposit_authorized"] is False
-    assert payload["withdrawal_authorized"] is False
-    assert payload["miners_started"] == 0
-
-    opportunity = MiningOpportunity(
-        opportunity_id="x", provider="nicehash", algorithm_id="sha256", status="DISCOVERY_ONLY"
-    )
-    assert opportunity.to_dict()["purchase_authorized"] is False
+# test_mining_artifacts_never_authorise_a_purchase retired with the hashrate
+# marketplace module. The forbidden-name scan above still asserts no
+# buy_hashrate/purchase_hashrate verb exists anywhere in v8 - a negative
+# assertion that stays true after the retirement and costs nothing to keep.
 
 
 def test_paper_artifacts_never_authorise_real_money() -> None:
@@ -168,15 +158,13 @@ def test_backfill_sends_no_authentication_headers() -> None:
 
 
 def test_cloud_hashing_remains_blocked() -> None:
-    """AWS/Alibaba may be a control plane; they may never hash."""
-    from quant_trade.cloud_rental.models import CloudProvider, WorkloadPurpose
-    from quant_trade.cloud_rental.policy import evaluate_provider_policy
+    """AWS/Alibaba may be a control plane; they may never hash.
 
-    for provider in (CloudProvider.AWS, CloudProvider.ALIBABA):
-        verdict = evaluate_provider_policy(
-            provider,
-            WorkloadPurpose.HASHING_WORKER,
-            None,
-            evaluated_at_utc="2026-07-28T00:00:00Z",
-        )
-        assert verdict.status.startswith("BLOCKED"), (provider, verdict.status)
+    The policy engine that evaluated this per provider retired with
+    cloud_rental. The prohibition outlives it as a fixed execution flag, and
+    this asserts the flag rather than the engine.
+    """
+    from quant_trade.v9.safety import EXECUTION_FLAGS
+
+    assert EXECUTION_FLAGS["AWS_ALIBABA_HASHING"] == "PROHIBITED"
+    assert EXECUTION_FLAGS["CLOUD_RESOURCE_CREATION"] == "DISABLED"

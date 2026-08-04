@@ -30,7 +30,7 @@ COMMON_UNIT = "net_return_on_committed_capital_30d"
 @dataclass
 class BoardEntry:
     entry_id: str
-    kind: str  # "trading" | "mining" | "cash"
+    kind: str  # "trading" | "cash"; the kind axis is open for future candidates
     status: str
     eligible: bool
     score: float | None = None  # ALWAYS the common unit when present
@@ -151,42 +151,20 @@ def _verify_cash_evidence(
     return evidence_class == "REAL", verified
 
 
-def _mining_score(cell: dict[str, Any]) -> tuple[float | None, str]:
-    """Return net ROC over the evidenced rental horizon.
-
-    A short rental is not presumed repeatable for a year. Prefer the explicit
-    horizon cash flows emitted by the economics engine; the hourly ratio is an
-    equivalent fallback because both numerator and denominator use the same
-    evidenced horizon. Neither path multiplies a short opportunity by 8,766.
-    """
-    econ = cell.get("conditional_economics") or {}
-    horizon_net = econ.get("horizon_net_usd")
-    horizon_cost = econ.get("horizon_cost_usd")
-    horizon_hours = econ.get("horizon_hours")
-    if horizon_net is not None and horizon_cost is not None:
-        if horizon_hours is None or not math.isclose(
-            float(horizon_hours), COMPARISON_HORIZON_DAYS * 24.0
-        ):
-            return None, (
-                "mining evidence horizon must equal the 30d board horizon; "
-                "short rentals are not assumed repeatable"
-            )
-        net = float(horizon_net)
-        cost = float(horizon_cost)
-        if math.isfinite(net) and math.isfinite(cost) and cost > 0:
-            return net / cost, ""
-        return None, "mining horizon net/cost must be finite with positive cost"
-    return None, "no verified 30d horizon net/cost return"
+# _mining_score retired with the mining route. Its rule survives it and is the
+# board's architecture: every candidate kind must express net return on
+# committed capital over the SAME 30d horizon or it is not ranked at all, and
+# a short opportunity is never multiplied into a presumed year-round stream
+# (the x8766 defect, V7-015). A future candidate kind - a token strategy, a
+# yield venue - gets a scorer of this shape, not a new unit.
 
 
 def build_opportunity_board(
     *,
     trading_rows: list[dict[str, Any]],
-    mining_cells: list[dict[str, Any]],
     cash_yield_annual: float,
     evaluated_at_utc: str,
     trading_lineage: dict[str, Any] | None = None,
-    mining_lineage: dict[str, Any] | None = None,
     cash_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not math.isfinite(cash_yield_annual) or cash_yield_annual < 0:
@@ -196,15 +174,16 @@ def build_opportunity_board(
     )
     cash_horizon_return = (1.0 + cash_yield_annual) ** (COMPARISON_HORIZON_DAYS / 365.25) - 1.0
     _verify_lineage("trading", trading_rows, trading_lineage, "TRADING_OPPORTUNITY_LEADERBOARD")
-    _verify_lineage("mining", mining_cells, mining_lineage, "MINING_RENTAL_MATRIX")
-    clocks = {
-        str(trading_lineage.get("evaluated_at_utc", "")),  # type: ignore[union-attr]
-        str(mining_lineage.get("evaluated_at_utc", "")),  # type: ignore[union-attr]
-    }
-    if len(clocks) != 1:
+    # With a single scan feeding the board, the old two-source clock
+    # reconciliation degenerates - but the invariant it protected does not:
+    # the rows being ranked must have been scanned at the clock this board
+    # claims to represent. Keep that, against the board's own clock.
+    scan_clock = str(trading_lineage.get("evaluated_at_utc", ""))  # type: ignore[union-attr]
+    if scan_clock != evaluated_at_utc:
         raise ValueError(
-            f"scan artifacts carry different evaluated_at_utc clocks {sorted(clocks)}; "
-            "re-scan both at one evaluation time or normalize explicitly"
+            f"the scan artifact was evaluated at {scan_clock!r} but the board "
+            f"claims {evaluated_at_utc!r}; re-scan at the board's evaluation "
+            "time or normalize explicitly"
         )
 
     entries: list[BoardEntry] = [
@@ -253,43 +232,6 @@ def build_opportunity_board(
                 ),
             )
         )
-    for cell in mining_cells:
-        status = str(cell.get("status", ""))
-        test_only = bool(cell.get("test_only"))
-        eligible = status == "ECONOMIC_CANDIDATE_PAPER_ONLY" and not test_only and cash_promotable
-        score, unit_problem = _mining_score(cell)
-        reasons = list(cell.get("reasons") or [])
-        if status == "ECONOMIC_CANDIDATE_PAPER_ONLY" and not test_only and not cash_promotable:
-            reasons.insert(0, "cash baseline is not byte-verified REAL evidence")
-        if eligible and score is None:
-            eligible = False
-            reasons.insert(0, unit_problem)
-        if eligible and score is not None and score <= cash_horizon_return:
-            eligible = False
-            reasons.insert(0, "net return does not exceed the cash baseline")
-        econ = cell.get("conditional_economics") or {}
-        entries.append(
-            BoardEntry(
-                entry_id=f"mining:{cell.get('identity', '?')}",
-                kind="mining",
-                status=status,
-                eligible=eligible,
-                score=score if eligible else None,
-                reasons=reasons,
-                test_only=test_only,
-                capacity_usd=_capacity(
-                    cell.get(
-                        "capacity_usd",
-                        econ.get("capacity_usd", econ.get("budget_ceiling_usd")),
-                    )
-                ),
-                risk_score=_bounded_score(cell.get("risk_score", econ.get("risk_score"))),
-                liquidity_score=_bounded_score(
-                    cell.get("liquidity_score", econ.get("liquidity_score"))
-                ),
-            )
-        )
-
     eligible_rows = [e for e in entries if e.eligible]
     eligible_rows.sort(
         key=lambda e: (
@@ -317,7 +259,7 @@ def build_opportunity_board(
         "entries": [e.to_dict() for e in ordered],
         "champion": champion.to_dict(),
         "challengers": [e.to_dict() for e in challengers],
-        "lineage": {"trading": trading_lineage, "mining": mining_lineage},
+        "lineage": {"trading": trading_lineage},
         "safety": dict(SAFETY_POSTURE),
         "real_money_authorized": False,
         "notes": [

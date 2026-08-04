@@ -13,9 +13,6 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from quant_trade.cloud_rental.market import ALGORITHM_UNITS
-from quant_trade.cloud_rental.models import CloudProvider, WorkloadPurpose
-from quant_trade.cloud_rental.policy import OFFICIAL_POLICY_SOURCES, evaluate_provider_policy
 from quant_trade.evidence.canonical_json import (
     atomic_write_json,
     load_json,
@@ -26,7 +23,6 @@ from quant_trade.opportunities.board import (
     build_opportunity_board,
     lineage_for_rows,
 )
-from quant_trade.opportunities.mining_scan import load_scan_config, scan_mining_cells
 from quant_trade.opportunities.trading_scan import (
     load_trading_scan_config,
     scan_trading_opportunities,
@@ -38,10 +34,6 @@ ARTIFACT_NAMES = (
     "DEFECT_REPRODUCTION_MATRIX.json",
     "DATA_PROVENANCE_REPORT.json",
     "TRADING_LEADERBOARD.json",
-    "MINING_POLICY_MATRIX.json",
-    "MINING_UNIT_AUDIT.json",
-    "MINING_EVIDENCE_REPORT.json",
-    "MINING_RENTAL_MATRIX.json",
     "UNIFIED_OPPORTUNITY_BOARD.json",
     "PAPER_ALLOCATION.json",
     "SHADOW_STATUS.json",
@@ -186,81 +178,6 @@ def _data_provenance(repo_root: Path) -> dict[str, Any]:
     }
 
 
-def _policy_matrix() -> dict[str, Any]:
-    rows = []
-    for provider in (CloudProvider.AWS, CloudProvider.ALIBABA):
-        for purpose in (WorkloadPurpose.CONTROL_PLANE, WorkloadPurpose.HASHING_WORKER):
-            gate = evaluate_provider_policy(
-                provider, purpose, None, evaluated_at_utc=EVALUATED_AT_UTC
-            )
-            rows.append(
-                {
-                    "provider": provider,
-                    "purpose": purpose,
-                    "status": gate.status,
-                    "control_plane_allowed": gate.control_plane_allowed,
-                    "hashing_allowed": gate.hashing_allowed,
-                    "reason": gate.reason,
-                    "official_sources_to_capture": OFFICIAL_POLICY_SOURCES[str(provider)],
-                    "source_snapshot_evidence": "MISSING",
-                }
-            )
-    return {
-        "artifact": "MINING_POLICY_MATRIX",
-        "schema_version": 3,
-        "evaluated_at_utc": EVALUATED_AT_UTC,
-        # Provider terms read from published policy pages, none of which is
-        # snapshotted here (every row says source_snapshot_evidence MISSING).
-        "evidence_class": "ASSUMPTION",
-        "rows": rows,
-        "legal_advice": False,
-        "miner_execution_authorized": False,
-    }
-
-
-def _unit_audit() -> dict[str, Any]:
-    return {
-        "artifact": "MINING_UNIT_AUDIT",
-        "schema_version": 3,
-        "evaluated_at_utc": EVALUATED_AT_UTC,
-        "evidence_class": "NOT_MEASURED",
-        # universal_th_divisor_present was published as False, phrased as the
-        # result of a code scan. No scan runs here; the claim is withdrawn.
-        "universal_th_divisor_present": None,
-        "universal_th_divisor_state": "NOT_MEASURED",
-        "algorithms": [definition.to_dict() for _, definition in sorted(ALGORITHM_UNITS.items())],
-    }
-
-
-def _mining_evidence(matrix: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "artifact": "MINING_EVIDENCE_REPORT",
-        "schema_version": 3,
-        "evaluated_at_utc": EVALUATED_AT_UTC,
-        # The counters below are zero because nothing was ever collected, not
-        # because a collection ran and found nothing.
-        "evidence_class": "NOT_MEASURED",
-        "real_quote_count": 0,
-        "real_exact_sku_benchmark_count": 0,
-        "real_market_snapshot_count": 0,
-        "real_delivery_evidence_count": 0,
-        "cells": [
-            {
-                "identity": cell["identity"],
-                "status": cell["status"],
-                "test_only": cell["test_only"],
-                "reasons": cell["reasons"],
-            }
-            for cell in matrix["cells"]
-        ],
-        "compute_rental": "POLICY_BLOCKED_AND_MISSING_BYTE_VERIFIED_EVIDENCE",
-        "hashpower_marketplace": (
-            "DISCOVERY_ONLY_IMPORTER_READY_NO_DELIVERY_HISTORY_OR_ECONOMIC_ENGINE"
-        ),
-        "managed_asic_lease": "DISCOVERY_ONLY_NO_CONTRACT_OR_DELIVERY_HISTORY",
-    }
-
-
 def _shadow_status(allocation: dict[str, Any]) -> dict[str, Any]:
     return {
         "artifact": "SHADOW_STATUS",
@@ -292,18 +209,10 @@ def generate_v7_artifacts(
         evaluated_at_utc=EVALUATED_AT_UTC,
         config_dir=root,
     ).to_dict()
-    mining_cfg_path = root / "configs/opportunities/mining_scan_v5.yaml"
-    mining = scan_mining_cells(
-        load_scan_config(mining_cfg_path),
-        evaluated_at_utc=EVALUATED_AT_UTC,
-        config_dir=mining_cfg_path.parent,
-    ).to_dict()
     cash = _cash_evidence(root)
     trading_rows = list(trading["rows"])
-    mining_cells = list(mining["cells"])
     board = build_opportunity_board(
         trading_rows=trading_rows,
-        mining_cells=mining_cells,
         cash_yield_annual=float(cash["annual_yield"]),
         evaluated_at_utc=EVALUATED_AT_UTC,
         cash_evidence={
@@ -316,12 +225,6 @@ def generate_v7_artifacts(
             path="artifacts/v7/TRADING_LEADERBOARD.json",
             evaluated_at_utc=EVALUATED_AT_UTC,
         ),
-        mining_lineage=lineage_for_rows(
-            mining_cells,
-            artifact="MINING_RENTAL_MATRIX",
-            path="artifacts/v7/MINING_RENTAL_MATRIX.json",
-            evaluated_at_utc=EVALUATED_AT_UTC,
-        ),
     )
     board["cash_evidence"] = cash
     allocation = allocate_paper_capital(board, 100_000.0)
@@ -330,10 +233,6 @@ def generate_v7_artifacts(
         "DEFECT_REPRODUCTION_MATRIX.json": _defect_matrix(),
         "DATA_PROVENANCE_REPORT.json": _data_provenance(root),
         "TRADING_LEADERBOARD.json": trading,
-        "MINING_POLICY_MATRIX.json": _policy_matrix(),
-        "MINING_UNIT_AUDIT.json": _unit_audit(),
-        "MINING_EVIDENCE_REPORT.json": _mining_evidence(mining),
-        "MINING_RENTAL_MATRIX.json": mining,
         "UNIFIED_OPPORTUNITY_BOARD.json": board,
         "PAPER_ALLOCATION.json": allocation,
         "SHADOW_STATUS.json": _shadow_status(allocation),

@@ -64,62 +64,6 @@
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
       "test_only": false
-    },
-    {
-      "capacity_usd": null,
-      "eligible": false,
-      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
-      "kind": "mining",
-      "liquidity_score": 1.0,
-      "rank": null,
-      "reasons": [
-        "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
-        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
-        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
-        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
-      ],
-      "risk_score": 1.0,
-      "score": null,
-      "score_unit": "net_return_on_committed_capital_30d",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS",
-      "test_only": true
-    },
-    {
-      "capacity_usd": null,
-      "eligible": false,
-      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
-      "kind": "mining",
-      "liquidity_score": 1.0,
-      "rank": null,
-      "reasons": [
-        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
-        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
-        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
-        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
-      ],
-      "risk_score": 1.0,
-      "score": null,
-      "score_unit": "net_return_on_committed_capital_30d",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
-      "test_only": true
-    },
-    {
-      "capacity_usd": null,
-      "eligible": false,
-      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
-      "kind": "mining",
-      "liquidity_score": 1.0,
-      "rank": null,
-      "reasons": [
-        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
-        "market snapshot missing: ../../data/mining/market/kas_kheavyhash.json (no sourced hashprice, economics cannot be computed)",
-        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
-      ],
-      "risk_score": 1.0,
-      "score": null,
-      "score_unit": "net_return_on_committed_capital_30d",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
-      "test_only": true
     }
   ],
   "champion": {
@@ -205,72 +149,10 @@
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
       "test_only": false
-    },
-    {
-      "capacity_usd": null,
-      "eligible": false,
-      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
-      "kind": "mining",
-      "liquidity_score": 1.0,
-      "rank": null,
-      "reasons": [
-        "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
-        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
-        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
-        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
-      ],
-      "risk_score": 1.0,
-      "score": null,
-      "score_unit": "net_return_on_committed_capital_30d",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS",
-      "test_only": true
-    },
-    {
-      "capacity_usd": null,
-      "eligible": false,
-      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
-      "kind": "mining",
-      "liquidity_score": 1.0,
-      "rank": null,
-      "reasons": [
-        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
-        "sha256 on gpu is INCOMPATIBLE_OR_UNBENCHMARKED: competitive hashing needs ASIC capacity, and no current provider policy permits it",
-        "market snapshot missing: ../../data/mining/market/btc_sha256.json (no sourced hashprice, economics cannot be computed)",
-        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
-      ],
-      "risk_score": 1.0,
-      "score": null,
-      "score_unit": "net_return_on_committed_capital_30d",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
-      "test_only": true
-    },
-    {
-      "capacity_usd": null,
-      "eligible": false,
-      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
-      "kind": "mining",
-      "liquidity_score": 1.0,
-      "rank": null,
-      "reasons": [
-        "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
-        "market snapshot missing: ../../data/mining/market/kas_kheavyhash.json (no sourced hashprice, economics cannot be computed)",
-        "no benchmark evidence for this exact SKU (a typed-in hashrate is not evidence)"
-      ],
-      "risk_score": 1.0,
-      "score": null,
-      "score_unit": "net_return_on_committed_capital_30d",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY",
-      "test_only": true
     }
   ],
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
   "lineage": {
-    "mining": {
-      "artifact": "MINING_RENTAL_MATRIX",
-      "evaluated_at_utc": "2026-07-25T06:00:00Z",
-      "path": "artifacts/v7/MINING_RENTAL_MATRIX.json",
-      "rows_sha256": "4342d7bee66c5d08bba5a54cdd5ca8cbc9d52f91255f43ac818e058c75b213fa"
-    },
     "trading": {
       "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",
       "evaluated_at_utc": "2026-07-25T06:00:00Z",

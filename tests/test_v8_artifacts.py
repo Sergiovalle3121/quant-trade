@@ -11,7 +11,6 @@ from quant_trade.v8.artifacts import (
     ARTIFACT_NAMES,
     NETWORK_PROBE_FILENAME,
     OUTCOME_NO_EDGE,
-    RECORDED_MINING_SCAN_FILENAME,
     artifact_fingerprint,
     generate_v8_artifacts,
 )
@@ -178,36 +177,14 @@ def test_canary_is_blocked_and_authorises_nothing(generated) -> None:
     assert len(canary["blocking_conditions"]) == 6
 
 
-def test_mining_scan_defaults_to_blocked_not_discovery(generated) -> None:
+def test_no_mining_artifact_is_generated_any_more(generated) -> None:
+    """The marketplace scan retired with the hashrate route."""
     out, _result = generated
-    mining = load_json(out / "MINING_MARKETPLACE_SCAN.json")
-    assert mining["status"] == "BLOCKED_NETWORK"
-    assert mining["quote_count"] == 0
-    assert mining["purchase_authorized"] is False
-    assert mining["miners_started"] == 0
-
-
-def test_a_recorded_mining_scan_is_used_when_present(tmp_path: Path) -> None:
-    out = tmp_path / "artifacts"
-    out.mkdir(parents=True)
-    atomic_write_json(out / NETWORK_PROBE_FILENAME, BLOCKED_PROBE)
-    atomic_write_json(
-        out / RECORDED_MINING_SCAN_FILENAME,
-        {
-            "artifact": "MINING_MARKETPLACE_SCAN",
-            "status": "DISCOVERY_ONLY",
-            "quotes": [{"algorithm_id": "sha256"}],
-            "quote_count": 1,
-            "errors": [],
-            "purchase_authorized": False,
-            "miners_started": 0,
-        },
-    )
-    generate_v8_artifacts(
-        tmp_path, evidence_root=tmp_path / "evidence", out_dir=out, source_commit_sha="x"
-    )
-    mining = load_json(out / "MINING_MARKETPLACE_SCAN.json")
-    assert mining["status"] == "DISCOVERY_ONLY"
+    leftovers = [p.name for p in out.glob("MINING_*.json")]
+    assert not leftovers, f"retired mining artifacts reappeared: {leftovers}"
+    board = load_json(out / "UNIFIED_OPPORTUNITY_BOARD.json")
+    kinds = {row["kind"] for row in board["rows"]}
+    assert "MINING_MARKETPLACE" not in kinds
 
 
 def test_the_regeneration_manifest_reports_zero_spend(generated) -> None:

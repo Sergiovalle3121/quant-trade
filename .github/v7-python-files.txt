@@ -6,15 +6,6 @@ src/quant_trade/carry/panel_backfill.py
 src/quant_trade/carry/research.py
 src/quant_trade/carry/store.py
 src/quant_trade/cli.py
-src/quant_trade/cloud_rental/__init__.py
-src/quant_trade/cloud_rental/bundle.py
-src/quant_trade/cloud_rental/catalog.py
-src/quant_trade/cloud_rental/economics.py
-src/quant_trade/cloud_rental/feasibility.py
-src/quant_trade/cloud_rental/hashpower_marketplace.py
-src/quant_trade/cloud_rental/market.py
-src/quant_trade/cloud_rental/models.py
-src/quant_trade/cloud_rental/policy.py
 src/quant_trade/evidence/canonical_json.py
 src/quant_trade/evidence/receipts.py
 src/quant_trade/execution/broker.py
@@ -24,7 +15,6 @@ src/quant_trade/execution/safety.py
 src/quant_trade/execution/simulated_broker.py
 src/quant_trade/opportunities/board.py
 src/quant_trade/opportunities/cli.py
-src/quant_trade/opportunities/mining_scan.py
 src/quant_trade/opportunities/shadow.py
 src/quant_trade/opportunities/trading_scan.py
 src/quant_trade/research/ledger.py
@@ -32,11 +22,8 @@ src/quant_trade/research/overfitting.py
 src/quant_trade/v7_artifacts.py
 tests/test_carry_capital_promotion.py
 tests/test_carry_research.py
-tests/test_cloud_rental.py
-tests/test_cloud_rental_cli.py
 tests/test_ledger_integrity.py
 tests/test_overfitting_evidence.py
-tests/test_v5_bundle_and_mining_scan.py
 tests/test_v5_defect_reproduction.py
 tests/test_v5_ledger_engine.py
 tests/test_v5_opportunity_board.py
@@ -46,5 +33,4 @@ tests/test_v6_receipts.py
 tests/test_v7_artifact_regeneration.py
 tests/test_v7_board_shadow_execution.py
 tests/test_v7_economic_ledger.py
-tests/test_v7_mining_rental_integrity.py
 tests/test_v7_provenance.py

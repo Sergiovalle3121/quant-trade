@@ -30,17 +30,6 @@
       "summary": "the only fee schedules available are ASSUMPTION-class retail defaults; no account-specific schedule has been captured"
     },
     {
-      "blocker_id": "B-POOL-EVIDENCE",
-      "consequence": "the mining route is capped at SHADOW_MARKET_ONLY",
-      "evidence": [
-        "pool hosts refused at CONNECT"
-      ],
-      "owner": "repository owner",
-      "resolution": "attach a read-only pool adapter on a host with egress",
-      "severity": "blocking",
-      "summary": "no pool payout record exists, so delivery and payment are unobserved"
-    },
-    {
       "blocker_id": "B-PAPER-DURATION",
       "consequence": "canary readiness is unreachable",
       "evidence": [

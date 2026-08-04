@@ -63,7 +63,6 @@ ARTIFACT_NAMES = (
     "EVIDENCE_INDEX.json",
     "REAL_TRADING_CAMPAIGNS.json",
     "TRADING_LEADERBOARD.json",
-    "MINING_MARKETPLACE_SCAN.json",
     "UNIFIED_OPPORTUNITY_BOARD.json",
     "PAPER_STATUS.json",
     "CANARY_READINESS.json",
@@ -73,7 +72,6 @@ ARTIFACT_NAMES = (
 
 #: Recorded inputs the generator reads rather than re-measures.
 NETWORK_PROBE_FILENAME = "NETWORK_REACHABILITY_PROBE.json"
-RECORDED_MINING_SCAN_FILENAME = "MINING_MARKETPLACE_SCAN.recorded.json"
 
 OUTCOME_PAPER_CANDIDATE = "PAPER_CANDIDATE"
 OUTCOME_NO_EDGE = "NO_EDGE_FOUND"
@@ -451,7 +449,7 @@ def _next_experiment(campaigns: list[CampaignResult]) -> dict[str, Any]:
 # --- board -------------------------------------------------------------------------
 
 
-def _unified_board(campaigns: list[CampaignResult], mining: dict[str, Any]) -> dict[str, Any]:
+def _unified_board(campaigns: list[CampaignResult]) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for campaign in campaigns:
         venues = campaign.evidence.get("venues", {}) or {}
@@ -469,19 +467,6 @@ def _unified_board(campaigns: list[CampaignResult], mining: dict[str, Any]) -> d
                 "blocking_reasons": campaign.blocking_reasons[:3],
             }
         )
-    rows.append(
-        {
-            "opportunity_id": "mining:nicehash",
-            "kind": "MINING_MARKETPLACE",
-            "status": mining.get("status"),
-            "measured": bool(mining.get("quotes")),
-            "expected_return_over_horizon": None,
-            "horizon_days": None,
-            "capacity_notional_usd": None,
-            "allocation_weight": 0.0,
-            "blocking_reasons": mining.get("errors", [])[:3],
-        }
-    )
     promoted = [r for r in rows if r["status"] == STATUS_PAPER_CANDIDATE]
     # The cash yield is the byte-verified RECORDED_RESPONSE carried over from
     # V7, not something V8 measures: V8 never loads or hashes the fixture, so
@@ -547,15 +532,6 @@ def generate_v8_artifacts(
     probe = probe if isinstance(probe, dict) else {}
 
     campaigns = run_all_campaigns(evidence_root=evidence, trial_registry_path=trial_registry_path)
-    # A recorded scan is an INPUT, kept under its own name. The generator
-    # never reads its own output back: that would make the second regeneration
-    # depend on the first, which is exactly the property being tested.
-    recorded_scan = out / RECORDED_MINING_SCAN_FILENAME
-    mining = load_json(recorded_scan) if recorded_scan.exists() else {}
-    mining = mining if isinstance(mining, dict) else {}
-    if not mining:
-        mining = _blocked_mining_scan(probe)
-
     promoted = [c for c in campaigns if c.promoted]
     outcome = OUTCOME_PAPER_CANDIDATE if promoted else OUTCOME_NO_EDGE
 
@@ -574,8 +550,7 @@ def generate_v8_artifacts(
         "EVIDENCE_INDEX.json": _evidence_index(evidence, probe),
         "REAL_TRADING_CAMPAIGNS.json": _campaigns_artifact(campaigns),
         "TRADING_LEADERBOARD.json": _leaderboard(campaigns),
-        "MINING_MARKETPLACE_SCAN.json": mining,
-        "UNIFIED_OPPORTUNITY_BOARD.json": _unified_board(campaigns, mining),
+        "UNIFIED_OPPORTUNITY_BOARD.json": _unified_board(campaigns),
         "PAPER_STATUS.json": paper,
         "CANARY_READINESS.json": canary,
         "NO_EDGE_DIAGNOSIS.json": _diagnosis(campaigns),
@@ -616,31 +591,6 @@ def generate_v8_artifacts(
     return GenerationResult(out_dir=str(out), hashes=hashes, outcome=outcome, campaigns=campaigns)
 
 
-def _blocked_mining_scan(probe: dict[str, Any]) -> dict[str, Any]:
-    from quant_trade.v8.hashrate_market import STATUS_BLOCKED_NETWORK, MarketplaceScan
-
-    scan = MarketplaceScan(
-        provider="nicehash",
-        status=STATUS_BLOCKED_NETWORK,
-        scanned_at_utc=EVALUATED_AT_UTC,
-    )
-    scan.blocked_hosts.append("api2.nicehash.com")
-    scan.errors.append(
-        "api2.nicehash.com: outbound HTTPS refused by the environment's egress "
-        "policy (CONNECT answered 403), consistent with the venue probe"
-    )
-    scan.notes.append(
-        "no marketplace prices were captured, so no hashrate opportunity was "
-        "priced; DISCOVERY_ONLY would overstate what is known"
-    )
-    if probe.get("blocked_venues"):
-        scan.notes.append(
-            "the same egress policy blocks "
-            + ", ".join(str(v) for v in probe.get("blocked_venues", []))
-        )
-    return scan.to_dict()
-
-
 def artifact_fingerprint(hashes: dict[str, str]) -> str:
     return sha256_of_text(canonical_dumps(dict(sorted(hashes.items()))))
 
@@ -675,7 +625,6 @@ __all__ = [
     "BASE_SHA",
     "EVALUATED_AT_UTC",
     "NETWORK_PROBE_FILENAME",
-    "RECORDED_MINING_SCAN_FILENAME",
     "OUTCOME_NO_EDGE",
     "OUTCOME_PAPER_CANDIDATE",
     "GenerationResult",

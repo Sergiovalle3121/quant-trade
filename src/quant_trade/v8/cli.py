@@ -254,25 +254,6 @@ def campaign(
         typer.echo("outcome: NO_EDGE_FOUND (no hypothesis cleared every gate)")
 
 
-@v8_app.command("mining-scan")
-def mining_scan(
-    btc_usd: Annotated[float, typer.Option(help="Verified BTC/USD rate.")] = 0.0,
-    out: Annotated[str, typer.Option()] = (
-        f"{DEFAULT_ARTIFACT_DIR}/MINING_MARKETPLACE_SCAN.recorded.json"
-    ),
-    scanned_at_utc: Annotated[str, typer.Option()] = "2026-07-28T08:00:00Z",
-) -> None:
-    """Capture public hashrate marketplace prices. Read-only; buys nothing."""
-    from quant_trade.v8.hashrate_market import scan_marketplace
-
-    scan = scan_marketplace(scanned_at_utc=scanned_at_utc, btc_usd=btc_usd if btc_usd > 0 else None)
-    atomic_write_json(out, scan.to_dict())
-    typer.echo(f"status: {scan.status}  quotes: {len(scan.quotes)}")
-    for error in scan.errors[:5]:
-        typer.echo(f"  error: {error}")
-    typer.echo(f"written: {out}")
-
-
 @v8_app.command("paper-status")
 def paper_status(
     state_dir: Annotated[str, typer.Option(help="Paper session state directory.")],

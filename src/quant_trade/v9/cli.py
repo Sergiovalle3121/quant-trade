@@ -1,4 +1,4 @@
-"""``quant-trade v9`` — paper daemon, cost import, mining shadow, artifacts.
+"""``quant-trade v9`` — paper daemon, cost import, artifacts.
 
 What this interface deliberately lacks is part of its design. There is no
 command that submits an order to a venue, buys hashrate, deposits, withdraws,
@@ -23,12 +23,11 @@ import typer
 
 from quant_trade.evidence.canonical_json import atomic_write_json, canonical_dumps
 
-v9_app = typer.Typer(help="V9 profitability evidence, autonomous paper and mining shadow.")
+v9_app = typer.Typer(help="V9 profitability evidence and autonomous paper.")
 
 DEFAULT_STATE_DIR = "data/v9_paper"
 DEFAULT_EVIDENCE_ROOT = "data/v9_evidence"
 DEFAULT_ARTIFACT_DIR = "artifacts/v9"
-DEFAULT_SHADOW_DIR = "data/v9_shadow"
 
 
 def _echo(payload: object) -> None:
@@ -273,60 +272,6 @@ def acquisition_status(
         min_settlements=int(PROMOTION_GATES["min_unique_settlements"]),
     )
     _echo(status.to_dict())
-
-
-# --- mining -----------------------------------------------------------------
-
-
-@v9_app.command("mining-units")
-def mining_units(
-    buy_info: Annotated[str, typer.Option(help="Captured public/buy/info response bytes.")],
-    algorithm: Annotated[str, typer.Option()] = "SHA256",
-    market: Annotated[str, typer.Option()] = "EU",
-    btc_usd: Annotated[float, typer.Option(help="BTC/USD you observed, for the USD view.")] = 0.0,
-) -> None:
-    """Normalise a captured buy/info response into checkable units."""
-    from quant_trade.v9.mining_units import parse_buy_info
-
-    spec = parse_buy_info(
-        Path(buy_info).read_bytes(),
-        algorithm=algorithm,
-        market=market,
-        captured_at_utc="",
-        evidence_class="RECORDED_TEST",
-        source_url="operator-supplied capture",
-    )
-    payload = spec.to_dict()
-    if btc_usd > 0:
-        payload["min_price_usd_per_th_day"] = spec.price_usd_per_canonical_unit_day(
-            spec.min_price_btc, btc_usd=btc_usd
-        )
-        payload["btc_usd_evidence_class"] = "OPERATOR_SUPPLIED"
-    _echo(payload)
-
-
-@v9_app.command("mining-shadow-status")
-def mining_shadow_status(
-    shadow_dir: Annotated[str, typer.Option()] = DEFAULT_SHADOW_DIR,
-    pool_evidence: Annotated[
-        bool, typer.Option(help="Whether parsed pool payout records are attached.")
-    ] = False,
-) -> None:
-    """Report the shadow window: how long, how many, and what still blocks."""
-    from quant_trade.v9.mining_shadow import ShadowCollector
-
-    collector = ShadowCollector(shadow_dir)
-    if not collector.journal_path.exists():
-        _echo(
-            {
-                "status": "BLOCKED_EVIDENCE",
-                "collector_running": False,
-                "reason": f"no shadow journal at {shadow_dir}; the window has not opened",
-            }
-        )
-        return
-    collector.resume()
-    _echo(collector.report(pool_evidence_present=pool_evidence))
 
 
 # --- artifacts --------------------------------------------------------------

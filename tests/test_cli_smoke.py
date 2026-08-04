@@ -16,17 +16,13 @@ def test_top_level_help_lists_command_groups():
         assert group in result.output
 
 
-def test_the_retired_mining_group_is_gone():
-    """The command group must not linger after its package is removed.
-
-    Only the top-level `mining` group is asserted gone. The word still appears
-    in the root help because the v9 app describes itself as covering mining,
-    and the v9 mining route has not been retired.
-    """
+def test_the_retired_mining_groups_are_gone():
+    """No mining command surface may linger after the packages were removed."""
     assert runner.invoke(app, ["mining", "--help"]).exit_code != 0
+    assert runner.invoke(app, ["cloud-rental", "--help"]).exit_code != 0
     root = runner.invoke(app, ["--help"])
     assert root.exit_code == 0
-    assert "cloud-rental" in root.output, "cloud_rental is retired separately, not here"
+    assert "cloud-rental" not in root.output
 
 
 def test_carry_help_lists_commands():
