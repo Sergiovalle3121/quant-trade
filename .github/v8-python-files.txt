@@ -6,8 +6,6 @@ src/quant_trade/v8/canary.py
 src/quant_trade/v8/cli.py
 src/quant_trade/v8/costs.py
 src/quant_trade/v8/evidence_pack.py
-src/quant_trade/v8/hashrate_cashflow.py
-src/quant_trade/v8/hashrate_market.py
 src/quant_trade/v8/holdout.py
 src/quant_trade/v8/network_probe.py
 src/quant_trade/v8/panel_builder.py
@@ -20,7 +18,6 @@ tests/test_v8_backfill.py
 tests/test_v8_campaigns.py
 tests/test_v8_costs_and_preregistration.py
 tests/test_v8_evidence_pack.py
-tests/test_v8_hashrate_market.py
 tests/test_v8_paper_and_canary.py
 tests/test_v8_safety.py
 tests/test_v8_validation.py
