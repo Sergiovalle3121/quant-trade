@@ -57,6 +57,17 @@ jobs:
             echo "::error::Regenerate artifacts/ in the same commit as the source change."
             exit 1
           fi
+      # On drift, ship the Linux-authoritative bytes so the operator can commit
+      # them without regenerating locally — the committed artifacts must match
+      # a Linux regeneration, and the development machine may not be able to
+      # produce one (Windows, or a policy blocking native extensions).
+      - name: Upload the Linux regeneration on drift
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-regenerated-artifacts
+          path: artifacts/
+          if-no-files-found: error
       - name: Provenance guard report
         run: python -m quant_trade.evidence.provenance_guard --repo-root .
 
