@@ -20,13 +20,13 @@
       "eligible": false,
       "entry_id": "trading:H1",
       "kind": "trading",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": null,
       "reasons": [
         "registered dataset missing: data/carry/funding_history_bybit.jsonl",
         "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": null,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
@@ -37,13 +37,13 @@
       "eligible": false,
       "entry_id": "trading:H2",
       "kind": "trading",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": null,
       "reasons": [
         "registered dataset missing: data/carry/funding_history_okx.jsonl",
         "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": null,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
@@ -54,12 +54,12 @@
       "eligible": false,
       "entry_id": "trading:H3",
       "kind": "trading",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": null,
       "reasons": [
         "registered dataset missing: data/carry/panel/okx_btc"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": null,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
@@ -71,12 +71,12 @@
     "eligible": true,
     "entry_id": "cash_usd",
     "kind": "cash",
-    "liquidity_score": 1.0,
+    "liquidity_score": null,
     "rank": 1,
     "reasons": [
       "byte-bound cash baseline prorated to the 30d comparison horizon"
     ],
-    "risk_score": 1.0,
+    "risk_score": null,
     "score": 0.003226608141027265,
     "score_unit": "net_return_on_committed_capital_30d",
     "status": "ELIGIBLE_BASELINE",
@@ -89,12 +89,12 @@
       "eligible": true,
       "entry_id": "cash_usd",
       "kind": "cash",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": 1,
       "reasons": [
         "byte-bound cash baseline prorated to the 30d comparison horizon"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": 0.003226608141027265,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "ELIGIBLE_BASELINE",
@@ -105,13 +105,13 @@
       "eligible": false,
       "entry_id": "trading:H1",
       "kind": "trading",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": null,
       "reasons": [
         "registered dataset missing: data/carry/funding_history_bybit.jsonl",
         "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": null,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
@@ -122,13 +122,13 @@
       "eligible": false,
       "entry_id": "trading:H2",
       "kind": "trading",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": null,
       "reasons": [
         "registered dataset missing: data/carry/funding_history_okx.jsonl",
         "last backfill attempt: NOT_RUN_NETWORK_BLOCKED (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>)"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": null,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
@@ -139,12 +139,12 @@
       "eligible": false,
       "entry_id": "trading:H3",
       "kind": "trading",
-      "liquidity_score": 1.0,
+      "liquidity_score": null,
       "rank": null,
       "reasons": [
         "registered dataset missing: data/carry/panel/okx_btc"
       ],
-      "risk_score": 1.0,
+      "risk_score": null,
       "score": null,
       "score_unit": "net_return_on_committed_capital_30d",
       "status": "NOT_RUN_NO_DATASET",
@@ -152,6 +152,7 @@
     }
   ],
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
+  "evidence_class": "MEASURED",
   "lineage": {
     "trading": {
       "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",

@@ -172,12 +172,14 @@ def test_an_honestly_declared_placeholder_is_not_a_finding(known_digests) -> Non
     assert not scan_payload(payload, source="honest", known_digests=known_digests)
 
 
-#: Provenance findings outstanding across the committed artifacts, measured on
-#: 2026-08-03. The repository declares an evidence class in a handful of places
-#: and nowhere else, so R1 fires broadly. This is a ratchet, not a pass: the
-#: number may fall, never rise. Lowering it requires declaring evidence classes
-#: on the artifacts, which is a decision about the artifacts, not about the guard.
-PROVENANCE_DEBT_CEILING = 871
+#: Provenance findings outstanding across the committed artifacts. Started at
+#: 871 when the guard landed; the mining retirement and the declaration sweep
+#: brought it to 16, all of them in the two recorded network probes
+#: (artifacts/v8/NETWORK_REACHABILITY_PROBE.json and the v9 .recorded.json).
+#: Those are recordings of probes that genuinely ran, and a recording is
+#: evidence: it does not get edited to please a linter. The ratchet stays so a
+#: new undeclared claim cannot land.
+PROVENANCE_DEBT_CEILING = 16
 
 
 def test_the_repository_provenance_debt_does_not_grow() -> None:
