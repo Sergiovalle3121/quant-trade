@@ -7,13 +7,16 @@ inputs is byte-identical, and a test asserts it.
 
 The honest shape of this run is worth stating up front, because a reader who
 skims the JSON should not have to infer it. Outbound HTTPS to every
-venue-published domain — three Bybit, three OKX, the hashrate marketplace and
-two pools — is refused at CONNECT by the environment's egress policy. So no
-campaign has been measured, and the trading state is ``NOT_MEASURED``. What
-*is* computable without price history is computed and reported: the cost
-stack, the executable-capital floor, the unit conversions, and the full fee
-arithmetic of a hashrate order. Those are properties of venue rules, not of
-market history, and they are the durable output of a blocked sprint.
+venue-published domain — three Bybit and three OKX — is refused at CONNECT by
+the environment's egress policy. So no campaign has been measured, and the
+trading state is ``NOT_MEASURED``. What *is* computable without price history
+is computed and reported: the cost stack and the executable-capital floor.
+Those are properties of venue rules, not of market history.
+
+The mining route was retired after this sprint's artifacts were first emitted.
+Its gates and errata remain part of the sealed V9 pre-registration — the
+declaration is history and its hash does not move — but no mining artifact is
+generated any more. See docs/MINING_RETIREMENT.md.
 """
 
 from __future__ import annotations
@@ -37,34 +40,7 @@ from quant_trade.v9.candidate_bridge import STATUS_NO_CANDIDATE
 from quant_trade.v9.cost_evidence import BundleSet, assumption_bundle
 from quant_trade.v9.economic_status import guard_artifacts
 from quant_trade.v9.margin import default_instrument_risk
-from quant_trade.v9.mining_cashflow import (
-    B4_CORRECTIONS,
-    DeliveryProfile,
-    HashrateOrder,
-    MarketplaceFees,
-    NetworkState,
-    PoolTerms,
-    run_campaign,
-)
-from quant_trade.v9.mining_evidence import (
-    STATUS_BLOCKED as MINING_BLOCKED,
-)
-from quant_trade.v9.mining_evidence import (
-    evaluate_mining_evidence,
-    mining_canary_manifest,
-)
-from quant_trade.v9.mining_shadow import (
-    GAP_THRESHOLD_SECONDS,
-    MIN_SHADOW_DAYS,
-    MIN_SHADOW_SNAPSHOTS,
-)
-from quant_trade.v9.mining_units import (
-    CANONICAL_SHA256_UNIT,
-    SPEED_UNIT_HASHES,
-    parse_buy_info,
-)
 from quant_trade.v9.preregistration import (
-    MINING_GATES,
     PROMOTION_GATES,
     V8_ERRATA,
     freeze_hash,
@@ -87,7 +63,6 @@ REFERENCE_BTC_USD = 60_000.0
 #: never reads back a file it wrote, which is what keeps regeneration 2
 #: independent of regeneration 1.
 RECORDED_PROBE_FILENAME = "NETWORK_REACHABILITY_PROBE.recorded.json"
-RECORDED_BUY_INFO_FILENAME = "NICEHASH_BUY_INFO.recorded.json"
 
 ARTIFACT_NAMES = (
     "DATA_AND_COST_EVIDENCE_INDEX.json",
@@ -97,10 +72,6 @@ ARTIFACT_NAMES = (
     "SMALL_CAPITAL_FEASIBILITY.json",
     "H3_LEDGER_RECONCILIATION.json",
     "PAPER_DAEMON_STATUS.json",
-    "MINING_EVIDENCE_INDEX.json",
-    "UNIT_CONVERSION_AUDIT.json",
-    "MINING_CASHFLOW.json",
-    "MINING_SHADOW_STATUS.json",
     "PROFIT_CLAIM_GUARD.json",
     "CANARY_READINESS_V9.json",
     "BLOCKERS.json",
@@ -116,13 +87,11 @@ class GenerationResult:
     out_dir: str
     hashes: dict[str, str] = field(default_factory=dict)
     trading_state: str = STATE_NOT_MEASURED
-    mining_state: str = MINING_BLOCKED
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "out_dir": self.out_dir,
             "trading_state": self.trading_state,
-            "mining_state": self.mining_state,
             "artifact_sha256": dict(sorted(self.hashes.items())),
         }
 
@@ -361,231 +330,6 @@ def _small_capital(bundles: BundleSet) -> dict[str, Any]:
     return payload
 
 
-# --- mining artifacts --------------------------------------------------------
-
-
-def _unit_conversion_audit(spec: Any) -> dict[str, Any]:
-    """The dimensional arithmetic, worked, so a reader can check it by hand."""
-    worked: list[dict[str, Any]] = []
-    for quoted_unit in ("PH", "TH", "GH"):
-        multiplier = SPEED_UNIT_HASHES[quoted_unit] / SPEED_UNIT_HASHES[CANONICAL_SHA256_UNIT]
-        worked.append(
-            {
-                "quoted_unit": f"{quoted_unit}/s",
-                "canonical_unit": f"{CANONICAL_SHA256_UNIT}/s",
-                "hashes_per_quoted_unit": SPEED_UNIT_HASHES[quoted_unit],
-                "canonical_units_per_quoted_unit": multiplier,
-                "example_quote_btc_per_unit_day": 0.001,
-                "naive_usd_per_canonical_unit_day": 0.001 * REFERENCE_BTC_USD,
-                "correct_usd_per_canonical_unit_day": 0.001 * REFERENCE_BTC_USD / multiplier,
-                "error_factor_if_skipped": multiplier,
-            }
-        )
-    payload: dict[str, Any] = {
-        "artifact": "UNIT_CONVERSION_AUDIT",
-        "schema_version": V9_SCHEMA_VERSION,
-        "evaluated_at_utc": EVALUATED_AT_UTC,
-        "speed_unit_hashes": dict(sorted(SPEED_UNIT_HASHES.items())),
-        "canonical_unit": CANONICAL_SHA256_UNIT,
-        "worked_examples": worked,
-        "btc_usd_reference": REFERENCE_BTC_USD,
-        "btc_usd_evidence_class": "ASSUMPTION",
-        "v8_erratum_addressed": "E9",
-        "v8_erratum_closure_state": STATE_NOT_MEASURED,
-        "note": (
-            "SHA-256 is quoted in PH/s. Skipping the conversion overstates the "
-            "cost of hashrate by exactly 1,000x, which is large enough to turn "
-            "any rental into an obvious loss or an obvious win depending on the "
-            "direction of the mistake."
-        ),
-    }
-    if spec is not None:
-        payload["observed_market_spec"] = spec.to_dict()
-    else:
-        payload["observed_market_spec"] = None
-        payload["observed_market_spec_reason"] = (
-            "public/buy/info was not captured: the marketplace host is refused "
-            "at CONNECT, so no live speed unit is on record"
-        )
-    return payload
-
-
-def _mining_cashflow_demo() -> dict[str, Any]:
-    """The fee arithmetic on a RECORDED_TEST order, labelled as such.
-
-    This is not a result. It exists so the sixteen corrections are visible as
-    numbers rather than as prose, on inputs that are explicitly synthetic.
-    """
-    from quant_trade.v9.mining_units import MarketSpec
-
-    spec = MarketSpec(
-        algorithm="SHA256",
-        market="EU",
-        speed_text="PH",
-        min_order_amount_btc=0.001,
-        min_speed_limit=0.1,
-        max_speed_limit=1000.0,
-        min_price_btc=0.0001,
-        max_price_btc=10.0,
-        enabled=True,
-        down_step=-0.0001,
-        raw_sha256="",
-        captured_at_utc=EVALUATED_AT_UTC,
-        evidence_class="SYNTHETIC",
-        source_url="synthetic fixture; no marketplace was contacted",
-    )
-    fees = MarketplaceFees(
-        order_creation_fee_btc=0.00001,
-        buyer_fee_rate_on_spend=0.03,
-        deposit_fee_btc=0.00002,
-        withdrawal_fee_btc=0.00003,
-        cancellation_fee_btc=0.00001,
-    )
-    pool = PoolTerms(
-        pool_name="synthetic-pool",
-        payout_scheme="FPPS",
-        pool_fee_rate=0.02,
-        minimum_payout_btc=0.0005,
-        payout_evidence_class="SYNTHETIC",
-    )
-    network = NetworkState(
-        network="bitcoin-mainnet",
-        difficulty=1.1e14,
-        block_reward_btc=3.125,
-        difficulty_drift_per_day=0.0015,
-    )
-    order = HashrateOrder(
-        spec=spec,
-        price_btc_per_speed_unit_day=0.001,
-        amount_btc=0.01,
-        speed_limit=1.0,
-        duration_hours=24.0,
-    )
-    ledger, outcomes = run_campaign(
-        [(order, DeliveryProfile(fill_ratio_at_price=0.85))],
-        deposit_btc=0.05,
-        fees=fees,
-        pool=pool,
-        network=network,
-        btc_usd=REFERENCE_BTC_USD,
-    )
-    summary = ledger.summary(horizon_days=1.0)
-    return {
-        "artifact": "MINING_CASHFLOW",
-        "schema_version": V9_SCHEMA_VERSION,
-        "evaluated_at_utc": EVALUATED_AT_UTC,
-        "state": STATE_NOT_MEASURED,
-        "evidence_class": "SYNTHETIC",
-        "inputs_are_synthetic": True,
-        "corrections_applied": list(B4_CORRECTIONS),
-        "fees": fees.to_dict(),
-        "pool": pool.to_dict(),
-        "order": order.to_dict(),
-        "outcome": outcomes[0].to_dict(),
-        "ledger": summary,
-        "interpretation": (
-            "These numbers demonstrate the fee arithmetic on synthetic inputs. "
-            "They say nothing about whether renting hashrate is worthwhile: the "
-            "difficulty, the price, the delivery ratio and the pool terms were "
-            "all chosen, not observed."
-        ),
-    }
-
-
-def _mining_evidence_index(probe: dict[str, Any], spec: Any) -> dict[str, Any]:
-    gate = evaluate_mining_evidence(
-        market_quotes=0 if spec is None else 1,
-        market_blocked=spec is None,
-        pool=None,
-    )
-    # No budget can be derived while the marketplace is unreadable. This call
-    # site used to invoke derive_canary_budget() with six invented fee
-    # literals and publish the result as terms derived from the venue's own
-    # minimum order amount and fees - inside the same artifact that reports
-    # market_quotes 0 and "no quote exists to price anything from". The venue
-    # has supplied nothing, so the budget stays absent rather than imagined.
-    budget = None
-    manifest = mining_canary_manifest(
-        gate,
-        budget=budget,
-        max_loss_btc=None,
-        # Operator-chosen safety ceilings, not venue terms: they cap what a
-        # first purchase could ever be, and are assumptions until a real
-        # quote exists to check them against.
-        price_ceiling_btc=0.001,
-        speed_limit=1.0,
-        max_duration_hours=24.0,
-        pool_name="<operator's own pool account>",
-        worker="<operator's own worker>",
-        btc_usd_reference=REFERENCE_BTC_USD,
-        notes=[
-            "No budget is stated. Deriving one needs the venue's minimum order "
-            "amount, its fees and the pool's payout minimum, none of which has "
-            "been read. The ceilings below are operator-chosen limits, class "
-            "ASSUMPTION; they bound a purchase, they do not price one.",
-        ],
-    )
-    payload = gate.to_dict()
-    payload.update(
-        {
-            "artifact": "MINING_EVIDENCE_INDEX",
-            "schema_version": V9_SCHEMA_VERSION,
-            "evaluated_at_utc": EVALUATED_AT_UTC,
-            "marketplace_blocked": spec is None,
-            "pool_adapter_attached": False,
-            "pool_payout_records": 0,
-            "gates": dict(sorted(MINING_GATES.items())),
-            "canary_manifest": manifest,
-            # This artifact mixes a measured blocking result with unmeasured
-            # ceilings; say so rather than letting the reader assume one class.
-            "canary_manifest_evidence_class": "ASSUMPTION",
-            "blocked_hosts": [
-                {"host": p.get("host"), "outcome": p.get("outcome"), "error": p.get("error")}
-                for p in probe.get("probes", []) or []
-            ],
-            "note": (
-                "Marketplace prices are a quote; pool payouts are the product. "
-                "Without the second, the route cannot exceed SHADOW_MARKET_ONLY "
-                "however attractive the arithmetic looks."
-            ),
-        }
-    )
-    return payload
-
-
-def _mining_shadow_status() -> dict[str, Any]:
-    return {
-        "artifact": "MINING_SHADOW_STATUS",
-        "schema_version": V9_SCHEMA_VERSION,
-        "evaluated_at_utc": EVALUATED_AT_UTC,
-        "status": MINING_BLOCKED,
-        "collector_running": False,
-        "snapshots": 0,
-        "observed_days": 0.0,
-        "gaps": 0,
-        "thresholds": {
-            "min_shadow_days": MIN_SHADOW_DAYS,
-            "min_shadow_snapshots": MIN_SHADOW_SNAPSHOTS,
-            "gap_threshold_seconds": GAP_THRESHOLD_SECONDS,
-        },
-        "blocking_reasons": [
-            "the marketplace host is refused at CONNECT, so no snapshot can be "
-            "captured and the window has not opened",
-        ],
-        "anti_forgery": [
-            "elapsed days accumulate from persisted wall-clock stamps, so a "
-            "replay advances the snapshot count and not the window",
-            "the journal is hash-chained: an edited or removed record is detectable",
-            "downtime is recorded as a gap and excluded from observed time",
-            "the bidding policy is frozen at start; changing it restarts the window",
-            "an injected clock marks the window unpromotable forever",
-        ],
-        "orders_placed": 0,
-        "btc_spent": 0.0,
-        "purchase_authorized": False,
-    }
-
-
 # --- cross-cutting artifacts -------------------------------------------------
 
 
@@ -633,15 +377,6 @@ def _blockers(probe: dict[str, Any], bundles: BundleSet) -> dict[str, Any]:
                 ),
             },
             {
-                "blocker_id": "B-POOL-EVIDENCE",
-                "severity": "blocking",
-                "summary": "no pool payout record exists, so delivery and payment are unobserved",
-                "evidence": ["pool hosts refused at CONNECT"],
-                "consequence": "the mining route is capped at SHADOW_MARKET_ONLY",
-                "owner": "repository owner",
-                "resolution": "attach a read-only pool adapter on a host with egress",
-            },
-            {
                 "blocker_id": "B-PAPER-DURATION",
                 "severity": "blocking",
                 "summary": (
@@ -680,18 +415,6 @@ def generate_v9_artifacts(
     probe = load_json(probe_path) if probe_path.exists() else {}
     probe = probe if isinstance(probe, dict) else {}
 
-    buy_info_path = out / RECORDED_BUY_INFO_FILENAME
-    spec = None
-    if buy_info_path.exists():
-        spec = parse_buy_info(
-            buy_info_path.read_bytes(),
-            algorithm="SHA256",
-            market="EU",
-            captured_at_utc=EVALUATED_AT_UTC,
-            evidence_class="RECORDED_TEST",
-            source_url="https://api2.nicehash.com/main/api/v2/public/buy/info",
-        )
-
     bundles = BundleSet()
     for venue in ("bybit", "okx"):
         bundles.add(assumption_bundle(venue, captured_at_utc=EVALUATED_AT_UTC))
@@ -724,10 +447,6 @@ def generate_v9_artifacts(
         "SMALL_CAPITAL_FEASIBILITY.json": _small_capital(bundles),
         "H3_LEDGER_RECONCILIATION.json": _h3_reconciliation(),
         "PAPER_DAEMON_STATUS.json": paper,
-        "MINING_EVIDENCE_INDEX.json": _mining_evidence_index(probe, spec),
-        "UNIT_CONVERSION_AUDIT.json": _unit_conversion_audit(spec),
-        "MINING_CASHFLOW.json": _mining_cashflow_demo(),
-        "MINING_SHADOW_STATUS.json": _mining_shadow_status(),
         "CANARY_READINESS_V9.json": canary,
         "BLOCKERS.json": _blockers(probe, bundles),
     }
@@ -753,7 +472,6 @@ def generate_v9_artifacts(
         "v8_errata_count": len(V8_ERRATA),
         "evidence_root": evidence.as_posix(),
         "trading_state": STATE_NOT_MEASURED,
-        "mining_state": MINING_BLOCKED,
         "artifact_sha256": dict(sorted(hashes.items())),
         "regeneration_command": "python -m quant_trade.v9.artifacts --source-commit-sha <sha>",
         "determinism": (
@@ -786,7 +504,6 @@ def generate_v9_artifacts(
         out_dir=str(out),
         hashes=hashes,
         trading_state=STATE_NOT_MEASURED,
-        mining_state=MINING_BLOCKED,
     )
 
 
@@ -809,7 +526,7 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out_dir,
         source_commit_sha=args.source_commit_sha,
     )
-    print(f"trading: {result.trading_state}  mining: {result.mining_state}")
+    print(f"trading: {result.trading_state}")
     for name, digest in sorted(result.hashes.items()):
         print(f"{digest}  {name}")
     return 0
@@ -823,7 +540,6 @@ __all__ = [
     "ARTIFACT_NAMES",
     "BASE_SHA",
     "EVALUATED_AT_UTC",
-    "RECORDED_BUY_INFO_FILENAME",
     "RECORDED_PROBE_FILENAME",
     "REFERENCE_BTC_USD",
     "GenerationResult",

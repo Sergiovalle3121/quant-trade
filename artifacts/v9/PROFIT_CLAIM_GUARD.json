@@ -32,13 +32,9 @@
     "GLOBAL_TRIAL_LEDGER_SUMMARY.json",
     "H3_LEDGER_RECONCILIATION.json",
     "HOLDOUT_VERDICT.json",
-    "MINING_CASHFLOW.json",
-    "MINING_EVIDENCE_INDEX.json",
-    "MINING_SHADOW_STATUS.json",
     "OOS_CAMPAIGN_RESULTS.json",
     "PAPER_DAEMON_STATUS.json",
-    "SMALL_CAPITAL_FEASIBILITY.json",
-    "UNIT_CONVERSION_AUDIT.json"
+    "SMALL_CAPITAL_FEASIBILITY.json"
   ],
   "schema_version": 1,
   "unsupportable_contexts": [

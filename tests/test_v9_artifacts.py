@@ -196,51 +196,33 @@ def test_the_guard_does_not_scan_its_own_output(generated) -> None:
     assert guard["scanned_sources"]
 
 
-def test_the_mining_route_is_blocked_and_authorises_nothing(generated) -> None:
-    out, result = generated
-    assert result.mining_state == "BLOCKED_EVIDENCE"
-    index = json.loads((out / "MINING_EVIDENCE_INDEX.json").read_text())
-    assert index["status"] == "BLOCKED_EVIDENCE"
-    assert index["purchase_authorized"] is False
-    manifest = index["canary_manifest"]
-    assert manifest["purchase_authorized"] is False
-    assert manifest["deposit_authorized"] is False
-    assert manifest["withdrawal_authorized"] is False
-    assert manifest["aws_alibaba_hashing"] == "PROHIBITED"
-    assert manifest["terms"]["orders"] == 1
-    # A budget can only be stated once the venue's own terms have been read.
-    # The marketplace is blocked, so there is nothing to price a purchase from;
-    # asserting a positive budget here pinned six invented fee literals in
-    # place and would have turned the suite red on correcting them.
-    assert index["marketplace_blocked"] is True
-    assert manifest["terms"]["max_budget_btc"] is None
-    assert manifest["terms"]["max_budget_usd"] is None
-    assert manifest["terms"]["budget_derivation"] == {}
-    assert index["canary_manifest_evidence_class"] == "ASSUMPTION"
-    shadow = json.loads((out / "MINING_SHADOW_STATUS.json").read_text())
-    assert shadow["orders_placed"] == 0
-    assert shadow["btc_spent"] == 0.0
+# The mining-route artifact tests (blocked-evidence gate, synthetic cashflow
+# labelling, the thousandfold unit audit) retired with the route itself. The
+# defects they pinned remain recorded in the sealed V9 errata (E9/E10), whose
+# hash has not moved. See docs/MINING_RETIREMENT.md.
 
 
-def test_the_mining_cashflow_artifact_is_labelled_synthetic(generated) -> None:
+def test_no_mining_artifact_is_generated_any_more(generated) -> None:
     out, _ = generated
-    payload = json.loads((out / "MINING_CASHFLOW.json").read_text())
-    assert payload["evidence_class"] == "SYNTHETIC"
-    assert payload["inputs_are_synthetic"] is True
-    assert payload["state"] == "NOT_MEASURED"
-    assert len(payload["corrections_applied"]) == 16
-    assert "nothing about whether renting hashrate is worthwhile" in payload["interpretation"]
+    leftovers = [p.name for p in out.glob("MINING_*.json")]
+    leftovers += [p.name for p in out.glob("UNIT_CONVERSION_AUDIT.json")]
+    assert not leftovers, f"retired mining artifacts reappeared: {leftovers}"
 
 
-def test_the_unit_audit_pins_the_thousandfold_error(generated) -> None:
+def test_the_sealed_preregistration_still_carries_the_mining_declaration(generated) -> None:
+    """Retiring the route must not rewrite the sealed declaration.
+
+    mining_gates and the E9/E10 errata are part of what was registered on
+    2026-07-28; the route's retirement is documented outside the sealed
+    content, so freeze_hash() must not move.
+    """
     out, _ = generated
-    audit = json.loads((out / "UNIT_CONVERSION_AUDIT.json").read_text())
-    ph = next(e for e in audit["worked_examples"] if e["quoted_unit"] == "PH/s")
-    assert ph["error_factor_if_skipped"] == pytest.approx(1000.0)
-    assert ph["naive_usd_per_canonical_unit_day"] == pytest.approx(
-        ph["correct_usd_per_canonical_unit_day"] * 1000.0
-    )
-    assert audit["btc_usd_evidence_class"] == "ASSUMPTION"
+    manifest = json.loads((out / "REGENERATION_MANIFEST.json").read_text())
+    assert manifest["preregistration_hash"] == freeze_hash()
+    prereg = manifest["preregistration"]
+    assert "mining_gates" in prereg, "the sealed declaration was edited"
+    errata_ids = {e["erratum_id"] for e in prereg["v8_errata"]}
+    assert {"E9", "E10"} <= errata_ids
 
 
 def test_the_capital_curve_brackets_its_own_floor(generated) -> None:
