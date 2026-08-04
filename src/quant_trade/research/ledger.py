@@ -243,6 +243,12 @@ class TrialRecord:
     split_policy: str = ""
     feature_version: str = ""
     execution_policy_hash: str = ""
+    # Seal of the experiment pre-registration this trial was run under. Empty
+    # means the trial was never declared in advance, which is not an error here
+    # - the ledger records what happened - but promotion refuses it. Optional by
+    # construction: the committed historical ledger predates the mechanism and
+    # must stay readable.
+    preregistration_seal: str = ""
     costs: dict[str, Any] = field(default_factory=dict)
     train_range: list[str] | None = None
     test_range: list[str] | None = None
@@ -276,6 +282,7 @@ def build_trial_record(
     split_policy: str = "",
     feature_version: str = "",
     execution_policy_hash: str = "",
+    preregistration_seal: str = "",
     costs: dict[str, Any] | None = None,
     train_range: list[str] | None = None,
     test_range: list[str] | None = None,
@@ -305,6 +312,7 @@ def build_trial_record(
         split_policy=split_policy,
         feature_version=feature_version,
         execution_policy_hash=execution_policy_hash,
+        preregistration_seal=preregistration_seal,
         costs=costs or {},
         train_range=train_range,
         test_range=test_range,
