@@ -31,34 +31,10 @@
       "kind": "trading",
       "rationale": "registered dataset missing: data/carry/panel/okx_btc",
       "status": "NOT_RUN_NO_DATASET"
-    },
-    {
-      "capital_usd": 0.0,
-      "entry_id": "mining:aws|us-east-1|g5.xlarge|NVIDIA A10G|sha256|BTC",
-      "fraction": 0.0,
-      "kind": "mining",
-      "rationale": "AWS Service Terms §1.25 effective 2026-07-09 prohibit cryptocurrency mining; an older blog, generic approval, YAML flag, or human_reviewed boolean does not prevail.",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_TERMS"
-    },
-    {
-      "capital_usd": 0.0,
-      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|sha256|BTC",
-      "fraction": 0.0,
-      "kind": "mining",
-      "rationale": "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY"
-    },
-    {
-      "capital_usd": 0.0,
-      "entry_id": "mining:alibaba|ap-southeast-1|ecs.gn7i-c32g1.8xlarge|NVIDIA A10|kheavyhash|KAS",
-      "fraction": 0.0,
-      "kind": "mining",
-      "rationale": "Alibaba Cloud documents cryptocurrency mining as a security-lock condition; tickets, flags, and human review do not unlock hashing.",
-      "status": "POLICY_BLOCKED:BLOCKED_PROVIDER_POLICY"
     }
   ],
   "artifact": "PAPER_CAPITAL_ALLOCATION",
-  "challengers_tracked": 6,
+  "challengers_tracked": 3,
   "champion": {
     "capacity_usd": null,
     "eligible": true,
@@ -77,12 +53,6 @@
   },
   "evaluated_at_utc": "2026-07-25T06:00:00Z",
   "lineage": {
-    "mining": {
-      "artifact": "MINING_RENTAL_MATRIX",
-      "evaluated_at_utc": "2026-07-25T06:00:00Z",
-      "path": "artifacts/v7/MINING_RENTAL_MATRIX.json",
-      "rows_sha256": "4342d7bee66c5d08bba5a54cdd5ca8cbc9d52f91255f43ac818e058c75b213fa"
-    },
     "trading": {
       "artifact": "TRADING_OPPORTUNITY_LEADERBOARD",
       "evaluated_at_utc": "2026-07-25T06:00:00Z",
