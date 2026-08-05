@@ -22,8 +22,9 @@ by walking visible levels against mid — so slippage *includes* the
 half-spread, and fees are kept separate (nothing double-counts). A notional
 the visible book cannot fill is **None — not executable**, never
 extrapolated. Raw pages + ingestion receipts live under
-`data/cache/crypto_costs/2026-08-05/` (git-ignored); manifest sha256
-`b983be0daefb1cccff6df38e0a688bc022c5151e27662b1b612cfa5461bb5928`.
+`data/cache/crypto_costs/2026-08-05/` (git-ignored); the measurement manifest
+is committed at `data/evidence/crypto_costs/measurement-2026-08-05.json`,
+sha256 `b983be0daefb1cccff6df38e0a688bc022c5151e27662b1b612cfa5461bb5928`.
 
 Round-trip execution cost vs mid (bps, p50 with p75 in brackets):
 
