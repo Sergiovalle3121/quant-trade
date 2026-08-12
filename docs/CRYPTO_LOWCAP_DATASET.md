@@ -180,7 +180,44 @@ from silence (Bybit `retCode 10001` over HTTP 200, Binance HTTP 400 `-1121`),
 and the collector archives and receipts the answering page *before* it
 interprets it, so an exclusion cites evidence like everything else.
 
-Run results are appended to this document when the collection completes.
+### Run results — MEASURED
+
+Both venues answered for all 5,698 symbols. Nothing was skipped.
+
+| | Binance | Bybit |
+|---|---:|---:|
+| symbols asked | 5,698 | 5,698 |
+| listed | 617 | 656 |
+| never listed | 5,081 | 5,030 |
+| listed, no bars in window | 0 | 12 |
+| daily bars collected | 777,872 | 574,889 |
+| earliest bar | 2017-08-17 | 2021-07-05 |
+| gap records | 1 | 1 |
+| on disk | 254 MB | 148 MB |
+
+The two gap records are single read timeouts (`STEEMUSDT` on Binance,
+`SIDUSUSDT` on Bybit). Both symbols were retried on the next pass and are now
+collected; the gap records stay in the journals as permanent evidence that the
+first attempt failed, which is the whole point of recording them.
+
+**Roughly 11% of the universe is tradable.** 617 and 656 symbols out of 5,698
+asked — the other ~88% were never listed on either venue at all. That number is
+worth sitting with: the point-in-time universe contains 6,360 coins in the rank
+band, and a strategy can act on a few hundred of them. Everything else is
+visible in the panel and untouchable, which is exactly the distinction the
+venue leg exists to draw.
+
+**The venue leg contains deaths too**, which is the second survivorship check
+passing: 182 of 617 Binance series (29%) and 222 of 656 Bybit series (36%) end
+before 2026-07. A panel built from currently-listed symbols would have silently
+dropped every one of them.
+
+Interruption note, recorded because the acquisition spans processes: the first
+collection pass was cut off at 87% (Binance) and 84% (Bybit) when its host
+process exited. Both resumed from their journals and completed with no lost
+work, no duplicated fetches and no corrupted chain — symbols with a terminal
+outcome were skipped, the two gap-only symbols were retried. The resume path is
+therefore exercised on real data, not only in tests.
 
 ## What is NOT measured
 
