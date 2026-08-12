@@ -115,8 +115,16 @@ def load_universe_facts(
     end_date: date,
     rank_ceiling: int = 1000,
     exclude_stablecoins: bool = True,
+    keep_symbols: set[str] | None = None,
 ) -> UniverseFacts:
     """Stream the day files into the facts the join needs.
+
+    ``keep_symbols`` retains per-date facts only for those tickers while still
+    counting every coin in the rank band. A coin no venue ever listed cannot
+    enter the panel, so keeping its 3,279 daily records would cost gigabytes to
+    reach the same answer — but the *count* still has to be right, because it
+    is the denominator that says how much of the investable universe was
+    actually reachable.
 
     Duplicate ``(date, cmc_id)`` rows collapse here rather than downstream: the
     source served four days padded with byte-identical repeats (see
@@ -131,6 +139,7 @@ def load_universe_facts(
     symbol_by_date_coin: dict[tuple[str, int], str] = {}
     days = 0
     stablecoins_seen = 0
+    coins_in_band: set[int] = set()
     for day_iso in _dates(start_date, end_date):
         day_file = days_dir / f"{day_iso}.jsonl"
         if not day_file.exists():
@@ -157,6 +166,9 @@ def load_universe_facts(
                 if exclude_stablecoins and symbol in STABLECOIN_SYMBOLS:
                     stablecoins_seen += 1
                     continue
+                coins_in_band.add(coin_id)
+                if keep_symbols is not None and symbol not in keep_symbols:
+                    continue
                 supply = float(row.get("circulating_supply") or 0.0)
                 by_date_coin[(day_iso, coin_id)] = {
                     "cmc_rank": float(rank),
@@ -167,7 +179,7 @@ def load_universe_facts(
                 }
                 symbol_by_date_coin[(day_iso, coin_id)] = symbol
                 ids_by_symbol.setdefault(symbol, set()).add(coin_id)
-    coins = len({coin for _day, coin in by_date_coin})
+    coins = len(coins_in_band)
     return UniverseFacts(
         by_date_coin=by_date_coin,
         ids_by_symbol=ids_by_symbol,
@@ -267,11 +279,26 @@ def build_panel(
     """
     import pandas as pd
 
+    # Venue series first: they name the only tickers that can possibly enter
+    # the panel, so the universe scan can keep per-date facts for those alone.
+    # The coin COUNT still covers the whole rank band, because that count is
+    # the denominator for how much of the investable universe was reachable.
+    venue_series = {
+        venue: load_venue_series(directory, start_date=start_date, end_date=end_date)
+        for venue, directory in sorted(venue_dirs.items())
+    }
+    listed_tickers = {
+        _base_ticker(symbol)
+        for series in venue_series.values()
+        for symbol in series
+    }
+
     facts = load_universe_facts(
         universe_dir,
         start_date=start_date,
         end_date=end_date,
         rank_ceiling=rank_ceiling,
+        keep_symbols=listed_tickers,
     )
     report = PanelBuildReport(
         window=(start_date.isoformat(), end_date.isoformat()),
@@ -283,8 +310,7 @@ def build_panel(
 
     # (venue, coin_id) -> {date: bar}
     bound: dict[tuple[str, int], dict[str, dict[str, float]]] = {}
-    for venue, directory in sorted(venue_dirs.items()):
-        series = load_venue_series(directory, start_date=start_date, end_date=end_date)
+    for venue, series in venue_series.items():
         report.venue_symbols_listed += len(series)
         for venue_symbol, bars in series.items():
             ticker = _base_ticker(venue_symbol)
