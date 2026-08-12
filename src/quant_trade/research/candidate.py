@@ -79,6 +79,18 @@ class SelectionCriteria:
     require_walk_forward_overfitting_evidence: bool = False
     max_walk_forward_pbo: float = 0.50
     min_walk_forward_windows: int = 4
+    #: Optional drawdown criterion RELATIVE to the benchmark's own drawdown,
+    #: applied IN ADDITION to ``max_test_drawdown`` and never in place of it.
+    #: ``None`` disables it, so every existing config behaves exactly as before.
+    #:
+    #: An absolute drawdown threshold silently encodes an asset class. 20% is a
+    #: meaningful bar where a diversified benchmark drew 26%, and no bar at all
+    #: where it drew 77% — there the threshold stops measuring the strategy and
+    #: starts measuring the market. A ratio of 1.0 asks the question that
+    #: survives the change of asset class: was holding this worse than holding
+    #: the benchmark? Loosening the absolute number would hide that; adding a
+    #: second, stricter-in-spirit criterion and reporting both does not.
+    max_drawdown_ratio_vs_benchmark: float | None = None
 
     @classmethod
     def from_yaml(cls, path: Path) -> SelectionCriteria:

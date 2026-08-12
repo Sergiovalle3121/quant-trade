@@ -8,6 +8,12 @@ from quant_trade.research.signals.allocation import (
 )
 from quant_trade.research.signals.breakout import donchian_breakout
 from quant_trade.research.signals.carry import funding_carry
+from quant_trade.research.signals.crypto_lowcap import (
+    annual_equal_weight_rebalance,
+    capacity_illiquidity,
+    death_avoidance,
+    survival_duration,
+)
 from quant_trade.research.signals.ensemble import ensemble_signal
 from quant_trade.research.signals.mean_reversion import simple_mean_reversion_etf
 from quant_trade.research.signals.momentum import cross_sectional_momentum, time_series_momentum
@@ -45,6 +51,21 @@ REGISTRY = {
     ),
     "equal_weight_quarterly": FunctionSignalModel(
         "equal_weight_quarterly", equal_weight_quarterly
+    ),
+    # The four sealed low/mid-cap crypto hypotheses. Each needs the extra
+    # point-in-time columns of the crypto panel (market cap, rank, venue
+    # turnover) and will raise on a plain OHLCV panel that lacks them.
+    "crypto_capacity_illiquidity": FunctionSignalModel(
+        "crypto_capacity_illiquidity", capacity_illiquidity
+    ),
+    "crypto_death_avoidance": FunctionSignalModel(
+        "crypto_death_avoidance", death_avoidance
+    ),
+    "crypto_annual_equal_weight_rebalance": FunctionSignalModel(
+        "crypto_annual_equal_weight_rebalance", annual_equal_weight_rebalance
+    ),
+    "crypto_survival_duration": FunctionSignalModel(
+        "crypto_survival_duration", survival_duration
     ),
 }
 

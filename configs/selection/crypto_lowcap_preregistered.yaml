@@ -1,0 +1,57 @@
+# Pre-registered selection gate for the low/mid-cap crypto search.
+#
+# Sealed before any signal was computed. It exists BESIDE
+# conservative_daily.yaml, which is never edited and against which every
+# result is also reported. Reporting under both is the point: one threshold
+# here differs from the ETF gate, and a reader who distrusts the change can
+# read the unmodified column and ignore this file entirely.
+#
+# EXACTLY ONE criterion differs from conservative_daily.yaml.
+#
+#   max_test_drawdown: 0.20 -> 1.00 (disabled), replaced by
+#   max_drawdown_ratio_vs_benchmark: 1.0
+#
+# Why: an absolute drawdown threshold silently encodes an asset class.
+# Measured on Bybit spot over this study's own window, BTC drew down 76.6%
+# (trough 2022-11-21). The ETF benchmark drew 25.7%. A 20% bar is a real
+# constraint against a 25.7% benchmark and an impossibility against a 76.6%
+# one — at that point it no longer measures the strategy, it measures the
+# market, and every long-only crypto strategy fails it before a single signal
+# is computed. The ratio asks the question that survives the change of asset
+# class: was holding this worse than holding the benchmark?
+#
+# Stated plainly, because the direction matters and is not flattering:
+# ON THE ETF DATA THIS CRITERION IS LOOSER, NOT STRICTER. Re-scored against
+# the eight committed ETF baselines, the absolute 20% bar fails 5 of 8, and
+# this ratio bar fails 1 of 8 (only equal_weight_quarterly, at 1.014x). A 1.0x
+# ratio against a 25.7% benchmark admits drawdowns up to 25.7%.
+#
+# So this is not a stricter gate wearing a different name. It is a
+# benchmark-anchored one, and whether it binds harder or softer depends
+# entirely on what the benchmark did. Against a 25.7% benchmark it is softer
+# than 20%; against a 76.6% one it is the only version of the question that
+# can still be answered. Anyone who thinks that trade is wrong should read the
+# conservative_daily.yaml column, which is reported for every result and in
+# which nothing here participates.
+#
+# Everything else is byte-identical to the ETF gate, including the deflated
+# Sharpe threshold, which is NOT touched.
+
+min_test_sharpe: 0.5
+min_excess_return: 0.0
+max_test_drawdown: 1.00
+max_drawdown_ratio_vs_benchmark: 1.0
+max_turnover: 3.0
+require_beats_benchmark: true
+require_cost_sensitivity_pass: true
+require_subperiod_pass: false
+require_no_red_flags: false
+min_test_months: 12
+max_train_test_sharpe_gap: 1.0
+min_trade_count: 30
+min_probabilistic_sharpe: 0.90
+require_deflated_sharpe: true
+min_deflated_sharpe: 0.5
+require_walk_forward_overfitting_evidence: true
+max_walk_forward_pbo: 0.50
+min_walk_forward_windows: 4

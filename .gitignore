@@ -70,3 +70,10 @@ data/v8_evidence/*/panel.jsonl
 data/v8_evidence/*/panel_manifest.json
 data/v8_evidence/*/panel_manifest.sha256
 data/v8_packs/
+
+# Built panels are derived market data: reproducible from the collectors and
+# their journals, too large to commit, and forbidden by the data-provider
+# rules. The build report and content digest beside them ARE committed, so the
+# panel a result was produced against stays identifiable.
+data/experiments/*/panel.csv.gz
+data/experiments/*/panel.parquet

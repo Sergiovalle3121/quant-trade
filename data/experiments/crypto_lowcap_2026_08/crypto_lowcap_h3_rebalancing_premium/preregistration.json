@@ -1,0 +1,60 @@
+{
+  "end_date": "2026-08-09",
+  "experiment_id": "crypto_lowcap_h3_rebalancing_premium",
+  "hypothesis": "Rebalancing to equal weight among assets with high volatility and imperfect correlation captures a rebalancing return that scales with cross-sectional dispersion, and low/mid-cap crypto has the highest dispersion of any liquid asset class. Capturing it requires trading against recent momentum at exactly the sizes where large capital cannot transact. Turnover is bounded by construction at one full rebalance per year, which is the only reason this fits the gate at all.",
+  "max_trials": 4,
+  "notes": [
+    "The only hypothesis of the four whose turnover cannot drift.",
+    "Dispersion is measured on the panel and reported; if realized dispersion is not materially above the ETF panel's, the mechanism is absent and the test is uninformative rather than negative."
+  ],
+  "refutation": "REFUTED if annual equal-weight rebalancing does not beat buy-and-hold of the IDENTICAL basket, net of the measured cost model, over the holdout. The comparison is against the same names deliberately: any difference is then attributable to the rebalancing itself and not to selection. PRIOR EVIDENCE AGAINST, declared here rather than discovered later: on the ETF panel, equal_weight_quarterly returned -6.0% against its benchmark with an information ratio of -0.304. Five ETFs are the lowest-dispersion case available and crypto low-caps the highest, which is why the hypothesis survives that result, but it is a real prior and a second negative would be decisive.",
+  "registered_at_commit": "963d98543ed38caaef44af55b04e577bed3143a9",
+  "registered_at_utc": "2026-08-12T05:16:03Z",
+  "schema_version": 1,
+  "seal": "f0452d5e96b63a5444eb91469c063d80e15b9d1a8d1eef45160436ca5858105e",
+  "selection_criterion": {
+    "also_reported_unmodified": "configs/selection/conservative_daily.yaml",
+    "benchmark": [
+      "equal-weight buy-and-hold of the same point-in-time universe",
+      "BTC buy-and-hold (venue klines)"
+    ],
+    "construction": "annual rebalance to equal weight vs buy-and-hold of the identical basket, both net of the same measured costs",
+    "costs": "docs/CRYPTO_LOWCAP_COST_MODEL.md measured model, p75 quantile, $1,000 order size, non-executable books = no trade",
+    "deflated_sharpe": {
+      "also_reported": [
+        "DSR with observed variance, new ledger only",
+        "DSR with the 109-trial ETF ledger combined (N=124)"
+      ],
+      "n_trials": 15,
+      "n_trials_policy": "the DECLARED budget is used even if fewer are spent",
+      "sharpe_variance_floor": 0.0025817269775679735,
+      "sharpe_variance_floor_source": "cross-trial variance of the 109-trial ETF ledger",
+      "variance_policy": "max(observed across this experiment's trials, floor)"
+    },
+    "expected_turnover_per_year": "1.0 by construction",
+    "holdout": {
+      "holdout_window": [
+        "2023-11-29",
+        "2026-08-09"
+      ],
+      "revealed": "once, after selection is frozen",
+      "seal": "quant_trade.research.holdout_seal",
+      "selection_window": [
+        "2017-08-17",
+        "2023-11-28"
+      ]
+    },
+    "power_limitation_declared": "a 2.69-year holdout has a standard error of roughly 0.75 on an annualized Sharpe, so it cannot separate a true Sharpe of 1.0 from 0; the verdict is a range, not a point, and will be reported as one",
+    "primary_gate": "configs/selection/crypto_lowcap_preregistered.yaml",
+    "validation": "walk-forward with embargo, same methodology as the ETF study"
+  },
+  "start_date": "2017-08-17",
+  "universe": [
+    "crypto_lowcap_panel@e25722f13e730ddd9a6779463149ffda67ceb807334d034c4ee67f5f3ac29b6e",
+    "membership: point-in-time CMC snapshot at each date, cmc_id identity",
+    "screen: cmc_rank <= 1000 on the rebalance date",
+    "tradability: venue klines required on the rebalance date (bybit or binance spot USDT)",
+    "prices: venue klines only; snapshot prices are cross-check, never execution",
+    "excluded: stablecoins (declared filter), coins with no vetted-venue listing"
+  ]
+}

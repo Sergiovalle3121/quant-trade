@@ -480,6 +480,14 @@ def computed_content_digests() -> frozenset[str]:
     as values and in prose (four docs cite the V8 freeze hash). Recomputing
     them at scan time keeps the author out of the loop: a cited hash resolves
     only if the sealed content still hashes to it.
+
+    The collector policy hashes are the same species: each is the sha256 of a
+    frozen policy dict's canonical dump, sealed into a dataset journal header
+    so that resuming under a changed policy is refused. A doc citing one is
+    naming the rule a dataset was collected under, and the citation resolves
+    only while the code still declares that rule - which is exactly the
+    property worth having, and the reason these are not registered as
+    unverifiable instead.
     """
     digests: set[str] = set()
     for module_name in ("quant_trade.v8.preregistration", "quant_trade.v9.preregistration"):
@@ -488,6 +496,21 @@ def computed_content_digests() -> frozenset[str]:
             digests.add(str(module.freeze_hash()))
         except Exception:  # noqa: BLE001 - a missing module simply contributes nothing
             continue
+    for module_name, attribute in (
+        ("quant_trade.data.universe", "UNIVERSE_POLICY_SHA256"),
+        ("quant_trade.data.deathlist", "DEATHLIST_POLICY_SHA256"),
+        ("quant_trade.data.venue_klines", "VENUE_POLICY_SHA256"),
+    ):
+        try:
+            module = __import__(module_name, fromlist=[attribute])
+            value = getattr(module, attribute)
+        except Exception:  # noqa: BLE001 - a missing module simply contributes nothing
+            continue
+        # One policy per module, or a mapping of them when the module covers
+        # several venues.
+        digests.update(
+            str(v) for v in (value.values() if isinstance(value, dict) else [value])
+        )
     return frozenset(digests)
 
 

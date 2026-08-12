@@ -121,6 +121,18 @@ def _reasons(
     drawdown = abs(_metric(result, "test_metrics", "max_drawdown") or 999.0)
     if drawdown > criteria.max_test_drawdown:
         reasons.append("missing or excessive test drawdown")
+    if criteria.max_drawdown_ratio_vs_benchmark is not None:
+        benchmark_dd = abs(_metric(result, "comparison_test", "benchmark_max_drawdown") or 0.0)
+        if benchmark_dd <= 0:
+            # No benchmark drawdown means no ratio. Reporting "passed" here
+            # would turn a missing measurement into a cleared gate.
+            reasons.append("benchmark drawdown missing; cannot judge relative drawdown")
+        elif drawdown / benchmark_dd > criteria.max_drawdown_ratio_vs_benchmark:
+            reasons.append(
+                f"test drawdown {drawdown:.1%} is "
+                f"{drawdown / benchmark_dd:.2f}x the benchmark's {benchmark_dd:.1%}, "
+                f"above the maximum {criteria.max_drawdown_ratio_vs_benchmark:.2f}x"
+            )
     turnover = _metric(result, "test_metrics", "turnover") or _metric(result, "turnover")
     if turnover is None or turnover > criteria.max_turnover:
         reasons.append("missing or excessive turnover")

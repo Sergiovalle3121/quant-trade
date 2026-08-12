@@ -48,7 +48,20 @@ def rebalance_mask(index: pd.DatetimeIndex, frequency: str) -> pd.Series:
             (months.ne(months.shift().to_numpy()) & months.isin([1, 4, 7, 10])).to_numpy(),
             index=index,
         )
-    raise ValueError("rebalance_frequency must be daily, weekly, monthly, or quarterly")
+    if f == "annual":
+        # Strict January starts, same no-fallback rule as quarterly. A panel
+        # beginning mid-year therefore holds nothing until the first January,
+        # which is the honest reading: the strategy had no rebalance date
+        # before then, and inventing one at the first available bar would put
+        # a rebalance wherever the data happens to start.
+        months = index.to_series().dt.month
+        return pd.Series(
+            (months.ne(months.shift().to_numpy()) & months.eq(1)).to_numpy(),
+            index=index,
+        )
+    raise ValueError(
+        "rebalance_frequency must be daily, weekly, monthly, quarterly, or annual"
+    )
 
 
 def weights_to_long(

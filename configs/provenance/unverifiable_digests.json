@@ -7,6 +7,13 @@
       "expected_at": "data/real_input/ (gitignored)",
       "why_not_committed": "repository policy excludes market-data cache; the panel was delivered by file upload and never committed",
       "consequence": "the selection arithmetic in docs/real_data_evidence/ re-derives from committed artefacts, but the backtests behind it cannot be reproduced here without obtaining a CSV that hashes to this value"
+    },
+    {
+      "sha256": "a94c1b4a40ae067065a3611747c4e4e7ef2ccc8b9468fe8c4bedba688ad188fc",
+      "names": "the CoinPaprika coin roster captured 2026-08-11T05:58Z, the external death list behind docs/CRYPTO_LOWCAP_DATASET.md",
+      "expected_at": "data/cache/crypto_universe/deathlist/raw/ (gitignored)",
+      "why_not_committed": "7.4 MB of provider response data; AGENTS.md forbids committing market data caches and provider responses",
+      "consequence": "the 81.1% death corroboration rate cannot be recomputed here without re-fetching the roster, and a re-fetch will NOT reproduce this digest - the roster changes daily as coins are flagged inactive, so this hash names one specific capture that no later fetch can recreate"
     }
   ]
 }
