@@ -1,0 +1,60 @@
+{
+  "end_date": "2026-08-09",
+  "experiment_id": "crypto_lowcap_h1_capacity_illiquidity",
+  "hypothesis": "Coins whose visible order book cannot absorb institutional size earn a persistent return premium relative to otherwise comparable liquid coins, because the marginal buyer pool structurally excludes professional capital. Measured support for the exclusion, not for the premium: 25% of micro-tier books and 8% of low-tier books could not fill a $10,000 market order at any price on visible depth (57 Bybit books, 2026-08-05). A fund of $50M taking a 1% position needs $500k, roughly fifty times what those books hold. Tested long-only, equal-weight within a capacity band, rebalanced annually, at $1,000 order size.",
+  "max_trials": 4,
+  "notes": [
+    "Highest prior risk of being a survivorship artifact of the four.",
+    "Capacity bands are computed from venue turnover, not from aggregator volume, which is inflated by wash trading."
+  ],
+  "refutation": "REFUTED if the capacity-excluded band does not beat the liquid band, net of the measured cost model, over the holdout. ALSO REFUTED, and this is the outcome the dataset was built to detect, if the excess disappears once coins that died are included at their real terminal values - that would identify the premium as survivorship rather than illiquidity. A positive result on survivors-only data is not evidence for this hypothesis and will not be reported as any.",
+  "registered_at_commit": "963d98543ed38caaef44af55b04e577bed3143a9",
+  "registered_at_utc": "2026-08-12T05:16:03Z",
+  "schema_version": 1,
+  "seal": "3049a3a423f741874f2441b901e2904e9da8ad7eea68fbda7160193dfc42fcb1",
+  "selection_criterion": {
+    "also_reported_unmodified": "configs/selection/conservative_daily.yaml",
+    "benchmark": [
+      "equal-weight buy-and-hold of the same point-in-time universe",
+      "BTC buy-and-hold (venue klines)"
+    ],
+    "construction": "equal-weight within capacity band, annual rebalance",
+    "costs": "docs/CRYPTO_LOWCAP_COST_MODEL.md measured model, p75 quantile, $1,000 order size, non-executable books = no trade",
+    "deflated_sharpe": {
+      "also_reported": [
+        "DSR with observed variance, new ledger only",
+        "DSR with the 109-trial ETF ledger combined (N=124)"
+      ],
+      "n_trials": 15,
+      "n_trials_policy": "the DECLARED budget is used even if fewer are spent",
+      "sharpe_variance_floor": 0.0025817269775679735,
+      "sharpe_variance_floor_source": "cross-trial variance of the 109-trial ETF ledger",
+      "variance_policy": "max(observed across this experiment's trials, floor)"
+    },
+    "expected_turnover_per_year": "0.8-1.2",
+    "holdout": {
+      "holdout_window": [
+        "2023-11-29",
+        "2026-08-09"
+      ],
+      "revealed": "once, after selection is frozen",
+      "seal": "quant_trade.research.holdout_seal",
+      "selection_window": [
+        "2017-08-17",
+        "2023-11-28"
+      ]
+    },
+    "power_limitation_declared": "a 2.69-year holdout has a standard error of roughly 0.75 on an annualized Sharpe, so it cannot separate a true Sharpe of 1.0 from 0; the verdict is a range, not a point, and will be reported as one",
+    "primary_gate": "configs/selection/crypto_lowcap_preregistered.yaml",
+    "validation": "walk-forward with embargo, same methodology as the ETF study"
+  },
+  "start_date": "2017-08-17",
+  "universe": [
+    "crypto_lowcap_panel@e25722f13e730ddd9a6779463149ffda67ceb807334d034c4ee67f5f3ac29b6e",
+    "membership: point-in-time CMC snapshot at each date, cmc_id identity",
+    "screen: cmc_rank <= 1000 on the rebalance date",
+    "tradability: venue klines required on the rebalance date (bybit or binance spot USDT)",
+    "prices: venue klines only; snapshot prices are cross-check, never execution",
+    "excluded: stablecoins (declared filter), coins with no vetted-venue listing"
+  ]
+}

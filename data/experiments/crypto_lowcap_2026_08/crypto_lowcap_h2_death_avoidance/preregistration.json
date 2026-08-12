@@ -1,0 +1,60 @@
+{
+  "end_date": "2026-08-09",
+  "experiment_id": "crypto_lowcap_h2_death_avoidance",
+  "hypothesis": "The dominant risk in low-cap crypto is going to zero, not underperforming: the top-500 universe measured 109-311 exits per year over 2016-2026, and 25,774 of 34,278 coins ever observed were last seen more than 30 days before the panel ends. If death is predictable from observable pre-death signals - rank decay, collapse of credible-venue turnover, spread widening, venue delisting - then screening the dying tail out of an otherwise passive equal-weight basket captures excess return without forecasting winners. This is a defensive edge, which is what the patience constraint can actually exploit.",
+  "max_trials": 4,
+  "notes": [
+    "Overlaps H4 by construction; if both pass, the joint test is whether either adds anything to the other.",
+    "The forced-exit leg is the only part that can breach the annual turnover budget, so its contribution to turnover is reported separately."
+  ],
+  "refutation": "REFUTED if the death-screened basket does not beat the unscreened basket of the same universe, net of measured costs, over the holdout. ALSO REFUTED if the names the screen ejects go on to outperform the names it keeps, measured from the ejection date - that would make the screen an expensive way to sell bottoms. A screen that only works with hindsight parameters, i.e. whose thresholds must be re-fit in the holdout, counts as refuted.",
+  "registered_at_commit": "963d98543ed38caaef44af55b04e577bed3143a9",
+  "registered_at_utc": "2026-08-12T05:16:03Z",
+  "schema_version": 1,
+  "seal": "d706905d69a980faa3e08019f0d4cfc590bed53b940df78f1331fe4c77f6c66b",
+  "selection_criterion": {
+    "also_reported_unmodified": "configs/selection/conservative_daily.yaml",
+    "benchmark": [
+      "equal-weight buy-and-hold of the same point-in-time universe",
+      "BTC buy-and-hold (venue klines)"
+    ],
+    "construction": "equal-weight basket minus death-screened names, annual rebalance plus forced exit on screen trigger",
+    "costs": "docs/CRYPTO_LOWCAP_COST_MODEL.md measured model, p75 quantile, $1,000 order size, non-executable books = no trade",
+    "deflated_sharpe": {
+      "also_reported": [
+        "DSR with observed variance, new ledger only",
+        "DSR with the 109-trial ETF ledger combined (N=124)"
+      ],
+      "n_trials": 15,
+      "n_trials_policy": "the DECLARED budget is used even if fewer are spent",
+      "sharpe_variance_floor": 0.0025817269775679735,
+      "sharpe_variance_floor_source": "cross-trial variance of the 109-trial ETF ledger",
+      "variance_policy": "max(observed across this experiment's trials, floor)"
+    },
+    "expected_turnover_per_year": "1.0-1.4",
+    "holdout": {
+      "holdout_window": [
+        "2023-11-29",
+        "2026-08-09"
+      ],
+      "revealed": "once, after selection is frozen",
+      "seal": "quant_trade.research.holdout_seal",
+      "selection_window": [
+        "2017-08-17",
+        "2023-11-28"
+      ]
+    },
+    "power_limitation_declared": "a 2.69-year holdout has a standard error of roughly 0.75 on an annualized Sharpe, so it cannot separate a true Sharpe of 1.0 from 0; the verdict is a range, not a point, and will be reported as one",
+    "primary_gate": "configs/selection/crypto_lowcap_preregistered.yaml",
+    "validation": "walk-forward with embargo, same methodology as the ETF study"
+  },
+  "start_date": "2017-08-17",
+  "universe": [
+    "crypto_lowcap_panel@e25722f13e730ddd9a6779463149ffda67ceb807334d034c4ee67f5f3ac29b6e",
+    "membership: point-in-time CMC snapshot at each date, cmc_id identity",
+    "screen: cmc_rank <= 1000 on the rebalance date",
+    "tradability: venue klines required on the rebalance date (bybit or binance spot USDT)",
+    "prices: venue klines only; snapshot prices are cross-check, never execution",
+    "excluded: stablecoins (declared filter), coins with no vetted-venue listing"
+  ]
+}

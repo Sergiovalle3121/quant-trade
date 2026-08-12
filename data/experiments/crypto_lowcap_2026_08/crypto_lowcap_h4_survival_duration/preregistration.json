@@ -1,0 +1,60 @@
+{
+  "end_date": "2026-08-09",
+  "experiment_id": "crypto_lowcap_h4_survival_duration",
+  "hypothesis": "Coins that have survived several years inside the low-cap band without dying have demonstrated something - real users, real maintenance, real exchange relationships - that no free fundamental dataset provides. Conditioning on years-survived-in-band is therefore a quality proxy obtainable from the point-in-time panel alone, and it is unavailable to large capital for the same capacity reason as H1. Turnover is the lowest of the four because survivors persist by definition.",
+  "max_trials": 3,
+  "notes": [
+    "Deliberately allocated the smallest budget because of the H2 overlap.",
+    "Survival duration is measured in the panel only; it is left-censored at 2017-08-17 and coins alive at the window start are marked censored, not assigned an age."
+  ],
+  "refutation": "REFUTED if forward returns are unrelated to survival duration after controlling for market cap and venue liquidity, or if the relation is negative - old low-caps dying slowly rather than proving quality. ALSO REFUTED, as a distinct hypothesis, if survival duration adds nothing to the H2 death screen: if the two are the same effect measured twice, this one has no independent content and will be reported as subsumed rather than as a second confirmation.",
+  "registered_at_commit": "963d98543ed38caaef44af55b04e577bed3143a9",
+  "registered_at_utc": "2026-08-12T05:16:03Z",
+  "schema_version": 1,
+  "seal": "9841f0ff6788febe6df0fbe59997366a802433c36da35905e49d8d17811a2e1a",
+  "selection_criterion": {
+    "also_reported_unmodified": "configs/selection/conservative_daily.yaml",
+    "benchmark": [
+      "equal-weight buy-and-hold of the same point-in-time universe",
+      "BTC buy-and-hold (venue klines)"
+    ],
+    "construction": "equal-weight within survival-duration cohort, annual rebalance",
+    "costs": "docs/CRYPTO_LOWCAP_COST_MODEL.md measured model, p75 quantile, $1,000 order size, non-executable books = no trade",
+    "deflated_sharpe": {
+      "also_reported": [
+        "DSR with observed variance, new ledger only",
+        "DSR with the 109-trial ETF ledger combined (N=124)"
+      ],
+      "n_trials": 15,
+      "n_trials_policy": "the DECLARED budget is used even if fewer are spent",
+      "sharpe_variance_floor": 0.0025817269775679735,
+      "sharpe_variance_floor_source": "cross-trial variance of the 109-trial ETF ledger",
+      "variance_policy": "max(observed across this experiment's trials, floor)"
+    },
+    "expected_turnover_per_year": "0.5-0.8",
+    "holdout": {
+      "holdout_window": [
+        "2023-11-29",
+        "2026-08-09"
+      ],
+      "revealed": "once, after selection is frozen",
+      "seal": "quant_trade.research.holdout_seal",
+      "selection_window": [
+        "2017-08-17",
+        "2023-11-28"
+      ]
+    },
+    "power_limitation_declared": "a 2.69-year holdout has a standard error of roughly 0.75 on an annualized Sharpe, so it cannot separate a true Sharpe of 1.0 from 0; the verdict is a range, not a point, and will be reported as one",
+    "primary_gate": "configs/selection/crypto_lowcap_preregistered.yaml",
+    "validation": "walk-forward with embargo, same methodology as the ETF study"
+  },
+  "start_date": "2017-08-17",
+  "universe": [
+    "crypto_lowcap_panel@e25722f13e730ddd9a6779463149ffda67ceb807334d034c4ee67f5f3ac29b6e",
+    "membership: point-in-time CMC snapshot at each date, cmc_id identity",
+    "screen: cmc_rank <= 1000 on the rebalance date",
+    "tradability: venue klines required on the rebalance date (bybit or binance spot USDT)",
+    "prices: venue klines only; snapshot prices are cross-check, never execution",
+    "excluded: stablecoins (declared filter), coins with no vetted-venue listing"
+  ]
+}
