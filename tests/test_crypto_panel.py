@@ -13,6 +13,7 @@ import json
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime, timedelta
 
+import pandas as pd
 import pytest
 
 from quant_trade.data.crypto_panel import (
@@ -22,6 +23,7 @@ from quant_trade.data.crypto_panel import (
     build_panel,
     load_universe_facts,
     load_venue_series,
+    overlay_market_events,
 )
 
 
@@ -514,6 +516,86 @@ def test_panel_prefix_is_invariant_to_future_identity_venue_and_warmup(tmp_path)
     assert "RANK_EXIT" in set(full["market_event"])
     assert "RANK_REENTRY" in set(full["market_event"])
     assert not full["market_event"].str.contains("DELIST").any()
+
+
+def test_future_venue_symbol_history_cannot_rewrite_left_censor_prefix(tmp_path) -> None:
+    """A later venue rename cannot import its older raw history into prior rows."""
+    days = ["2020-01-10", "2020-01-11", "2020-01-12"]
+    rows = {
+        days[0]: [_coin(7, "OLD", 10, 100_000_000.0, 10_000_000.0)],
+        days[1]: [_coin(7, "OLD", 10, 100_000_000.0, 10_000_000.0)],
+        days[2]: [_coin(7, "NEW", 10, 100_000_000.0, 10_000_000.0)],
+    }
+    _write_universe(tmp_path / "universe", rows)
+    _write_venue(
+        tmp_path / "bybit",
+        {
+            "OLDUSDT": [_bar(day, 10.0) for day in days[:2]],
+            # The old raw NEWUSDT bar is outside the requested panel window and
+            # has no causal CMC binding.  It must not censor OLDUSDT's prefix
+            # merely because NEW becomes the venue metadata on a future date.
+            "NEWUSDT": [_bar("2020-01-05", 10.0), _bar(days[2], 10.0)],
+        },
+        collection_start="2020-01-01",
+    )
+
+    short, _ = build_panel(
+        tmp_path / "universe",
+        {"bybit": tmp_path / "bybit"},
+        start_date=date.fromisoformat(days[0]),
+        end_date=date.fromisoformat(days[1]),
+        min_bound_bars=1,
+    )
+    full, _ = build_panel(
+        tmp_path / "universe",
+        {"bybit": tmp_path / "bybit"},
+        start_date=date.fromisoformat(days[0]),
+        end_date=date.fromisoformat(days[2]),
+        min_bound_bars=1,
+    )
+    full_prefix = full[full["timestamp"].dt.date <= date.fromisoformat(days[1])].reset_index(
+        drop=True
+    )
+
+    assert short.to_csv(index=False) == full_prefix.to_csv(index=False)
+    assert not short["left_censored"].any()
+    assert set(full["venue_symbol"]) == {"OLDUSDT", "NEWUSDT"}
+
+
+def test_event_overlay_never_manufactures_ohlc_for_a_sparse_event(tmp_path) -> None:
+    rows, days = _three_day_universe()
+    _write_universe(tmp_path / "universe", rows)
+    _write_venue(tmp_path / "bybit", {"AAAUSDT": [_bar(days[0], 10.0), _bar(days[2], 9.0)]})
+    panel, _ = build_panel(
+        tmp_path / "universe",
+        {"bybit": tmp_path / "bybit"},
+        start_date=date.fromisoformat(days[0]),
+        end_date=date.fromisoformat(days[2]),
+        min_bound_bars=1,
+    )
+    events = pd.DataFrame(
+        [
+            {
+                "timestamp": datetime(2020, 1, 2, tzinfo=UTC),
+                "instrument_id": "CMC:1",
+                "venue": "bybit",
+                "market_event": "HALT",
+            },
+            {
+                "timestamp": datetime(2020, 1, 3, tzinfo=UTC),
+                "instrument_id": "CMC:1",
+                "venue": "bybit",
+                "market_event": "DELISTING_ANNOUNCED",
+            },
+        ]
+    )
+
+    overlaid, sparse = overlay_market_events(panel, events)
+
+    assert len(overlaid) == len(panel) == 2
+    assert "DELISTING_ANNOUNCED" in overlaid.iloc[-1]["market_event"]
+    assert len(sparse) == 1
+    assert sparse.iloc[0]["market_event"] == "HALT"
 
 
 def test_a_dead_coin_keeps_its_history_up_to_death(tmp_path) -> None:

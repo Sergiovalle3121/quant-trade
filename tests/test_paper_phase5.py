@@ -123,3 +123,38 @@ def test_config_rejects_broker(tmp_path: Path):
     )
     with pytest.raises(ValueError):
         load_paper_config(cfg)
+
+
+def test_config_rejects_crypto_before_starting_legacy_paper(tmp_path: Path):
+    cfg = tmp_path / "crypto.yaml"
+    cfg.write_text(
+        Path("configs/paper/equal_weight_synthetic_paper.yaml")
+        .read_text()
+        .replace("equal_weight_buy_and_hold", "crypto_capacity_illiquidity"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="sealed crypto workflow"):
+        load_paper_config(cfg)
+
+
+def test_simulator_rejects_renamed_crypto_bytes_after_config_validation(tmp_path: Path):
+    data = tmp_path / "innocent.csv"
+    data.write_text(
+        "timestamp,symbol,instrument_id,open,high,low,close,volume\n"
+        "2024-01-01T00:00:00Z,SPY,CMC:7,10,11,9,10,1000\n"
+        "2024-01-02T00:00:00Z,SPY,CMC:7,10,11,9,10,1000\n",
+        encoding="utf-8",
+    )
+    cfg = tmp_path / "paper.yaml"
+    cfg.write_text(
+        Path("configs/paper/equal_weight_synthetic_paper.yaml")
+        .read_text()
+        .replace("examples/data/sample_multi_asset_ohlcv.csv", str(data))
+        .replace("outputs/paper", str(tmp_path / "out"))
+        .replace("state/paper", str(tmp_path / "state")),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="crypto panel bytes are blocked"):
+        PaperTradingSimulator(cfg).run()

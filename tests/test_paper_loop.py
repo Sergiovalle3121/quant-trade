@@ -24,7 +24,7 @@ class GrowingFeed:
         rng = np.random.default_rng(seed)
         dates = pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC")
         rows = []
-        for sym, drift in [("AAA-USD", 0.002), ("BBB-USD", 0.001)]:
+        for sym, drift in [("AAA", 0.002), ("BBB", 0.001)]:
             close = 100 * np.cumprod(1 + rng.normal(drift, 0.01, n))
             open_ = np.concatenate([[100.0], close[:-1]])
             for i, ts in enumerate(dates):
@@ -64,7 +64,7 @@ def _config(tmp_path, **overrides) -> LoopConfig:
         session_name="loop_test",
         strategy="time_series_momentum",
         strategy_params={"lookback_days": 10, "rebalance_frequency": "daily"},
-        symbols=["AAA-USD", "BBB-USD"],
+        symbols=["AAA", "BBB"],
         initial_cash=100_000.0,
         costs={"percentage_commission": 0.0005},
         risk_limits=PaperRiskLimits(max_weight_per_asset=0.6, max_turnover_per_rebalance=2.0),
@@ -100,6 +100,15 @@ def test_pending_target_executes_next_bar_across_process_restarts(tmp_path):
     assert s2["bar"] > decided_at  # fills happen strictly after the decision bar
     session = json.loads(r2.session_state_path.read_text())
     assert session["positions"]  # holding now
+
+
+def test_loop_rejects_crypto_panel_identity_before_generating_targets(tmp_path):
+    feed = GrowingFeed()
+    feed.panel["instrument_id"] = "CMC:7"
+    runner = _runner(tmp_path, feed)
+
+    with pytest.raises(SafetyGateError, match="crypto panel bytes are blocked"):
+        runner.run_cycle()
 
 
 def test_cycle_without_new_bar_is_a_heartbeat_noop(tmp_path):

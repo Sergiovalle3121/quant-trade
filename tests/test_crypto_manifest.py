@@ -14,6 +14,21 @@ from quant_trade.data.crypto_manifest import (
     write_manifest,
 )
 
+_PHASE_COMPONENTS = {
+    "selection_panel_component": "bars/selection",
+    "holdout_panel_component": "bars/holdout",
+    "selection_market_events_component": "events/selection",
+    "holdout_market_events_component": "events/holdout",
+}
+_COMPONENT_PROVENANCE = {
+    "bars/selection": "selection.panel.json",
+    "bars/holdout": "holdout.panel.json",
+    "events/selection": "selection.market-events.json",
+    "events/holdout": "holdout.market-events.json",
+    "journal/bybit": "journal.jsonl",
+}
+_COMPONENTS = {name: chr(ord("a") + index) * 64 for index, name in enumerate(_COMPONENT_PROVENANCE)}
+
 
 def _validation(passed: bool = True) -> CausalValidationEvidence:
     return CausalValidationEvidence(
@@ -42,12 +57,13 @@ def _manifest(**overrides) -> CryptoDatasetManifest:
         "instruments": 5,
         "schema_version": 2,
         "code_commit": "a" * 40,
-        "policy": {"rank_ceiling": 1000, "market_cap_usd": [10e6, 1e9]},
-        "components": {"panel/csv": "b" * 64, "journal/bybit": "c" * 64},
-        "component_provenance": {
-            "panel/csv": "panel.csv",
-            "journal/bybit": "journal.jsonl",
+        "policy": {
+            "rank_ceiling": 1000,
+            "market_cap_usd": [10e6, 1e9],
+            **_PHASE_COMPONENTS,
         },
+        "components": _COMPONENTS,
+        "component_provenance": _COMPONENT_PROVENANCE,
         "causal_validation": _validation(),
         "gap_summary": {"unexplained": 0},
         "terms_status": "UNRESOLVED_NO_REDISTRIBUTION",
@@ -61,6 +77,87 @@ def test_trusted_manifest_is_hash_stable_and_allows_research_gate() -> None:
     assert manifest.digest() == _manifest().digest()
     assert len(manifest.digest()) == 64
     manifest.require_trusted("pnl_generation")
+
+
+def test_trusted_manifest_requires_declared_panel_and_event_components() -> None:
+    missing_policy = dict(_manifest().policy)
+    missing_policy.pop("selection_market_events_component")
+    with pytest.raises(
+        CryptoManifestError,
+        match="must declare selection_market_events_component",
+    ):
+        _manifest(policy=missing_policy)
+
+    components = dict(_COMPONENTS)
+    provenance = dict(_COMPONENT_PROVENANCE)
+    components.pop("events/holdout")
+    provenance.pop("events/holdout")
+    with pytest.raises(CryptoManifestError, match="absent from hashes or provenance"):
+        _manifest(components=components, component_provenance=provenance)
+
+
+def test_trusted_manifest_rejects_aliased_phase_components() -> None:
+    policy = dict(_manifest().policy)
+    policy["holdout_market_events_component"] = policy["selection_market_events_component"]
+    with pytest.raises(CryptoManifestError, match="component names must be distinct"):
+        _manifest(policy=policy)
+
+
+def test_trusted_manifest_accepts_policy_declared_nonliteral_component_names() -> None:
+    manifest = _manifest()
+
+    assert manifest.policy["selection_panel_component"] == "bars/selection"
+    assert manifest.policy["holdout_market_events_component"] == "events/holdout"
+    manifest.require_trusted("causal_research")
+
+
+def test_unvalidated_manifest_may_omit_phase_component_policy() -> None:
+    manifest = _manifest(
+        status="UNVALIDATED",
+        policy={"rank_ceiling": 1000},
+        components={"raw/source": "a" * 64},
+        component_provenance={"raw/source": "raw.json"},
+    )
+
+    with pytest.raises(CryptoManifestError, match="cannot be used"):
+        manifest.require_trusted("causal_research")
+
+
+def test_manifest_defensively_copies_and_deeply_freezes_hash_bound_mappings() -> None:
+    policy = {
+        "rank_ceiling": 1000,
+        "filters": {"market_cap_usd": [10e6, 1e9]},
+        **_PHASE_COMPONENTS,
+    }
+    gaps = {"unexplained": 0, "by_symbol": {"BTCUSDT": []}}
+    manifest = _manifest(policy=policy, gap_summary=gaps)
+    original_digest = manifest.digest()
+
+    policy["rank_ceiling"] = 5
+    policy["filters"]["market_cap_usd"].append(2e9)
+    gaps["unexplained"] = 9
+    gaps["by_symbol"]["BTCUSDT"].append("future-gap")
+
+    assert manifest.policy["rank_ceiling"] == 1000
+    assert manifest.gap_summary["unexplained"] == 0
+    assert manifest.digest() == original_digest
+    with pytest.raises(TypeError):
+        manifest.policy["rank_ceiling"] = 5  # type: ignore[index]
+    with pytest.raises(TypeError):
+        manifest.gap_summary["by_symbol"]["BTCUSDT"] = ("gap",)  # type: ignore[index]
+
+    detached = manifest.sealed_content()
+    detached["gap_summary"]["unexplained"] = 12
+    assert manifest.gap_summary["unexplained"] == 0
+    assert manifest.digest() == original_digest
+
+
+def test_require_trusted_revalidates_state_even_after_frozen_dataclass_bypass() -> None:
+    manifest = _manifest()
+    object.__setattr__(manifest, "gap_summary", {"unexplained": 1})
+
+    with pytest.raises(CryptoManifestError, match="zero unexplained gaps"):
+        manifest.require_trusted("pnl_generation")
 
 
 def test_trust_claim_requires_every_adversarial_check() -> None:
@@ -87,14 +184,11 @@ def test_manifest_requires_gap_and_terms_provenance() -> None:
         _manifest(gap_summary={"unexplained": 1})
     assert _manifest(status="UNVALIDATED", gap_summary={"unexplained": 1})
     with pytest.raises(CryptoManifestError, match="exactly every hashed component"):
-        _manifest(component_provenance={"panel/csv": "panel.csv"})
+        _manifest(component_provenance={"bars/selection": "selection.panel.json"})
+    unsafe_provenance = dict(_COMPONENT_PROVENANCE)
+    unsafe_provenance["bars/selection"] = "../panel.csv"
     with pytest.raises(CryptoManifestError, match="beneath the provenance root"):
-        _manifest(
-            component_provenance={
-                "panel/csv": "../panel.csv",
-                "journal/bybit": "journal.jsonl",
-            }
-        )
+        _manifest(component_provenance=unsafe_provenance)
 
 
 def test_component_hashes_bind_exact_bytes(tmp_path) -> None:
@@ -121,15 +215,16 @@ def test_manifest_write_is_non_overwriting_and_digest_bound(tmp_path) -> None:
 def _write_loadable_manifest(tmp_path):
     provenance = tmp_path / "provenance"
     provenance.mkdir()
-    panel = provenance / "panel.csv"
-    journal = provenance / "journal.jsonl"
-    panel.write_bytes(b"causal panel bytes")
-    journal.write_bytes(b"collector journal bytes")
-    paths = {"panel/csv": panel, "journal/bybit": journal}
+    paths = {
+        logical_name: provenance / relative_path
+        for logical_name, relative_path in _COMPONENT_PROVENANCE.items()
+    }
+    for index, component in enumerate(paths.values()):
+        component.write_bytes(f"sealed component {index}".encode())
     manifest = _manifest(components=component_hashes(paths))
     manifest_path = tmp_path / "dataset_manifest.json"
     write_manifest(manifest_path, manifest)
-    return manifest_path, provenance, panel, manifest
+    return manifest_path, provenance, paths["bars/selection"], manifest
 
 
 def test_loader_verifies_embedded_digest_and_component_bytes(tmp_path) -> None:

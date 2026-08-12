@@ -107,9 +107,45 @@ def test_unknown_evidence_class_is_rejected():
 
 def test_measured_class_without_bytes_hash_is_rejected():
     with pytest.raises(CostModelError, match="sha256"):
+        CostInput(name="x", value_bps=1.0, evidence_class="REAL_PUBLIC_RETAIL", source="s")
+
+
+def test_measured_cost_input_requires_explicit_utc_capture_time() -> None:
+    with pytest.raises(CostModelError, match="captured_at_utc"):
         CostInput(
-            name="x", value_bps=1.0, evidence_class="REAL_PUBLIC_RETAIL", source="s"
+            name="x",
+            value_bps=1.0,
+            evidence_class="REAL_PUBLIC_RETAIL",
+            source="s",
+            captured_at_utc="2026-08-05T00:00:00",
+            raw_sha256="a" * 64,
         )
+
+
+def test_account_fee_evidence_requires_typed_scope_metadata() -> None:
+    with pytest.raises(CostModelError, match="account_scope.*endpoint.*venue.*venue_symbol"):
+        CostInput(
+            name="account_fee",
+            value_bps=10.0,
+            evidence_class="REAL_ACCOUNT_SPECIFIC",
+            source="Bybit account fee endpoint",
+            captured_at_utc="2026-08-05T00:00:00Z",
+            raw_sha256="a" * 64,
+        )
+
+    fee = CostInput(
+        name="account_fee",
+        value_bps=10.0,
+        evidence_class="REAL_ACCOUNT_SPECIFIC",
+        source="Bybit account fee endpoint",
+        captured_at_utc="2026-08-05T00:00:00Z",
+        raw_sha256="a" * 64,
+        venue="bybit",
+        endpoint="/v5/account/fee-rate",
+        account_scope="dedicated-subaccount",
+        venue_symbol="CMC:7",
+    )
+    assert fee.endpoint == "/v5/account/fee-rate"
 
 
 def test_fee_assumption_is_labelled():
@@ -177,6 +213,24 @@ def test_measured_profile_requires_manifest_hash():
         )
 
 
+def test_measured_profile_requires_explicit_utc_capture_time() -> None:
+    with pytest.raises(CostModelError, match="captured_at_utc"):
+        TierCostProfile(
+            tier="mid",
+            market_cap_min_usd=100e6,
+            market_cap_max_usd=1e9,
+            sample_count=1,
+            half_spread_bps_p50=5.0,
+            half_spread_bps_p75=9.0,
+            exec_cost_bps_by_notional={},
+            exec_cost_p75_bps_by_notional={},
+            evidence_class="REAL_PUBLIC_RETAIL",
+            source="s",
+            captured_at_utc="2026-08-05T00:00:00-06:00",
+            manifest_sha256="a" * 64,
+        )
+
+
 def test_max_viable_turnover_is_budget_over_cost():
     assert max_viable_annual_turnover(100.0, 500.0) == pytest.approx(5.0)
     assert equivalent_total_window_turnover(0.52, 5.75) == pytest.approx(2.99)
@@ -218,10 +272,7 @@ def _instruments_bytes(bases: list[str]) -> bytes:
     payload = {
         "retCode": 0,
         "result": {
-            "list": [
-                {"baseCoin": base, "quoteCoin": "USDT", "status": "Trading"}
-                for base in bases
-            ]
+            "list": [{"baseCoin": base, "quoteCoin": "USDT", "status": "Trading"} for base in bases]
         },
     }
     return json.dumps(payload).encode()

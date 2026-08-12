@@ -7,6 +7,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from typing import Any, Literal
 
 from quant_trade.evidence.canonical_json import (
@@ -20,10 +21,50 @@ from quant_trade.evidence.canonical_json import (
 DatasetStatus = Literal["TRUSTED_CAUSAL", "UNVALIDATED", "INVALID"]
 MANIFEST_SCHEMA_VERSION = 1
 TRUSTED_CAUSAL = "TRUSTED_CAUSAL"
+TRUSTED_PHASE_COMPONENT_POLICY_FIELDS = (
+    "selection_panel_component",
+    "holdout_panel_component",
+    "selection_market_events_component",
+    "holdout_market_events_component",
+)
 
 
 class CryptoManifestError(ValueError):
     """Raised when provenance is incomplete or a trust claim is unsupported."""
+
+
+def _freeze_json_value(value: Any, *, field_name: str) -> Any:
+    """Detach and recursively freeze a JSON-compatible manifest value."""
+    if isinstance(value, Mapping):
+        frozen: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise CryptoManifestError(f"{field_name} keys must be strings")
+            frozen[key] = _freeze_json_value(item, field_name=field_name)
+        return MappingProxyType(frozen)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json_value(item, field_name=field_name) for item in value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    raise CryptoManifestError(f"{field_name} must contain only JSON-compatible values")
+
+
+def _freeze_mapping(value: Any, *, field_name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise CryptoManifestError(f"{field_name} must be a JSON object")
+    frozen = _freeze_json_value(value, field_name=field_name)
+    if not isinstance(frozen, Mapping):  # pragma: no cover - guarded above
+        raise CryptoManifestError(f"{field_name} must be a JSON object")
+    return frozen
+
+
+def _thaw_json_value(value: Any) -> Any:
+    """Return detached plain JSON containers for hashing and persistence."""
+    if isinstance(value, Mapping):
+        return {key: _thaw_json_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json_value(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True)
@@ -61,17 +102,27 @@ class CryptoDatasetManifest:
     instruments: int
     schema_version: int
     code_commit: str
-    policy: dict[str, Any]
-    components: dict[str, str]
-    component_provenance: dict[str, str]
+    policy: Mapping[str, Any]
+    components: Mapping[str, str]
+    component_provenance: Mapping[str, str]
     causal_validation: CausalValidationEvidence
-    gap_summary: dict[str, Any]
+    gap_summary: Mapping[str, Any]
     terms_status: str
     redistribution_allowed: bool = False
     notes: tuple[str, ...] = field(default_factory=tuple)
     manifest_schema_version: int = MANIFEST_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        for name in ("policy", "components", "component_provenance", "gap_summary"):
+            object.__setattr__(
+                self,
+                name,
+                _freeze_mapping(getattr(self, name), field_name=name),
+            )
+        object.__setattr__(self, "notes", tuple(self.notes))
+        self._validate_state()
+
+    def _validate_state(self) -> None:
         if self.manifest_schema_version != MANIFEST_SCHEMA_VERSION:
             raise CryptoManifestError(f"manifest_schema_version must be {MANIFEST_SCHEMA_VERSION}")
         if self.status not in {TRUSTED_CAUSAL, "UNVALIDATED", "INVALID"}:
@@ -103,7 +154,30 @@ class CryptoDatasetManifest:
             )
         for name, provenance in self.component_provenance.items():
             _validate_provenance_path(name, provenance)
-        if not isinstance(self.gap_summary, dict) or not self.gap_summary:
+        if self.status == TRUSTED_CAUSAL:
+            declared_phase_components: list[str] = []
+            for policy_field in TRUSTED_PHASE_COMPONENT_POLICY_FIELDS:
+                component_name = self.policy.get(policy_field)
+                if (
+                    not isinstance(component_name, str)
+                    or not component_name.strip()
+                    or component_name != component_name.strip()
+                ):
+                    raise CryptoManifestError(f"TRUSTED_CAUSAL policy must declare {policy_field}")
+                declared_phase_components.append(component_name)
+            if len(set(declared_phase_components)) != len(declared_phase_components):
+                raise CryptoManifestError("TRUSTED_CAUSAL phase component names must be distinct")
+            missing_components = sorted(set(declared_phase_components).difference(self.components))
+            missing_provenance = sorted(
+                set(declared_phase_components).difference(self.component_provenance)
+            )
+            if missing_components or missing_provenance:
+                raise CryptoManifestError(
+                    "TRUSTED_CAUSAL policy names phase components absent from hashes or "
+                    "provenance: "
+                    f"components={missing_components}, provenance={missing_provenance}"
+                )
+        if not isinstance(self.gap_summary, Mapping) or not self.gap_summary:
             raise CryptoManifestError("gap_summary is required")
         unexplained = self.gap_summary.get("unexplained")
         if isinstance(unexplained, bool) or not isinstance(unexplained, int) or unexplained < 0:
@@ -124,8 +198,17 @@ class CryptoDatasetManifest:
             raise CryptoManifestError("an invalid dataset must state why")
 
     def sealed_content(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["notes"] = list(self.notes)
+        payload: dict[str, Any] = {}
+        for item in fields(self):
+            value = getattr(self, item.name)
+            if isinstance(value, CausalValidationEvidence):
+                payload[item.name] = value.to_dict()
+            elif item.name in {"policy", "components", "component_provenance", "gap_summary"}:
+                payload[item.name] = _thaw_json_value(value)
+            elif item.name == "notes":
+                payload[item.name] = list(value)
+            else:
+                payload[item.name] = value
         return payload
 
     def digest(self) -> str:
@@ -135,6 +218,7 @@ class CryptoDatasetManifest:
         return {**self.sealed_content(), "digest": self.digest()}
 
     def require_trusted(self, action: str) -> None:
+        self._validate_state()
         if self.status != TRUSTED_CAUSAL or not self.causal_validation.passed:
             raise CryptoManifestError(
                 f"dataset {self.dataset_id!r} is {self.status}; it cannot be used for "
@@ -277,6 +361,7 @@ def write_manifest(
 __all__ = [
     "MANIFEST_SCHEMA_VERSION",
     "TRUSTED_CAUSAL",
+    "TRUSTED_PHASE_COMPONENT_POLICY_FIELDS",
     "CausalValidationEvidence",
     "CryptoDatasetManifest",
     "CryptoManifestError",

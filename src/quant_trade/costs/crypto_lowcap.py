@@ -21,7 +21,9 @@ archived, sha256 recorded).
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
 from typing import Any
 
 from quant_trade.v9.cost_evidence import COST_EVIDENCE_CLASSES
@@ -47,6 +49,32 @@ class CostModelError(ValueError):
     """Raised when a cost input violates its own evidence declaration."""
 
 
+def _require_utc_timestamp(value: str, *, field_name: str) -> None:
+    """Require an explicit, zero-offset ISO-8601 timestamp.
+
+    Treating a naive timestamp as UTC would make evidence capture time depend
+    on an ambient timezone.  Provenance timestamps therefore have to carry a
+    literal ``Z`` or ``+00:00`` offset.
+    """
+
+    if not isinstance(value, str) or not value.strip():
+        raise CostModelError(f"{field_name} must be an explicit UTC timestamp")
+    normalized = value.strip()
+    try:
+        parsed = datetime.fromisoformat(
+            normalized[:-1] + "+00:00" if normalized.endswith("Z") else normalized
+        )
+    except ValueError as exc:
+        raise CostModelError(f"{field_name} must be an explicit UTC timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise CostModelError(f"{field_name} must be an explicit UTC timestamp")
+
+
+def _require_sha256(value: str, *, field_name: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise CostModelError(f"{field_name} must be a lower-case SHA-256")
+
+
 @dataclass(frozen=True)
 class CostInput:
     """One priced input and where its number came from."""
@@ -57,6 +85,10 @@ class CostInput:
     source: str
     captured_at_utc: str = ""
     raw_sha256: str = ""
+    venue: str = ""
+    endpoint: str = ""
+    account_scope: str = ""
+    venue_symbol: str = ""
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -69,11 +101,26 @@ class CostInput:
             raise CostModelError(f"{self.name}: value_bps must be >= 0")
         if not self.source.strip():
             raise CostModelError(f"{self.name}: every cost input needs a source")
-        if self.evidence_class in MEASURED_CLASSES and not self.raw_sha256.strip():
-            raise CostModelError(
-                f"{self.name}: {self.evidence_class} requires the sha256 of the "
-                "raw evidence; without bytes it is an ASSUMPTION"
+        if self.evidence_class in MEASURED_CLASSES:
+            _require_sha256(self.raw_sha256, field_name=f"{self.name}: raw_sha256")
+            _require_utc_timestamp(
+                self.captured_at_utc,
+                field_name=f"{self.name}: captured_at_utc",
             )
+        if self.evidence_class == "REAL_ACCOUNT_SPECIFIC":
+            required_metadata = {
+                "venue": self.venue,
+                "endpoint": self.endpoint,
+                "account_scope": self.account_scope,
+                "venue_symbol": self.venue_symbol,
+            }
+            missing = sorted(name for name, value in required_metadata.items() if not value.strip())
+            if missing:
+                raise CostModelError(
+                    f"{self.name}: REAL_ACCOUNT_SPECIFIC fee evidence requires {', '.join(missing)}"
+                )
+            if self.venue.strip().lower() != self.venue:
+                raise CostModelError(f"{self.name}: venue must be canonical lower-case")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -130,8 +177,17 @@ class TierCostProfile:
     def __post_init__(self) -> None:
         if self.evidence_class not in COST_EVIDENCE_CLASSES:
             raise CostModelError(f"unknown evidence_class {self.evidence_class!r}")
-        if self.evidence_class in MEASURED_CLASSES and not self.manifest_sha256.strip():
-            raise CostModelError(f"{self.tier}: measured profile requires manifest sha256")
+        if not self.source.strip():
+            raise CostModelError(f"{self.tier}: every cost profile needs a source")
+        if self.evidence_class in MEASURED_CLASSES:
+            _require_sha256(
+                self.manifest_sha256,
+                field_name=f"{self.tier}: manifest_sha256",
+            )
+            _require_utc_timestamp(
+                self.captured_at_utc,
+                field_name=f"{self.tier}: captured_at_utc",
+            )
 
     def exec_cost_bps(self, notional_usd: float) -> float | None:
         """Round-trip execution cost at the closest calibrated notional at or
@@ -203,9 +259,7 @@ class CostModelSummary:
     fees: tuple[CostInput, ...]
     profiles: tuple[TierCostProfile, ...]
     calibration_notionals: tuple[float, ...] = CALIBRATION_NOTIONALS
-    not_measured: tuple[str, ...] = field(
-        default_factory=lambda: NOT_MEASURED_COMPONENTS
-    )
+    not_measured: tuple[str, ...] = field(default_factory=lambda: NOT_MEASURED_COMPONENTS)
 
     def to_dict(self) -> dict[str, Any]:
         return {

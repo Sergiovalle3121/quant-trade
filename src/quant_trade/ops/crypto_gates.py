@@ -255,6 +255,36 @@ class ShadowPolicy:
 _HARD_SHADOW_POLICY = ShadowPolicy()
 
 
+def _effective_shadow_policy(policy: ShadowPolicy) -> ShadowPolicy:
+    """Clamp valid values to hard limits and replace invalid values fail-closed."""
+    minimums: dict[str, int] = {}
+    for name in (
+        "minimum_demo_order_cycles",
+        "minimum_shadow_calendar_days",
+        "minimum_complete_annual_rebalances",
+    ):
+        value = getattr(policy, name)
+        hard_floor = getattr(_HARD_SHADOW_POLICY, name)
+        minimums[name] = (
+            max(value, hard_floor)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0
+            else hard_floor
+        )
+    maximums: dict[str, int] = {}
+    for name in (
+        "maximum_unresolved_reconciliation_discrepancies",
+        "maximum_duplicate_orders",
+    ):
+        value = getattr(policy, name)
+        hard_ceiling = getattr(_HARD_SHADOW_POLICY, name)
+        maximums[name] = (
+            min(value, hard_ceiling)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0
+            else hard_ceiling
+        )
+    return ShadowPolicy(**minimums, **maximums)
+
+
 @dataclass(frozen=True)
 class ShadowEvidence:
     demo_completed_order_cycles: int | None = None
@@ -381,10 +411,12 @@ def evaluate_shadow(
         if isinstance(value, int) and not isinstance(value, bool) and value > hard_ceiling:
             blockers.append(f"shadow policy {name} cannot be relaxed above {hard_ceiling}")
 
+    effective_policy = _effective_shadow_policy(policy)
+
     minimums = {
-        "demo_completed_order_cycles": policy.minimum_demo_order_cycles,
-        "shadow_calendar_days": policy.minimum_shadow_calendar_days,
-        "complete_annual_rebalances": policy.minimum_complete_annual_rebalances,
+        "demo_completed_order_cycles": effective_policy.minimum_demo_order_cycles,
+        "shadow_calendar_days": effective_policy.minimum_shadow_calendar_days,
+        "complete_annual_rebalances": effective_policy.minimum_complete_annual_rebalances,
     }
     for name, required in minimums.items():
         value = _int_evidence(name, getattr(observed, name), missing, blockers)
@@ -393,9 +425,9 @@ def evaluate_shadow(
 
     maximums = {
         "unresolved_reconciliation_discrepancies": (
-            policy.maximum_unresolved_reconciliation_discrepancies
+            effective_policy.maximum_unresolved_reconciliation_discrepancies
         ),
-        "duplicate_orders": policy.maximum_duplicate_orders,
+        "duplicate_orders": effective_policy.maximum_duplicate_orders,
     }
     for name, maximum in maximums.items():
         value = _int_evidence(name, getattr(observed, name), missing, blockers)
@@ -567,6 +599,58 @@ def _canary_policy_blockers(policy: CanaryPolicy) -> list[str]:
     return blockers
 
 
+def _effective_canary_policy(policy: CanaryPolicy) -> CanaryPolicy:
+    """Return a valid policy honoring stricter values and immutable hard limits."""
+    hard_maximums = (
+        "maximum_declared_risk_capital_usd",
+        "maximum_initial_capital_fraction",
+        "maximum_initial_capital_usd",
+        "maximum_asset_fraction",
+        "maximum_order_adv_fraction",
+        "maximum_order_depth_fraction",
+        "daily_loss_kill_fraction",
+        "drawdown_pause_fraction",
+        "maximum_slippage_ratio",
+        "maximum_median_cost_error_fraction",
+        "maximum_scale_increment_fraction",
+    )
+    values: dict[str, float | int] = {}
+    for name in hard_maximums:
+        value = getattr(policy, name)
+        hard_ceiling = getattr(_HARD_CANARY_POLICY, name)
+        values[name] = (
+            min(float(value), hard_ceiling)
+            if isinstance(value, int | float)
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+            and float(value) > 0
+            else hard_ceiling
+        )
+    for name in ("minimum_fills_before_scale", "minimum_calendar_days_before_scale"):
+        value = getattr(policy, name)
+        hard_floor = getattr(_HARD_CANARY_POLICY, name)
+        values[name] = (
+            max(value, hard_floor)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0
+            else hard_floor
+        )
+    return CanaryPolicy(
+        maximum_declared_risk_capital_usd=float(values["maximum_declared_risk_capital_usd"]),
+        maximum_initial_capital_fraction=float(values["maximum_initial_capital_fraction"]),
+        maximum_initial_capital_usd=float(values["maximum_initial_capital_usd"]),
+        maximum_asset_fraction=float(values["maximum_asset_fraction"]),
+        maximum_order_adv_fraction=float(values["maximum_order_adv_fraction"]),
+        maximum_order_depth_fraction=float(values["maximum_order_depth_fraction"]),
+        daily_loss_kill_fraction=float(values["daily_loss_kill_fraction"]),
+        drawdown_pause_fraction=float(values["drawdown_pause_fraction"]),
+        minimum_fills_before_scale=int(values["minimum_fills_before_scale"]),
+        minimum_calendar_days_before_scale=int(values["minimum_calendar_days_before_scale"]),
+        maximum_slippage_ratio=float(values["maximum_slippage_ratio"]),
+        maximum_median_cost_error_fraction=float(values["maximum_median_cost_error_fraction"]),
+        maximum_scale_increment_fraction=float(values["maximum_scale_increment_fraction"]),
+    )
+
+
 def canary_capital_limit(policy: CanaryPolicy, risk_capital_usd: float) -> float:
     """Return ``min(10% of risk capital, USD 500)`` without moving funds."""
     if (
@@ -621,6 +705,7 @@ def evaluate_canary_readiness(
 ) -> ReadinessVerdict:
     """Evaluate readiness for human review, never authorisation or execution."""
     blockers = _canary_policy_blockers(policy)
+    effective_policy = _effective_canary_policy(policy)
     missing: list[str] = []
     observed = evidence or CanaryEvidence()
 
@@ -656,19 +741,20 @@ def evaluate_canary_readiness(
         blockers,
     )
     if risk_capital is not None:
-        if risk_capital >= policy.maximum_declared_risk_capital_usd:
+        if risk_capital >= effective_policy.maximum_declared_risk_capital_usd:
             blockers.append(
-                f"risk_capital_usd must remain below {policy.maximum_declared_risk_capital_usd:.2f}"
+                "risk_capital_usd must remain below "
+                f"{effective_policy.maximum_declared_risk_capital_usd:.2f}"
             )
-        if proposed is not None and proposed > canary_capital_limit(policy, risk_capital):
+        if proposed is not None and proposed > canary_capital_limit(effective_policy, risk_capital):
             blockers.append("proposed_initial_capital_usd exceeds the canary capital limit")
 
     configured_limits = {
-        "configured_maximum_asset_fraction": policy.maximum_asset_fraction,
-        "configured_maximum_order_adv_fraction": policy.maximum_order_adv_fraction,
-        "configured_maximum_order_depth_fraction": policy.maximum_order_depth_fraction,
-        "configured_daily_loss_kill_fraction": policy.daily_loss_kill_fraction,
-        "configured_drawdown_pause_fraction": policy.drawdown_pause_fraction,
+        "configured_maximum_asset_fraction": effective_policy.maximum_asset_fraction,
+        "configured_maximum_order_adv_fraction": effective_policy.maximum_order_adv_fraction,
+        "configured_maximum_order_depth_fraction": effective_policy.maximum_order_depth_fraction,
+        "configured_daily_loss_kill_fraction": effective_policy.daily_loss_kill_fraction,
+        "configured_drawdown_pause_fraction": effective_policy.drawdown_pause_fraction,
     }
     for name, maximum in configured_limits.items():
         value = _positive_number(name, getattr(observed, name), missing, blockers)
@@ -691,21 +777,23 @@ def evaluate_canary_scale(
 ) -> ReadinessVerdict:
     """Evaluate scale evidence; even a pass cannot scale anything automatically."""
     blockers = _canary_policy_blockers(policy)
+    effective_policy = _effective_canary_policy(policy)
     missing: list[str] = []
     observed = evidence or CanaryScaleEvidence()
 
     fills = _int_evidence("observed_fills", observed.observed_fills, missing, blockers)
-    if fills is not None and fills < policy.minimum_fills_before_scale:
+    if fills is not None and fills < effective_policy.minimum_fills_before_scale:
         blockers.append(
-            f"observed_fills {fills} is below required {policy.minimum_fills_before_scale}"
+            "observed_fills "
+            f"{fills} is below required {effective_policy.minimum_fills_before_scale}"
         )
     days = _int_evidence(
         "observed_calendar_days", observed.observed_calendar_days, missing, blockers
     )
-    if days is not None and days < policy.minimum_calendar_days_before_scale:
+    if days is not None and days < effective_policy.minimum_calendar_days_before_scale:
         blockers.append(
             "observed_calendar_days "
-            f"{days} is below required {policy.minimum_calendar_days_before_scale}"
+            f"{days} is below required {effective_policy.minimum_calendar_days_before_scale}"
         )
 
     slippage = _positive_number(
@@ -715,10 +803,10 @@ def evaluate_canary_scale(
         blockers,
         allow_zero=True,
     )
-    if slippage is not None and slippage > policy.maximum_slippage_ratio:
+    if slippage is not None and slippage > effective_policy.maximum_slippage_ratio:
         blockers.append(
             "p95_realized_to_simulated_slippage_ratio "
-            f"{slippage} exceeds {policy.maximum_slippage_ratio}"
+            f"{slippage} exceeds {effective_policy.maximum_slippage_ratio}"
         )
     cost_error = _positive_number(
         "median_cost_error_fraction",
@@ -727,10 +815,10 @@ def evaluate_canary_scale(
         blockers,
         allow_zero=True,
     )
-    if cost_error is not None and cost_error > policy.maximum_median_cost_error_fraction:
+    if cost_error is not None and cost_error > effective_policy.maximum_median_cost_error_fraction:
         blockers.append(
             f"median_cost_error_fraction {cost_error} exceeds "
-            f"{policy.maximum_median_cost_error_fraction}"
+            f"{effective_policy.maximum_median_cost_error_fraction}"
         )
 
     for name in ("unresolved_reconciliation_discrepancies", "duplicate_orders"):
@@ -744,10 +832,13 @@ def evaluate_canary_scale(
         missing,
         blockers,
     )
-    if scale_increment is not None and scale_increment > policy.maximum_scale_increment_fraction:
+    if (
+        scale_increment is not None
+        and scale_increment > effective_policy.maximum_scale_increment_fraction
+    ):
         blockers.append(
             f"proposed_scale_increment_fraction {scale_increment} exceeds "
-            f"{policy.maximum_scale_increment_fraction}"
+            f"{effective_policy.maximum_scale_increment_fraction}"
         )
 
     pause_events = (

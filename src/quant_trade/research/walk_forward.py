@@ -11,6 +11,7 @@ from quant_trade.metrics.statistics import return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
 from quant_trade.research.grid_search import expand_parameter_grid, valid_params
 from quant_trade.research.ledger import append_trial
+from quant_trade.research.runner import _reject_crypto_config, _reject_crypto_data
 from quant_trade.research.splits import TIME_COLUMN, walk_forward_splits
 from quant_trade.strategies import get_strategy
 
@@ -44,7 +45,9 @@ def _stitch_oos_equity(curves: list[pd.DataFrame], initial_cash: float) -> pd.Da
 
 
 def run_walk_forward(cfg):
+    _reject_crypto_config(cfg, "legacy single-asset walk-forward runner")
     data = load_ohlcv(cfg.data_path)
+    _reject_crypto_data(data, "legacy single-asset walk-forward runner")
     split = cfg.split
     splits = walk_forward_splits(
         data,

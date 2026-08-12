@@ -17,6 +17,12 @@ been evaluated by this remediation. It must not be read until a replacement
 `TRUSTED_CAUSAL` panel, new ExperimentSpec v2 seals, and a frozen candidate
 exist.
 
+The implementation branch is **draft-only scaffolding**. Its status remains
+NO-GO: opening a draft PR records and reviews the controls, but does not make
+the dataset valid, authorize a holdout reveal, promote a candidate, or support
+a profitability claim. Merge remains blocked until the complete CI contract is
+green and an independent reviewer approves the causal and economic bindings.
+
 The four failures that dominate the decision are:
 
 1. venue selection used the future length of each price history;
@@ -72,11 +78,46 @@ the instrument on its twentieth observed bar; it never deletes its first 19
 rows. Every ticker binding, including an apparently unique one, must pass the
 price-plausibility check.
 
+Sensitive venue facts are governed by a separate `MarketEventLedger`, not
+inferred from klines or missing panel rows. `HALT`, delisting announcement,
+confirmed delisting/listing end, and any evidenced terminal recovery cite a
+source and SHA-256 in that sparse ledger. Selection and holdout ledgers are
+distinct manifest components. A protected run rejects a sensitive event copied
+into `PanelRow.market_event` unless the active ledger contains the exact same
+timestamp, stable instrument, venue, event, and recovery price. Derived panel
+metadata such as gap, rename, and rank exit/reentry does not acquire terminal
+semantics. An empty ledger is explicit evidence of no confirmed sensitive
+event; it is never permission to reinterpret an absence.
+
 Acceptance is byte-level prefix invariance: building `[start, T]` and
 `[start, T + future]`, then cutting the latter at `T`, must produce identical
 ordered records. Adversarial fixtures cover venue disagreement, reused ticker,
 rename, 1-19 day listing, rank exit/reentry, one-bar gap, halt, confirmed
 delisting, and incompatible price.
+
+The canonical panel component is also lossless with respect to every finite
+floating-point value consumed by the evaluator. It preserves round-trip float
+precision, canonicalizes timestamps to UTC and signed zero, rejects NaN and
+infinity, and sorts complete normalized records deterministically. Thus even a
+sub-tenth-decimal price change changes the component digest; two economically
+different in-memory panels cannot share a seal because of JSON rounding.
+
+Hashes for account fees, measured cost profiles, and venue-event notices are
+not accepted as self-attestations. Their original bytes are distinct manifest
+components below the sealed provenance root and are rehashed before any signal
+or P&L is evaluated. Account-specific fees also bind venue, API endpoint,
+dedicated account scope, venue symbol, and an explicit UTC capture time.
+Selection may read only its active evidence sources; it never opens either
+holdout panel or holdout event component.
+
+The protected runner also verifies the code actually executing. In a checkout,
+the sealed full commit must equal Git `HEAD` and the complete tree—including
+untracked files and submodules—must be clean. Installed builds and unsigned
+sidecar metadata fail closed; they will require an independently verifiable
+build attestation in a future version. A declared `code_commit` without Git
+proof fails before targets are constructed, and the portable runtime proof
+(commit, tree object, mode and clean status—not a local absolute path) is
+included in the content-addressed run artifact.
 
 No market bytes are committed or redistributed. A replacement manifest must
 record source/component hashes, code commit, UTC policy, date range, gaps,
@@ -123,12 +164,39 @@ data can never become a pass. A complete candidate must satisfy all of:
 - positive net excess over both benchmarks;
 - PSR and DSR at least 0.95, PBO at most 0.10, at least four walk-forward
   windows, and no unregistered ledger trial;
-- at least 30 independent trades;
+- at least 30 independent closed, non-overlapping portfolio round trips;
 - absolute OOS drawdown at most 25% and no worse than either benchmark;
 - gross expected alpha at least twice p95 total cost;
 - non-negative result at 2x costs and 50% fills;
 - no asset or episode above 25% of positive P&L;
 - capacity at least twice proposed canary capital.
+
+The stress result is a second full evaluator run, not arithmetic applied to
+the baseline return and not a caller-supplied scalar. It uses the same sealed
+targets, panel, event ledger, venue limits and account fees with an exact
+`cost_multiplier=2.0` and `fill_fraction_multiplier=0.5`. The fill reduction is
+applied before venue quantity rounding; doubled costs are charged inside the
+cash accounting. The complete stressed executions and equity curve are
+content-addressed before the non-negative-return gate is evaluated.
+
+The sealed independent-trade definition is
+`closed_nonoverlapping_portfolio_round_trip_v1`. An instrument episode opens
+when filled buys move its reconstructed position from zero to positive and
+closes only when fills return it to zero, or an evidenced terminal settlement
+closes it. Partial fills, repeated legs, and buy/sell sides inside one episode
+do not create extra observations. Because instrument episodes can overlap, the
+count uses the maximum set of temporally non-overlapping closed intervals. Open
+positions and overlapping exposure therefore cannot manufacture the required
+30 independent observations.
+
+The current draft deliberately cannot emit a promotion `PASS`: concentration
+must be reconstructed from independently reloaded, hash-verified holdout panel
+marks, not marks copied into the result artifact. That consumer boundary is
+still pending. In addition, an annual strategy may not generate 30 genuinely
+independent closed portfolio episodes inside the present holdout. These are
+`INSUFFICIENT_EVIDENCE` conditions, not thresholds the implementation may
+relax. They must be resolved (or Bybit declared statistically insufficient)
+before this draft can be considered merge-ready.
 
 If H1-H4 exhaust their sealed budgets without a PASS, the outcome is NO-GO;
 no post-hoc variants are permitted.

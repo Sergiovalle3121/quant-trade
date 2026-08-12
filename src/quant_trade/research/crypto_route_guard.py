@@ -104,6 +104,8 @@ def mapping_requires_sealed_crypto_route(payload: Mapping[str, Any]) -> bool:
     dataset = payload.get("dataset_binding")
     dataset = dataset if isinstance(dataset, Mapping) else {}
     universe = payload.get("universe", payload.get("symbols", ()))
+    if isinstance(universe, Mapping):
+        universe = universe.get("symbols", universe.get("instruments", ()))
     if isinstance(universe, str) or not isinstance(universe, Iterable):
         universe = (universe,)
     tags = payload.get("tags", ())

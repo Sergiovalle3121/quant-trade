@@ -255,6 +255,27 @@ def test_invalid_shadow_policy_is_no_go() -> None:
     assert any("shadow policy" in item for item in verdict.blocking_conditions)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("minimum_demo_order_cycles", "100"),
+        ("minimum_shadow_calendar_days", 365.0),
+        ("maximum_unresolved_reconciliation_discrepancies", "0"),
+        ("maximum_duplicate_orders", None),
+    ],
+)
+def test_shadow_invalid_policy_types_return_no_go_without_type_error(
+    field: str,
+    value: object,
+) -> None:
+    policy = ShadowPolicy(**{field: value})  # type: ignore[arg-type]
+
+    verdict = evaluate_shadow(policy, _complete_shadow())
+
+    assert verdict.status == "NO_GO"
+    assert any(field in item for item in verdict.blocking_conditions)
+
+
 def test_shadow_hard_floors_cannot_be_relaxed_by_a_caller() -> None:
     relaxed = ShadowPolicy(
         minimum_demo_order_cycles=0,
@@ -339,6 +360,30 @@ def test_invalid_canary_policy_is_no_go() -> None:
     verdict = evaluate_canary_readiness(policy, _complete_canary())
     assert verdict.status == "NO_GO"
     assert len(verdict.blocking_conditions) >= 3
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("maximum_declared_risk_capital_usd", "5000"),
+        ("maximum_asset_fraction", "0.05"),
+        ("maximum_slippage_ratio", None),
+        ("minimum_fills_before_scale", "100"),
+        ("minimum_calendar_days_before_scale", 30.0),
+    ],
+)
+def test_canary_invalid_policy_types_return_no_go_without_type_error(
+    field: str,
+    value: object,
+) -> None:
+    policy = CanaryPolicy(**{field: value})  # type: ignore[arg-type]
+
+    readiness = evaluate_canary_readiness(policy, _complete_canary())
+    scaling = evaluate_canary_scale(policy, _complete_scale())
+
+    assert readiness.status == scaling.status == "NO_GO"
+    assert any(field in item for item in readiness.blocking_conditions)
+    assert any(field in item for item in scaling.blocking_conditions)
 
 
 def test_canary_hard_floors_cannot_be_relaxed_by_a_caller() -> None:

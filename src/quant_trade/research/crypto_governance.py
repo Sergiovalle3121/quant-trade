@@ -46,6 +46,27 @@ from quant_trade.metrics.statistics import (
     return_moments,
     sharpe_variance_across_trials,
 )
+from quant_trade.research.crypto_economic_evidence import (
+    CryptoEconomicEvidenceError,
+    canonical_evidence_digest,
+    derive_capacity,
+    derive_execution_economics,
+    derive_overfitting_evidence,
+    derive_pnl_concentration,
+    derive_stress_evidence,
+)
+from quant_trade.research.crypto_evaluator import (
+    EvaluationResult,
+    ExecutionResult,
+    RebalanceRecord,
+)
+from quant_trade.research.holdout_seal import (
+    HoldoutSealError,
+    assert_dataset_not_invalidated,
+    load_crypto_holdout_authorization,
+    load_seal,
+    read_reveals,
+)
 from quant_trade.research.ledger import ledger_integrity_report, read_ledger
 
 SCHEMA_VERSION = 2
@@ -54,6 +75,16 @@ HYPOTHESIS_TRIAL_BUDGETS = MappingProxyType({"H1": 4, "H2": 4, "H3": 4, "H4": 3}
 CAMPAIGN_TRIAL_BUDGET = 15
 REQUIRED_BENCHMARKS = frozenset({"btc_buy_and_hold", "eligible_equal_weight"})
 MIN_VERIFIED_DSR_TRIALS = CAMPAIGN_TRIAL_BUDGET
+HYPOTHESIS_STRATEGIES = MappingProxyType(
+    {
+        "H1": "crypto_capacity_illiquidity",
+        "H2": "crypto_death_avoidance",
+        "H3": "crypto_annual_equal_weight_rebalance",
+        "H4": "crypto_survival_duration",
+    }
+)
+INDEPENDENT_TRADE_DEFINITION = "closed_nonoverlapping_portfolio_round_trip_v1"
+_TERMINAL_EXECUTION_STATUSES = frozenset({"TERMINAL_RECOVERY", "WRITTEN_DOWN"})
 
 
 class CryptoGovernanceError(ValueError):
@@ -102,6 +133,75 @@ def _benchmark_id(spec: Mapping[str, Any]) -> str:
     return str(spec.get("benchmark_id", spec.get("type", ""))).strip()
 
 
+def _control_parameter(control: Mapping[str, Any], name: str) -> Any:
+    nested = control.get("strategy_params")
+    if nested is not None:
+        if not isinstance(nested, Mapping):
+            raise CryptoGovernanceError("control.strategy_params must be a mapping")
+        top_level_overrides = set(control).difference(
+            {"strategy", "strategy_params", "comparison_variable"}
+        )
+        if top_level_overrides:
+            raise CryptoGovernanceError(
+                "control cannot mix strategy_params with top-level parameter overrides"
+            )
+        return nested.get(name)
+    return control.get(name)
+
+
+def _validate_hypothesis_strategy_contract(spec: ExperimentSpec) -> None:
+    expected_strategy = HYPOTHESIS_STRATEGIES[spec.hypothesis_id]
+    if spec.strategy != expected_strategy:
+        raise CryptoGovernanceError(f"{spec.hypothesis_id} strategy must be {expected_strategy}")
+    control_strategy = str(spec.control.get("strategy", spec.strategy))
+    if control_strategy != expected_strategy:
+        raise CryptoGovernanceError(f"{spec.hypothesis_id} control must use {expected_strategy}")
+    if str(spec.strategy_params.get("rebalance_frequency", "")).lower() != "annual":
+        raise CryptoGovernanceError(
+            f"{spec.hypothesis_id} candidate must preserve the sealed annual frequency"
+        )
+
+    expected_variables = {
+        "H1": "liquid_band",
+        "H2": "screen_off",
+        "H3": "rebalance_once",
+        "H4": "min_age_days",
+    }
+    variable = expected_variables[spec.hypothesis_id]
+    if spec.control.get("comparison_variable") != variable:
+        raise CryptoGovernanceError(
+            f"{spec.hypothesis_id} control.comparison_variable must be {variable}"
+        )
+    control_value = _control_parameter(spec.control, variable)
+
+    if str(spec.strategy_params.get("rebalance_frequency", "")) != "annual":
+        raise CryptoGovernanceError(
+            f"{spec.hypothesis_id} candidate must use the sealed annual frequency"
+        )
+
+    if spec.hypothesis_id in {"H1", "H2", "H3"}:
+        if spec.strategy_params.get(variable, False) is not False:
+            raise CryptoGovernanceError(f"{spec.hypothesis_id} candidate {variable} must be false")
+        if control_value is not True:
+            raise CryptoGovernanceError(f"{spec.hypothesis_id} control {variable} must be true")
+    if spec.hypothesis_id == "H3" and spec.strategy_params.get("freeze_cohort") is not True:
+        raise CryptoGovernanceError("H3 candidate must freeze its cohort")
+    if spec.hypothesis_id == "H4":
+        candidate_age = spec.strategy_params.get("min_age_days")
+        if (
+            isinstance(candidate_age, bool)
+            or not isinstance(candidate_age, (int, float))
+            or not math.isfinite(float(candidate_age))
+            or not float(candidate_age).is_integer()
+            or int(candidate_age) <= 0
+        ):
+            raise CryptoGovernanceError("H4 candidate min_age_days must be an integer > 0")
+        if spec.strategy_params.get("exclude_left_censored") is not True:
+            raise CryptoGovernanceError("H4 must explicitly exclude left-censored histories")
+        if isinstance(control_value, bool) or control_value != 0:
+            raise CryptoGovernanceError("H4 control min_age_days must be zero")
+
+
 def canonical_digest(value: Any) -> str:
     """Return a canonical SHA-256 digest for a JSON-shaped value.
 
@@ -133,6 +233,7 @@ class ExperimentSpec:
     dataset_digest: str
     dataset_status: str
     gate0_status: str
+    gate0_verdict_digest: str
     gate0_evidence_digest: str
     code_commit: str
     venue: str
@@ -145,6 +246,7 @@ class ExperimentSpec:
     selection_panel_digest: str
     holdout_panel_digest: str
     holdout_seal_digest: str
+    holdout_authorization_digest: str
     cohort_digest: str
     split_policy: Mapping[str, Any]
     walk_forward_policy: Mapping[str, Any]
@@ -208,13 +310,14 @@ class ExperimentSpec:
             raise CryptoGovernanceError(
                 "gate0_status must be PASS before an experiment can be sealed"
             )
-        if not _is_hex_digest(self.gate0_evidence_digest, minimum=64, maximum=64):
-            raise CryptoGovernanceError(
-                "gate0_evidence_digest must be a 64-character SHA-256 digest"
-            )
-        if not _is_hex_digest(self.holdout_seal_digest, minimum=64, maximum=64):
-            raise CryptoGovernanceError("holdout_seal_digest must be a 64-character SHA-256 digest")
-        for name in ("selection_panel_digest", "holdout_panel_digest"):
+        for name in (
+            "gate0_verdict_digest",
+            "gate0_evidence_digest",
+            "holdout_seal_digest",
+            "holdout_authorization_digest",
+            "selection_panel_digest",
+            "holdout_panel_digest",
+        ):
             if not _is_hex_digest(str(getattr(self, name)), minimum=64, maximum=64):
                 raise CryptoGovernanceError(f"{name} must be a 64-character SHA-256 digest")
         if not _is_hex_digest(self.cohort_digest, minimum=64, maximum=64):
@@ -246,6 +349,10 @@ class ExperimentSpec:
         for name in required_nonempty:
             if not getattr(self, name):
                 raise CryptoGovernanceError(f"{name} must be declared before the run")
+        comparison_variable = self.control.get("comparison_variable")
+        if not isinstance(comparison_variable, str) or not comparison_variable.strip():
+            raise CryptoGovernanceError("control.comparison_variable is required")
+        _validate_hypothesis_strategy_contract(self)
 
         policy_venue = str(self.venue_policy.get("venue", "")).strip()
         if not policy_venue:
@@ -277,9 +384,47 @@ class ExperimentSpec:
         if str(self.universe_policy.get("quote", "")).upper() != "USDT":
             raise CryptoGovernanceError("universe_policy.quote must be USDT")
 
+        panel_encoding = str(self.split_policy.get("panel_component_encoding", ""))
+        if panel_encoding != "canonical_panel_v1":
+            raise CryptoGovernanceError(
+                "split_policy.panel_component_encoding must be canonical_panel_v1"
+            )
+        phase_components = []
+        for name in (
+            "selection_panel_component",
+            "holdout_panel_component",
+            "selection_market_events_component",
+            "holdout_market_events_component",
+        ):
+            component = self.split_policy.get(name)
+            if not isinstance(component, str) or not component.strip():
+                raise CryptoGovernanceError(f"split_policy.{name} is required")
+            phase_components.append(component)
+        if len(set(phase_components)) != len(phase_components):
+            raise CryptoGovernanceError(
+                "panel and market-event components must be distinct for each phase"
+            )
+
         delay = self.execution_policy.get("decision_to_execution_bars")
-        if isinstance(delay, bool) or not isinstance(delay, (int, float)) or int(delay) < 1:
+        if (
+            isinstance(delay, bool)
+            or not isinstance(delay, (int, float))
+            or not math.isfinite(float(delay))
+            or not float(delay).is_integer()
+            or int(delay) < 1
+        ):
             raise CryptoGovernanceError("execution_policy must delay decisions by at least one bar")
+        additional_latency = self.execution_policy.get("additional_latency_bars", int(delay) - 1)
+        if (
+            isinstance(additional_latency, bool)
+            or not isinstance(additional_latency, (int, float))
+            or not math.isfinite(float(additional_latency))
+            or not float(additional_latency).is_integer()
+            or int(additional_latency) != int(delay) - 1
+        ):
+            raise CryptoGovernanceError(
+                "execution_policy.additional_latency_bars must equal decision_to_execution_bars - 1"
+            )
         if str(self.execution_policy.get("execution_price", "")).lower() != "open":
             raise CryptoGovernanceError("execution_policy.execution_price must be open")
         if self.execution_policy.get("partial_fills") is not True:
@@ -323,7 +468,11 @@ class ExperimentSpec:
         }
         for name, (boundary, direction) in fixed_criteria.items():
             value = criteria.get(name)
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+            ):
                 raise CryptoGovernanceError(f"selection_criteria.{name} is required")
             is_strict_enough = (
                 float(value) >= boundary if direction == "at least" else float(value) <= boundary
@@ -332,10 +481,31 @@ class ExperimentSpec:
                 raise CryptoGovernanceError(
                     f"selection_criteria.{name} must be {direction} {boundary}"
                 )
+        if not 0 <= float(criteria["max_pbo"]) <= 1:
+            raise CryptoGovernanceError("selection_criteria.max_pbo must be in [0, 1]")
+        if not 0 <= float(criteria["max_oos_drawdown"]) <= 1:
+            raise CryptoGovernanceError("selection_criteria.max_oos_drawdown must be in [0, 1]")
+        if not 0 <= float(criteria["max_positive_pnl_share"]) <= 1:
+            raise CryptoGovernanceError(
+                "selection_criteria.max_positive_pnl_share must be in [0, 1]"
+            )
         if criteria.get("require_nonnegative_double_cost_half_fill") is not True:
             raise CryptoGovernanceError(
                 "selection_criteria.require_nonnegative_double_cost_half_fill must be true"
             )
+        if criteria.get("independent_trade_definition") != INDEPENDENT_TRADE_DEFINITION:
+            raise CryptoGovernanceError(
+                "selection_criteria.independent_trade_definition must seal the conservative "
+                f"{INDEPENDENT_TRADE_DEFINITION} method"
+            )
+        canary = criteria.get("canary_capital_usd")
+        if (
+            isinstance(canary, bool)
+            or not isinstance(canary, (int, float))
+            or not math.isfinite(float(canary))
+            or not 0 < float(canary) <= 500
+        ):
+            raise CryptoGovernanceError("selection_criteria.canary_capital_usd must be in (0, 500]")
 
         if len(self.benchmarks) != 2 or any(
             not isinstance(item, Mapping) for item in self.benchmarks
@@ -346,6 +516,29 @@ class ExperimentSpec:
             raise CryptoGovernanceError(
                 "benchmarks must be btc_buy_and_hold and eligible_equal_weight"
             )
+        benchmark_map = {_benchmark_id(item): item for item in self.benchmarks}
+        btc = benchmark_map["btc_buy_and_hold"]
+        if str(btc.get("instrument_id", "")) != "CMC:1":
+            raise CryptoGovernanceError("btc_buy_and_hold instrument_id must be CMC:1")
+        min_bound_bars = btc.get("min_bound_bars", 20)
+        if (
+            isinstance(min_bound_bars, bool)
+            or not isinstance(min_bound_bars, (int, float))
+            or not float(min_bound_bars).is_integer()
+            or int(min_bound_bars) < 1
+        ):
+            raise CryptoGovernanceError("btc_buy_and_hold.min_bound_bars must be an integer >= 1")
+        basket = benchmark_map["eligible_equal_weight"]
+        if str(basket.get("rebalance_frequency", "")).lower() != "annual":
+            raise CryptoGovernanceError("eligible_equal_weight must rebalance annually")
+        basket_top_n = basket.get("top_n")
+        if (
+            isinstance(basket_top_n, bool)
+            or not isinstance(basket_top_n, (int, float))
+            or not float(basket_top_n).is_integer()
+            or int(basket_top_n) < 1
+        ):
+            raise CryptoGovernanceError("eligible_equal_weight.top_n must be an integer >= 1")
 
         budgets = {str(key): int(value) for key, value in self.campaign_trial_budgets.items()}
         if budgets != dict(HYPOTHESIS_TRIAL_BUDGETS):
@@ -363,6 +556,14 @@ class ExperimentSpec:
             raise CryptoGovernanceError("walk_forward_policy.min_windows is required")
         if int(min_windows) < 4:
             raise CryptoGovernanceError("walk_forward_policy must require at least 4 windows")
+        if self.walk_forward_policy.get("selection_only") is not True:
+            raise CryptoGovernanceError("walk_forward_policy must be selection-only")
+        partitions = self.walk_forward_policy.get("cscv_partitions")
+        if type(partitions) is not int or partitions < 4 or partitions > 16 or partitions % 2:
+            raise CryptoGovernanceError(
+                "walk_forward_policy.cscv_partitions is required and must be an even "
+                "integer in [4, 16]"
+            )
 
         # Force serialization now.  NaN/Infinity or a non-canonical nested value
         # must fail at construction, not much later when the experiment is run.
@@ -401,6 +602,64 @@ class ExperimentSpec:
     def to_dict(self) -> dict[str, Any]:
         payload = {field.name: _thaw(getattr(self, field.name)) for field in fields(self)}
         return {**payload, "seal": self.seal()}
+
+
+def campaign_spec_compatibility_errors(
+    reference: ExperimentSpec,
+    campaign_specs: Sequence[ExperimentSpec],
+) -> tuple[str, ...]:
+    """Return cross-spec contradictions in immutable campaign-wide bindings.
+
+    H1--H4 may vary only their hypothesis, strategy parameters, causal control,
+    refutation and experiment identity. Dataset, venue, Gate-0, split, cohort,
+    walk-forward and promotion policy are one common experiment environment.
+    """
+
+    scalar_fields = (
+        "campaign_id",
+        "dataset_id",
+        "dataset_digest",
+        "dataset_status",
+        "gate0_status",
+        "gate0_verdict_digest",
+        "gate0_evidence_digest",
+        "code_commit",
+        "venue",
+        "selection_start",
+        "selection_end",
+        "holdout_start",
+        "holdout_end",
+        "selection_panel_digest",
+        "holdout_panel_digest",
+        "holdout_seal_digest",
+        "holdout_authorization_digest",
+        "cohort_digest",
+    )
+    policy_fields = (
+        "venue_policy",
+        "universe_policy",
+        "split_policy",
+        "walk_forward_policy",
+        "selection_criteria",
+        "execution_policy",
+        "cost_policy",
+        "benchmarks",
+    )
+    errors: list[str] = []
+    for index, trial_spec in enumerate(campaign_specs):
+        if not isinstance(trial_spec, ExperimentSpec):
+            errors.append(f"campaign_specs[{index}] is not an ExperimentSpec")
+            continue
+        seal = trial_spec.seal()
+        for field_name in scalar_fields:
+            if getattr(trial_spec, field_name) != getattr(reference, field_name):
+                errors.append(f"{seal}: shared {field_name} mismatch")
+        for field_name in policy_fields:
+            if canonical_digest(getattr(trial_spec, field_name)) != canonical_digest(
+                getattr(reference, field_name)
+            ):
+                errors.append(f"{seal}: shared {field_name} mismatch")
+    return tuple(errors)
 
 
 def seal_experiment_spec(directory: str | Path, spec: ExperimentSpec) -> tuple[Path, str]:
@@ -456,23 +715,41 @@ class CryptoPromotionThresholds:
     min_capacity_canary_multiple: float = 2.0
 
     def __post_init__(self) -> None:
+        numeric_values = (
+            self.min_psr,
+            self.min_dsr,
+            self.max_pbo,
+            self.min_walk_forward_windows,
+            self.min_independent_trades,
+            self.max_oos_drawdown,
+            self.min_gross_alpha_cost_multiple,
+            self.max_positive_pnl_share,
+            self.min_capacity_canary_multiple,
+        )
+        if any(
+            isinstance(value, bool) or not math.isfinite(float(value)) for value in numeric_values
+        ):
+            raise CryptoGovernanceError("promotion thresholds must be finite numeric values")
         floors = (
-            (self.min_psr >= 0.95, "min_psr must be >= 0.95"),
-            (self.min_dsr >= 0.95, "min_dsr must be >= 0.95"),
-            (self.max_pbo <= 0.10, "max_pbo must be <= 0.10"),
+            (0.95 <= self.min_psr <= 1.0, "min_psr must be in [0.95, 1.0]"),
+            (0.95 <= self.min_dsr <= 1.0, "min_dsr must be in [0.95, 1.0]"),
+            (0.0 <= self.max_pbo <= 0.10, "max_pbo must be in [0.0, 0.10]"),
             (
                 self.min_walk_forward_windows >= 4,
                 "min_walk_forward_windows must be >= 4",
             ),
             (self.min_independent_trades >= 30, "min_independent_trades must be >= 30"),
-            (self.max_oos_drawdown <= 0.25, "max_oos_drawdown must be <= 0.25"),
+            (
+                0.0 <= self.max_oos_drawdown <= 0.25,
+                "max_oos_drawdown must be in [0.0, 0.25]",
+            ),
             (
                 self.min_gross_alpha_cost_multiple >= 2.0,
                 "min_gross_alpha_cost_multiple must be >= 2.0",
             ),
             (
-                self.max_positive_pnl_share <= 0.25,
-                "max_positive_pnl_share must be <= 0.25",
+                0.0 <= self.max_positive_pnl_share <= 0.25,
+                "max_positive_pnl_share must be in [0.0, 0.25]",
             ),
             (
                 self.min_capacity_canary_multiple >= 2.0,
@@ -685,6 +962,15 @@ def _evaluate_unbound_economic_checks(
         "gate0_status_binding",
         _path(evidence, ("gate0_status",), ("gate0", "status")),
         spec.gate0_status,
+    )
+    add_binding(
+        "gate0_verdict_binding",
+        _path(
+            evidence,
+            ("gate0_verdict_digest",),
+            ("gate0", "verdict_digest"),
+        ),
+        spec.gate0_verdict_digest,
     )
     add_binding(
         "gate0_evidence_binding",
@@ -903,12 +1189,35 @@ def _evaluate_unbound_economic_checks(
         thresholds.min_walk_forward_windows,
         "at least four walk-forward windows are required",
     )
-    trade_count = _finite_number(
-        _path(
-            evidence,
-            ("test_metrics", "independent_trade_count"),
-            ("test_metrics", "trade_count"),
+    trade_definition = spec.selection_criteria.get("independent_trade_definition")
+    definition_valid = trade_definition == INDEPENDENT_TRADE_DEFINITION
+    checks.append(
+        PromotionCheck(
+            "independent_trade_definition",
+            (
+                VerdictStatus.PASS
+                if definition_valid
+                else (
+                    VerdictStatus.INSUFFICIENT_EVIDENCE
+                    if trade_definition is None
+                    else VerdictStatus.NO_GO
+                )
+            ),
+            "independent trades must use sealed non-overlapping closed round trips",
+            trade_definition,
+            INDEPENDENT_TRADE_DEFINITION,
         )
+    )
+    trade_count = (
+        _finite_number(
+            _path(
+                evidence,
+                ("test_metrics", "independent_trade_count"),
+                ("test_metrics", "trade_count"),
+            )
+        )
+        if definition_valid
+        else None
     )
     add_numeric(
         "independent_trade_count",
@@ -962,6 +1271,17 @@ def _evaluate_unbound_economic_checks(
             "<= 1.0x",
             "strategy drawdown must be no worse than the benchmark",
         )
+
+    control = comparisons.get("sealed_control")
+    control = control if isinstance(control, Mapping) else {}
+    control_excess = _finite_number(control.get("net_excess_return"))
+    add_numeric(
+        "net_excess_vs_sealed_control",
+        control_excess,
+        control_excess > 0.0 if control_excess is not None else None,
+        "> 0",
+        "the treatment must beat its sealed same-cohort control after identical costs",
+    )
 
     gross_alpha = _finite_number(
         _path(
@@ -1062,6 +1382,7 @@ def _evaluate_unbound_economic_checks(
 _STRICT_CRYPTO_LEDGER_FIELDS = frozenset(
     {
         "schema_version",
+        "phase",
         "campaign_id",
         "experiment_id",
         "hypothesis_id",
@@ -1071,12 +1392,17 @@ _STRICT_CRYPTO_LEDGER_FIELDS = frozenset(
         "dataset_digest",
         "code_commit",
         "artifact_digest",
+        "candidate_result_digest",
+        "control_result_digest",
         "source",
+        "holdout_seal_digest",
+        "holdout_authorization_digest",
         "execution_policy_digest",
         "cost_policy_digest",
         "benchmark_policy_digest",
         "cohort_digest",
         "metrics_digest",
+        "benchmark_artifacts_digest",
         "test_range",
         "test_sharpe_per_period",
         "sequence",
@@ -1089,11 +1415,16 @@ _LEDGER_DIGEST_FIELDS = frozenset(
         "experiment_spec_seal",
         "dataset_digest",
         "artifact_digest",
+        "candidate_result_digest",
+        "control_result_digest",
+        "holdout_seal_digest",
+        "holdout_authorization_digest",
         "execution_policy_digest",
         "cost_policy_digest",
         "benchmark_policy_digest",
         "cohort_digest",
         "metrics_digest",
+        "benchmark_artifacts_digest",
         "entry_hash",
     }
 )
@@ -1123,6 +1454,15 @@ def _strict_crypto_ledger_errors(record: Mapping[str, Any]) -> tuple[str, ...]:
         errors.append(f"schema_version must be {SCHEMA_VERSION}")
     if record.get("source") != "protected_crypto_runner":
         errors.append("source must be protected_crypto_runner")
+    phase = record.get("phase")
+    if phase not in {"SELECTION", "HOLDOUT"}:
+        errors.append("phase must be SELECTION or HOLDOUT")
+    if phase == "HOLDOUT":
+        reveal_digest = str(record.get("holdout_reveal_digest", ""))
+        if not _is_hex_digest(reveal_digest, minimum=64, maximum=64):
+            errors.append("HOLDOUT rows require holdout_reveal_digest")
+    elif str(record.get("holdout_reveal_digest", "")).strip():
+        errors.append("SELECTION rows cannot carry a holdout reveal digest")
     if str(record.get("preregistration_seal", "")).strip():
         errors.append("legacy preregistration_seal is forbidden for crypto Gate 3")
     for name in _LEDGER_DIGEST_FIELDS:
@@ -1147,11 +1487,710 @@ def _status_from_checks(checks: Sequence[PromotionCheck]) -> VerdictStatus:
     return VerdictStatus.PASS
 
 
+def independent_closed_round_trip_count(
+    executions: Sequence[Mapping[str, Any]],
+) -> int:
+    """Count the maximum set of non-overlapping closed portfolio episodes.
+
+    An instrument episode opens only when filled buys move its reconstructed
+    position from zero to positive and closes only when filled sells return it
+    to zero. ``TERMINAL_RECOVERY`` and ``WRITTEN_DOWN`` close the remaining
+    position even when venue-filled quantity is zero. Partial executions stay
+    inside one episode and never manufacture additional observations.
+
+    Episodes across instruments can overlap. Sorting by close time and greedily
+    accepting only intervals that begin strictly after the prior accepted close
+    yields the maximum number of temporally non-overlapping portfolio episodes.
+    """
+
+    if isinstance(executions, (str, bytes)) or not isinstance(executions, Sequence):
+        raise CryptoGovernanceError("executions must be a sequence of mappings")
+    normalized: list[tuple[pd.Timestamp, int, Mapping[str, Any]]] = []
+    for index, execution in enumerate(executions):
+        if not isinstance(execution, Mapping):
+            raise CryptoGovernanceError("every execution must be a mapping")
+        quantity = _finite_number(execution.get("filled_quantity"))
+        if quantity is not None and quantity < 0:
+            raise CryptoGovernanceError("filled_quantity cannot be negative")
+        status = str(execution.get("status", "")).upper()
+        active = (quantity is not None and quantity > 0) or (status in _TERMINAL_EXECUTION_STATUSES)
+        if not active:
+            continue
+        timestamp = pd.to_datetime(execution.get("execution_timestamp"), utc=True, errors="coerce")
+        if pd.isna(timestamp):
+            raise CryptoGovernanceError(
+                "filled and terminal executions require execution_timestamp"
+            )
+        normalized.append((pd.Timestamp(timestamp), index, execution))
+    normalized.sort(key=lambda item: (item[0], item[1]))
+
+    positions: dict[str, float] = {}
+    opened_at: dict[str, pd.Timestamp] = {}
+    intervals: list[tuple[pd.Timestamp, pd.Timestamp]] = []
+    tolerance = 1e-9
+    for timestamp, _index, execution in normalized:
+        instrument = str(execution.get("instrument_id", "")).strip()
+        side = str(execution.get("side", "")).lower()
+        quantity = _finite_number(execution.get("filled_quantity")) or 0.0
+        status = str(execution.get("status", "")).upper()
+        if not instrument or side not in {"buy", "sell"}:
+            raise CryptoGovernanceError(
+                "economically active executions require instrument_id and buy/sell side"
+            )
+        prior = positions.get(instrument, 0.0)
+        if side == "buy":
+            if quantity <= 0:
+                raise CryptoGovernanceError("active buy executions require positive fill")
+            if prior <= tolerance:
+                opened_at[instrument] = timestamp
+            positions[instrument] = prior + quantity
+            continue
+
+        if status in _TERMINAL_EXECUTION_STATUSES:
+            updated = 0.0
+        else:
+            if quantity <= 0:
+                raise CryptoGovernanceError("active sell executions require positive fill")
+            if quantity > prior + tolerance:
+                raise CryptoGovernanceError("execution history sells more than the open position")
+            updated = max(0.0, prior - quantity)
+        if prior > tolerance and updated <= tolerance:
+            start = opened_at.pop(instrument, None)
+            if start is None or timestamp < start:
+                raise CryptoGovernanceError("closed execution episode has no causal entry")
+            intervals.append((start, timestamp))
+            positions.pop(instrument, None)
+        else:
+            positions[instrument] = updated
+
+    accepted = 0
+    last_close: pd.Timestamp | None = None
+    for start, close in sorted(intervals, key=lambda item: (item[1], item[0])):
+        if last_close is None or start > last_close:
+            accepted += 1
+            last_close = close
+    return accepted
+
+
+def _annual_completed_cycle_upper_bound(spec: ExperimentSpec) -> int:
+    """Upper-bound non-overlapping entry-to-exit cycles under annual entry waves.
+
+    Every accepted portfolio interval must begin strictly after the preceding
+    close. Annual strategies can create at most one new independent interval
+    per calendar-year entry wave, even when H2 forces several overlapping exits.
+    """
+
+    start = _parse_day("holdout_start", spec.holdout_start)
+    end = _parse_day("holdout_end", spec.holdout_end)
+    return max(0, end.year - start.year + 1)
+
+
+def _derived_result_metrics(payload: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if payload is None:
+        return None
+    equity_rows = payload.get("equity")
+    executions = payload.get("executions")
+    if (
+        not isinstance(equity_rows, Sequence)
+        or isinstance(equity_rows, (str, bytes))
+        or len(equity_rows) < 2
+        or not isinstance(executions, Sequence)
+        or isinstance(executions, (str, bytes))
+    ):
+        return None
+    timestamps: list[pd.Timestamp] = []
+    values: list[float] = []
+    for row in equity_rows:
+        if not isinstance(row, Mapping):
+            return None
+        timestamp = pd.to_datetime(row.get("timestamp"), utc=True, errors="coerce")
+        value = _finite_number(row.get("value_usd"))
+        if pd.isna(timestamp) or value is None or value <= 0:
+            return None
+        timestamps.append(pd.Timestamp(timestamp))
+        values.append(value)
+    if any(right <= left for left, right in zip(timestamps, timestamps[1:], strict=False)):
+        return None
+    series = pd.Series(values, index=pd.DatetimeIndex(timestamps), dtype=float)
+    returns = series.pct_change().dropna()
+    try:
+        independent_trades = independent_closed_round_trip_count(executions)
+    except CryptoGovernanceError:
+        return None
+    return {
+        **return_moments(returns),
+        "max_drawdown": float((series / series.cummax() - 1.0).min()),
+        "independent_trade_count": independent_trades,
+        "independent_trade_definition": INDEPENDENT_TRADE_DEFINITION,
+        "total_return": float(series.iloc[-1] / series.iloc[0] - 1.0),
+    }
+
+
+def _selection_return_series(
+    artifact: Mapping[str, Any],
+    *,
+    trial_id: str,
+    selection_start: str,
+    selection_end: str,
+) -> pd.Series:
+    runs = artifact.get("runs")
+    runs = runs if isinstance(runs, Mapping) else {}
+    candidate = runs.get("candidate")
+    candidate = candidate if isinstance(candidate, Mapping) else {}
+    equity_rows = candidate.get("equity")
+    if (
+        not isinstance(equity_rows, Sequence)
+        or isinstance(equity_rows, (str, bytes))
+        or len(equity_rows) < 3
+    ):
+        raise CryptoGovernanceError(f"selection trial {trial_id} has no usable equity path")
+    timestamps: list[pd.Timestamp] = []
+    values: list[float] = []
+    for row in equity_rows:
+        if not isinstance(row, Mapping):
+            raise CryptoGovernanceError(f"selection trial {trial_id} equity row is malformed")
+        timestamp = pd.to_datetime(row.get("timestamp"), utc=True, errors="coerce")
+        value = _finite_number(row.get("value_usd"))
+        if pd.isna(timestamp) or value is None or value <= 0:
+            raise CryptoGovernanceError(
+                f"selection trial {trial_id} equity contains invalid timestamp/value"
+            )
+        timestamps.append(pd.Timestamp(timestamp))
+        values.append(value)
+    index = pd.DatetimeIndex(timestamps)
+    if not index.is_monotonic_increasing or not index.is_unique:
+        raise CryptoGovernanceError(
+            f"selection trial {trial_id} equity must be chronological and unique"
+        )
+    observed_start = index.min().date().isoformat()
+    observed_end = index.max().date().isoformat()
+    if observed_start != selection_start or observed_end != selection_end:
+        raise CryptoGovernanceError(
+            f"selection trial {trial_id} equity must cover exactly "
+            f"[{selection_start}, {selection_end}]"
+        )
+    returns = pd.Series(values, index=index, dtype=float).pct_change().dropna()
+    returns.attrs["data_scope"] = "selection"
+    return returns
+
+
+def _derive_verified_overfitting(
+    *,
+    spec: ExperimentSpec,
+    selection_records: Sequence[Mapping[str, Any]],
+    artifact_map: Mapping[str, Mapping[str, Any]],
+    artifacts_verified: bool,
+) -> tuple[Mapping[str, Any] | None, PromotionCheck]:
+    partitions = spec.walk_forward_policy.get("cscv_partitions")
+    if partitions is None:
+        return None, PromotionCheck(
+            "verified_overfitting_derivation",
+            VerdictStatus.INSUFFICIENT_EVIDENCE,
+            "CSCV partitions must be sealed before selection trials run",
+            None,
+            "walk_forward_policy.cscv_partitions",
+        )
+    if not artifacts_verified:
+        return None, PromotionCheck(
+            "verified_overfitting_derivation",
+            VerdictStatus.INSUFFICIENT_EVIDENCE,
+            "PBO requires all 15 selection artifacts to pass byte bindings first",
+            None,
+            CAMPAIGN_TRIAL_BUDGET,
+        )
+    trial_returns: dict[str, pd.Series] = {}
+    try:
+        for record in selection_records:
+            run_id = str(record.get("run_id", "")).strip()
+            if not run_id or run_id in trial_returns:
+                raise CryptoGovernanceError("selection run identifiers must be unique")
+            artifact = artifact_map.get(run_id)
+            if artifact is None:
+                raise CryptoGovernanceError(f"selection artifact {run_id} is missing")
+            trial_returns[run_id] = _selection_return_series(
+                artifact,
+                trial_id=run_id,
+                selection_start=spec.selection_start,
+                selection_end=spec.selection_end,
+            )
+        if len(trial_returns) != CAMPAIGN_TRIAL_BUDGET:
+            raise CryptoGovernanceError("exactly 15 selection return paths are required")
+        derived = derive_overfitting_evidence(
+            trial_returns,
+            partitions=int(partitions),
+            min_windows=int(spec.walk_forward_policy["min_windows"]),
+        )
+    except (CryptoGovernanceError, CryptoEconomicEvidenceError, TypeError, ValueError) as exc:
+        return None, PromotionCheck(
+            "verified_overfitting_derivation",
+            VerdictStatus.INSUFFICIENT_EVIDENCE,
+            f"selection return paths cannot support sealed PBO/walk-forward: {exc}",
+            None,
+            {"trials": CAMPAIGN_TRIAL_BUDGET, "partitions": partitions},
+        )
+    walk_forward = derived.get("walk_forward")
+    walk_forward = walk_forward if isinstance(walk_forward, Mapping) else {}
+    walk_forward_pbo = _finite_number(walk_forward.get("walk_forward_pbo"))
+    max_pbo = float(spec.selection_criteria["max_pbo"])
+    walk_forward_passed = (
+        walk_forward.get("decision") == "PASS"
+        and walk_forward_pbo is not None
+        and walk_forward_pbo <= max_pbo
+    )
+    return derived, PromotionCheck(
+        "verified_overfitting_derivation",
+        VerdictStatus.PASS if walk_forward_passed else VerdictStatus.NO_GO,
+        (
+            "PBO and passing walk-forward evidence were recomputed from 15 bound paths"
+            if walk_forward_passed
+            else "sealed walk-forward evidence fails its PBO/decision threshold"
+        ),
+        {
+            "digest": derived["digest"],
+            "pbo": derived["pbo"],
+            "windows": derived["windows"],
+            "walk_forward_pbo": walk_forward_pbo,
+            "walk_forward_decision": walk_forward.get("decision"),
+        },
+        {
+            "trials": CAMPAIGN_TRIAL_BUDGET,
+            "partitions": partitions,
+            "walk_forward_pbo": f"<= {max_pbo}",
+            "walk_forward_decision": "PASS",
+        },
+    )
+
+
+def _result_from_artifact_payload(
+    payload: Mapping[str, Any] | None,
+    *,
+    label: str,
+) -> EvaluationResult:
+    if payload is None:
+        raise CryptoGovernanceError(f"{label} result payload is missing")
+    summary = payload.get("summary")
+    equity_rows = payload.get("equity")
+    execution_rows = payload.get("executions")
+    rebalance_rows = payload.get("rebalances")
+    if not isinstance(summary, Mapping):
+        raise CryptoGovernanceError(f"{label}.summary is missing")
+    if (
+        not isinstance(equity_rows, Sequence)
+        or isinstance(equity_rows, (str, bytes))
+        or len(equity_rows) < 2
+    ):
+        raise CryptoGovernanceError(f"{label}.equity is incomplete")
+    if not isinstance(execution_rows, Sequence) or isinstance(execution_rows, (str, bytes)):
+        raise CryptoGovernanceError(f"{label}.executions is missing")
+    if not isinstance(rebalance_rows, Sequence) or isinstance(rebalance_rows, (str, bytes)):
+        raise CryptoGovernanceError(f"{label}.rebalances is missing")
+
+    timestamps: list[pd.Timestamp] = []
+    values: list[float] = []
+    for row in equity_rows:
+        if not isinstance(row, Mapping):
+            raise CryptoGovernanceError(f"{label}.equity contains a malformed row")
+        timestamp = pd.to_datetime(row.get("timestamp"), utc=True, errors="coerce")
+        value = _finite_number(row.get("value_usd"))
+        if pd.isna(timestamp) or value is None or value < 0:
+            raise CryptoGovernanceError(f"{label}.equity contains invalid data")
+        timestamps.append(pd.Timestamp(timestamp))
+        values.append(value)
+    try:
+        executions = [
+            ExecutionResult(**dict(row)) for row in execution_rows if isinstance(row, Mapping)
+        ]
+        rebalances = [
+            RebalanceRecord(**dict(row)) for row in rebalance_rows if isinstance(row, Mapping)
+        ]
+    except TypeError as exc:
+        raise CryptoGovernanceError(f"{label} accounting row is incomplete: {exc}") from exc
+    if len(executions) != len(execution_rows) or len(rebalances) != len(rebalance_rows):
+        raise CryptoGovernanceError(f"{label} accounting rows must be mappings")
+
+    required_summary = (
+        "initial_capital_usd",
+        "total_turnover",
+        "total_cost_usd",
+        "delisting_losses_usd",
+        "delisted_positions",
+        "delisting_recovery",
+        "cost_multiplier",
+        "fill_fraction_multiplier",
+    )
+    if any(name not in summary for name in required_summary):
+        raise CryptoGovernanceError(f"{label}.summary lacks simulator accounting fields")
+    try:
+        result = EvaluationResult(
+            equity=pd.Series(values, index=pd.DatetimeIndex(timestamps), dtype=float),
+            rebalances=rebalances,
+            executions=executions,
+            total_turnover=float(summary["total_turnover"]),
+            total_cost_usd=float(summary["total_cost_usd"]),
+            delisting_losses_usd=float(summary["delisting_losses_usd"]),
+            delisted_positions=int(summary["delisted_positions"]),
+            delisting_recovery=float(summary["delisting_recovery"]),
+            initial_capital_usd=float(summary["initial_capital_usd"]),
+            cost_multiplier=float(summary["cost_multiplier"]),
+            fill_fraction_multiplier=float(summary["fill_fraction_multiplier"]),
+        )
+    except (TypeError, ValueError) as exc:
+        raise CryptoGovernanceError(f"{label}.summary accounting is invalid") from exc
+    if canonical_digest(result.summary()) != canonical_digest(summary):
+        raise CryptoGovernanceError(f"{label}.summary is not derivable from its result rows")
+    return result
+
+
+def _canonical_evidence_block_error(block: Mapping[str, Any]) -> str | None:
+    claimed = block.get("digest")
+    if not isinstance(claimed, str) or not claimed:
+        return "digest is missing"
+    payload = {str(key): value for key, value in block.items() if key != "digest"}
+    try:
+        actual = canonical_evidence_digest(payload)
+    except CryptoEconomicEvidenceError as exc:
+        return str(exc)
+    return None if claimed == actual else "digest contradicts canonical block bytes"
+
+
+def _verified_gate3_panel_input(
+    evidence: Mapping[str, Any], spec: ExperimentSpec
+) -> tuple[pd.DataFrame | None, PromotionCheck]:
+    gate3_inputs = evidence.get("gate3_inputs")
+    gate3_inputs = gate3_inputs if isinstance(gate3_inputs, Mapping) else {}
+    raw = gate3_inputs.get("panel")
+    if not isinstance(raw, Mapping) or not isinstance(raw.get("payload"), Mapping):
+        return None, PromotionCheck(
+            "verified_gate3_panel_input",
+            VerdictStatus.INSUFFICIENT_EVIDENCE,
+            "gate3_inputs.panel.payload is missing",
+        )
+    payload = raw["payload"]
+    columns = payload.get("columns")
+    records = payload.get("records")
+    shaped = (
+        raw.get("encoding") == "canonical_panel_v1"
+        and isinstance(columns, Sequence)
+        and not isinstance(columns, (str, bytes))
+        and isinstance(records, Sequence)
+        and not isinstance(records, (str, bytes))
+        and bool(columns)
+        and bool(records)
+        and all(isinstance(name, str) and name for name in columns)
+        and len(set(columns)) == len(columns)
+        and all(isinstance(row, Mapping) and set(row) == set(columns) for row in records)
+    )
+    if not shaped:
+        return None, PromotionCheck(
+            "verified_gate3_panel_input",
+            VerdictStatus.NO_GO,
+            "gate3 panel input is present but not canonical_panel_v1 shaped",
+        )
+    observed_digest = canonical_digest(payload)
+    if raw.get("digest") != observed_digest or observed_digest != spec.holdout_panel_digest:
+        return None, PromotionCheck(
+            "verified_gate3_panel_input",
+            VerdictStatus.NO_GO,
+            "gate3 panel bytes contradict their digest or sealed holdout component",
+            raw.get("digest"),
+            spec.holdout_panel_digest,
+        )
+    frame = pd.DataFrame([dict(row) for row in records], columns=list(columns))
+    return frame, PromotionCheck(
+        "verified_gate3_panel_input",
+        VerdictStatus.PASS,
+        "gate3 panel payload hashes to the sealed holdout panel component",
+        observed_digest,
+        spec.holdout_panel_digest,
+    )
+
+
+def _verified_gate3_execution_limits_input(
+    evidence: Mapping[str, Any], spec: ExperimentSpec
+) -> tuple[Mapping[str, Any] | None, PromotionCheck]:
+    gate3_inputs = evidence.get("gate3_inputs")
+    gate3_inputs = gate3_inputs if isinstance(gate3_inputs, Mapping) else {}
+    raw = gate3_inputs.get("execution_limits")
+    if not isinstance(raw, Mapping) or not isinstance(raw.get("payload"), Mapping):
+        return None, PromotionCheck(
+            "verified_gate3_execution_limits_input",
+            VerdictStatus.INSUFFICIENT_EVIDENCE,
+            "gate3_inputs.execution_limits.payload is missing",
+        )
+    payload = raw["payload"]
+    if not payload:
+        return None, PromotionCheck(
+            "verified_gate3_execution_limits_input",
+            VerdictStatus.INSUFFICIENT_EVIDENCE,
+            "gate3 execution-limit payload is empty",
+        )
+    observed_digest = canonical_digest(payload)
+    expected_digest = str(spec.execution_policy["execution_limits_digest"])
+    if raw.get("digest") != observed_digest or observed_digest != expected_digest:
+        return None, PromotionCheck(
+            "verified_gate3_execution_limits_input",
+            VerdictStatus.NO_GO,
+            "execution-limit payload contradicts its digest or sealed policy",
+            raw.get("digest"),
+            expected_digest,
+        )
+    return payload, PromotionCheck(
+        "verified_gate3_execution_limits_input",
+        VerdictStatus.PASS,
+        "execution-limit payload hashes to the sealed execution policy",
+        observed_digest,
+        expected_digest,
+    )
+
+
+def _derive_verified_gate3_blocks(
+    evidence: Mapping[str, Any],
+    spec: ExperimentSpec,
+) -> tuple[dict[str, Mapping[str, Any]], tuple[PromotionCheck, ...]]:
+    runs = evidence.get("runs")
+    runs = runs if isinstance(runs, Mapping) else {}
+    candidate_payload = runs.get("candidate")
+    candidate_payload = candidate_payload if isinstance(candidate_payload, Mapping) else None
+    benchmark_payloads = runs.get("benchmarks")
+    benchmark_payloads = benchmark_payloads if isinstance(benchmark_payloads, Mapping) else {}
+    stress_payload = runs.get("stress_candidate")
+    stress_payload = stress_payload if isinstance(stress_payload, Mapping) else None
+    panel_input, panel_input_check = _verified_gate3_panel_input(evidence, spec)
+    limits_input, limits_input_check = _verified_gate3_execution_limits_input(evidence, spec)
+
+    verified: dict[str, Mapping[str, Any]] = {}
+    checks: list[PromotionCheck] = [panel_input_check, limits_input_check]
+    for name in ("economics", "stress", "concentration", "capacity"):
+        raw = evidence.get(name)
+        if not isinstance(raw, Mapping):
+            checks.append(
+                PromotionCheck(
+                    f"verified_{name}_derivation",
+                    VerdictStatus.INSUFFICIENT_EVIDENCE,
+                    f"sealed {name} detail block is missing",
+                )
+            )
+            continue
+        digest_error = _canonical_evidence_block_error(raw)
+        if digest_error is not None:
+            checks.append(
+                PromotionCheck(
+                    f"verified_{name}_derivation",
+                    (
+                        VerdictStatus.INSUFFICIENT_EVIDENCE
+                        if digest_error == "digest is missing"
+                        else VerdictStatus.NO_GO
+                    ),
+                    f"{name} {digest_error}",
+                )
+            )
+            continue
+        if raw.get("available") is False:
+            checks.append(
+                PromotionCheck(
+                    f"verified_{name}_derivation",
+                    VerdictStatus.INSUFFICIENT_EVIDENCE,
+                    f"runner could not derive {name}: {raw.get('reason', 'unspecified')}",
+                    raw.get("digest"),
+                    "complete derivation",
+                )
+            )
+            continue
+        try:
+            candidate = _result_from_artifact_payload(candidate_payload, label="candidate")
+            if name == "economics":
+                if set(benchmark_payloads) != REQUIRED_BENCHMARKS:
+                    raise CryptoGovernanceError("economics requires the exact benchmark pair")
+                benchmarks = {
+                    benchmark_id: _result_from_artifact_payload(
+                        (
+                            benchmark_payloads[benchmark_id]
+                            if isinstance(benchmark_payloads[benchmark_id], Mapping)
+                            else None
+                        ),
+                        label=f"benchmarks[{benchmark_id}]",
+                    )
+                    for benchmark_id in sorted(REQUIRED_BENCHMARKS)
+                }
+                expected = derive_execution_economics(candidate, benchmarks)
+            elif name == "stress":
+                stressed = _result_from_artifact_payload(
+                    stress_payload,
+                    label="stress_candidate",
+                )
+                expected = derive_stress_evidence(
+                    stressed,
+                    cost_multiplier=2.0,
+                    fill_fraction=0.5,
+                )
+            elif name == "concentration":
+                if panel_input is None:
+                    raise CryptoGovernanceError("sealed gate3 panel input is unavailable")
+                expected = derive_pnl_concentration(candidate, panel_input)
+            else:
+                if limits_input is None:
+                    raise CryptoGovernanceError("sealed gate3 execution-limit input is unavailable")
+                expected = derive_capacity(
+                    candidate,
+                    limits_input,
+                    float(spec.selection_criteria["canary_capital_usd"]),
+                )
+        except (CryptoGovernanceError, CryptoEconomicEvidenceError, TypeError, ValueError) as exc:
+            checks.append(
+                PromotionCheck(
+                    f"verified_{name}_derivation",
+                    VerdictStatus.INSUFFICIENT_EVIDENCE,
+                    f"{name} cannot be independently reconstructed: {exc}",
+                    raw.get("digest"),
+                    "complete runner accounting detail",
+                )
+            )
+            continue
+        if canonical_digest(raw) != canonical_digest(expected):
+            checks.append(
+                PromotionCheck(
+                    f"verified_{name}_derivation",
+                    VerdictStatus.NO_GO,
+                    f"{name} identities contradict the bound run/detail",
+                    raw.get("digest"),
+                    expected.get("digest"),
+                )
+            )
+            continue
+        verified[name] = expected
+        checks.append(
+            PromotionCheck(
+                f"verified_{name}_derivation",
+                VerdictStatus.PASS,
+                f"{name} was independently reconstructed from bound run/detail",
+                expected.get("digest"),
+                expected.get("digest"),
+            )
+        )
+    return verified, tuple(checks)
+
+
+def _selection_trial_binding_errors(
+    record: Mapping[str, Any],
+    trial_spec: ExperimentSpec,
+    artifact: Mapping[str, Any] | None,
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    if artifact is None:
+        return ("selection artifact is missing",)
+    artifact_digest: str | None = None
+    with suppress(CryptoGovernanceError, TypeError, ValueError):
+        artifact_digest = evaluation_artifact_digest(artifact)
+    expected_fields = {
+        "phase": "SELECTION",
+        "promotable": False,
+        "campaign_id": trial_spec.campaign_id,
+        "experiment_id": trial_spec.experiment_id,
+        "hypothesis_id": trial_spec.hypothesis_id,
+        "experiment_spec_seal": trial_spec.seal(),
+        "run_id": record.get("run_id"),
+        "dataset_digest": trial_spec.dataset_digest,
+        "code_commit": trial_spec.code_commit,
+        "selection_panel_digest": trial_spec.selection_panel_digest,
+        "holdout_seal_digest": trial_spec.holdout_seal_digest,
+        "holdout_authorization_digest": trial_spec.holdout_authorization_digest,
+        "holdout_reveal_count": 0,
+        "selection_range": [trial_spec.selection_start, trial_spec.selection_end],
+        "artifact_digest": artifact_digest,
+    }
+    for name, expected in expected_fields.items():
+        if artifact.get(name) != expected:
+            errors.append(f"artifact {name} contradicts its ExperimentSpec")
+    runtime_provenance = artifact.get("runtime_provenance")
+    runtime_provenance = runtime_provenance if isinstance(runtime_provenance, Mapping) else {}
+    if (
+        runtime_provenance.get("code_commit") != trial_spec.code_commit
+        or runtime_provenance.get("clean") is not True
+        or runtime_provenance.get("source_mode") != "git-checkout"
+        or len(str(runtime_provenance.get("source_tree_digest", ""))) not in {40, 64}
+        or not _is_hex_digest(
+            str(runtime_provenance.get("source_tree_digest", "")), minimum=40, maximum=64
+        )
+    ):
+        errors.append("runtime provenance does not bind a clean ExperimentSpec commit")
+    if record.get("artifact_digest") != artifact_digest:
+        errors.append("ledger artifact_digest does not bind the selection artifact")
+
+    policy = artifact.get("policy_bindings")
+    policy = policy if isinstance(policy, Mapping) else {}
+    expected_policy = {
+        "execution_policy_digest": trial_spec.execution_policy_digest,
+        "cost_policy_digest": trial_spec.cost_policy_digest,
+        "benchmark_policy_digest": trial_spec.benchmark_policy_digest,
+        "cohort_digest": trial_spec.cohort_digest,
+    }
+    for name, expected in expected_policy.items():
+        if policy.get(name) != expected or record.get(name) != expected:
+            errors.append(f"{name} is not bound across spec, artifact and ledger")
+
+    runs = artifact.get("runs")
+    runs = runs if isinstance(runs, Mapping) else {}
+    candidate = runs.get("candidate")
+    candidate = candidate if isinstance(candidate, Mapping) else None
+    control = runs.get("control")
+    control = control if isinstance(control, Mapping) else None
+    candidate_digest = canonical_digest(candidate) if candidate is not None else None
+    control_digest = canonical_digest(control) if control is not None else None
+    if (
+        artifact.get("candidate_result_digest") != candidate_digest
+        or record.get("candidate_result_digest") != candidate_digest
+    ):
+        errors.append("candidate result is not byte-bound")
+    if (
+        artifact.get("control_result_digest") != control_digest
+        or record.get("control_result_digest") != control_digest
+    ):
+        errors.append("control result is not byte-bound")
+
+    benchmark_runs = runs.get("benchmarks")
+    benchmark_runs = benchmark_runs if isinstance(benchmark_runs, Mapping) else {}
+    benchmark_digests = artifact.get("benchmark_artifact_digests")
+    benchmark_digests = benchmark_digests if isinstance(benchmark_digests, Mapping) else {}
+    if set(benchmark_runs) != REQUIRED_BENCHMARKS or set(benchmark_digests) != REQUIRED_BENCHMARKS:
+        errors.append("selection artifact does not contain the exact benchmark pair")
+    else:
+        for benchmark_id in REQUIRED_BENCHMARKS:
+            payload = benchmark_runs.get(benchmark_id)
+            digest = canonical_digest(payload) if isinstance(payload, Mapping) else None
+            if benchmark_digests.get(benchmark_id) != digest:
+                errors.append(f"{benchmark_id} result is not byte-bound")
+    if record.get("benchmark_artifacts_digest") != canonical_digest(benchmark_digests):
+        errors.append("benchmark artifact set is not bound to the ledger")
+
+    metrics = artifact.get("test_metrics")
+    metrics = metrics if isinstance(metrics, Mapping) else None
+    derived = _derived_result_metrics(candidate)
+    derived_metrics = (
+        {key: value for key, value in derived.items() if key != "total_return"}
+        if derived is not None
+        else None
+    )
+    if (
+        metrics is None
+        or derived_metrics is None
+        or canonical_digest(metrics) != canonical_digest(derived_metrics)
+    ):
+        errors.append("selection metrics are not derivable from candidate equity")
+    elif record.get("metrics_digest") != canonical_digest(metrics) or record.get(
+        "test_sharpe_per_period"
+    ) != metrics.get("sharpe_per_period"):
+        errors.append("selection metrics are not exactly bound to the ledger")
+    return tuple(errors)
+
+
 def evaluate_crypto_promotion(
     evidence: Mapping[str, Any],
     spec: ExperimentSpec,
     *,
     ledger_path: str | Path | None = None,
+    holdout_directory: str | Path | None = None,
+    campaign_specs: Sequence[ExperimentSpec] | None = None,
+    campaign_artifacts: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> PromotionVerdict:
     """Verify the sealed Gate-3 artifact against a strict hash-chained ledger.
 
@@ -1179,14 +2218,71 @@ def evaluate_crypto_promotion(
         strict_checks.append(PromotionCheck(name, status, detail, actual, expected))
 
     spec_seal = spec.seal()
+    add_binding("artifact_phase", evidence.get("phase"), "HOLDOUT")
+    add_binding("artifact_promotable", evidence.get("promotable"), True)
     add_binding("campaign_binding", evidence.get("campaign_id"), spec.campaign_id)
     add_binding("experiment_binding", evidence.get("experiment_id"), spec.experiment_id)
     add_binding("dataset_id_binding", evidence.get("dataset_id"), spec.dataset_id)
+    runtime_provenance = evidence.get("runtime_provenance")
+    runtime_provenance = runtime_provenance if isinstance(runtime_provenance, Mapping) else {}
+    add_binding(
+        "runtime_code_commit_binding",
+        runtime_provenance.get("code_commit"),
+        spec.code_commit,
+    )
+    add_binding("runtime_clean_binding", runtime_provenance.get("clean"), True)
+    add_binding(
+        "runtime_source_mode_binding",
+        runtime_provenance.get("source_mode"),
+        "git-checkout",
+    )
+    runtime_tree_digest = str(runtime_provenance.get("source_tree_digest", ""))
+    runtime_tree_valid = len(runtime_tree_digest) in {40, 64} and _is_hex_digest(
+        runtime_tree_digest, minimum=40, maximum=64
+    )
+    strict_checks.append(
+        PromotionCheck(
+            "runtime_source_tree_binding",
+            VerdictStatus.PASS if runtime_tree_valid else VerdictStatus.INSUFFICIENT_EVIDENCE,
+            (
+                "runtime tree object is content-addressed"
+                if runtime_tree_valid
+                else "runtime source_tree_digest is missing or malformed"
+            ),
+            runtime_tree_digest or None,
+            "full 40- or 64-character Git tree object id",
+        )
+    )
+    annual_cycle_bound = _annual_completed_cycle_upper_bound(spec)
+    required_cycles = int(spec.selection_criteria["min_independent_trades"])
+    strict_checks.append(
+        PromotionCheck(
+            "annual_independent_cycle_feasibility",
+            (
+                VerdictStatus.PASS
+                if annual_cycle_bound >= required_cycles
+                else VerdictStatus.INSUFFICIENT_EVIDENCE
+            ),
+            (
+                "the sealed holdout can support the required annual independent cycles"
+                if annual_cycle_bound >= required_cycles
+                else "annual frequency and holdout length cannot establish 30 independent "
+                "non-overlapping round trips; the preregistered requirements conflict"
+            ),
+            annual_cycle_bound,
+            required_cycles,
+        )
+    )
 
     holdout = evidence.get("holdout")
     holdout = holdout if isinstance(holdout, Mapping) else {}
     expected_test_range = [spec.holdout_start, spec.holdout_end]
     add_binding("holdout_seal_binding", holdout.get("seal_digest"), spec.holdout_seal_digest)
+    add_binding(
+        "holdout_authorization_binding",
+        holdout.get("authorization_digest"),
+        spec.holdout_authorization_digest,
+    )
     add_binding("holdout_test_range", holdout.get("test_range"), expected_test_range)
     add_binding("holdout_reveal_count", holdout.get("reveal_count"), 1)
 
@@ -1212,6 +2308,80 @@ def evaluate_crypto_promotion(
         frozen_selection.get("experiment_spec_seal"),
         spec_seal,
     )
+
+    persisted_reveal_digest: str | None = None
+    if holdout_directory is None:
+        strict_checks.append(
+            PromotionCheck(
+                "persisted_holdout_evidence",
+                VerdictStatus.INSUFFICIENT_EVIDENCE,
+                "the persisted holdout directory is required",
+            )
+        )
+    else:
+        try:
+            persisted_seal = load_seal(holdout_directory)
+            assert_dataset_not_invalidated(holdout_directory, persisted_seal.dataset_digest)
+            persisted_authorization = load_crypto_holdout_authorization(holdout_directory)
+            persisted_reveals = read_reveals(holdout_directory)
+        except (HoldoutSealError, OSError, ValueError) as exc:
+            strict_checks.append(
+                PromotionCheck(
+                    "persisted_holdout_evidence",
+                    VerdictStatus.NO_GO,
+                    f"persisted holdout evidence is invalid: {exc}",
+                )
+            )
+        else:
+            persisted_ok = len(persisted_reveals) == 1
+            strict_checks.append(
+                PromotionCheck(
+                    "persisted_holdout_evidence",
+                    VerdictStatus.PASS if persisted_ok else VerdictStatus.NO_GO,
+                    "exactly one durable reveal must exist",
+                    len(persisted_reveals),
+                    1,
+                )
+            )
+            add_binding(
+                "persisted_holdout_seal",
+                persisted_seal.seal(),
+                spec.holdout_seal_digest,
+            )
+            add_binding(
+                "persisted_holdout_dataset",
+                [persisted_seal.dataset_id, persisted_seal.dataset_digest],
+                [spec.dataset_id, spec.dataset_digest],
+            )
+            add_binding(
+                "persisted_holdout_authorization",
+                persisted_authorization.digest(),
+                spec.holdout_authorization_digest,
+            )
+            add_binding(
+                "persisted_gate0_verdict",
+                persisted_authorization.gate0_verdict_digest,
+                spec.gate0_verdict_digest,
+            )
+            add_binding(
+                "persisted_gate0_evidence",
+                persisted_authorization.gate0_evidence_digest,
+                spec.gate0_evidence_digest,
+            )
+            if persisted_reveals:
+                persisted_record = persisted_reveals[0]
+                persisted_reveal_digest = canonical_digest(persisted_record)
+                add_binding(
+                    "artifact_reveal_matches_persisted_log",
+                    recomputed_reveal_digest,
+                    persisted_reveal_digest,
+                )
+                add_binding(
+                    "artifact_reveal_record_matches_persisted_log",
+                    canonical_digest(reveal_record) if reveal_record is not None else None,
+                    persisted_reveal_digest,
+                )
+    verified_reveal_digest = persisted_reveal_digest
 
     policy_bindings = evidence.get("policy_bindings")
     policy_bindings = policy_bindings if isinstance(policy_bindings, Mapping) else {}
@@ -1285,29 +2455,12 @@ def evaluate_crypto_promotion(
             recomputed_digest,
         )
 
-    recomputed_candidate_metrics: dict[str, Any] | None = None
-    if candidate_run is not None:
-        equity_rows = candidate_run.get("equity")
-        executions = candidate_run.get("executions")
-        if isinstance(equity_rows, Sequence) and not isinstance(equity_rows, (str, bytes)):
-            equity_values = [
-                _finite_number(row.get("value_usd"))
-                for row in equity_rows
-                if isinstance(row, Mapping)
-            ]
-            if equity_values and all(value is not None and value > 0 for value in equity_values):
-                series = pd.Series([value for value in equity_values if value is not None])
-                returns = series.pct_change().dropna()
-                recomputed_candidate_metrics = {
-                    **return_moments(returns),
-                    "max_drawdown": float((series / series.cummax() - 1.0).min()),
-                    "independent_trade_count": sum(
-                        1
-                        for row in executions or []
-                        if isinstance(row, Mapping)
-                        and (_finite_number(row.get("filled_quantity")) or 0.0) > 0
-                    ),
-                }
+    derived_candidate = _derived_result_metrics(candidate_run)
+    recomputed_candidate_metrics = (
+        {key: value for key, value in derived_candidate.items() if key != "total_return"}
+        if derived_candidate is not None
+        else None
+    )
     candidate_metrics = evidence.get("test_metrics")
     candidate_metrics = candidate_metrics if isinstance(candidate_metrics, Mapping) else None
     add_binding(
@@ -1319,26 +2472,90 @@ def evaluate_crypto_promotion(
             else None
         ),
     )
+    candidate_summary = candidate_run.get("summary") if candidate_run is not None else None
+    add_binding(
+        "candidate_summary_total_return_derivation",
+        (
+            _finite_number(candidate_summary.get("total_return"))
+            if isinstance(candidate_summary, Mapping)
+            else None
+        ),
+        derived_candidate.get("total_return") if derived_candidate is not None else None,
+    )
+
+    control_run = runs.get("control")
+    control_run = control_run if isinstance(control_run, Mapping) else None
+    control_result_digest = evidence.get("control_result_digest")
+    recomputed_control_result_digest = (
+        canonical_digest(control_run) if control_run is not None else None
+    )
+    add_binding(
+        "control_result_artifact_binding",
+        control_result_digest,
+        recomputed_control_result_digest,
+    )
+    derived_control = _derived_result_metrics(control_run)
+    control_summary = control_run.get("summary") if control_run is not None else None
+    add_binding(
+        "control_summary_total_return_derivation",
+        (
+            _finite_number(control_summary.get("total_return"))
+            if isinstance(control_summary, Mapping)
+            else None
+        ),
+        derived_control.get("total_return") if derived_control is not None else None,
+    )
+    control_comparison = comparisons.get("sealed_control")
+    control_comparison = control_comparison if isinstance(control_comparison, Mapping) else None
+    add_binding(
+        "sealed_control_artifact_binding",
+        control_comparison.get("artifact_digest") if control_comparison is not None else None,
+        recomputed_control_result_digest,
+    )
+    control_excess = (
+        derived_candidate["total_return"] - derived_control["total_return"]
+        if derived_candidate is not None and derived_control is not None
+        else None
+    )
+    add_binding(
+        "sealed_control_excess_derivation",
+        (
+            _finite_number(control_comparison.get("net_excess_return"))
+            if control_comparison is not None
+            else None
+        ),
+        control_excess,
+    )
+    add_binding(
+        "sealed_control_drawdown_derivation",
+        (
+            _finite_number(control_comparison.get("control_max_drawdown"))
+            if control_comparison is not None
+            else None
+        ),
+        derived_control.get("max_drawdown") if derived_control is not None else None,
+    )
 
     for benchmark_id in sorted(REQUIRED_BENCHMARKS):
         comparison = comparisons.get(benchmark_id)
         comparison = comparison if isinstance(comparison, Mapping) else None
         payload = benchmark_runs.get(benchmark_id)
-        candidate_summary = candidate_run.get("summary") if candidate_run is not None else None
         benchmark_summary = payload.get("summary") if isinstance(payload, Mapping) else None
-        candidate_total = (
-            _finite_number(candidate_summary.get("total_return"))
-            if isinstance(candidate_summary, Mapping)
-            else None
+        derived_benchmark = _derived_result_metrics(
+            payload if isinstance(payload, Mapping) else None
         )
-        benchmark_total = (
-            _finite_number(benchmark_summary.get("total_return"))
-            if isinstance(benchmark_summary, Mapping)
-            else None
+        add_binding(
+            f"{benchmark_id}_summary_total_return_derivation",
+            (
+                _finite_number(benchmark_summary.get("total_return"))
+                if isinstance(benchmark_summary, Mapping)
+                else None
+            ),
+            derived_benchmark.get("total_return") if derived_benchmark is not None else None,
         )
         recomputed_excess = (
-            candidate_total - benchmark_total
-            if candidate_total is not None and benchmark_total is not None
+            derived_candidate["total_return"] - derived_benchmark["total_return"]
+            if derived_candidate is not None and derived_benchmark is not None
             else None
         )
         add_binding(
@@ -1349,6 +2566,15 @@ def evaluate_crypto_promotion(
                 else None
             ),
             recomputed_excess,
+        )
+        add_binding(
+            f"{benchmark_id}_drawdown_derivation",
+            (
+                _finite_number(comparison.get("benchmark_max_drawdown"))
+                if comparison is not None
+                else None
+            ),
+            derived_benchmark.get("max_drawdown") if derived_benchmark is not None else None,
         )
 
     comparisons = evidence.get("comparisons")
@@ -1472,7 +2698,9 @@ def evaluate_crypto_promotion(
         )
     )
 
-    counts = Counter(str(row.get("hypothesis_id", "")) for row in campaign_records)
+    selection_records = [row for row in campaign_records if row.get("phase") == "SELECTION"]
+    holdout_records = [row for row in campaign_records if row.get("phase") == "HOLDOUT"]
+    counts = Counter(str(row.get("hypothesis_id", "")) for row in selection_records)
     expected_counts = dict(HYPOTHESIS_TRIAL_BUDGETS)
     if any(counts[key] > expected_counts[key] for key in expected_counts):
         budget_status = VerdictStatus.NO_GO
@@ -1496,24 +2724,97 @@ def evaluate_crypto_promotion(
         )
     )
 
-    spec_records = [
-        row for row in campaign_records if str(row.get("experiment_spec_seal", "")) == spec_seal
-    ]
-    if len(spec_records) > spec.trial_budget:
-        spec_budget_status = VerdictStatus.NO_GO
-    elif len(spec_records) < spec.trial_budget:
-        spec_budget_status = VerdictStatus.INSUFFICIENT_EVIDENCE
+    supplied_specs = list(campaign_specs or ())
+    specs_by_seal: dict[str, ExperimentSpec] = {}
+    campaign_spec_errors = list(campaign_spec_compatibility_errors(spec, supplied_specs))
+    for trial_spec in supplied_specs:
+        if not isinstance(trial_spec, ExperimentSpec):
+            continue
+        seal = trial_spec.seal()
+        if seal in specs_by_seal:
+            campaign_spec_errors.append(f"duplicate campaign spec seal {seal}")
+        specs_by_seal[seal] = trial_spec
+    spec_counts = Counter(item.hypothesis_id for item in specs_by_seal.values())
+    selection_seals = [str(row.get("experiment_spec_seal", "")) for row in selection_records]
+    if campaign_specs is None:
+        campaign_specs_status = VerdictStatus.INSUFFICIENT_EVIDENCE
+        campaign_specs_detail = "all 15 sealed ExperimentSpecs are required"
+    elif (
+        campaign_spec_errors
+        or len(specs_by_seal) != CAMPAIGN_TRIAL_BUDGET
+        or dict(spec_counts) != dict(HYPOTHESIS_TRIAL_BUDGETS)
+        or set(selection_seals) != set(specs_by_seal)
+        or len(selection_seals) != len(set(selection_seals))
+        or spec_seal not in specs_by_seal
+    ):
+        campaign_specs_status = VerdictStatus.NO_GO
+        campaign_specs_detail = (
+            "selection trials must map one-to-one to 15 unique, policy-compatible specs"
+        )
     else:
-        spec_budget_status = VerdictStatus.PASS
+        campaign_specs_status = VerdictStatus.PASS
+        campaign_specs_detail = "all 15 selection trials have unique sealed specifications"
     strict_checks.append(
         PromotionCheck(
-            "experiment_trial_budget",
-            spec_budget_status,
-            "the exact spec must consume its complete sealed trial allocation",
-            len(spec_records),
-            spec.trial_budget,
+            "campaign_experiment_specs",
+            campaign_specs_status,
+            campaign_specs_detail,
+            {
+                "specs": len(specs_by_seal),
+                "hypotheses": dict(spec_counts),
+                "errors": campaign_spec_errors,
+            },
+            {"specs": CAMPAIGN_TRIAL_BUDGET, "hypotheses": dict(HYPOTHESIS_TRIAL_BUDGETS)},
         )
     )
+
+    artifact_map = dict(campaign_artifacts or {})
+    selection_binding_errors: list[tuple[str, tuple[str, ...]]] = []
+    for record in selection_records:
+        run_id_value = str(record.get("run_id", ""))
+        candidate_trial_spec = specs_by_seal.get(str(record.get("experiment_spec_seal", "")))
+        if candidate_trial_spec is None:
+            selection_binding_errors.append((run_id_value, ("unknown ExperimentSpec seal",)))
+            continue
+        errors = _selection_trial_binding_errors(
+            record,
+            candidate_trial_spec,
+            artifact_map.get(run_id_value),
+        )
+        if errors:
+            selection_binding_errors.append((run_id_value, errors))
+    expected_artifact_ids = {str(row.get("run_id", "")) for row in selection_records}
+    extra_artifacts = set(artifact_map).difference(expected_artifact_ids)
+    if campaign_artifacts is None:
+        artifact_status = VerdictStatus.INSUFFICIENT_EVIDENCE
+        artifact_detail = "the 15 complete selection artifacts are required"
+    elif selection_binding_errors or extra_artifacts:
+        artifact_status = VerdictStatus.NO_GO
+        artifact_detail = "a selection ledger row is not exactly derivable from its artifact"
+    else:
+        artifact_status = VerdictStatus.PASS
+        artifact_detail = "all selection rows bind complete runner artifacts"
+    strict_checks.append(
+        PromotionCheck(
+            "selection_trial_artifact_bindings",
+            artifact_status,
+            artifact_detail,
+            {"errors": selection_binding_errors, "extra_artifacts": sorted(extra_artifacts)},
+            "exact one-to-one artifact bindings",
+        )
+    )
+
+    overfitting, overfitting_check = _derive_verified_overfitting(
+        spec=spec,
+        selection_records=selection_records,
+        artifact_map=artifact_map,
+        artifacts_verified=artifact_status is VerdictStatus.PASS,
+    )
+    strict_checks.append(overfitting_check)
+
+    spec_records = [
+        row for row in holdout_records if str(row.get("experiment_spec_seal", "")) == spec_seal
+    ]
 
     run_id = str(evidence.get("run_id", "")).strip()
     candidate_rows = [row for row in spec_records if str(row.get("run_id", "")) == run_id]
@@ -1523,6 +2824,7 @@ def evaluate_crypto_promotion(
     benchmark_results_digest = canonical_digest(benchmark_digests)
     expected_candidate = {
         "schema_version": SCHEMA_VERSION,
+        "phase": "HOLDOUT",
         "campaign_id": spec.campaign_id,
         "experiment_id": spec.experiment_id,
         "hypothesis_id": spec.hypothesis_id,
@@ -1533,8 +2835,11 @@ def evaluate_crypto_promotion(
         "dataset_digest": spec.dataset_digest,
         "code_commit": spec.code_commit,
         "artifact_digest": recomputed_artifact_digest,
+        "candidate_result_digest": recomputed_candidate_result_digest,
+        "control_result_digest": recomputed_control_result_digest,
         "holdout_seal_digest": spec.holdout_seal_digest,
-        "holdout_reveal_digest": recomputed_reveal_digest,
+        "holdout_authorization_digest": spec.holdout_authorization_digest,
+        "holdout_reveal_digest": verified_reveal_digest,
         "execution_policy_digest": spec.execution_policy_digest,
         "cost_policy_digest": spec.cost_policy_digest,
         "benchmark_policy_digest": spec.benchmark_policy_digest,
@@ -1548,6 +2853,10 @@ def evaluate_crypto_promotion(
         candidate_status = VerdictStatus.INSUFFICIENT_EVIDENCE
         candidate_detail = "run_id is missing"
         candidate_actual: Any = None
+    elif len(holdout_records) > 1:
+        candidate_status = VerdictStatus.NO_GO
+        candidate_detail = "the campaign contains more than one holdout evaluation"
+        candidate_actual = len(holdout_records)
     elif len(candidate_rows) == 0:
         candidate_status = VerdictStatus.INSUFFICIENT_EVIDENCE
         candidate_detail = "candidate run is absent from the exact spec ledger"
@@ -1580,10 +2889,43 @@ def evaluate_crypto_promotion(
         )
     )
 
+    verified_gate3, gate3_checks = _derive_verified_gate3_blocks(evidence, spec)
+    strict_checks.extend(gate3_checks)
+    economic_evidence = dict(evidence)
+    for name in ("overfitting", "economics", "stress", "concentration", "capacity"):
+        economic_evidence.pop(name, None)
+    if overfitting is not None:
+        economic_evidence["overfitting"] = {
+            "pbo": overfitting["pbo"],
+            "windows": overfitting["windows"],
+        }
+    economics = verified_gate3.get("economics")
+    if economics is not None:
+        economic_evidence["economics"] = {
+            "gross_alpha_return": economics["gross_alpha_return"],
+            "total_cost_p95_return": economics["total_cost_p95_return"],
+        }
+    stress = verified_gate3.get("stress")
+    if stress is not None:
+        economic_evidence["stress"] = {
+            "double_cost_half_fill_total_return": stress["double_cost_half_fill_total_return"]
+        }
+    concentration = verified_gate3.get("concentration")
+    if concentration is not None:
+        economic_evidence["concentration"] = {
+            "max_asset_positive_pnl_share": concentration["max_asset_positive_pnl_share"],
+            "max_episode_positive_pnl_share": concentration["max_episode_positive_pnl_share"],
+        }
+    capacity = verified_gate3.get("capacity")
+    if capacity is not None:
+        economic_evidence["capacity"] = {
+            "capacity_usd": capacity["capacity_usd"],
+            "canary_capital_usd": capacity["canary_capital_usd"],
+        }
     base = _evaluate_unbound_economic_checks(
-        evidence,
+        economic_evidence,
         spec,
-        ledger_records=campaign_records,
+        ledger_records=selection_records,
         ledger_intact=ledger_verified,
         thresholds=thresholds,
     )
@@ -1594,7 +2936,7 @@ def evaluate_crypto_promotion(
 
     trial_sharpes = [
         value
-        for row in campaign_records
+        for row in selection_records
         if row.get("status") == "evaluated" and (value := _record_sharpe(row)) is not None
     ]
     variance = sharpe_variance_across_trials(trial_sharpes)
@@ -1602,6 +2944,8 @@ def evaluate_crypto_promotion(
         ledger_verified
         and not malformed
         and budget_status is VerdictStatus.PASS
+        and campaign_specs_status is VerdictStatus.PASS
+        and artifact_status is VerdictStatus.PASS
         and len(trial_sharpes) == MIN_VERIFIED_DSR_TRIALS
         and variance > 0
     )
@@ -1676,7 +3020,7 @@ def evaluate_crypto_promotion(
             "dsr_trial_count": len(trial_sharpes),
             "trial_sharpe_variance": variance,
             "artifact_digest": recomputed_artifact_digest,
-            "holdout_reveal_digest": recomputed_reveal_digest,
+            "holdout_reveal_digest": verified_reveal_digest,
         }
     )
     return PromotionVerdict(
@@ -1695,7 +3039,9 @@ evaluate_promotion_verdict = evaluate_crypto_promotion
 
 __all__ = [
     "CAMPAIGN_TRIAL_BUDGET",
+    "HYPOTHESIS_STRATEGIES",
     "HYPOTHESIS_TRIAL_BUDGETS",
+    "INDEPENDENT_TRADE_DEFINITION",
     "MIN_VERIFIED_DSR_TRIALS",
     "PROMOTION_THRESHOLDS",
     "REQUIRED_BENCHMARKS",
@@ -1705,9 +3051,11 @@ __all__ = [
     "PromotionCheck",
     "PromotionVerdict",
     "VerdictStatus",
+    "campaign_spec_compatibility_errors",
     "canonical_digest",
     "evaluate_crypto_promotion",
     "evaluation_artifact_digest",
+    "independent_closed_round_trip_count",
     "evaluate_promotion_verdict",
     "load_experiment_spec",
     "seal_experiment_spec",

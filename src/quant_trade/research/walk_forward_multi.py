@@ -28,6 +28,10 @@ from quant_trade.data.manifest import file_sha256
 from quant_trade.data.panel import load_canonical_dataset
 from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_moments
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_summary
+from quant_trade.research.crypto_route_guard import (
+    mapping_requires_sealed_crypto_route,
+    panel_requires_sealed_crypto_route,
+)
 from quant_trade.research.ledger import append_trial
 from quant_trade.research.multi_asset_runner import _cost, _execution_policy
 from quant_trade.research.overfitting import assess_walk_forward_overfitting
@@ -84,8 +88,18 @@ def _metric_value(metrics: dict[str, Any], name: str) -> float:
 def run_multi_asset_walk_forward(config: dict[str, Any]) -> dict[str, Any]:
     if config.get("mode") != "multi_asset_walk_forward":
         raise ValueError("config mode must be multi_asset_walk_forward")
+    if mapping_requires_sealed_crypto_route(config):
+        raise ValueError(
+            "crypto research is blocked in the generic walk-forward runner; use the "
+            "sealed crypto selection runner with its causal venue-specific evaluator"
+        )
     data_path = Path(config["data_path"])
     data = load_canonical_dataset(data_path)
+    if panel_requires_sealed_crypto_route(data):
+        raise ValueError(
+            "crypto dataset bytes are blocked in the generic walk-forward runner even "
+            "when configuration metadata is omitted or renamed"
+        )
     dataset_binding = {
         "data_path": str(data_path),
         "data_sha256": file_sha256(data_path),

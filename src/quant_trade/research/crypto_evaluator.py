@@ -65,9 +65,17 @@ class ExecutionLimits:
     tick_size: float | None = None
     quantity_step: float | None = None
     min_notional_usd: float | None = None
+    median_daily_notional_20d_usd: float | None = None
+    executable_depth_usd: float | None = None
 
     def __post_init__(self) -> None:
-        for name in ("tick_size", "quantity_step", "min_notional_usd"):
+        for name in (
+            "tick_size",
+            "quantity_step",
+            "min_notional_usd",
+            "median_daily_notional_20d_usd",
+            "executable_depth_usd",
+        ):
             value = getattr(self, name)
             if value is not None and (not math.isfinite(value) or value <= 0):
                 raise ValueError(f"{name} must be finite and > 0")
@@ -127,6 +135,8 @@ class EvaluationResult:
     delisted_positions: int = 0
     delisting_recovery: float = DEFAULT_DELISTING_RECOVERY
     initial_capital_usd: float = 0.0
+    cost_multiplier: float = 1.0
+    fill_fraction_multiplier: float = 1.0
 
     @property
     def annual_turnover(self) -> float:
@@ -139,6 +149,10 @@ class EvaluationResult:
         equity = self.equity
         total_return = float(equity.iloc[-1] / equity.iloc[0] - 1.0) if len(equity) else 0.0
         years = (equity.index[-1] - equity.index[0]).days / 365.25 if len(equity) > 1 else 0.0
+        refused_legs = sum(
+            execution.status in {"REFUSED", "EXPIRED"} for execution in self.executions
+        )
+        expired_legs = sum(execution.status == "EXPIRED" for execution in self.executions)
         return {
             "initial_capital_usd": self.initial_capital_usd,
             "final_value_usd": float(equity.iloc[-1]) if len(equity) else 0.0,
@@ -158,7 +172,13 @@ class EvaluationResult:
             "delisted_positions": self.delisted_positions,
             "delisting_losses_usd": self.delisting_losses_usd,
             "delisting_recovery": self.delisting_recovery,
-            "refused_legs": sum(r.refused_legs for r in self.rebalances),
+            "cost_multiplier": self.cost_multiplier,
+            "fill_fraction_multiplier": self.fill_fraction_multiplier,
+            # Execution records are the complete audit trail.  Unlike
+            # RebalanceRecord, they also contain decisions that could not reach
+            # a future open before the backtest ended.
+            "refused_legs": refused_legs,
+            "expired_legs": expired_legs,
             "capped_legs": sum(r.capped_legs for r in self.rebalances),
             "unpriceable_legs": sum(r.unpriceable_legs for r in self.rebalances),
         }
@@ -172,6 +192,7 @@ class _PendingIntent:
     order_intent: str
     target: dict[str, float]
     open_eligibility_exempt: frozenset[str] = frozenset()
+    preserve_symbols: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -300,6 +321,70 @@ def _normalise_weights(weights: pd.DataFrame, symbols: set[str]) -> pd.DataFrame
     return frame.sort_values(["timestamp", "order_intent", "symbol"]).reset_index(drop=True)
 
 
+def _normalise_sparse_market_events(
+    market_events: Any | None,
+    *,
+    symbols: set[str],
+    expected_venue: str,
+) -> pd.DataFrame:
+    columns = [
+        "timestamp",
+        "instrument_id",
+        "market_event",
+        "terminal_recovery_price",
+    ]
+    if market_events is None:
+        return pd.DataFrame(columns=columns)
+    if hasattr(market_events, "to_frame"):
+        frame = market_events.to_frame()
+    elif isinstance(market_events, pd.DataFrame):
+        frame = market_events.copy()
+    else:
+        raise ValueError("market_events must be a DataFrame or MarketEventLedger")
+    required = {
+        "timestamp",
+        "instrument_id",
+        "venue",
+        "market_event",
+        "observed_at_utc",
+        "source",
+        "source_sha256",
+    }
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"market_events missing evidence columns: {missing}")
+    if frame.empty:
+        # The panel already fixes the experiment venue.  An explicitly empty,
+        # schema-valid ledger carries no contrary venue or event claim.
+        return pd.DataFrame(columns=columns)
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+    frame["observed_at_utc"] = pd.to_datetime(frame["observed_at_utc"], utc=True, errors="coerce")
+    if frame[["timestamp", "observed_at_utc"]].isna().any().any():
+        raise ValueError("market_events contain invalid timestamps")
+    if (frame["observed_at_utc"] > frame["timestamp"]).any():
+        raise ValueError("market_events observed_at_utc must be no later than effective timestamp")
+    frame["instrument_id"] = frame["instrument_id"].astype(str)
+    if not set(frame["instrument_id"]).issubset(symbols):
+        unknown = sorted(set(frame["instrument_id"]).difference(symbols))
+        raise ValueError(f"market_events contain unknown instruments: {unknown}")
+    venues = {str(value).lower() for value in frame["venue"].unique()}
+    if venues != {expected_venue.lower()}:
+        raise ValueError(
+            f"market_events require exactly venue={expected_venue!r}; observed {sorted(venues)}"
+        )
+    frame["market_event"] = frame["market_event"].map(normalise_market_event)
+    if frame.duplicated(["timestamp", "instrument_id", "market_event"]).any():
+        raise ValueError("market_events contain duplicate event evidence")
+    if "terminal_recovery_price" not in frame:
+        frame["terminal_recovery_price"] = None
+    recovery = pd.to_numeric(frame["terminal_recovery_price"], errors="coerce")
+    invalid_recovery = frame["terminal_recovery_price"].notna() & (recovery.isna() | recovery.le(0))
+    if invalid_recovery.any():
+        raise ValueError("terminal_recovery_price must be positive when present")
+    frame["terminal_recovery_price"] = recovery
+    return frame[columns].sort_values(["timestamp", "instrument_id"]).reset_index(drop=True)
+
+
 def evaluate(
     panel: pd.DataFrame,
     weights: pd.DataFrame,
@@ -313,6 +398,9 @@ def evaluate(
     execution_limits: dict[str, ExecutionLimits] | None = None,
     taker_fees: dict[str, CostInput] | None = None,
     expected_venue: str = "bybit",
+    market_events: Any | None = None,
+    cost_multiplier: float = 1.0,
+    fill_fraction_multiplier: float = 1.0,
 ) -> EvaluationResult:
     """Evaluate long-format targets with mandatory next-open execution.
 
@@ -325,12 +413,25 @@ def evaluate(
         raise ValueError("delisting_recovery must be in [0, 1]")
     if not math.isfinite(initial_capital_usd) or initial_capital_usd <= 0:
         raise ValueError("initial_capital_usd must be finite and positive")
+    if not math.isfinite(cost_multiplier) or cost_multiplier < 1.0:
+        raise ValueError("cost_multiplier must be finite and >= 1")
+    if (
+        not math.isfinite(fill_fraction_multiplier)
+        or fill_fraction_multiplier <= 0
+        or fill_fraction_multiplier > 1
+    ):
+        raise ValueError("fill_fraction_multiplier must be finite and in (0, 1]")
 
     policy = execution_policy or BarExecutionPolicy()
     limits = execution_limits or {}
     fees = taker_fees or {}
     data = _normalise_panel(panel, expected_venue)
     symbols = set(data["symbol"].astype(str))
+    sparse_events = _normalise_sparse_market_events(
+        market_events,
+        symbols=symbols,
+        expected_venue=expected_venue,
+    )
     targets = _normalise_weights(weights, symbols)
     dates = list(data["timestamp"].drop_duplicates().sort_values())
     date_index = {ts: i for i, ts in enumerate(dates)}
@@ -349,6 +450,16 @@ def evaluate(
             )
         decision_facts_by_day[day] = dict(known_facts)
 
+    def facts_as_of(timestamp: Any) -> dict[str, _DecisionFact]:
+        """Latest completed venue facts at or before a sparse event timestamp."""
+
+        prior_days = [day for day in dates if day <= timestamp]
+        return decision_facts_by_day[prior_days[-1]] if prior_days else {}
+
+    forced_symbols_by_day = {
+        ts: frozenset(group["symbol"].astype(str))
+        for ts, group in targets[targets["order_intent"].eq(FORCED_EXIT)].groupby("timestamp")
+    }
     decisions: dict[Any, list[_PendingIntent]] = {}
     for (ts, intent), group in targets.groupby(["timestamp", "order_intent"], sort=True):
         if ts not in date_index:
@@ -368,6 +479,20 @@ def evaluate(
             order_intent=str(intent),
             target=target,
             open_eligibility_exempt=exempt,
+            # When an H2 death trigger coincides with the annual portfolio
+            # target, the sparse forced exit owns that zero-weight leg and its
+            # retries.  The ordinary target must not submit a second sell at
+            # the same open.  A contradictory positive target is deliberately
+            # not preserved and remains visible to the evaluator.
+            preserve_symbols=(
+                frozenset(
+                    symbol
+                    for symbol in forced_symbols_by_day.get(ts, frozenset())
+                    if target.get(symbol, 0.0) == 0.0
+                )
+                if str(intent) == TARGET_PORTFOLIO
+                else frozenset()
+            ),
         )
         decisions.setdefault(ts, []).append(intent_spec)
 
@@ -379,9 +504,23 @@ def evaluate(
         equity=None,
         delisting_recovery=delisting_recovery,
         initial_capital_usd=initial_capital_usd,
+        cost_multiplier=cost_multiplier,
+        fill_fraction_multiplier=fill_fraction_multiplier,
     )
     equity_points: list[float] = []
     announced: set[str] = set()
+    sparse_by_timestamp: dict[Any, dict[str, tuple[str, float | None]]] = {}
+    for (timestamp, symbol), group in sparse_events.groupby(
+        ["timestamp", "instrument_id"], sort=True
+    ):
+        event_expression = "|".join(str(value) for value in group["market_event"])
+        recoveries = group["terminal_recovery_price"].dropna().astype(float).unique()
+        if len(recoveries) > 1:
+            raise ValueError("market_events contain conflicting terminal recovery prices")
+        sparse_by_timestamp.setdefault(timestamp, {})[str(symbol)] = (
+            normalise_market_event(event_expression),
+            float(recoveries[0]) if len(recoveries) else None,
+        )
 
     def mark_for(ts: Any, symbol: str, *, at_open: bool) -> float | None:
         row = rows.get((ts, symbol))
@@ -441,6 +580,8 @@ def evaluate(
             if intent.order_intent == FORCED_EXIT
             else {**{symbol: 0.0 for symbol in units}, **intent.target}
         )
+        for symbol in intent.preserve_symbols:
+            desired.pop(symbol, None)
         requests: list[tuple[bool, str, float, float, float]] = []
         executed_notional_total = 0.0
         cost_total = 0.0
@@ -490,6 +631,18 @@ def evaluate(
                 and decision_row.eligible_to_open
                 and decision_row.tradable
             )
+            if side == "buy" and symbol in announced:
+                refused += 1
+                record_refusal(
+                    intent,
+                    symbol,
+                    side,
+                    abs(delta_notional) / open_price,
+                    abs(delta_notional),
+                    "new buys are blocked after a delisting announcement",
+                    ts,
+                )
+                continue
             if (
                 side == "buy"
                 and not decision_eligible
@@ -517,7 +670,8 @@ def evaluate(
             before_weight = current_value / value
             target_weight = before_weight + delta_notional / value
             decision_fact = decision_facts_by_day.get(intent.decision_timestamp, {}).get(
-                symbol, _DecisionFact(None, None)
+                symbol,
+                facts_as_of(intent.decision_timestamp).get(symbol, _DecisionFact(None, None)),
             )
             cap = decision_fact.market_cap_usd or 0.0
             fee = fees.get(symbol, BYBIT_SPOT_TAKER_FEE)
@@ -564,6 +718,9 @@ def evaluate(
                     )
                     continue
                 executable_qty = min(executable_qty, volume * policy.max_volume_participation_rate)
+            # Apply the sealed fill stress before venue rounding.  The
+            # resulting shortfall remains visible as a partial/refused leg.
+            executable_qty *= fill_fraction_multiplier
             executable_qty = _floor_to_step(
                 executable_qty,
                 instrument_limits.quantity_step or policy.lot_size,
@@ -575,7 +732,9 @@ def evaluate(
             volume_value = decision_fact.volume
             if volume_value is not None:
                 participation = executable_qty / volume_value
-            impact_bps = policy.market_impact_bps_at_full_participation * participation
+            impact_bps = (
+                policy.market_impact_bps_at_full_participation * participation * cost_multiplier
+            )
             fill_price_raw *= 1 + (1 if is_buy else -1) * impact_bps / 10_000
             fill_price = _conservative_tick(fill_price_raw, side, instrument_limits.tick_size)
             filled_notional = executable_qty * fill_price
@@ -596,7 +755,7 @@ def evaluate(
                 )
                 continue
 
-            cost_rate = leg.cost_usd / leg.executed_notional_usd
+            cost_rate = leg.cost_usd / leg.executed_notional_usd * cost_multiplier
             cost = filled_notional * cost_rate
             if is_buy and filled_notional + cost > cash:
                 affordable = _floor_to_step(
@@ -628,7 +787,7 @@ def evaluate(
             units[symbol] = units.get(symbol, 0.0) + signed_quantity
             if abs(units[symbol]) <= 1e-12:
                 units.pop(symbol, None)
-            base_fee = filled_notional * fee.value_bps / 10_000
+            base_fee = filled_notional * fee.value_bps / 10_000 * cost_multiplier
             model_impact = max(0.0, cost - base_fee)
             bar_impact = abs(fill_price - open_price) * executable_qty
             refused_qty = max(0.0, raw_requested_qty - executable_qty)
@@ -679,53 +838,71 @@ def evaluate(
             for symbol, target_weight in intent.target.items()
         )
 
-    for index, day in enumerate(dates):
+    timeline = sorted(set(dates) | set(sparse_events["timestamp"]))
+    open_index = -1
+    for day in timeline:
+        has_venue_open = day in date_index
+        if has_venue_open:
+            open_index += 1
         # Intents become executable before today's close is observable.
-        eligible = [intent for intent in pending_intents if intent.eligible_index <= index]
-        pending_intents = [intent for intent in pending_intents if intent.eligible_index > index]
-        for intent in eligible:
-            forced_residual = execute_intent(day, intent)
-            if not forced_residual:
-                continue
-            if index < intent.expires_index:
-                pending_intents.append(replace(intent, eligible_index=index + 1))
-                continue
-            for symbol, target_weight in intent.target.items():
-                remaining = units.get(symbol, 0.0)
-                if target_weight != 0.0 or remaining <= 1e-12:
+        if has_venue_open:
+            eligible = [intent for intent in pending_intents if intent.eligible_index <= open_index]
+            pending_intents = [
+                intent for intent in pending_intents if intent.eligible_index > open_index
+            ]
+            for intent in eligible:
+                forced_residual = execute_intent(day, intent)
+                if not forced_residual:
                     continue
-                price = mark_for(day, symbol, at_open=True)
-                record_refusal(
-                    intent,
-                    symbol,
-                    "sell",
-                    remaining,
-                    remaining * (price or 0.0),
-                    "forced exit residual exceeded max_order_age_bars",
-                    day,
-                    status="EXPIRED",
-                )
+                if open_index < intent.expires_index:
+                    pending_intents.append(replace(intent, eligible_index=open_index + 1))
+                    continue
+                for symbol, target_weight in intent.target.items():
+                    remaining = units.get(symbol, 0.0)
+                    if target_weight != 0.0 or remaining <= 1e-12:
+                        continue
+                    price = mark_for(day, symbol, at_open=True)
+                    record_refusal(
+                        intent,
+                        symbol,
+                        "sell",
+                        remaining,
+                        remaining * (price or 0.0),
+                        "forced exit residual exceeded max_order_age_bars",
+                        day,
+                        status="EXPIRED",
+                    )
 
         # Today's marks/facts become known only after open execution.
-        for symbol in symbols:
-            row = rows.get((day, symbol))
-            if row is None or row.data_status != DATA_STATUS_VALID:
-                continue
-            mark = _finite_positive(row.mark_price)
-            if mark is not None:
-                last_mark[symbol] = mark
+        if has_venue_open:
+            for symbol in symbols:
+                row = rows.get((day, symbol))
+                if row is None or row.data_status != DATA_STATUS_VALID:
+                    continue
+                mark = _finite_positive(row.mark_price)
+                if mark is not None:
+                    last_mark[symbol] = mark
 
         # Only explicit events have terminal semantics.  A prior close is not
         # retroactively declared executable by a later absence.
-        for symbol in list(units):
+        for symbol in sorted(symbols):
             row = rows.get((day, symbol))
-            events = (
-                parse_market_events(row.market_event) if row is not None else frozenset({"NONE"})
+            row_events = parse_market_events(row.market_event) if row is not None else frozenset()
+            sparse_event, sparse_recovery = sparse_by_timestamp.get(day, {}).get(
+                symbol, ("NONE", None)
             )
+            events = row_events | parse_market_events(sparse_event)
+            if not events:
+                events = frozenset({"NONE"})
             terminal = bool(events & _TERMINAL_EVENTS)
-            if events & _ANNOUNCEMENT_EVENTS and not terminal and symbol not in announced:
+            first_announcement = bool(events & _ANNOUNCEMENT_EVENTS) and symbol not in announced
+            if events & (_ANNOUNCEMENT_EVENTS | _TERMINAL_EVENTS):
                 announced.add(symbol)
-                first_eligible = index + 1 + policy.additional_latency_bars
+            if first_announcement and not terminal and symbol in units:
+                # Sparse timestamps do not consume venue-bar latency.  The
+                # event becomes executable at the first later venue open plus
+                # any sealed additional open bars.
+                first_eligible = open_index + 1 + policy.additional_latency_bars
                 pending_intents.append(
                     _PendingIntent(
                         decision_timestamp=day,
@@ -735,7 +912,7 @@ def evaluate(
                         target={symbol: 0.0},
                     )
                 )
-            if not terminal:
+            if not terminal or symbol not in units:
                 continue
             pending_intents = [
                 intent
@@ -744,7 +921,7 @@ def evaluate(
             ]
             quantity = units.pop(symbol)
             previous_value = quantity * last_mark.get(symbol, 0.0)
-            recovery_price = (
+            recovery_price = sparse_recovery or (
                 _finite_positive(getattr(row, "terminal_recovery_price", None))
                 if row is not None
                 else None
@@ -771,34 +948,38 @@ def evaluate(
                     impact_usd=0.0,
                     status="TERMINAL_RECOVERY" if recovered > 0 else "WRITTEN_DOWN",
                     reason=(
-                        "explicit terminal event with evidenced recovery price"
+                        "explicit terminal event with evidenced recovery settlement; "
+                        "no simulated venue fill or fee"
                         if recovered > 0
-                        else "explicit terminal event had no demonstrated executable exit"
+                        else "explicit terminal event had no evidenced recovery settlement; "
+                        "written down to zero"
                     ),
                 )
             )
 
-        value = portfolio_value(day, at_open=False)
-        if not math.isfinite(value) or value < 0:
-            raise ValueError("portfolio accounting produced invalid equity")
-        equity_points.append(value)
+        if has_venue_open:
+            value = portfolio_value(day, at_open=False)
+            if not math.isfinite(value) or value < 0:
+                raise ValueError("portfolio accounting produced invalid equity")
+            equity_points.append(value)
 
         # Decisions use today's completed bar and are queued only afterwards.
-        for intent in decisions.get(day, []):
-            if intent.eligible_index < len(dates):
-                pending_intents.append(intent)
-            else:
-                for symbol in intent.target:
-                    record_refusal(
-                        intent,
-                        symbol,
-                        "sell" if intent.target[symbol] == 0 else "buy",
-                        0.0,
-                        0.0,
-                        "backtest ended before the mandatory next-open execution",
-                        None,
-                        status="EXPIRED",
-                    )
+        if has_venue_open:
+            for intent in decisions.get(day, []):
+                if intent.eligible_index < len(dates):
+                    pending_intents.append(intent)
+                else:
+                    for symbol in intent.target:
+                        record_refusal(
+                            intent,
+                            symbol,
+                            "sell" if intent.target[symbol] == 0 else "buy",
+                            0.0,
+                            0.0,
+                            "backtest ended before the mandatory next-open execution",
+                            None,
+                            status="EXPIRED",
+                        )
 
     for intent in pending_intents:
         for symbol in intent.target:

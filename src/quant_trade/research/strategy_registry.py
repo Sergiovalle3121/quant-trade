@@ -49,24 +49,18 @@ REGISTRY = {
     "vol_targeted_equal_weight": FunctionSignalModel(
         "vol_targeted_equal_weight", vol_targeted_equal_weight
     ),
-    "equal_weight_quarterly": FunctionSignalModel(
-        "equal_weight_quarterly", equal_weight_quarterly
-    ),
+    "equal_weight_quarterly": FunctionSignalModel("equal_weight_quarterly", equal_weight_quarterly),
     # The four sealed low/mid-cap crypto hypotheses. Each needs the extra
     # point-in-time columns of the crypto panel (market cap, rank, venue
     # turnover) and will raise on a plain OHLCV panel that lacks them.
     "crypto_capacity_illiquidity": FunctionSignalModel(
         "crypto_capacity_illiquidity", capacity_illiquidity
     ),
-    "crypto_death_avoidance": FunctionSignalModel(
-        "crypto_death_avoidance", death_avoidance
-    ),
+    "crypto_death_avoidance": FunctionSignalModel("crypto_death_avoidance", death_avoidance),
     "crypto_annual_equal_weight_rebalance": FunctionSignalModel(
         "crypto_annual_equal_weight_rebalance", annual_equal_weight_rebalance
     ),
-    "crypto_survival_duration": FunctionSignalModel(
-        "crypto_survival_duration", survival_duration
-    ),
+    "crypto_survival_duration": FunctionSignalModel("crypto_survival_duration", survival_duration),
 }
 
 
@@ -74,7 +68,9 @@ def list_research_signal_models() -> list[str]:
     return sorted(REGISTRY)
 
 
-def get_research_signal_model(name: str):
+def get_research_signal_model(name: str, *, allow_sealed_crypto: bool = False):
+    if name.startswith("crypto_") and not allow_sealed_crypto:
+        raise ValueError("crypto research models can only be resolved by the sealed crypto runner")
     try:
         return REGISTRY[name]
     except KeyError as e:

@@ -80,10 +80,14 @@ def _gate0(**overrides):
 def _crypto_inputs(tmp_path):
     provenance = tmp_path / "provenance"
     provenance.mkdir()
-    panel = provenance / "panel.csv"
-    journal = provenance / "journal.jsonl"
-    panel.write_bytes(b"causal panel")
-    journal.write_bytes(b"collector journal")
+    panel = provenance / "selection.panel.json"
+    holdout_panel = provenance / "holdout.panel.json"
+    events = provenance / "selection.market-events.json"
+    holdout_events = provenance / "holdout.market-events.json"
+    panel.write_bytes(b"causal selection panel")
+    holdout_panel.write_bytes(b"causal holdout panel")
+    events.write_bytes(b"causal selection events")
+    holdout_events.write_bytes(b"causal holdout events")
     from quant_trade.data.crypto_manifest import component_hashes
 
     manifest = CryptoDatasetManifest(
@@ -99,9 +103,27 @@ def _crypto_inputs(tmp_path):
         instruments=5,
         schema_version=2,
         code_commit="a" * 40,
-        policy={"rank_ceiling": 1000},
-        components=component_hashes({"panel": panel, "journal": journal}),
-        component_provenance={"panel": "panel.csv", "journal": "journal.jsonl"},
+        policy={
+            "rank_ceiling": 1000,
+            "selection_panel_component": "selection_panel",
+            "holdout_panel_component": "holdout_panel",
+            "selection_market_events_component": "selection_market_events",
+            "holdout_market_events_component": "holdout_market_events",
+        },
+        components=component_hashes(
+            {
+                "selection_panel": panel,
+                "holdout_panel": holdout_panel,
+                "selection_market_events": events,
+                "holdout_market_events": holdout_events,
+            }
+        ),
+        component_provenance={
+            "selection_panel": "selection.panel.json",
+            "holdout_panel": "holdout.panel.json",
+            "selection_market_events": "selection.market-events.json",
+            "holdout_market_events": "holdout.market-events.json",
+        },
         causal_validation=CausalValidationEvidence(
             prefix_invariance_passed=True,
             fixed_venue_passed=True,

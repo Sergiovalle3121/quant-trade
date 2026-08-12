@@ -187,6 +187,84 @@ def normalise_market_event(value: Any) -> str:
     return "|".join(token.strip().upper() for token in str(value).split("|"))
 
 
+def combine_market_events(*values: str) -> str:
+    """Combine derived and evidenced events without erasing either meaning."""
+
+    combined: list[str] = []
+    for value in values:
+        for token in str(value).split("|"):
+            event = token.strip().upper()
+            if event == MARKET_EVENT_NONE:
+                continue
+            if event not in combined:
+                combined.append(event)
+    return normalise_market_event("|".join(combined) if combined else MARKET_EVENT_NONE)
+
+
+def overlay_market_events(
+    panel: Any,
+    market_events: Any,
+    *,
+    expected_venue: str = DEFAULT_VENUE,
+) -> tuple[Any, Any]:
+    """Overlay evidence that coincides with a bar and retain sparse event rows.
+
+    Returns ``(panel_with_bar_events, sparse_events)``.  An event without a
+    venue bar is deliberately not converted into OHLC; callers pass the sparse
+    frame separately to the evaluator.
+    """
+
+    import pandas as pd
+
+    if hasattr(market_events, "to_frame"):
+        events = market_events.to_frame()
+    elif isinstance(market_events, pd.DataFrame):
+        events = market_events.copy()
+    else:
+        raise ValueError("market_events must be a DataFrame or MarketEventLedger")
+    required = {"timestamp", "instrument_id", "venue", "market_event"}
+    missing = sorted(required.difference(events.columns))
+    if missing:
+        raise ValueError(f"market_events missing required columns: {missing}")
+    events["timestamp"] = pd.to_datetime(events["timestamp"], utc=True, errors="coerce")
+    if events["timestamp"].isna().any():
+        raise ValueError("market_events contain invalid timestamps")
+    events["instrument_id"] = events["instrument_id"].astype(str)
+    if not events["instrument_id"].str.fullmatch(r"CMC:[1-9][0-9]*").all():
+        raise ValueError("market_events require stable CMC:<positive id> identities")
+    if {str(value).lower() for value in events["venue"].unique()} != {expected_venue.lower()}:
+        raise ValueError(f"market_events must contain only venue={expected_venue!r}")
+    events["market_event"] = events["market_event"].map(normalise_market_event)
+
+    frame = panel.copy()
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+    identity_column = "instrument_id" if "instrument_id" in frame else "symbol"
+    row_keys = set(zip(frame["timestamp"], frame[identity_column].astype(str), strict=False))
+    coincident = events.apply(
+        lambda row: (row["timestamp"], row["instrument_id"]) in row_keys,
+        axis=1,
+    )
+    on_bar = events[coincident]
+    for row in on_bar.itertuples(index=False):
+        evidenced_event = row.market_event
+        mask = frame["timestamp"].eq(row.timestamp) & frame[identity_column].astype(str).eq(
+            row.instrument_id
+        )
+        frame.loc[mask, "market_event"] = frame.loc[mask, "market_event"].map(
+            lambda current, event=evidenced_event: combine_market_events(current, event)
+        )
+        if (
+            hasattr(row, "terminal_recovery_price")
+            and row.terminal_recovery_price is not None
+            and not pd.isna(row.terminal_recovery_price)
+        ):
+            if "terminal_recovery_price" not in frame:
+                frame["terminal_recovery_price"] = None
+            frame.loc[mask, "terminal_recovery_price"] = float(row.terminal_recovery_price)
+    sparse = events[~coincident].reset_index(drop=True)
+    return frame, sparse
+
+
 @dataclass(frozen=True)
 class PanelRow:
     """One immutable point-in-time panel observation."""
@@ -736,22 +814,20 @@ def build_panel(
             report.coins_below_min_bound_bars += 1
         first_bound_day = min(coin_bars_by_day)
         first_observed_day = facts.first_observed_date[coin_id]
-        bound_venue_symbols = {venue_symbol for venue_symbol, _bar in coin_bars_by_day.values()}
-        raw_symbol_first_days = [
-            venue_symbol_first_dates[symbol]
-            for symbol in bound_venue_symbols
-            if symbol in venue_symbol_first_dates
-        ]
+        first_bound_symbol = coin_bars_by_day[first_bound_day][0]
+        raw_symbol_first_day = venue_symbol_first_dates.get(first_bound_symbol)
         # The stable identity's history is observed only when the venue symbol
-        # itself first appears after the collection boundary and that first raw
-        # bar is the first bar causally bound to this CMC id.  Anything else is
-        # conservative left-censoring (including missing journal provenance and
-        # a reused ticker whose older raw history belonged to another coin).
+        # through which it was first bound appears after the collection boundary
+        # and that first raw bar is the first bar causally bound to this CMC id.
+        # A later rename must never rewrite this provenance using the renamed
+        # symbol's older raw history.  Anything else is conservative
+        # left-censoring (including missing journal provenance and a reused
+        # initial ticker whose older raw history belonged to another coin).
         history_origin_observed = (
             venue_collection_start is not None
-            and bool(raw_symbol_first_days)
-            and min(raw_symbol_first_days) > venue_collection_start
-            and min(raw_symbol_first_days) == first_bound_day
+            and raw_symbol_first_day is not None
+            and raw_symbol_first_day > venue_collection_start
+            and raw_symbol_first_day == first_bound_day
         )
         previous_day: str | None = None
         previous_ticker: str | None = None
@@ -890,10 +966,12 @@ __all__ = [
     "UniverseFacts",
     "bind_bar_to_coin",
     "build_panel",
+    "combine_market_events",
     "coin_ids_for_tickers",
     "load_universe_facts",
     "load_venue_series",
     "normalise_data_status",
     "normalise_market_event",
+    "overlay_market_events",
     "parse_market_events",
 ]

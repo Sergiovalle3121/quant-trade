@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from quant_trade.data.crypto_market_events import MarketEventEvidence, MarketEventLedger
 from quant_trade.execution.bar_model import BarExecutionPolicy
 from quant_trade.research.crypto_evaluator import (
     FORCED_EXIT,
@@ -69,6 +70,25 @@ def _weights(rows: list[tuple]) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def _market_event(
+    *,
+    timestamp: str,
+    event: str,
+    instrument_id: str = "CMC:7",
+    recovery: float | None = None,
+) -> MarketEventEvidence:
+    return MarketEventEvidence(
+        instrument_id=instrument_id,
+        venue="bybit",
+        event=event,
+        effective_at_utc=timestamp,
+        observed_at_utc=timestamp,
+        source=f"Bybit explicit {event} evidence",
+        source_sha256="b" * 64,
+        terminal_recovery_price=recovery,
+    )
+
+
 def test_signal_at_t_cannot_fill_same_bar_and_uses_next_open() -> None:
     panel = _panel(
         {"CMC:7": {DAYS[0]: 10.0, DAYS[1]: 30.0, DAYS[2]: 30.0}},
@@ -81,6 +101,19 @@ def test_signal_at_t_cannot_fill_same_bar_and_uses_next_open() -> None:
     assert execution.execution_timestamp.startswith(DAYS[1])
     assert execution.open_price == 20.0
     assert result.equity.iloc[0] == pytest.approx(1_000.0)
+
+
+def test_empty_market_event_ledger_is_equivalent_to_no_events() -> None:
+    panel = _panel({"CMC:7": dict(zip(DAYS[:3], [10.0, 11.0, 12.0], strict=True))})
+    weights = _weights([(DAYS[0], "CMC:7", 1.0)])
+
+    without_events = evaluate(panel, weights)
+    empty_ledger = evaluate(panel, weights, market_events=MarketEventLedger.from_events([]))
+
+    pd.testing.assert_series_equal(empty_ledger.equity, without_events.equity)
+    assert [item.to_dict() for item in empty_ledger.executions] == [
+        item.to_dict() for item in without_events.executions
+    ]
 
 
 def test_additional_latency_is_applied_after_the_mandatory_next_bar() -> None:
@@ -134,6 +167,123 @@ def test_announced_delisting_forces_exit_at_next_open() -> None:
     assert sells[0].execution_timestamp.startswith(DAYS[2])
 
 
+def test_sparse_announcement_waits_for_next_real_open_and_events_do_not_age_order() -> None:
+    panel = _panel(
+        {
+            "CMC:7": {
+                "2020-01-01": 10.0,
+                "2020-01-02": 10.0,
+                "2020-01-05": 9.0,
+                "2020-01-06": 8.0,
+            }
+        }
+    )
+    ledger = MarketEventLedger.from_events(
+        [
+            _market_event(timestamp="2020-01-03T00:00:00Z", event="DELISTING_ANNOUNCED"),
+            _market_event(timestamp="2020-01-04T00:00:00Z", event="HALT"),
+        ]
+    )
+    result = evaluate(
+        panel,
+        _weights([("2020-01-01", "CMC:7", 1.0)]),
+        market_events=ledger,
+    )
+
+    sells = [execution for execution in result.executions if execution.side == "sell"]
+    assert len(sells) == 1
+    assert sells[0].order_intent == FORCED_EXIT
+    assert sells[0].execution_timestamp.startswith("2020-01-05")
+    assert list(result.equity.index) == list(panel["timestamp"].drop_duplicates())
+
+
+def test_sparse_confirmed_delisting_without_bar_uses_evidenced_recovery() -> None:
+    panel = _panel({"CMC:7": {"2020-01-01": 10.0, "2020-01-02": 10.0, "2020-01-04": 10.0}})
+    ledger = MarketEventLedger.from_events(
+        [
+            _market_event(
+                timestamp="2020-01-03T00:00:00Z",
+                event="DELISTING_CONFIRMED",
+                recovery=8.0,
+            )
+        ]
+    )
+    result = evaluate(
+        panel,
+        _weights([("2020-01-01", "CMC:7", 1.0)]),
+        market_events=ledger,
+        delisting_recovery=1.0,
+    )
+
+    terminal = result.executions[-1]
+    assert terminal.execution_timestamp.startswith("2020-01-03")
+    assert terminal.status == "TERMINAL_RECOVERY"
+    assert terminal.fill_price == 8.0
+    assert result.delisted_positions == 1
+    assert list(result.equity.index) == list(panel["timestamp"].drop_duplicates())
+
+
+def test_sparse_halt_without_bar_keeps_position_and_last_mark() -> None:
+    panel = _panel({"CMC:7": {"2020-01-01": 10.0, "2020-01-02": 10.0, "2020-01-04": 12.0}})
+    ledger = MarketEventLedger.from_events(
+        [_market_event(timestamp="2020-01-03T00:00:00Z", event="HALT")]
+    )
+    result = evaluate(
+        panel,
+        _weights([("2020-01-01", "CMC:7", 1.0)]),
+        market_events=ledger,
+    )
+
+    assert result.delisted_positions == 0
+    assert result.equity.iloc[-1] > result.equity.iloc[1]
+
+
+def test_announced_delisting_blocks_same_decision_repurchase() -> None:
+    panel = _panel(
+        {"CMC:7": dict(zip(DAYS, [10.0, 10.0, 9.0, 20.0], strict=True))},
+        events={(DAYS[1], "CMC:7"): "DELISTING_ANNOUNCED"},
+    )
+    result = evaluate(
+        panel,
+        _weights(
+            [
+                (DAYS[0], "CMC:7", 1.0),
+                (DAYS[1], "CMC:7", 1.0),
+            ]
+        ),
+    )
+
+    at_day_3 = [
+        execution
+        for execution in result.executions
+        if execution.execution_timestamp and DAYS[2] in execution.execution_timestamp
+    ]
+    assert any(
+        execution.side == "sell"
+        and execution.order_intent == FORCED_EXIT
+        and execution.filled_quantity > 0
+        for execution in at_day_3
+    )
+    blocked = [execution for execution in at_day_3 if execution.side == "buy"]
+    assert len(blocked) == 1
+    assert blocked[0].status == "REFUSED"
+    assert blocked[0].filled_quantity == 0.0
+    assert "delisting announcement" in blocked[0].reason
+
+
+def test_announcement_blocks_first_purchase_even_without_an_existing_position() -> None:
+    panel = _panel(
+        {"CMC:7": dict(zip(DAYS[:3], [10.0, 9.0, 8.0], strict=True))},
+        events={(DAYS[0], "CMC:7"): "DELISTING_ANNOUNCED"},
+    )
+    result = evaluate(panel, _weights([(DAYS[0], "CMC:7", 1.0)]))
+
+    assert len(result.executions) == 1
+    assert result.executions[0].status == "REFUSED"
+    assert result.executions[0].filled_quantity == 0.0
+    assert "delisting announcement" in result.executions[0].reason
+
+
 def test_execution_day_rank_exit_cannot_retroactively_block_a_decision() -> None:
     panel = _panel(
         {"CMC:7": dict(zip(DAYS, [10.0, 10.0, 10.0, 10.0], strict=True))},
@@ -185,6 +335,8 @@ def test_last_bar_decision_expires_instead_of_filling_same_bar() -> None:
     assert result.rebalances == []
     assert result.executions[0].status == "EXPIRED"
     assert result.executions[0].execution_timestamp is None
+    assert result.summary()["refused_legs"] == 1
+    assert result.summary()["expired_legs"] == 1
 
 
 def test_turnover_accumulates_using_executed_notional() -> None:
@@ -322,6 +474,41 @@ def test_forced_exit_retries_residual_then_expires_at_max_age() -> None:
         if rebalance.decision_timestamp.startswith(DAYS[1])
     ]
     assert [rebalance.capped_legs for rebalance in forced_rebalances] == [1, 1]
+    assert result.summary()["expired_legs"] == 1
+
+
+def test_same_day_target_does_not_duplicate_a_forced_exit_leg() -> None:
+    panel = _panel(
+        {"CMC:7": dict(zip(DAYS, [10.0] * 4, strict=True))},
+        volume=1_000.0,
+    )
+    decision_day = panel["timestamp"].eq(pd.Timestamp(DAYS[1], tz="UTC"))
+    panel.loc[decision_day, "volume"] = 5.0
+    weights = _weights(
+        [
+            (DAYS[0], "CMC:7", 1.0),
+            (DAYS[1], "CMC:7", 0.0),
+            (DAYS[1], "CMC:7", 0.0, FORCED_EXIT),
+        ]
+    )
+    result = evaluate(
+        panel,
+        weights,
+        execution_policy=BarExecutionPolicy(
+            max_volume_participation_rate=0.1,
+            max_order_age_bars=1,
+        ),
+    )
+
+    sells_on_first_open = [
+        execution
+        for execution in result.executions
+        if execution.side == "sell"
+        and execution.execution_timestamp
+        and DAYS[2] in execution.execution_timestamp
+    ]
+    assert len(sells_on_first_open) == 1
+    assert sells_on_first_open[0].order_intent == FORCED_EXIT
 
 
 def test_affordability_is_rechecked_against_min_notional() -> None:
@@ -399,3 +586,42 @@ def test_candidate_cannot_claim_the_btc_benchmark_exemption() -> None:
     weights["open_eligibility_exempt"] = True
     with pytest.raises(ValueError, match="reserved for the single CMC:1"):
         evaluate(panel, weights)
+
+
+def test_stress_multipliers_change_the_actual_fill_and_cost_profile() -> None:
+    panel = _panel({"CMC:7": dict(zip(DAYS[:3], [10.0, 10.0, 10.0], strict=True))})
+    weights = _weights([(DAYS[0], "CMC:7", 0.5)])
+
+    baseline = evaluate(panel, weights)
+    stressed = evaluate(
+        panel,
+        weights,
+        cost_multiplier=2.0,
+        fill_fraction_multiplier=0.5,
+    )
+
+    baseline_fill = next(item for item in baseline.executions if item.status != "EXPIRED")
+    stressed_fill = next(item for item in stressed.executions if item.status != "EXPIRED")
+    assert stressed_fill.filled_quantity == pytest.approx(baseline_fill.filled_quantity * 0.5)
+    # Half the notional at twice the fee rate leaves the same absolute fee,
+    # proving that both stress controls affected accounting rather than only
+    # decorating an output payload.
+    assert stressed_fill.fee_usd == pytest.approx(baseline_fill.fee_usd)
+    assert stressed.cost_multiplier == 2.0
+    assert stressed.fill_fraction_multiplier == 0.5
+    assert stressed.summary()["cost_multiplier"] == 2.0
+
+
+@pytest.mark.parametrize(
+    ("cost_multiplier", "fill_fraction"),
+    [(0.99, 1.0), (float("nan"), 1.0), (1.0, 0.0), (1.0, 1.01)],
+)
+def test_stress_multipliers_fail_closed(cost_multiplier: float, fill_fraction: float) -> None:
+    panel = _panel({"CMC:7": dict(zip(DAYS[:2], [10.0, 10.0], strict=True))})
+    with pytest.raises(ValueError, match="multiplier"):
+        evaluate(
+            panel,
+            _weights([(DAYS[0], "CMC:7", 1.0)]),
+            cost_multiplier=cost_multiplier,
+            fill_fraction_multiplier=fill_fraction,
+        )

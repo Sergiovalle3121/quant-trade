@@ -995,6 +995,7 @@ def broker_rebalance_plan(
     from quant_trade.live.loop import LoopConfig, PaperLoopRunner
     from quant_trade.paper.rebalancer import target_weights_to_orders
     from quant_trade.paper.state import load_state
+    from quant_trade.research.crypto_route_guard import panel_requires_sealed_crypto_route
     from quant_trade.research.strategy_registry import get_research_signal_model
 
     cfg = LoopConfig.from_yaml(loop_config)
@@ -1009,6 +1010,11 @@ def broker_rebalance_plan(
         panel = load_canonical_dataset(data)
     else:
         panel = PaperLoopRunner(cfg)._fetch_panel()
+    if panel_requires_sealed_crypto_route(panel):
+        raise typer.BadParameter(
+            "crypto panel bytes are blocked in the legacy broker planner; "
+            "the sealed Gate 3 workflow is required"
+        )
     panel = panel[panel["symbol"].isin(cfg.symbols)].sort_values("timestamp")
     if panel.empty:
         raise typer.BadParameter("no market data available for the configured symbols")

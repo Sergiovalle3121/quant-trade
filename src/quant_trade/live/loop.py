@@ -42,6 +42,11 @@ from quant_trade.paper.models import PaperFill, PaperOrder, PaperRiskLimits, Pap
 from quant_trade.paper.rebalancer import target_weights_to_orders
 from quant_trade.paper.risk import validate_order
 from quant_trade.paper.state import load_state, save_state
+from quant_trade.research.crypto_route_guard import (
+    mapping_requires_sealed_crypto_route,
+    panel_requires_sealed_crypto_route,
+    requires_sealed_crypto_route,
+)
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 _INTERVAL_TO_TIMEDELTA = {
@@ -82,6 +87,11 @@ class LoopConfig:
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         if raw.get("mode") != "paper_loop":
             raise ValueError("loop config mode must be paper_loop")
+        if mapping_requires_sealed_crypto_route(raw):
+            raise ValueError(
+                "crypto is blocked in the legacy paper loop; use Bybit Demo only "
+                "after the sealed Gate 3 workflow passes"
+            )
         if raw.get("broker") is not None:
             raise ValueError("broker connectivity is not allowed in the paper loop")
         limits = PaperRiskLimits(**(raw.get("risk_limits") or {}))
@@ -127,6 +137,15 @@ class PaperLoopRunner:
         provider: MarketDataProvider | None = None,
         now_fn: Any = None,
     ) -> None:
+        if requires_sealed_crypto_route(
+            strategy=config.strategy,
+            provider=config.provider,
+            instruments=config.symbols,
+        ):
+            raise ValueError(
+                "crypto is blocked in the legacy paper loop; use Bybit Demo only "
+                "after the sealed Gate 3 workflow passes"
+            )
         self.config = config
         self.cost_model = CostModel(**config.costs)
         self._provider = provider or get_data_provider(config.provider)
@@ -208,9 +227,7 @@ class PaperLoopRunner:
             "drawdown": session.max_drawdown,
         }
 
-    def _persist_history(
-        self, state: LoopState, executed: list[PaperOrder], ts_str: str
-    ) -> None:
+    def _persist_history(self, state: LoopState, executed: list[PaperOrder], ts_str: str) -> None:
         self._append_jsonl("snapshots.jsonl", [self._snapshot_row(state, ts_str)])
         self._append_jsonl("orders.jsonl", [o.to_dict() for o in executed])
         self._append_jsonl("events.jsonl", state.events)
@@ -367,6 +384,11 @@ class PaperLoopRunner:
             return {"action": "paused", "orders": 0}
 
         panel = self._fetch_panel()
+        if panel_requires_sealed_crypto_route(panel):
+            raise SafetyGateError(
+                "crypto panel bytes are blocked in the legacy paper loop; "
+                "the sealed Gate 3 workflow is required"
+            )
         panel = panel[panel["symbol"].isin(self.config.symbols)].sort_values("timestamp")
         if panel.empty:
             self._write_heartbeat(state, summary)
@@ -427,9 +449,7 @@ class PaperLoopRunner:
         if not session.kill_switch_active:
             model = get_research_signal_model(self.config.strategy)
             signals = model.generate(panel, self.config.strategy_params)
-            todays = (
-                signals[signals["timestamp"] == newest_ts] if not signals.empty else signals
-            )
+            todays = signals[signals["timestamp"] == newest_ts] if not signals.empty else signals
             if not todays.empty:
                 state.pending_target = {
                     str(r.symbol): float(r.target_weight) for r in todays.itertuples()

@@ -1,3 +1,5 @@
+import pytest
+
 from quant_trade.backtest.costs import CostModel
 from quant_trade.data.panel import load_canonical_dataset
 from quant_trade.research.benchmarks import run_benchmark
@@ -23,3 +25,19 @@ def test_robustness_functions():
     assert not subperiod_analysis(
         run_benchmark(data, {"type": "cash"}, 10000, CostModel()).equity_curve
     ).empty
+
+
+def test_generic_robustness_rejects_crypto_panel_under_renamed_strategy() -> None:
+    data = load_canonical_dataset("examples/data/sample_multi_asset_ohlcv.csv")
+    data["instrument_id"] = "CMC:7"
+
+    with pytest.raises(ValueError, match="sealed crypto runner"):
+        cost_sensitivity(data, "time_series_momentum", {"lookback_days": 20}, 10_000)
+    with pytest.raises(ValueError, match="sealed crypto runner"):
+        parameter_sensitivity_grid(
+            data,
+            "time_series_momentum",
+            {"lookback_days": [20]},
+            10_000,
+            CostModel(),
+        )

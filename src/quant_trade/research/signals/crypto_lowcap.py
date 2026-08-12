@@ -100,7 +100,10 @@ def _eligible(
     event or a wash-trading burst carry a coin for months.
     """
     turnover = _pivot(data, "venue_turnover_usd")
-    trailing = turnover.rolling(window, min_periods=max(2, window // 3)).median()
+    trailing = turnover.rolling(
+        window,
+        min_periods=min(window, max(2, window // 3)),
+    ).median()
     liquid = trailing >= order_notional * turnover_multiple
     try:
         eligible_to_open = _pivot(data, "eligible_to_open").astype("boolean")
@@ -151,7 +154,10 @@ def capacity_illiquidity(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataF
         data, order_notional=order_notional, turnover_multiple=multiple, window=window
     )
     turnover = _pivot(data, "venue_turnover_usd")
-    trailing = turnover.rolling(window, min_periods=max(2, window // 3)).median()
+    trailing = turnover.rolling(
+        window,
+        min_periods=min(window, max(2, window // 3)),
+    ).median()
     # Least liquid scores highest, unless the control band is requested.
     scores = trailing if liquid_band else -trailing
     selected = _top_n_mask(scores, eligible, top_n)
@@ -226,9 +232,6 @@ def death_avoidance(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
     held: set[str] = set()
     forced_rows: list[dict[str, Any]] = []
     for timestamp in close.index:
-        if bool(annual.loc[timestamp]):
-            held = set(selected.columns[selected.loc[timestamp].fillna(False)])
-            continue  # TARGET_PORTFOLIO takes precedence on the same timestamp.
         exiting = sorted(
             symbol
             for symbol in held
@@ -244,12 +247,14 @@ def death_avoidance(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
                 }
             )
             held.remove(symbol)
+        if bool(annual.loc[timestamp]):
+            held = set(selected.columns[selected.loc[timestamp].fillna(False)])
     if not forced_rows:
         return targets
     forced = pd.DataFrame(forced_rows)
     return (
         pd.concat([targets, forced], ignore_index=True)
-        .sort_values(["timestamp", "symbol"])
+        .sort_values(["timestamp", "symbol", "order_intent"])
         .reset_index(drop=True)
     )
 

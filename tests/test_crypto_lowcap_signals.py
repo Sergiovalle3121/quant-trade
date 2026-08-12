@@ -15,6 +15,7 @@ import pytest
 from quant_trade.research.signals.base import rebalance_mask
 from quant_trade.research.signals.crypto_lowcap import (
     FORCED_EXIT,
+    TARGET_PORTFOLIO,
     annual_equal_weight_rebalance,
     capacity_illiquidity,
     death_avoidance,
@@ -125,7 +126,7 @@ def test_registered_under_a_stable_name(signal) -> None:
         "annual_equal_weight_rebalance": "crypto_annual_equal_weight_rebalance",
         "survival_duration": "crypto_survival_duration",
     }[signal.__name__]
-    model = get_research_signal_model(name)
+    model = get_research_signal_model(name, allow_sealed_crypto=True)
     assert model.generate(_panel(), {}).equals(signal(_panel(), {}))
 
 
@@ -242,6 +243,37 @@ def test_death_screen_emits_sparse_forced_exit_between_annual_rebalances() -> No
     assert exits.iloc[0]["target_weight"] == 0.0
     assert exits.iloc[0]["timestamp"].month == 2
     assert not weights.duplicated(["timestamp", "symbol"]).any()
+
+
+def test_death_trigger_on_annual_rebalance_keeps_forced_exit_semantics() -> None:
+    panel = _panel(n_days=1_100, n_symbols=4, seed=3, start="2019-01-01")
+    first_rebalance = pd.Timestamp("2020-01-01", tz="UTC")
+    next_rebalance = pd.Timestamp("2021-01-01", tz="UTC")
+    params = {
+        "top_n": 4,
+        "rank_lookback_days": 30,
+        "max_rank_decay": 50,
+    }
+    baseline = death_avoidance(panel[panel["timestamp"] <= first_rebalance], params)
+    held = set(
+        baseline[baseline["timestamp"].eq(first_rebalance) & baseline["target_weight"].gt(0)][
+            "symbol"
+        ]
+    )
+    assert held
+    target = sorted(held)[0]
+    panel.loc[
+        panel["symbol"].eq(target) & panel["timestamp"].ge(next_rebalance),
+        "cmc_rank",
+    ] += 500
+
+    weights = death_avoidance(panel, params)
+    same_day = weights[weights["timestamp"].eq(next_rebalance) & weights["symbol"].eq(target)]
+
+    assert set(same_day["order_intent"]) == {TARGET_PORTFOLIO, FORCED_EXIT}
+    assert same_day["target_weight"].eq(0.0).all()
+    forced = same_day[same_day["order_intent"].eq(FORCED_EXIT)]
+    assert len(forced) == 1
 
 
 def test_buy_and_hold_control_trades_exactly_once() -> None:

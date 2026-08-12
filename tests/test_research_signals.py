@@ -35,7 +35,9 @@ def test_all_signals_generate_weights():
         left_censored=False,
     )
     for name in list_research_signal_models():
-        w = get_research_signal_model(name).generate(
+        w = get_research_signal_model(
+            name, allow_sealed_crypto=name.startswith("crypto_")
+        ).generate(
             panel,
             {
                 "lookback_days": 20,
