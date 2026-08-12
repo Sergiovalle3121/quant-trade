@@ -14,6 +14,48 @@
       "expected_at": "data/cache/crypto_universe/deathlist/raw/ (gitignored)",
       "why_not_committed": "7.4 MB of provider response data; AGENTS.md forbids committing market data caches and provider responses",
       "consequence": "the 81.1% death corroboration rate cannot be recomputed here without re-fetching the roster, and a re-fetch will NOT reproduce this digest - the roster changes daily as coins are flagged inactive, so this hash names one specific capture that no later fetch can recreate"
+    },
+    {
+      "sha256": "87f456019d52f325161f82ab20c85dcfb197b61c00ba37aad728141ff22dbd28",
+      "names": "the isolated Binance BTCUSDT/ETHUSDT development collection journal cited by docs/BINANCE_BTC_ETH_TSMOM_DEVELOPMENT_VERDICT.md",
+      "expected_at": ".tmp/binance_btc_eth_dev_2017_2023/journal.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market-data collection caches and provider receipts",
+      "consequence": "the development verdict remains auditable by hash but requires the local journal and series bytes to reproduce"
+    },
+    {
+      "sha256": "d346550d10c3fc373c7645f1f048bacd89b6f446b6a03e6d589a74231efa636a",
+      "names": "the isolated Binance BTCUSDT daily development series through 2023-11-28",
+      "expected_at": ".tmp/binance_btc_eth_dev_2017_2023/series/BTCUSDT.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market data caches and redistribution rights have not been resolved",
+      "consequence": "the reported BTC benchmark and strategy sleeve cannot be reproduced without bytes matching this digest"
+    },
+    {
+      "sha256": "c98d61902b6d6f730bf8ec2773885bc9c691928d4d1fda4b2987ac8337826b2c",
+      "names": "the isolated Binance ETHUSDT daily development series through 2023-11-28",
+      "expected_at": ".tmp/binance_btc_eth_dev_2017_2023/series/ETHUSDT.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market data caches and redistribution rights have not been resolved",
+      "consequence": "the reported ETH benchmark and strategy sleeve cannot be reproduced without bytes matching this digest"
+    },
+    {
+      "sha256": "d78ecc933d68a9093628a5df99b87040ff2692eacd6a3d2e28607431ff9828a3",
+      "names": "the canonical combined component digest for the isolated Binance development evidence",
+      "expected_at": "computed in memory from the registered journal and two series digests",
+      "why_not_committed": "it identifies canonical content rather than a standalone file; the underlying market-data bytes remain gitignored",
+      "consequence": "this digest binds the three missing components but does not substitute for possessing and rehashing their bytes"
+    },
+    {
+      "sha256": "8f59ede2dce8814dc0863f7f842613b35495df851c2b0ee639b3a10038be2eb7",
+      "names": "the canonical in-memory seal of binance_btc_eth_tsmom_long_cash_v1",
+      "expected_at": "derived from configs/experiments/binance_btc_eth_tsmom_long_cash_v1.yaml",
+      "why_not_committed": "the committed YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
+      "consequence": "the loader recomputes and verifies this seal; changing any declared field invalidates it"
+    },
+    {
+      "sha256": "6df2b74b161ffed24ec98613de54991d16a79b8881c3d72c5acb97ebca362389",
+      "names": "the canonical in-memory NO_GO development report cited by docs/BINANCE_BTC_ETH_TSMOM_DEVELOPMENT_VERDICT.md",
+      "expected_at": "computed by quant_trade.research.prospective_development from the registered local evidence",
+      "why_not_committed": "the repository commits the concise verdict and evaluator, not a duplicate generated payload whose source market data cannot be redistributed",
+      "consequence": "the exact report can be reproduced only with the three registered local evidence files; this registration does not claim those bytes are present"
     }
   ]
 }
