@@ -250,3 +250,111 @@ files cannot enable branch protection themselves.
 Green CI proves that the implementation satisfies its tested contract. It
 does not prove an economic edge, capacity, legal availability, or future
 profitability.
+
+## Capital-feasibility evidence for Gate 4
+
+`evaluate_capital_feasibility` is a pure, offline sizing check. It binds the
+operator-supplied MXN/quote conversion, a separate quote/USD conversion,
+account fee, ask, tick, quantity step, minimum notional, currencies, and
+capture time to canonical hashes. It does not assume that USDT equals USD.
+Missing or stale evidence returns `INSUFFICIENT_EVIDENCE`; contradictory
+evidence or too few executable instruments returns `NO_GO`. No result
+authorizes an order.
+
+The hard 5% per-asset ceiling implies at least 20 distinct executable
+instruments. For a MXN 1,000 sleeve, each instrument receives at most MXN 50.
+That amount must cover the rounded minimum order and its fee. The legacy
+`minimum_order_constraints_allow_diversification` boolean remains readable for
+old artifacts but can no longer establish readiness: Gate 4 recomputes and
+requires a byte-bound `CapitalFeasibility` result with status `PASS`.
+That evidence must identify Bybit Demo Spot and the dedicated subaccount, use
+unique venue symbols/base assets, and its converted USD sleeve must match the
+proposed canary capital to within one cent. Evidence from Binance, a live
+environment, derivatives, a shared account, or a different sleeve cannot be
+reused to pass this gate.
+
+This is intentionally a feasibility gate, not a recommendation to weaken the
+5% ceiling when capital is too small. A failed minimum-order check means do not
+trade; it does not permit concentrating the sleeve or changing strategy rules.
+
+## Prospective Binance BTC/ETH campaign (sealed signal only)
+
+`binance_btc_eth_tsmom_long_cash_v1` is a separate, single-trial prospective
+falsification campaign. It is not an H1-H4 variant, a backtest result, a
+profitable candidate, or a reason to reveal either existing holdout. Its
+canonical declaration and SHA-256 seal live in
+`configs/experiments/binance_btc_eth_tsmom_long_cash_v1.yaml`.
+
+The declaration fixes Binance Spot, only `BTCUSDT` and `ETHUSDT`, independent
+50% sleeves, and LONG/CASH exposure. At the last UTC daily close of each
+calendar month, each symbol is LONG only when its close is above the last
+observed daily close inside the calendar month exactly 12 months earlier. It
+does not use a 365-row offset and does not fall back to month -13 when the
+reference month is absent. A target is emitted only at initialization or a
+LONG/CASH transition. A sleeve that remains LONG is not traded back to 50%, so
+ordinary price drift does not create a rebalance.
+
+Every intention decided from close `t` records the next daily open as its
+earliest execution. It contains no execution price and cannot authorize a
+same-bar fill or an order. `development_tsmom_targets` exposes the identical
+pure signal core for pre-holdout falsification, but accepts only subranges
+inside the sealed evidence interval 2018-08-31 through 2023-11-28; a start one
+day earlier or an end one day later fails closed. `development_end=2026-08-31`
+is the warm-up/final close for the first prospective decision, not a cap or
+license for development evidence. `prospective_tsmom_targets` fixes its
+decision range from that 2026-08-31 close through 2029-08-31. Neither function
+reads a data file, evaluates returns, routes an order, or contacts Binance.
+
+The economic comparison, if eventually authorized after the seal expires,
+has exactly three frozen benchmarks: BTC buy-and-hold, ETH buy-and-hold, and a
+50/50 BTC/ETH buy-and-hold basket. The cost floor is 10 bps venue fee plus 5
+bps friction per side, with a mandatory 2x-cost stress. No leverage, short,
+margin, or Earn exposure is permitted.
+
+The signal, universe, costs, and benchmark set were sealed before the first
+development diagnostic. The acceptance criteria had been stated in the task,
+but were added to the machine-readable seal only after that diagnostic.
+Accordingly, this development run is a falsification/diagnostic and never
+confirmatory evidence. The final prospective seal fixes the criteria before
+the future holdout starts: net total return must be positive and outperform all
+three benchmarks overall, absolute drawdown must not exceed 25%, and a second
+run at 2x costs and 50% fills must remain non-negative. Time robustness uses
+exactly four contiguous, non-empty blocks and requires outperformance in at
+least three; that block comparison applies to the two risk benchmarks fixed by
+the original proposal (BTC buy-and-hold and 50/50 BTC/ETH buy-and-hold). ETH
+buy-and-hold is the third overall benchmark, not a retroactively added block
+requirement. The four blocks are partitioned as equal contiguous daily
+observations over the aligned series
+(`EQUAL_CONTIGUOUS_DAILY_OBSERVATIONS`), leaving no choice of calendar or
+market-regime boundaries during the future holdout.
+
+Any eventual promotion additionally requires positive net excess against each
+benchmark, PSR and DSR of at least 0.95, and a one-sided 95% excess-return
+confidence interval whose lower bound is above zero. With only one registered
+trial, PBO is explicitly `NOT_IDENTIFIABLE_SINGLE_TRIAL`; if PBO remains a
+mandatory criterion the verdict is `INSUFFICIENT_EVIDENCE`, never an inferred
+pass. Drawdown must be at most 25% and no worse than every benchmark, the same
+2x-cost/50%-fill stress must remain non-negative, both sleeves must contribute
+positive P&L, neither may exceed 75% of positive P&L, and capacity must cover
+at least twice proposed capital. Even complete economic success keeps
+`real_money_authorized=false`.
+
+The first 24 months end on 2028-08-31, but that date is a non-economic
+administrative checkpoint, **not a reveal**. The additional 12 months through
+2029-08-31 are committed ex ante. In particular, the implementation cannot
+inspect 24-month returns and then choose whether to extend; inability to prove
+sufficiency without seeing those returns defaults to continued sealing. No
+economic reveal is allowed before 2029-09-01.
+
+This strategy is deliberately absent from the legacy strategy registry and
+all runners. Its spec states `live_execution_enabled=false`,
+`real_money_authorized=false`, and `external_action_authorized=false`.
+Producing a target therefore proves only deterministic signal behavior, not
+edge, execution feasibility, readiness to deposit MXN 1,000, or any path to a
+million pesos.
+
+Its two 50% research sleeves also contradict Gate 4's live 5% per-asset
+ceiling. That conflict is intentional and fail-closed: even a future economic
+success would require a separately reviewed concentration policy before this
+campaign could become canary-eligible. The prospective declaration itself
+cannot weaken Gate 4.

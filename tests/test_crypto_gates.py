@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 
 import pytest
 
 import quant_trade.ops.crypto_gates as crypto_gates
+from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
+from quant_trade.ops.crypto_capital import (
+    CapitalFeasibility,
+    CapitalFeasibilityRequest,
+    CapitalInstrumentEvidence,
+    FxEvidence,
+    evaluate_capital_feasibility,
+)
 from quant_trade.ops.crypto_gates import (
     CanaryEvidence,
     CanaryPolicy,
@@ -29,6 +37,93 @@ from quant_trade.ops.crypto_gates import (
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "configs" / "crypto" / "bybit_spot_demo.yaml"
+
+
+def _passing_capital_feasibility() -> CapitalFeasibility:
+    fx_payload = {
+        "base_currency": "MXN",
+        "quote_currency": "USDT",
+        "quote_per_base": 0.054,
+        "captured_at_utc": "2026-08-12T11:00:00Z",
+    }
+    fx = FxEvidence(
+        base_currency="MXN",
+        quote_currency="USDT",
+        quote_per_base=0.054,
+        captured_at_utc="2026-08-12T11:00:00Z",
+        source="offline test fixture",
+        source_payload=fx_payload,
+        raw_sha256=sha256_of_text(canonical_dumps(fx_payload)),
+    )
+    instruments: list[CapitalInstrumentEvidence] = []
+    for index in range(1, 21):
+        payload = {
+            "venue": "bybit",
+            "market": "spot",
+            "environment": "demo",
+            "account_scope": "dedicated_subaccount",
+            "instrument_id": f"CMC:{index}",
+            "venue_symbol": f"COIN{index}USDT",
+            "base_currency": f"COIN{index}",
+            "quote_currency": "USDT",
+            "reference_ask_quote": 1.0,
+            "tick_size_quote": 0.01,
+            "quantity_step": 0.1,
+            "min_notional_quote": 1.0,
+            "taker_fee_bps": 10.0,
+            "fee_currency": "USDT",
+            "fee_charging_mode": "QUOTE_ON_TOP",
+            "minimum_fee_amount": 0.0,
+            "captured_at_utc": "2026-08-12T11:00:00Z",
+        }
+        instruments.append(
+            CapitalInstrumentEvidence(
+                instrument_id=f"CMC:{index}",
+                venue_symbol=f"COIN{index}USDT",
+                base_currency=f"COIN{index}",
+                quote_currency="USDT",
+                reference_ask_quote=1.0,
+                tick_size_quote=0.01,
+                quantity_step=0.1,
+                min_notional_quote=1.0,
+                taker_fee_bps=10.0,
+                fee_currency="USDT",
+                fee_charging_mode="QUOTE_ON_TOP",
+                minimum_fee_amount=0.0,
+                captured_at_utc="2026-08-12T11:00:00Z",
+                source="offline test fixture",
+                source_payload=payload,
+                raw_sha256=sha256_of_text(canonical_dumps(payload)),
+            )
+        )
+    quote_usd_payload = {
+        "base_currency": "USDT",
+        "quote_currency": "USD",
+        "quote_per_base": 0.999,
+        "captured_at_utc": "2026-08-12T11:00:00Z",
+    }
+    return evaluate_capital_feasibility(
+        CapitalFeasibilityRequest(
+            sleeve_amount=1_000.0,
+            sleeve_currency="MXN",
+            as_of_utc="2026-08-12T12:00:00Z",
+            fx=fx,
+            instruments=tuple(instruments),
+            venue="bybit",
+            market="spot",
+            environment="demo",
+            account_scope="dedicated_subaccount",
+            quote_to_usd_fx=FxEvidence(
+                base_currency="USDT",
+                quote_currency="USD",
+                quote_per_base=0.999,
+                captured_at_utc="2026-08-12T11:00:00Z",
+                source="offline test fixture",
+                source_payload=quote_usd_payload,
+                raw_sha256=sha256_of_text(canonical_dumps(quote_usd_payload)),
+            ),
+        )
+    )
 
 
 def _complete_gate0(**overrides: object) -> Gate0Evidence:
@@ -88,9 +183,10 @@ def _complete_canary(**overrides: object) -> CanaryEvidence:
         "human_approval_each_initial_rebalance": True,
         "post_rebalance_reconciliation_required": True,
         "venue_balance_operational_only": True,
+        "capital_feasibility": _passing_capital_feasibility(),
         "minimum_order_constraints_allow_diversification": True,
         "risk_capital_usd": 4_000.0,
-        "proposed_initial_capital_usd": 400.0,
+        "proposed_initial_capital_usd": 53.946,
         "configured_maximum_asset_fraction": 0.05,
         "configured_maximum_order_adv_fraction": 0.01,
         "configured_maximum_order_depth_fraction": 0.05,
@@ -329,6 +425,66 @@ def test_canary_readiness_is_insufficient_without_positive_evidence() -> None:
     assert verdict.status == "INSUFFICIENT_EVIDENCE"
     assert "shadow_passed" in verdict.missing_conditions
     assert "risk_capital_usd" in verdict.missing_conditions
+    assert "capital_feasibility" in verdict.missing_conditions
+
+
+def test_legacy_diversification_boolean_cannot_replace_calculated_feasibility() -> None:
+    verdict = evaluate_canary_readiness(
+        CanaryPolicy(),
+        _complete_canary(
+            capital_feasibility=None,
+            minimum_order_constraints_allow_diversification=True,
+        ),
+    )
+
+    assert verdict.status == "INSUFFICIENT_EVIDENCE"
+    assert "capital_feasibility" in verdict.missing_conditions
+
+
+def test_tampered_or_no_go_capital_feasibility_blocks_canary_review() -> None:
+    genuine = _passing_capital_feasibility()
+    forged = replace(genuine, per_asset_cap_quote=999.0)
+    tampered = evaluate_canary_readiness(
+        CanaryPolicy(),
+        _complete_canary(capital_feasibility=forged),
+    )
+    no_go = evaluate_canary_readiness(
+        CanaryPolicy(),
+        _complete_canary(
+            capital_feasibility=evaluate_capital_feasibility(
+                replace(genuine.request, instruments=genuine.request.instruments[:19])
+            )
+        ),
+    )
+
+    assert tampered.status == no_go.status == "NO_GO"
+    assert any("recomputation" in item for item in tampered.blocking_conditions)
+    assert any("capital_feasibility is NO_GO" in item for item in no_go.blocking_conditions)
+
+
+def test_canary_binds_calculated_sleeve_to_exact_proposed_usd_capital() -> None:
+    result = evaluate_canary_readiness(
+        CanaryPolicy(),
+        _complete_canary(proposed_initial_capital_usd=5.3946),
+    )
+
+    assert result.status == "NO_GO"
+    assert any("converted sleeve amount" in item for item in result.blocking_conditions)
+
+
+def test_full_risk_capital_cannot_be_mislabeled_as_the_ten_percent_canary() -> None:
+    # MXN 1,000 converts to USD 53.946 in the fixture.  At that declared risk
+    # capital, the hard canary limit is only USD 5.3946, not the full sleeve.
+    result = evaluate_canary_readiness(
+        CanaryPolicy(),
+        _complete_canary(
+            risk_capital_usd=53.946,
+            proposed_initial_capital_usd=5.3946,
+        ),
+    )
+
+    assert result.status == "NO_GO"
+    assert any("converted sleeve amount" in item for item in result.blocking_conditions)
 
 
 def test_canary_readiness_rejects_capital_and_risk_limit_violations() -> None:

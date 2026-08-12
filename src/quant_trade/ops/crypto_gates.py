@@ -16,6 +16,7 @@ from typing import Any, Literal
 import yaml
 
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
+from quant_trade.ops.crypto_capital import CapitalFeasibility
 
 Gate0Status = Literal["PASS", "BLOCKED", "INSUFFICIENT_EVIDENCE"]
 ReadinessStatus = Literal["PASS", "NO_GO", "INSUFFICIENT_EVIDENCE"]
@@ -490,6 +491,9 @@ class CanaryEvidence:
     human_approval_each_initial_rebalance: bool | None = None
     post_rebalance_reconciliation_required: bool | None = None
     venue_balance_operational_only: bool | None = None
+    capital_feasibility: CapitalFeasibility | None = None
+    # Retained for artifact compatibility only.  A caller-supplied boolean can
+    # never establish feasibility; Gate 4 requires the recomputable object.
     minimum_order_constraints_allow_diversification: bool | None = None
     risk_capital_usd: float | None = None
     proposed_initial_capital_usd: float | None = None
@@ -504,7 +508,10 @@ class CanaryEvidence:
     slippage_outside_model_pause_configured: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        if self.capital_feasibility is not None:
+            payload["capital_feasibility"] = self.capital_feasibility.to_dict()
+        return payload
 
 
 @dataclass(frozen=True)
@@ -718,7 +725,6 @@ def evaluate_canary_readiness(
         "human_approval_each_initial_rebalance",
         "post_rebalance_reconciliation_required",
         "venue_balance_operational_only",
-        "minimum_order_constraints_allow_diversification",
         "stale_data_pause_configured",
         "unexpected_fee_pause_configured",
         "abnormal_latency_pause_configured",
@@ -731,6 +737,45 @@ def evaluate_canary_readiness(
         elif value is not True:
             blockers.append(f"{name} is not positively verified")
 
+    # The legacy diversification flag remains readable in old artifacts but
+    # is never proof: it is an unauthenticated assertion by the caller.  The
+    # byte-bound feasibility object is recalculated here before it can pass.
+    legacy_diversification = observed.minimum_order_constraints_allow_diversification
+    if legacy_diversification is not None and legacy_diversification is not True:
+        blockers.append("minimum_order_constraints_allow_diversification is contradicted")
+    capital_feasibility = observed.capital_feasibility
+    verified_capital_feasibility: CapitalFeasibility | None = None
+    if capital_feasibility is None:
+        missing.append("capital_feasibility")
+    elif not isinstance(capital_feasibility, CapitalFeasibility):
+        blockers.append("capital_feasibility must be a CapitalFeasibility result")
+    elif not capital_feasibility.is_verified():
+        blockers.append("capital_feasibility does not match a fresh recomputation")
+    elif capital_feasibility.status == "INSUFFICIENT_EVIDENCE":
+        missing.append("capital_feasibility.PASS")
+    elif not capital_feasibility.passed:
+        blockers.append("capital_feasibility is NO_GO")
+    elif capital_feasibility.maximum_asset_fraction > effective_policy.maximum_asset_fraction:
+        blockers.append(
+            "capital_feasibility uses a larger asset fraction than the effective canary policy"
+        )
+    else:
+        expected_context = {
+            "venue": "bybit",
+            "market": "spot",
+            "environment": "demo",
+            "account_scope": "dedicated_subaccount",
+        }
+        context_mismatch = False
+        for field_name, expected in expected_context.items():
+            if getattr(capital_feasibility.request, field_name) != expected:
+                blockers.append(
+                    f"capital_feasibility {field_name} does not match Bybit canary policy"
+                )
+                context_mismatch = True
+        if not context_mismatch:
+            verified_capital_feasibility = capital_feasibility
+
     risk_capital = _positive_number(
         "risk_capital_usd", observed.risk_capital_usd, missing, blockers
     )
@@ -740,6 +785,15 @@ def evaluate_canary_readiness(
         missing,
         blockers,
     )
+    if verified_capital_feasibility is not None and proposed is not None:
+        converted_sleeve = verified_capital_feasibility.sleeve_amount_usd
+        if converted_sleeve is None:
+            missing.append("capital_feasibility.sleeve_amount_usd")
+        elif not math.isclose(proposed, converted_sleeve, rel_tol=0.0, abs_tol=0.01):
+            blockers.append(
+                "proposed_initial_capital_usd does not match capital_feasibility "
+                "converted sleeve amount"
+            )
     if risk_capital is not None:
         if risk_capital >= effective_policy.maximum_declared_risk_capital_usd:
             blockers.append(
