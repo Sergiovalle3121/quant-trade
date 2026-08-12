@@ -7,12 +7,17 @@ from pathlib import Path
 
 import pytest
 
+from quant_trade.data.crypto_manifest import (
+    CausalValidationEvidence,
+    CryptoDatasetManifest,
+)
 from quant_trade.research.preregistration import (
     ExperimentPreregistration,
     PreregistrationError,
     assert_within_budget,
     budget_status,
     load_preregistration,
+    require_trusted_crypto_dataset,
     seal_preregistration,
     trials_for_seal,
     verify,
@@ -155,15 +160,16 @@ def test_the_ledger_carries_the_seal_and_defaults_to_unsealed() -> None:
     from quant_trade.research.ledger import build_trial_record
 
     sealed = build_trial_record(
-        source="test", strategy="s", strategy_params={}, run_id="r",
+        source="test",
+        strategy="s",
+        strategy_params={},
+        run_id="r",
         preregistration_seal="abc123",
     )
     assert sealed.preregistration_seal == "abc123"
     assert "preregistration_seal" in sealed.to_entry()
 
-    undeclared = build_trial_record(
-        source="test", strategy="s", strategy_params={}, run_id="r"
-    )
+    undeclared = build_trial_record(source="test", strategy="s", strategy_params={}, run_id="r")
     assert undeclared.preregistration_seal == "", (
         "the ledger records what happened; refusing an undeclared trial is "
         "promotion's job, not the ledger's"
@@ -179,3 +185,28 @@ def test_the_committed_historical_ledger_stays_readable() -> None:
     assert all("preregistration_seal" not in r for r in records), (
         "historical rows are expected to lack the field entirely"
     )
+
+
+def test_crypto_preregistration_requires_a_trusted_causal_manifest() -> None:
+    manifest = CryptoDatasetManifest(
+        dataset_id="bad-panel",
+        status="UNVALIDATED",
+        venue="bybit",
+        market="spot",
+        quote_asset="USDT",
+        timezone="UTC",
+        start_date="2021-07-05",
+        end_date="2023-11-28",
+        rows=1,
+        instruments=1,
+        schema_version=2,
+        code_commit="a" * 40,
+        policy={"rank_ceiling": 1000},
+        components={"panel": "b" * 64},
+        component_provenance={"panel": "panel.csv"},
+        causal_validation=CausalValidationEvidence(),
+        gap_summary={"unexplained": 1},
+        terms_status="UNRESOLVED_NO_REDISTRIBUTION",
+    )
+    with pytest.raises(PreregistrationError, match="TRUSTED_CAUSAL"):
+        require_trusted_crypto_dataset(manifest)

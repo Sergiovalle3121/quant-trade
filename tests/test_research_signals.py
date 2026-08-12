@@ -29,6 +29,10 @@ def test_all_signals_generate_weights():
         market_cap_usd=500e6,
         cmc_rank=50.0,
         venue_turnover_usd=5e6,
+        eligible_to_open=True,
+        tradable=True,
+        first_venue_bar_at=panel["timestamp"].min(),
+        left_censored=False,
     )
     for name in list_research_signal_models():
         w = get_research_signal_model(name).generate(
@@ -51,6 +55,8 @@ def test_all_signals_generate_weights():
                 ],
             },
         )
-        assert set(w.columns) == {"timestamp", "symbol", "target_weight"}
+        required = {"timestamp", "symbol", "target_weight"}
+        assert required.issubset(w.columns)
+        assert set(w.columns).issubset(required | {"order_intent"})
         assert (w["target_weight"] <= 0.5 + 1e-12).all() if not w.empty else True
         assert (w["target_weight"] >= -1e-12).all() if not w.empty else True  # long-only default

@@ -14,9 +14,11 @@ import pytest
 
 from quant_trade.research.signals.base import rebalance_mask
 from quant_trade.research.signals.crypto_lowcap import (
+    FORCED_EXIT,
     annual_equal_weight_rebalance,
     capacity_illiquidity,
     death_avoidance,
+    frozen_rebalance_cohort,
     survival_duration,
 )
 from quant_trade.research.strategy_registry import get_research_signal_model
@@ -63,6 +65,10 @@ def _panel(
                     "cmc_rank": float(50 + i * 20),
                     "market_cap_usd": price * 1e6 * (i + 1),
                     "reported_volume_usd": float(turnover[j]) * 3,
+                    "eligible_to_open": True,
+                    "tradable": True,
+                    "first_venue_bar_at": dates[first],
+                    "left_censored": first == 0,
                 }
             )
     return pd.DataFrame(rows).sort_values(["timestamp", "symbol"]).reset_index(drop=True)
@@ -160,6 +166,25 @@ def test_capacity_screen_rejects_coins_too_thin_for_the_order() -> None:
     assert weights["target_weight"].sum() == 0.0
 
 
+def test_explicit_open_eligibility_and_tradability_are_both_required() -> None:
+    panel = _panel()
+    target = panel["symbol"].iloc[-1]
+    panel.loc[panel["symbol"] == target, "eligible_to_open"] = False
+    ineligible = capacity_illiquidity(panel, {"top_n": 20})
+    assert not ((ineligible["symbol"] == target) & (ineligible["target_weight"] > 0)).any()
+
+    panel.loc[panel["symbol"] == target, "eligible_to_open"] = True
+    panel.loc[panel["symbol"] == target, "tradable"] = False
+    untradable = capacity_illiquidity(panel, {"top_n": 20})
+    assert not ((untradable["symbol"] == target) & (untradable["target_weight"] > 0)).any()
+
+
+def test_plain_price_presence_is_not_an_eligibility_contract() -> None:
+    panel = _panel().drop(columns=["eligible_to_open"])
+    with pytest.raises(ValueError, match="eligible_to_open"):
+        capacity_illiquidity(panel, {})
+
+
 def test_death_screen_ejects_a_collapsing_name() -> None:
     panel = _panel(n_symbols=6, seed=3)
     # A name that survives to the end: the fixture kills every fifth symbol, and
@@ -187,6 +212,38 @@ def test_death_screen_ejects_a_collapsing_name() -> None:
     assert target not in held(screened)
 
 
+def test_death_screen_emits_sparse_forced_exit_between_annual_rebalances() -> None:
+    panel = _panel(n_days=1_200, n_symbols=6, seed=3, start="2018-06-01")
+    january = pd.Timestamp("2020-01-01", tz="UTC")
+    at_january = death_avoidance(
+        panel[panel["timestamp"] <= january],
+        {"top_n": 6, "rank_lookback_days": 30, "max_rank_decay": 50},
+    )
+    held = set(
+        at_january[(at_january["timestamp"] == january) & (at_january["target_weight"] > 0)][
+            "symbol"
+        ]
+    )
+    assert held
+    target = sorted(held)[0]
+    february = pd.Timestamp("2020-02-10", tz="UTC")
+    panel.loc[
+        (panel["symbol"] == target) & (panel["timestamp"] >= february),
+        "cmc_rank",
+    ] += 500
+
+    weights = death_avoidance(
+        panel,
+        {"top_n": 6, "rank_lookback_days": 30, "max_rank_decay": 50},
+    )
+    exits = weights[(weights["symbol"] == target) & (weights["order_intent"] == FORCED_EXIT)]
+    assert len(exits) == 1
+    assert exits.iloc[0]["timestamp"] == february
+    assert exits.iloc[0]["target_weight"] == 0.0
+    assert exits.iloc[0]["timestamp"].month == 2
+    assert not weights.duplicated(["timestamp", "symbol"]).any()
+
+
 def test_buy_and_hold_control_trades_exactly_once() -> None:
     panel = _panel()
     once = annual_equal_weight_rebalance(panel, {"rebalance_once": True})
@@ -194,6 +251,50 @@ def test_buy_and_hold_control_trades_exactly_once() -> None:
     assert once["timestamp"].nunique() == 1
     assert annual["timestamp"].nunique() > 1
     assert once["timestamp"].min() == annual["timestamp"].min()
+
+
+def test_h3_arms_share_one_frozen_cohort_and_never_add_replacements() -> None:
+    panel = _panel(n_days=1_500)
+    cohort = frozen_rebalance_cohort(panel, {"top_n": 4})
+    annual = annual_equal_weight_rebalance(panel, {"top_n": 4})
+    once = annual_equal_weight_rebalance(panel, {"top_n": 4, "rebalance_once": True})
+
+    assert cohort.instrument_ids
+    assert annual.attrs["cohort_digest"] == cohort.digest == once.attrs["cohort_digest"]
+    annual_positive = set(annual[annual["target_weight"] > 0]["symbol"])
+    once_positive = set(once[once["target_weight"] > 0]["symbol"])
+    assert annual_positive == once_positive == set(cohort.instrument_ids)
+
+    # A future outsider can become the largest name, but it cannot enter either
+    # arm: the cohort was fixed before treatment and control diverged.
+    outsider = next(
+        symbol for symbol in panel["symbol"].unique() if symbol not in cohort.instrument_ids
+    )
+    future = panel["timestamp"] > pd.Timestamp(cohort.decision_timestamp)
+    panel.loc[future & (panel["symbol"] == outsider), "market_cap_usd"] = 999e9
+    changed = annual_equal_weight_rebalance(panel, {"top_n": 4})
+    assert outsider not in set(changed[changed["target_weight"] > 0]["symbol"])
+    assert changed.attrs["cohort_digest"] == cohort.digest
+
+
+def test_dynamic_equal_weight_benchmark_reselects_current_eligible_names() -> None:
+    panel = _panel(n_days=1_500)
+    cohort = frozen_rebalance_cohort(panel, {"top_n": 4})
+    last_rebalance = pd.Timestamp("2023-01-01", tz="UTC")
+    present = set(panel.loc[panel["timestamp"] == last_rebalance, "symbol"])
+    outsider = next(symbol for symbol in sorted(present) if symbol not in cohort.instrument_ids)
+    after_cohort = panel["timestamp"] > pd.Timestamp(cohort.decision_timestamp)
+    panel.loc[after_cohort & panel["symbol"].eq(outsider), "market_cap_usd"] = 999e9
+
+    dynamic = annual_equal_weight_rebalance(panel, {"top_n": 4, "freeze_cohort": False})
+    frozen = annual_equal_weight_rebalance(panel, {"top_n": 4})
+    dynamic_held = set(
+        dynamic[dynamic["timestamp"].eq(last_rebalance) & dynamic["target_weight"].gt(0)]["symbol"]
+    )
+
+    assert dynamic.attrs["cohort_mode"] == "dynamic_eligible"
+    assert outsider in dynamic_held
+    assert outsider not in set(frozen[frozen["target_weight"] > 0]["symbol"])
 
 
 def test_left_censored_coins_are_excluded_from_survival_ranking() -> None:
@@ -220,6 +321,34 @@ def test_survival_duration_prefers_the_older_cohort() -> None:
     not_chosen = {s: a for s, a in ages.items() if s not in chosen and a > 0}
     if chosen and not_chosen:
         assert min(ages[s] for s in chosen) >= max(not_chosen.values()) - 1
+
+
+def test_h4_age_is_elapsed_from_first_venue_bar_and_survives_a_gap() -> None:
+    panel = _panel(n_days=900)
+    non_censored = panel.loc[~panel["left_censored"], "symbol"].unique()[0]
+    rows = panel[panel["symbol"] == non_censored]
+    first = pd.Timestamp(rows["first_venue_bar_at"].iloc[0])
+    gap_start = first + pd.Timedelta(days=100)
+    gap_end = first + pd.Timedelta(days=160)
+    panel = panel[
+        ~((panel["symbol"] == non_censored) & panel["timestamp"].between(gap_start, gap_end))
+    ]
+    weights = survival_duration(
+        panel,
+        {"min_age_days": 300, "top_n": 20, "liquidity_window": 30},
+    )
+    eligible_after_300 = weights[
+        (weights["symbol"] == non_censored)
+        & (weights["timestamp"] >= first + pd.Timedelta(days=300))
+        & (weights["target_weight"] > 0)
+    ]
+    assert not eligible_after_300.empty
+
+
+def test_h4_refuses_age_inferred_from_panel_presence() -> None:
+    panel = _panel().drop(columns=["first_venue_bar_at"])
+    with pytest.raises(ValueError, match="first_venue_bar_at"):
+        survival_duration(panel, {})
 
 
 @pytest.mark.parametrize("signal", SIGNALS, ids=lambda f: f.__name__)

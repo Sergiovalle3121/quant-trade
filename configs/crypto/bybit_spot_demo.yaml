@@ -1,0 +1,19 @@
+# Declarative Gate 0 policy only.  This file contains no endpoint, credential,
+# signing material, or order-submission capability.
+schema_version: 1
+venue: bybit
+environment: demo
+market: spot
+account_scope: dedicated_subaccount
+fee_source: operator_capture_per_symbol
+read_permission_required: true
+spot_permission_required: true
+ip_allowlist_required: true
+withdrawals_enabled: false
+transfers_enabled: false
+margin_enabled: false
+derivatives_enabled: false
+loans_enabled: false
+live_endpoint_enabled: false
+credentials_in_repository: false
+execution_adapter_enabled: false

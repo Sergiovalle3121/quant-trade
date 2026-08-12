@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from quant_trade.research.candidate import CandidateStrategy
+from quant_trade.research.crypto_route_guard import candidate_requires_sealed_crypto_route
 
 PromotionStatus = Literal["fail", "warning", "pass"]
 
@@ -75,6 +76,12 @@ def evaluate_promotion(
         "candidate_not_rejected",
         candidate.status in {"candidate", "paper_ready"},
         "candidate status must be candidate or paper_ready",
+    )
+    add(
+        "crypto_requires_gate3_verdict",
+        not candidate_requires_sealed_crypto_route(candidate),
+        "crypto candidates cannot use the legacy promotion path; a sealed tri-state "
+        "Gate 3 verdict with two benchmarks is required",
     )
     add(
         "selection_rejections_empty",

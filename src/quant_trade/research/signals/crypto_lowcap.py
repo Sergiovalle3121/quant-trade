@@ -12,10 +12,11 @@ roughly one full rebalance per year fails on turnover before its returns are
 examined. Every signal here rebalances in January and not otherwise.
 
 **Point-in-time membership.** A coin is eligible on a date only if the snapshot
-dated that day contained it and a venue served a bar for it. The panel already
-enforces this by construction — rows exist only where both held — so a pivot
-leaves NaN outside membership and NaN becomes zero weight. Nothing here needs
-to know today's coin list, which is the whole point.
+dated that day placed it in the declared band, its identity warm-up had
+completed, and the venue served a tradable bar. The panel deliberately retains
+marks outside that opening universe, so signals consume the explicit
+``eligible_to_open`` flag rather than inferring membership from row presence.
+Nothing here needs to know today's coin list, which is the whole point.
 
 **Capacity before cost.** Eligibility requires that the coin's own venue
 turnover could plausibly absorb the order size. Aggregator volume is not used
@@ -28,11 +29,13 @@ truncation-invariance tests that cover the whole registry.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
 from quant_trade.data.panel import pivot_close
+from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
 from quant_trade.research.signals.base import rebalance_mask, weights_to_long
 
 #: Order size the capacity screen is applied at, matching the cost model's
@@ -53,12 +56,23 @@ DEFAULT_LIQUIDITY_WINDOW = 90
 #: Columns these signals need beyond canonical OHLCV. They come from the
 #: point-in-time universe join in `quant_trade.data.crypto_panel`, and a plain
 #: price panel simply does not carry them.
-REQUIRED_PANEL_COLUMNS = ("market_cap_usd", "cmc_rank", "venue_turnover_usd")
+REQUIRED_PANEL_COLUMNS = (
+    "market_cap_usd",
+    "cmc_rank",
+    "venue_turnover_usd",
+    "eligible_to_open",
+    "tradable",
+)
+
+H4_REQUIRED_PANEL_COLUMNS = ("first_venue_bar_at", "left_censored")
+
+TARGET_PORTFOLIO = "TARGET_PORTFOLIO"
+FORCED_EXIT = "FORCED_EXIT"
 
 
-def _require_columns(data: pd.DataFrame) -> None:
+def _require_columns(data: pd.DataFrame, extra: tuple[str, ...] = ()) -> None:
     """Fail with the reason rather than a KeyError from three frames down."""
-    missing = [c for c in REQUIRED_PANEL_COLUMNS if c not in data.columns]
+    missing = [c for c in (*REQUIRED_PANEL_COLUMNS, *extra) if c not in data.columns]
     if missing:
         raise ValueError(
             f"crypto low-cap signals require the point-in-time columns {missing} "
@@ -88,8 +102,12 @@ def _eligible(
     turnover = _pivot(data, "venue_turnover_usd")
     trailing = turnover.rolling(window, min_periods=max(2, window // 3)).median()
     liquid = trailing >= order_notional * turnover_multiple
-    present = _pivot(data, "close").notna()
-    return liquid.fillna(False) & present
+    try:
+        eligible_to_open = _pivot(data, "eligible_to_open").astype("boolean")
+        tradable = _pivot(data, "tradable").astype("boolean")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("eligible_to_open and tradable must contain booleans") from exc
+    return liquid.fillna(False) & eligible_to_open.fillna(False) & tradable.fillna(False)
 
 
 def _equal_weight(selected: pd.DataFrame) -> pd.DataFrame:
@@ -138,9 +156,7 @@ def capacity_illiquidity(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataF
     scores = trailing if liquid_band else -trailing
     selected = _top_n_mask(scores, eligible, top_n)
     close = pivot_close(data)
-    return weights_to_long(
-        _equal_weight(selected), rebalance=rebalance_mask(close.index, freq)
-    )
+    return weights_to_long(_equal_weight(selected), rebalance=rebalance_mask(close.index, freq))
 
 
 def death_avoidance(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
@@ -173,9 +189,11 @@ def death_avoidance(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
     screen_off = bool(params.get("screen_off", False))
     freq = str(params.get("rebalance_frequency", "annual"))
 
-    eligible = _eligible(
+    base_eligible = _eligible(
         data, order_notional=order_notional, turnover_multiple=multiple, window=window
     )
+    eligible = base_eligible.copy()
+    death_trigger = pd.DataFrame(False, index=eligible.index, columns=eligible.columns, dtype=bool)
     if not screen_off:
         rank = _pivot(data, "cmc_rank")
         decay = rank - rank.shift(rank_lookback)
@@ -187,14 +205,102 @@ def death_avoidance(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
         short = turnover.rolling(window, min_periods=max(2, window // 3)).median()
         long = turnover.rolling(long_window, min_periods=window).median()
         collapsed = (short < long * turnover_collapse).fillna(False)
-        eligible = eligible & alive_by_rank & ~collapsed
+        death_trigger = ((~alive_by_rank) | collapsed).fillna(False)
+        eligible = eligible & ~death_trigger
 
     # Among survivors, hold the largest by market cap so the basket is a
     # stable, low-turnover core rather than a rotating tail.
     selected = _top_n_mask(_pivot(data, "market_cap_usd"), eligible, top_n)
     close = pivot_close(data)
-    return weights_to_long(
-        _equal_weight(selected), rebalance=rebalance_mask(close.index, freq)
+    annual = rebalance_mask(close.index, freq)
+    targets = weights_to_long(_equal_weight(selected), rebalance=annual)
+    targets["order_intent"] = TARGET_PORTFOLIO
+
+    # H2 promises an exit when its death screen fires, not merely exclusion at
+    # the following annual rebalance.  Simulate only the membership state needed
+    # to emit sparse exits: annual targets replace the desired basket; between
+    # them, a newly triggered held name receives a symbol-only zero target.
+    # The evaluator interprets FORCED_EXIT as preserving every other position.
+    if screen_off:
+        return targets
+    held: set[str] = set()
+    forced_rows: list[dict[str, Any]] = []
+    for timestamp in close.index:
+        if bool(annual.loc[timestamp]):
+            held = set(selected.columns[selected.loc[timestamp].fillna(False)])
+            continue  # TARGET_PORTFOLIO takes precedence on the same timestamp.
+        exiting = sorted(
+            symbol
+            for symbol in held
+            if symbol in death_trigger.columns and bool(death_trigger.at[timestamp, symbol])
+        )
+        for symbol in exiting:
+            forced_rows.append(
+                {
+                    "timestamp": timestamp,
+                    "symbol": symbol,
+                    "target_weight": 0.0,
+                    "order_intent": FORCED_EXIT,
+                }
+            )
+            held.remove(symbol)
+    if not forced_rows:
+        return targets
+    forced = pd.DataFrame(forced_rows)
+    return (
+        pd.concat([targets, forced], ignore_index=True)
+        .sort_values(["timestamp", "symbol"])
+        .reset_index(drop=True)
+    )
+
+
+@dataclass(frozen=True)
+class FrozenCohort:
+    """The exact H3 cohort chosen once, before either arm diverges."""
+
+    decision_timestamp: str
+    instrument_ids: tuple[str, ...]
+    digest: str
+
+
+def frozen_rebalance_cohort(
+    data: pd.DataFrame, params: dict[str, Any] | None = None
+) -> FrozenCohort:
+    """Select H3's cohort once and return its canonical audit digest."""
+    params = params or {}
+    _require_columns(data)
+    order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
+    multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
+    window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
+    top_n = int(params.get("top_n", 20))
+    freq = str(params.get("rebalance_frequency", "annual"))
+    if top_n < 1:
+        raise ValueError("top_n must be >= 1")
+
+    eligible = _eligible(
+        data, order_notional=order_notional, turnover_multiple=multiple, window=window
+    )
+    selected = _top_n_mask(_pivot(data, "market_cap_usd"), eligible, top_n)
+    close = pivot_close(data)
+    mask = rebalance_mask(close.index, freq)
+    decisions = [timestamp for timestamp in mask[mask].index if bool(selected.loc[timestamp].any())]
+    if len(decisions) == 0:
+        timestamp = ""
+        instruments: tuple[str, ...] = ()
+    else:
+        first = decisions[0]
+        timestamp = pd.Timestamp(first).isoformat()
+        instruments = tuple(sorted(selected.columns[selected.loc[first].fillna(False)]))
+    payload = {
+        "decision_timestamp": timestamp,
+        "instrument_ids": list(instruments),
+        "selection_rule": "largest_market_cap_among_eligible_top_n",
+        "top_n": top_n,
+    }
+    return FrozenCohort(
+        decision_timestamp=timestamp,
+        instrument_ids=instruments,
+        digest=sha256_of_text(canonical_dumps(payload)),
     )
 
 
@@ -207,39 +313,70 @@ def annual_equal_weight_rebalance(data: pd.DataFrame, params: dict[str, Any]) ->
     the first rebalance date and never trades again. Any difference between the
     two is then attributable to rebalancing and not to selection, which is what
     makes the test interpretable.
+
+    ``freeze_cohort=False`` is reserved for the external equal-weight eligible
+    benchmark.  It reselects the point-in-time eligible basket at every
+    rebalance; H3 itself defaults to, and its control requires, the frozen path.
     """
     _require_columns(data)
-    order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
-    multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
-    window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
-    top_n = int(params.get("top_n", 20))
     rebalance_once = bool(params.get("rebalance_once", False))
+    freeze_cohort = bool(params.get("freeze_cohort", True))
     freq = str(params.get("rebalance_frequency", "annual"))
-
-    eligible = _eligible(
-        data, order_notional=order_notional, turnover_multiple=multiple, window=window
-    )
-    selected = _top_n_mask(_pivot(data, "market_cap_usd"), eligible, top_n)
-    weights = _equal_weight(selected)
     close = pivot_close(data)
     mask = rebalance_mask(close.index, freq)
+
+    if freeze_cohort:
+        cohort = frozen_rebalance_cohort(data, params)
+        selected = pd.DataFrame(False, index=close.index, columns=close.columns)
+        if cohort.instrument_ids:
+            selected.loc[:, list(cohort.instrument_ids)] = True
+        weights = _equal_weight(selected)
+        if cohort.decision_timestamp:
+            cohort_timestamp = pd.Timestamp(cohort.decision_timestamp)
+            mask = mask & (mask.index >= cohort_timestamp)
+        else:
+            mask = pd.Series(False, index=mask.index)
+    else:
+        order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
+        multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
+        window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
+        top_n = int(params.get("top_n", 20))
+        if top_n < 1:
+            raise ValueError("top_n must be >= 1")
+        eligible = _eligible(
+            data,
+            order_notional=order_notional,
+            turnover_multiple=multiple,
+            window=window,
+        )
+        selected = _top_n_mask(_pivot(data, "market_cap_usd"), eligible, top_n)
+        weights = _equal_weight(selected).reindex(
+            index=close.index, columns=close.columns, fill_value=0.0
+        )
     if rebalance_once:
         first = mask[mask].index[:1]
         mask = pd.Series(mask.index.isin(first), index=mask.index)
-    return weights_to_long(weights, rebalance=mask)
+    result = weights_to_long(weights, rebalance=mask)
+    result["order_intent"] = TARGET_PORTFOLIO
+    if freeze_cohort:
+        result.attrs["cohort_digest"] = cohort.digest
+        result.attrs["cohort_instrument_ids"] = cohort.instrument_ids
+        result.attrs["cohort_decision_timestamp"] = cohort.decision_timestamp
+        result.attrs["cohort_mode"] = "frozen"
+    else:
+        result.attrs["cohort_mode"] = "dynamic_eligible"
+    return result
 
 
 def survival_duration(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
     """H4: hold the coins that have survived longest inside the band.
 
-    Age is counted in observed bars since the coin first appeared in the panel,
-    so it is a within-panel measure and is **left-censored**: a coin already
-    alive on the first date has an unknown true age. Censored coins are
-    excluded rather than credited with the age they happen to show, because
-    crediting them would rank the panel's opening cohort above everything that
-    joined later purely as an artifact of when the window starts.
+    Age is elapsed calendar time since the first venue bar known at that date.
+    It therefore continues through a data gap and does not use entry into the
+    top-1000 as a proxy for listing.  Histories that begin before collection are
+    explicitly left-censored and excluded rather than assigned a flattering age.
     """
-    _require_columns(data)
+    _require_columns(data, H4_REQUIRED_PANEL_COLUMNS)
     order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
     multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
     window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
@@ -251,19 +388,30 @@ def survival_duration(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFram
     eligible = _eligible(
         data, order_notional=order_notional, turnover_multiple=multiple, window=window
     )
-    present = _pivot(data, "close").notna()
-    age = present.cumsum().where(present)
+    age_rows = data[["timestamp", "symbol", "first_venue_bar_at", "left_censored"]].copy()
+    age_rows["timestamp"] = pd.to_datetime(age_rows["timestamp"], utc=True, errors="coerce")
+    age_rows["first_venue_bar_at"] = pd.to_datetime(
+        age_rows["first_venue_bar_at"], utc=True, errors="coerce"
+    )
+    if age_rows[["timestamp", "first_venue_bar_at"]].isna().any().any():
+        raise ValueError("H4 requires valid timestamp and first_venue_bar_at values")
+    age_rows["age_days"] = (age_rows["timestamp"] - age_rows["first_venue_bar_at"]).dt.days
+    if (age_rows["age_days"] < 0).any():
+        raise ValueError("first_venue_bar_at cannot be later than the panel row")
+    try:
+        age_rows["left_censored"] = age_rows["left_censored"].astype("boolean")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("left_censored must contain booleans") from exc
+    age = age_rows.pivot(index="timestamp", columns="symbol", values="age_days").sort_index()
+    censored = age_rows.pivot(
+        index="timestamp", columns="symbol", values="left_censored"
+    ).sort_index()
     if exclude_censored:
-        censored = present.iloc[0]
-        age = age.loc[:, ~censored.fillna(False)] if censored.any() else age
-        eligible = eligible.reindex(columns=age.columns, fill_value=False)
-        present = present.reindex(columns=age.columns, fill_value=False)
+        eligible = eligible & ~censored.reindex_like(eligible).fillna(True)
     eligible = eligible & (age >= min_age_days).fillna(False)
     selected = _top_n_mask(age, eligible, top_n)
     close = pivot_close(data)
-    weights = _equal_weight(selected).reindex(
-        columns=pivot_close(data).columns, fill_value=0.0
-    )
+    weights = _equal_weight(selected).reindex(columns=pivot_close(data).columns, fill_value=0.0)
     return weights_to_long(weights, rebalance=rebalance_mask(close.index, freq))
 
 
@@ -271,8 +419,12 @@ __all__ = [
     "DEFAULT_LIQUIDITY_WINDOW",
     "DEFAULT_ORDER_NOTIONAL_USD",
     "DEFAULT_TURNOVER_MULTIPLE",
+    "FORCED_EXIT",
+    "FrozenCohort",
+    "TARGET_PORTFOLIO",
     "annual_equal_weight_rebalance",
     "capacity_illiquidity",
     "death_avoidance",
+    "frozen_rebalance_cohort",
     "survival_duration",
 ]

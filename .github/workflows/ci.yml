@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -13,7 +16,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -c requirements.lock.txt -e ".[cloud,data,dev,crypto]"
       - name: Ruff
         run: ruff check .
       - name: V7 format check
@@ -22,6 +25,28 @@ jobs:
         run: xargs ruff format --check < .github/v8-python-files.txt
       - name: V9 format check
         run: xargs ruff format --check < .github/v9-python-files.txt
+      - name: Crypto safety format check
+        run: >-
+          ruff format --check
+          src/quant_trade/data/crypto_panel.py
+          src/quant_trade/ops/crypto_gates.py
+          src/quant_trade/data/crypto_manifest.py
+          src/quant_trade/research/crypto_evaluator.py
+          src/quant_trade/research/crypto_governance.py
+          src/quant_trade/research/crypto_runner.py
+          src/quant_trade/research/crypto_route_guard.py
+          src/quant_trade/research/holdout_seal.py
+          src/quant_trade/research/signals/crypto_lowcap.py
+          tests/test_committed_crypto_invalidation.py
+          tests/test_crypto_evaluator.py
+          tests/test_crypto_gates.py
+          tests/test_crypto_governance.py
+          tests/test_crypto_legacy_guards.py
+          tests/test_crypto_manifest.py
+          tests/test_crypto_panel.py
+          tests/test_crypto_runner.py
+          tests/test_crypto_lowcap_signals.py
+          tests/test_holdout_seal.py
       - name: Mypy
         run: mypy src
       - name: Diff whitespace check
@@ -40,7 +65,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -c requirements.lock.txt -e ".[cloud,data,dev,crypto]"
       - name: Regenerate every artifact set in place
         run: |
           set -euo pipefail
@@ -83,8 +108,76 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -c requirements.lock.txt -e ".[cloud,data,dev,crypto]"
       - name: Compile smoke check
         run: python -m compileall -q src tests
       - name: Pytest
         run: pytest -q
+
+  critical-safety-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -c requirements.lock.txt -e ".[cloud,data,dev,crypto]"
+      - name: Enforce critical crypto safety branch coverage
+        run: |
+          pytest -q \
+            tests/test_crypto_gates.py \
+            tests/test_crypto_manifest.py \
+            tests/test_crypto_panel.py \
+            tests/test_crypto_evaluator.py \
+            tests/test_crypto_lowcap_signals.py \
+            tests/test_crypto_runner.py \
+            tests/test_holdout_seal.py \
+            tests/test_crypto_governance.py \
+            --cov=src/quant_trade \
+            --cov-branch \
+            --cov-report=
+          coverage report \
+            --include='src/quant_trade/ops/crypto_gates.py,src/quant_trade/data/crypto_manifest.py,src/quant_trade/data/crypto_panel.py,src/quant_trade/research/crypto_evaluator.py,src/quant_trade/research/crypto_runner.py,src/quant_trade/research/signals/crypto_lowcap.py,src/quant_trade/research/holdout_seal.py,src/quant_trade/research/crypto_governance.py' \
+            --show-missing \
+            --fail-under=80
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the same locked dependency set used by CI
+        run: >-
+          python -m pip install -c requirements.lock.txt
+          -e ".[cloud,data,dev,crypto]"
+          "pip-audit==2.10.1"
+      - name: Audit that locked dependency set
+        run: >-
+          python -m pip_audit
+          --requirement requirements.lock.txt
+          --strict
+          --progress-spinner off
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan commits for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Keep the check read-only and never upload a report that could
+          # contain secret-adjacent match context. The job log stays redacted.
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"

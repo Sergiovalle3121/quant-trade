@@ -125,6 +125,13 @@ quant-trade data fetch-funding --provider ccxt-binance --symbol BTC-USDT-PERP --
 
 See `docs/CRYPTO_DATA.md` for symbology, pagination/rate-limit behavior, quality checks, and crypto research configs. Every research run records the dataset's sha256 (`dataset_binding`) for reproducibility.
 
+The low/mid-cap Bybit study is currently blocked from P&L generation: its
+first constructed panel was invalidated after a causal audit. See
+`docs/CRYPTO_VALIDATION_GATES.md` for the fail-closed rebuild, experiment,
+promotion, shadow, and canary contract. Legacy research/promotion commands
+reject `crypto_*` strategies so the venue-specific evaluator cannot be
+bypassed.
+
 ## Alpha components and statistical validation
 
 The research lab includes a volatility-targeted multi-horizon momentum signal (`multi_horizon_tsmom`), Donchian breakout with ATR exits (`donchian_breakout`), and perpetual funding carry (`funding_carry`, requires funding data joined via `attach_funding_rates`). The multi-asset engine supports shorts (explicit `allow_short`), per-bar funding accrual, and no-trade rebalance bands (`portfolio.rebalance_band`).

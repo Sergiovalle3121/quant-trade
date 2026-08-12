@@ -18,6 +18,10 @@ from quant_trade.metrics.statistics import probabilistic_sharpe_ratio, return_mo
 from quant_trade.reporting.artifacts import create_run_dir, write_csv, write_json, write_yaml
 from quant_trade.reporting.research_report import generate_research_summary
 from quant_trade.research.benchmarks import compare_to_benchmark, run_benchmark
+from quant_trade.research.crypto_route_guard import (
+    mapping_requires_sealed_crypto_route,
+    panel_requires_sealed_crypto_route,
+)
 from quant_trade.research.ledger import append_trial_record, build_trial_record, sha256_hex
 from quant_trade.research.robustness import (
     bootstrap_summary,
@@ -128,10 +132,24 @@ def _split(
 def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any]:
     if config.get("mode") != "multi_asset_research":
         raise ValueError("config mode must be multi_asset_research")
+    strategy = str(config.get("strategy", ""))
+    if mapping_requires_sealed_crypto_route(config):
+        raise ValueError(
+            "crypto research is blocked in the generic runner: it uses a flat-cost "
+            "engine and a single benchmark. Use the sealed crypto Gate 2 workflow only "
+            "after a TRUSTED_CAUSAL single-venue panel exists; P&L generation is disabled "
+            "until then."
+        )
     data_path = Path(config["data_path"])
     if not data_path.exists():
         raise FileNotFoundError(f"{data_path} not found. Run quant-trade data fetch ... first.")
     data = load_canonical_dataset(data_path)
+    if panel_requires_sealed_crypto_route(data):
+        raise ValueError(
+            "crypto dataset bytes are blocked in the generic runner even when the config "
+            "omits or renames their asset class. Use the sealed crypto Gate 2 workflow; "
+            "P&L generation is disabled until its evidence gates pass."
+        )
     # Bind the run to the exact bytes it consumed so results are reproducible
     # and auditable against dataset versions.
     dataset_binding = {
@@ -145,7 +163,6 @@ def run_multi_asset_research_experiment(config: dict[str, Any]) -> dict[str, Any
         float(split_cfg.get("train_fraction", 0.7)),
         int(split_cfg.get("embargo_bars", 0)),
     )
-    strategy = str(config["strategy"])
     params = dict(config.get("strategy_params", {}))
     overfitting_evidence = _load_overfitting_evidence(config, dataset_binding, strategy)
     initial = float(config.get("initial_cash", 100000))
