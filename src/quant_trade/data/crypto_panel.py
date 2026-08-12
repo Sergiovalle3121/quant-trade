@@ -115,16 +115,21 @@ def load_universe_facts(
     end_date: date,
     rank_ceiling: int = 1000,
     exclude_stablecoins: bool = True,
-    keep_symbols: set[str] | None = None,
+    keep_coin_ids: set[int] | None = None,
 ) -> UniverseFacts:
     """Stream the day files into the facts the join needs.
 
-    ``keep_symbols`` retains per-date facts only for those tickers while still
+    ``keep_coin_ids`` retains per-date facts only for those coins while still
     counting every coin in the rank band. A coin no venue ever listed cannot
     enter the panel, so keeping its 3,279 daily records would cost gigabytes to
     reach the same answer — but the *count* still has to be right, because it
     is the denominator that says how much of the investable universe was
     actually reachable.
+
+    The filter is by coin id and NOT by ticker on purpose. Filtering by ticker
+    silently drops the dates on which a coin carried a different symbol, so a
+    renamed coin loses part of its history — a survivorship-shaped hole opened
+    by an optimisation. ``coin_ids_for_tickers`` resolves the ids first.
 
     Duplicate ``(date, cmc_id)`` rows collapse here rather than downstream: the
     source served four days padded with byte-identical repeats (see
@@ -167,7 +172,7 @@ def load_universe_facts(
                     stablecoins_seen += 1
                     continue
                 coins_in_band.add(coin_id)
-                if keep_symbols is not None and symbol not in keep_symbols:
+                if keep_coin_ids is not None and coin_id not in keep_coin_ids:
                     continue
                 supply = float(row.get("circulating_supply") or 0.0)
                 by_date_coin[(day_iso, coin_id)] = {
@@ -188,6 +193,39 @@ def load_universe_facts(
         coins=coins,
         stablecoins_seen=stablecoins_seen,
     )
+
+
+def coin_ids_for_tickers(
+    universe_dir: str | Path,
+    tickers: set[str],
+    *,
+    start_date: date,
+    end_date: date,
+    rank_ceiling: int = 1000,
+) -> set[int]:
+    """Every coin id that ever carried one of ``tickers`` in the window.
+
+    A light pass that keeps only id/ticker pairs, so the expensive per-date
+    facts can afterwards be loaded for the coins that can actually be traded
+    without dropping the dates on which one of them wore a different symbol.
+    """
+    days_dir = Path(universe_dir) / "days"
+    found: set[int] = set()
+    for day_iso in _dates(start_date, end_date):
+        day_file = days_dir / f"{day_iso}.jsonl"
+        if not day_file.exists():
+            continue
+        with day_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                rank = row.get("cmc_rank")
+                if rank is None or int(rank) > rank_ceiling:
+                    continue
+                if str(row["symbol"]).upper() in tickers:
+                    found.add(int(row["cmc_id"]))
+    return found
 
 
 def load_venue_series(
@@ -293,12 +331,19 @@ def build_panel(
         for symbol in series
     }
 
+    tradable_ids = coin_ids_for_tickers(
+        universe_dir,
+        listed_tickers,
+        start_date=start_date,
+        end_date=end_date,
+        rank_ceiling=rank_ceiling,
+    )
     facts = load_universe_facts(
         universe_dir,
         start_date=start_date,
         end_date=end_date,
         rank_ceiling=rank_ceiling,
-        keep_symbols=listed_tickers,
+        keep_coin_ids=tradable_ids,
     )
     report = PanelBuildReport(
         window=(start_date.isoformat(), end_date.isoformat()),
@@ -344,6 +389,21 @@ def build_panel(
         if current is None or len(bars) > len(bound[(current, coin_id)]):
             best_venue[coin_id] = venue
 
+    # One label per coin, for its whole life. The ticker is only cosmetic here:
+    # identity is cmc_id, and labelling each row with the ticker the coin
+    # carried THAT DAY would split a renamed coin into two series downstream —
+    # the same weld this module exists to prevent, arriving through the back
+    # door as a string. The last ticker in the window is used so the label is
+    # the recognisable one.
+    latest: dict[int, tuple[str, str]] = {}
+    for (day_iso, coin_id), symbol in facts.symbol_by_date_coin.items():
+        seen = latest.get(coin_id)
+        if seen is None or day_iso >= seen[0]:
+            latest[coin_id] = (day_iso, symbol)
+    stable_label = {
+        coin_id: f"{symbol}:{coin_id}" for coin_id, (_day, symbol) in latest.items()
+    }
+
     rows: list[dict[str, Any]] = []
     for coin_id, venue in sorted(best_venue.items()):
         bars = bound[(venue, coin_id)]
@@ -359,7 +419,7 @@ def build_panel(
                     "timestamp": datetime.fromisoformat(day_iso).replace(
                         tzinfo=UTC
                     ),
-                    "symbol": f"{facts.symbol_by_date_coin[(day_iso, coin_id)]}:{coin_id}",
+                    "symbol": stable_label[coin_id],
                     "cmc_id": coin_id,
                     "venue": venue,
                     "open": float(bar["open"]),

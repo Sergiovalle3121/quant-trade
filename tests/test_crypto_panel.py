@@ -206,6 +206,34 @@ def test_panel_joins_prices_to_point_in_time_facts(tmp_path) -> None:
     assert frame["venue"].iloc[0] == "bybit"
 
 
+def test_a_renamed_coin_stays_one_series(tmp_path) -> None:
+    """Identity is cmc_id, so a rename must not split the panel row label.
+
+    Labelling each row with the ticker the coin carried that day would produce
+    two series for one coin — the same identity weld this module prevents on
+    the join, arriving through the back door as a string.
+    """
+    days = ["2020-01-01", "2020-01-02", "2020-01-03"]
+    rows = {
+        days[0]: [_coin(7, "OLD", 10, 1_000.0, 100.0)],
+        days[1]: [_coin(7, "NEW", 10, 1_000.0, 100.0)],
+        days[2]: [_coin(7, "NEW", 10, 1_000.0, 100.0)],
+    }
+    _write_universe(tmp_path / "universe", rows)
+    _write_venue(tmp_path / "bybit", {"OLDUSDT": [_bar(d, 10.0) for d in days]})
+    frame, _ = build_panel(
+        tmp_path / "universe",
+        {"bybit": tmp_path / "bybit"},
+        start_date=date(2020, 1, 1),
+        end_date=date(2020, 1, 3),
+        min_bound_bars=1,
+    )
+    assert frame["symbol"].nunique() == 1
+    assert frame["cmc_id"].nunique() == 1
+    assert set(frame["symbol"]) == {"NEW:7"}  # the last ticker in the window
+    assert len(frame) == 3
+
+
 def test_a_coin_the_venue_never_listed_is_simply_absent(tmp_path) -> None:
     rows, days = _three_day_universe()
     rows = {d: r + [_coin(2, "BBB", 11, 500.0, 50.0)] for d, r in rows.items()}

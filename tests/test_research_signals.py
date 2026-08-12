@@ -21,6 +21,15 @@ def test_all_signals_generate_weights():
         }
     )
     panel = attach_funding_rates(data, funding)
+    # The crypto low-cap signals read point-in-time universe columns that a
+    # price panel does not carry. Synthesize them the same way funding is
+    # synthesized above, so the sweep keeps exercising EVERY registered signal
+    # rather than quietly skipping four of them.
+    panel = panel.assign(
+        market_cap_usd=500e6,
+        cmc_rank=50.0,
+        venue_turnover_usd=5e6,
+    )
     for name in list_research_signal_models():
         w = get_research_signal_model(name).generate(
             panel,

@@ -1,0 +1,24 @@
+{
+ "ambiguous_bars_bound": 246861,
+ "ambiguous_bars_unbound": 28815,
+ "coins_below_min_bound_bars": 52,
+ "coins_in_panel": 893,
+ "coins_in_rank_band": 6330,
+ "duplicate_rows_dropped": 0,
+ "negative_value_rows_dropped": 0,
+ "notes": [],
+ "rows_in_panel": 893626,
+ "stablecoins_excluded": 47043,
+ "symbols_ambiguous_ticker": 272,
+ "symbols_unique_ticker": 979,
+ "universe_days": 3280,
+ "venue_symbols_listed": 1273,
+ "venues_used": [
+  "binance",
+  "bybit"
+ ],
+ "window": [
+  "2017-08-17",
+  "2026-08-09"
+ ]
+}

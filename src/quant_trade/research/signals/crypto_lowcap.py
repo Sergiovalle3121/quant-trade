@@ -50,6 +50,23 @@ DEFAULT_TURNOVER_MULTIPLE = 50.0
 DEFAULT_LIQUIDITY_WINDOW = 90
 
 
+#: Columns these signals need beyond canonical OHLCV. They come from the
+#: point-in-time universe join in `quant_trade.data.crypto_panel`, and a plain
+#: price panel simply does not carry them.
+REQUIRED_PANEL_COLUMNS = ("market_cap_usd", "cmc_rank", "venue_turnover_usd")
+
+
+def _require_columns(data: pd.DataFrame) -> None:
+    """Fail with the reason rather than a KeyError from three frames down."""
+    missing = [c for c in REQUIRED_PANEL_COLUMNS if c not in data.columns]
+    if missing:
+        raise ValueError(
+            f"crypto low-cap signals require the point-in-time columns {missing} "
+            "which a plain OHLCV panel does not carry; build the panel with "
+            "quant_trade.data.crypto_panel.build_panel"
+        )
+
+
 def _pivot(data: pd.DataFrame, column: str) -> pd.DataFrame:
     return data.pivot(index="timestamp", columns="symbol", values=column).sort_index()
 
@@ -102,6 +119,7 @@ def capacity_illiquidity(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataF
     refutation is written against, and it must be run with identical
     parameters or the comparison proves nothing.
     """
+    _require_columns(data)
     top_n = int(params.get("top_n", 20))
     order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
     multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
@@ -143,6 +161,7 @@ def death_avoidance(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
     ``screen_off=True`` disables both screens, producing the unscreened basket
     the sealed refutation compares against.
     """
+    _require_columns(data)
     order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
     multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
     window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
@@ -189,6 +208,7 @@ def annual_equal_weight_rebalance(data: pd.DataFrame, params: dict[str, Any]) ->
     two is then attributable to rebalancing and not to selection, which is what
     makes the test interpretable.
     """
+    _require_columns(data)
     order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
     multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
     window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
@@ -219,6 +239,7 @@ def survival_duration(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFram
     crediting them would rank the panel's opening cohort above everything that
     joined later purely as an artifact of when the window starts.
     """
+    _require_columns(data)
     order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
     multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
     window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))

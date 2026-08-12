@@ -1,0 +1,17 @@
+{
+ "components": {
+  "journal/binance": "55391b01389a79f34a2cae490761f5786722f4c0d574a3d52a60e3561c110696",
+  "journal/bybit": "43cbedb8b9a0453543219deffa4d988d0adcbb537e790c81125fc304540488ad",
+  "journal/deathlist": "4068410d4c34467282fdb0bb9085e65b2da27e792995bed95559e4171599c6b4",
+  "journal/universe": "6ecbf1d65d3ef0d9f5a214ae502b531e7e2e385b9e299ef82bd5b4738f7715c8",
+  "panel/build_report": "14258a9cbaad147750e52e4251c624d1cf9eb308b7ab947e9f15ea885d34cd62",
+  "panel/csv": "6bc2c11a7ec9a981460c30b4bd1b819f33ec8732000b8e9bcbd7cae842fd3cad"
+ },
+ "digest": "5d142d8c1734758dfdd3ed80da6eaa102673f423aac6876e90f03c5783b5036c",
+ "rows": 893626,
+ "symbols": 911,
+ "window": [
+  "2017-08-17",
+  "2026-08-09"
+ ]
+}
