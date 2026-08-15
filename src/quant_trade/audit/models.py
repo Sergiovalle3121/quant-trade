@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
+from pathlib import PurePath
 from typing import Any
 
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
@@ -15,6 +16,22 @@ class AuditStatus(StrEnum):
     PASS = "PASS"
     NO_GO = "NO_GO"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+class FindingClass(StrEnum):
+    """Whether a finding is about the method or about the result.
+
+    A package can be methodologically clean and still not beat its benchmark.
+    Both are worth reporting, but only the first is a defect in how the research
+    was conducted, and a customer is owed that distinction.  This label changes
+    nothing about the verdict: a blocking check blocks either way.
+    """
+
+    #: An error in how the result was produced: look-ahead, unbound bytes,
+    #: same-bar execution, undeclared costs, a broken trial ledger.
+    DEFECT = "DEFECT"
+    #: A property of the result itself, correctly measured.
+    RESULT = "RESULT"
 
 
 @dataclass(frozen=True)
@@ -30,9 +47,29 @@ class AuditInput:
     required_columns: tuple[str, ...]
     timestamp_column: str = "timestamp"
     max_file_size_bytes: int = 25_000_000
+    symbol_column: str = "symbol"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def redacted(self) -> AuditInput:
+        """Drop local filesystem layout from anything that leaves this machine.
+
+        The delivered bundle keeps file *names* so a customer can tell which
+        artifact a finding refers to, and loses the directory tree of whoever
+        ran the audit.  The result stays self-consistent: its digest still
+        recomputes from exactly the bytes in the delivered file.
+        """
+        return replace(
+            self,
+            root_dir="<redacted>",
+            dataset_path=PurePath(self.dataset_path).name,
+            results_path=PurePath(self.results_path).name,
+            manifest_path=PurePath(self.manifest_path).name if self.manifest_path else None,
+            trial_ledger_path=(
+                PurePath(self.trial_ledger_path).name if self.trial_ledger_path else None
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -59,10 +96,12 @@ class AuditCheck:
     status: AuditStatus
     summary: str
     evidence: tuple[str, ...] = ()
+    finding_class: FindingClass = FindingClass.DEFECT
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["status"] = self.status.value
+        payload["finding_class"] = self.finding_class.value
         return payload
 
 
@@ -102,7 +141,9 @@ class AuditBundle:
     input_hashes: tuple[tuple[str, str], ...]
     checks: tuple[AuditCheck, ...]
     verdict: AuditVerdict
-    schema_version: int = 1
+    # v2 adds AuditCheck.finding_class and AuditInput.symbol_column, so a v2
+    # digest is deliberately not comparable with a v1 one.
+    schema_version: int = 2
 
     def _content_dict(self) -> dict[str, Any]:
         return {
@@ -120,3 +161,17 @@ class AuditBundle:
 
     def to_dict(self) -> dict[str, Any]:
         return {**self._content_dict(), "bundle_digest": self.bundle_digest}
+
+
+def recompute_bundle_digest(payload: dict[str, Any]) -> str:
+    """Recompute a delivered bundle's digest from its own bytes.
+
+    A content address nobody else can check is decoration.  This lets the
+    recipient of an ``audit.json`` confirm, with no trust in the sender and no
+    access to the original inputs, that the file was not edited after it was
+    produced.
+    """
+    if not isinstance(payload, dict) or "bundle_digest" not in payload:
+        raise ValueError("payload must be an audit bundle containing bundle_digest")
+    content = {key: value for key, value in payload.items() if key != "bundle_digest"}
+    return sha256_of_text(canonical_dumps(content))

@@ -21,3 +21,7 @@
 # treat them as opaque.
 artifacts/** -text
 tests/fixtures/** -text
+# The audit fixtures are hash-pinned the same way: dataset.csv's digest is
+# recorded in both dataset.manifest.json and results.json, so a CRLF rewrite
+# turns the "clean package passes" demo into a manifest mismatch.
+configs/audit/fixtures/** -text

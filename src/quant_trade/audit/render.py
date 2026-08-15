@@ -20,6 +20,7 @@ def render_html(bundle: AuditBundle) -> str:
             "<tr>"
             f'<td class="code">{_e(check.code)}</td>'
             f"<td>{_e(check.category)}</td>"
+            f"<td>{_e(check.finding_class.value)}</td>"
             f'<td class="{_e(check.status.value.lower())}">{_e(check.status.value)}</td>'
             f"<td>{_e(check.summary)}</td>"
             f"<td>{evidence}</td>"
@@ -48,7 +49,11 @@ def render_html(bundle: AuditBundle) -> str:
         "<strong>Bundle digest:</strong> "
         f'<span class="code">{_e(bundle.bundle_digest)}</span></p>'
         f"<ul>{reasons}</ul>"
-        "<table><thead><tr><th>Check</th><th>Category</th><th>Status</th>"
+        "<p><strong>DEFECT</strong> is an error in how a result was produced. "
+        "<strong>RESULT</strong> is a correctly measured property of the result "
+        "itself, such as not beating a benchmark. Both can block; only the first "
+        "is a flaw in the method.</p>"
+        "<table><thead><tr><th>Check</th><th>Category</th><th>Class</th><th>Status</th>"
         "<th>Summary</th><th>Evidence</th></tr></thead><tbody>"
         + "".join(rows)
         + "</tbody></table></body></html>\n"

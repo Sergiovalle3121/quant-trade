@@ -23,6 +23,7 @@ from quant_trade.audit.models import (
     AuditJob,
     AuditStatus,
     AuditVerdict,
+    FindingClass,
 )
 from quant_trade.audit.render import render_html
 from quant_trade.evidence.canonical_json import (
@@ -161,6 +162,7 @@ def load_audit_input(config_path: str | Path) -> AuditInput:
         required_columns=tuple(str(column).strip() for column in required),
         timestamp_column=str(payload.get("timestamp_column", "timestamp")).strip(),
         max_file_size_bytes=max_bytes,
+        symbol_column=str(payload.get("symbol_column", "symbol")).strip(),
     )
 
 
@@ -238,8 +240,9 @@ def _check(
     status: AuditStatus,
     summary: str,
     *evidence: str,
+    finding_class: FindingClass = FindingClass.DEFECT,
 ) -> AuditCheck:
-    return AuditCheck(code, category, status, summary, tuple(evidence))
+    return AuditCheck(code, category, status, summary, tuple(evidence), finding_class)
 
 
 def _schema_checks(rows: list[dict[str, Any]], audit_input: AuditInput) -> list[AuditCheck]:
@@ -298,7 +301,13 @@ def _timestamp_checks(rows: list[dict[str, Any]], audit_input: AuditInput) -> li
             )
         ]
     cutoff = _parse_utc(audit_input.evaluation_cutoff_utc)
-    parsed: list[datetime] = []
+    # A panel is causal when each instrument's own history moves forward.  Real
+    # exports are almost always sorted by (symbol, timestamp), which is not
+    # globally ascending; grouping first is what stops that from reading as a
+    # look-ahead defect.  Within a group, a timestamp going backwards still is.
+    symbol_column = audit_input.symbol_column
+    grouped = bool(symbol_column) and all(symbol_column in row for row in rows)
+    parsed_by_series: dict[str, list[datetime]] = {}
     invalid = 0
     future = 0
     availability_violations = 0
@@ -309,7 +318,8 @@ def _timestamp_checks(rows: list[dict[str, Any]], audit_input: AuditInput) -> li
         except (TypeError, ValueError):
             invalid += 1
             continue
-        parsed.append(event_time)
+        series = str(row[symbol_column]) if grouped else ""
+        parsed_by_series.setdefault(series, []).append(event_time)
         if event_time > cutoff:
             future += 1
         for available_column in availability_columns:
@@ -333,13 +343,19 @@ def _timestamp_checks(rows: list[dict[str, Any]], audit_input: AuditInput) -> li
                 f"availability_violations={availability_violations}",
             )
         ]
-    if parsed != sorted(parsed):
+    unordered = sorted(
+        series for series, values in parsed_by_series.items() if values != sorted(values)
+    )
+    if unordered:
+        scope = f"{symbol_column}={','.join(unordered[:5])}" if grouped else "whole dataset"
         return [
             _check(
                 "TIMESTAMP_CAUSALITY",
                 "causality",
                 AuditStatus.NO_GO,
                 "Dataset rows are not ordered causally by the declared timestamp.",
+                f"unordered_series={len(unordered)}",
+                scope,
             )
         ]
     return [
@@ -349,6 +365,7 @@ def _timestamp_checks(rows: list[dict[str, Any]], audit_input: AuditInput) -> li
             AuditStatus.PASS,
             "All timestamps are parseable, ordered, and on or before the declared cutoff.",
             f"cutoff={audit_input.evaluation_cutoff_utc}",
+            f"series={len(parsed_by_series)}" if grouped else "series=whole dataset",
         )
     ]
 
@@ -603,6 +620,8 @@ def _benchmark_checks(results: dict[str, Any]) -> list[AuditCheck]:
             "A finite strategy_net_return is required for comparison.",
         )
     elif float(strategy_return) <= max(value for _, value in values):
+        # Still blocking, and deliberately labelled RESULT: losing to the
+        # benchmark is a correctly measured outcome, not a flaw in the method.
         comparison = _check(
             "NET_BENCHMARK_RESULT",
             "economics",
@@ -610,6 +629,7 @@ def _benchmark_checks(results: dict[str, Any]) -> list[AuditCheck]:
             "Net strategy return does not exceed every declared benchmark.",
             f"strategy_net_return={float(strategy_return)}",
             f"best_benchmark_net_return={max(value for _, value in values)}",
+            finding_class=FindingClass.RESULT,
         )
     else:
         comparison = _check(
@@ -619,6 +639,7 @@ def _benchmark_checks(results: dict[str, Any]) -> list[AuditCheck]:
             "Net strategy return exceeds every declared benchmark.",
             f"strategy_net_return={float(strategy_return)}",
             f"best_benchmark_net_return={max(value for _, value in values)}",
+            finding_class=FindingClass.RESULT,
         )
     return [declared, comparison]
 
@@ -705,8 +726,14 @@ def _aggregate(checks: tuple[AuditCheck, ...]) -> AuditVerdict:
     )
 
 
-def run_audit(audit_input: AuditInput) -> AuditBundle:
-    """Evaluate local evidence and return a deterministic, fail-closed bundle."""
+def run_audit(audit_input: AuditInput, *, redact: bool = False) -> AuditBundle:
+    """Evaluate local evidence and return a deterministic, fail-closed bundle.
+
+    With ``redact`` the emitted bundle carries file names instead of absolute
+    paths, so a delivered report does not disclose either party's directory
+    layout.  Files are still read from the real paths; only what is written out
+    changes, and the bundle stays verifiable from its own bytes.
+    """
     _parse_utc(audit_input.evaluation_cutoff_utc)
     if (
         isinstance(audit_input.max_file_size_bytes, bool)
@@ -757,12 +784,13 @@ def run_audit(audit_input: AuditInput) -> AuditBundle:
         )
     )
     checks_tuple = tuple(checks)
+    reported_input = audit_input.redacted() if redact else audit_input
     job_seed = canonical_dumps(
-        {"audit_input": audit_input.to_dict(), "input_hashes": dict(input_hashes)}
+        {"audit_input": reported_input.to_dict(), "input_hashes": dict(input_hashes)}
     )
     job = AuditJob(job_id=f"audit-{sha256_of_text(job_seed)[:20]}")
     return AuditBundle(
-        audit_input=audit_input,
+        audit_input=reported_input,
         job=job,
         input_hashes=input_hashes,
         checks=checks_tuple,
