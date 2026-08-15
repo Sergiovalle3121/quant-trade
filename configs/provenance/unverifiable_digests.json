@@ -112,6 +112,27 @@
       "expected_at": "derived from configs/experiments/binance_liquid_xsmom_30d_top20_weekly_v1.yaml",
       "why_not_committed": "the YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
       "consequence": "the loader recomputes the seal and any change to the blocked one-trial declaration invalidates it; this registration is not evidence of profitability or an independent preregistration timestamp"
+    },
+    {
+      "sha256": "98c3cc11d38c9aa08e48baf404fb93b09c7862cef5a955f2263772b3196000c5",
+      "names": "the canonical in-memory policy hash for the BTC cash-and-carry feasibility schema v1",
+      "expected_at": "derived from the frozen policy constants in quant_trade.research.prospective_carry_feasibility",
+      "why_not_committed": "the value identifies a canonical policy mapping rather than standalone file bytes; the implementation and its tests are committed",
+      "consequence": "the hash documents the fail-closed feasibility policy only; it is not market evidence, performance evidence or authorization to trade derivatives"
+    },
+    {
+      "sha256": "d99c9bd28cb7b8d7f3be33c148ff3291863a10543429c57c6f54b6037171d82c",
+      "names": "the public CoinDesk Data OpenAPI snapshot observed for the world-order-flow procurement assessment",
+      "expected_at": "an external provider-documentation response observed on 2026-08-14 and deliberately not committed",
+      "why_not_committed": "the multi-megabyte provider documentation response is external mutable content and repository policy excludes provider-response caches",
+      "consequence": "the procurement note can name the exact observation but cannot reproduce it from this checkout; it grants no license and clears no data-feasibility blocker"
+    },
+    {
+      "sha256": "5d2c57f22a4437b3064a596b3dd804c7e1e683b3228d4a5d6901e73f1053c540",
+      "names": "the canonical in-memory seal of SPY_TOM_Dm1_P3_v1",
+      "expected_at": "derived from configs/experiments/spy_tom_dm1_p3_v1.yaml",
+      "why_not_committed": "the committed YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
+      "consequence": "the loader recomputes and verifies the seal; it is local content addressing, not an external timestamp, performance evidence or trading authorization"
     }
   ]
 }
