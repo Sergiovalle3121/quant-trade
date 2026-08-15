@@ -62,12 +62,26 @@ timestamp causality, next-bar execution, costs, benchmarks, and the trial
 ledger without executing customer code or using the network:
 
 ```bash
+quant-trade audit init --package-dir ./my-research --evaluation-cutoff-utc "2024-12-31T23:59:59Z"
 quant-trade audit run --config configs/audit/clean.yaml --out-dir artifacts/audit-clean
+quant-trade audit verify --bundle artifacts/audit-clean/audit.json
 ```
 
+`init` builds the package skeleton with both SHA-256 digests already computed,
+so a clerical slip cannot masquerade as unbound results; `verify` recomputes a
+delivered bundle's digest from its own bytes, needing no access to the original
+inputs. `run` exits 0/1/2 for PASS/INSUFFICIENT_EVIDENCE/NO_GO and takes
+`--redact` to keep local paths out of a delivered report. Row ordering is checked
+per instrument, so a panel exported as `(symbol, timestamp)` is causal rather
+than a false `NO_GO`. Every check carries `finding_class`: `DEFECT` for an error
+in the method, `RESULT` for a correctly measured outcome such as not beating a
+benchmark — the verdict is unchanged, the report just stops conflating the two.
+
 It emits deterministic JSON/HTML and always leaves
-`real_money_authorized=false`. See `docs/QUANT_RESEARCH_AUDITOR.md` and the
-bounded customer-validation process in `docs/AUDIT_PILOT_PLAYBOOK.md`.
+`real_money_authorized=false`. Sample outputs are committed under
+`artifacts/audit-sample/`. See `docs/QUANT_RESEARCH_AUDITOR.md`, the bounded
+customer-validation process in `docs/AUDIT_PILOT_PLAYBOOK.md`, and the pilot
+packaging in `docs/CLAUDE_REVENUE_PILOT.md`.
 
 ### Single experiment
 
@@ -219,6 +233,28 @@ Small-capital arithmetic is kept separate from strategy evidence. The
 fail-closed planner distinguishes total risk capital from a canary and flags
 the 1,000x-in-one-month shortcut as `NO_GO`; it never authorizes a deposit or
 profit claim. See `docs/WEALTH_BUILDING_PLAN.md`.
+
+Two further arithmetic gates run before any data is opened, so a target or a
+strategy family that could never have worked does not consume a trial:
+
+```bash
+quant-trade wealth target-feasibility --start 100 --target 1000000 --days 30
+```
+
+`quant_trade.ops.growth_feasibility` adds the stochastic layer the planner
+lacks. Under a declared lognormal model, raising volatility does not
+monotonically raise the chance of a large multiple: the variance drag caps it at
+a finite optimum, and at that optimum the median outcome is exactly the starting
+capital divided by the target multiple. Reaching 10,000x in 30 days therefore
+tops out at about 1 in 112,915 with no edge, and would need a net Sharpe of 9.23
+for even a 5% chance — no volatility, leverage, or sizing changes that.
+`quant_trade.ops.family_screen` applies the same discipline to a strategy
+family, naming the binding constraint (`min_notional`, `cost_drag`,
+`fixed_data_cost`, `data_license`, `no_point_in_time_data`). Both are pure
+functions, emit `ASSUMPTION`-classed output, and authorize nothing. The applied
+results, the venue matrix, and the family matrix are in
+`docs/CLAUDE_ALPHA_SEARCH_REPORT.md`; the audit-pilot counterpart is
+`docs/CLAUDE_REVENUE_PILOT.md`.
 
 Net-money measurement is also separate from alpha. The offline MXN tax-lot
 ledger reconciles FIFO inventory, event-time FX, fees, observed slippage,
