@@ -7,6 +7,10 @@ from typing import Annotated
 
 import typer
 
+from quant_trade.ops.growth_feasibility import (
+    TargetFeasibilityRequest,
+    evaluate_target_feasibility,
+)
 from quant_trade.ops.wealth_plan import GrowthGoal, WealthPlanRequest, evaluate_wealth_plan
 
 wealth_app = typer.Typer(
@@ -69,6 +73,58 @@ def assess_wealth_plan(
                 illustrative_annual_return_fraction=illustrative_annual_return_fraction,
                 monthly_contribution=monthly_contribution,
             ),
+        )
+    )
+    typer.echo(json.dumps(result.to_dict(), sort_keys=True))
+
+
+@wealth_app.command("target-feasibility")
+def assess_target_feasibility(
+    start: Annotated[
+        float, typer.Option(help="Starting capital in USD, treated as a real constraint.")
+    ],
+    target: Annotated[float, typer.Option(help="Target capital in USD.")],
+    days: Annotated[int, typer.Option(help="Horizon length, in --basis days.")],
+    basis: Annotated[
+        str, typer.Option(help="CALENDAR or TRADING; decides days per year.")
+    ] = "CALENDAR",
+    sharpe: Annotated[
+        float, typer.Option(help="Assumed net-of-cost Sharpe. An assumption, never a measurement.")
+    ] = 0.0,
+    volatility: Annotated[
+        float, typer.Option(help="Assumed annual volatility as a fraction, e.g. 0.30.")
+    ] = 0.30,
+    kelly_fraction: Annotated[
+        float, typer.Option(help="Fraction of the growth-optimal long position.")
+    ] = 0.5,
+    annual_round_trips: Annotated[
+        float, typer.Option(help="Full position rotations per year.")
+    ] = 0.0,
+    round_trip_cost_bps: Annotated[
+        float, typer.Option(help="All-in cost of one round trip, in basis points.")
+    ] = 0.0,
+    monthly_fixed_cost_usd: Annotated[
+        float, typer.Option(help="Data and tooling paid monthly regardless of activity.")
+    ] = 0.0,
+) -> None:
+    """Print whether a target is reachable under declared assumptions.
+
+    Reports the required compound return, the volatility that maximises the
+    chance of success, the ceiling on that chance, and the Sharpe each ceiling
+    would demand.  It never establishes expected profit or authorises money.
+    """
+    result = evaluate_target_feasibility(
+        TargetFeasibilityRequest(
+            starting_capital_usd=start,
+            target_capital_usd=target,
+            horizon_days=days,
+            horizon_basis=basis,
+            assumed_net_sharpe=sharpe,
+            assumed_annual_volatility=volatility,
+            kelly_fraction=kelly_fraction,
+            annual_round_trips=annual_round_trips,
+            round_trip_cost_bps=round_trip_cost_bps,
+            monthly_fixed_cost_usd=monthly_fixed_cost_usd,
         )
     )
     typer.echo(json.dumps(result.to_dict(), sort_keys=True))
