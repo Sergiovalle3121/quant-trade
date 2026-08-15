@@ -1,0 +1,20 @@
+title = "quant-trade secret scanning"
+
+[extend]
+useDefault = true
+
+# The default generic API-key rule interprets this dataclass type annotation as
+# a high-entropy assignment. It is not key material: the test constructs its
+# deterministic Ed25519 fixture separately from bytes(range(1, 33)). Keep the
+# exception pinned to the original commit, exact path, exact line, and rule so
+# no future secret-looking value is suppressed.
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Synthetic Ed25519 fixture type annotation false positive"
+  condition = "AND"
+  regexTarget = "secret"
+  commits = ["fff22724359c885de3ac45fe6ff1d5fbc3cff1bc"]
+  paths = ['''^tests/test_ccdata_attested_loader\.py$''']
+  regexes = ['''^Ed25519PrivateKey$''']

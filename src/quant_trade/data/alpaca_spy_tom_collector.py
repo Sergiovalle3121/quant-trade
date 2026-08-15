@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import importlib
 import json
 import math
 import os
@@ -27,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
@@ -141,6 +142,54 @@ class ReadOnlyTransport(Protocol):
         headers: Mapping[str, str],
         timeout_seconds: float,
     ) -> HttpResponse: ...
+
+
+class _WindowsFileLockApi(Protocol):
+    """Typed subset of ``msvcrt`` used for non-blocking file locks."""
+
+    LK_NBLCK: int
+    LK_UNLCK: int
+
+    def locking(self, file_descriptor: int, mode: int, byte_count: int, /) -> None: ...
+
+
+class _PosixFileLockApi(Protocol):
+    """Typed subset of ``fcntl`` used for non-blocking file locks."""
+
+    LOCK_EX: int
+    LOCK_NB: int
+    LOCK_UN: int
+
+    def flock(self, file_descriptor: int, operation: int, /) -> None: ...
+
+
+def _windows_file_lock_api() -> _WindowsFileLockApi:
+    return cast(_WindowsFileLockApi, importlib.import_module("msvcrt"))
+
+
+def _posix_file_lock_api() -> _PosixFileLockApi:
+    return cast(_PosixFileLockApi, importlib.import_module("fcntl"))
+
+
+def _lock_file_descriptor(file_descriptor: int) -> None:
+    if os.name == "nt":
+        windows_lock_api = _windows_file_lock_api()
+        windows_lock_api.locking(file_descriptor, windows_lock_api.LK_NBLCK, 1)
+        return
+    posix_lock_api = _posix_file_lock_api()
+    posix_lock_api.flock(
+        file_descriptor,
+        posix_lock_api.LOCK_EX | posix_lock_api.LOCK_NB,
+    )
+
+
+def _unlock_file_descriptor(file_descriptor: int) -> None:
+    if os.name == "nt":
+        windows_lock_api = _windows_file_lock_api()
+        windows_lock_api.locking(file_descriptor, windows_lock_api.LK_UNLCK, 1)
+        return
+    posix_lock_api = _posix_file_lock_api()
+    posix_lock_api.flock(file_descriptor, posix_lock_api.LOCK_UN)
 
 
 class RequestsReadOnlyTransport:
@@ -297,14 +346,7 @@ class _CollectionMutex:
                 if handle.read(2) != b"\0":
                     raise AlpacaSpyTomCollectorError("COLLECTION_LOCK_FILE_IS_UNSAFE")
             handle.seek(0)
-            if os.name == "nt":
-                import msvcrt
-
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                fcntl: Any = __import__("fcntl")
-
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _lock_file_descriptor(handle.fileno())
         except AlpacaSpyTomCollectorError:
             handle.close()
             raise
@@ -323,14 +365,7 @@ class _CollectionMutex:
             return
         with contextlib.suppress(OSError):
             handle.seek(0)
-            if os.name == "nt":
-                import msvcrt
-
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl: Any = __import__("fcntl")
-
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            _unlock_file_descriptor(handle.fileno())
         handle.close()
 
 
