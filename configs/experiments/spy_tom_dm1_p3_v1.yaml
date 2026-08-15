@@ -1,0 +1,84 @@
+schema_version: 1
+strategy_id: SPY_TOM_Dm1_P3_v1
+campaign_mode: PAPER_RESEARCH_ONLY
+symbol: SPY
+trial_budget: 1
+source_hypothesis:
+  citation: McConnell and Xu (2008), Equity Returns at the Turn of the Month
+  doi: 10.2469/faj.v64.n2.11
+  published_result: a four-day U.S. equity turn-of-month return concentration over 1926-2005
+  translation: SPY fractional target from the penultimate session close window through the third session of the next month
+  exact_replication: false
+capital_policy:
+  paper_starting_capital_cents: 20000
+  maximum_gross_exposure_cents: 19500
+  minimum_cash_reserve_cents: 500
+  entry_target_exposure_cents: 19500
+  fractional_shares_required: true
+  allow_exposure_above_capital: false
+calendar_policy:
+  calendar_id: XNYS
+  timezone: America/New_York
+  calendar_must_be_explicit: true
+  calendar_months_must_be_declared_complete: true
+  per_session_open_close_required: true
+  authoritative_source_receipt_and_hash_required: true
+  shortened_required_session_action: EXCLUDE_ENTIRE_PAIR_NO_FALLBACK
+  market_open_local: '09:30:00'
+  market_close_local: '16:00:00'
+window_policy:
+  decision_local_time: '15:55:00'
+  earliest_execution_local_offset_minutes: 1
+  expiry_local_time: '15:58:00'
+  primary_entry_session: PENULTIMATE_SESSION_OF_MONTH
+  primary_exit_session_next_month: 3
+  control_entry_session_next_month: 8
+  control_exit_session_next_month: 12
+  primary_holding_intervals: 4
+  control_holding_intervals: 4
+  missing_observation_action: NO_INTENTION_NO_FALLBACK
+  same_bar_execution_allowed: false
+  price_input_allowed: false
+sample_policy:
+  minimum_paired_months: 120
+  comparison: PRIMARY_MINUS_SAME_MONTH_DAY8_TO_DAY12_CONTROL
+  all_historical_data_classification: DEVELOPMENT_ONLY
+  historical_result_may_be_called_holdout: false
+  parameter_search_allowed: false
+  interim_rule_change_allowed: false
+return_accounting:
+  total_return_required: true
+  price_return_only_allowed: false
+  point_in_time_corporate_action_receipts_required: true
+  cash_dividend_policy: CREDIT_IF_HELD_AT_EX_DATE_OPEN
+  split_policy: ADJUST_QUANTITY_AT_EFFECTIVE_SESSION_OPEN
+  missing_dividend_or_split_evidence_action: INSUFFICIENT_EVIDENCE
+instrument_policy:
+  allowed_symbols:
+    - SPY
+  position_mode: LONG_OR_CASH
+  fractional: true
+  leverage_allowed: false
+  shorts_allowed: false
+  options_allowed: false
+  stops_allowed: false
+  dynamic_parameters_allowed: false
+verdict_policy:
+  allowed_verdicts:
+    - NO_GO
+    - INSUFFICIENT_EVIDENCE
+  pass_verdict_allowed: false
+  maximum_verdict: INSUFFICIENT_EVIDENCE
+  minimum_paired_months_before_evaluation: 120
+  paper_profit_is_live_evidence: false
+authorization:
+  research_only: true
+  paper_observation_only: true
+  paper_order_routing_enabled: false
+  strategy_registry_enabled: false
+  network_enabled: false
+  credential_access_enabled: false
+  live_execution_enabled: false
+  real_money_authorized: false
+  bank_transfer_authorized: false
+seal: 5d2c57f22a4437b3064a596b3dd804c7e1e683b3228d4a5d6901e73f1053c540
