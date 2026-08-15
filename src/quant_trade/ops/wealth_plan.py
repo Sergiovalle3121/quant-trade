@@ -14,6 +14,19 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
+from quant_trade.ops.arithmetic_guards import (
+    finite_number,
+    invalid_safe,
+    positive_integer,
+    qualified_type_name,
+)
+
+# Single implementation of the input guards, shared with the other fail-closed
+# arithmetic modules; these aliases keep this module's call sites unchanged.
+_qualified_type_name = qualified_type_name
+_invalid_safe = invalid_safe
+_number = finite_number
+_positive_integer = positive_integer
 
 WealthPlanStatus = Literal["FEASIBLE", "NO_GO", "INSUFFICIENT_EVIDENCE"]
 Workstream = Literal["AUDIT_REVENUE", "H2_RESEARCH"]
@@ -203,61 +216,6 @@ class WealthPlanAssessment:
             "real_money_authorized": False,
             "profit_claim_authorized": False,
         }
-
-
-def _qualified_type_name(value: Any) -> str:
-    return f"{type(value).__module__}.{type(value).__qualname__}"
-
-
-def _invalid_safe(value: Any) -> Any:
-    """Represent rejected values canonically so even bad requests are hash-bound."""
-    if isinstance(value, float) and not math.isfinite(value):
-        label = "NaN" if math.isnan(value) else "Infinity" if value > 0 else "-Infinity"
-        return {"__invalid_float__": label}
-    if isinstance(value, dict):
-        return {str(key): _invalid_safe(child) for key, child in value.items()}
-    if isinstance(value, list | tuple):
-        return [_invalid_safe(child) for child in value]
-    if value is None or isinstance(value, str | int | float | bool):
-        return value
-    return {"__invalid_type__": _qualified_type_name(value)}
-
-
-def _number(
-    value: Any,
-    name: str,
-    missing: list[str],
-    blockers: list[str],
-    *,
-    allow_zero: bool = False,
-) -> float | None:
-    if value is None:
-        missing.append(name)
-        return None
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        blockers.append(f"{name} must be a finite number")
-        return None
-    number = float(value)
-    if not math.isfinite(number) or number < 0 or (number == 0 and not allow_zero):
-        qualifier = "non-negative" if allow_zero else "positive"
-        blockers.append(f"{name} must be finite and {qualifier}")
-        return None
-    return number
-
-
-def _positive_integer(
-    value: Any,
-    name: str,
-    missing: list[str],
-    blockers: list[str],
-) -> int | None:
-    if value is None:
-        missing.append(name)
-        return None
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        blockers.append(f"{name} must be a positive integer")
-        return None
-    return value
 
 
 def _currency(value: Any, missing: list[str], blockers: list[str]) -> str | None:
