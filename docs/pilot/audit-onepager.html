@@ -1,0 +1,641 @@
+<title>Backtest Evidence Audit</title>
+<style>
+  :root {
+    --ground: #F2F4F3;
+    --raised: #FBFCFB;
+    --ink: #14181B;
+    --ink-soft: #4C5A56;
+    --ink-faint: #74827D;
+    --rule: #C9D1CE;
+    --rule-soft: #DFE5E2;
+    --bind: #0B5D4A;
+    --bind-wash: #E2EDE8;
+    --block: #A32B1C;
+    --block-wash: #F6E6E2;
+    --missing: #8A6A12;
+    --missing-wash: #F4EEDD;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Menlo", "Consolas",
+      "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101414;
+      --raised: #171D1C;
+      --ink: #E4EAE7;
+      --ink-soft: #A3B0AC;
+      --ink-faint: #74827D;
+      --rule: #2A3331;
+      --rule-soft: #202826;
+      --bind: #4FBF9E;
+      --bind-wash: #14302A;
+      --block: #E0725F;
+      --block-wash: #331C18;
+      --missing: #D2A83F;
+      --missing-wash: #2E2716;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #101414;
+    --raised: #171D1C;
+    --ink: #E4EAE7;
+    --ink-soft: #A3B0AC;
+    --ink-faint: #74827D;
+    --rule: #2A3331;
+    --rule-soft: #202826;
+    --bind: #4FBF9E;
+    --bind-wash: #14302A;
+    --block: #E0725F;
+    --block-wash: #331C18;
+    --missing: #D2A83F;
+    --missing-wash: #2E2716;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 1.5rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+
+  /* ---- masthead ---------------------------------------------------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    padding-top: 4.5rem;
+  }
+
+  .stamp {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--bind);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .stamp::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(1.9rem, 4.6vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 20ch;
+  }
+
+  .standfirst {
+    font-size: clamp(1.05rem, 1.9vw, 1.25rem);
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- sections ---------------------------------------------------- */
+
+  section { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.4rem;
+  }
+
+  p { margin: 0; max-width: 66ch; }
+  p + p { margin-top: 0.9rem; }
+  .lede { font-size: 1.05rem; }
+
+  /* ---- verdict demo ------------------------------------------------ */
+
+  .demo {
+    border: 1px solid var(--rule);
+    background: var(--raised);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .demo-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .demo-bar .label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-right: 0.4rem;
+  }
+
+  button.tab {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--rule);
+    padding: 0.35rem 0.8rem;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+
+  button.tab:hover { border-color: var(--ink-faint); color: var(--ink); }
+
+  button.tab[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--ground);
+  }
+
+  button.tab:focus-visible {
+    outline: 2px solid var(--bind);
+    outline-offset: 2px;
+  }
+
+  .verdict-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6rem 1.25rem;
+    padding: 1.1rem 1rem;
+    border-bottom: 1px solid var(--rule-soft);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+  }
+
+  .verdict-badge {
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.6rem;
+  }
+
+  .verdict-badge[data-state="PASS"] { color: var(--bind); background: var(--bind-wash); }
+  .verdict-badge[data-state="NO_GO"] { color: var(--block); background: var(--block-wash); }
+
+  .digest { color: var(--ink-faint); word-break: break-all; }
+
+  .checks { display: flex; flex-direction: column; }
+
+  .check {
+    display: grid;
+    grid-template-columns: 7.5rem 5.5rem 1fr;
+    gap: 0.35rem 1rem;
+    align-items: baseline;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .check:last-child { border-bottom: 0; }
+
+  .check .state {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .check[data-state="PASS"] .state { color: var(--bind); }
+  .check[data-state="NO_GO"] .state { color: var(--block); }
+  .check[data-state="INSUFFICIENT_EVIDENCE"] .state { color: var(--missing); }
+
+  .check .cls {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+  }
+
+  .check .body { font-size: 0.9rem; line-height: 1.5; }
+
+  .check .code {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: block;
+  }
+
+  .check .why { color: var(--ink-soft); }
+
+  .demo-foot {
+    padding: 0.9rem 1rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+
+  /* ---- grids ------------------------------------------------------- */
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+
+  .card {
+    background: var(--ground);
+    padding: 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .card p { font-size: 0.92rem; color: var(--ink-soft); }
+
+  ul.plain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    max-width: 66ch;
+  }
+
+  ul.plain li {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.75rem;
+    align-items: start;
+  }
+
+  ul.plain li::before {
+    content: attr(data-mark);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--bind);
+    line-height: 1.65;
+  }
+
+  ul.plain li[data-mark="✕"]::before { color: var(--block); }
+
+  /* ---- boundary panel ---------------------------------------------- */
+
+  .boundary {
+    border-left: 3px solid var(--bind);
+    background: var(--bind-wash);
+    padding: 1.5rem 1.5rem 1.5rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .boundary h3 { color: var(--ink); }
+  .boundary p { color: var(--ink-soft); }
+
+  /* ---- close ------------------------------------------------------- */
+
+  .close {
+    border-top: 2px solid var(--ink);
+    padding-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .ask {
+    font-family: var(--mono);
+    font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+    max-width: 34ch;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .contact {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    border: 1px dashed var(--rule);
+    padding: 0.9rem 1rem;
+    max-width: 34rem;
+  }
+
+  footer {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: 1.25rem;
+  }
+
+  @media (max-width: 34rem) {
+    .check { grid-template-columns: 1fr; gap: 0.15rem; }
+    .check .cls { letter-spacing: 0.06em; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="stamp">Independent research verification</div>
+    <h1>Does your backtest mean what you think it means?</h1>
+    <p class="standfirst">
+      A bounded, offline audit of a quantitative research package. It checks whether
+      your results are <strong>bound to the bytes you say produced them</strong>, whether your
+      timestamps are causal, whether you executed after you decided, whether you paid
+      realistic costs, and whether you counted every variant you tried &mdash; not just the
+      one that won.
+    </p>
+    <p class="standfirst">
+      It runs on your machine. It never executes your code and never touches the network.
+    </p>
+  </header>
+
+  <section>
+    <h2>The same twelve checks, two packages</h2>
+    <p class="lede">
+      Below is real output, not a mockup. Two research packages of identical shape: one
+      clean, one deliberately contaminated with the four mistakes that most often make a
+      backtest look profitable. Switch between them.
+    </p>
+
+    <div class="demo">
+      <div class="demo-bar">
+        <span class="label">Package</span>
+        <button class="tab" type="button" data-pkg="clean" aria-pressed="true">clean</button>
+        <button class="tab" type="button" data-pkg="contaminated" aria-pressed="false">contaminated</button>
+      </div>
+
+      <div class="verdict-line">
+        <span class="verdict-badge" id="verdict" data-state="PASS">PASS</span>
+        <span id="tally">12 passed &middot; 0 blocking &middot; 0 missing</span>
+        <span class="digest" id="digest">sha256 444b2167d12b9f2b&hellip;</span>
+      </div>
+
+      <div class="checks" id="checks"></div>
+
+      <p class="demo-foot" id="foot"></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What the four contaminations actually are</h2>
+    <div class="cards">
+      <div class="card">
+        <h3>Look-ahead</h3>
+        <p>
+          A column carrying information from the future, or a timestamp after the cutoff
+          the research declared. The strategy knew something on Tuesday that nobody knew
+          until Friday.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Same-bar execution</h3>
+        <p>
+          Deciding and filling at the same price. The most common way to manufacture a
+          profitable backtest without noticing you did it.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Unbound results</h3>
+        <p>
+          The results declare a dataset hash that does not match the dataset supplied. The
+          numbers were not produced from the data they claim.
+        </p>
+      </div>
+      <div class="card">
+        <h3>An unaccounted search</h3>
+        <p>
+          Fifty-eight variants tried, one reported. The deflated Sharpe ratio prices that
+          in, and a result that looked strong often survives it at roughly zero.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What you get</h2>
+    <ul class="plain">
+      <li data-mark="→">A content-addressed SHA-256 for every input the audit accepted.</li>
+      <li data-mark="→">A tri-state verdict &mdash; PASS, NO_GO, or INSUFFICIENT_EVIDENCE &mdash; with each finding labelled DEFECT (an error in the method) or RESULT (a correctly measured outcome, such as not beating your benchmark).</li>
+      <li data-mark="→">Check-level findings in deterministic JSON, plus a standalone HTML report.</li>
+      <li data-mark="→">A digest your own counterparty can recompute from the report's bytes, with no access to your data and no trust in me.</li>
+      <li data-mark="→">A thirty-minute walkthrough of the findings and a short remediation list.</li>
+    </ul>
+    <p>
+      Priced per package, quoted after I see the scope. No subscription, no seat, no
+      platform to log into.
+    </p>
+  </section>
+
+  <section>
+    <h2>The boundary</h2>
+    <div class="boundary">
+      <div>
+        <h3>Your data does not leave your machine</h3>
+        <p>
+          The audit reads bounded local CSV or JSON. It imports no customer module,
+          evaluates no expression, shells out to nothing, and opens no socket. Delivered
+          reports can be redacted so they carry file names rather than paths.
+        </p>
+      </div>
+      <div>
+        <h3>I never take credentials</h3>
+        <p>
+          No API keys, no account exports, no order endpoints, no personal data. If your
+          package contains any of it, that is a reason to stop, not to proceed.
+        </p>
+      </div>
+      <div>
+        <h3>Nothing here authorizes money</h3>
+        <p>
+          Every verdict permanently exports
+          <code>real_money_authorized=false</code> and
+          <code>expected_profit_established=false</code>. Constructing a verdict with
+          either set to true raises an exception &mdash; it is an invariant of the code, not a
+          promise in a document.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What this is not</h2>
+    <ul class="plain">
+      <li data-mark="✕">Not a claim that your strategy will make money. The audit does not score expected returns and cannot.</li>
+      <li data-mark="✕">Not an independent reproduction of your numbers. Your costs, benchmarks, net return and execution lag are read as declared, never recomputed from the data. The honest claim is that a package is <em>internally consistent and byte-bound</em> &mdash; which is a narrower thing than the word "audit" invites you to assume, and I would rather say so now than argue about it later.</li>
+      <li data-mark="✕">Not statistical validation in full. Walk-forward independence, concentration and capacity are outside this scope rather than quietly represented as covered.</li>
+      <li data-mark="✕">Not investment advice, signals, custody, pooled capital, or managed accounts.</li>
+    </ul>
+  </section>
+
+  <section class="close">
+    <p class="ask">
+      Three research teams, one bounded package each. Twenty minutes about how you review
+      research today.
+    </p>
+    <p>
+      If you have artifacts &mdash; a dataset extract, a results file, a record of what you
+      tried &mdash; that is enough to run the audit. If the last research error that reached
+      review cost you something, I would rather hear about that than pitch you.
+    </p>
+    <div class="contact">
+      [ your contact goes here &mdash; email or a scheduling link ]
+    </div>
+  </section>
+
+  <footer>
+    Research evidence only &middot; No real-money authorization &middot; No network access
+  </footer>
+
+</div>
+
+<script>
+  const PACKAGES = {
+    clean: {
+      verdict: "PASS",
+      tally: "12 passed &middot; 0 blocking &middot; 0 missing",
+      digest: "sha256 444b2167d12b9f2b&hellip;",
+      foot: "Every declared check passed. That means the evidence is complete and consistent — not that the strategy is profitable.",
+      checks: [
+        ["PASS","DEFECT","INPUT_BYTES","Every supplied input was read as bounded local bytes and hashed."],
+        ["PASS","DEFECT","DATASET_SCHEMA","Dataset contains every declared required column."],
+        ["PASS","DEFECT","LOOKAHEAD_COLUMNS","No future, lead, or target-return column signature was found."],
+        ["PASS","DEFECT","TIMESTAMP_CAUSALITY","Timestamps are parseable, ordered within each instrument, and on or before the cutoff."],
+        ["PASS","DEFECT","MANIFEST_PROVENANCE","Manifest hash, size, source, capture time and usage rights all check out."],
+        ["PASS","DEFECT","RESULT_DATASET_BINDING","Results are bound to the supplied dataset bytes."],
+        ["PASS","DEFECT","NEXT_BAR_EXECUTION","Signals execute at least one bar after observation."],
+        ["PASS","DEFECT","COSTS_DECLARED","Applied fees and slippage are explicitly declared."],
+        ["PASS","DEFECT","BENCHMARKS_DECLARED","At least one finite net benchmark result is declared."],
+        ["PASS","RESULT","NET_BENCHMARK_RESULT","Net strategy return exceeds every declared benchmark."],
+        ["PASS","DEFECT","TRIAL_LEDGER","Trial ledger is non-empty, uniquely identified, and byte-bound to results."],
+        ["PASS","DEFECT","SAFETY_BOUNDARY","Audit was local-only, executed no customer code, and cannot authorize real money."]
+      ]
+    },
+    contaminated: {
+      verdict: "NO_GO",
+      tally: "5 passed &middot; 7 blocking &middot; 0 missing",
+      digest: "sha256 54eb3300d99b4016&hellip;",
+      foot: "Seven independent blocking findings. Six are defects in how the result was produced; one is the result itself.",
+      checks: [
+        ["PASS","DEFECT","INPUT_BYTES","Every supplied input was read as bounded local bytes and hashed."],
+        ["PASS","DEFECT","DATASET_SCHEMA","Dataset contains every declared required column."],
+        ["NO_GO","DEFECT","LOOKAHEAD_COLUMNS","Column names indicate future information in the research dataset."],
+        ["NO_GO","DEFECT","TIMESTAMP_CAUSALITY","Timestamps are invalid, after the cutoff, or precede feature availability."],
+        ["NO_GO","DEFECT","MANIFEST_PROVENANCE","Manifest is not bound to the supplied dataset bytes."],
+        ["NO_GO","DEFECT","RESULT_DATASET_BINDING","Results were not produced from the supplied dataset bytes."],
+        ["NO_GO","DEFECT","NEXT_BAR_EXECUTION","Signals are executed on the same bar or use an invalid lag."],
+        ["NO_GO","DEFECT","COSTS_DECLARED","Costs are absent, not applied, negative, or non-finite."],
+        ["PASS","DEFECT","BENCHMARKS_DECLARED","At least one finite net benchmark result is declared."],
+        ["NO_GO","RESULT","NET_BENCHMARK_RESULT","Net strategy return does not exceed every declared benchmark."],
+        ["NO_GO","DEFECT","TRIAL_LEDGER","Trial identifiers are missing or duplicated."],
+        ["PASS","DEFECT","SAFETY_BOUNDARY","Audit was local-only, executed no customer code, and cannot authorize real money."]
+      ]
+    }
+  };
+
+  const checksEl = document.getElementById("checks");
+  const verdictEl = document.getElementById("verdict");
+  const tallyEl = document.getElementById("tally");
+  const digestEl = document.getElementById("digest");
+  const footEl = document.getElementById("foot");
+
+  function render(name) {
+    const pkg = PACKAGES[name];
+    verdictEl.textContent = pkg.verdict;
+    verdictEl.setAttribute("data-state", pkg.verdict);
+    tallyEl.innerHTML = pkg.tally;
+    digestEl.innerHTML = pkg.digest;
+    footEl.textContent = pkg.foot;
+    checksEl.replaceChildren(...pkg.checks.map(([state, cls, code, why]) => {
+      const row = document.createElement("div");
+      row.className = "check";
+      row.setAttribute("data-state", state);
+
+      const s = document.createElement("span");
+      s.className = "state";
+      s.textContent = state;
+
+      const c = document.createElement("span");
+      c.className = "cls";
+      c.textContent = cls;
+
+      const b = document.createElement("span");
+      b.className = "body";
+      const k = document.createElement("span");
+      k.className = "code";
+      k.textContent = code;
+      const w = document.createElement("span");
+      w.className = "why";
+      w.textContent = why;
+      b.append(k, w);
+
+      row.append(s, c, b);
+      return row;
+    }));
+  }
+
+  document.querySelectorAll("button.tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("button.tab").forEach((other) =>
+        other.setAttribute("aria-pressed", String(other === btn))
+      );
+      render(btn.dataset.pkg);
+    });
+  });
+
+  render("clean");
+</script>

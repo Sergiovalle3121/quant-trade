@@ -73,6 +73,23 @@ quant-trade audit verify --bundle ./salida/audit.json
 Un `FILL_ME` sin reemplazar nunca puede pasar: el auditor lo rechaza. Eso es
 deliberado — una plantilla que pasa sin llenarse no probaría nada.
 
+## La página de una sola hoja
+
+`docs/pilot/audit-onepager.html` es el material que se le enseña a un prospecto.
+Ábrelo local con doble clic, o publícalo como página compartible.
+
+Muestra la salida **real** de la herramienta sobre los dos paquetes commiteados,
+conmutables: el limpio da `PASS`, el contaminado da siete hallazgos bloqueantes,
+con los mismos doce códigos que emite `audit/runner.py`. No es una maqueta.
+
+Incluye a propósito una sección de límites — que los costos y benchmarks se leen
+como el cliente los declara y no se recalculan. Esa sección gana clientes en vez
+de perderlos: un investigador escéptico que lee una página honesta sobre sus
+propios límites confía en el resto de la página.
+
+Lo único sin llenar es el recuadro de contacto al final. Esa decisión es del
+operador, no de este repositorio.
+
 ## Guion de demo, dos minutos
 
 Corre los dos ejemplos ya commiteados y muestra la diferencia:
