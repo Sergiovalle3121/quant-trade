@@ -1,0 +1,125 @@
+schema_version: 1
+request_id: ccdata_world_order_flow_internal_proprietary_v1
+provider: CoinDesk Data / CCData
+commercial_status: QUOTE_REQUIRED
+purchase_authorized: false
+credentials_required_in_repo: false
+
+intended_use:
+  customer_type: pre-revenue individual research project
+  use_scope:
+    - internal commercial quantitative research
+    - backtesting with own infrastructure
+    - derived signals and risk metrics
+    - proprietary trading with the customer's own capital
+  prohibited_by_customer:
+    - raw-data redistribution
+    - client asset management
+    - paid signals
+    - public display of licensed data
+
+coverage:
+  asset_class: spot crypto
+  observation_start: 2018-01-01
+  development_cutoff: 2023-11-28
+  minimum_stable_assets: 84
+  preferred_assets: 100
+  quote_currencies:
+    - USD
+    - EUR
+    - GBP
+    - JPY
+    - CHF
+    - CAD
+    - AUD
+    - NZD
+    - NOK
+    - SEK
+    - KRW
+  venues: all supported constituent spot venues
+
+required_delivery:
+  granularity: daily, plus event-level correction evidence
+  historical_days_request:
+    operation_id: spot_v1_historical_days
+    groups: [ID, MAPPING, MAPPING_ADVANCED, OHLC, TRADE, VOLUME]
+    aggregate: 1
+    fill: false
+    apply_mapping: true
+    response_format: CSV
+  trade_audit_request:
+    operation_id: spot_v2_historical_trades_hour
+    skip_invalid_messages: false
+  fields:
+    - UNIT
+    - TIMESTAMP
+    - MARKET
+    - INSTRUMENT
+    - MAPPED_INSTRUMENT
+    - BASE
+    - QUOTE
+    - BASE_ID
+    - QUOTE_ID
+    - TRANSFORM_FUNCTION
+    - VOLUME_BUY
+    - VOLUME_SELL
+    - VOLUME_UNKNOWN
+    - QUOTE_VOLUME_BUY
+    - QUOTE_VOLUME_SELL
+    - QUOTE_VOLUME_UNKNOWN
+    - TOTAL_TRADES_BUY
+    - TOTAL_TRADES_SELL
+    - TOTAL_TRADES_UNKNOWN
+  correction_fields:
+    - CCSEQ
+    - SIDE
+    - SOURCE
+    - STATUS
+    - TIMESTAMP
+    - TIMESTAMP_NS
+    - RECEIVED_TIMESTAMP
+    - RECEIVED_TIMESTAMP_NS
+    - correction_or_invalidation_type
+    - revised_at_utc
+    - prior_status
+    - new_status
+  supporting_components:
+    - stable asset and instrument mapping history
+    - venue-constituent history
+    - side-classification methodology and version history
+    - correction and restatement policy
+    - immutable delivery manifest with SHA-256 per object
+    - dataset version, revision id, generated-at and as-of timestamps
+    - machine-readable schema with version
+
+licence_requirements:
+  commercial_use: required
+  own_account_trading: explicitly_permitted_in_writing
+  derived_signals_and_backtests: explicitly_permitted_in_writing
+  local_raw_storage: explicitly_permitted_in_writing
+  independent_auditor_access: quote_separately
+  redistribution: not_requested
+  quote_items:
+    - lowest-cost Start-Up or equivalent plan satisfying every required use
+    - one-time historical extract price
+    - ongoing prospective daily delivery price
+    - setup and delivery charges
+    - taxes
+    - minimum term
+    - cancellation and data-retention rights after termination
+
+acceptance:
+  sample_required_before_purchase: true
+  sample_scope: at least 10 assets, all 11 quotes, 30 observations, all constituent venues
+  signed_manifest_or_vendor_attestation_required: true
+  historical_vintage_or_replayable_correction_chain_required: true
+  current_restated_history_without_revision_evidence_is_insufficient: true
+  secrets_must_remain_outside_repository: true
+  pnl_or_real_money_authorized: false
+
+economic_acceptance:
+  planned_trading_capital_usd: 200
+  expected_annual_net_p25_usd: null
+  maximum_fixed_data_cost_usd: null
+  rule: expected annual net P&L at p25 must exceed two times all fixed costs
+  purchase_gate: INSUFFICIENT_EVIDENCE

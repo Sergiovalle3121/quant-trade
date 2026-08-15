@@ -23,6 +23,7 @@ cloud = [
 ]
 
 data = [
+  "cryptography>=50.0.0",
   "yfinance>=0.2",
   "requests>=2.31",
 ]
