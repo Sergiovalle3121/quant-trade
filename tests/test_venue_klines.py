@@ -6,7 +6,8 @@ injected-clock provenance. Fixtures only."""
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -54,8 +55,18 @@ def _binance_page(bars: list[tuple[int, float]]) -> HttpResponse:
         json.dumps(
             [
                 [
-                    ms, str(px), str(px * 1.1), str(px * 0.9), str(px), "10",
-                    ms + MS_PER_DAY - 1, "100", 5, "5", "50", "0",
+                    ms,
+                    str(px),
+                    str(px * 1.1),
+                    str(px * 0.9),
+                    str(px),
+                    "10",
+                    ms + MS_PER_DAY - 1,
+                    "100",
+                    5,
+                    "5",
+                    "50",
+                    "0",
                 ]
                 for ms, px in bars  # binance pages arrive oldest-first
             ]
@@ -101,9 +112,7 @@ def _collect(tmp_path, symbols, pages, *, venue=VENUE_BYBIT, start=None, end=Non
 
 def test_bybit_parse_rejects_relabelled_klines() -> None:
     with pytest.raises(ValueError, match="identity mismatch"):
-        parse_kline_page(
-            _bybit_page("ETHUSDT", [(DAY0, 1.0)]), symbol="BTCUSDT", venue=VENUE_BYBIT
-        )
+        parse_kline_page(_bybit_page("ETHUSDT", [(DAY0, 1.0)]), symbol="BTCUSDT", venue=VENUE_BYBIT)
 
 
 @pytest.mark.parametrize(
@@ -122,12 +131,8 @@ def test_binance_http_error_that_is_not_unlisted_is_a_parse_error() -> None:
 
 
 def test_both_venues_normalize_to_the_same_fields() -> None:
-    bybit = parse_kline_page(
-        _bybit_page("AUSDT", [(DAY0, 2.0)]), symbol="AUSDT", venue=VENUE_BYBIT
-    )
-    binance = parse_kline_page(
-        _binance_page([(DAY0, 2.0)]), symbol="AUSDT", venue=VENUE_BINANCE
-    )
+    bybit = parse_kline_page(_bybit_page("AUSDT", [(DAY0, 2.0)]), symbol="AUSDT", venue=VENUE_BYBIT)
+    binance = parse_kline_page(_binance_page([(DAY0, 2.0)]), symbol="AUSDT", venue=VENUE_BINANCE)
     assert bybit == binance  # identical rows despite opposite wire formats
 
 
@@ -190,9 +195,7 @@ def test_delisted_symbol_keeps_its_history_and_death_date(tmp_path) -> None:
         {"DEADUSDT": _bybit_page("DEADUSDT", bars)},
         end=date(2020, 1, 1),
     )
-    record = next(
-        r for r in read_journal(tmp_path / "journal.jsonl") if r.get("type") == "symbol"
-    )
+    record = next(r for r in read_journal(tmp_path / "journal.jsonl") if r.get("type") == "symbol")
     assert record["first_date"] == "2018-01-01"
     assert record["last_date"] == "2018-01-03"  # the series stops: that is the death
     series = (tmp_path / "series" / "DEADUSDT.jsonl").read_text(encoding="utf-8")
@@ -222,9 +225,7 @@ def test_listed_but_no_bars_is_its_own_outcome(tmp_path) -> None:
     result = _collect(tmp_path, ["QUIETUSDT"], {"QUIETUSDT": _bybit_page("QUIETUSDT", [])})
     assert result.symbols_empty == 1
     assert result.symbols_not_listed == 0
-    record = next(
-        r for r in read_journal(tmp_path / "journal.jsonl") if r.get("type") == "symbol"
-    )
+    record = next(r for r in read_journal(tmp_path / "journal.jsonl") if r.get("type") == "symbol")
     assert record["outcome"] == OUTCOME_EMPTY
 
 
@@ -234,6 +235,157 @@ def test_bars_past_the_window_end_are_not_written(tmp_path) -> None:
     series = (tmp_path / "series" / "AUSDT.jsonl").read_text(encoding="utf-8")
     rows = [json.loads(line) for line in series.splitlines()]
     assert rows[-1]["date"] == "2018-01-05"
+
+
+def test_binance_request_hard_binds_end_time(tmp_path) -> None:
+    urls: list[str] = []
+
+    def capture(url: str) -> HttpResponse:
+        urls.append(url)
+        return _binance_page([(DAY0, 1.0)])
+
+    _collect(
+        tmp_path,
+        ["AUSDT"],
+        capture,
+        venue=VENUE_BINANCE,
+        start=date(2018, 1, 1),
+        end=date(2018, 1, 5),
+    )
+    expected_end = DAY0 + 4 * MS_PER_DAY
+    assert urls and f"endTime={expected_end}" in urls[0]
+    receipts = [
+        json.loads(line)
+        for line in (tmp_path / "receipts.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert receipts[0]["request_parameters"] == {
+        "symbol": "AUSDT",
+        "start_ms": DAY0,
+        "end_ms": expected_end,
+    }
+
+
+def test_bybit_request_hard_binds_end_and_receipt_matches_url(tmp_path) -> None:
+    urls: list[str] = []
+
+    def capture(url: str) -> HttpResponse:
+        urls.append(url)
+        return _bybit_page("AUSDT", [(DAY0, 1.0)])
+
+    _collect(
+        tmp_path,
+        ["AUSDT"],
+        capture,
+        venue=VENUE_BYBIT,
+        start=date(2018, 1, 1),
+        end=date(2018, 1, 5),
+    )
+
+    assert len(urls) == 1
+    query = parse_qs(urlsplit(urls[0]).query)
+    expected = {
+        "symbol": "AUSDT",
+        "start_ms": DAY0,
+        "end_ms": DAY0 + 4 * MS_PER_DAY,
+    }
+    assert query["start"] == [str(expected["start_ms"])]
+    assert query["end"] == [str(expected["end_ms"])]
+    receipt = json.loads((tmp_path / "receipts.jsonl").read_text(encoding="utf-8"))
+    assert receipt["request_parameters"] == expected
+
+
+def test_bybit_newest_first_paginates_backwards_without_losing_old_history(tmp_path) -> None:
+    bars = [(DAY0 + index * MS_PER_DAY, 1.0 + index) for index in range(1_002)]
+    calls: list[tuple[int, int]] = []
+
+    def newest_page(url: str) -> HttpResponse:
+        query = parse_qs(urlsplit(url).query)
+        request_start = int(query["start"][0])
+        request_end = int(query["end"][0])
+        calls.append((request_start, request_end))
+        eligible = [bar for bar in bars if request_start <= bar[0] <= request_end]
+        return _bybit_page("AUSDT", eligible[-1_000:])
+
+    end = date(2018, 1, 1) + timedelta(days=len(bars) - 1)
+    result = _collect(
+        tmp_path,
+        ["AUSDT"],
+        newest_page,
+        venue=VENUE_BYBIT,
+        start=date(2018, 1, 1),
+        end=end,
+    )
+
+    assert result.status == "OK"
+    assert len(calls) == 2
+    assert calls[0] == (DAY0, bars[-1][0])
+    assert calls[1] == (DAY0, bars[2][0] - 1)
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "series" / "AUSDT.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(rows) == len(bars)
+    assert rows[0]["start_ms"] == bars[0][0]
+    assert rows[-1]["start_ms"] == bars[-1][0]
+
+    receipts = [
+        json.loads(line)
+        for line in (tmp_path / "receipts.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [
+        (item["request_parameters"]["start_ms"], item["request_parameters"]["end_ms"])
+        for item in receipts
+    ] == calls
+
+
+def test_binance_oldest_first_still_paginates_forwards(tmp_path) -> None:
+    bars = [(DAY0 + index * MS_PER_DAY, 1.0 + index) for index in range(1_002)]
+    calls: list[tuple[int, int]] = []
+
+    def oldest_page(url: str) -> HttpResponse:
+        query = parse_qs(urlsplit(url).query)
+        request_start = int(query["startTime"][0])
+        request_end = int(query["endTime"][0])
+        calls.append((request_start, request_end))
+        eligible = [bar for bar in bars if request_start <= bar[0] <= request_end]
+        return _binance_page(eligible[:1_000])
+
+    end = date(2018, 1, 1) + timedelta(days=len(bars) - 1)
+    result = _collect(
+        tmp_path,
+        ["AUSDT"],
+        oldest_page,
+        venue=VENUE_BINANCE,
+        start=date(2018, 1, 1),
+        end=end,
+    )
+
+    assert result.status == "OK"
+    assert calls == [
+        (DAY0, bars[-1][0]),
+        (bars[1_000][0], bars[-1][0]),
+    ]
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "series" / "AUSDT.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(rows) == len(bars)
+    assert rows[0]["start_ms"] == bars[0][0]
+    assert rows[-1]["start_ms"] == bars[-1][0]
+
+
+def test_series_bytes_use_policy_bound_lf_on_every_platform(tmp_path) -> None:
+    _collect(
+        tmp_path,
+        ["AUSDT"],
+        {"AUSDT": _bybit_page("AUSDT", [(DAY0, 1.0), (DAY0 + MS_PER_DAY, 2.0)])},
+    )
+
+    payload = (tmp_path / "series" / "AUSDT.jsonl").read_bytes()
+    assert b"\r\n" not in payload
+    assert payload.count(b"\n") == 2
+    header = read_journal(tmp_path / "journal.jsonl")[0]
+    assert header["policy"]["series_line_ending"] == "LF"
 
 
 # --- journal integrity ---------------------------------------------------
@@ -383,9 +535,7 @@ def test_receipt_records_the_real_http_status(tmp_path) -> None:
     # the 400 body is archived too: it is the evidence that the venue answered
     assert receipts and receipts[0]["http_status"] == 400
     # and the exclusion it justifies points back at those bytes
-    record = next(
-        r for r in read_journal(tmp_path / "journal.jsonl") if r.get("type") == "symbol"
-    )
+    record = next(r for r in read_journal(tmp_path / "journal.jsonl") if r.get("type") == "symbol")
     assert record["outcome"] == OUTCOME_NOT_LISTED
     assert record["raw_sha256s"] == [receipts[0]["raw_sha256"]]
     assert (tmp_path / "raw" / f"{receipts[0]['raw_sha256']}.json").exists()
