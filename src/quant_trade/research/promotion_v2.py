@@ -21,6 +21,10 @@ import yaml
 
 from quant_trade.metrics.statistics import expected_max_sharpe, psr_from_moments
 from quant_trade.research.candidate import CandidateStrategy
+from quant_trade.research.crypto_route_guard import (
+    candidate_requires_sealed_crypto_route,
+    mapping_requires_sealed_crypto_route,
+)
 from quant_trade.research.ledger import (
     LedgerIntegrityReport,
     ledger_integrity_report,
@@ -149,6 +153,16 @@ def evaluate_promotion_v2(
             notes=["no readable results.json; nothing can be recomputed"],
         )
 
+    crypto_routed = mapping_requires_sealed_crypto_route(results) or (
+        candidate is not None and candidate_requires_sealed_crypto_route(candidate)
+    )
+    add(
+        "crypto_requires_sealed_gate3",
+        not crypto_routed,
+        "crypto candidates require ExperimentSpec v2, two identically-costed "
+        "benchmarks, and the tri-state Gate 3 evaluator; legacy V2 cannot promote them",
+    )
+
     # --- pull raw evidence -------------------------------------------------
     sharpe_pp = _num(results, "test_metrics", "sharpe_per_period")
     observations = _num(results, "test_metrics", "observations")
@@ -174,14 +188,18 @@ def evaluate_promotion_v2(
     recomputed_psr: float | None = None
     recomputed_dsr: float | None = None
     dsr_threshold: float | None = None
-    if None not in (sharpe_pp, observations, skew, kurt):
-        n_obs = int(observations)  # type: ignore[arg-type]
-        recomputed_psr = psr_from_moments(sharpe_pp, n_obs, skew, kurt, 0.0)  # type: ignore[arg-type]
+    if sharpe_pp is not None and observations is not None and skew is not None and kurt is not None:
+        n_obs = int(observations)
+        recomputed_psr = psr_from_moments(sharpe_pp, n_obs, skew, kurt, 0.0)
         dsr_threshold = expected_max_sharpe(
             integrity.effective_trial_count, integrity.sharpe_variance
         )
         recomputed_dsr = psr_from_moments(
-            sharpe_pp, n_obs, skew, kurt, benchmark_sharpe=dsr_threshold  # type: ignore[arg-type]
+            sharpe_pp,
+            n_obs,
+            skew,
+            kurt,
+            benchmark_sharpe=dsr_threshold,
         )
 
     # --- gates (all fail closed) ------------------------------------------
@@ -285,7 +303,8 @@ def evaluate_promotion_v2(
     )
     if policy.require_approval_notes:
         effective_notes = (
-            approval_notes if approval_notes is not None
+            approval_notes
+            if approval_notes is not None
             else (candidate.approval_notes if candidate else "")
         )
         has_notes = bool(effective_notes.strip())

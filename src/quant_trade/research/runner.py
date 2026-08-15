@@ -15,6 +15,10 @@ from quant_trade.reporting.artifacts import (
     write_summary,
     write_yaml,
 )
+from quant_trade.research.crypto_route_guard import (
+    mapping_requires_sealed_crypto_route,
+    panel_requires_sealed_crypto_route,
+)
 from quant_trade.research.experiment_config import ExperimentConfig
 from quant_trade.research.splits import chronological_train_test_split, date_based_split
 from quant_trade.strategies import get_strategy
@@ -36,8 +40,28 @@ def _run(data, cfg: ExperimentConfig, params: dict[str, Any]):
     return run_backtest(data, strategy, cfg.initial_cash, _cost(cfg.costs))
 
 
+def _legacy_single_asset_config(cfg: ExperimentConfig) -> dict[str, Any]:
+    return {
+        "strategy": cfg.strategy,
+        "dataset_id": cfg.experiment_name,
+        "data_path": cfg.data_path,
+    }
+
+
+def _reject_crypto_config(cfg: ExperimentConfig, workflow: str) -> None:
+    if mapping_requires_sealed_crypto_route(_legacy_single_asset_config(cfg)):
+        raise ValueError(f"{workflow} cannot process crypto; use the sealed crypto runner")
+
+
+def _reject_crypto_data(data: Any, workflow: str) -> None:
+    if panel_requires_sealed_crypto_route(data):
+        raise ValueError(f"{workflow} loaded crypto records; use the sealed crypto runner")
+
+
 def run_experiment(cfg: ExperimentConfig):
+    _reject_crypto_config(cfg, "legacy single-asset experiment runner")
     data = load_ohlcv(cfg.data_path)
+    _reject_crypto_data(data, "legacy single-asset experiment runner")
     dataset_binding = {
         "data_path": str(cfg.data_path),
         "data_sha256": file_sha256(Path(cfg.data_path)),

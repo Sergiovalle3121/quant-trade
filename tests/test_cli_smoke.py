@@ -12,7 +12,7 @@ runner = CliRunner()
 def test_top_level_help_lists_command_groups():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for group in ("carry", "research", "paper", "selection"):
+    for group in ("audit", "carry", "research", "paper", "selection", "wealth"):
         assert group in result.output
 
 

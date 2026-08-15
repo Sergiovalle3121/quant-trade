@@ -11,6 +11,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from quant_trade.audit.cli import audit_app
 from quant_trade.backtest.engine import BacktestEngine
 from quant_trade.carry.cli import carry_app
 from quant_trade.cloud.entrypoint import cloud_app
@@ -25,6 +26,7 @@ from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
 from quant_trade.opportunities.cli import opportunities_app
 from quant_trade.ops.cli import ops_app
+from quant_trade.ops.wealth_cli import wealth_app
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
 from quant_trade.research.runner import run_experiment
@@ -54,6 +56,8 @@ app.add_typer(opportunities_app, name="opportunities")
 app.add_typer(stress_app, name="stress")
 app.add_typer(v8_app, name="v8")
 app.add_typer(v9_app, name="v9")
+app.add_typer(audit_app, name="audit")
+app.add_typer(wealth_app, name="wealth")
 console = Console()
 
 
@@ -995,6 +999,7 @@ def broker_rebalance_plan(
     from quant_trade.live.loop import LoopConfig, PaperLoopRunner
     from quant_trade.paper.rebalancer import target_weights_to_orders
     from quant_trade.paper.state import load_state
+    from quant_trade.research.crypto_route_guard import panel_requires_sealed_crypto_route
     from quant_trade.research.strategy_registry import get_research_signal_model
 
     cfg = LoopConfig.from_yaml(loop_config)
@@ -1009,6 +1014,11 @@ def broker_rebalance_plan(
         panel = load_canonical_dataset(data)
     else:
         panel = PaperLoopRunner(cfg)._fetch_panel()
+    if panel_requires_sealed_crypto_route(panel):
+        raise typer.BadParameter(
+            "crypto panel bytes are blocked in the legacy broker planner; "
+            "the sealed Gate 3 workflow is required"
+        )
     panel = panel[panel["symbol"].isin(cfg.symbols)].sort_values("timestamp")
     if panel.empty:
         raise typer.BadParameter("no market data available for the configured symbols")

@@ -1,0 +1,43 @@
+{
+  "artifact": "DATASET_INVALIDATION",
+  "schema_version": 1,
+  "seal": "46de562af19fc05e03bfe941d5a8aa0ef4d10fd22dc0310cc97e7ffb1f30efdd",
+  "status": "INVALID_LOOKAHEAD",
+  "dataset_id": "crypto_lowcap_panel_v1",
+  "dataset_digest": "e25722f13e730ddd9a6779463149ffda67ceb807334d034c4ee67f5f3ac29b6e",
+  "superseded_dataset_digests": [
+    "5d142d8c1734758dfdd3ed80da6eaa102673f423aac6876e90f03c5783b5036c"
+  ],
+  "invalidated_at_utc": "2026-08-12T05:30:00Z",
+  "invalidated_by": "independent causal audit",
+  "reasons": [
+    "venue was selected per coin using the venue with the most bars over the full future window",
+    "coins with fewer than 20 total future bars were removed globally instead of using a causal warm-up",
+    "the instrument label depended on the last ticker observed in the future window",
+    "rank exits removed otherwise tradable prices and were indistinguishable from delistings",
+    "the evaluator executed signals at the same close used to decide them",
+    "a missing row was treated as a terminal delisting and could create a retroactive exit"
+  ],
+  "invalidated_artifacts": {
+    "holdout_seal": "6740d82b32da0e04e6f5401d64c7d163994b39409c3a82333335286d99150191",
+    "experiment_preregistrations": [
+      "crypto_lowcap_h1_capacity_illiquidity",
+      "crypto_lowcap_h2_death_avoidance",
+      "crypto_lowcap_h3_rebalancing_premium",
+      "crypto_lowcap_h4_survival_duration"
+    ]
+  },
+  "pnl_generation_allowed": false,
+  "holdout_reveal_allowed": false,
+  "candidate_promotion_allowed": false,
+  "replacement_requirements": [
+    "build a single-venue Bybit panel with stable CMC:<cmc_id> identities",
+    "pass byte-identical prefix-invariance and adversarial identity/event tests",
+    "produce a new TRUSTED_CAUSAL dataset digest",
+    "register new ExperimentSpec v2 seals against the replacement digest"
+  ],
+  "notes": [
+    "The original report, digest, holdout seal and preregistrations remain in history for traceability.",
+    "This invalidation does not reveal or evaluate the reserved holdout."
+  ]
+}

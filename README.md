@@ -55,6 +55,20 @@ Supported strategy registry names are:
 
 The canonical time column throughout loaders, splits, and reports is `timestamp`.
 
+### Offline research audit
+
+The local BYOD auditor checks byte bindings, basic look-ahead signatures,
+timestamp causality, next-bar execution, costs, benchmarks, and the trial
+ledger without executing customer code or using the network:
+
+```bash
+quant-trade audit run --config configs/audit/clean.yaml --out-dir artifacts/audit-clean
+```
+
+It emits deterministic JSON/HTML and always leaves
+`real_money_authorized=false`. See `docs/QUANT_RESEARCH_AUDITOR.md` and the
+bounded customer-validation process in `docs/AUDIT_PILOT_PLAYBOOK.md`.
+
 ### Single experiment
 
 ```bash
@@ -124,6 +138,93 @@ quant-trade data fetch-funding --provider ccxt-binance --symbol BTC-USDT-PERP --
 ```
 
 See `docs/CRYPTO_DATA.md` for symbology, pagination/rate-limit behavior, quality checks, and crypto research configs. Every research run records the dataset's sha256 (`dataset_binding`) for reproducibility.
+
+The low/mid-cap Bybit study is currently blocked from P&L generation: its
+first constructed panel was invalidated after a causal audit. See
+`docs/CRYPTO_VALIDATION_GATES.md` for the fail-closed rebuild, experiment,
+promotion, shadow, and canary contract. Legacy research/promotion commands
+reject `crypto_*` strategies so the venue-specific evaluator cannot be
+bypassed.
+
+The replacement H2 acquisition path is Binance-only and selection-only. It
+hashes every permitted historical CMC day, hard-caps requests at 2023-11-28,
+and supports exact resumable batches. Its current real-data manifest is
+`INSUFFICIENT_EVIDENCE` because the normalized daily rows lack a causal
+stablecoin classification; no P&L may be generated from that symbol plan.
+See `docs/BINANCE_H2_DATA_ACQUISITION.md`.
+
+The separately sealed BTC weekly-momentum translation was also falsified on
+development data. It returned 255.73% but trailed BTC buy-and-hold's 776.15%,
+beat BTC in 0/4 contiguous blocks, and suffered an 80.84% maximum drawdown.
+It is retired as `NO_GO`; no lookback, threshold, weekday, or exposure variant
+may be introduced after observing that result. See
+`docs/BINANCE_BTC_WEEKLY_MOMENTUM_DEVELOPMENT_VERDICT.md`.
+
+A distinct one-trial cross-sectional momentum declaration now ranks 30-day
+returns only inside a point-in-time top-100 liquidity cohort and produces a
+paired top-20 liquidity control. Its development evaluator is deliberately
+fail-closed: real bundles stop after their manifest, before any market JSONL
+is opened, while an explicitly synthetic mode only exercises Friday fills,
+the paired control, benchmarks, filters and 2x-cost/50%-fill stress. It can
+return only `NO_GO` or `INSUFFICIENT_EVIDENCE`, never `PASS`. Local hashes and
+a receipt labelled `live` do not authenticate Binance symbol rules; schema v2
+therefore exposes no executable rule. Exchange filters also remain quoted in
+USDT and require point-in-time FX, fees and external source attestation before
+economic evaluation. See `docs/BINANCE_LIQUID_XSMOM_CAMPAIGN.md` and
+`docs/BINANCE_LIQUID_XSMOM_DEVELOPMENT_EVALUATOR.md`.
+
+The next economically distinct candidate, AANV30 on-chain value, remains a
+data-feasibility backlog rather than a strategy. Its offline gate requires 30
+exact daily active-address observations, point-in-time market cap, stable
+chain/contract/CMC identity, reproducible method bytes, commercial-use terms
+and at least 100 completely covered assets. Passing that gate would authorize
+only a future preregistration—not a signal, P&L, holdout access or trading.
+Current project evidence is therefore `INSUFFICIENT_EVIDENCE`. See
+`docs/AANV30_DATA_FEASIBILITY.md`.
+
+A second data-only backlog tracks the published `world order flow` family.
+The paper input is CryptoCompare/CCData buyer- and seller-initiated volume,
+aggregated across exchanges in 11 fiat currencies on its own 30-observation
+calendar. A Binance USDT kline is explicitly rejected as a substitute. The
+public CCData terms, exact historical signed-volume contract and point-in-time
+vintages are not yet authenticated for commercial use, so schema v1 can never
+advance beyond `INSUFFICIENT_EVIDENCE` and authorizes no model or backtest. See
+`docs/WORLD_ORDER_FLOW_DATA_FEASIBILITY.md`.
+
+BTC cash-and-carry is tracked as a separate, derivatives-based research path,
+not as an exception to the Spot-only canary policy. With a US$200 research
+budget, the conservative capital envelope reserves US$40 and can match about
+US$80 of spot with US$80 of isolated 1x perpetual exposure. That is only
+technical sizing, not expected profit: schema v1 remains
+`INSUFFICIENT` until a trusted external attestation root and parsers bind the
+venue, account, funding, basis, fees, liquidation, FX, legal, tax and
+counterparty evidence bytes. It contains no P&L or derivatives execution path.
+See `docs/BTC_CASH_AND_CARRY_FEASIBILITY.md`.
+
+For Alpaca, the repository now contains a separate SPY turn-of-the-month
+research campaign, a GET-only evidence collector and an isolated US$200 Paper
+sleeve. The collector downloads only the exact preregistered event windows,
+enforces bounded pagination and content-addressed receipts, and never calls
+account, order, position or transfer endpoints. The development evaluator is
+deliberately limited to `INSUFFICIENT_EVIDENCE` until an external authority
+attests the calendar, SIP market data, corporate actions and fee vintages. The
+Paper sleeve prevents duplicate plans, stale-state resets and campaign forks,
+but it is simulation infrastructure—not evidence of profitability and not a
+live-money adapter. See `docs/ALPACA_SPY_TOM_READONLY_COLLECTOR.md`,
+`docs/SPY_TURN_OF_MONTH_CAMPAIGN.md`,
+`docs/SPY_TURN_OF_MONTH_DEVELOPMENT_EVALUATOR.md` and
+`docs/ALPACA_USD200_PAPER_SLEEVE.md`.
+
+Small-capital arithmetic is kept separate from strategy evidence. The
+fail-closed planner distinguishes total risk capital from a canary and flags
+the 1,000x-in-one-month shortcut as `NO_GO`; it never authorizes a deposit or
+profit claim. See `docs/WEALTH_BUILDING_PLAN.md`.
+
+Net-money measurement is also separate from alpha. The offline MXN tax-lot
+ledger reconciles FIFO inventory, event-time FX, fees, observed slippage,
+realized/unrealized P&L and minimum funding. Tax fields remain empty unless the
+operator supplies an explicit sensitivity scenario; they are not legal or tax
+advice. See `docs/AFTER_TAX_TCA_MXN.md`.
 
 ## Alpha components and statistical validation
 

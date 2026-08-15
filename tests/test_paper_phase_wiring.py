@@ -93,7 +93,7 @@ class GrowingFeed:
         rng = np.random.default_rng(11)
         dates = pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC")
         rows = []
-        for sym, drift in [("AAA-USD", 0.002), ("BBB-USD", 0.001)]:
+        for sym, drift in [("AAA", 0.002), ("BBB", 0.001)]:
             close = 100 * np.cumprod(1 + rng.normal(drift, 0.01, n))
             open_ = np.concatenate([[100.0], close[:-1]])
             for i, ts in enumerate(dates):
@@ -133,7 +133,7 @@ def _loop_config(tmp_path, **overrides) -> LoopConfig:
         session_name="wiring_test",
         strategy="time_series_momentum",
         strategy_params={"lookback_days": 10, "rebalance_frequency": "daily"},
-        symbols=["AAA-USD", "BBB-USD"],
+        symbols=["AAA", "BBB"],
         initial_cash=100_000.0,
         costs={"percentage_commission": 0.0005},
         risk_limits=PaperRiskLimits(max_weight_per_asset=0.6, max_turnover_per_rebalance=2.0),
@@ -199,7 +199,7 @@ def test_paper_export_session_materializes_standard_artifacts(tmp_path):
                 "session_name": "wiring_test",
                 "strategy": "time_series_momentum",
                 "strategy_params": {"lookback_days": 10, "rebalance_frequency": "daily"},
-                "universe": {"symbols": ["AAA-USD", "BBB-USD"]},
+                "universe": {"symbols": ["AAA", "BBB"]},
                 "initial_cash": 100000.0,
                 "costs": {"percentage_commission": 0.0005},
                 "risk_limits": {"kill_switch_enabled": True},
@@ -210,17 +210,29 @@ def test_paper_export_session_materializes_standard_artifacts(tmp_path):
     )
     result = CliRunner().invoke(
         app,
-        ["paper", "export-session", "--config", str(cfg_path),
-         "--output-dir", str(tmp_path / "exports")],
+        [
+            "paper",
+            "export-session",
+            "--config",
+            str(cfg_path),
+            "--output-dir",
+            str(tmp_path / "exports"),
+        ],
     )
     assert result.exit_code == 0, result.output
     runs = list((tmp_path / "exports" / "wiring_test").iterdir())
     assert len(runs) == 1
     out = runs[0]
     for name in [
-        "account_snapshots.csv", "orders.csv", "fills.csv", "positions.csv",
-        "events.csv", "risk_events.csv", "paper_metrics.json",
-        "paper_summary.md", "final_state.json",
+        "account_snapshots.csv",
+        "orders.csv",
+        "fills.csv",
+        "positions.csv",
+        "events.csv",
+        "risk_events.csv",
+        "paper_metrics.json",
+        "paper_summary.md",
+        "final_state.json",
     ]:
         assert (out / name).exists(), name
     snapshots = pd.read_csv(out / "account_snapshots.csv")
@@ -311,8 +323,16 @@ def test_rebalance_plan_creates_orders_on_quarter_start(tmp_path, monkeypatch):
     data = _panel_csv(tmp_path, end="2024-04-01")  # first trading day of Q2
     result = CliRunner().invoke(
         app,
-        ["broker", "rebalance-plan", "--loop-config", str(loop_cfg),
-         "--broker-config", str(broker_cfg), "--data", str(data)],
+        [
+            "broker",
+            "rebalance-plan",
+            "--loop-config",
+            str(loop_cfg),
+            "--broker-config",
+            str(broker_cfg),
+            "--data",
+            str(data),
+        ],
     )
     assert result.exit_code == 0, result.output
     plan_dir = Path(result.output.strip().split(": ")[-1].split(" (")[0])
@@ -333,8 +353,16 @@ def test_rebalance_plan_noop_when_no_rebalance_due(tmp_path, monkeypatch):
     data = _panel_csv(tmp_path, end="2024-05-15")  # mid-quarter bar
     result = CliRunner().invoke(
         app,
-        ["broker", "rebalance-plan", "--loop-config", str(loop_cfg),
-         "--broker-config", str(broker_cfg), "--data", str(data)],
+        [
+            "broker",
+            "rebalance-plan",
+            "--loop-config",
+            str(loop_cfg),
+            "--broker-config",
+            str(broker_cfg),
+            "--data",
+            str(data),
+        ],
     )
     assert result.exit_code == 0, result.output
     assert "No rebalance due" in result.output
@@ -350,8 +378,16 @@ def test_rebalance_plan_fails_whole_plan_on_safety_violation(tmp_path, monkeypat
     data = _panel_csv(tmp_path, end="2024-04-01")
     result = CliRunner().invoke(
         app,
-        ["broker", "rebalance-plan", "--loop-config", str(loop_cfg),
-         "--broker-config", str(broker_cfg), "--data", str(data)],
+        [
+            "broker",
+            "rebalance-plan",
+            "--loop-config",
+            str(loop_cfg),
+            "--broker-config",
+            str(broker_cfg),
+            "--data",
+            str(data),
+        ],
     )
     assert result.exit_code == 1
     plans = list((tmp_path / "outputs" / "broker_plans" / "ew_session").iterdir())

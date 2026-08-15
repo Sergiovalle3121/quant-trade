@@ -122,8 +122,8 @@ def test_registry_resolves_ccxt_exchanges():
     assert not provider.supports_interval("2w")
 
 
-def test_end_to_end_crypto_pipeline_fetch_cache_research(tmp_path):
-    """Full offline crypto path: fake exchange -> cache -> research backtest."""
+def test_generic_research_refuses_crypto_cache_even_with_a_renamed_strategy(tmp_path):
+    """Acquisition may work, but crypto P&L must use the sealed workflow."""
     from quant_trade.data.cache import write_cache
     from quant_trade.research.multi_asset_runner import run_multi_asset_research_experiment
 
@@ -152,7 +152,5 @@ def test_end_to_end_crypto_pipeline_fetch_cache_research(tmp_path):
         "costs": {"percentage_commission": 0.0010, "slippage_bps": 5.0, "spread_bps": 3.0},
         "output_dir": str(tmp_path / "outputs"),
     }
-    result = run_multi_asset_research_experiment(config)
-    assert result["symbols"] == ["BTC-USD", "ETH-USD"]
-    assert result["dataset_binding"]["data_sha256"]
-    assert "sharpe" in result["test_metrics"]
+    with pytest.raises(ValueError, match="crypto dataset bytes are blocked"):
+        run_multi_asset_research_experiment(config)

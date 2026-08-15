@@ -11,7 +11,9 @@ __pycache__/
 .env.*
 !.env.example
 coverage.xml
+.coverage*
 htmlcov/
+.tmp/
 dist/
 build/
 .DS_Store

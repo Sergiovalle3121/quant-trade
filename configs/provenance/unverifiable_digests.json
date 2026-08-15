@@ -14,6 +14,125 @@
       "expected_at": "data/cache/crypto_universe/deathlist/raw/ (gitignored)",
       "why_not_committed": "7.4 MB of provider response data; AGENTS.md forbids committing market data caches and provider responses",
       "consequence": "the 81.1% death corroboration rate cannot be recomputed here without re-fetching the roster, and a re-fetch will NOT reproduce this digest - the roster changes daily as coins are flagged inactive, so this hash names one specific capture that no later fetch can recreate"
+    },
+    {
+      "sha256": "87f456019d52f325161f82ab20c85dcfb197b61c00ba37aad728141ff22dbd28",
+      "names": "the isolated Binance BTCUSDT/ETHUSDT development collection journal cited by docs/BINANCE_BTC_ETH_TSMOM_DEVELOPMENT_VERDICT.md",
+      "expected_at": ".tmp/binance_btc_eth_dev_2017_2023/journal.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market-data collection caches and provider receipts",
+      "consequence": "the development verdict remains auditable by hash but requires the local journal and series bytes to reproduce"
+    },
+    {
+      "sha256": "d346550d10c3fc373c7645f1f048bacd89b6f446b6a03e6d589a74231efa636a",
+      "names": "the isolated Binance BTCUSDT daily development series through 2023-11-28",
+      "expected_at": ".tmp/binance_btc_eth_dev_2017_2023/series/BTCUSDT.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market data caches and redistribution rights have not been resolved",
+      "consequence": "the reported BTC benchmark and strategy sleeve cannot be reproduced without bytes matching this digest"
+    },
+    {
+      "sha256": "c98d61902b6d6f730bf8ec2773885bc9c691928d4d1fda4b2987ac8337826b2c",
+      "names": "the isolated Binance ETHUSDT daily development series through 2023-11-28",
+      "expected_at": ".tmp/binance_btc_eth_dev_2017_2023/series/ETHUSDT.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market data caches and redistribution rights have not been resolved",
+      "consequence": "the reported ETH benchmark and strategy sleeve cannot be reproduced without bytes matching this digest"
+    },
+    {
+      "sha256": "d78ecc933d68a9093628a5df99b87040ff2692eacd6a3d2e28607431ff9828a3",
+      "names": "the canonical combined component digest for the isolated Binance development evidence",
+      "expected_at": "computed in memory from the registered journal and two series digests",
+      "why_not_committed": "it identifies canonical content rather than a standalone file; the underlying market-data bytes remain gitignored",
+      "consequence": "this digest binds the three missing components but does not substitute for possessing and rehashing their bytes"
+    },
+    {
+      "sha256": "8f59ede2dce8814dc0863f7f842613b35495df851c2b0ee639b3a10038be2eb7",
+      "names": "the canonical in-memory seal of binance_btc_eth_tsmom_long_cash_v1",
+      "expected_at": "derived from configs/experiments/binance_btc_eth_tsmom_long_cash_v1.yaml",
+      "why_not_committed": "the committed YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
+      "consequence": "the loader recomputes and verifies this seal; changing any declared field invalidates it"
+    },
+    {
+      "sha256": "6df2b74b161ffed24ec98613de54991d16a79b8881c3d72c5acb97ebca362389",
+      "names": "the canonical in-memory NO_GO development report cited by docs/BINANCE_BTC_ETH_TSMOM_DEVELOPMENT_VERDICT.md",
+      "expected_at": "computed by quant_trade.research.prospective_development from the registered local evidence",
+      "why_not_committed": "the repository commits the concise verdict and evaluator, not a duplicate generated payload whose source market data cannot be redistributed",
+      "consequence": "the exact report can be reproduced only with the three registered local evidence files; this registration does not claim those bytes are present"
+    },
+    {
+      "sha256": "a1a896f4609e4c8283b114404f415d29f97404ed4a50e27cc8393029db8df910",
+      "names": "the canonical in-memory seal of binance_btc_weekly_momentum_1w_long_cash_v1",
+      "expected_at": "derived from configs/experiments/binance_btc_weekly_momentum_1w_long_cash_v1.yaml",
+      "why_not_committed": "the committed YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
+      "consequence": "the loader recomputes and verifies this seal; changing any declared field invalidates it"
+    },
+    {
+      "sha256": "cc0290f029f825ebe5bfde1782c69984f7a1dd7454f3eb1e1e1f244096f5066b",
+      "names": "the hash-chained Binance BTC weekly development collection journal",
+      "expected_at": ".tmp/binance_btc_weekly_1w_dev_2017_2023_lf/journal.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market-data collection caches and provider receipts",
+      "consequence": "the request-bound development verdict cannot be reproduced without this exact local journal"
+    },
+    {
+      "sha256": "5b0d76cd0565b4f9df44c50423bb6ab3d566373266fec76e1f594c6331657396",
+      "names": "the canonical aggregate digest of Binance BTC weekly development receipts",
+      "expected_at": ".tmp/binance_btc_weekly_1w_dev_2017_2023_lf/raw/ (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing provider receipts and market-data caches",
+      "consequence": "the receipt chain and request-side cutoff require the local receipt bytes to reproduce"
+    },
+    {
+      "sha256": "3d569ef3089f380c5efaa2fa48f8e39539118105ca83173681ab6da6449ce316",
+      "names": "the LF-canonical Binance BTCUSDT weekly-campaign development series through 2023-11-28",
+      "expected_at": ".tmp/binance_btc_weekly_1w_dev_2017_2023_lf/series/BTCUSDT.jsonl (gitignored)",
+      "why_not_committed": "AGENTS.md forbids committing market data caches and redistribution rights have not been resolved",
+      "consequence": "the reported strategy and BTC benchmark cannot be reproduced without bytes matching this digest"
+    },
+    {
+      "sha256": "19360169137ef223e34cbdddb08155cb840685967785565753da6a0824da2392",
+      "names": "the canonical Binance collector policy used for the LF weekly development collection",
+      "expected_at": "derived from the frozen venue_klines Binance policy",
+      "why_not_committed": "the value hashes the canonical in-memory policy rather than standalone file bytes",
+      "consequence": "collector policy changes invalidate the development evidence and prevent cache reuse"
+    },
+    {
+      "sha256": "b30563248d27cb53ab24c5b018d65b95d3b35641a380c25c475511cdb50a9708",
+      "names": "the canonical combined dataset binding for the BTC weekly development evidence",
+      "expected_at": "computed in memory from the verified spec, policy, journal, receipts and series digests",
+      "why_not_committed": "it identifies canonical content rather than a standalone file; the underlying market-data bytes remain gitignored",
+      "consequence": "the binding names the exact evidence set but does not substitute for possessing and rehashing each component"
+    },
+    {
+      "sha256": "ffb42188d7d9a35dd79a1c8d876f4af1201de951e192f0fcd11b92f9e8a3203d",
+      "names": "the canonical in-memory NO_GO report for binance_btc_weekly_momentum_1w_long_cash_v1",
+      "expected_at": "computed by quant_trade.research.prospective_weekly_development from the registered local evidence",
+      "why_not_committed": "the repository commits the concise verdict and evaluator, not a duplicate generated payload whose source market data cannot be redistributed",
+      "consequence": "the exact report can be reproduced only with the registered local evidence; this registration does not claim those bytes are present"
+    },
+    {
+      "sha256": "906e9dd5a0bd449dbc344921aea033456976132a3487a88f8b8fe1ce85010fdf",
+      "names": "the canonical in-memory seal of binance_liquid_xsmom_30d_top20_weekly_v1",
+      "expected_at": "derived from configs/experiments/binance_liquid_xsmom_30d_top20_weekly_v1.yaml",
+      "why_not_committed": "the YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
+      "consequence": "the loader recomputes the seal and any change to the blocked one-trial declaration invalidates it; this registration is not evidence of profitability or an independent preregistration timestamp"
+    },
+    {
+      "sha256": "98c3cc11d38c9aa08e48baf404fb93b09c7862cef5a955f2263772b3196000c5",
+      "names": "the canonical in-memory policy hash for the BTC cash-and-carry feasibility schema v1",
+      "expected_at": "derived from the frozen policy constants in quant_trade.research.prospective_carry_feasibility",
+      "why_not_committed": "the value identifies a canonical policy mapping rather than standalone file bytes; the implementation and its tests are committed",
+      "consequence": "the hash documents the fail-closed feasibility policy only; it is not market evidence, performance evidence or authorization to trade derivatives"
+    },
+    {
+      "sha256": "d99c9bd28cb7b8d7f3be33c148ff3291863a10543429c57c6f54b6037171d82c",
+      "names": "the public CoinDesk Data OpenAPI snapshot observed for the world-order-flow procurement assessment",
+      "expected_at": "an external provider-documentation response observed on 2026-08-14 and deliberately not committed",
+      "why_not_committed": "the multi-megabyte provider documentation response is external mutable content and repository policy excludes provider-response caches",
+      "consequence": "the procurement note can name the exact observation but cannot reproduce it from this checkout; it grants no license and clears no data-feasibility blocker"
+    },
+    {
+      "sha256": "5d2c57f22a4437b3064a596b3dd804c7e1e683b3228d4a5d6901e73f1053c540",
+      "names": "the canonical in-memory seal of SPY_TOM_Dm1_P3_v1",
+      "expected_at": "derived from configs/experiments/spy_tom_dm1_p3_v1.yaml",
+      "why_not_committed": "the committed YAML is the human-readable declaration, while this value hashes its canonical in-memory representation rather than the YAML file bytes",
+      "consequence": "the loader recomputes and verifies the seal; it is local content addressing, not an external timestamp, performance evidence or trading authorization"
     }
   ]
 }

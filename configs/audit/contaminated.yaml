@@ -1,0 +1,10 @@
+schema_version: 1
+root_dir: fixtures/contaminated
+dataset_path: dataset.csv
+results_path: results.json
+manifest_path: dataset.manifest.json
+trial_ledger_path: trial_ledger.json
+evaluation_cutoff_utc: "2024-12-31T23:59:59Z"
+timestamp_column: timestamp
+required_columns: [timestamp, symbol, open, high, low, close, volume]
+max_file_size_bytes: 1000000

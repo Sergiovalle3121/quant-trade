@@ -44,6 +44,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from quant_trade.data.crypto_manifest import CryptoDatasetManifest
 from quant_trade.evidence.canonical_json import (
     atomic_write_json,
     canonical_dumps,
@@ -76,6 +77,23 @@ SEALED_FIELDS = (
 
 class PreregistrationError(RuntimeError):
     """Raised when a declaration is malformed, unsealed, or contradicted."""
+
+
+def require_trusted_crypto_dataset(
+    manifest: CryptoDatasetManifest,
+    *,
+    action: str = "experiment_preregistration",
+) -> None:
+    """Prevent legacy seals from being attached to an invalid crypto panel.
+
+    Crypto experiments use :class:`ExperimentSpec` v2 for their final sealed
+    protocol.  This guard exists for callers still using the legacy primitive:
+    the dataset trust decision must happen before any seal is written.
+    """
+    try:
+        manifest.require_trusted(action)
+    except ValueError as exc:
+        raise PreregistrationError(str(exc)) from exc
 
 
 @dataclass(frozen=True)
@@ -203,9 +221,7 @@ def budget_status(
     }
 
 
-def assert_within_budget(
-    prereg: ExperimentPreregistration, records: list[dict[str, Any]]
-) -> None:
+def assert_within_budget(prereg: ExperimentPreregistration, records: list[dict[str, Any]]) -> None:
     """Fail closed when an experiment has spent more trials than it declared."""
     status = budget_status(prereg, records)
     if status["over_budget"]:

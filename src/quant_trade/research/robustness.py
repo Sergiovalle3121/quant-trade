@@ -13,7 +13,16 @@ from quant_trade.research.bootstrap import (
     bootstrap_confidence_intervals,
     moving_block_bootstrap,
 )
+from quant_trade.research.crypto_route_guard import panel_requires_sealed_crypto_route
 from quant_trade.research.strategy_registry import get_research_signal_model
+
+
+def _require_legacy_non_crypto_panel(data: pd.DataFrame) -> None:
+    if panel_requires_sealed_crypto_route(data):
+        raise ValueError(
+            "crypto robustness P&L requires the sealed crypto runner and cannot use "
+            "the generic flat-cost engine"
+        )
 
 
 def parameter_sensitivity_grid(
@@ -24,6 +33,7 @@ def parameter_sensitivity_grid(
     cost_model: CostModel,
     execution_policy: BarExecutionPolicy | None = None,
 ) -> pd.DataFrame:
+    _require_legacy_non_crypto_panel(data)
     rows = []
     keys = list(param_grid)
     for vals in product(*[param_grid[k] for k in keys]):
@@ -50,6 +60,7 @@ def cost_sensitivity(
     initial_cash: float,
     execution_policy: BarExecutionPolicy | None = None,
 ) -> pd.DataFrame:
+    _require_legacy_non_crypto_panel(data)
     levels = {
         "zero": CostModel(),
         "low": CostModel(percentage_commission=0.0001, slippage_bps=1),
@@ -198,4 +209,3 @@ def simple_bootstrap_or_block_bootstrap(
         clean, samples=samples, block_size=block_size, seed=seed, nan_policy="drop"
     )
     return draws[["sample", "total_return"]].copy()
-

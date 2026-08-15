@@ -1,0 +1,95 @@
+schema_version: 1
+strategy_id: binance_btc_eth_tsmom_long_cash_v1
+campaign_mode: PROSPECTIVE_ONLY
+venue: Binance
+market: Spot
+symbols:
+  - BTCUSDT
+  - ETHUSDT
+sleeves:
+  BTCUSDT: 0.5
+  ETHUSDT: 0.5
+position_mode: long_cash
+signal_policy:
+  momentum_lookback_calendar_months: 12
+  decision_frequency: monthly
+  decision_bar: last_daily_utc_close_of_calendar_month
+  execution_bar: next_daily_utc_open
+  decision_to_execution_bars: 1
+  emit_only_on_state_change: true
+  rebalance_drift: false
+  tie_state: CASH
+trial_budget: 1
+development_evidence_start: '2018-08-31'
+development_evidence_end: '2023-11-28'
+development_end: '2026-08-31'
+holdout_start: '2026-09-01'
+primary_holdout_end: '2028-08-31'
+holdout_end: '2029-08-31'
+reveal_policy:
+  primary_holdout_months: 24
+  default_extension_months: 12
+  default_extension_without_interim_reveal: true
+  interim_economic_reveal_at_primary_end: false
+  reveal_not_before: '2029-09-01'
+  insufficient_evidence_action: EXTEND_WITHOUT_REVEAL
+benchmarks:
+  - benchmark_id: btc_usdt_buy_and_hold
+    symbol_weights:
+      BTCUSDT: 1.0
+  - benchmark_id: eth_usdt_buy_and_hold
+    symbol_weights:
+      ETHUSDT: 1.0
+  - benchmark_id: btc_eth_50_50_buy_and_hold
+    symbol_weights:
+      BTCUSDT: 0.5
+      ETHUSDT: 0.5
+cost_policy:
+  fee_floor_bps_per_side: 10.0
+  friction_floor_bps_per_side: 5.0
+  stress_cost_multiplier: 2.0
+development_falsification_policy:
+  net_total_return_positive: true
+  outperform_each_benchmark: true
+  required_benchmark_ids:
+    - btc_usdt_buy_and_hold
+    - eth_usdt_buy_and_hold
+    - btc_eth_50_50_buy_and_hold
+  contiguous_blocks: 4
+  block_partition_method: EQUAL_CONTIGUOUS_DAILY_OBSERVATIONS
+  minimum_outperforming_blocks: 3
+  block_outperformance_benchmark_ids:
+    - btc_usdt_buy_and_hold
+    - btc_eth_50_50_buy_and_hold
+  max_drawdown_abs: 0.25
+  stress_cost_multiplier: 2.0
+  stress_fill_fraction: 0.5
+  stress_total_return_min: 0.0
+promotion_policy:
+  excess_net_return_positive_each_benchmark: true
+  psr_min: 0.95
+  dsr_min: 0.95
+  pbo_policy: NOT_IDENTIFIABLE_SINGLE_TRIAL
+  mandatory_pbo_means_insufficient_evidence: true
+  one_sided_excess_confidence_level: 0.95
+  one_sided_excess_confidence_interval_lower_bound_min_exclusive: 0.0
+  max_drawdown_abs: 0.25
+  max_drawdown_not_worse_than_each_benchmark: true
+  stress_cost_multiplier: 2.0
+  stress_fill_fraction: 0.5
+  stress_total_return_min: 0.0
+  both_sleeves_positive_pnl: true
+  max_positive_pnl_share_per_sleeve: 0.75
+  capacity_multiple_of_proposed_capital_min: 2.0
+  real_money_authorized: false
+safety_policy:
+  leverage_allowed: false
+  shorts_allowed: false
+  margin_allowed: false
+  earn_allowed: false
+authorization:
+  research_only: true
+  live_execution_enabled: false
+  real_money_authorized: false
+  external_action_authorized: false
+seal: 8f59ede2dce8814dc0863f7f842613b35495df851c2b0ee639b3a10038be2eb7

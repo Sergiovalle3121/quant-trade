@@ -87,7 +87,7 @@ VENUE_POLICIES: dict[str, dict[str, Any]] = {
         "endpoint": "https://api.bybit.com/v5/market/kline",
         "url_template": (
             "{endpoint}?category=spot&symbol={symbol}&interval=D"
-            "&start={start_ms}&limit={limit}"
+            "&start={start_ms}&end={end_ms}&limit={limit}"
         ),
         "market": "spot",
         "interval": "1d",
@@ -97,13 +97,15 @@ VENUE_POLICIES: dict[str, dict[str, Any]] = {
         "page_order": "newest_first",
         "not_listed_signal": "http 200 with retCode 10001",
         "earliest_known_bar": "2021-07-05",
+        "series_line_ending": "LF",
     },
     VENUE_BINANCE: {
         "venue": VENUE_BINANCE,
         "api": "v3",
         "endpoint": "https://api.binance.com/api/v3/klines",
         "url_template": (
-            "{endpoint}?symbol={symbol}&interval=1d&startTime={start_ms}&limit={limit}"
+            "{endpoint}?symbol={symbol}&interval=1d&startTime={start_ms}"
+            "&endTime={end_ms}&limit={limit}"
         ),
         "market": "spot",
         "interval": "1d",
@@ -113,6 +115,7 @@ VENUE_POLICIES: dict[str, dict[str, Any]] = {
         "page_order": "oldest_first",
         "not_listed_signal": "http 400 with code -1121",
         "earliest_known_bar": "2017-08-17",
+        "series_line_ending": "LF",
     },
 }
 
@@ -129,8 +132,7 @@ NORMALIZED_FIELDS = (
 )
 
 VENUE_POLICY_SHA256: dict[str, str] = {
-    venue: sha256_of_text(canonical_dumps(policy))
-    for venue, policy in VENUE_POLICIES.items()
+    venue: sha256_of_text(canonical_dumps(policy)) for venue, policy in VENUE_POLICIES.items()
 }
 
 JOURNAL_FILENAME = "journal.jsonl"
@@ -301,8 +303,7 @@ def _parse_binance(response: HttpResponse, symbol: str) -> list[dict[str, Any]]:
         raise ValueError(f"binance page is not a list: {response.body[:200]!r}")
     # [openTime, open, high, low, close, volume, closeTime, quoteAssetVolume, ...]
     return [
-        _row_from_fields(int(r[0]), r[1], r[2], r[3], r[4], r[5], r[7], symbol)
-        for r in payload
+        _row_from_fields(int(r[0]), r[1], r[2], r[3], r[4], r[5], r[7], symbol) for r in payload
     ]
 
 
@@ -312,9 +313,7 @@ _PARSERS: dict[str, Callable[[HttpResponse, str], list[dict[str, Any]]]] = {
 }
 
 
-def parse_kline_page(
-    response: HttpResponse, *, symbol: str, venue: str
-) -> list[dict[str, Any]]:
+def parse_kline_page(response: HttpResponse, *, symbol: str, venue: str) -> list[dict[str, Any]]:
     """Normalize one venue page, refusing to relabel someone else's bars.
 
     Raises ``SymbolNotListed`` when the venue reports an unknown instrument, so
@@ -335,16 +334,32 @@ def _fetch_symbol_history(
     start_ms: int,
     end_ms: int,
     fetch: Callable[[str], HttpResponse],
-    on_page: Callable[[HttpResponse, list[dict[str, Any]], int], None],
+    on_page: Callable[[HttpResponse, list[dict[str, Any]], int, int], None],
 ) -> list[dict[str, Any]]:
-    """Page forward through one symbol's daily history."""
+    """Page through one symbol's daily history in the venue's native direction."""
     policy = VENUE_POLICIES[venue]
     limit = int(policy["page_limit"])
+    page_order = str(policy["page_order"])
+    if page_order not in {"oldest_first", "newest_first"}:
+        raise ValueError(f"unsupported page_order {page_order!r} for venue {venue!r}")
     collected: dict[int, dict[str, Any]] = {}
     cursor = start_ms
+    if page_order == "newest_first":
+        cursor = end_ms
     for _ in range(MAX_PAGES_PER_SYMBOL):
+        if page_order == "oldest_first":
+            request_start_ms, request_end_ms = cursor, end_ms
+        else:
+            # Bybit returns the newest ``limit`` rows inside [start, end]. Keep
+            # the lower bound fixed and move the upper bound backwards so a
+            # long window cannot silently lose its oldest pages.
+            request_start_ms, request_end_ms = start_ms, cursor
         url = str(policy["url_template"]).format(
-            endpoint=policy["endpoint"], symbol=symbol, start_ms=cursor, limit=limit
+            endpoint=policy["endpoint"],
+            symbol=symbol,
+            start_ms=request_start_ms,
+            end_ms=request_end_ms,
+            limit=limit,
         )
         response = fetch(url)
         # Archive and receipt the page BEFORE interpreting it. "The venue never
@@ -356,21 +371,32 @@ def _fetch_symbol_history(
         try:
             rows = parse_kline_page(response, symbol=symbol, venue=venue)
         except SymbolNotListed:
-            on_page(response, [], cursor)
+            on_page(response, [], request_start_ms, request_end_ms)
             raise
-        on_page(response, rows, cursor)
+        on_page(response, rows, request_start_ms, request_end_ms)
         if not rows:
             break
         for row in rows:
-            if row["start_ms"] not in collected and row["start_ms"] <= end_ms:
+            if start_ms <= row["start_ms"] <= end_ms and row["start_ms"] not in collected:
                 collected[row["start_ms"]] = row
-        newest = rows[-1]["start_ms"]
-        if newest >= end_ms or len(rows) < limit:
-            break
-        next_cursor = newest + MS_PER_DAY
-        if next_cursor <= cursor:
-            # The venue stopped advancing; looping would fabricate progress.
-            break
+        if page_order == "oldest_first":
+            newest = rows[-1]["start_ms"]
+            if newest >= end_ms or len(rows) < limit:
+                break
+            next_cursor = newest + MS_PER_DAY
+            if next_cursor <= cursor:
+                # The venue stopped advancing; looping would fabricate progress.
+                break
+        else:
+            oldest = rows[0]["start_ms"]
+            if oldest <= start_ms or len(rows) < limit:
+                break
+            # ``end`` is inclusive. One millisecond before the oldest returned
+            # daily open prevents overlap without assuming the prior day traded.
+            next_cursor = oldest - 1
+            if next_cursor >= cursor:
+                # The venue stopped retreating; looping would fabricate progress.
+                break
         cursor = next_cursor
     return [collected[key] for key in sorted(collected)]
 
@@ -500,7 +526,8 @@ def collect_venue_klines(
             def on_page(
                 response: HttpResponse,
                 rows: list[dict[str, Any]],
-                cursor: int,
+                request_start_ms: int,
+                request_end_ms: int,
                 _symbol: str = symbol,
                 _shas: list[str] = raw_shas,
             ) -> None:
@@ -517,7 +544,11 @@ def collect_venue_klines(
                     IngestionReceipt(
                         provider_or_venue=venue,
                         endpoint=str(VENUE_POLICIES[venue]["endpoint"]),
-                        request_parameters={"symbol": _symbol, "start_ms": cursor},
+                        request_parameters={
+                            "symbol": _symbol,
+                            "start_ms": request_start_ms,
+                            "end_ms": request_end_ms,
+                        },
                         http_status=response.status,
                         captured_at_utc=_utc_stamp(active_clock),
                         adapter_name=f"data.venue_klines.{venue}_spot",
@@ -568,9 +599,7 @@ def collect_venue_klines(
                 consecutive_failures += 1
                 if consecutive_failures >= CONSECUTIVE_FAILURE_ABORT:
                     result.status = "NOT_RUN_NETWORK_BLOCKED"
-                    result.error = (
-                        f"{consecutive_failures} consecutive failures, last: {failure}"
-                    )
+                    result.error = f"{consecutive_failures} consecutive failures, last: {failure}"
                     break
                 continue
             consecutive_failures = 0
@@ -587,7 +616,10 @@ def collect_venue_klines(
             }
             if rows:
                 series_file = series_dir / f"{symbol}.jsonl"
-                with series_file.open("w", encoding="utf-8") as handle:
+                # ``newline='\n'`` keeps the content-addressed series identical
+                # on Windows and POSIX.  Platform-default CRLF previously made
+                # a semantically equal raw-page rebuild fail byte verification.
+                with series_file.open("w", encoding="utf-8", newline="\n") as handle:
                     for row in rows:
                         handle.write(canonical_dumps(row) + "\n")
                 record["first_date"] = rows[0]["date"]
@@ -612,6 +644,7 @@ def collect_venue_klines(
 
 
 __all__ = [
+    "JOURNAL_FILENAME",
     "MS_PER_DAY",
     "NORMALIZED_FIELDS",
     "OUTCOME_EMPTY",

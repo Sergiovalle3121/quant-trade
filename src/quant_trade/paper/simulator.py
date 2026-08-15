@@ -29,6 +29,7 @@ from quant_trade.paper.rebalancer import target_weights_to_orders
 from quant_trade.paper.reports import write_csvs, write_report
 from quant_trade.paper.risk import generate_risk_events, should_trigger_kill_switch, validate_order
 from quant_trade.paper.state import load_state, save_state
+from quant_trade.research.crypto_route_guard import panel_requires_sealed_crypto_route
 from quant_trade.research.strategy_registry import get_research_signal_model
 
 
@@ -56,6 +57,11 @@ class PaperTradingSimulator:
         out.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(self.config_path, out / "config_used.yaml")
         data = load_ohlcv_csv(Path(self.config.data_path))
+        if panel_requires_sealed_crypto_route(data):
+            raise RuntimeError(
+                "crypto panel bytes are blocked in the legacy paper simulator; "
+                "Gate 3 and the sealed crypto runner are required"
+            )
         data = data[data["symbol"].isin(self.config.universe.get("symbols", []))].sort_values(
             "timestamp"
         )
@@ -201,10 +207,7 @@ class PaperTradingSimulator:
                         create_event(ts_str, "rebalance_due", "rebalance orders created").to_dict()
                     )
                 for order in new_orders:
-                    if (
-                        orders_submitted_today
-                        >= self.config.risk_limits.max_orders_per_day
-                    ):
+                    if orders_submitted_today >= self.config.risk_limits.max_orders_per_day:
                         order.status = "rejected"
                         order.reason = "max_orders_per_day reached"
                         orders.append(order.to_dict())
@@ -300,8 +303,8 @@ class PaperTradingSimulator:
                         pos.quantity -= fill_decision.quantity
                         state.cash += notional - cost
                         state.realized_pnl += (
-                            (price - pos.average_cost) * fill_decision.quantity - cost
-                        )
+                            price - pos.average_cost
+                        ) * fill_decision.quantity - cost
                         if pos.quantity <= 1e-9:
                             del state.positions[order.symbol]
                     paper_fill = PaperFill(
@@ -319,9 +322,7 @@ class PaperTradingSimulator:
                     state.fills.append(paper_fill)
                     fills.append(paper_fill.to_dict())
                     event_type = (
-                        "order_filled"
-                        if order.status == "filled"
-                        else "order_partially_filled"
+                        "order_filled" if order.status == "filled" else "order_partially_filled"
                     )
                     events.append(
                         create_event(
@@ -443,4 +444,3 @@ class PaperTradingSimulator:
             state,
         )
         return out
-

@@ -6,12 +6,18 @@ from typing import Any
 import yaml
 
 from quant_trade.paper.models import PaperRiskLimits, PaperTradingConfig
+from quant_trade.research.crypto_route_guard import mapping_requires_sealed_crypto_route
 
 
 def load_paper_config(path: Path) -> PaperTradingConfig:
     raw: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if raw.get("mode") != "simulated":
         raise ValueError("paper trading mode must be simulated")
+    if mapping_requires_sealed_crypto_route(raw):
+        raise ValueError(
+            "crypto is blocked in the legacy paper simulator; use the sealed crypto "
+            "workflow after Gate 3"
+        )
     if "broker" in raw:
         raise ValueError("broker config is not allowed in Phase 5")
     data_path = Path(str(raw.get("data_path", "")))

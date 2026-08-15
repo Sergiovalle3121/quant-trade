@@ -1,0 +1,8 @@
+{
+  "byte_sha256": "98b6d374deecf83d67e124a647b668f53441bd82144665a12c1fd342319a18d7",
+  "captured_at_utc": "2024-01-04T00:00:00Z",
+  "data_source": "synthetic",
+  "provenance_notes": "Deterministic synthetic fixture created solely for offline auditor tests; it contains no provider or market-data bytes.",
+  "size_bytes": 218,
+  "source_name": "synthetic-audit-fixture-v1"
+}

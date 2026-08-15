@@ -32,16 +32,24 @@ pandas-free.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from quant_trade.data.crypto_manifest import (
+    TRUSTED_CAUSAL,
+    CryptoDatasetManifest,
+    component_hashes,
+    provenance_paths,
+)
 from quant_trade.evidence.canonical_json import (
     atomic_write_json,
     canonical_dumps,
     load_json,
     sha256_of_text,
 )
+from quant_trade.ops.crypto_gates import Gate0Verdict, require_gate0_passed
 
 SCHEMA_VERSION = 1
 
@@ -50,6 +58,13 @@ SEAL_FILENAME = "holdout_seal.json"
 #: Append-only reveal log. Separate from the seal so recording a reveal can
 #: never rewrite the declaration it is a reveal of.
 REVEAL_LOG_FILENAME = "holdout_reveals.jsonl"
+#: A separate append-only historical fact: the named dataset was later found
+#: unsuitable for economic inference.  The original seal remains readable,
+#: but it can never be revealed or used to create a replacement seal.
+INVALIDATION_FILENAME = "INVALIDATION.json"
+#: Nested, independently hashed authorization used only by the protected
+#: crypto sealing entry point. Legacy non-crypto seals remain unchanged.
+CRYPTO_AUTHORIZATION_FIELD = "crypto_authorization"
 
 #: Fields that constitute the declaration. Anything outside this set is
 #: metadata and stays out of the hash.
@@ -72,6 +87,126 @@ class HoldoutSealError(RuntimeError):
     """Raised when a seal is malformed, contradicted, or read out of order."""
 
 
+def load_invalidation(directory: str | Path) -> dict[str, Any] | None:
+    """Load a dataset invalidation without mutating the historical seal."""
+    path = Path(directory) / INVALIDATION_FILENAME
+    if not path.exists():
+        return None
+    payload = load_json(path)
+    if not isinstance(payload, dict):
+        raise HoldoutSealError(f"dataset invalidation at {path} must be a JSON object")
+    claimed = str(payload.get("seal", ""))
+    actual = invalidation_seal(payload)
+    if not claimed or claimed != actual:
+        raise HoldoutSealError(
+            f"dataset invalidation seal mismatch at {path}: stored {claimed[:12]}..., "
+            f"content hashes to {actual[:12]}..."
+        )
+    invalid_digest = payload.get("dataset_digest")
+    if not _is_sha256(invalid_digest):
+        raise HoldoutSealError("dataset invalidation must name a SHA-256 dataset_digest")
+    superseded = payload.get("superseded_dataset_digests", [])
+    if not isinstance(superseded, list) or any(not _is_sha256(item) for item in superseded):
+        raise HoldoutSealError("superseded_dataset_digests must be a list of SHA-256 digests")
+    if len(set(superseded)) != len(superseded):
+        raise HoldoutSealError("superseded_dataset_digests contains duplicates")
+    _validate_invalidated_artifacts(Path(directory), payload)
+    return payload
+
+
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _validate_invalidated_artifacts(directory: Path, payload: dict[str, Any]) -> None:
+    """Verify every historical artifact explicitly named by an invalidation."""
+    artifacts = payload.get("invalidated_artifacts")
+    if artifacts is None:
+        return
+    if not isinstance(artifacts, dict):
+        raise HoldoutSealError("invalidated_artifacts must be a JSON object")
+    invalid_digests = {
+        str(payload["dataset_digest"]),
+        *(str(item) for item in payload.get("superseded_dataset_digests", [])),
+    }
+
+    expected_holdout = artifacts.get("holdout_seal")
+    if expected_holdout is not None:
+        if not _is_sha256(expected_holdout):
+            raise HoldoutSealError("invalidated holdout_seal must be a SHA-256 digest")
+        holdout_path = directory / SEAL_FILENAME
+        if not holdout_path.is_file():
+            raise HoldoutSealError(f"invalidated holdout artifact is missing: {holdout_path}")
+        loaded = load_seal(directory)
+        if loaded.seal() != expected_holdout:
+            raise HoldoutSealError(
+                "invalidated holdout artifact does not match its declared digest"
+            )
+        if loaded.dataset_digest not in invalid_digests:
+            raise HoldoutSealError(
+                "invalidated holdout artifact does not bind an invalidated dataset digest"
+            )
+
+    preregistrations = artifacts.get("experiment_preregistrations", [])
+    if not isinstance(preregistrations, list) or any(
+        not isinstance(item, str) or not item.strip() for item in preregistrations
+    ):
+        raise HoldoutSealError("invalidated experiment_preregistrations must be identifiers")
+    if len(set(preregistrations)) != len(preregistrations):
+        raise HoldoutSealError("invalidated experiment_preregistrations contains duplicates")
+    if preregistrations:
+        from quant_trade.research.preregistration import (
+            PreregistrationError,
+            load_preregistration,
+        )
+
+        for experiment_id in preregistrations:
+            experiment_directory = directory / experiment_id
+            try:
+                registration = load_preregistration(experiment_directory)
+            except PreregistrationError as exc:
+                raise HoldoutSealError(
+                    f"invalidated preregistration artifact is missing or corrupt: {experiment_id}"
+                ) from exc
+            if registration.experiment_id != experiment_id:
+                raise HoldoutSealError(
+                    f"invalidated preregistration identity mismatch: {experiment_id}"
+                )
+            if not any(
+                digest in universe_member
+                for digest in invalid_digests
+                for universe_member in registration.universe
+            ):
+                raise HoldoutSealError(
+                    f"invalidated preregistration does not bind an invalidated digest: "
+                    f"{experiment_id}"
+                )
+
+
+def invalidation_seal(payload: dict[str, Any]) -> str:
+    """Hash all invalidation fields except the hash itself."""
+    content = {key: value for key, value in payload.items() if key != "seal"}
+    return sha256_of_text(canonical_dumps(content))
+
+
+def assert_dataset_not_invalidated(directory: str | Path, digest: str) -> None:
+    """Fail closed if ``digest`` is named by the directory's invalidation."""
+    invalidation = load_invalidation(directory)
+    if invalidation is None:
+        return
+    invalid_digests = {
+        str(invalidation["dataset_digest"]),
+        *(str(item) for item in invalidation.get("superseded_dataset_digests", [])),
+    }
+    if digest in invalid_digests:
+        reasons = invalidation.get("reasons") or ["unspecified integrity failure"]
+        raise HoldoutSealError(
+            f"dataset {digest[:12]}... is {invalidation.get('status', 'INVALID')}: "
+            f"{'; '.join(str(reason) for reason in reasons)}. The historical seal "
+            "is retained for traceability but is not usable or revealable."
+        )
+
+
 def dataset_digest(components: dict[str, str]) -> str:
     """Commit to a dataset's full content via its per-file digests.
 
@@ -83,8 +218,7 @@ def dataset_digest(components: dict[str, str]) -> str:
     """
     if not components:
         raise HoldoutSealError(
-            "refusing to digest an empty dataset: a seal bound to nothing "
-            "constrains nothing"
+            "refusing to digest an empty dataset: a seal bound to nothing constrains nothing"
         )
     return sha256_of_text(canonical_dumps(dict(sorted(components.items()))))
 
@@ -142,15 +276,60 @@ class HoldoutSeal:
         return self.holdout_start <= day <= self.holdout_end
 
 
-def seal_holdout(directory: str | Path, seal: HoldoutSeal) -> tuple[Path, str]:
-    """Write a declaration and return its path and digest.
+@dataclass(frozen=True)
+class CryptoHoldoutAuthorization:
+    """Hash-bound proof that the protected crypto sealing prerequisites passed."""
 
-    Refuses to overwrite: a holdout that can be re-declared after the run is
-    decoration, and making that a filesystem-level guarantee costs one
-    existence check.
-    """
+    dataset_id: str
+    manifest_status: str
+    manifest_digest: str
+    gate0_status: str
+    gate0_verdict_digest: str
+    gate0_evidence_digest: str
+    holdout_seal_digest: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.dataset_id, str) or not self.dataset_id.strip():
+            raise HoldoutSealError("crypto holdout dataset_id is required")
+        if self.manifest_status != TRUSTED_CAUSAL:
+            raise HoldoutSealError("crypto holdout manifest_status must be TRUSTED_CAUSAL")
+        if self.gate0_status != "PASS":
+            raise HoldoutSealError("crypto holdout gate0_status must be PASS")
+        for name in (
+            "manifest_digest",
+            "gate0_verdict_digest",
+            "gate0_evidence_digest",
+            "holdout_seal_digest",
+        ):
+            if not _is_sha256(getattr(self, name)):
+                raise HoldoutSealError(f"crypto holdout {name} must be a SHA-256 digest")
+        if self.schema_version != 1:
+            raise HoldoutSealError("unsupported crypto holdout authorization schema")
+
+    def sealed_content(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def digest(self) -> str:
+        return sha256_of_text(canonical_dumps(self.sealed_content()))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**self.sealed_content(), "digest": self.digest()}
+
+
+def _is_crypto_seal(seal: HoldoutSeal) -> bool:
+    return seal.dataset_id.lower().startswith("crypto") or seal.seal_id.lower().startswith("crypto")
+
+
+def _write_holdout_seal(
+    directory: str | Path,
+    seal: HoldoutSeal,
+    *,
+    crypto_authorization: CryptoHoldoutAuthorization | None = None,
+) -> tuple[Path, str]:
     out = Path(directory)
     out.mkdir(parents=True, exist_ok=True)
+    assert_dataset_not_invalidated(out, seal.dataset_digest)
     path = out / SEAL_FILENAME
     if path.exists():
         raise HoldoutSealError(
@@ -158,8 +337,75 @@ def seal_holdout(directory: str | Path, seal: HoldoutSeal) -> tuple[Path, str]:
             "Seal a new seal_id against a new dataset instead."
         )
     payload = seal.to_dict()
+    if crypto_authorization is not None:
+        payload[CRYPTO_AUTHORIZATION_FIELD] = crypto_authorization.to_dict()
     atomic_write_json(path, payload)
     return path, str(payload["seal"])
+
+
+def seal_holdout(directory: str | Path, seal: HoldoutSeal) -> tuple[Path, str]:
+    """Write a declaration and return its path and digest.
+
+    Refuses to overwrite: a holdout that can be re-declared after the run is
+    decoration, and making that a filesystem-level guarantee costs one
+    existence check.
+    """
+    if _is_crypto_seal(seal):
+        raise HoldoutSealError(
+            "legacy seal_holdout is blocked for crypto; use seal_crypto_holdout with "
+            "verified manifest and Gate 0 bindings"
+        )
+    return _write_holdout_seal(directory, seal)
+
+
+def seal_crypto_holdout(
+    directory: str | Path,
+    seal: HoldoutSeal,
+    *,
+    manifest: CryptoDatasetManifest,
+    provenance_root: str | Path,
+    manifest_digest: str,
+    gate0_verdict: Gate0Verdict,
+    gate0_verdict_digest: str,
+    gate0_evidence_digest: str,
+) -> tuple[Path, str]:
+    """Protected crypto entry: bind verified causal bytes and exact Gate 0 evidence."""
+    if not _is_crypto_seal(seal):
+        raise HoldoutSealError("seal_crypto_holdout only accepts crypto dataset identities")
+    try:
+        manifest.require_trusted("holdout_seal")
+        require_gate0_passed(gate0_verdict, "holdout_seal")
+    except (ValueError, RuntimeError) as exc:
+        raise HoldoutSealError(str(exc)) from exc
+
+    actual_manifest_digest = manifest.digest()
+    if manifest_digest != actual_manifest_digest:
+        raise HoldoutSealError("provided manifest_digest does not match the manifest")
+    if seal.dataset_id != manifest.dataset_id:
+        raise HoldoutSealError("holdout dataset_id does not match the causal manifest")
+    if seal.dataset_digest != actual_manifest_digest:
+        raise HoldoutSealError("holdout dataset_digest must equal the causal manifest digest")
+    try:
+        observed_components = component_hashes(provenance_paths(manifest, provenance_root))
+    except ValueError as exc:
+        raise HoldoutSealError(str(exc)) from exc
+    if observed_components != manifest.components:
+        raise HoldoutSealError("causal manifest component bytes do not match at holdout sealing")
+    if gate0_verdict_digest != gate0_verdict.digest():
+        raise HoldoutSealError("provided Gate 0 verdict digest does not match the exact verdict")
+    if gate0_evidence_digest != gate0_verdict.evidence_digest():
+        raise HoldoutSealError("provided Gate 0 evidence digest does not match the exact evidence")
+
+    authorization = CryptoHoldoutAuthorization(
+        dataset_id=manifest.dataset_id,
+        manifest_status=manifest.status,
+        manifest_digest=actual_manifest_digest,
+        gate0_status=gate0_verdict.status,
+        gate0_verdict_digest=gate0_verdict_digest,
+        gate0_evidence_digest=gate0_evidence_digest,
+        holdout_seal_digest=seal.seal(),
+    )
+    return _write_holdout_seal(directory, seal, crypto_authorization=authorization)
 
 
 def load_seal(directory: str | Path) -> HoldoutSeal:
@@ -178,6 +424,37 @@ def load_seal(directory: str | Path) -> HoldoutSeal:
             f"hashes to {actual[:12]}.... The declaration was edited after sealing."
         )
     return seal
+
+
+def load_crypto_holdout_authorization(directory: str | Path) -> CryptoHoldoutAuthorization:
+    """Verify the nested crypto prerequisite binding and its holdout linkage."""
+    path = Path(directory) / SEAL_FILENAME
+    if not path.exists():
+        raise HoldoutSealError(f"no sealed holdout at {path}")
+    payload = load_json(path)
+    raw = payload.get(CRYPTO_AUTHORIZATION_FIELD)
+    if not isinstance(raw, dict):
+        raise HoldoutSealError("crypto holdout lacks protected manifest and Gate 0 authorization")
+    known = {item.name for item in CryptoHoldoutAuthorization.__dataclass_fields__.values()}
+    unknown = set(raw) - known - {"digest"}
+    missing = known - set(raw)
+    if unknown or missing:
+        raise HoldoutSealError(
+            f"malformed crypto holdout authorization; unknown={sorted(unknown)}, "
+            f"missing={sorted(missing)}"
+        )
+    claimed = raw.get("digest")
+    authorization = CryptoHoldoutAuthorization(**{key: raw[key] for key in known})
+    if not isinstance(claimed, str) or claimed != authorization.digest():
+        raise HoldoutSealError("crypto holdout authorization digest mismatch")
+    seal = load_seal(directory)
+    if authorization.dataset_id != seal.dataset_id:
+        raise HoldoutSealError("crypto holdout authorization dataset identity mismatch")
+    if authorization.manifest_digest != seal.dataset_digest:
+        raise HoldoutSealError("crypto holdout authorization manifest digest mismatch")
+    if authorization.holdout_seal_digest != seal.seal():
+        raise HoldoutSealError("crypto holdout authorization seal linkage mismatch")
+    return authorization
 
 
 def verify_against_dataset(seal: HoldoutSeal, components: dict[str, str]) -> None:
@@ -208,9 +485,7 @@ def read_reveals(directory: str | Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
 
 
@@ -242,11 +517,12 @@ def record_reveal(
     if not reason.strip():
         raise HoldoutSealError("a reveal must state its reason")
     if not frozen_selection:
-        raise HoldoutSealError(
-            "a reveal must name the already-frozen selection it will evaluate"
-        )
+        raise HoldoutSealError("a reveal must name the already-frozen selection it will evaluate")
     out = Path(directory)
     seal = load_seal(out)
+    assert_dataset_not_invalidated(out, seal.dataset_digest)
+    if _is_crypto_seal(seal):
+        load_crypto_holdout_authorization(out)
     assert_not_revealed(out)
     record = {
         "seal_id": seal.seal_id,
@@ -262,16 +538,24 @@ def record_reveal(
 
 
 __all__ = [
+    "CRYPTO_AUTHORIZATION_FIELD",
+    "CryptoHoldoutAuthorization",
+    "INVALIDATION_FILENAME",
     "REVEAL_LOG_FILENAME",
     "SEAL_FILENAME",
     "HoldoutSeal",
     "HoldoutSealError",
+    "assert_dataset_not_invalidated",
     "assert_not_revealed",
     "assert_within_selection",
     "dataset_digest",
     "load_seal",
+    "load_invalidation",
+    "load_crypto_holdout_authorization",
+    "invalidation_seal",
     "read_reveals",
     "record_reveal",
     "seal_holdout",
+    "seal_crypto_holdout",
     "verify_against_dataset",
 ]
