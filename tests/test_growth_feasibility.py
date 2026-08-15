@@ -119,6 +119,20 @@ def test_cost_drag_and_fixed_cost_arithmetic() -> None:
     assert result.costs.annual_fixed_cost_fraction_of_capital == pytest.approx(11.88)
 
 
+def test_an_unknown_cost_is_not_silently_treated_as_zero() -> None:
+    """Reporting a total that assumes away a missing cost understates the burden."""
+    no_fixed = evaluate_target_feasibility(_request(monthly_fixed_cost_usd=None))
+    assert no_fixed.costs is not None
+    assert no_fixed.costs.annual_turnover_cost_fraction == pytest.approx(0.26)
+    assert no_fixed.costs.annual_fixed_cost_fraction_of_capital is None
+    assert no_fixed.costs.total_annual_cost_fraction is None
+    assert no_fixed.costs.breakeven_gross_sharpe is None
+
+    no_turnover = evaluate_target_feasibility(_request(round_trip_cost_bps=None))
+    assert no_turnover.costs is not None
+    assert no_turnover.costs.total_annual_cost_fraction is None
+
+
 def test_a_ten_thousand_x_month_is_no_go_with_named_reasons() -> None:
     result = evaluate_target_feasibility(_request())
     assert result.status == "NO_GO"

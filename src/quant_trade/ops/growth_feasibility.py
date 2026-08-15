@@ -404,9 +404,11 @@ def _costs(
     if monthly_fixed_cost_usd is not None:
         monthly_fixed = monthly_fixed_cost_usd / start
         annual_fixed = monthly_fixed * 12.0
+    # Both halves or neither: an absent cost is unknown, not zero, and reporting
+    # a total that quietly treats it as zero would understate the burden.
     total: float | None = None
-    if turnover_drag is not None or annual_fixed is not None:
-        total = (turnover_drag or 0.0) + (annual_fixed or 0.0)
+    if turnover_drag is not None and annual_fixed is not None:
+        total = turnover_drag + annual_fixed
     breakeven: float | None = None
     if total is not None and volatility is not None:
         breakeven = breakeven_gross_sharpe(total, volatility)
