@@ -242,9 +242,12 @@ recomendar cualquier gasto:
    sobre el tiempo de creación de las corporate actions*, y que puede haber
    retrasos tanto en recibirlas de sus proveedores como en procesarlas. Sin
    marca temporal garantizada no hay vintage atestiguable, y el evaluador exige
-   que el vintage preceda a la apertura de la sesión efectiva. Además, el
-   endpoint `/v2/corporate_actions/announcements` del que depende v1 fue
-   sustituido por `/v1/corporate-actions`.
+   que el vintage preceda a la apertura de la sesión efectiva. Nota adicional,
+   más débil: la referencia actual documenta `/v1/corporate-actions` y el
+   `/v2/corporate_actions/announcements` del que depende el colector ya no
+   aparece en ella. No encontré un aviso formal de deprecación, así que lo
+   registro como señal, no como hecho verificado — y no hace falta para el
+   veredicto: la ausencia de garantía temporal ya lo cierra.
 2. **Muestra al filo.** El evaluador exige ≥120 meses pareados completos, y la
    cobertura histórica de Alpaca empieza en 2016 tanto en el plan Basic como en
    el de pago. El propio doc de campaña advierte que *una sola exclusión por
