@@ -137,6 +137,18 @@ def test_nested_universe_symbols_cannot_hide_crypto_identity() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "strategy",
+    [
+        "binance_btc_eth_tsmom_long_cash_v1",
+        "binance_btc_weekly_momentum_1w_long_cash_v1",
+        "binance_liquid_xsmom_30d_top20_weekly_v1",
+    ],
+)
+def test_prospective_crypto_strategy_names_cannot_enter_legacy_routes(strategy: str) -> None:
+    assert mapping_requires_sealed_crypto_route({"strategy": strategy})
+
+
 def test_generic_walk_forward_blocks_crypto_before_reading_dataset(tmp_path) -> None:
     with pytest.raises(ValueError, match="generic walk-forward runner"):
         run_multi_asset_walk_forward(

@@ -1,0 +1,97 @@
+schema_version: 1
+strategy_id: binance_btc_weekly_momentum_1w_long_cash_v1
+campaign_mode: PROSPECTIVE_ONLY
+venue: Binance
+market: Spot
+symbol: BTCUSDT
+position_mode: long_cash
+source_hypothesis:
+  citation: Liu and Tsyvinski (2021), Risks and Returns of Cryptocurrency
+  doi: 10.1093/rfs/hhaa113
+  external_result: current coin-market weekly return predicts future coin-market returns
+  translation: BTCUSDT proxy; positive prior-week return means LONG, otherwise CASH
+  exact_replication: false
+signal_policy:
+  lookback_calendar_days: 7
+  calendar_timezone: UTC
+  decision_frequency: weekly
+  decision_weekday: SUNDAY
+  decision_bar: sunday_daily_utc_close
+  execution_bar: next_daily_utc_open
+  decision_to_execution_bars: 1
+  weekly_return_definition: close_t_over_close_t_minus_7_calendar_days_minus_1
+  long_condition: weekly_return_strictly_positive
+  cash_condition: weekly_return_non_positive
+  missing_reference_action: NO_SIGNAL_NO_FALLBACK
+  emit_only_on_state_change: true
+  rebalance_drift: false
+  tie_state: CASH
+trial_budget: 1
+development_window:
+  data_start: '2017-08-17'
+  decision_start: '2017-08-27'
+  decision_end: '2023-11-26'
+  evidence_end: '2023-11-28'
+  fresh_collection_required: true
+  request_side_end_time_required: true
+prospective_window:
+  observation_start: '2026-08-17'
+  first_reference_date: '2026-08-23'
+  first_decision_date: '2026-08-30'
+  first_execution_date: '2026-08-31'
+  primary_decision_count: 104
+  primary_last_decision_date: '2028-08-20'
+  primary_observation_end: '2028-08-27'
+  extension_decision_count: 52
+  total_decision_count: 156
+  final_last_decision_date: '2029-08-19'
+  final_observation_end: '2029-08-26'
+  interim_economic_reveal_allowed: false
+  reveal_not_before: '2029-08-27'
+  insufficient_evidence_action: CONTINUE_EXTENSION_WITHOUT_REVEAL
+benchmarks:
+  - benchmark_id: btc_usdt_buy_and_hold
+    kind: buy_and_hold
+    symbol_weights:
+      BTCUSDT: 1.0
+  - benchmark_id: zero_yield_cash
+    kind: cash
+    annual_return_fraction: 0.0
+cost_policy:
+  fee_floor_bps_per_side: 10.0
+  friction_floor_bps_per_side: 5.0
+  stress_cost_multiplier: 2.0
+  stress_long_fill_fraction: 0.5
+  stress_cash_exit_fill_fraction: 1.0
+development_falsification_policy:
+  net_total_return_positive: true
+  outperform_each_benchmark: true
+  required_benchmark_ids:
+    - btc_usdt_buy_and_hold
+    - zero_yield_cash
+  contiguous_blocks: 4
+  minimum_outperforming_blocks: 3
+  minimum_completed_decisions: 300
+  minimum_independent_trades: 30
+  max_drawdown_abs: 0.25
+  stress_total_return_min: 0.0
+promotion_blockers:
+  gate0: BINANCE_DEMO_VENUE_POLICY_NOT_IMPLEMENTED
+  pbo: NOT_IDENTIFIABLE_SINGLE_TRIAL
+  pbo_is_mandatory: true
+  gate4: ONE_ASSET_100PCT_CONTRADICTS_5PCT_PER_ASSET_AND_20_ASSET_POLICY
+  maximum_verdict_without_new_governance: INSUFFICIENT_EVIDENCE
+safety_policy:
+  leverage_allowed: false
+  shorts_allowed: false
+  margin_allowed: false
+  derivatives_allowed: false
+  earn_allowed: false
+authorization:
+  research_only: true
+  generic_runner_enabled: false
+  strategy_registry_enabled: false
+  live_execution_enabled: false
+  real_money_authorized: false
+  external_action_authorized: false
+seal: a1a896f4609e4c8283b114404f415d29f97404ed4a50e27cc8393029db8df910

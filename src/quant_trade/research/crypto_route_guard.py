@@ -17,6 +17,9 @@ import pandas as pd
 
 CRYPTO_STRATEGIES = frozenset(
     {
+        "binance_btc_eth_tsmom_long_cash_v1",
+        "binance_btc_weekly_momentum_1w_long_cash_v1",
+        "binance_liquid_xsmom_30d_top20_weekly_v1",
         "crypto_capacity_illiquidity",
         "crypto_death_avoidance",
         "crypto_annual_equal_weight_rebalance",

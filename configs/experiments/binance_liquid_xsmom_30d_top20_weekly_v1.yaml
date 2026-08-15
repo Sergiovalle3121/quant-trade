@@ -1,0 +1,126 @@
+schema_version: 1
+strategy_id: binance_liquid_xsmom_30d_top20_weekly_v1
+campaign_mode: PROSPECTIVE_DECLARATION_BLOCKED
+venue: Binance
+market: Spot
+quote_asset: USDT
+universe_policy:
+  stable_identity: CMC:<cmc_id>
+  market_cap_min_usd_inclusive: 10000000.0
+  market_cap_max_usd_inclusive: 1000000000.0
+  classification_flags_required_false:
+    - is_stablecoin
+    - is_wrapped_asset
+    - is_leveraged_token
+    - is_derivative_token
+    - is_rebase_token
+  unknown_classification_action: NO_SIGNAL
+  eligibility_fields_required_true:
+    - eligible_to_open
+    - tradable
+  point_in_time_availability_field: universe_observed_at_utc
+  classification_availability_field: classification_public_known_at_utc
+  classification_interval: valid_from_inclusive_valid_to_exclusive
+  classification_open_end_representation: EXPLICIT_NULL_ONLY_INVALID_TEXT_REJECTED
+  venue_binding_availability_field: venue_symbol_bound_at_utc
+  required_venue: Binance
+  required_market: Spot
+  required_data_status: VALID
+  venue_symbol_pattern: NONEMPTY_ASCII_ALNUM_BASE_PLUS_USDT
+  venue_symbol_unique_per_timestamp: true
+signal_policy:
+  decision_frequency: weekly
+  decision_weekday: THURSDAY
+  decision_timestamp: THURSDAY_00_00_UTC
+  latest_signal_bar: WEDNESDAY_00_00_TO_THURSDAY_00_00_UTC
+  required_close_count: 31
+  momentum_lookback_calendar_days: 30
+  momentum_return: close_wednesday_t_over_close_t_minus_30_days_minus_1
+  liquidity_window_calendar_days: 30
+  liquidity_window: t_minus_29_days_through_t_inclusive
+  liquidity_daily_quote_volume_floor_usd: 5000000.0
+  liquidity_minimum_passing_days: 15
+  liquidity_score: median_venue_turnover_usd_over_exact_30_day_window
+  parent_cohort_size: 100
+  portfolio_size: 20
+  parent_sort: liquidity_desc_then_cmc_id_numeric_asc
+  candidate_sort: momentum_desc_then_cmc_id_numeric_asc
+  missing_or_gapped_history_action: NO_SIGNAL
+  fewer_than_100_eligible_action: NO_SIGNAL
+  fallback_allowed: false
+  substitution_allowed: false
+  stops_allowed: false
+portfolio_policy:
+  candidate: top20_momentum_within_top100_liquidity
+  liquidity_control: top20_liquidity_within_identical_top100_cohort
+  target_weight_per_asset: 0.0475
+  gross_target_weight: 0.95
+  cash_reserve_weight: 0.05
+  rebalance_interval_calendar_days: 7
+  research_capital_usd: 200.0
+  research_target_notional_per_leg_usd: 9.5
+  missing_selected_leg_rule: NO_SIGNAL_IF_MIN_NOTIONAL_PRECHECK_FAILS_NO_REPLACEMENT
+  delta_below_minimum_action: REFUSE_VISIBLY_NO_SUPPRESSION_OR_REDISTRIBUTION
+execution_policy:
+  decision_to_execution_calendar_days: 1
+  only_execution_instant: FRIDAY_00_00_UTC_OPEN
+  missing_exact_friday_open_action: EXPIRE_NO_RETRY
+  next_observed_bar_fallback_allowed: false
+  same_boundary_execution_allowed: false
+  min_notional_availability_field: symbol_rules_observed_at_utc
+  research_min_notional_screen_usd: 9.5
+  min_notional_precheck_does_not_establish_executability: true
+  full_execution_filters_and_friday_price_required_before_evaluation: true
+  target_execution_status: PENDING_EXECUTION_VALIDATION
+benchmarks:
+  - benchmark_id: btc_usdt_buy_and_hold_comparable
+    start: same_first_friday_open
+    btc_weight: 0.95
+    cash_weight: 0.05
+    same_costs: true
+  - benchmark_id: btc_usdt_buy_and_hold_full_gate_required
+    start: same_first_friday_open
+    btc_weight: 1.0
+    same_costs: true
+  - benchmark_id: top20_liquidity_control
+    cohort: identical_top100_liquidity_cohort_and_digest
+    weight_per_asset: 0.0475
+    cash_weight: 0.05
+    same_dates_costs_and_execution_rules: true
+trial_budget: 1
+evidence_policy:
+  external_evidence: MIXED_NOT_AN_EXACT_REPLICATION
+  development_or_holdout_window_activated: false
+  economic_evaluation_allowed: false
+  independent_preregistration_timestamp_exists: false
+  preregistration_claim_before_commit_allowed: false
+  canonical_output_digests:
+    - cohort
+    - scores
+    - paired_target_set
+  digest_binding: schema_decision_spec_identity_venue_scores_weights
+  candidate_control_same_cohort_digest_required: true
+  output_timestamps: TIMEZONE_AWARE_UTC_ONLY
+  cohort_score_order: LIQUIDITY_DESC_THEN_CMC_ID_NUMERIC_ASC
+  selected_min_notional_precheck_must_remain_true: true
+  prior_failed_campaigns_preserved:
+    - binance_btc_eth_tsmom_long_cash_v1
+    - binance_btc_weekly_momentum_1w_long_cash_v1
+promotion_blockers:
+  current_panel: INVALID_LOOKAHEAD
+  stablecoin_point_in_time_evidence: UNKNOWN_IN_CURRENT_PANEL
+  gate0: BINANCE_VENUE_POLICY_NOT_APPROVED
+  pbo: NOT_IDENTIFIABLE_SINGLE_TRIAL
+  frequency: WEEKLY_CONFLICTS_WITH_CURRENT_ANNUAL_COST_EVIDENCE
+  costs: ACCOUNT_AND_SYMBOL_SPECIFIC_COSTS_NOT_BOUND
+  minimum_notional: POINT_IN_TIME_SYMBOL_RULES_DATASET_NOT_BUILT
+  maximum_verdict: INSUFFICIENT_EVIDENCE
+authorization:
+  research_only: true
+  generic_runner_enabled: false
+  strategy_registry_enabled: false
+  network_access_enabled: false
+  live_execution_enabled: false
+  real_money_authorized: false
+  external_action_authorized: false
+seal: 906e9dd5a0bd449dbc344921aea033456976132a3487a88f8b8fe1ce85010fdf
