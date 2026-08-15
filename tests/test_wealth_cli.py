@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from quant_trade.ops.wealth_cli import wealth_app
@@ -80,7 +81,7 @@ def test_goal_currency_amounts_and_horizon_are_required_not_guessed(
 ) -> None:
     result = _invoke_without_goal_option(missing_option)
     assert result.exit_code == 2
-    assert f"Missing option '{missing_option}'" in result.output
+    assert f"Missing option '{missing_option}'" in Text.from_ansi(result.output).plain
 
 
 def test_goal_options_are_documented_as_required() -> None:
@@ -88,5 +89,6 @@ def test_goal_options_are_documented_as_required() -> None:
         wealth_app, ["assess", "--help"], terminal_width=200, color=False
     )
     assert help_result.exit_code == 0
+    plain_help = Text.from_ansi(help_result.output).plain
     for option in _REQUIRED_GOAL_OPTIONS:
-        assert option in help_result.output
+        assert option in plain_help
