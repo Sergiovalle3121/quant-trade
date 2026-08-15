@@ -291,6 +291,39 @@ argumento cuantitativo para que el ingreso ganado vaya primero.
 
 ---
 
+## Apéndice: los supuestos exactos de la §4
+
+La tabla de familias no es una opinión redactada: es la salida de
+`screen_families()` sobre estos `StrategyFamilyProfile`. Se publican para que
+cualquiera reconstruya la tabla y discuta un supuesto concreto en vez del
+resultado. Todos con `capital_usd=100`, `portfolio_fraction_traded_per_rebalance=1.0`
+salvo donde se indica, y `fractional_units_supported=True`.
+
+| # | posiciones | rebal./año | bps/lado | mín. nocional | datos US$/mes | licencia | PIT | vol |
+|---|---:|---:|---:|---:|---:|---|---|---:|
+| 1 | 1 | 12 | 0.5 | $1 | 0 | `NOT_REQUIRED` | sí | 16% |
+| 2 | 20 | 12 | 3 | $1 | 0 | `NOT_REQUIRED` | **no** | 25% |
+| 3 | 20 | 52 | 3 | $1 | 99 | `COMMERCIAL_VERIFIED` | sí | 25% |
+| 4 | 1 | 12 | 0.5 | $1 | 99 | `COMMERCIAL_VERIFIED` | sí | 16% |
+| 4b | 1 | 12 | 0.5 | $1 | **0** | `COMMERCIAL_VERIFIED` | sí | 16% |
+| 5 | 10 | 52 | 3 | $1 | 99 | `UNKNOWN` | — | 30% |
+| 6 | 20 | 4 (25% del libro) | 3 | $1 | 0 | `NOT_REQUIRED` | **no** | 14% |
+| 7 | 100 | 12 | 25 | $1 | 129 | `UNKNOWN` | — | 80% |
+| 8 | 2 | 365 | 25 | $1 | 0 | `NOT_REQUIRED` | sí | 10% |
+| 9 | 10 | 252 | 25 | $1 | 0 | `NON_COMMERCIAL` | — | 80% |
+| 10 | 20 | 1 | 25 | $1 | 0 | `UNKNOWN` | sí | 80% |
+| 11 | 20 | 1 | 60 | $5 | 0 | `UNKNOWN` | sí | 120% |
+
+Procedencia de los costos por lado: 0.5 bp es el spread de SPY; 3 bps una
+acción USA típica con comisión cero; 25 bps el taker tier-1 de Alpaca cripto;
+60 bps la medición propia de libros Bybit micro-cap a US$100
+([`CRYPTO_LOWCAP_COST_MODEL.md`](CRYPTO_LOWCAP_COST_MODEL.md)). US$129/mes es la
+cotización registrada de CoinGecko Analyst
+([`CRYPTO_LOWCAP_DATA_SOURCES.md`](CRYPTO_LOWCAP_DATA_SOURCES.md)).
+
+**Si un supuesto está mal, cámbialo y vuelve a correr el screen.** Ese es el
+punto de tenerlo como función pura y no como párrafo.
+
 ## Fuentes
 
 - [Alpaca — FINRA retira la regla PDT y el nuevo marco de margen intradía](https://alpaca.markets/blog/finra-retires-the-pdt-rule-introducing-alpacas-new-intraday-margin-framework/)
