@@ -1,0 +1,9 @@
+{
+  "benchmarks": [{"name": "buy-and-hold", "net_return": 0.9}],
+  "costs": {"applied": false, "fee_bps": 0.0, "slippage_bps": 0.0},
+  "dataset_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "execution": {"signal_lag_bars": 0},
+  "strategy_id": "lookahead-demo",
+  "strategy_net_return": 0.8,
+  "trial_ledger_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+}

@@ -1,0 +1,12 @@
+{
+  "benchmarks": [
+    {"name": "BTCUSDT buy-and-hold", "net_return": 0.08},
+    {"name": "eligible equal-weight", "net_return": 0.06}
+  ],
+  "costs": {"applied": true, "fee_bps": 10.0, "slippage_bps": 5.0},
+  "dataset_sha256": "98b6d374deecf83d67e124a647b668f53441bd82144665a12c1fd342319a18d7",
+  "execution": {"signal_lag_bars": 1},
+  "strategy_id": "example-sealed-strategy",
+  "strategy_net_return": 0.12,
+  "trial_ledger_sha256": "1ebc832421bfa7239ff4325d26da65ec856dc0a7e16f2a390f77bb169d5039de"
+}
