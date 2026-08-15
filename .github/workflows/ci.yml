@@ -67,6 +67,10 @@ jobs:
           src/quant_trade/research/prospective_spy_tom_development.py
           src/quant_trade/research/signals/crypto_lowcap.py
           src/quant_trade/audit
+          src/quant_trade/metrics/normal.py
+          src/quant_trade/ops/arithmetic_guards.py
+          src/quant_trade/ops/growth_feasibility.py
+          src/quant_trade/ops/family_screen.py
           tests/test_committed_crypto_invalidation.py
           tests/test_crypto_evaluator.py
           tests/test_crypto_economic_evidence.py
@@ -104,6 +108,10 @@ jobs:
           tests/test_audit_cli.py
           tests/test_audit_models.py
           tests/test_audit_runner.py
+          tests/test_audit_package_and_delivery.py
+          tests/test_growth_feasibility.py
+          tests/test_family_screen.py
+          tests/test_normal_distribution.py
           tests/test_wealth_cli.py
           tests/test_wealth_plan.py
           tests/test_tax_lot_ledger.py
@@ -222,11 +230,15 @@ jobs:
             tests/test_prospective_spy_tom.py \
             tests/test_prospective_spy_tom_development.py \
             tests/test_runtime_provenance.py \
+            tests/test_audit_package_and_delivery.py \
+            tests/test_growth_feasibility.py \
+            tests/test_family_screen.py \
+            tests/test_normal_distribution.py \
             --cov=src/quant_trade \
             --cov-branch \
             --cov-report=
           coverage report \
-            --include='src/quant_trade/ops/crypto_capital.py,src/quant_trade/ops/crypto_gates.py,src/quant_trade/ops/tax_lot_ledger.py,src/quant_trade/execution/alpaca_campaign_sleeve.py,src/quant_trade/costs/crypto_lowcap.py,src/quant_trade/data/crypto_manifest.py,src/quant_trade/data/crypto_panel.py,src/quant_trade/data/crypto_market_events.py,src/quant_trade/data/crypto_selection.py,src/quant_trade/data/crypto_stablecoin_evidence.py,src/quant_trade/data/binance_symbol_rules.py,src/quant_trade/data/aanv30_feasibility.py,src/quant_trade/data/world_order_flow_feasibility.py,src/quant_trade/data/ccdata_attested_loader.py,src/quant_trade/data/alpaca_spy_tom_collector.py,src/quant_trade/research/crypto_economic_evidence.py,src/quant_trade/research/crypto_evaluator.py,src/quant_trade/research/crypto_runner.py,src/quant_trade/research/runtime_provenance.py,src/quant_trade/research/crypto_route_guard.py,src/quant_trade/research/prospective_crypto.py,src/quant_trade/research/prospective_development.py,src/quant_trade/research/prospective_weekly_momentum.py,src/quant_trade/research/prospective_weekly_development.py,src/quant_trade/research/prospective_xsmom.py,src/quant_trade/research/prospective_xsmom_development.py,src/quant_trade/research/prospective_carry_feasibility.py,src/quant_trade/research/prospective_spy_tom.py,src/quant_trade/research/prospective_spy_tom_development.py,src/quant_trade/research/signals/crypto_lowcap.py,src/quant_trade/research/holdout_seal.py,src/quant_trade/research/crypto_governance.py' \
+            --include='src/quant_trade/ops/crypto_capital.py,src/quant_trade/ops/crypto_gates.py,src/quant_trade/ops/tax_lot_ledger.py,src/quant_trade/execution/alpaca_campaign_sleeve.py,src/quant_trade/costs/crypto_lowcap.py,src/quant_trade/data/crypto_manifest.py,src/quant_trade/data/crypto_panel.py,src/quant_trade/data/crypto_market_events.py,src/quant_trade/data/crypto_selection.py,src/quant_trade/data/crypto_stablecoin_evidence.py,src/quant_trade/data/binance_symbol_rules.py,src/quant_trade/data/aanv30_feasibility.py,src/quant_trade/data/world_order_flow_feasibility.py,src/quant_trade/data/ccdata_attested_loader.py,src/quant_trade/data/alpaca_spy_tom_collector.py,src/quant_trade/research/crypto_economic_evidence.py,src/quant_trade/research/crypto_evaluator.py,src/quant_trade/research/crypto_runner.py,src/quant_trade/research/runtime_provenance.py,src/quant_trade/research/crypto_route_guard.py,src/quant_trade/research/prospective_crypto.py,src/quant_trade/research/prospective_development.py,src/quant_trade/research/prospective_weekly_momentum.py,src/quant_trade/research/prospective_weekly_development.py,src/quant_trade/research/prospective_xsmom.py,src/quant_trade/research/prospective_xsmom_development.py,src/quant_trade/research/prospective_carry_feasibility.py,src/quant_trade/research/prospective_spy_tom.py,src/quant_trade/research/prospective_spy_tom_development.py,src/quant_trade/research/signals/crypto_lowcap.py,src/quant_trade/research/holdout_seal.py,src/quant_trade/research/crypto_governance.py,src/quant_trade/audit/models.py,src/quant_trade/audit/package.py,src/quant_trade/metrics/normal.py,src/quant_trade/ops/arithmetic_guards.py,src/quant_trade/ops/growth_feasibility.py,src/quant_trade/ops/family_screen.py' \
             --show-missing \
             --fail-under=80
 
