@@ -100,6 +100,30 @@ def test_sufficient_campaign_without_cscv_cannot_be_candidate(monkeypatch):
     assert result.metrics["deflated_sharpe"] == 0.0
 
 
+def test_sufficient_campaign_with_missing_configured_ledger_fails_closed(
+    monkeypatch, tmp_path
+):
+    original = research_module._load_snapshots
+
+    def force_verified_manifest(config):
+        snapshots, manifest, settlements, signal = original(config)
+        return snapshots, dataclasses.replace(manifest, data_source="real"), settlements, signal
+
+    monkeypatch.setattr(research_module, "_load_snapshots", force_verified_manifest)
+    config = _config()
+    config["trial_registry_path"] = str(tmp_path / "missing-ledger.jsonl")
+    config["gate"] = {
+        "min_funding_events": 1,
+        "min_span_days": 0,
+        "min_walk_forward_windows": 0,
+        "min_probabilistic_sharpe": 0,
+    }
+    result = run_carry_research(config)
+    assert result.decision == "REJECTED"
+    assert any("trial ledger does not exist" in reason for reason in result.reasons)
+    assert result.metrics["deflated_sharpe"] == 0.0
+
+
 def test_carry_builds_cscv_from_preregistered_signal_variants():
     config = _config()
     config["statistics"] = {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,7 +29,13 @@ def _metric(payload: dict[str, Any], *keys: str) -> float | None:
         if not isinstance(cur, dict) or key not in cur:
             return None
         cur = cur[key]
-    return float(cur) if cur is not None else None
+    if cur is None:
+        return None
+    try:
+        value = float(cur)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
 
 
 def _statistical_reasons(
