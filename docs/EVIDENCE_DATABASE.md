@@ -27,6 +27,14 @@ issues and cannot contribute evidence merely because an old database row still
 exists. Re-ingestion is required after an intentional artifact change, making
 the reviewed bytes explicit and auditable.
 
+Category credit also requires semantic metadata defined by
+`metadata_requirements` in the scorecard policy. Each inner list is a set of
+accepted alternatives and every listed group must be satisfied. For example,
+research quality requires both a strategy identity and a dataset binding;
+renaming an arbitrary file to `metrics.json` cannot satisfy that category.
+Nested JSON metadata is retained with depth and item limits while secret-like
+keys and values remain redacted.
+
 This supports reproducible model-risk and vendor due diligence; it does not
 certify returns, authorize capital, or imply that the software has a particular
 commercial valuation. A buyer must still assess security, support, licensing,

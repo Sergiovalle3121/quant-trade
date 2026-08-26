@@ -89,3 +89,37 @@ def test_reingestion_explicitly_accepts_intentional_artifact_change(tmp_path):
     research = next(c for c in refreshed.categories if c.name == "research_quality")
     assert research.evidence_paths == [str(artifact)]
     assert not any("digest mismatch" in issue for issue in refreshed.blocking_issues)
+
+
+def test_category_requires_semantic_metadata_not_just_a_matching_filename(tmp_path):
+    policy = tmp_path / "policy.yaml"
+    policy.write_text(
+        "minimum_pass_score: 70\n"
+        "weights: {}\n"
+        "metadata_requirements:\n"
+        "  research_quality:\n"
+        "    - [strategy_id, strategy]\n"
+        "    - [dataset_binding, data_sha256]\n",
+        encoding="utf-8",
+    )
+    cfg = EvidenceConfig(tmp_path / "evidence.sqlite", tmp_path / "outputs", policy)
+    root = tmp_path / "research"
+    root.mkdir()
+    artifact = root / "metrics.json"
+    artifact.write_text(json.dumps({"strategy_id": "s1"}), encoding="utf-8")
+    ingest_path(cfg, root)
+
+    incomplete = build_scorecard(cfg, "s1")
+    category = next(c for c in incomplete.categories if c.name == "research_quality")
+    assert category.status == "fail"
+    assert any("lacks required metadata" in issue for issue in category.blocking_issues)
+
+    artifact.write_text(
+        json.dumps({"strategy_id": "s1", "dataset_binding": {"data_sha256": "abc"}}),
+        encoding="utf-8",
+    )
+    ingest_path(cfg, artifact)
+    complete = build_scorecard(cfg, "s1")
+    category = next(c for c in complete.categories if c.name == "research_quality")
+    assert category.status == "pass"
+    assert category.evidence_paths == [str(artifact)]
