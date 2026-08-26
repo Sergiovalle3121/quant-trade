@@ -100,9 +100,7 @@ def test_sufficient_campaign_without_cscv_cannot_be_candidate(monkeypatch):
     assert result.metrics["deflated_sharpe"] == 0.0
 
 
-def test_sufficient_campaign_with_missing_configured_ledger_fails_closed(
-    monkeypatch, tmp_path
-):
+def test_sufficient_campaign_with_missing_configured_ledger_fails_closed(monkeypatch, tmp_path):
     original = research_module._load_snapshots
 
     def force_verified_manifest(config):

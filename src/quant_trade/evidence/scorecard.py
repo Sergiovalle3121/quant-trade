@@ -88,8 +88,7 @@ def _contains_key(value: Any, key: str) -> bool:
 def _meets_requirements(row: Any, requirements: list[list[str]]) -> bool:
     metadata = _metadata(row)
     return all(
-        any(_contains_key(metadata, key) for key in alternatives)
-        for alternatives in requirements
+        any(_contains_key(metadata, key) for key in alternatives) for alternatives in requirements
     )
 
 
@@ -103,23 +102,15 @@ def build_scorecard(config: EvidenceConfig, strategy_id: str) -> StrategyScoreca
     for name in SCORECARD_CATEGORIES:
         wanted = CATEGORY_TYPES[name]
         requirements = policy.metadata_requirements.get(name, [])
-        candidates = [
-            row for row in verified_rows if str(row["artifact_type"]) in wanted
-        ]
-        paths = [
-            str(row["path"])
-            for row in candidates
-            if _meets_requirements(row, requirements)
-        ]
+        candidates = [row for row in verified_rows if str(row["artifact_type"]) in wanted]
+        paths = [str(row["path"]) for row in candidates if _meets_requirements(row, requirements)]
         issues: list[str] = [] if paths else [f"Missing evidence for {name}"]
         if candidates and requirements and not paths:
             issues.append(f"Evidence for {name} lacks required metadata")
         issues.extend(
             problem
             for path, problem in integrity_problems.items()
-            if any(
-                str(row["path"]) == path and str(row["artifact_type"]) in wanted for row in rows
-            )
+            if any(str(row["path"]) == path and str(row["artifact_type"]) in wanted for row in rows)
         )
         score = 75.0 if paths else 0.0
         status: EvidenceStatus = (
