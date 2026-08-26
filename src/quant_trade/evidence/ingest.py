@@ -33,18 +33,36 @@ def looks_secret(path: Path, text: str) -> bool:
     return any(pattern.search(haystack) for pattern in SECRET_PATTERNS)
 
 
+def _sanitize_value(value: Any, *, depth: int = 0) -> Any:
+    if depth >= 6:
+        return "[TRUNCATED]"
+    if isinstance(value, dict):
+        clean: dict[str, Any] = {}
+        for raw_key, nested in list(value.items())[:100]:
+            key = str(raw_key)
+            clean[key] = (
+                "[REDACTED]"
+                if any(pattern.search(key) for pattern in SECRET_PATTERNS)
+                else _sanitize_value(nested, depth=depth + 1)
+            )
+        return clean
+    if isinstance(value, list):
+        return [_sanitize_value(item, depth=depth + 1) for item in value[:100]]
+    if isinstance(value, str):
+        return (
+            "[REDACTED]"
+            if any(pattern.search(value) for pattern in SECRET_PATTERNS)
+            else value[:2000]
+        )
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    return str(value)[:2000]
+
+
 def sanitize_metadata(payload: dict[str, Any]) -> dict[str, Any]:
-    clean: dict[str, Any] = {}
-    for key, value in payload.items():
-        if (
-            any(pattern.search(str(key)) for pattern in SECRET_PATTERNS)
-            or isinstance(value, str)
-            and any(pattern.search(value) for pattern in SECRET_PATTERNS)
-        ):
-            clean[key] = "[REDACTED]"
-        elif isinstance(value, (str, int, float, bool)) or value is None:
-            clean[key] = value
-    return clean
+    """Retain bounded nested evidence metadata while redacting secret-like fields."""
+    sanitized = _sanitize_value(payload)
+    return sanitized if isinstance(sanitized, dict) else {}
 
 
 def detect_artifact_type(path: Path, metadata: dict[str, Any]) -> str:
