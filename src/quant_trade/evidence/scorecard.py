@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 from quant_trade.evidence.config import EvidenceConfig, load_scorecard_policy
 from quant_trade.evidence.database import connect, fetch_artifacts
@@ -29,22 +31,64 @@ CATEGORY_TYPES = {
 }
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verified_artifacts(rows: list[Any]) -> tuple[list[Any], dict[str, str]]:
+    """Revalidate indexed artifact bytes before they can support a scorecard."""
+    verified: list[Any] = []
+    problems: dict[str, str] = {}
+    for row in rows:
+        raw_path = str(row["path"])
+        path = Path(raw_path)
+        if not path.is_file():
+            problems[raw_path] = f"Evidence artifact is missing: {raw_path}"
+            continue
+        try:
+            actual_sha = _sha256(path)
+        except OSError as exc:
+            problems[raw_path] = f"Evidence artifact is unreadable: {raw_path} ({exc})"
+            continue
+        if actual_sha != str(row["sha256"]):
+            problems[raw_path] = f"Evidence artifact digest mismatch: {raw_path}"
+            continue
+        verified.append(row)
+    return verified, problems
+
+
 def build_scorecard(config: EvidenceConfig, strategy_id: str) -> StrategyScorecard:
     policy = load_scorecard_policy(config.scorecard_policy_path)
     with connect(config.database_path) as conn:
         rows = fetch_artifacts(conn, strategy_id)
+    verified_rows, integrity_problems = _verified_artifacts(rows)
     categories: list[ScorecardCategory] = []
-    blocking: list[str] = []
+    blocking: list[str] = list(integrity_problems.values())
     for name in SCORECARD_CATEGORIES:
         wanted = CATEGORY_TYPES[name]
-        paths = [str(row["path"]) for row in rows if str(row["artifact_type"]) in wanted]
+        paths = [
+            str(row["path"])
+            for row in verified_rows
+            if str(row["artifact_type"]) in wanted
+        ]
         issues: list[str] = [] if paths else [f"Missing evidence for {name}"]
+        issues.extend(
+            problem
+            for path, problem in integrity_problems.items()
+            if any(
+                str(row["path"]) == path and str(row["artifact_type"]) in wanted for row in rows
+            )
+        )
         score = 75.0 if paths else 0.0
         status: EvidenceStatus = (
             "pass" if score >= policy.minimum_pass_score else ("warning" if paths else "fail")
         )
         if issues:
-            blocking.extend(issues)
+            blocking.extend(issue for issue in issues if issue not in blocking)
         categories.append(
             ScorecardCategory(
                 name, score, status, paths, ["Conservative offline evidence score."], issues
