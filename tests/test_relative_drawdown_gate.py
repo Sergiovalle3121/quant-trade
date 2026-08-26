@@ -80,6 +80,11 @@ def test_a_missing_benchmark_drawdown_fails_closed() -> None:
     assert reasons == ["benchmark drawdown missing; cannot judge relative drawdown"]
 
 
+def test_zero_strategy_drawdown_is_not_treated_as_missing() -> None:
+    criteria = SelectionCriteria(max_test_drawdown=0.20)
+    assert _dd_reasons(criteria, _result(0.0, 0.20)) == []
+
+
 @pytest.mark.skipif(not ETF_RUNS.exists(), reason="committed ETF artifacts absent")
 def test_on_the_etf_data_the_ratio_gate_is_looser_than_the_absolute_one() -> None:
     """The uncomfortable direction, asserted against the committed artifacts.

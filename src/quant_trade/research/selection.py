@@ -118,7 +118,8 @@ def _reasons(
         or train_sharpe - test_sharpe > criteria.max_train_test_sharpe_gap
     ):
         reasons.append("missing or excessive train/test Sharpe gap")
-    drawdown = abs(_metric(result, "test_metrics", "max_drawdown") or 999.0)
+    raw_drawdown = _metric(result, "test_metrics", "max_drawdown")
+    drawdown = abs(raw_drawdown) if raw_drawdown is not None else 999.0
     if drawdown > criteria.max_test_drawdown:
         reasons.append("missing or excessive test drawdown")
     if criteria.max_drawdown_ratio_vs_benchmark is not None:
@@ -133,7 +134,9 @@ def _reasons(
                 f"{drawdown / benchmark_dd:.2f}x the benchmark's {benchmark_dd:.1%}, "
                 f"above the maximum {criteria.max_drawdown_ratio_vs_benchmark:.2f}x"
             )
-    turnover = _metric(result, "test_metrics", "turnover") or _metric(result, "turnover")
+    turnover = _metric(result, "test_metrics", "turnover")
+    if turnover is None:
+        turnover = _metric(result, "turnover")
     if turnover is None or turnover > criteria.max_turnover:
         reasons.append("missing or excessive turnover")
     excess = _metric(result, "comparison_test", "excess_return")

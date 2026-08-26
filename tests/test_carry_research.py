@@ -96,6 +96,8 @@ def test_sufficient_campaign_without_cscv_cannot_be_candidate(monkeypatch):
     assert result.decision == "REJECTED"
     assert result.cscv["available"] is False
     assert any("CSCV rank-based PBO unavailable" in reason for reason in result.reasons)
+    assert any("trial ledger is not configured" in reason for reason in result.reasons)
+    assert result.metrics["deflated_sharpe"] == 0.0
 
 
 def test_carry_builds_cscv_from_preregistered_signal_variants():

@@ -671,16 +671,33 @@ def run_carry_research(config: dict[str, Any]) -> CarryCampaignResult:
     else:
         psr = probabilistic_sharpe_ratio(net.dropna())
         from quant_trade.metrics.statistics import deflated_sharpe_ratio
-        from quant_trade.research.ledger import ledger_stats
+        from quant_trade.research.ledger import ledger_integrity_report, ledger_stats
 
         trial_registry = config.get("trial_registry_path")
+        registry_problem: str | None = None
         if trial_registry:
+            integrity = ledger_integrity_report(None, registry_path=trial_registry)
+            if not integrity.exists:
+                registry_problem = "trial ledger does not exist; deflated Sharpe is unavailable"
+            elif not integrity.is_intact:
+                registry_problem = "trial ledger is corrupt; deflated Sharpe is unavailable"
+            elif integrity.valid_records < 1:
+                registry_problem = (
+                    "trial ledger has no recorded trials; deflated Sharpe is unavailable"
+                )
             prior_trials, sharpe_variance = ledger_stats(None, registry_path=trial_registry)
         else:
+            registry_problem = "trial ledger is not configured; deflated Sharpe is unavailable"
             prior_trials, sharpe_variance = 0, 0.0
         effective_trials = max(1, prior_trials + 1)
-        dsr = deflated_sharpe_ratio(net.dropna(), effective_trials, sharpe_variance)
+        dsr = (
+            deflated_sharpe_ratio(net.dropna(), effective_trials, sharpe_variance)
+            if registry_problem is None
+            else 0.0
+        )
         rejection: list[str] = []
+        if registry_problem is not None:
+            rejection.append(registry_problem)
         if total_return <= 0:
             rejection.append("campaign net carry is not positive")
         if total_return_2x <= 0:

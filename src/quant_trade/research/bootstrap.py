@@ -62,6 +62,8 @@ def _clean_returns(returns: pd.Series | np.ndarray, nan_policy: NanPolicy) -> np
         values = values[~nan_mask]
     if np.isinf(values).any():
         raise ValueError("returns contain non-finite (inf) values")
+    if (values <= -1.0).any():
+        raise ValueError("simple returns must be greater than -1 to keep wealth positive")
     if values.size < _MIN_OBSERVATIONS:
         raise ValueError(
             f"need at least {_MIN_OBSERVATIONS} observations for a bootstrap, "
