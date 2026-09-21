@@ -44,6 +44,12 @@ quant-trade crypto-lowcap select --experiment-dir data/experiments/crypto_lowcap
     --trials configs/research/crypto_lowcap_trials.yaml
 quant-trade crypto-lowcap reveal --experiment-dir data/experiments/crypto_lowcap_2026_08 --panel data/experiments/crypto_lowcap_2026_08/panel.csv.gz --reason "final evaluation"
 quant-trade crypto-lowcap report --experiment-dir data/experiments/crypto_lowcap_2026_08 --output docs/CRYPTO_LOWCAP_RESULTS.md
+quant-trade crypto-lowcap horizon --experiment-dir data/experiments/crypto_lowcap_2026_08 --capital 10000 --target 1000000
+quant-trade crypto-lowcap doctor --experiment-dir data/experiments/crypto_lowcap_2026_08   # or: make crypto-lowcap-run
 ```
 
 See `docs/CRYPTO_LOWCAP_RUNBOOK.md` for the dataset re-collection and re-seal paths.
+
+## 8. What this implies for capital
+
+NOT_RUN: `quant-trade crypto-lowcap horizon` has not been run.

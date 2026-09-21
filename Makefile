@@ -1,4 +1,4 @@
-.PHONY: install test lint format backtest-sample v7-artifacts v8-artifacts
+.PHONY: install test lint format backtest-sample v7-artifacts v8-artifacts crypto-lowcap-doctor crypto-lowcap-run
 
 install:
 	pip install -e '.[dev]'
@@ -23,3 +23,13 @@ v7-artifacts:
 
 v8-artifacts:
 	quant-trade v8 revenue-run --source-commit-sha "$(SOURCE_COMMIT_SHA)" --verify-determinism
+
+# The low/mid-cap crypto campaign, end to end, on a machine that holds the
+# dataset. `doctor` says what is missing; `run-all` runs only the missing steps.
+REASON ?= final evaluation of the frozen candidates
+
+crypto-lowcap-doctor:
+	quant-trade crypto-lowcap doctor
+
+crypto-lowcap-run:
+	quant-trade crypto-lowcap run-all --reason "$(REASON)"

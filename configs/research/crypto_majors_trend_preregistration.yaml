@@ -36,7 +36,8 @@ selection_criterion:
   deflated_sharpe:
     n_trials: 4
     n_trials_policy: the DECLARED budget is used even if fewer are spent
-    also_reported: DSR combined with the 19-trial low-cap programme and the 109-trial ETF ledger (N=132)
+    also_reported: DSR at N=7 pooled with H8 on this dataset (4 + 3 declared); and combined
+      with the 19-trial low-cap programme and the 109-trial ETF ledger (N=135)
 refutation: >-
   REFUTED if, over the sealed holdout and net of costs, the candidate does not
   beat BTC buy-and-hold on Sharpe ratio OR its maximum drawdown is not below

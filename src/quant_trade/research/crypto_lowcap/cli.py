@@ -278,47 +278,17 @@ def reseal(
     )
 
 
-@crypto_lowcap_app.command("seal-majors")
-def seal_majors(
-    data_path: Annotated[Path, typer.Option(help="The fetched canonical CSV")],
-    experiment_dir: Annotated[Path, typer.Option(help="New experiment dir (must not exist)")],
-    declaration: Annotated[Path, typer.Option(help="Unsealed H6 declaration YAML")] = Path(
-        "configs/research/crypto_majors_trend_preregistration.yaml"
-    ),
-    train_fraction: Annotated[float, typer.Option(help="Same cut as the research config")] = 0.7,
-    at_utc: Annotated[str | None, typer.Option()] = None,
-    code_sha: Annotated[str | None, typer.Option()] = None,
-) -> None:
-    """Seal the H6 declaration and a holdout against the dataset's sha256.
+def _majors_declaration(
+    raw: dict[str, Any],
+    *,
+    sha: str,
+    days: list[str],
+    cut: int,
+    stamp: str,
+    commit: str,
+) -> Any:
+    from quant_trade.research.preregistration import ExperimentPreregistration
 
-    The declaration is committed unsealed because a seal must bind to bytes
-    and only a machine with egress has them. This binds it: the CSV's sha256
-    enters the universe line, the 70/30 cut is the research config's, and the
-    holdout seal's dataset digest is computed over that same sha256.
-    """
-    import pandas as pd
-    import yaml
-
-    from quant_trade.data.manifest import file_sha256
-    from quant_trade.research.holdout_seal import HoldoutSeal, dataset_digest, seal_holdout
-    from quant_trade.research.preregistration import (
-        ExperimentPreregistration,
-        seal_preregistration,
-    )
-
-    if experiment_dir.exists():
-        raise typer.BadParameter(f"{experiment_dir} exists; a seal is never written over one")
-    if not data_path.is_file():
-        raise typer.BadParameter(f"no dataset at {data_path}")
-    raw = yaml.safe_load(declaration.read_text(encoding="utf-8")) or {}
-    stamp = at_utc or _now_utc()
-    commit = _code_sha(code_sha)
-    sha = file_sha256(data_path)
-    frame = pd.read_csv(data_path, usecols=["timestamp"])
-    days = sorted({str(pd.Timestamp(v).date()) for v in frame["timestamp"]})
-    cut = int(len(days) * train_fraction)
-    if cut <= 0 or cut >= len(days):
-        raise typer.BadParameter("dataset too short to split")
     universe = [f"crypto_majors_kraken_daily@{sha}", *[str(u) for u in raw["universe"][1:]]]
     criterion = dict(raw["selection_criterion"])
     criterion["holdout"] = {
@@ -328,7 +298,7 @@ def seal_majors(
         "revealed": "once, after selection is frozen",
     }
     criterion["variants"] = raw["variants"]
-    prereg = ExperimentPreregistration(
+    return ExperimentPreregistration(
         experiment_id=str(raw["experiment_id"]),
         hypothesis=str(raw["hypothesis"]).strip(),
         universe=universe,
@@ -341,7 +311,62 @@ def seal_majors(
         registered_at_commit=commit,
         notes=[str(n) for n in raw.get("notes", [])],
     )
-    _, prereg_seal = seal_preregistration(experiment_dir, prereg)
+
+
+DEFAULT_MAJORS_DECLARATIONS = (
+    "configs/research/crypto_majors_trend_preregistration.yaml",
+    "configs/research/crypto_majors_voltarget_preregistration.yaml",
+)
+
+
+@crypto_lowcap_app.command("seal-majors")
+def seal_majors(
+    data_path: Annotated[Path, typer.Option(help="The fetched canonical CSV")],
+    experiment_dir: Annotated[Path, typer.Option(help="New experiment dir (must not exist)")],
+    declaration: Annotated[
+        list[Path] | None, typer.Option(help="Unsealed declaration YAML, repeatable")
+    ] = None,
+    train_fraction: Annotated[float, typer.Option(help="Same cut as the research config")] = 0.7,
+    at_utc: Annotated[str | None, typer.Option()] = None,
+    code_sha: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Seal the majors declarations (H6, H8) and one holdout against the CSV's sha256.
+
+    The declarations are committed unsealed because a seal must bind to bytes
+    and only a machine with egress has them. This binds them: the CSV's sha256
+    enters every universe line, the 70/30 cut is the research config's, and
+    the holdout seal's dataset digest is computed over that same sha256. Each
+    declaration is sealed under its own experiment_id, the low-cap layout.
+    """
+    import pandas as pd
+    import yaml
+
+    from quant_trade.data.manifest import file_sha256
+    from quant_trade.research.holdout_seal import HoldoutSeal, dataset_digest, seal_holdout
+    from quant_trade.research.preregistration import seal_preregistration
+
+    if experiment_dir.exists():
+        raise typer.BadParameter(f"{experiment_dir} exists; a seal is never written over one")
+    if not data_path.is_file():
+        raise typer.BadParameter(f"no dataset at {data_path}")
+    declarations = [Path(p) for p in (declaration or DEFAULT_MAJORS_DECLARATIONS)]
+    stamp = at_utc or _now_utc()
+    commit = _code_sha(code_sha)
+    sha = file_sha256(data_path)
+    frame = pd.read_csv(data_path, usecols=["timestamp"])
+    days = sorted({str(pd.Timestamp(v).date()) for v in frame["timestamp"]})
+    cut = int(len(days) * train_fraction)
+    if cut <= 0 or cut >= len(days):
+        raise typer.BadParameter("dataset too short to split")
+    sealed: list[dict[str, Any]] = []
+    for path in declarations:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        prereg = _majors_declaration(raw, sha=sha, days=days, cut=cut, stamp=stamp, commit=commit)
+        target = experiment_dir / prereg.experiment_id
+        _, prereg_seal = seal_preregistration(target, prereg)
+        sealed.append(
+            {"experiment_id": prereg.experiment_id, "seal": prereg_seal, "path": str(target)}
+        )
     components = {"dataset/csv": sha}
     seal = HoldoutSeal(
         seal_id=experiment_dir.name,
@@ -363,18 +388,203 @@ def seal_majors(
     _, holdout_seal = seal_holdout(experiment_dir, seal)
     atomic_write_json(
         experiment_dir / "dataset_binding.json",
-        {"data_path": str(data_path), "data_sha256": sha, "components": components},
+        {
+            "data_path": str(data_path),
+            "data_sha256": sha,
+            "components": components,
+            "preregistrations": sealed,
+        },
     )
     _echo(
         {
             "experiment_dir": str(experiment_dir),
-            "preregistration_seal": prereg_seal,
+            "preregistrations": sealed,
             "holdout_seal": holdout_seal,
             "data_sha256": sha,
             "selection_window": [days[0], days[cut - 1]],
             "holdout_window": [days[cut], days[-1]],
         }
     )
+
+
+def _inputs(
+    experiment_dir: Path,
+    panel: Path | None,
+    universe_dir: Path,
+    deathlist_dir: Path,
+    venue_dir: list[str] | None,
+    build_report: Path | None,
+) -> Any:
+    from quant_trade.data.panel_digest import DigestInputs
+
+    return DigestInputs(
+        universe_dir=universe_dir,
+        venue_dirs=_venue_dirs(list(venue_dir or DEFAULT_VENUE_DIRS)),
+        deathlist_dir=deathlist_dir,
+        build_report_path=build_report or experiment_dir / "panel_build_report.json",
+        panel_path=panel or experiment_dir / "panel.csv.gz",
+    )
+
+
+@crypto_lowcap_app.command("doctor")
+def doctor(
+    experiment_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_EXPERIMENT_DIR),
+    trials: Annotated[Path, typer.Option()] = Path(DEFAULT_TRIALS),
+    panel: Annotated[Path | None, typer.Option()] = None,
+    universe_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_UNIVERSE_DIR),
+    deathlist_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_DEATHLIST_DIR),
+    venue_dir: Annotated[list[str] | None, typer.Option(help="name=path, repeatable")] = None,
+    build_report: Annotated[Path | None, typer.Option()] = None,
+    at_utc: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Read-only pre-flight: what is missing, what would refuse, how long it takes."""
+    from quant_trade.research.crypto_lowcap.doctor import doctor_exit_code, run_doctor
+
+    inputs = _inputs(experiment_dir, panel, universe_dir, deathlist_dir, venue_dir, build_report)
+    report = run_doctor(experiment_dir, inputs, trials, at_utc=at_utc or _now_utc())
+    _echo(report.to_dict())
+    raise typer.Exit(code=doctor_exit_code(report))
+
+
+@crypto_lowcap_app.command("run-all")
+def run_all_command(
+    reason: Annotated[str, typer.Option(help="Recorded if the holdout is revealed")] = "",
+    experiment_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_EXPERIMENT_DIR),
+    trials: Annotated[Path, typer.Option()] = Path(DEFAULT_TRIALS),
+    panel: Annotated[Path | None, typer.Option()] = None,
+    universe_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_UNIVERSE_DIR),
+    deathlist_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_DEATHLIST_DIR),
+    venue_dir: Annotated[list[str] | None, typer.Option(help="name=path, repeatable")] = None,
+    build_report: Annotated[Path | None, typer.Option()] = None,
+    output: Annotated[Path, typer.Option()] = Path("docs/CRYPTO_LOWCAP_RESULTS.md"),
+    dry_run: Annotated[bool, typer.Option(help="Print the steps and run nothing")] = False,
+    evaluated_at_utc: Annotated[str | None, typer.Option()] = None,
+    code_sha: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """verify-panel, select, reveal, report: only the steps still missing."""
+    from quant_trade.research.crypto_lowcap.orchestrate import run_all
+
+    inputs = _inputs(experiment_dir, panel, universe_dir, deathlist_dir, venue_dir, build_report)
+    result = run_all(
+        experiment_dir,
+        inputs,
+        trials,
+        reason=reason,
+        output=output,
+        dry_run=dry_run,
+        at_utc=evaluated_at_utc or _now_utc(),
+        code_sha=_code_sha(code_sha),
+    )
+    for step in result["steps"]:
+        typer.echo(f"{step['name']:<14} {step['status']:<8} {step['detail']}")
+    _echo(result)
+    if result["failed_step"]:
+        raise typer.Exit(code=1)
+
+
+@crypto_lowcap_app.command("horizon")
+def horizon(
+    capital: Annotated[float, typer.Option(help="Starting capital, USD")],
+    target: Annotated[float, typer.Option(help="Target wealth, USD")],
+    experiment_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_EXPERIMENT_DIR),
+    monthly_contribution: Annotated[float, typer.Option()] = 0.0,
+    years: Annotated[int, typer.Option()] = 30,
+    samples: Annotated[int, typer.Option()] = 2000,
+    seed: Annotated[int, typer.Option()] = 20260921,
+    assume_annual_return: Annotated[
+        float | None, typer.Option(help="ASSUMPTION; with volatility")
+    ] = None,
+    assume_annual_volatility: Annotated[
+        float | None, typer.Option(help="ASSUMPTION; with return")
+    ] = None,
+    at_utc: Annotated[str | None, typer.Option()] = None,
+    code_sha: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Years to a target from the revealed holdout, as a distribution with its limits."""
+    from quant_trade.research.crypto_lowcap.horizon import run_horizon
+
+    payload = run_horizon(
+        experiment_dir,
+        capital=capital,
+        target=target,
+        monthly_contribution=monthly_contribution,
+        years=years,
+        samples=samples,
+        seed=seed,
+        assume_annual_return=assume_annual_return,
+        assume_annual_volatility=assume_annual_volatility,
+        at_utc=at_utc or _now_utc(),
+        code_sha=_code_sha(code_sha),
+    )
+    _echo({k: v for k, v in payload.items() if k != "declared_limits"})
+
+
+@crypto_lowcap_app.command("majors-overlap")
+def majors_overlap(
+    candidate_run: Annotated[Path, typer.Option(help="H8 research run directory")],
+    reference_run: Annotated[Path, typer.Option(help="H6 research run directory")],
+    threshold: Annotated[float, typer.Option()] = 0.9,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """H8's declared subsumption test against the frozen H6 candidate."""
+    from quant_trade.research.crypto_lowcap.majors import overlap
+
+    payload = overlap(candidate_run, reference_run, threshold=threshold)
+    if output is not None:
+        atomic_write_json(output, payload)
+    _echo(payload)
+
+
+@crypto_lowcap_app.command("paper-plan")
+def paper_plan(
+    capital_usd: Annotated[float, typer.Option(help="Paper capital for the first plan")],
+    as_of: Annotated[str, typer.Option(help="YYYY-MM-DD; must follow the sealed holdout end")],
+    experiment_dir: Annotated[Path, typer.Option()] = Path(DEFAULT_EXPERIMENT_DIR),
+    panel: Annotated[Path | None, typer.Option(help="A panel extended past the holdout")] = None,
+    state_dir: Annotated[Path, typer.Option()] = Path("data/paper/crypto_lowcap"),
+    at_utc: Annotated[str | None, typer.Option()] = None,
+    code_sha: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Write the next rebalance ticket for the frozen candidate. Places no order."""
+    from quant_trade.research.crypto_lowcap.paper_bridge import plan_rebalance
+
+    plan = plan_rebalance(
+        experiment_dir,
+        panel or experiment_dir / "panel.csv.gz",
+        capital_usd=capital_usd,
+        as_of=as_of,
+        state_dir=state_dir,
+        at_utc=at_utc or _now_utc(),
+        code_sha=_code_sha(code_sha),
+    )
+    _echo({k: v for k, v in plan.items() if k not in ("holdings_before", "achieved_weights")})
+
+
+@crypto_lowcap_app.command("paper-record")
+def paper_record(
+    plan: Annotated[Path, typer.Option(help="The plan JSON written by paper-plan")],
+    fills: Annotated[Path, typer.Option(help="Operator-authored fills JSON")],
+    state_dir: Annotated[Path, typer.Option()] = Path("data/paper/crypto_lowcap"),
+    at_utc: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Reconcile reported fills against a plan and journal them."""
+    from quant_trade.research.crypto_lowcap.paper_bridge import record_fills
+
+    _echo(record_fills(state_dir, plan, fills, at_utc=at_utc or _now_utc()))
+
+
+@crypto_lowcap_app.command("paper-status")
+def paper_status_command(
+    state_dir: Annotated[Path, typer.Option()] = Path("data/paper/crypto_lowcap"),
+    now_utc: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """The low-frequency paper gate, from the journal alone. Never approves real money."""
+    from quant_trade.research.crypto_lowcap.paper_bridge import STATUS_BROKEN, paper_status
+
+    payload = paper_status(state_dir, now_utc=now_utc or _now_utc())
+    _echo(payload)
+    if payload["status"] == STATUS_BROKEN:
+        raise typer.Exit(code=1)
 
 
 @crypto_lowcap_app.command("status")

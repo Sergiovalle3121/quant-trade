@@ -25,6 +25,27 @@ If any of these is missing, go to §5 first.
 python -m pip install -e ".[dev,crypto]"
 ```
 
+## 1a. One command: doctor, then run-all
+
+```bash
+make crypto-lowcap-doctor      # read-only: what is missing, what would refuse, how long
+make crypto-lowcap-run         # verify-panel -> select -> reveal -> report, only the missing steps
+# or, with explicit paths:
+quant-trade crypto-lowcap doctor --experiment-dir data/experiments/crypto_lowcap_2026_08 \
+  --universe-dir data/cache/crypto_universe/v1 --deathlist-dir data/cache/crypto_universe/deathlist \
+  --venue-dir bybit=data/cache/venue_klines/bybit --venue-dir binance=data/cache/venue_klines/binance
+quant-trade crypto-lowcap run-all --reason "final evaluation of the frozen candidates" --dry-run
+```
+
+`doctor` never writes into the experiment directory. Every failing check
+carries the exact command that fixes it, with your paths. Its runtime estimate
+is an ASSUMPTION: two constants measured on one synthetic panel (about 7 s per
+signal generation and 1 s per evaluation at 688k rows), scaled by your panel's
+rows. `run-all` reads the programme state from the artifacts, runs only the
+steps still missing, and stops at the first failure; it refuses to start if a
+reveal would happen and no `--reason` was given. §1–§4 below are the same four
+steps, one at a time.
+
 ## 1. Verify the panel against the seal (fails closed)
 
 The seal is bound to bytes, not dates. The first seal recorded its component
@@ -107,6 +128,24 @@ git add data/experiments/crypto_lowcap_2026_08/{campaign_lock.json,panel_verific
 The report refuses to render if it contains profit-claim language. The panel
 itself stays git-ignored.
 
+## 4a. What the verdict implies for capital
+
+```bash
+quant-trade crypto-lowcap horizon --experiment-dir data/experiments/crypto_lowcap_2026_08 \
+  --capital 10000 --target 1000000 --monthly-contribution 0 --years 30
+```
+
+Only after a reveal. The holdout's daily returns are resampled with the
+stationary bootstrap into 30-year paths, and the artifact reports, for the
+primary candidate at both delisting assumptions and for each benchmark: years
+to the target at p5/p50/p95, the probability of reaching it within 5/10/20/30
+years, the probability of losing half the capital before reaching it, and the
+median terminal wealth; plus whether the capital even fits the measured cost
+model per leg. Without a reveal it says NOT_MEASURED. With
+`--assume-annual-return R --assume-annual-volatility V` and no reveal it
+produces an ASSUMPTION projection, clearly labelled and never mixed with a
+measured row. The report's §8 renders `holdout/HORIZON.json`.
+
 ## 5. If the dataset is missing, or the digest does not reproduce
 
 Re-collect with the existing collectors (the calls are in
@@ -150,11 +189,24 @@ quant-trade research walk-forward-multi --config configs/research/walk_forward_c
 quant-trade selection run --outputs outputs --criteria configs/selection/crypto_majors_preregistered.yaml
 ```
 
-`seal-majors` seals the declaration and a 70/30 holdout against the CSV's
-sha256, in that order, and refuses an existing target. The research config's
-`split.train_fraction: 0.7` is the same cut. The four declared variants are the
-walk-forward grid; the gate's `max_turnover` is derived from the 200 bps/year
-drag budget in its header rather than copied from the ETF study.
+`seal-majors` seals every declaration it is given (by default H6 `trend` and
+H8 `voltarget`) under `<experiment_dir>/<experiment_id>/preregistration.json`
+plus one 70/30 holdout at the root, all against the CSV's sha256, and refuses
+an existing target. The research configs' `split.train_fraction: 0.7` is the
+same cut. The declared variants are the walk-forward grids; the gate's
+`max_turnover` is derived from the 200 bps/year drag budget in its header
+rather than copied from the ETF study.
+
+H8 (`configs/research/crypto_majors_voltarget_preregistered.yaml` and its
+walk-forward twin) runs the same three commands. Its declared subsumption test
+against H6 is one command once both research runs exist:
+
+```bash
+quant-trade crypto-lowcap majors-overlap --candidate-run outputs/crypto_majors/<h8 run> \
+  --reference-run outputs/crypto_majors/<h6 run> --output outputs/crypto_majors/H8_OVERLAP.json
+```
+
+A correlation above 0.9 is reported as SUBSUMED: the same bet measured twice.
 
 ## 7. Other programmes that are built and blocked only by egress
 
@@ -168,13 +220,34 @@ drag budget in its header rather than copied from the ETF study.
   executable floor at $75 and shows the per-fill fee floor eating 52% at the
   bottom rung. Size accordingly before any paper session.
 
-## 8. From a verdict to money: the policy
+## 8. From a verdict to money: the policy, and the paper bridge
 
 1. `REVEALED`, `RANGE_ABOVE_ZERO` at recovery 0.0 and the primary gate passing
-   at both recoveries → a paper trial with the frozen candidate. The V9
-   canary gate (72 h, 500 events) was written for 8-hour funding; a
-   low-frequency gate (N rebalances, fills reconciled against the measured
-   cost model) is the declared follow-up and does not exist yet.
+   at both recoveries → a paper trial with the frozen candidate through the
+   low-frequency bridge below. The V9 canary gate (72 h, 500 events) was
+   written for 8-hour funding and does not apply.
+
+   ```bash
+   # each rebalance date after the holdout end, with a panel extended to that date:
+   quant-trade crypto-lowcap paper-plan --experiment-dir data/experiments/crypto_lowcap_2026_08 \
+     --panel data/experiments/crypto_lowcap_2026_08/panel_extended.csv.gz \
+     --capital-usd 1000 --as-of 2026-10-01 --state-dir data/paper/crypto_lowcap
+   # execute the ticket by hand on a venue's paper/test facility (or record the book), then:
+   quant-trade crypto-lowcap paper-record --state-dir data/paper/crypto_lowcap \
+     --plan data/paper/crypto_lowcap/plans/<date>_<sha>.json --fills my_fills.json
+   quant-trade crypto-lowcap paper-status --state-dir data/paper/crypto_lowcap
+   ```
+
+   `fills.json` is yours to write: `{"plan_sha256": "...", "venue": "...",
+   "fills": [{"symbol", "side", "quantity", "price", "fee_usd",
+   "executed_at_utc"}]}`. The bridge refuses a plan inside the evaluated
+   window, a fill for a symbol not in the plan, a second fill for the same
+   plan, and an edited plan. The journal is hash-chained; a broken chain is
+   the status `JOURNAL_BROKEN`. The declared gate (ASSUMPTION): at least 3
+   monthly or 2 annual rebalances recorded, realised cost within 2x the
+   model, at most 10% of planned legs refused. `real_money_approved` is
+   false in every status the bridge writes, and it has no path to place an
+   order. Commit `data/paper/crypto_lowcap/` as evidence.
 2. `RANGE_INCLUDES_ZERO` → inconclusive. The only honest cure is more time.
    Nothing is re-tuned.
 3. `RANGE_BELOW_ZERO`, or no candidate → the programme closes with its results

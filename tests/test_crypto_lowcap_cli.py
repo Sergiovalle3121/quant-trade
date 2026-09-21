@@ -220,10 +220,19 @@ def test_seal_majors_binds_the_declaration_to_the_csv(tmp_path: Path) -> None:
 
     sha = file_sha256(csv)
     assert payload["data_sha256"] == sha
-    prereg = load_preregistration(target)
+    assert [p["experiment_id"] for p in payload["preregistrations"]] == [
+        "crypto_majors_h6_trend_vol_target",
+        "crypto_majors_h8_vol_target_derisk",
+    ]
+    prereg = load_preregistration(target / "crypto_majors_h6_trend_vol_target")
     assert prereg.universe[0].endswith(sha)
     assert prereg.max_trials == 4
     assert prereg.selection_criterion["holdout"]["holdout_window"] == payload["holdout_window"]
+    h8 = load_preregistration(target / "crypto_majors_h8_vol_target_derisk")
+    assert h8.max_trials == 3
+    assert h8.universe[0] == prereg.universe[0]
+    binding = json.loads((target / "dataset_binding.json").read_text(encoding="utf-8"))
+    assert len(binding["preregistrations"]) == 2
     seal = load_seal(target)
     verify_against_dataset(seal, {"dataset/csv": sha})
     assert seal.selection_end < seal.holdout_start

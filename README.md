@@ -184,6 +184,12 @@ on the declared budget, and freezes at most one primary candidate; `reveal` read
 holdout exactly once and reports a range; `report` renders `docs/CRYPTO_LOWCAP_RESULTS.md`
 and refuses profit language. H5 (mid-cap monthly momentum, judged on measured cost drag)
 and H6 (trend following on crypto majors, sealed by `seal-majors` against the dataset's
-sha256) were registered before any of the five was evaluated. This environment has no
-egress to the venues and no dataset, so the numbers come from the operator's machine:
-see `docs/CRYPTO_LOWCAP_RUNBOOK.md`. Nothing in the campaign can place an order.
+sha256) were registered before any of the five was evaluated, and H8 (volatility-targeted
+equal weight of majors, de-risking to cash) beside H6 with a declared subsumption test.
+`doctor` and `run-all` (or `make crypto-lowcap-run`) run the whole campaign on a machine that
+holds the dataset; `horizon` turns a revealed verdict into years-to-target distributions with
+their declared limits; `paper-plan`/`paper-record`/`paper-status` are the low-frequency paper
+bridge from a positive verdict to a hash-chained fill record, with `real_money_approved`
+always false. This environment has no egress to the venues and no dataset, so the numbers
+come from the operator's machine: see `docs/CRYPTO_LOWCAP_RUNBOOK.md`. Nothing in the
+campaign can place an order.

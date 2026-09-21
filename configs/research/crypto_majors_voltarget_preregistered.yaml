@@ -1,0 +1,37 @@
+# H8, first declared variant, on real Kraken daily majors. Point data_path at
+# the file `quant-trade data fetch --config configs/data/crypto_majors_kraken_daily.yaml`
+# prints, then: quant-trade research run --config <this file>
+experiment_name: crypto_majors_h8_vol_target_derisk
+mode: multi_asset_research
+data_path: data/cache/ccxt-kraken/BTC-USD_ETH-USD_XRP-USD_LTC-USD_ADA-USD_SOL-USD_DOT-USD_LINK-USD/1d/BTC-USD_ETH-USD_XRP-USD_LTC-USD_ADA-USD_SOL-USD_DOT-USD_LINK-USD_2018-01-01_2026-08-31_adjusted.csv
+initial_cash: 10000
+strategy: vol_targeted_equal_weight
+strategy_params:
+  volatility_window: 63
+  target_volatility: 0.20
+  max_weight_per_asset: 0.25
+  rebalance_frequency: monthly
+  periods_per_year: 365
+portfolio:
+  allow_leverage: false
+  allow_short: false
+  max_gross_exposure: 1.0
+  max_weight_per_asset: 0.25
+  rebalance_band: 0.05
+costs:
+  fixed_commission: 0.0
+  percentage_commission: 0.0010
+  slippage_bps: 2.0
+  spread_bps: 1.0
+benchmark:
+  type: buy_and_hold_symbol
+  symbol: BTC-USD
+split:
+  method: chronological
+  train_fraction: 0.7          # the same cut seal-majors seals
+  embargo_bars: 63             # the longest lookback
+robustness:
+  run_cost_sensitivity: true
+  run_subperiod_analysis: true
+  run_rolling_metrics: true
+output_dir: outputs/crypto_majors

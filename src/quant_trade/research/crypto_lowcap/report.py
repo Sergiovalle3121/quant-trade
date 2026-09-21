@@ -349,6 +349,106 @@ NOT_MEASURED_ITEMS = (
 )
 
 
+def _horizon_row(row: dict[str, Any]) -> str:
+    if row.get("evidence_class") == "NOT_MEASURED":
+        return _row(
+            [
+                f"`{row['name']}`",
+                str(row.get("recovery") or "-"),
+                "NOT_MEASURED",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
+    ytt = row["years_to_target"]
+    reach = row.get("p_reach_by_years", {})
+    return _row(
+        [
+            f"`{row['name']}`",
+            str(row.get("recovery") or "-"),
+            row["evidence_class"],
+            _pct(row.get("cagr_holdout")),
+            _fmt(row.get("constant_return_years_to_target"), 1),
+            f"{_fmt(ytt['p50'], 1)} [{_fmt(ytt['p5'], 1)}, {_fmt(ytt['p95'], 1)}]",
+            _fmt(reach.get("10"), 2),
+            _fmt(row.get("p_50pct_drawdown_before_target"), 2),
+            f"{row['median_terminal_wealth_usd']:,.0f}",
+        ]
+    )
+
+
+def _section_horizon(exp: Path) -> list[str]:
+    from quant_trade.research.crypto_lowcap.horizon import horizon_path
+
+    lines = ["## 8. What this implies for capital", ""]
+    horizon = _optional(horizon_path(exp))
+    if horizon is None:
+        lines.append("NOT_RUN: `quant-trade crypto-lowcap horizon` has not been run.")
+        return [*lines, ""]
+    inputs = horizon["inputs"]
+    lines.append(
+        f"State `{horizon['state']}`. Capital {inputs['capital_usd']:,.0f}, target "
+        f"{inputs['target_usd']:,.0f}, monthly contribution "
+        f"{inputs['monthly_contribution_usd']:,.0f}, horizon {inputs['years']} years, "
+        f"{inputs['samples']} resampled paths (stationary bootstrap, expected block "
+        f"{inputs['expected_block_size']:g} days, seed {inputs['seed']})."
+    )
+    lines.append("")
+    if horizon["state"] == "NOT_MEASURED":
+        lines.append(f"NOT_MEASURED: {horizon.get('reason')}")
+        return [*lines, ""]
+    rows = list(horizon.get("rows", []))
+    if horizon.get("assumed"):
+        rows = list(horizon["assumed"]["rows"])
+        lines.append(
+            f"ASSUMPTION: annual return {horizon['assumed']['annual_return']:+.1%}, annual "
+            f"volatility {horizon['assumed']['annual_volatility']:.1%}, "
+            f"{horizon['assumed']['model']}. Nothing measured enters these rows."
+        )
+        lines.append("")
+    lines.append(
+        _row(
+            [
+                "series",
+                "recovery",
+                "evidence",
+                "holdout CAGR",
+                "constant-CAGR years",
+                "years to target p50 [p5, p95]",
+                "P(reach in 10y)",
+                "P(halve first)",
+                "median terminal",
+            ]
+        )
+    )
+    lines.append("|---|---|---|---:|---:|---|---:|---:|---:|")
+    for row in rows:
+        lines.append(_horizon_row(row))
+    lines.append("")
+    cap = horizon.get("capacity")
+    if cap:
+        lines.append(
+            f"Capacity at this capital: `{cap['status']}`"
+            + (
+                f" (leg {cap['leg_notional_usd']:,.0f} against a calibrated maximum of "
+                f"{cap['max_calibrated_notional_usd']:,.0f} and a fully executable maximum of "
+                f"{cap['max_fully_executable_notional_usd']:,.0f} per leg)"
+                if "leg_notional_usd" in cap
+                else f": {cap.get('reason', '')}"
+            )
+        )
+        lines.append("")
+    lines.append("Declared limits of every row above:")
+    lines.append("")
+    for item in horizon.get("declared_limits", []):
+        lines.append(f"- {item}")
+    return [*lines, ""]
+
+
 def _section_reproduction(exp: Path) -> list[str]:
     panel = f"{exp}/panel.csv.gz"
     cmd = "quant-trade crypto-lowcap"
@@ -365,6 +465,8 @@ def _section_reproduction(exp: Path) -> list[str]:
         "    --trials configs/research/crypto_lowcap_trials.yaml",
         f'{cmd} reveal --experiment-dir {exp} --panel {panel} --reason "final evaluation"',
         f"{cmd} report --experiment-dir {exp} --output docs/CRYPTO_LOWCAP_RESULTS.md",
+        f"{cmd} horizon --experiment-dir {exp} --capital 10000 --target 1000000",
+        f"{cmd} doctor --experiment-dir {exp}   # or: make crypto-lowcap-run",
         "```",
         "",
         "See `docs/CRYPTO_LOWCAP_RUNBOOK.md` for the dataset re-collection and re-seal paths.",
@@ -398,6 +500,7 @@ def render_results_markdown(experiment_dir: str | Path) -> str:
         *_section_frozen(frozen),
         *_section_holdout(verdict),
         *_section_reproduction(exp),
+        *_section_horizon(exp),
     ]
     text = "\n".join(lines)
     assert_no_profit_claims(text)

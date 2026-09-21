@@ -43,21 +43,25 @@ def vol_targeted_equal_weight(data: pd.DataFrame, params: dict[str, Any]) -> pd.
 
     Scale = min(1, target / realized), so the portfolio never levers up; it
     only de-risks toward cash when the trailing equal-weight volatility runs
-    above ``target_volatility``. Annualization assumes an equity daily
-    calendar (sqrt(252)), matching the panel this experiment is defined on.
+    above ``target_volatility``. Annualization uses ``periods_per_year``,
+    which defaults to the equity daily calendar (252) that the ETF study was
+    defined on; a 24/7 crypto panel declares 365.
     """
     vw = int(params.get("volatility_window", 63))
     target = float(params.get("target_volatility", 0.10))
     max_w = float(params.get("max_weight_per_asset", 1.0))
     freq = str(params.get("rebalance_frequency", "monthly"))
+    periods = float(params.get("periods_per_year", 252))
     if vw < 2:
         raise ValueError("volatility_window must be >= 2")
     if target <= 0:
         raise ValueError("target_volatility must be positive")
+    if periods <= 0:
+        raise ValueError("periods_per_year must be positive")
     close = pivot_close(data)
     base = 1.0 / len(close.columns)
     portfolio_returns = calculate_returns(close).mean(axis=1)
-    realized = portfolio_returns.rolling(vw).std() * (252.0**0.5)
+    realized = portfolio_returns.rolling(vw).std() * (periods**0.5)
     scale = (target / realized).clip(upper=1.0)
     weights = (
         pd.DataFrame(base, index=close.index, columns=close.columns)

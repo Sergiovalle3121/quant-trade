@@ -140,16 +140,23 @@ def run_reveal(
     primary_bench = str(config.deflated_sharpe.get("primary_benchmark", "ew_universe_buy_and_hold"))
 
     bench_metrics: dict[str, dict[str, dict[str, Any] | None]] = {}
+    bench_equity: dict[str, dict[str, dict[str, Any] | None]] = {}
     for name, weights in benchmark_weights(panel, config, start).items():
         bench_metrics[name] = {}
+        bench_equity[name] = {}
         for rec in RECOVERIES:
-            bench_metrics[name][rec] = (
-                None
-                if weights is None
-                else performance(
-                    evaluate_span(panel, weights, start, end, common=common, recovery=float(rec))
-                )
-            )
+            if weights is None:
+                bench_metrics[name][rec] = None
+                bench_equity[name][rec] = None
+                continue
+            ev = evaluate_span(panel, weights, start, end, common=common, recovery=float(rec))
+            bench_metrics[name][rec] = performance(ev)
+            # Kept so downstream tools (the capital horizon) never need to read
+            # the holdout panel again: the reveal is the one read.
+            bench_equity[name][rec] = {
+                "dates": [t.strftime("%Y-%m-%d") for t in ev.equity_frame["timestamp"]],
+                "values": [float(v) for v in ev.equity_frame["equity"]],
+            }
 
     summary_by_id = {t["trial_id"]: t for t in results["trials"]}
     entries = [("primary", frozen["primary"]), *(("secondary", s) for s in frozen["secondaries"])]
@@ -280,7 +287,7 @@ def run_reveal(
     }
     payload = {
         "artifact": "HOLDOUT_VERDICT",
-        "schema_version": 1,
+        "schema_version": 2,
         "state": STATE_REVEALED,
         "seal_id": seal.seal_id,
         "seal": seal.seal(),
@@ -300,6 +307,9 @@ def run_reveal(
         },
         "benchmarks": {
             name: {rec: bench_metrics[name][rec] for rec in RECOVERIES} for name in bench_metrics
+        },
+        "benchmark_equity": {
+            name: {rec: bench_equity[name][rec] for rec in RECOVERIES} for name in bench_equity
         },
         "program": program,
         "candidates": candidates,
