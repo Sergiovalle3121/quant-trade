@@ -11,6 +11,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from quant_trade.audit.cli import audit_app
 from quant_trade.backtest.engine import BacktestEngine
 from quant_trade.carry.cli import carry_app
 from quant_trade.cloud.entrypoint import cloud_app
@@ -56,6 +57,7 @@ app.add_typer(stress_app, name="stress")
 app.add_typer(v8_app, name="v8")
 app.add_typer(v9_app, name="v9")
 app.add_typer(crypto_lowcap_app, name="crypto-lowcap")
+app.add_typer(audit_app, name="audit")
 console = Console()
 
 

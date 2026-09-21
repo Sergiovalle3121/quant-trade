@@ -173,6 +173,30 @@ The `quant-trade trials` command group manages paper-only 30/60/90-day strategy 
 
 The project now includes a research-only versioned data lake (`quant-trade datalake ...`) for local CSV registration, immutable versions, snapshots, contracts, quality reports, provider comparison utilities, lineage artifacts, and a static dashboard. Generated market data artifacts remain ignored by git and are not approved for live trading. See `docs/DATA_LAKE.md`, `docs/DATASET_VERSIONING.md`, and `docs/DATA_CONTRACTS.md`.
 
+## Phase 16: the backtest audit (the first thing this repository sells)
+
+`quant-trade audit` turns the validation engine into a second opinion on a
+backtest a client uploads: PSR and DSR at the declared number of trials,
+stationary bootstrap, declared out-of-sample split, trades re-costed at
+1x/2x/3x with the break-even cost, benchmark comparison, CSCV over an
+optional variants matrix and fourteen data-quality red flags. Six
+dimensions, a class A to D, and an evidence tag (`MEASURED`, `DECLARED`,
+`NOT_MEASURED`) on every number. No market data is needed; nothing is
+executed; the report refuses profit language in both languages.
+
+```
+quant-trade audit run --equity examples/audit/sample_equity.csv \
+  --trades examples/audit/sample_trades.csv --trials 20 --cost-bps 5 \
+  --oos-start 2023-01-01 --output-dir outputs/audit_demo      # or: make audit-demo
+python -m pip install -e ".[dev,web]" && quant-trade audit serve   # web form on :8000
+```
+
+`Dockerfile.web` and `railway.json` deploy the service on Railway in free
+mode (watermarked reports); Stripe payments switch on only when every
+Stripe variable is set. `docs/AUDIT_SAAS.md` has the estimators, thresholds,
+assumptions and the deployment steps; `docs/AUDIT_TERMS_TEMPLATE.md` is a
+terms-of-service template to have reviewed before charging.
+
 ## Session C: the low/mid-cap crypto campaign, and two more sealed hypotheses
 
 `quant-trade crypto-lowcap` runs the programme that Sessions A and B sealed and never

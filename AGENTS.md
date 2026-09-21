@@ -65,3 +65,14 @@ Data lake code is research/backtesting only. Do not commit generated datasets, s
 - Never read a holdout date outside `reveal`; never call `reveal` twice; never edit a sealed pre-registration, holdout seal or frozen selection.
 - The results document is rendered from artifacts only and must keep passing the profit-claim guard.
 - Panels, journals and caches stay git-ignored; digests, seals, ledgers, verifications and verdicts are committed.
+
+## Phase 16 backtest audit safety
+
+- The audit (`src/quant_trade/audit/`) analyses files a client uploads. It never executes, recommends, custodies or connects to a broker or exchange, and never claims that money was or will be made.
+- Every verdict sentence, page and report must pass the profit-claim guard in English and Spanish (`audit/guard.py`); a sentence that fails it is a bug, not a report.
+- Every reported number carries an evidence tag (`MEASURED`, `DECLARED`, `NOT_MEASURED`). Do not report a client declaration as measured.
+- Uploads, the audit database and generated reports stay git-ignored (`state/`, `outputs/`). Never commit a client file.
+- No secret has a default. Stripe keys and `DATABASE_URL` come from the environment only; free mode is forced when any Stripe variable is missing.
+- Web tests use `TestClient` with Stripe simulated by the HMAC helper; nothing reaches the network in tests.
+- A new red flag, threshold or dimension needs a test and a line in `docs/AUDIT_SAAS.md`.
+- Retention deletes require explicit confirmation (`audit purge --yes`).
