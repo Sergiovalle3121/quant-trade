@@ -1,0 +1,64 @@
+{
+  "end_date": "2026-08-09",
+  "experiment_id": "crypto_lowcap_h5_midcap_momentum",
+  "hypothesis": "The cross-sectional momentum factor in crypto is documented (Liu, Tsyvinski and Wu, 2022: size and momentum factors price the cross-section). What is not documented is whether it survives the cost of trading it at retail size, and the measured cost model (docs/CRYPTO_LOWCAP_COST_MODEL.md, 57 Bybit books, 2026-08-05) says the answer depends entirely on where: at a 500 bps/year drag budget and p75 costs, monthly rotation at $1,000 orders clears the budget in the mid tier ($100M-$1B) and nowhere below it. So the hypothesis is tested only there, monthly, with a one-week skip against short-term reversal. It is the only rotation strategy this programme registers, and the only one whose gate reads measured cost drag instead of raw turnover, because raw turnover encodes a cost level that the cost model measures directly.",
+  "max_trials": 4,
+  "notes": [
+    "Registered after H1-H4 and before any of the five was evaluated; the programme's declared DSR budget rises from 15 to 19 and is never lowered.",
+    "The only monthly hypothesis; the mid-tier confinement is part of the hypothesis, declared from the cost model, not tuned.",
+    "Its control (equal weight of the eligible mid-tier set) is a fifth benchmark for the annual hypotheses, reported but not gated."
+  ],
+  "refutation": "REFUTED if the momentum-ranked basket does not beat the equal-weight basket of the SAME eligible mid-tier coins on the SAME monthly dates, net of the measured cost model, over the holdout; the control differs only in the ranking, so any difference is attributable to momentum and not to the tier, the frequency or the rebalancing. ALSO REFUTED if measured cost drag exceeds 500 bps/year at $1,000 orders, whatever the gross excess: a premium that costs more than it pays is not an edge at this capital scale. PRIOR EVIDENCE AGAINST, declared here: on the ETF panel cross_sectional_momentum lost to equal weight in every configuration, and the crypto low-cap turnover budget is an order of magnitude tighter than the one that killed it there.",
+  "registered_at_commit": "3df9f351d45b848e3b99ab8eb2a5f122e84c7752",
+  "registered_at_utc": "2026-09-21T00:00:00Z",
+  "schema_version": 1,
+  "seal": "74876279c264cbb4970b5d231637e23d6895d1136dd55efdbfe752210d3f87f9",
+  "selection_criterion": {
+    "also_reported_unmodified": [
+      "configs/selection/crypto_lowcap_preregistered.yaml",
+      "configs/selection/conservative_daily.yaml"
+    ],
+    "benchmark": [
+      "equal-weight buy-and-hold of the same point-in-time universe",
+      "BTC buy-and-hold (venue klines)"
+    ],
+    "construction": "monthly rebalance to equal weight among the top_n coins by trailing return (t - lookback_days to t - skip_days), eligible AND inside the mid tier ($100M-$1B market cap) on the rebalance date; control = equal weight of the same eligible mid-tier set on the same dates",
+    "costs": "docs/CRYPTO_LOWCAP_COST_MODEL.md measured model, p75 quantile, $1,000 order size, non-executable books = no trade",
+    "deflated_sharpe": {
+      "also_reported": [
+        "DSR with observed variance, new ledger only",
+        "DSR with the 109-trial ETF ledger combined (N=124)"
+      ],
+      "n_trials": 19,
+      "n_trials_policy": "the DECLARED budget of the whole programme (4+4+4+3+4 = 19) is used even if fewer are spent",
+      "sharpe_variance_floor": 0.0025817269775679735,
+      "sharpe_variance_floor_source": "cross-trial variance of the 109-trial ETF ledger",
+      "variance_policy": "max(observed across this experiment's trials, floor)"
+    },
+    "expected_turnover_per_year": "6-12; judged by measured cost drag, not raw turnover",
+    "holdout": {
+      "holdout_window": [
+        "2023-11-29",
+        "2026-08-09"
+      ],
+      "revealed": "once, after selection is frozen",
+      "seal": "quant_trade.research.holdout_seal",
+      "selection_window": [
+        "2017-08-17",
+        "2023-11-28"
+      ]
+    },
+    "power_limitation_declared": "a 2.69-year holdout has a standard error of roughly 0.75 on an annualized Sharpe, so it cannot separate a true Sharpe of 1.0 from 0; the verdict is a range, not a point, and will be reported as one",
+    "primary_gate": "configs/selection/crypto_lowcap_monthly_preregistered.yaml",
+    "validation": "walk-forward with embargo, same methodology as the ETF study"
+  },
+  "start_date": "2017-08-17",
+  "universe": [
+    "crypto_lowcap_panel@e25722f13e730ddd9a6779463149ffda67ceb807334d034c4ee67f5f3ac29b6e",
+    "membership: point-in-time CMC snapshot at each date, cmc_id identity",
+    "screen: cmc_rank <= 1000 on the rebalance date",
+    "tradability: venue klines required on the rebalance date (bybit or binance spot USDT)",
+    "prices: venue klines only; snapshot prices are cross-check, never execution",
+    "excluded: stablecoins (declared filter), coins with no vetted-venue listing"
+  ]
+}

@@ -17,16 +17,20 @@ from quant_trade.research.signals.crypto_lowcap import (
     annual_equal_weight_rebalance,
     capacity_illiquidity,
     death_avoidance,
+    midcap_momentum,
     survival_duration,
 )
 from quant_trade.research.strategy_registry import get_research_signal_model
 
+#: The four annual hypotheses sealed in Session B.
 SIGNALS = (
     capacity_illiquidity,
     death_avoidance,
     annual_equal_weight_rebalance,
     survival_duration,
 )
+#: Plus H5, monthly, which shares every invariant except the January rule.
+ALL_SIGNALS = (*SIGNALS, midcap_momentum)
 
 
 def _panel(
@@ -68,7 +72,7 @@ def _panel(
     return pd.DataFrame(rows).sort_values(["timestamp", "symbol"]).reset_index(drop=True)
 
 
-@pytest.mark.parametrize("signal", SIGNALS, ids=lambda f: f.__name__)
+@pytest.mark.parametrize("signal", ALL_SIGNALS, ids=lambda f: f.__name__)
 def test_truncation_invariance(signal) -> None:
     """Weights before t cannot change when data after t is removed."""
     panel = _panel()
@@ -95,7 +99,7 @@ def test_truncation_invariance(signal) -> None:
     pd.testing.assert_series_equal(left, right, check_exact=False, rtol=1e-9)
 
 
-@pytest.mark.parametrize("signal", SIGNALS, ids=lambda f: f.__name__)
+@pytest.mark.parametrize("signal", ALL_SIGNALS, ids=lambda f: f.__name__)
 def test_weights_are_long_only_and_never_exceed_one(signal) -> None:
     weights = signal(_panel(), {})
     assert (weights["target_weight"] >= 0).all()
@@ -111,13 +115,14 @@ def test_rebalances_only_in_january(signal) -> None:
     assert set(months) <= {1}
 
 
-@pytest.mark.parametrize("signal", SIGNALS, ids=lambda f: f.__name__)
+@pytest.mark.parametrize("signal", ALL_SIGNALS, ids=lambda f: f.__name__)
 def test_registered_under_a_stable_name(signal) -> None:
     name = {
         "capacity_illiquidity": "crypto_capacity_illiquidity",
         "death_avoidance": "crypto_death_avoidance",
         "annual_equal_weight_rebalance": "crypto_annual_equal_weight_rebalance",
         "survival_duration": "crypto_survival_duration",
+        "midcap_momentum": "crypto_midcap_momentum",
     }[signal.__name__]
     model = get_research_signal_model(name)
     assert model.generate(_panel(), {}).equals(signal(_panel(), {}))
@@ -222,8 +227,65 @@ def test_survival_duration_prefers_the_older_cohort() -> None:
         assert min(ages[s] for s in chosen) >= max(not_chosen.values()) - 1
 
 
-@pytest.mark.parametrize("signal", SIGNALS, ids=lambda f: f.__name__)
+@pytest.mark.parametrize("signal", ALL_SIGNALS, ids=lambda f: f.__name__)
 def test_an_empty_panel_produces_no_weights(signal) -> None:
     empty = _panel().iloc[0:0]
     with pytest.raises((ValueError, KeyError, IndexError)):
         signal(empty, {})
+
+
+# --- H5: mid-cap monthly momentum --------------------------------------------
+
+
+def _midcap_panel(**kwargs) -> pd.DataFrame:
+    """The fixture scaled so every coin's market cap sits in the mid tier."""
+    panel = _panel(**kwargs)
+    # _panel puts caps at price * 1e6 * (i + 1): roughly $10M-$120M, i.e. low.
+    # Multiply into $100M-$1B so the tier filter is exercised, not tripped.
+    panel["market_cap_usd"] = panel["market_cap_usd"] * 12.0
+    return panel
+
+
+def test_midcap_momentum_rebalances_monthly_not_annually() -> None:
+    weights = midcap_momentum(_midcap_panel(), {})
+    months = pd.to_datetime(weights["timestamp"].unique()).month
+    assert len(set(months)) > 1
+
+
+def test_midcap_momentum_never_holds_a_coin_outside_the_tier() -> None:
+    panel = _midcap_panel()
+    outsider = sorted(panel["symbol"].unique())[0]
+    panel.loc[panel["symbol"] == outsider, "market_cap_usd"] = 5e9  # large tier
+    weights = midcap_momentum(panel, {"top_n": 50})
+    assert outsider not in set(weights[weights["target_weight"] > 0]["symbol"])
+    with pytest.raises(ValueError, match="unknown market-cap tier"):
+        midcap_momentum(panel, {"tier": "galactic"})
+
+
+def test_midcap_momentum_ranks_by_trailing_return_with_a_skip() -> None:
+    """The name with the strongest lookback return is held; the skip window is
+    excluded from the score so a last-week bounce cannot buy itself."""
+    panel = _midcap_panel(n_symbols=6, seed=11)
+    lookback, skip = 60, 7
+    weights = midcap_momentum(panel, {"lookback_days": lookback, "skip_days": skip, "top_n": 1})
+    when = weights["timestamp"].max()
+    held = weights[(weights["timestamp"] == when) & (weights["target_weight"] > 0)]["symbol"]
+    assert len(held) == 1
+    close = panel.pivot(index="timestamp", columns="symbol", values="close").sort_index()
+    score = (close.shift(skip) / close.shift(lookback) - 1.0).loc[when].dropna()
+    assert held.iloc[0] == score.idxmax()
+    with pytest.raises(ValueError, match="lookback_days must exceed skip_days"):
+        midcap_momentum(panel, {"lookback_days": 5, "skip_days": 7})
+
+
+def test_midcap_momentum_control_holds_every_eligible_name_equally() -> None:
+    panel = _midcap_panel()
+    ranked = midcap_momentum(panel, {"top_n": 2})
+    control = midcap_momentum(panel, {"top_n": 2, "equal_weight_control": True})
+    when = ranked["timestamp"].max()
+    held_ranked = ranked[(ranked["timestamp"] == when) & (ranked["target_weight"] > 0)]
+    held_control = control[(control["timestamp"] == when) & (control["target_weight"] > 0)]
+    assert len(held_ranked) == 2
+    assert len(held_control) > 2
+    assert held_control["target_weight"].nunique() == 1
+    assert set(held_ranked["symbol"]) <= set(held_control["symbol"])

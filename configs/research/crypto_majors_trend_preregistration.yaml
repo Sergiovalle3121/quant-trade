@@ -1,0 +1,51 @@
+# H6 declaration: multi-horizon trend following with volatility targeting on
+# crypto majors. Committed UNSEALED because a seal must bind to dataset bytes,
+# and this environment cannot fetch them. `quant-trade crypto-lowcap
+# seal-majors` seals exactly this text against the CSV's sha256, in an
+# experiment directory that also receives the 70/30 holdout seal. Editing this
+# file after sealing changes nothing: the sealed copy is the declaration.
+experiment_id: crypto_majors_h6_trend_vol_target
+hypothesis: >-
+  Time-series momentum with volatility-targeted sizing is the most widely
+  followed retail strategy with real evidence behind it, and crypto majors are
+  the one crypto market where its costs are small: the measured mega-tier
+  round trip is 1.4-1.9 bps at $1,000 orders before fees. The claim is not
+  that it beats BTC in return; it is that a long-only, vol-targeted blend of
+  21/63/126/252-day trend signals across eight majors holds BTC's Sharpe or
+  better while cutting the drawdown, net of a 26 bps round trip. DECLARED RISK:
+  trend backtests on BTC lean on two or three rallies; the deflated Sharpe and
+  the sealed holdout are the instruments that measure how much of the result
+  is that.
+universe:
+  - "crypto_majors_kraken_daily@<sealed by seal-majors to the CSV sha256>"
+  - "BTC-USD, ETH-USD, XRP-USD, LTC-USD, ADA-USD, SOL-USD, DOT-USD, LINK-USD on Kraken spot, daily"
+  - "membership: a symbol is eligible from its first Kraken bar; absence is zero weight"
+max_trials: 4
+variants:
+  - {lookbacks: [21, 63, 126, 252], portfolio_volatility_target: 0.20}
+  - {lookbacks: [63, 126, 252], portfolio_volatility_target: 0.20}
+  - {lookbacks: [21, 63, 126, 252], portfolio_volatility_target: 0.40}
+  - {lookbacks: [63, 126, 252], portfolio_volatility_target: 0.40}
+selection_criterion:
+  primary_gate: configs/selection/crypto_majors_preregistered.yaml
+  also_reported_unmodified: configs/selection/conservative_daily.yaml
+  benchmark: BTC-USD buy-and-hold (buy_and_hold_symbol)
+  costs: "10 bps commission + 2 bps slippage + 1 bps spread per side (ASSUMPTION, errs high vs the 1.4-1.9 bps measured mega-tier execution)"
+  construction: multi_horizon_tsmom, long-only, weekly rebalance, 5-point no-trade band, per-asset cap 0.25
+  validation: research run (70/30 chronological, 252-bar embargo) + walk-forward-multi over the four variants
+  deflated_sharpe:
+    n_trials: 4
+    n_trials_policy: the DECLARED budget is used even if fewer are spent
+    also_reported: DSR combined with the 19-trial low-cap programme and the 109-trial ETF ledger (N=132)
+refutation: >-
+  REFUTED if, over the sealed holdout and net of costs, the candidate does not
+  beat BTC buy-and-hold on Sharpe ratio OR its maximum drawdown is not below
+  BTC's (drawdown ratio >= 1.0). Both must hold; a lower drawdown bought with a
+  lower Sharpe is a different risk profile, not an edge. ALSO REFUTED if the
+  walk-forward PBO exceeds 0.5 across the four declared variants, or if the
+  result at 3x costs is negative. PRIOR EVIDENCE AGAINST, declared: on the ETF
+  panel every trend and momentum baseline lost to equal weight, and
+  multi_horizon_tsmom itself was never evaluated on real data.
+notes:
+  - "Separate dataset, separate seal, separate budget; DSR is also reported pooled with the low-cap programme."
+  - "The existing multi-asset runner does not stamp pre-registration seals into its ledger; this seal is the declaration, and promote-v2 will refuse promotion for that reason. Promotion is not the question here; selection is."

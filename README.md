@@ -172,3 +172,18 @@ The `quant-trade trials` command group manages paper-only 30/60/90-day strategy 
 ## Phase 15: Data Lake v2 + Dataset Versioning
 
 The project now includes a research-only versioned data lake (`quant-trade datalake ...`) for local CSV registration, immutable versions, snapshots, contracts, quality reports, provider comparison utilities, lineage artifacts, and a static dashboard. Generated market data artifacts remain ignored by git and are not approved for live trading. See `docs/DATA_LAKE.md`, `docs/DATASET_VERSIONING.md`, and `docs/DATA_CONTRACTS.md`.
+
+## Session C: the low/mid-cap crypto campaign, and two more sealed hypotheses
+
+`quant-trade crypto-lowcap` runs the programme that Sessions A and B sealed and never
+executed: `verify-panel` reproduces the panel digest the holdout is bound to (probing
+declared recipes, failing closed), `select` runs the 19 declared trials of H1–H5 over the
+selection window only, under the measured cost model at both delisting assumptions and
+1x/2x/3x costs, with calendar-year walk-forward, a hash-chained ledger and deflated Sharpe
+on the declared budget, and freezes at most one primary candidate; `reveal` reads the
+holdout exactly once and reports a range; `report` renders `docs/CRYPTO_LOWCAP_RESULTS.md`
+and refuses profit language. H5 (mid-cap monthly momentum, judged on measured cost drag)
+and H6 (trend following on crypto majors, sealed by `seal-majors` against the dataset's
+sha256) were registered before any of the five was evaluated. This environment has no
+egress to the venues and no dataset, so the numbers come from the operator's machine:
+see `docs/CRYPTO_LOWCAP_RUNBOOK.md`. Nothing in the campaign can place an order.

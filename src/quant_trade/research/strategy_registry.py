@@ -12,6 +12,7 @@ from quant_trade.research.signals.crypto_lowcap import (
     annual_equal_weight_rebalance,
     capacity_illiquidity,
     death_avoidance,
+    midcap_momentum,
     survival_duration,
 )
 from quant_trade.research.signals.ensemble import ensemble_signal
@@ -67,6 +68,9 @@ REGISTRY = {
     "crypto_survival_duration": FunctionSignalModel(
         "crypto_survival_duration", survival_duration
     ),
+    # H5, registered after the four above and before any of them was
+    # evaluated: monthly cross-sectional momentum confined to the mid tier.
+    "crypto_midcap_momentum": FunctionSignalModel("crypto_midcap_momentum", midcap_momentum),
 }
 
 

@@ -153,3 +153,58 @@ def test_summary_reports_annual_turnover_against_the_gate() -> None:
     summary = result.summary()
     assert summary["years"] == pytest.approx(2.0, abs=0.01)
     assert summary["annual_turnover"] == pytest.approx(result.total_turnover / 2.0, rel=0.01)
+
+
+def test_cost_multiplier_scales_every_priced_component() -> None:
+    """2x costs must charge exactly twice, and refuse exactly what 1x refused."""
+    panel = _panel({"A": dict(zip(DAYS, [10.0, 10.0, 10.0], strict=True))})
+    weights = _weights([(DAYS[0], "A", 1.0)])
+    base = evaluate(panel, weights, initial_capital_usd=1_000.0)
+    doubled = evaluate(panel, weights, initial_capital_usd=1_000.0, cost_multiplier=2.0)
+    assert doubled.total_cost_usd == pytest.approx(2.0 * base.total_cost_usd)
+    assert doubled.summary()["cost_multiplier"] == 2.0
+    assert doubled.rebalances[0].executed_legs == base.rebalances[0].executed_legs == 1
+    with pytest.raises(ValueError, match="multiplier"):
+        evaluate(panel, weights, cost_multiplier=0.0)
+
+
+def test_executed_legs_exclude_refusals() -> None:
+    """A leg the book could not fill is not a trade that happened."""
+    panel = _panel(
+        {"A": dict(zip(DAYS, [10.0, 10.0, 10.0], strict=True))}, market_cap=5e6
+    )
+    beyond = evaluate(panel, _weights([(DAYS[0], "A", 1.0)]), initial_capital_usd=50_000.0)
+    assert beyond.rebalances[0].unpriceable_legs == 1
+    assert beyond.rebalances[0].executed_legs == 0
+    assert beyond.summary()["executed_legs"] == 0
+
+
+def test_buy_and_hold_benchmark_emits_a_single_target_date() -> None:
+    from quant_trade.research.crypto_evaluator import equal_weight_benchmark
+
+    days = pd.date_range("2019-01-01", periods=800, freq="D", tz="UTC")
+    rows = []
+    for symbol in ("A", "B"):
+        for day in days:
+            rows.append(
+                {
+                    "timestamp": day,
+                    "symbol": symbol,
+                    "open": 10.0,
+                    "high": 10.0,
+                    "low": 10.0,
+                    "close": 10.0,
+                    "volume": 1.0,
+                    "market_cap_usd": MID_CAP,
+                    "cmc_rank": 100.0,
+                    "venue_turnover_usd": 1e6,
+                }
+            )
+    panel = pd.DataFrame(rows)
+    rebalanced = equal_weight_benchmark(panel)
+    held = equal_weight_benchmark(panel, buy_and_hold=True)
+    # The panel opens on a January bar, so the strict-January mask fires on
+    # 2019-01-01 as well as on the two later Januaries.
+    assert rebalanced["timestamp"].nunique() == 3
+    assert held["timestamp"].nunique() == 1
+    assert held["timestamp"].min() == rebalanced["timestamp"].min()

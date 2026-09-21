@@ -32,6 +32,7 @@ from typing import Any
 
 import pandas as pd
 
+from quant_trade.costs.crypto_lowcap import TIERS
 from quant_trade.data.panel import pivot_close
 from quant_trade.research.signals.base import rebalance_mask, weights_to_long
 
@@ -48,6 +49,17 @@ DEFAULT_TURNOVER_MULTIPLE = 50.0
 #: Trailing window for turnover, long enough that one quiet week cannot eject a
 #: coin and short enough to notice a venue winding a listing down.
 DEFAULT_LIQUIDITY_WINDOW = 90
+
+#: The one market-cap tier where the measured cost model says monthly
+#: rotation fits inside a 500 bps/year drag budget at $1,000 orders
+#: (`docs/CRYPTO_LOWCAP_COST_MODEL.md`, Block 4.3). H5 is confined to it by
+#: construction, not by tuning. ASSUMPTION, declared.
+DEFAULT_MOMENTUM_TIER = "mid"
+
+#: Bars skipped between the momentum window and the rebalance date, the
+#: standard guard against the short-term reversal that would otherwise be
+#: bought at the top of a one-week bounce. ASSUMPTION, declared.
+DEFAULT_MOMENTUM_SKIP_DAYS = 7
 
 
 #: Columns these signals need beyond canonical OHLCV. They come from the
@@ -267,12 +279,71 @@ def survival_duration(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFram
     return weights_to_long(weights, rebalance=rebalance_mask(close.index, freq))
 
 
+def _tier_bounds(tier: str) -> tuple[float, float]:
+    for name, low, high in TIERS:
+        if name == tier:
+            return low, high
+    raise ValueError(f"unknown market-cap tier {tier!r}; choose from {[t[0] for t in TIERS]}")
+
+
+def midcap_momentum(data: pd.DataFrame, params: dict[str, Any]) -> pd.DataFrame:
+    """H5: cross-sectional momentum inside the one tier monthly rotation can afford.
+
+    The cross-sectional momentum factor in crypto is documented (Liu,
+    Tsyvinski and Wu 2022). What is not documented is whether it survives the
+    costs of trading it at retail size, and the measured cost model says the
+    answer depends entirely on where: monthly rotation at $1,000 orders clears
+    a 500 bps/year drag budget in the mid tier ($100M-$1B) and nowhere below
+    it. So the hypothesis is tested only there. The tier filter is part of the
+    hypothesis, declared before any signal was computed, and the gate that
+    judges it caps measured cost drag rather than raw turnover.
+
+    Score at t is the return from ``t - lookback_days`` to ``t - skip_days``,
+    so nothing later than t enters. ``equal_weight_control=True`` holds every
+    eligible coin in the tier at equal weight on the same monthly dates; it is
+    the sealed control, and it isolates the ranking from the rebalancing.
+    """
+    _require_columns(data)
+    order_notional = float(params.get("order_notional_usd", DEFAULT_ORDER_NOTIONAL_USD))
+    multiple = float(params.get("turnover_multiple", DEFAULT_TURNOVER_MULTIPLE))
+    window = int(params.get("liquidity_window", DEFAULT_LIQUIDITY_WINDOW))
+    lookback = int(params.get("lookback_days", 84))
+    skip = int(params.get("skip_days", DEFAULT_MOMENTUM_SKIP_DAYS))
+    top_n = int(params.get("top_n", 20))
+    tier = str(params.get("tier", DEFAULT_MOMENTUM_TIER))
+    freq = str(params.get("rebalance_frequency", "monthly"))
+    equal_weight_control = bool(params.get("equal_weight_control", False))
+    if top_n < 1:
+        raise ValueError("top_n must be >= 1")
+    if skip < 0 or lookback <= skip:
+        raise ValueError("lookback_days must exceed skip_days, and skip_days must be >= 0")
+
+    eligible = _eligible(
+        data, order_notional=order_notional, turnover_multiple=multiple, window=window
+    )
+    low, high = _tier_bounds(tier)
+    caps = _pivot(data, "market_cap_usd")
+    in_tier = ((caps >= low) & (caps < high)).fillna(False)
+    eligible = eligible & in_tier
+
+    close = pivot_close(data)
+    momentum = close.shift(skip) / close.shift(lookback) - 1.0
+    if equal_weight_control:
+        selected = eligible
+    else:
+        selected = _top_n_mask(momentum, eligible & momentum.notna(), top_n)
+    return weights_to_long(_equal_weight(selected), rebalance=rebalance_mask(close.index, freq))
+
+
 __all__ = [
     "DEFAULT_LIQUIDITY_WINDOW",
+    "DEFAULT_MOMENTUM_SKIP_DAYS",
+    "DEFAULT_MOMENTUM_TIER",
     "DEFAULT_ORDER_NOTIONAL_USD",
     "DEFAULT_TURNOVER_MULTIPLE",
     "annual_equal_weight_rebalance",
     "capacity_illiquidity",
     "death_avoidance",
+    "midcap_momentum",
     "survival_duration",
 ]

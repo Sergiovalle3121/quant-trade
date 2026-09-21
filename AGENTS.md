@@ -58,3 +58,10 @@ Cloud deployment code is paper-only. Defaults must remain dry-run, AWS credentia
 ## Phase 15 data lake safety
 
 Data lake code is research/backtesting only. Do not commit generated datasets, snapshots, manifests, market data, secrets, or paid-provider responses. Data lake tests must remain offline and deterministic. Dataset versions and quality reports do not imply live-trading readiness.
+
+## Session C crypto campaign safety
+
+- The trial grid (`configs/research/crypto_lowcap_trials.yaml`) and every gate file are locked on first `select`; never edit them after a run, register a new experiment instead.
+- Never read a holdout date outside `reveal`; never call `reveal` twice; never edit a sealed pre-registration, holdout seal or frozen selection.
+- The results document is rendered from artifacts only and must keep passing the profit-claim guard.
+- Panels, journals and caches stay git-ignored; digests, seals, ledgers, verifications and verdicts are committed.

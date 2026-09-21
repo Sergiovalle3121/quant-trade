@@ -25,6 +25,7 @@ from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
 from quant_trade.opportunities.cli import opportunities_app
 from quant_trade.ops.cli import ops_app
+from quant_trade.research.crypto_lowcap.cli import crypto_lowcap_app
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
 from quant_trade.research.runner import run_experiment
@@ -54,6 +55,7 @@ app.add_typer(opportunities_app, name="opportunities")
 app.add_typer(stress_app, name="stress")
 app.add_typer(v8_app, name="v8")
 app.add_typer(v9_app, name="v9")
+app.add_typer(crypto_lowcap_app, name="crypto-lowcap")
 console = Console()
 
 

@@ -1,0 +1,50 @@
+# Pre-registered selection gate for the MONTHLY low/mid-cap crypto hypothesis (H5).
+#
+# Sealed before any signal was computed. It exists BESIDE
+# crypto_lowcap_preregistered.yaml (the annual gate) and conservative_daily.yaml
+# (the unmodified ETF gate), and every H5 result is reported under all three.
+#
+# EXACTLY ONE criterion differs from crypto_lowcap_preregistered.yaml.
+#
+#   max_turnover: 3.0 -> 100.0 (disabled), replaced by
+#   max_cost_drag_bps_per_year: 500
+#
+# Why: a raw turnover cap encodes a cost level. 3.0 over a window was the right
+# bar for ETFs at ~12 bps a round trip, and for annual crypto rebalancing where
+# the cost model was never the binding constraint. A monthly strategy trades
+# twelve times a year by construction and fails 3.0 before its returns are
+# looked at, whatever they cost. The question that survives the change of
+# frequency is how much the rotation actually cost, and the measured cost model
+# (docs/CRYPTO_LOWCAP_COST_MODEL.md) answers it per tier and per order size.
+# 500 bps/year is the middle of the three drag budgets that document declares,
+# and under it monthly rotation is viable ONLY in the mid tier at <= $1,000
+# orders. H5 is confined to that tier for exactly this reason.
+#
+# Stated plainly: this criterion is not stricter than 3.0, it is a different
+# question. A strategy that rotates monthly in mid at $1k orders and pays 480
+# bps/year passes here and fails the annual gate. Anyone who thinks that trade
+# is wrong should read the annual and ETF columns, which are reported for every
+# H5 result and in which nothing here participates.
+#
+# The drag criterion fails closed when no measured drag is reported: a strategy
+# evaluated without the cost model has no drag to show, not a drag of zero.
+
+min_test_sharpe: 0.5
+min_excess_return: 0.0
+max_test_drawdown: 1.00
+max_drawdown_ratio_vs_benchmark: 1.0
+max_turnover: 100.0
+max_cost_drag_bps_per_year: 500
+require_beats_benchmark: true
+require_cost_sensitivity_pass: true
+require_subperiod_pass: false
+require_no_red_flags: false
+min_test_months: 12
+max_train_test_sharpe_gap: 1.0
+min_trade_count: 30
+min_probabilistic_sharpe: 0.90
+require_deflated_sharpe: true
+min_deflated_sharpe: 0.5
+require_walk_forward_overfitting_evidence: true
+max_walk_forward_pbo: 0.50
+min_walk_forward_windows: 4
