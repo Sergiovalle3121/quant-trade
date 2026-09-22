@@ -29,12 +29,17 @@ under only one of them is quoting a choice, not a measurement.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 import pandas as pd
 
-from quant_trade.costs.crypto_lowcap import DEFAULT_TIER_PROFILES, TierCostProfile
+from quant_trade.costs.crypto_lowcap import (
+    BYBIT_SPOT_TAKER_FEE,
+    DEFAULT_TIER_PROFILES,
+    CostInput,
+    TierCostProfile,
+)
 from quant_trade.costs.rebalance import QUANTILE_P75, rebalance_cost
 
 #: What a position is worth when its series ends. ASSUMPTION, declared, and
@@ -53,6 +58,9 @@ class RebalanceRecord:
     refused_legs: int
     capped_legs: int
     unpriceable_legs: int
+    #: Legs that moved money. The gate's ``min_trade_count`` counts these,
+    #: because a refused or unpriceable leg is not a trade that happened.
+    executed_legs: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -68,6 +76,7 @@ class EvaluationResult:
     delisted_positions: int = 0
     delisting_recovery: float = DEFAULT_DELISTING_RECOVERY
     initial_capital_usd: float = 0.0
+    cost_multiplier: float = 1.0
 
     @property
     def annual_turnover(self) -> float:
@@ -100,10 +109,47 @@ class EvaluationResult:
             "delisted_positions": self.delisted_positions,
             "delisting_losses_usd": self.delisting_losses_usd,
             "delisting_recovery": self.delisting_recovery,
+            "executed_legs": sum(r.executed_legs for r in self.rebalances),
+            "cost_multiplier": self.cost_multiplier,
             "refused_legs": sum(r.refused_legs for r in self.rebalances),
             "capped_legs": sum(r.capped_legs for r in self.rebalances),
             "unpriceable_legs": sum(r.unpriceable_legs for r in self.rebalances),
         }
+
+
+def scaled_cost_model(
+    profiles: tuple[TierCostProfile, ...],
+    taker_fee: CostInput,
+    multiplier: float,
+) -> tuple[tuple[TierCostProfile, ...], CostInput]:
+    """The measured model with every priced component multiplied.
+
+    Cost sensitivity asks what happens when the world is 2x or 3x more
+    expensive than the one cross-section that was measured. Scaling the
+    execution tables and the fee together, and leaving capacity alone, is the
+    honest version of that question: a book that could not fill an order at
+    1x still cannot fill it at 3x, it just charges more for what it can.
+    """
+    if multiplier <= 0:
+        raise ValueError("cost multiplier must be positive")
+    if multiplier == 1.0:
+        return profiles, taker_fee
+
+    def _scale(table: dict[float, float | None]) -> dict[float, float | None]:
+        return {n: (None if v is None else v * multiplier) for n, v in table.items()}
+
+    scaled = tuple(
+        replace(
+            profile,
+            half_spread_bps_p50=profile.half_spread_bps_p50 * multiplier,
+            half_spread_bps_p75=profile.half_spread_bps_p75 * multiplier,
+            exec_cost_bps_by_notional=_scale(profile.exec_cost_bps_by_notional),
+            exec_cost_p75_bps_by_notional=_scale(profile.exec_cost_p75_bps_by_notional),
+        )
+        for profile in profiles
+    )
+    fee = replace(taker_fee, value_bps=taker_fee.value_bps * multiplier)
+    return scaled, fee
 
 
 def evaluate(
@@ -114,7 +160,9 @@ def evaluate(
     delisting_recovery: float = DEFAULT_DELISTING_RECOVERY,
     quantile: str = QUANTILE_P75,
     profiles: tuple[TierCostProfile, ...] = DEFAULT_TIER_PROFILES,
+    taker_fee: CostInput = BYBIT_SPOT_TAKER_FEE,
     min_executable_fraction: float = 1.0,
+    cost_multiplier: float = 1.0,
 ) -> EvaluationResult:
     """Run long-format ``weights`` over ``panel`` under the measured cost model.
 
@@ -125,6 +173,7 @@ def evaluate(
         raise ValueError("delisting_recovery must be in [0, 1]")
     if initial_capital_usd <= 0:
         raise ValueError("initial_capital_usd must be positive")
+    profiles, taker_fee = scaled_cost_model(profiles, taker_fee, cost_multiplier)
 
     close = panel.pivot(index="timestamp", columns="symbol", values="close").sort_index()
     caps = panel.pivot(index="timestamp", columns="symbol", values="market_cap_usd")
@@ -141,6 +190,7 @@ def evaluate(
         equity=None,
         delisting_recovery=delisting_recovery,
         initial_capital_usd=initial_capital_usd,
+        cost_multiplier=cost_multiplier,
     )
     equity_points: list[float] = []
     last_price: dict[str, float] = {}
@@ -185,6 +235,7 @@ def evaluate(
                 portfolio_value_usd=value,
                 quantile=quantile,
                 profiles=profiles,
+                taker_fee=taker_fee,
                 min_executable_fraction=min_executable_fraction,
             )
             achieved = cost.achieved_weights
@@ -208,6 +259,9 @@ def evaluate(
                     refused_legs=cost.refused_legs,
                     capped_legs=cost.capped_legs,
                     unpriceable_legs=cost.unpriceable_legs,
+                    executed_legs=sum(
+                        1 for leg in cost.legs if leg.executed_notional_usd > 0
+                    ),
                 )
             )
         equity_points.append(value)
@@ -217,18 +271,33 @@ def evaluate(
 
 
 def equal_weight_benchmark(
-    panel: pd.DataFrame, *, rebalance_frequency: str = "annual", top_n: int = 20
+    panel: pd.DataFrame,
+    *,
+    rebalance_frequency: str = "annual",
+    top_n: int = 20,
+    buy_and_hold: bool = False,
 ) -> pd.DataFrame:
-    """Buy-and-hold equal weight of the point-in-time universe.
+    """Equal weight of the point-in-time universe, as a benchmark.
 
-    The benchmark every result is measured against. It is built from the same
-    panel with the same membership rule, so beating it means beating the
-    universe rather than beating a different universe.
+    Built from the same panel with the same membership rule, so beating it
+    means beating the universe rather than beating a different universe.
+
+    ``buy_and_hold=False`` rebalances to equal weight every period, which is
+    exactly the H3 signal at the same ``top_n``. That makes it a useful
+    reference, and a useless benchmark for H3 itself: excess return against it
+    is zero by construction. The sealed pre-registrations name equal-weight
+    **buy-and-hold** as the benchmark, which is ``buy_and_hold=True``: one
+    target on the first rebalance date, never traded again.
     """
     from quant_trade.research.signals.crypto_lowcap import annual_equal_weight_rebalance
 
     return annual_equal_weight_rebalance(
-        panel, {"top_n": top_n, "rebalance_frequency": rebalance_frequency}
+        panel,
+        {
+            "top_n": top_n,
+            "rebalance_frequency": rebalance_frequency,
+            "rebalance_once": buy_and_hold,
+        },
     )
 
 
@@ -238,4 +307,5 @@ __all__ = [
     "RebalanceRecord",
     "equal_weight_benchmark",
     "evaluate",
+    "scaled_cost_model",
 ]

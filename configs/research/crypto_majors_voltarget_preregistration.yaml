@@ -1,0 +1,56 @@
+# H8 declaration: volatility-targeted equal weight of crypto majors, de-risking
+# to cash. Committed UNSEALED for the same reason as H6: a seal binds to
+# dataset bytes this environment cannot fetch. `quant-trade crypto-lowcap
+# seal-majors` seals this text and H6's together, against one CSV sha256, in
+# one experiment directory with one holdout seal. Registered before any
+# majors number exists; the dataset's declared DSR budget is 4 (H6) + 3 = 7.
+experiment_id: crypto_majors_h8_vol_target_derisk
+hypothesis: >-
+  De-risking to cash when the trailing 63-day volatility of an equal-weight
+  basket of eight crypto majors exceeds a target is risk management, not
+  trend: it holds the same names in the same proportions and only scales the
+  whole position toward cash when the market is wild. The claim is that this
+  keeps BTC's Sharpe or better while cutting the drawdown, net of costs, at
+  monthly rebalancing. It is registered beside H6 because it is a different
+  mechanism (volatility of the basket rather than the sign of past returns)
+  and because if the two turn out to be the same bet, the declared
+  subsumption test below says so instead of counting it twice.
+universe:
+  - "crypto_majors_kraken_daily@<sealed by seal-majors to the CSV sha256>"
+  - "BTC-USD, ETH-USD, XRP-USD, LTC-USD, ADA-USD, SOL-USD, DOT-USD, LINK-USD on Kraken spot, daily"
+  - "membership: a symbol is eligible from its first Kraken bar; absence is zero weight"
+max_trials: 3
+variants:
+  - {target_volatility: 0.20}
+  - {target_volatility: 0.30}
+  - {target_volatility: 0.40}
+selection_criterion:
+  primary_gate: configs/selection/crypto_majors_preregistered.yaml
+  also_reported_unmodified: configs/selection/conservative_daily.yaml
+  benchmark: BTC-USD buy-and-hold (buy_and_hold_symbol)
+  costs: "10 bps commission + 2 bps slippage + 1 bps spread per side (ASSUMPTION, identical to H6)"
+  construction: vol_targeted_equal_weight, long-only, monthly rebalance, volatility_window 63, periods_per_year 365, per-asset cap 0.25
+  validation: research run (70/30 chronological, 63-bar embargo) + walk-forward-multi over the three variants
+  deflated_sharpe:
+    n_trials: 7
+    n_trials_policy: the DECLARED budget of this dataset (H6 4 + H8 3) is used even if fewer are spent
+    pooled_with: crypto_majors_h6_trend_vol_target
+    also_reported: combined with the 19-trial low-cap programme and the 109-trial ETF ledger (N=135)
+  subsumption:
+    reference: the frozen H6 candidate on the same dataset
+    statistic: Pearson correlation of daily test-window returns (equity_curve_test.csv)
+    threshold: 0.9
+    verdict_if_above: SUBSUMED (reported as the same bet measured twice, never as a second confirmation)
+refutation: >-
+  REFUTED if, over the sealed holdout and net of costs, the candidate does not
+  beat BTC buy-and-hold on Sharpe ratio OR its maximum drawdown is not below
+  BTC's (drawdown ratio >= 1.0). ALSO REFUTED, as subsumed, if the Pearson
+  correlation of its daily test-window returns with the frozen H6 candidate
+  exceeds 0.9: two strategies that move together are one bet, and one bet
+  gets one count in the deflation. ALSO REFUTED if the walk-forward PBO
+  exceeds 0.5 across the three declared variants, or if the result at 3x
+  costs is negative. PRIOR EVIDENCE AGAINST, declared: on the ETF panel
+  vol_targeted_equal_weight returned -6.8% against its benchmark.
+notes:
+  - "Same dataset, same seal and same holdout as H6; separate pre-registration and budget."
+  - "The existing multi-asset runner does not stamp pre-registration seals into its ledger; this seal is the declaration. Selection, not promotion, is the question."

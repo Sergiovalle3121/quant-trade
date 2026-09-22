@@ -136,6 +136,17 @@ def _reasons(
     turnover = _metric(result, "test_metrics", "turnover") or _metric(result, "turnover")
     if turnover is None or turnover > criteria.max_turnover:
         reasons.append("missing or excessive turnover")
+    if criteria.max_cost_drag_bps_per_year is not None:
+        drag = _metric(result, "test_metrics", "cost_drag_bps_per_year")
+        if drag is None:
+            # No measured drag means no judgement. A missing cost model is not
+            # a free one.
+            reasons.append("measured cost drag missing; cannot judge annual cost drag")
+        elif drag > criteria.max_cost_drag_bps_per_year:
+            reasons.append(
+                f"measured cost drag {drag:.0f} bps/year exceeds the maximum "
+                f"{criteria.max_cost_drag_bps_per_year:.0f} bps/year"
+            )
     excess = _metric(result, "comparison_test", "excess_return")
     if excess is None or excess < criteria.min_excess_return:
         reasons.append("missing or insufficient excess return")

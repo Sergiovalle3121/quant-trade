@@ -1,0 +1,28 @@
+# H6 walk-forward over the four DECLARED variants, and no others.
+#   quant-trade research walk-forward-multi --config <this file>
+mode: multi_asset_walk_forward
+experiment_name: wf_crypto_majors_h6_trend_vol_target
+data_path: data/cache/ccxt-kraken/BTC-USD_ETH-USD_XRP-USD_LTC-USD_ADA-USD_SOL-USD_DOT-USD_LINK-USD/1d/BTC-USD_ETH-USD_XRP-USD_LTC-USD_ADA-USD_SOL-USD_DOT-USD_LINK-USD_2018-01-01_2026-08-31_adjusted.csv
+strategy: multi_horizon_tsmom
+strategy_params:
+  volatility_window: 63
+  max_weight_per_asset: 0.25
+  max_gross_exposure: 1.0
+  allow_short: false
+  rebalance_frequency: weekly
+parameter_grid:
+  lookbacks: [[21, 63, 126, 252], [63, 126, 252]]
+  portfolio_volatility_target: [0.20, 0.40]
+split:
+  train_size: 504    # ~16 months of daily bars for selection
+  test_size: 252     # ~8 months strictly out-of-sample
+  step_size: 252
+  embargo_bars: 21
+initial_cash: 10000
+costs: {percentage_commission: 0.0010, slippage_bps: 2.0, spread_bps: 1.0}
+portfolio: {max_weight_per_asset: 0.25, rebalance_band: 0.05}
+ranking_metric: sharpe
+overfitting:
+  max_walk_forward_pbo: 0.50
+  min_windows: 4
+output_dir: outputs/crypto_majors

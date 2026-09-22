@@ -91,6 +91,19 @@ class SelectionCriteria:
     #: the benchmark? Loosening the absolute number would hide that; adding a
     #: second, stricter-in-spirit criterion and reporting both does not.
     max_drawdown_ratio_vs_benchmark: float | None = None
+    #: Optional cap on the strategy's MEASURED annual cost drag, in basis points
+    #: of initial capital per year, applied IN ADDITION to ``max_turnover``.
+    #: ``None`` disables it, so every existing config behaves exactly as before.
+    #:
+    #: A raw turnover cap encodes a cost level. 3.0 over a window is the right
+    #: bar where a round trip costs 12 bps and no bar at all where it costs
+    #: 400: the same rotation is harmless in one and fatal in the other. Where
+    #: a measured per-tier, per-size cost model exists, the question that
+    #: survives the change of venue is how much the rotation actually cost, and
+    #: that is what this criterion reads. It fails closed when the metric is
+    #: absent, because a strategy evaluated without a cost model has no drag to
+    #: report, not a drag of zero.
+    max_cost_drag_bps_per_year: float | None = None
 
     @classmethod
     def from_yaml(cls, path: Path) -> SelectionCriteria:

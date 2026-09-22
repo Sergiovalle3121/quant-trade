@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - "Dockerfile"
+      - "Dockerfile.web"
       - "requirements.lock.txt"
       - "pyproject.toml"
 
@@ -23,3 +24,21 @@ jobs:
         run: docker build -t quant-trade:paper .
       - name: Smoke-run default command availability
         run: docker run --rm --entrypoint quant-trade quant-trade:paper --help
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the audit web image
+        run: docker build -f Dockerfile.web -t quant-trade:audit-web .
+      - name: Serve and probe the health endpoint
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name audit-web -e PORT=8080 -p 8080:8080 quant-trade:audit-web
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health; then echo; docker stop audit-web; exit 0; fi
+            sleep 1
+          done
+          docker logs audit-web
+          docker stop audit-web
+          exit 1

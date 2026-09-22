@@ -1,0 +1,15 @@
+# Backtest audit web service. Research-only: no broker, no keys, no execution.
+# Free mode unless every Stripe variable is present in the environment.
+FROM python:3.11-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+RUN useradd --create-home --shell /usr/sbin/nologin quant
+COPY pyproject.toml README.md requirements.lock.txt ./
+COPY src ./src
+COPY configs ./configs
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir -e ".[cloud,web]" -c requirements.lock.txt \
+    && mkdir -p /app/state/audit && chown -R quant:quant /app/state
+USER quant
+EXPOSE 8000
+CMD ["sh", "-c", "quant-trade audit serve --host 0.0.0.0 --port ${PORT:-8000}"]
