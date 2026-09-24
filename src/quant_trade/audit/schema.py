@@ -61,8 +61,35 @@ LONG_SIDES = {"long", "buy", "compra", "b", "l"}
 SHORT_SIDES = {"short", "sell", "venta", "s"}
 
 
+#: Spanish names of the uploaded files, for ``ParseError.message_es``.
+FILE_NAMES_ES = {
+    "equity": "de la curva de equity",
+    "benchmark": "del benchmark",
+    "trades": "de operaciones",
+    "variants": "de variantes",
+}
+
+
 class ParseError(ValueError):
-    """The upload cannot be audited as supplied; the message says why."""
+    """The upload cannot be audited as supplied; the message says why.
+
+    ``str(error)`` is the English message; ``message_es`` is its Spanish
+    twin and ``code`` a stable machine-readable reason. Callers that raise
+    without a Spanish message (older code, third-party importers) fall back
+    to the English text, so a page never shows an empty error.
+    """
+
+    def __init__(self, message: str, *, message_es: str | None = None, code: str = "parse") -> None:
+        super().__init__(message)
+        self.code = code
+        self.message_es = message_es or message
+
+    def localized(self, locale: str) -> str:
+        return self.message_es if locale == "es" else str(self)
+
+
+def _file_es(what: str) -> str:
+    return FILE_NAMES_ES.get(what, what)
 
 
 class Evidence(BaseModel):
@@ -172,19 +199,43 @@ def _pick(frame: pd.DataFrame, aliases: tuple[str, ...]) -> str | None:
 
 def _read_csv(data: bytes, *, what: str) -> pd.DataFrame:
     if not data or not data.strip():
-        raise ParseError(f"the {what} file is empty")
+        raise ParseError(
+            f"the {what} file is empty",
+            message_es=f"El archivo {_file_es(what)} está vacío.",
+            code="empty",
+        )
     if len(data) > MAX_UPLOAD_BYTES:
         raise ParseError(
-            f"the {what} file is {len(data):,} bytes; the limit is {MAX_UPLOAD_BYTES:,}"
+            f"the {what} file is {len(data):,} bytes; the limit is {MAX_UPLOAD_BYTES:,}",
+            message_es=(
+                f"El archivo {_file_es(what)} pesa {len(data):,} bytes; "
+                f"el límite es {MAX_UPLOAD_BYTES:,}."
+            ),
+            code="too_large",
         )
     try:
         frame = pd.read_csv(io.BytesIO(data), sep=None, engine="python", encoding="utf-8-sig")
     except UnicodeDecodeError as exc:
-        raise ParseError(f"the {what} file is not UTF-8 text") from exc
+        raise ParseError(
+            f"the {what} file is not UTF-8 text",
+            message_es=f"El archivo {_file_es(what)} no es texto UTF-8.",
+            code="encoding",
+        ) from exc
     except (pd.errors.ParserError, pd.errors.EmptyDataError, ValueError) as exc:
-        raise ParseError(f"the {what} file could not be read as CSV: {exc}") from exc
+        raise ParseError(
+            f"the {what} file could not be read as CSV: {exc}",
+            message_es=f"El archivo {_file_es(what)} no se pudo leer como CSV: {exc}",
+            code="not_csv",
+        ) from exc
     if len(frame) > MAX_ROWS:
-        raise ParseError(f"the {what} file has {len(frame):,} rows; the limit is {MAX_ROWS:,}")
+        raise ParseError(
+            f"the {what} file has {len(frame):,} rows; the limit is {MAX_ROWS:,}",
+            message_es=(
+                f"El archivo {_file_es(what)} tiene {len(frame):,} filas; "
+                f"el límite es {MAX_ROWS:,}."
+            ),
+            code="too_many_rows",
+        )
     return _normalise_columns(frame)
 
 
@@ -218,14 +269,25 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     ts_col = _pick(raw, TIMESTAMP_ALIASES)
     if ts_col is None:
         raise ParseError(
-            f"the {what} file needs a timestamp column (one of: {', '.join(TIMESTAMP_ALIASES)})"
+            f"the {what} file needs a timestamp column (one of: {', '.join(TIMESTAMP_ALIASES)})",
+            message_es=(
+                f"El archivo {_file_es(what)} necesita una columna de fecha "
+                f"(una de: {', '.join(TIMESTAMP_ALIASES)})."
+            ),
+            code="missing_timestamp",
         )
     equity_col = _pick(raw, EQUITY_ALIASES)
     return_col = _pick(raw, RETURN_ALIASES)
     if equity_col is None and return_col is None:
         raise ParseError(
             f"the {what} file needs an equity column (one of: {', '.join(EQUITY_ALIASES)}) "
-            f"or a return column (one of: {', '.join(RETURN_ALIASES)})"
+            f"or a return column (one of: {', '.join(RETURN_ALIASES)})",
+            message_es=(
+                f"El archivo {_file_es(what)} necesita una columna de equity "
+                f"(una de: {', '.join(EQUITY_ALIASES)}) o de retornos "
+                f"(una de: {', '.join(RETURN_ALIASES)})."
+            ),
+            code="missing_value",
         )
     if equity_col is not None and return_col is not None:
         warnings.append(f"both {equity_col!r} and {return_col!r} present; using {equity_col!r}")
@@ -252,7 +314,11 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     duplicates = int(frame["timestamp"].duplicated().sum())
     frame = frame.drop_duplicates("timestamp", keep="last").reset_index(drop=True)
     if len(frame) < 2:
-        raise ParseError(f"the {what} file has fewer than two usable rows")
+        raise ParseError(
+            f"the {what} file has fewer than two usable rows",
+            message_es=f"El archivo {_file_es(what)} tiene menos de dos filas utilizables.",
+            code="too_few_rows",
+        )
 
     if source == "equity":
         equity = frame["value"].astype(float)
@@ -304,7 +370,13 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
     """
     raw = _read_csv(data, what="trades")
     if len(raw) > MAX_TRADES:
-        raise ParseError(f"the trades file has {len(raw):,} rows; the limit is {MAX_TRADES:,}")
+        raise ParseError(
+            f"the trades file has {len(raw):,} rows; the limit is {MAX_TRADES:,}",
+            message_es=(
+                f"El archivo de operaciones tiene {len(raw):,} filas; el límite es {MAX_TRADES:,}."
+            ),
+            code="too_many_trades",
+        )
     columns = {
         "entry_time": _pick(raw, TRADE_ENTRY_TIME),
         "exit_time": _pick(raw, TRADE_EXIT_TIME),
@@ -317,7 +389,13 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
         raise ParseError(
             "the trades file is missing column(s): "
             + ", ".join(missing)
-            + " (entry_time, exit_time, quantity, entry_price, exit_price are required)"
+            + " (entry_time, exit_time, quantity, entry_price, exit_price are required)",
+            message_es=(
+                "Al archivo de operaciones le faltan columnas: "
+                + ", ".join(missing)
+                + " (se requieren entry_time, exit_time, quantity, entry_price y exit_price)."
+            ),
+            code="missing_trade_columns",
         )
     side_col = _pick(raw, TRADE_SIDE)
     pnl_col = _pick(raw, TRADE_PNL)
@@ -378,7 +456,11 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
     if invalid:
         warnings.append(f"{invalid} trade row(s) with unreadable or non-positive fields dropped")
     if not trades:
-        raise ParseError("the trades file contains no usable trades")
+        raise ParseError(
+            "the trades file contains no usable trades",
+            message_es="El archivo de operaciones no contiene ninguna operación utilizable.",
+            code="no_trades",
+        )
     return ParsedTrades(
         trades=trades,
         sides=sides,
@@ -401,16 +483,35 @@ def parse_variants_csv(data: bytes) -> np.ndarray:
     numeric = raw.apply(lambda column: _to_numeric(column)[0])
     numeric = numeric.dropna(axis=1, how="all")
     if numeric.shape[1] < 2:
-        raise ParseError("the variants file needs at least two numeric return columns")
+        raise ParseError(
+            "the variants file needs at least two numeric return columns",
+            message_es=(
+                "El archivo de variantes necesita al menos dos columnas numéricas de retornos."
+            ),
+            code="too_few_variants",
+        )
     if numeric.shape[1] > MAX_VARIANTS:
         raise ParseError(
-            f"the variants file has {numeric.shape[1]} columns; the limit is {MAX_VARIANTS}"
+            f"the variants file has {numeric.shape[1]} columns; the limit is {MAX_VARIANTS}",
+            message_es=(
+                f"El archivo de variantes tiene {numeric.shape[1]} columnas; "
+                f"el límite es {MAX_VARIANTS}."
+            ),
+            code="too_many_variants",
         )
     matrix = numeric.to_numpy(dtype=float)
     if not np.isfinite(matrix).all():
-        raise ParseError("the variants file contains empty or non-numeric cells")
+        raise ParseError(
+            "the variants file contains empty or non-numeric cells",
+            message_es="El archivo de variantes contiene celdas vacías o no numéricas.",
+            code="variants_not_numeric",
+        )
     if len(matrix) < 16:
-        raise ParseError("the variants file needs at least 16 rows")
+        raise ParseError(
+            "the variants file needs at least 16 rows",
+            message_es="El archivo de variantes necesita al menos 16 filas.",
+            code="too_few_variant_rows",
+        )
     return matrix
 
 

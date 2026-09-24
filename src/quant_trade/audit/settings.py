@@ -20,6 +20,10 @@ DEFAULT_PRICE_USD_CENTS = 4900
 DEFAULT_RETENTION_DAYS = 30
 DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP = 10
 DEFAULT_BOOTSTRAP_SAMPLES = 1000
+#: 0 ignores ``X-Forwarded-For`` and uses the socket address; behind one
+#: reverse proxy (Railway) set ``AUDIT_TRUSTED_PROXY_HOPS=1``.
+DEFAULT_TRUSTED_PROXY_HOPS = 0
+MAX_TRUSTED_PROXY_HOPS = 10
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -46,6 +50,14 @@ class AuditSettings:
     price_usd_cents: int = DEFAULT_PRICE_USD_CENTS
     retention_days: int = DEFAULT_RETENTION_DAYS
     bootstrap_samples: int = DEFAULT_BOOTSTRAP_SAMPLES
+    trusted_proxy_hops: int = DEFAULT_TRUSTED_PROXY_HOPS
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
+            raise ValueError(
+                f"trusted_proxy_hops must be between 0 and {MAX_TRUSTED_PROXY_HOPS}, "
+                f"got {self.trusted_proxy_hops}"
+            )
 
     @property
     def stripe_configured(self) -> bool:
@@ -89,6 +101,9 @@ class AuditSettings:
             price_usd_cents=int(env.get("AUDIT_PRICE_USD_CENTS", DEFAULT_PRICE_USD_CENTS)),
             retention_days=int(env.get("AUDIT_RETENTION_DAYS", DEFAULT_RETENTION_DAYS)),
             bootstrap_samples=int(env.get("AUDIT_BOOTSTRAP_SAMPLES", DEFAULT_BOOTSTRAP_SAMPLES)),
+            trusted_proxy_hops=int(
+                env.get("AUDIT_TRUSTED_PROXY_HOPS", "").strip() or DEFAULT_TRUSTED_PROXY_HOPS
+            ),
         )
 
 
