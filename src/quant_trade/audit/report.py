@@ -173,6 +173,18 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_class": "Con esta dimensión en PASS y las demás igual, la clase sería",
         "plan_none": "Todas las dimensiones pasan: no queda ningún paso abierto.",
         "plan_locked": "pasos concretos, con las cifras de tu archivo, en el informe completo",
+        "kpis": "Resumen ejecutivo",
+        "kpis_locked": "Las cifras clave de tu archivo se muestran en el informe completo.",
+        "kpi_return": "Retorno total",
+        "kpi_drawdown": "Drawdown máximo",
+        "kpi_dd_p95": "Drawdown p95 remuestreado, 1 año",
+        "kpi_sharpe": "Sharpe anualizado",
+        "kpi_pf": "Profit factor",
+        "kpi_trades": "Operaciones · % de aciertos",
+        "kpi_breakeven": "Coste extra que lo lleva a cero",
+        "kpi_stress": "Sin las 5 mejores operaciones",
+        "kpi_stress_curve": "Sin los 5 mejores periodos",
+        "bps_side": "pb por lado",
         "stress": "Pruebas de estrés: sin los mejores resultados",
         "stress_intro": (
             "Quitamos los mejores periodos y operaciones de lo que subiste y medimos lo que "
@@ -310,6 +322,18 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_class": "With this dimension at PASS and the rest unchanged, the class would be",
         "plan_none": "Every dimension passes: no step is left open.",
         "plan_locked": "concrete steps, with your file's figures, in the full report",
+        "kpis": "Executive summary",
+        "kpis_locked": "Your file's key figures are shown in the full report.",
+        "kpi_return": "Total return",
+        "kpi_drawdown": "Maximum drawdown",
+        "kpi_dd_p95": "Resampled drawdown p95, 1 year",
+        "kpi_sharpe": "Annualised Sharpe",
+        "kpi_pf": "Profit factor",
+        "kpi_trades": "Trades · win rate",
+        "kpi_breakeven": "Extra cost that takes it to zero",
+        "kpi_stress": "Without the best 5 trades",
+        "kpi_stress_curve": "Without the best 5 periods",
+        "bps_side": "bps per side",
         "stress": "Stress tests: without the best outcomes",
         "stress_intro": (
             "We remove the best periods and trades from what you uploaded and measure what "
@@ -686,6 +710,85 @@ def _plan_html(data: dict[str, Any], locale: str, labels: dict[str, str], *, loc
     return intro + "<div class='meaning plan'>" + "".join(items) + "</div>"
 
 
+KPI_CSS = (
+    ".kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0}"
+    "@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}"
+    ".kpi{border:1px solid var(--border);border-radius:16px;padding:16px 18px;background:#fff}"
+    ".kpi b{display:block;font-family:var(--serif);font-weight:400;"
+    "font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.1;letter-spacing:-.01em}"
+    ".kpi span{display:block;margin-top:6px;color:var(--text-2);font-size:.82rem}"
+    ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
+    ".kpi.locked b{color:var(--text-3);letter-spacing:.2em}"
+)
+
+
+def _ev_value(block: Any) -> float | None:
+    if isinstance(block, dict) and block.get("evidence") != "NOT_MEASURED":
+        value = block.get("value")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, str, str]]:
+    """``(label, shown value, tone)`` for each key figure that was measured."""
+    perf = data.get("performance") or {}
+    stats = data.get("trade_stats") or {}
+    costs = data.get("costs") or {}
+    risk = data.get("risk") or {}
+    stress = data.get("stress") or {}
+    out: list[tuple[str, str, str]] = []
+
+    def add(label: str, value: float | None, shown: str, tone: str = "") -> None:
+        if value is not None:
+            out.append((labels[label], shown, tone))
+
+    total = _ev_value(perf.get("total_return"))
+    add("kpi_return", total, f"{total:+.1%}" if total is not None else "")
+    dd = _ev_value(perf.get("max_drawdown"))
+    add("kpi_drawdown", dd, f"{dd:.1%}" if dd is not None else "")
+    p95 = _ev_value((risk.get("max_drawdown") or {}).get("p95"))
+    add("kpi_dd_p95", p95, f"{p95:.1%}" if p95 is not None else "")
+    sharpe = _ev_value(perf.get("sharpe"))
+    add("kpi_sharpe", sharpe, f"{sharpe:.2f}" if sharpe is not None else "")
+    pf = _ev_value(stats.get("profit_factor"))
+    add("kpi_pf", pf, f"{pf:.2f}" if pf is not None else "")
+    count = _ev_value(stats.get("trade_count"))
+    rate = _ev_value(stats.get("win_rate"))
+    if count is not None and rate is not None:
+        out.append((labels["kpi_trades"], f"{count:,.0f} · {rate:.0%}", ""))
+    breakeven = _ev_value(costs.get("break_even_bps"))
+    reference = _ev_value(costs.get("reference_bps")) or 0.0
+    if breakeven is not None:
+        tone = "bad" if breakeven < 3 * reference else "good"
+        label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
+        out.append((label, f"{breakeven:,.2f}", tone))
+    for block, scenario, label, percent in (
+        (stress.get("trades") or {}, "best_5_trades", "kpi_stress", False),
+        (stress.get("returns") or {}, "best_5_periods", "kpi_stress_curve", True),
+    ):
+        row = next((r for r in block.get("rows", []) if r.get("scenario") == scenario), None)
+        value = _ev_value(row["result"]) if row else None
+        if value is not None:
+            shown = f"{value:+.1%}" if percent else f"{value:+,.2f}"
+            out.append((labels[label], shown, "good" if value > 0 else "bad"))
+    return out
+
+
+def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) -> str:
+    kpis = _kpi_list(data, labels)
+    if not kpis:
+        return ""
+    tiles = "".join(
+        f"<div class='kpi locked'><b>•••</b><span>{_e(label)}</span></div>"
+        if locked
+        else f"<div class='kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
+        for label, shown, tone in kpis
+    )
+    note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""
+    return note + f"<div class='kpis'>{tiles}</div>"
+
+
 STRESS_SCENARIOS: dict[str, dict[str, str]] = {
     "es": {
         "best_1pct_periods": "Sin el mejor 1 % de periodos ({removed})",
@@ -969,6 +1072,7 @@ def render_html(
     locale: str | None = None,
     switch_url: str | None = None,
     head_meta: str | None = None,
+    compare_link: str | None = None,
 ) -> str:
     """The audit as one HTML document.
 
@@ -1018,6 +1122,24 @@ def render_html(
                 f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
                 f"target='_blank'>{_e(labels['buy_code'])}{_e(price)}</a></p>"
             )
+    compare_html = ""
+    if compare_link and not locked:
+        from quant_trade.audit.compare import COPY as COMPARE_COPY
+        from quant_trade.audit.compare import MAX_LINK_CHARS
+
+        ccopy = COMPARE_COPY["en" if locale == "en" else "es"]
+        action = "/compare" if locale == "en" else "/comparar"
+        compare_html = (
+            f"<form class='publish no-print' method='post' action='{action}'>"
+            f"<p class='muted'>{_e(ccopy['from_report_help'])}</p>"
+            f"<input type='hidden' name='lang' value='{_e(locale)}'>"
+            f"<input type='hidden' name='link_a' value='{_e(compare_link)}'>"
+            f"<div class='inline-form'><input type='url' name='link_b' required "
+            f"maxlength='{MAX_LINK_CHARS}' autocomplete='off' spellcheck='false' "
+            f"aria-label='{_e(ccopy['link_b'])}' placeholder='{_e(ccopy['placeholder'])}'>"
+            f"<button class='btn btn-dark' type='submit'>{_e(ccopy['submit'])}</button></div>"
+            "</form>"
+        )
     publish_html = ""
     if publish_url and not locked:
         publish_html = (
@@ -1340,13 +1462,16 @@ def render_html(
         + (legal_links_html(locale) if legal_links else "")
         + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
     )
+    kpis_html = _kpis_html(data, labels, locked=locked)
     sections = [
+        section(labels["kpis"], kpis_html) if kpis_html else "",
         section(labels["meaning"], _meaning_html(verdict, locale)),
         section(labels["charts"], _charts_html(data, locale)),
         section(labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels)),
         section(labels["plan"], _plan_html(data, locale, labels, locked=True)) if locked else "",
         detail_html,
         publish_html,
+        compare_html,
         section(labels["inputs"], inputs_html + _source_html(data, labels)),
         section(labels["declared"], declared_html),
         section(labels["not_measured"], nm_html),
@@ -1366,6 +1491,7 @@ def render_html(
         + STYLE
         + charts.CHART_CSS
         + PLAN_CSS
+        + KPI_CSS
         + "</style>"
         + SCRIPT_TAG
         + "</head><body>"
@@ -1403,6 +1529,7 @@ def render(
     locale: str | None = None,
     switch_url: str | None = None,
     head_meta: str | None = None,
+    compare_link: str | None = None,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1419,6 +1546,7 @@ def render(
         locale=locale,
         switch_url=switch_url,
         head_meta=head_meta,
+        compare_link=compare_link,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
