@@ -242,6 +242,8 @@ Routes:
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
 | `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. 410 once purged. |
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
+| `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
+| `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
 Every private URL carries a per-audit secret token; a wrong token is a 404.
@@ -262,8 +264,12 @@ with an empty value):
 | `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
 | `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. |
 | `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. |
-| `AUDIT_RETENTION_DAYS` | `30` | Used by `audit purge`. |
+| `AUDIT_RETENTION_DAYS` | `30` | Shown on the form and the privacy page. `audit purge --days` must use the same number. |
 | `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. |
+| `AUDIT_OPERATOR_NAME` | empty | Legal name of whoever runs the service, shown on the terms and privacy pages. |
+| `AUDIT_OPERATOR_CONTACT` | empty | Contact for privacy and deletion requests (an e-mail address). |
+| `AUDIT_OPERATOR_ADDRESS` | empty | Postal address of the operator. |
+| `AUDIT_JURISDICTION` | empty | Governing law and courts, for example "Leyes de México; tribunales de la Ciudad de México". |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
 
 ### Deploying on Railway
@@ -286,10 +292,16 @@ with an empty value):
    `https://<domain>/webhooks/stripe` for `checkout.session.completed`.
    Locally: `stripe listen --forward-to localhost:8000/webhooks/stripe`
    then `stripe trigger checkout.session.completed`.
-5. Retention: run `quant-trade audit purge --days 30` and confirm with
-   `--yes` (a Railway cron service works). Unpaid uploads, reports and the
-   client's description are deleted; id, digests and class are kept so the
-   record stays verifiable.
+5. Retention: run `quant-trade audit purge --days 30 --yes` every day (a
+   Railway cron service works), with the same number of days as
+   `AUDIT_RETENTION_DAYS`. The privacy page promises it, and nothing runs it
+   automatically. Unpaid uploads, reports and the client's description are
+   deleted; id, digests and class are kept so the record stays verifiable.
+   The upload IP address of every audit past the window, paid ones too, is
+   cleared in the same run.
+6. Set the four `AUDIT_OPERATOR_*`/`AUDIT_JURISDICTION` variables. Until
+   they are set, `/terminos` and `/privacidad` show "[sin configurar]" and a
+   warning, and `/health` reports `"legal_configured": false`.
 
 ### Testing a deployment on Railway
 
@@ -355,11 +367,43 @@ Telegram, forums and videos. The guard refuses "verificado", "certificado",
 "aprobado", "pasarás", "certified", "approved" and "verified track record"
 unless directly negated, which is what lets the fixed wording through.
 
-### Terms and privacy: current state
+### Terms and privacy
 
-The terms exist only as `docs/AUDIT_TERMS_TEMPLATE.md`, with placeholders
-unfilled, and the site does not link them. There is no privacy page. Both
-should be filled in, reviewed and linked before charging.
+`/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
+`audit/legal.py` from the running configuration: the price, whether card
+payments (Stripe) or access codes are on, the retention window and the
+upload limit. Every page links both, and the upload form links them next to
+the consent box, whose text now reads the configured retention. The date of
+the wording is `legal.LEGAL_UPDATED`; change it with the text.
+
+The operator's name, contact, address and jurisdiction come only from the
+variables above; no default looks like a real person or company.
+`docs/AUDIT_TERMS_TEMPLATE.md` is the template the texts were written from.
+
+**Have a lawyer in the jurisdiction where the service is sold review both
+texts before charging anyone.** They are an honest description of what the
+code does, not legal advice. Points to check in particular: the refund
+policy (a report already unlocked is not refunded unless the law says
+otherwise), the 30-day answer to privacy requests, the liability cap,
+international hosting, and whether consumer or data-protection law in the
+client's country requires more (for example a data-processing register or a
+named representative).
+
+What the privacy page promises, and how the operator keeps each promise:
+
+| Promise | How |
+|---|---|
+| Unpaid audits' files, report, declarations and description are deleted after `AUDIT_RETENTION_DAYS` | `quant-trade audit purge --days N --yes`, daily |
+| The upload IP is deleted after the same window, paid audits too | the same purge run |
+| A client gets a copy of their data | `quant-trade audit export AUDIT_ID [--out DIR]` (writes to `outputs/`, git-ignored) |
+| A client's audit is deleted completely on request (files, report, hashes, class, verification page) | `quant-trade audit delete AUDIT_ID --yes` (without `--yes` it only shows what would go) |
+| A client leaves the updates list | `quant-trade audit waitlist-remove EMAIL --yes` |
+| A client withdraws a verification page | `POST /audits/{id}/unpublish?token=…` from the report |
+| No broker or exchange keys, no card data, no cookies, no third-party analytics | the code asks for none and sets none |
+
+Before acting on an export or delete request, ask for the report's private
+link: the audit id alone does not prove the audit is the requester's. The
+link carries the token, which only its owner holds.
 
 ### Verifying a report
 
@@ -383,3 +427,5 @@ the same seed reproduces the JSON byte for byte.
   changing their fixed wording needs a test.
 - Access codes are stored hashed and printed once; `codes list` never shows
   them.
+- The terms and privacy pages pass the guard in both languages; anything the
+  privacy page promises needs a command that does it and a test.

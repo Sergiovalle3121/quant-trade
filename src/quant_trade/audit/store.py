@@ -533,17 +533,41 @@ class Store:
             conn.execute(self.waitlist.insert().values(email=clean, created_at=_iso(at), note=note))
             return True
 
+    def remove_waitlist(self, email: str, *, dry_run: bool = False) -> bool:
+        """Remove an e-mail from the waitlist (a privacy request). ``True`` if it was there."""
+        sa = self._sa
+        condition = self.waitlist.c.email == email.strip().lower()
+        with self.engine.begin() as conn:
+            exists = conn.execute(sa.select(self.waitlist.c.id).where(condition)).first()
+            if exists and not dry_run:
+                conn.execute(self.waitlist.delete().where(condition))
+        return exists is not None
+
     def waitlist_emails(self) -> list[str]:
         sa = self._sa
         with self.engine.connect() as conn:
             rows = conn.execute(sa.select(self.waitlist.c.email).order_by(self.waitlist.c.id)).all()
         return [row[0] for row in rows]
 
+    # -- deletion on request ---------------------------------------------
+    def delete_audit(self, audit_id: str) -> bool:
+        """Remove every trace of one audit: row, hashes, files and publication.
+
+        Unlike the retention purge nothing verifiable is kept: this answers a
+        client's deletion request. ``False`` when the id is unknown.
+        """
+        with self.engine.begin() as conn:
+            conn.execute(self.publications.delete().where(self.publications.c.audit_id == audit_id))
+            conn.execute(self.audit_files.delete().where(self.audit_files.c.audit_id == audit_id))
+            deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
+        return bool(deleted.rowcount)
+
     # -- retention ---------------------------------------------------------
     def purge_expired(self, now: datetime, *, retention_days: int, dry_run: bool = False) -> int:
         """Drop uploads, reports and declared text of unpaid audits older than
         the retention window. Hashes, class and id stay so the record remains
-        verifiable. Returns how many audits were (or would be) purged."""
+        verifiable. The upload IP of every audit past the window is cleared,
+        paid or not. Returns how many unpaid audits were (or would be) purged."""
         sa = self._sa
         cutoff = _iso(now - timedelta(days=retention_days))
         condition = (
@@ -558,7 +582,16 @@ class Store:
                 ).scalar()
                 or 0
             )
-            if dry_run or count == 0:
+            if dry_run:
+                return count
+            # The upload IP only serves the hourly limit: past the retention
+            # window it goes for every audit, paid ones included.
+            conn.execute(
+                self.audits.update()
+                .where((self.audits.c.created_at < cutoff) & (self.audits.c.client_ip != ""))
+                .values(client_ip="")
+            )
+            if count == 0:
                 return count
             expired = sa.select(self.audits.c.id).where(condition)
             conn.execute(
