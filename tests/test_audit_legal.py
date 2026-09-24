@@ -28,6 +28,7 @@ from quant_trade.audit.pages import error_page, landing, legal_page  # noqa: E40
 from quant_trade.audit.retention import RetentionWorker, run_retention  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.theme import SCRIPT_TAG  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 from quant_trade.cli import app  # noqa: E402
 
@@ -71,7 +72,7 @@ def test_both_texts_pass_the_guard_in_every_mode(ctx: LegalContext, locale: str)
     for text in (terms_text(ctx, locale), privacy_text(ctx, locale)):
         page = legal_page(text, locale=locale)
         assert find_claims(page) == []
-        assert "<script" not in page
+        assert "<script" not in page.replace(SCRIPT_TAG, "")
 
 
 def test_unconfigured_operator_shows_a_placeholder_and_a_warning() -> None:

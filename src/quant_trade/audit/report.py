@@ -22,7 +22,8 @@ from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import legal_links_html
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
-from quant_trade.audit.seo import private_meta
+from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
+from quant_trade.audit.theme import SCRIPT_TAG, STYLE, aurora, class_ring, grid_bg, logo
 from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning, summary
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
@@ -51,7 +52,7 @@ DISCLAIMER = {
 
 LABELS: dict[str, dict[str, str]] = {
     "es": {
-        "title": "Contraprueba · Auditoría de backtest",
+        "title": f"{BRAND} · Auditoría de backtest",
         "generated": "Generada",
         "audit_id": "Identificador",
         "inputs": "Archivos auditados (sha256)",
@@ -164,7 +165,7 @@ LABELS: dict[str, dict[str, str]] = {
         "fees": "Costes que detalla el informe",
     },
     "en": {
-        "title": "Contraprueba · Backtest audit",
+        "title": f"{BRAND} · Backtest audit",
         "generated": "Generated",
         "audit_id": "Identifier",
         "inputs": "Audited files (sha256)",
@@ -419,67 +420,6 @@ PERCENT_KEYS = {
     "dsr_at_trials_used",
 }
 
-_CSS = """
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:auto;padding:24px;
-color:#1a1a1a;background:#fff;max-width:1000px;line-height:1.45}
-h1{font-size:1.6rem;margin:.2em 0}
-h2{font-size:1.15rem;margin-top:1.6em;border-bottom:1px solid #ddd;padding-bottom:.2em}
-table{border-collapse:collapse;width:100%;margin:.4em 0;font-size:.92rem}
-th,td{border:1px solid #e3e3e3;padding:5px 8px;text-align:left;vertical-align:top}
-th{background:#f5f5f5}
-code{font-size:.85em;word-break:break-all}
-.badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.75rem;font-weight:600}
-.MEASURED{background:#e3f2e6;color:#1b5e20}
-.DECLARED{background:#fff3cd;color:#7a5200}
-.NOT_MEASURED{background:#eee;color:#555}
-.PASS{background:#e3f2e6;color:#1b5e20}
-.WEAK{background:#fff3cd;color:#7a5200}
-.FAIL{background:#fde2e1;color:#8b1a10}
-.NOT_APPLICABLE{background:#eee;color:#555}
-.WARN{background:#fff3cd;color:#7a5200}
-.verdict{border:2px solid #333;padding:14px 18px;border-radius:8px;margin:1em 0}
-.verdict .cls{font-size:2.4rem;font-weight:800;margin-right:12px}
-.muted{color:#666;font-size:.9rem}
-.disclaimer{background:#f7f7f7;border-left:4px solid #999;padding:10px 14px;margin:1.6em 0;
-font-size:.9rem}
-.watermark{position:fixed;top:40%;left:5%;right:5%;text-align:center;font-size:5rem;
-font-weight:900;color:rgba(200,0,0,.12);transform:rotate(-25deg);pointer-events:none;z-index:9}
-.banner{background:#fde2e1;color:#8b1a10;padding:8px 12px;border-radius:6px;margin-bottom:1em;
-font-weight:600}
-.locked{filter:blur(5px);user-select:none;pointer-events:none}
-.paybox{border:1px dashed #8b1a10;padding:10px 14px;margin:.6em 0;border-radius:6px}
-.paybox button{background:#8b1a10;color:#fff;border:0;padding:8px 14px;border-radius:5px;
-font-weight:600;cursor:pointer}
-.toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:12px;
-margin:.4em 0}
-.print-btn{background:#fff;color:#1a1a1a;border:1px solid #999;padding:6px 12px;border-radius:5px;
-font-weight:600;cursor:pointer}
-.meaning{display:grid;grid-template-columns:1fr;gap:8px;margin:.6em 0}
-.meaning .item{border:1px solid #e3e3e3;border-radius:6px;padding:8px 12px}
-.meaning .item h3{font-size:1rem;margin:0 0 .2em}
-.lockbox{border:1px dashed #8b1a10;border-radius:6px;padding:10px 14px;margin:1em 0}
-.lockbox ul{margin:.4em 0}
-.paybox input{padding:7px 9px;border:1px solid #bbb;border-radius:5px;margin-right:6px}
-.notice{background:#e8f0fe;color:#123a7a;padding:8px 12px;border-radius:6px;margin:.6em 0;
-font-weight:600}
-.publish{border:1px solid #ddd;border-radius:6px;padding:10px 14px;margin:1em 0}
-.publish button{background:#1b5e20;color:#fff;border:0;padding:8px 14px;border-radius:5px;
-font-weight:600;cursor:pointer}
-@media (min-width:760px){.meaning{grid-template-columns:1fr 1fr}}
-img,svg{max-width:100%;height:auto}
-@media (max-width:759px){body{padding:16px}table{display:block;overflow-x:auto}
-.watermark{font-size:2.4rem}}
-@media print{
-.no-print,.paybox,.print-btn,.publish{display:none!important}
-body{max-width:none;padding:0;font-size:11pt}
-table{display:table}
-h2{break-after:avoid;page-break-after:avoid}
-table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
-.badge,.verdict{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.watermark{position:fixed}
-}
-"""
-
 
 def to_json(result: AuditResult) -> str:
     return pretty_dumps(result.model_dump(mode="json")) + "\n"
@@ -593,7 +533,8 @@ def _meaning_html(verdict: dict[str, Any], locale: str) -> str:
         if dimension is None:
             continue
         items.append(
-            f"<div class='item'><h3>{_e(_dimension_title(name, locale))} "
+            f"<div class='item s-{_e(dimension['status'])}'>"
+            f"<h3>{_e(_dimension_title(name, locale))} "
             f"{_status_badge(dimension['status'], locale)}</h3>"
             f"<p>{_e(meaning(name, dimension['status'], locale))}</p></div>"
         )
@@ -649,7 +590,7 @@ def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str,
     if not flags:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
-        "<ul>"
+        "<ul class='flag-list'>"
         + "".join(
             f"<li>{_badge(flag['severity'])} {_e(flag_title(flag['code'], locale))} "
             f"<code>{_e(flag['code'])}</code></li>"
@@ -862,15 +803,17 @@ def render_html(
         price = f" (USD {price_usd:,.0f})" if price_usd else ""
         paybox = (
             f"<form class='paybox' method='post' action='{_e(checkout_url)}'>"
-            f"<button type='submit'>{_e(labels['pay'])}{_e(price)}</button></form>"
+            f"<button class='btn btn-primary btn-lg' type='submit'>{_e(labels['pay'])}{_e(price)}"
+            "</button></form>"
         )
     if locked and redeem_url:
         paybox += (
             f"<form class='paybox' method='post' action='{_e(redeem_url)}'>"
-            f"<label>{_e(labels['redeem'])}</label><br>"
-            "<input type='text' name='code' required maxlength='40' autocomplete='off' "
-            "placeholder='AUD-XXXX-XXXX-XXXX'>"
-            f"<button type='submit'>{_e(labels['redeem_button'])}</button></form>"
+            f"<label for='redeem-code'>{_e(labels['redeem'])}</label><div class='inline-form'>"
+            "<input id='redeem-code' type='text' name='code' required maxlength='40' "
+            "autocomplete='off' spellcheck='false' placeholder='AUD-XXXX-XXXX-XXXX'>"
+            f"<button class='btn btn-primary' type='submit'>{_e(labels['redeem_button'])}</button>"
+            "</div></form>"
         )
         if contact_url:
             # Where a client without a code buys one (bank transfer, WhatsApp).
@@ -884,13 +827,8 @@ def render_html(
         publish_html = (
             f"<form class='publish' method='post' action='{_e(publish_url)}'>"
             f"<p class='muted'>{_e(labels['publish_help'])}</p>"
-            f"<button type='submit'>{_e(labels['publish'])}</button></form>"
+            f"<button class='btn btn-dark' type='submit'>{_e(labels['publish'])}</button></form>"
         )
-
-    verdict_html = (
-        f"<div class='verdict'><span class='cls'>{_e(verdict['overall'])}</span>"
-        f"<span>{_e(verdict['summary'])}</span></div>"
-    )
 
     inputs_html = (
         "<table>"
@@ -1140,7 +1078,10 @@ def render_html(
             + f"</ul>{paybox}</div>"
         )
     else:
-        detail_html = "".join(f"<h2>{_e(title)}</h2>{body}" for title, body in detail)
+        detail_html = "".join(
+            f"<section class='detail'><h2>{_e(title)}</h2>{body}</section>"
+            for title, body in detail
+        )
 
     watermark_html = ""
     if watermark:
@@ -1149,10 +1090,8 @@ def render_html(
             f"<div class='watermark'>{_e(text)}</div><div class='banner'>{_e(text)}</div>"
         )
 
-    body = [
-        watermark_html,
-        f"<div class='notice'>{_e(notice)}</div>" if notice else "",
-        "<div class='toolbar no-print'><button type='button' class='print-btn' "
+    toolbar = (
+        "<div class='nav-end no-print'><button type='button' class='print-btn' "
         f"onclick='window.print()'>{_e(labels['print'])}</button>"
         + (
             f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
@@ -1160,42 +1099,81 @@ def render_html(
             if switch_url
             else ""
         )
-        + "</div>",
-        f"<h1>{_e(labels['title'])} · {_e(verdict['overall'])}</h1>",
-        f"<p class='muted'>{_e(labels['audit_id'])}: <code>{_e(data['audit_id'])}</code> · "
-        f"{_e(labels['generated'])}: {_e(data['generated_at_utc'])} · engine "
-        f"{_e(data['engine']['name'])} {_e(data['engine']['package_version'])} · seed "
-        f"{_e(data['engine']['seed'])}</p>",
-        f"<h2>{_e(labels['verdict'])}</h2>{verdict_html}{'' if locked else paybox}",
-        f"<h2>{_e(labels['meaning'])}</h2>{_meaning_html(verdict, locale)}",
-        f"<h2>{_e(labels['charts'])}</h2>{_charts_html(data, locale)}",
-        f"<h2>{_e(labels['flags_free'])}</h2>{_flags_free_html(data['red_flags'], locale, labels)}",
-        f"<h2>{_e(labels['inputs'])}</h2>{inputs_html}{_source_html(data, labels)}",
-        f"<h2>{_e(labels['declared'])}</h2>{declared_html}",
-        f"<h2>{_e(labels['not_measured'])}</h2>{nm_html}",
-        f"<h2>{_e(labels['seal'])}</h2>{seal_html}",
+        + "</div>"
+    )
+    home = "/en" if locale == "en" else "/"
+    header = (
+        f"<header class='nav nav-solid'><div class='wrap nav-in'>{logo(home)}{toolbar}</div>"
+        "</header>"
+    )
+    engine = data["engine"]
+    meta = (
+        f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
+        f"<span>{_e(labels['generated'])} {_e(data['generated_at_utc'])}</span>"
+        f"<span>engine {_e(engine['name'])} {_e(engine['package_version'])}</span>"
+        f"<span>seed {_e(engine['seed'])}</span>"
+    )
+    hero = (
+        "<section class='report-hero'>"
+        + aurora()
+        + grid_bg()
+        + "<div class='wrap wrap-mid'>"
+        + watermark_html
+        + (f"<div class='notice'>{_e(notice)}</div>" if notice else "")
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(labels['title'])}</div>"
+        + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
+        + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
+        + "<div class='verdict rise' style='--i:3'>"
+        + class_ring(str(verdict["overall"]), size="lg")
+        + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
+        f"<p class='verdict-text'>{_e(verdict['summary'])}</p></div></div>"
+        + ("" if locked else paybox)
+        + "</div></section>"
+    )
+
+    def section(title: str, content: str) -> str:
+        return f"<section class='rsec'><h2>{_e(title)}</h2>{content}</section>"
+
+    footer = (
+        "<div class='report-foot'>"
+        f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
+        f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>"
+        f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>"
+        + (legal_links_html(locale) if legal_links else "")
+        + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
+    )
+    sections = [
+        section(labels["meaning"], _meaning_html(verdict, locale)),
+        section(labels["charts"], _charts_html(data, locale)),
+        section(labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels)),
         detail_html,
         publish_html,
-        f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
-        f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>",
-        f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>",
-        legal_links_html(locale) if legal_links else "",
+        section(labels["inputs"], inputs_html + _source_html(data, labels)),
+        section(labels["declared"], declared_html),
+        section(labels["not_measured"], nm_html),
+        section(labels["seal"], seal_html),
+        footer,
     ]
     page_title = f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}"
     return (
         "<!doctype html><html lang='"
         + _e(locale)
         + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, "
-        "initial-scale=1'><title>"
+        "initial-scale=1'><meta name='theme-color' content='#05070b'><title>"
         + _e(page_title)
         + "</title>"
         + (head_meta if head_meta is not None else private_meta(page_title, locale))
         + "<style>"
-        + _CSS
+        + STYLE
         + charts.CHART_CSS
-        + "</style></head><body>"
-        + "".join(body)
-        + "</body></html>"
+        + "</style>"
+        + SCRIPT_TAG
+        + "</head><body>"
+        + header
+        + hero
+        + "<main id='main' class='paper report-main'><div class='wrap wrap-mid'>"
+        + "".join(sections)
+        + "</div></main></body></html>"
     )
 
 

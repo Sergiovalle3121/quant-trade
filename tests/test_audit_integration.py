@@ -34,6 +34,7 @@ from quant_trade.audit.schema import (
     build_inputs,
     report_digest_name,
 )
+from quant_trade.audit.theme import SCRIPT_TAG
 from quant_trade.audit.verdict import DIMENSION_ORDER, MEANING, meaning
 from quant_trade.cli import app
 
@@ -331,7 +332,8 @@ def test_the_full_report_has_charts_explanations_and_print(locale: str) -> None:
     assert 'class="monthly"' in html_text
     assert "window.print()" in html_text
     assert "@media print" in html_text
-    assert "<script" not in html_text.lower()
+    # The one script is the site's own enhancement file; nothing inline.
+    assert "<script" not in html_text.lower().replace(SCRIPT_TAG.lower(), "")
     heading = "Qué significa para ti" if locale == "es" else "What this means for you"
     assert heading in html_text
     challenge_title = "Simulador de reto" if locale == "es" else "Prop-firm challenge simulator"

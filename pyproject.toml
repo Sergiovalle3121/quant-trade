@@ -58,6 +58,9 @@ pythonpath = ["src"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"quant_trade.audit" = ["static/*.js", "static/fonts/*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

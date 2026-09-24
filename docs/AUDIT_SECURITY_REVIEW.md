@@ -34,8 +34,11 @@ Every change below has an offline, deterministic test in
   (`pages.py`, `report.py`, `charts.py`, `seo.py`). A test uploads an MT5
   report whose expert name, symbol and file name, and a description, carry
   script tags and event handlers, then parses the report (both languages),
-  the verification page and the badge: no script tag and no event-handler
-  attribute other than the print button. Query values shown on pages
+  the verification page and the badge: no script tag other than the site's
+  own `/static/app.js` (same origin, no inline code; added with the 2026-09-24
+  redesign, and every page works without it) and no event-handler attribute
+  other than the print button. Fonts are self-hosted (`font-src 'self'`), so
+  no visitor request reaches a font service. Query values shown on pages
   (`code=`, `error=`, `lang=`) are matched against fixed values, never echoed.
 - **Owner tokens.** 32 random bytes from `secrets` (43 URL-safe characters),
   stored only as SHA-256, compared with `hmac.compare_digest`. A wrong token

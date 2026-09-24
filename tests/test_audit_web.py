@@ -255,7 +255,7 @@ def test_client_ip_takes_the_nth_entry_from_the_right(
 def test_waitlist(tmp_path: Path) -> None:
     client = _client(tmp_path)
     ok = client.post("/waitlist", data={"email": "a@b.co", "lang": "en"}, follow_redirects=False)
-    assert ok.status_code == 303 and ok.headers["location"] == "/?lang=en&joined=1"
+    assert ok.status_code == 303 and ok.headers["location"] == "/?lang=en&joined=1#news"
     bad = client.post("/waitlist", data={"email": "nope"}, follow_redirects=False)
     assert bad.headers["location"].endswith("error=email")
     assert client.get("/?lang=en&joined=1").text.count("Joined") == 1
