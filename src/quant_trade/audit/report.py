@@ -122,6 +122,7 @@ LABELS: dict[str, dict[str, str]] = {
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
         "redeem_button": "Canjear código",
         "buy_code": "¿No tienes código? Pídelo aquí",
+        "pack": "pack de 3 informes: USD {price:.0f}",
         "publish": "Publicar verificación pública",
         "publish_help": (
             "Crea una página pública con la clase, las dimensiones y los hashes, y un sello "
@@ -271,6 +272,7 @@ LABELS: dict[str, dict[str, str]] = {
         "redeem": "Have an access code? Enter it to see the full report",
         "redeem_button": "Redeem code",
         "buy_code": "No code yet? Ask for one here",
+        "pack": "pack of 3 reports: USD {price:.0f}",
         "publish": "Publish a public verification",
         "publish_help": (
             "Creates a public page with the class, the dimensions and the hashes, and a badge "
@@ -1073,6 +1075,7 @@ def render_html(
     switch_url: str | None = None,
     head_meta: str | None = None,
     compare_link: str | None = None,
+    pack_price_usd: float = 0.0,
 ) -> str:
     """The audit as one HTML document.
 
@@ -1120,7 +1123,14 @@ def render_html(
             price = f" (USD {price_usd:,.0f})" if price_usd else ""
             paybox += (
                 f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
-                f"target='_blank'>{_e(labels['buy_code'])}{_e(price)}</a></p>"
+                f"target='_blank'>{_e(labels['buy_code'])}{_e(price)}</a>"
+                + (
+                    f" <span class='muted'>· {_e(labels['pack'].format(price=pack_price_usd))}"
+                    "</span>"
+                    if pack_price_usd
+                    else ""
+                )
+                + "</p>"
             )
     compare_html = ""
     if compare_link and not locked:
@@ -1530,6 +1540,7 @@ def render(
     switch_url: str | None = None,
     head_meta: str | None = None,
     compare_link: str | None = None,
+    pack_price_usd: float = 0.0,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1547,6 +1558,7 @@ def render(
         switch_url=switch_url,
         head_meta=head_meta,
         compare_link=compare_link,
+        pack_price_usd=pack_price_usd,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

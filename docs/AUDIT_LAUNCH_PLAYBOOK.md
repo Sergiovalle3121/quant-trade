@@ -76,7 +76,7 @@ EA X-Ray gratis y EUR 29, AntiOverfit EUR 97):
 | Vista previa | Gratis | Siempre: clase, gráficas, banderas rojas y explicación de cada dimensión. |
 | Primeras 10 auditorías completas | Gratis a cambio de opinión | Semanas 1 y 2. Pide el archivo real y una opinión sobre la claridad del informe. |
 | Informe completo | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Desde la primera venta. |
-| Paquete de 3 | Unos USD 69 (código con `--credits 3`) | Para quien compara varios robots o varias versiones. |
+| Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`, código con `--credits 3`) | Para quien compara varios robots o varias versiones. |
 | Informe completo | USD 49 | Cuando tengas opiniones publicables de clientes reales. |
 
 La vista previa gratuita es el anzuelo: el trader ve la clase y las gráficas
