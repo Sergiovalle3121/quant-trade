@@ -203,6 +203,15 @@ class ParsedTrades:
     client_pnl: list[float | None]
     invalid_rows: int
     warnings: list[str] = field(default_factory=list)
+    #: Per-trade costs the platform already charged (commission, swap, fees;
+    #: positive is a cost), aligned with ``trades``. ``None`` when the file
+    #: does not itemise them.
+    fees: list[float] | None = None
+
+    @property
+    def reports_fees(self) -> bool:
+        """True when the file itemises a non-zero cost for some trade."""
+        return self.fees is not None and any(fee != 0 for fee in self.fees)
 
 
 def _normalise_columns(frame: pd.DataFrame) -> pd.DataFrame:

@@ -376,6 +376,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "status": "ok",
             "free_mode": cfg.free_mode,
             "stripe_enabled": cfg.stripe_enabled,
+            "access_codes": cfg.access_codes_enabled,
             "database": cfg.database_kind,
             "legal_configured": cfg.legal_configured,
         }
@@ -565,6 +566,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             redeem_url=f"/audits/{record.id}/redeem?token={token}" if redeemable else None,
             publish_url=f"/audits/{record.id}/publish?token={token}" if publishable else None,
             notice=notice,
+            contact_url=cfg.contact_url if redeemable else None,
             legal_links=True,
         )
         return html_text

@@ -270,7 +270,9 @@ def scan(
                     )
                 )
 
-    if declared.cost_bps_per_side == 0:
+    # A report that itemises commission and fees has measured costs even
+    # when the client declares none.
+    if declared.cost_bps_per_side == 0 and not (trades is not None and trades.reports_fees):
         flags.append(
             RedFlag(
                 "ZERO_DECLARED_COSTS",

@@ -195,6 +195,16 @@ supplied". It is not a prediction.
   side on entry and exit notional. Funding, borrow, financing and market
   impact are not modelled. With zero declared cost a 10 bps per side
   reference is assumed and labelled as such.
+- When a platform report itemises commission, swap or fees (MT5, MT4
+  history, NinjaTrader, QuantConnect, backtesting.py, vectorbt), those
+  per-trade costs are MEASURED and sit in every row of the cost table, the
+  0x row included; the multiples add cost on top of them. A tester fills at
+  bid/ask, so the spread is already in the prices, and with zero declared
+  cost the reference on top is 0.5 bps per side of assumed slippage (about
+  half a pip on EURUSD at 1.10; 10 bps would be 11 pips per side). The
+  break-even is the extra cost per side on top of the reported fees, and
+  `ZERO_DECLARED_COSTS` is not raised because the costs were measured. A
+  cost the client declares is charged on top of the reported fees.
 - CSCV needs the variants matrix; without it the PBO is NOT_MEASURED and
   multiplicity relies on the DSR alone.
 - The bootstrap is per period and does not annualise; its block size is
@@ -277,36 +287,45 @@ with an empty value):
 1. Create a service from this repository. `railway.json` selects
    `Dockerfile.web` and the `/health` check; the container listens on
    `$PORT`.
-2. Storage: either add the Railway Postgres plugin (it injects
-   `DATABASE_URL`) or mount a volume at `/data` and set
-   `DATABASE_URL=sqlite:////data/audit.db`.
+2. Storage: either add the Railway Postgres plugin and reference its
+   variable from the service (`DATABASE_URL=${{Postgres.DATABASE_URL}}`), or
+   mount a volume at `/data` and set `DATABASE_URL=sqlite:////data/audit.db`.
+   The image runs as the non-root user `quant` and Railway mounts volumes
+   owned by root, so with a volume also set `RAILWAY_RUN_UID=0`; otherwise
+   SQLite cannot create the file and every upload fails. Postgres is the
+   simpler choice and the only one a separate cron service can share.
 3. Set `AUDIT_BASE_URL` to the public domain Railway assigns or to the
-   custom domain you attach, and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
+   custom domain you attach (it is also the address in the badge embed code
+   of `/v/…` pages), and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
    hourly limit counts the visitor's address and not Railway's proxy.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
    `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
-   `AUDIT_CONTACT_URL`, then create codes from a Railway shell (see
-   "Selling with access codes"). For card payments create a Stripe price, add the three Stripe variables, set
+   `AUDIT_CONTACT_URL`, then create codes from a shell inside the service
+   (`railway ssh`, or the service's shell in the dashboard; see "Selling
+   with access codes"). A client without a code sees the price and the
+   `AUDIT_CONTACT_URL` link on the landing and under the locked report. For card payments create a Stripe price, add the three Stripe variables, set
    `AUDIT_FREE_MODE=false`, and register the webhook endpoint
    `https://<domain>/webhooks/stripe` for `checkout.session.completed`.
    Locally: `stripe listen --forward-to localhost:8000/webhooks/stripe`
    then `stripe trigger checkout.session.completed`.
 5. Retention: run `quant-trade audit purge --days 30 --yes` every day (a
-   Railway cron service works), with the same number of days as
-   `AUDIT_RETENTION_DAYS`. The privacy page promises it, and nothing runs it
-   automatically. Unpaid uploads, reports and the client's description are
-   deleted; id, digests and class are kept so the record stays verifiable.
-   The upload IP address of every audit past the window, paid ones too, is
-   cleared in the same run.
+   Railway cron service with the same variables works with Postgres; with a
+   SQLite volume run it from `railway ssh`, since a volume attaches to one
+   service only), with the same number of days as `AUDIT_RETENTION_DAYS`.
+   The privacy page promises it, and nothing runs it automatically. Unpaid
+   uploads, reports and the client's description are deleted; id, digests
+   and class are kept so the record stays verifiable. The upload IP address
+   of every audit past the window, paid ones too, is cleared in the same run.
 6. Set the four `AUDIT_OPERATOR_*`/`AUDIT_JURISDICTION` variables. Until
    they are set, `/terminos` and `/privacidad` show "[sin configurar]" and a
    warning, and `/health` reports `"legal_configured": false`.
 
 ### Testing a deployment on Railway
 
-1. Open `https://<domain>/health`: `free_mode` and `stripe_enabled` say
-   which mode the variables produced.
+1. Open `https://<domain>/health`: `free_mode`, `stripe_enabled` and
+   `access_codes` say which mode the variables produced. Selling with codes
+   shows `"free_mode": false, "access_codes": true`.
 2. Open `/ejemplo`: a full report of synthetic data renders with charts.
 3. Upload an MT5 tester report (`Report.html` as the terminal saves it) and,
    if you have it, the optimisation XML. The report shows the class, the
@@ -314,10 +333,20 @@ with an empty value):
 4. In free mode, or after unlocking, press "Publish a public verification"
    at the bottom of the report and open the `/v/…` page and its
    `badge.svg`. Check it shows no file, trade or description.
-5. With codes on: in a Railway shell run
-   `quant-trade audit codes create --credits 1 --note test`, upload a file
-   with that code in the "Access code" field, check the report is complete,
-   then upload again with the same code and check you get the preview.
+5. With codes on: in the service shell (`railway ssh`) run
+   `quant-trade audit codes create --credits 1 --note test` and copy the
+   code (it is printed once). Upload a file with that code in the "Access
+   code" field and check the report is complete and says the code was
+   applied. Upload again with the same code: you get the preview with the
+   notice that the code could not be applied, and under it the price and
+   your `AUDIT_CONTACT_URL` link. `quant-trade audit codes list` shows the
+   credit as used.
+6. Without a code: upload, check the preview shows the verdict, charts and
+   plain-language text but no numbers of the locked sections (view the
+   page source), then redeem a new code in the box at the bottom and check
+   the full report appears.
+7. Open the pages on a phone: tables scroll sideways inside the page and
+   nothing else overflows.
 
 ### Selling with access codes
 

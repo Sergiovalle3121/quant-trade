@@ -64,6 +64,7 @@ def test_health_and_landing_pages_pass_the_guard(tmp_path: Path) -> None:
         "status": "ok",
         "free_mode": True,
         "stripe_enabled": False,
+        "access_codes": False,
         "database": "sqlite",
         "legal_configured": False,
     }
