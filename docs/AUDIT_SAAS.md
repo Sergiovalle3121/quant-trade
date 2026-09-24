@@ -81,6 +81,30 @@ each with its evidence tag. "What it means for you" gives two plain
 sentences per dimension. The "Print / save PDF" button uses the print
 stylesheet, which hides the buttons and the forms.
 
+### Plan to reach a better class
+
+`audit/plan.py` turns the verdict into one step per dimension that did not
+pass (FAIL, WEAK or NOT_MEASURED), rebuilt from the stored JSON so older
+audits get it too. Each step has a fixed title, a finding with the result's
+own figures and the actions the audit would need to see:
+
+- data quality: every red flag with a hint (`FLAG_HINTS`, one per flag code
+  in both languages; a new flag needs its hint, which a test enforces);
+- significance: observations still needed for PSR 0.95 (the minimum track
+  record length minus what was uploaded) as a rough calendar span;
+- multiplicity: DSR at the trials used, the trial count at which it falls
+  below 0.5 and the PBO when measured;
+- costs: the break-even extra cost per side against 3x the reference;
+- out of sample and benchmark: what to declare or upload, and the class cap
+  when they are missing (B without a holdout or without trades).
+
+`class_if_passed` is the class rule applied to that one dimension at PASS
+with the rest unchanged, shown only when it differs from the current class.
+Steps that change the class on their own come first, then FAIL, WEAK and
+NOT_MEASURED. The plan never says a strategy will work: a better class means
+the files answer more of the audit's questions. An unpaid report in paid
+mode shows only the step titles; the figures are in the paid detail.
+
 ## What is measured, and from where
 
 Every leaf value in the JSON carries an evidence tag:
