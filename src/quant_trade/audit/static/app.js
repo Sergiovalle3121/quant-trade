@@ -30,6 +30,28 @@
       items.forEach(function (el) { el.classList.add("in"); });
     }
 
+    // Key figures count up once, the first time they are seen.
+    var counters = d.querySelectorAll("[data-count]");
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if ("IntersectionObserver" in window && !still) {
+      var co = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          co.unobserve(e.target);
+          var el = e.target, end = parseInt(el.textContent, 10), t0 = null;
+          if (!(end > 1) || String(end) !== el.textContent.trim()) return;
+          var step = function (t) {
+            if (t0 === null) t0 = t;
+            var k = Math.min(1, (t - t0) / 1400);
+            el.textContent = String(Math.round(end * (1 - Math.pow(1 - k, 3))));
+            if (k < 1) window.requestAnimationFrame(step);
+          };
+          window.requestAnimationFrame(step);
+        });
+      }, { threshold: 0.4 });
+      counters.forEach(function (el) { co.observe(el); });
+    }
+
     // A soft light that follows the pointer over cards.
     d.addEventListener("pointermove", function (ev) {
       var card = ev.target && ev.target.closest ? ev.target.closest(".spot") : null;
