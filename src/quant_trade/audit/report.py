@@ -51,7 +51,7 @@ DISCLAIMER = {
 
 LABELS: dict[str, dict[str, str]] = {
     "es": {
-        "title": "Auditoría de backtest",
+        "title": "Contraprueba · Auditoría de backtest",
         "generated": "Generada",
         "audit_id": "Identificador",
         "inputs": "Archivos auditados (sha256)",
@@ -164,7 +164,7 @@ LABELS: dict[str, dict[str, str]] = {
         "fees": "Costes que detalla el informe",
     },
     "en": {
-        "title": "Backtest audit",
+        "title": "Contraprueba · Backtest audit",
         "generated": "Generated",
         "audit_id": "Identifier",
         "inputs": "Audited files (sha256)",

@@ -571,7 +571,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention.stop()
 
     app = FastAPI(
-        title="Backtest audit",
+        title="Contraprueba",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
