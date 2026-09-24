@@ -640,18 +640,24 @@ the same seed reproduces the JSON byte for byte.
 
 ## Look and feel
 
-Every page shares one visual system in `audit/theme.py`: a dark, high-contrast
-shell with a light reading surface for reports and legal text, the
-self-hosted fonts Inter, Instrument Serif and JetBrains Mono (SIL Open Font
-License, files and licences in `audit/static/fonts/`), and CSS-only motion
-that honours `prefers-reduced-motion`. The stylesheet is inlined so a report
-saved to disk keeps its look (it falls back to system fonts offline).
-`/static/app.js` is the only script: it adds drag-and-drop and file names on
-the upload fields, scroll reveals, a "working" overlay while an audit runs and
-a copy button for the badge code. Every page works without it. `/static/`
+Every page shares one visual system in `audit/theme.py`: a monochrome,
+high-contrast design that alternates black and light-grey sections, with one
+sans-serif family for everything (Inter, tight tracking at display sizes) and
+JetBrains Mono for labels and identifiers. Both are self-hosted (SIL Open Font
+License, files and licences in `audit/static/fonts/`). Colour is kept for
+meaning only: the class ring and the PASS/WEAK/FAIL and
+MEASURED/DECLARED/NOT_MEASURED labels. Motion is CSS-only and honours
+`prefers-reduced-motion`: sections fade in as they scroll, the landing's report
+illustration settles into place and the long statement lights up line by line
+where the browser supports scroll-driven animations (elsewhere it is simply
+shown). The stylesheet is inlined so a report saved to disk keeps its look (it
+falls back to system fonts offline). `/static/app.js` is the only script: it
+adds drag-and-drop and file names on the upload fields, scroll reveals, the
+count-up of the landing's key figures, a "working" overlay while an audit runs
+and a copy button for the badge code. Every page works without it. `/static/`
 serves only the files listed in `theme.STATIC_FILES`. Printing always gets a
-light, static page. The landing's report illustration is labelled as
-synthetic data.
+light, static page. The landing's report illustration, including its three
+figures, is labelled as synthetic data.
 
 ## Security
 

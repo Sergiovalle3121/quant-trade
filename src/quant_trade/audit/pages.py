@@ -497,6 +497,13 @@ _UI: dict[str, dict[str, Any]] = {
             "número etiquetado según su evidencia."
         ),
         "mock_cap": "Ilustración con datos sintéticos",
+        "mock_is": "Dentro de muestra",
+        "mock_oos": "Fuera de muestra",
+        "mock_kpis": [
+            ("0,41", "Sharpe deflactado"),
+            ("120", "Intentos contados"),
+            ("3,2 pb", "Coste de equilibrio"),
+        ],
         "chip_trials": "Intentos reales desde el XML de MT5",
         "chip_hash": "Cada número con su evidencia",
         "platforms": "Lee el archivo que ya tienes",
@@ -531,8 +538,8 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "stats": [
             ("6", "dimensiones auditadas"),
+            ("{flags}", "banderas rojas revisadas en cada archivo"),
             ("{presets}", "retos de prop firms simulables"),
-            ("3", "etiquetas de evidencia"),
             ("{platforms}", "plataformas que se leen tal cual"),
         ],
         "evidence_eyebrow": "Evidencia",
@@ -664,6 +671,13 @@ _UI: dict[str, dict[str, Any]] = {
             "labelled by its evidence."
         ),
         "mock_cap": "Illustration with synthetic data",
+        "mock_is": "In sample",
+        "mock_oos": "Out of sample",
+        "mock_kpis": [
+            ("0.41", "Deflated Sharpe"),
+            ("120", "Trials counted"),
+            ("3.2 bp", "Break-even cost"),
+        ],
         "chip_trials": "Real trial count from the MT5 XML",
         "chip_hash": "Every number with its evidence",
         "platforms": "Reads the file you already have",
@@ -697,8 +711,8 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "stats": [
             ("6", "audited dimensions"),
+            ("{flags}", "red flags checked on every file"),
             ("{presets}", "prop-firm challenges to simulate"),
-            ("3", "evidence labels"),
             ("{platforms}", "platforms read as they are"),
         ],
         "evidence_eyebrow": "Evidence",
@@ -1002,20 +1016,22 @@ def _section_head(eyebrow: str, title: str, lead: str = "", *, center: bool = Fa
 def _spark_paths() -> tuple[str, str]:
     """A deterministic synthetic curve for the landing's illustration."""
     seed, level, values = 20260924, 0.0, []
-    for _ in range(64):
+    for _ in range(72):
         seed = (seed * 1103515245 + 12345) % 2**31
         level += (seed / 2**31 - 0.5) * 1.6 + 0.16
         values.append(level)
     lo, hi = min(values), max(values)
     points = [
-        (4 + i * 312 / (len(values) - 1), 84 - (v - lo) / (hi - lo or 1) * 72)
+        (4 + i * 432 / (len(values) - 1), 124 - (v - lo) / (hi - lo or 1) * 100)
         for i, v in enumerate(values)
     ]
     line = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in points)
-    return line, f"{line} L316,92 L4,92 Z"
+    return line, f"{line} L436,132 L4,132 Z"
 
 
 _SPARK_LINE, _SPARK_AREA = _spark_paths()
+#: Where the illustration's out-of-sample stretch starts (x in the 440-wide box).
+_SPARK_SPLIT = 316
 
 
 def _mock(locale: str) -> str:
@@ -1028,31 +1044,38 @@ def _mock(locale: str) -> str:
         for i, (name, status) in enumerate(_MOCK_STATUSES)
     )
     grid = "".join(
-        f"<line class='spark-grid' x1='0' x2='320' y1='{y}' y2='{y}'/>" for y in (12, 36, 60, 84)
+        f"<line class='spark-grid' x1='0' x2='440' y1='{y}' y2='{y}'/>" for y in (24, 58, 92, 126)
     )
+    kpis = "".join(
+        f"<div><strong>{_e(value)}</strong><span>{_e(label)}</span></div>"
+        for value, label in ui["mock_kpis"]
+    )
+    split = _SPARK_SPLIT
     return (
-        "<div class='rise' style='--i:4;position:relative'>"
-        f"<div class='mock spot' role='img' aria-label='{_e(ui['mock_cap'])}'><div class='mock-in'>"
+        "<div class='stage rise' style='--i:5'>"
+        f"<div class='mock spot' role='img' aria-label='{_e(ui['mock_cap'])}'>"
         "<div class='mock-top'><div class='mock-dots'><i></i><i></i><i></i></div>"
         f"<span class='mock-url'>{_e(BRAND.lower())} · {_e(ui['mock_url'])}</span></div>"
-        "<div class='mock-body'><div class='mock-head'>"
+        "<div class='mock-body'><div class='mock-col'><div class='mock-head'>"
         + class_ring("B")
         + f"<div><div class='mock-k'>{_e(ui['mock_k'])}</div>"
         f"<div class='mock-t'>{_e(class_text('B', locale))}</div></div></div>"
-        "<svg class='spark' viewBox='0 0 320 96' aria-hidden='true'><defs>"
-        "<linearGradient id='spg' x1='0' x2='1'><stop offset='0' stop-color='#9aa8ff'/>"
-        "<stop offset='1' stop-color='#6ee7d8'/></linearGradient>"
+        f"<ul class='mock-dims'>{rows}</ul></div>"
+        "<div class='mock-col'>"
+        "<svg class='spark' viewBox='0 0 440 140' aria-hidden='true'><defs>"
         "<linearGradient id='spa' x1='0' x2='0' y1='0' y2='1'>"
-        "<stop offset='0' stop-color='#9aa8ff' stop-opacity='.28'/>"
-        "<stop offset='1' stop-color='#9aa8ff' stop-opacity='0'/></linearGradient></defs>"
+        "<stop offset='0' stop-color='#f4f4f6' stop-opacity='.16'/>"
+        "<stop offset='1' stop-color='#f4f4f6' stop-opacity='0'/></linearGradient></defs>"
+        f"<rect class='spark-oos' x='{split}' y='0' width='{440 - split}' height='140'/>"
         f"{grid}<path class='spark-area' d='{_SPARK_AREA}'/>"
-        f"<path class='spark-line' pathLength='1' d='{_SPARK_LINE}'/></svg>"
-        f"<ul class='mock-dims'>{rows}</ul>"
+        f"<path class='spark-line' pathLength='1' d='{_SPARK_LINE}'/>"
+        f"<line class='spark-split' x1='{split}' x2='{split}' y1='0' y2='140'/>"
+        f"<text class='spark-lbl' x='6' y='12'>{_e(ui['mock_is'])}</text>"
+        f"<text class='spark-lbl' x='{split + 6}' y='12'>{_e(ui['mock_oos'])}</text></svg>"
+        f"<div class='mock-kpis'>{kpis}</div>"
         "<div class='mock-tags'><span class='badge MEASURED'>MEASURED</span>"
         "<span class='badge DECLARED'>DECLARED</span>"
         "<span class='badge NOT_MEASURED'>NOT_MEASURED</span></div></div></div></div>"
-        f"<div class='float-chip fc-1'>{icon('layers')}{_e(ui['chip_trials'])}</div>"
-        f"<div class='float-chip fc-2'>{icon('hash')}{_e(ui['chip_hash'])}</div>"
         f"<div class='mock-cap'>{_e(ui['mock_cap'])}</div></div>"
     )
 
@@ -1066,7 +1089,7 @@ def _hero(locale: str, sample: str) -> str:
     ui = _UI[locale]
     trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in ui["trust"])
     return (
-        "<section class='hero'>" + aurora() + grid_bg() + "<div class='wrap hero-grid'><div>"
+        "<section class='hero dark'>" + aurora() + grid_bg() + "<div class='wrap'>"
         f"<div class='pill rise' style='--i:0'><span class='dot'></span>"
         f"{_e(TAGLINE[locale])}</div>"
         f"<h1 class='display'><span class='l rise' style='--i:1'>{_e(ui['hero_a'])}</span>"
@@ -1075,35 +1098,44 @@ def _hero(locale: str, sample: str) -> str:
         "<div class='hero-cta rise' style='--i:4'>"
         f"<a class='btn btn-primary btn-lg' href='#subir'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
-        f"<a class='btn btn-ghost btn-lg' href='{_e(sample)}'>{_e(ui['cta_sample'])}</a></div>"
-        f"<ul class='trust rise' style='--i:5'>{trust}</ul></div>"
-        + _mock(locale)
-        + "</div></section>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
+        f"<ul class='trust rise' style='--i:4'>{trust}</ul>" + _mock(locale) + "</div></section>"
     )
 
 
-def _marquee(locale: str) -> str:
-    items = "".join(f"<span>{_e(name)}</span>" for name in PLATFORMS)
+def _specs(locale: str) -> str:
+    """The key figures in a row, then the platforms the importers read."""
+    ui = _UI[locale]
+    counts = {
+        "presets": len(PRESETS),
+        "platforms": len(PLATFORMS),
+        "flags": len(FLAG_TITLES),
+    }
+    specs = "".join(
+        f"<div data-reveal style='--i:{i}'><b data-count>{_e(value.format(**counts))}</b>"
+        f"<span>{_e(label)}</span></div>"
+        for i, (value, label) in enumerate(ui["stats"])
+    )
+    platforms = "".join(f"<li>{_e(name)}</li>" for name in PLATFORMS)
     return (
-        "<section class='section-tight' aria-label='"
-        + _e(_UI[locale]["platforms"])
-        + f"'><p class='marquee-label'>{_e(_UI[locale]['platforms'])}</p>"
-        f"<div class='marquee'><div class='marquee-track'>{items}"
-        f"<span aria-hidden='true' style='display:contents'>{items}</span></div></div></section>"
+        "<section class='dark' style='padding-bottom:clamp(88px,11vw,150px)'><div class='wrap'>"
+        f"<div class='specs'>{specs}</div>"
+        f"<div class='platforms' data-reveal><p>{_e(ui['platforms'])}</p><ul>{platforms}</ul></div>"
+        "</div></section>"
     )
 
 
 def _problems(locale: str) -> str:
     ui = _UI[locale]
-    cards = "".join(
-        f"<div class='card spot' data-reveal style='--i:{i}'>"
-        f"<span class='big-num'>0{i + 1}</span><h3>{_e(title)}</h3><p>{_e(text)}</p></div>"
+    items = "".join(
+        f"<div data-reveal style='--i:{i}'><span class='n'>0{i + 1}</span>"
+        f"<h3>{_e(title)}</h3><p>{_e(text)}</p></div>"
         for i, (title, text) in enumerate(ui["problems"])
     )
     return (
-        "<section class='section'><div class='wrap'>"
+        "<section class='section light'><div class='wrap'>"
         + _section_head(ui["problem_eyebrow"], _title_pair(ui["problem_title"]), ui["problem_lead"])
-        + f"<div class='cards'>{cards}</div></div></section>"
+        + f"<div class='trio'>{items}</div></div></section>"
     )
 
 
@@ -1116,16 +1148,11 @@ def _dimensions(locale: str, copy: dict[str, Any]) -> str:
         f"<h3>{_e(titles[name])}</h3><p>{_e(text)}</p></div>"
         for i, (name, text) in enumerate(zip(DIMENSION_ORDER, copy["measure"], strict=False))
     )
-    counts = {"presets": len(PRESETS), "platforms": len(PLATFORMS)}
-    stats = "".join(
-        f"<div><b class='grad-text'>{_e(value.format(**counts))}</b><span>{_e(label)}</span></div>"
-        for value, label in ui["stats"]
-    )
     return (
-        "<section class='section' id='measure'><div class='wrap'>"
-        + _section_head(copy["measure_title"], _title_pair(ui["dims_title"]), copy["pitch"])
+        "<section class='section dark' id='measure'><div class='wrap'>"
+        + _section_head(copy["measure_title"], _title_pair(ui["dims_title"]))
+        + f"<p class='statement'>{_e(copy['pitch'])}</p>"
         + f"<div class='cards'>{cards}</div>"
-        + f"<div class='stats' data-reveal style='margin-top:18px'>{stats}</div>"
         + "</div></section>"
     )
 
@@ -1138,7 +1165,7 @@ def _evidence(locale: str, copy: dict[str, Any]) -> str:
         for i, (tag, text) in enumerate(ui["evidence"])
     )
     return (
-        "<section class='section'><div class='wrap split'><div class='sticky'>"
+        "<section class='section light'><div class='wrap split'><div class='sticky'>"
         + _section_head(
             ui["evidence_eyebrow"], _title_pair(ui["evidence_title"]), ui["evidence_lead"]
         )
@@ -1155,7 +1182,7 @@ def _differences(locale: str) -> str:
         for i, (name, title, text) in enumerate(ui["diffs"])
     )
     return (
-        "<section class='section'><div class='wrap'>"
+        "<section class='section light'><div class='wrap'>"
         + _section_head(ui["diff_eyebrow"], _title_pair(ui["diff_title"]))
         + f"<div class='cards cards-2'>{cards}</div></div></section>"
     )
@@ -1167,10 +1194,11 @@ def _how_html(copy: dict[str, Any], locale: str) -> str:
         f"<li data-reveal style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(copy["how"])
     )
     return (
-        "<section class='section' id='how'><div class='wrap'>"
+        "<section class='section dark' id='how'><div class='wrap'>"
         + _section_head(ui["how_eyebrow"], f"<h2 class='h2'>{_e(copy['how_title'])}</h2>")
         + f"<ol class='steps'>{steps}</ol>"
-        + f"<div class='section-tight' data-reveal><p class='muted'>{_e(copy['guides_text'])} "
+        + f"<div class='section-tight' data-reveal style='padding-bottom:0'><p class='muted'>"
+        f"{_e(copy['guides_text'])} "
         f"<a href='{_e(guides_index_url(locale))}'>{_e(copy['guides_link'])}</a></p></div>"
         + "</div></section>"
     )
@@ -1247,7 +1275,9 @@ def _prices_html(
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
         )
-    return f"<section class='section' id='pricing'><div class='wrap'>{head}{body}</div></section>"
+    return (
+        f"<section class='section dark' id='pricing'><div class='wrap'>{head}{body}</div></section>"
+    )
 
 
 def _drop(
@@ -1356,7 +1386,7 @@ def _upload_form(
         f"<li style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(ui["busy_steps"])
     )
     return (
-        "<section class='section' id='subir'><div class='wrap upload'>"
+        "<section class='section light' id='subir'><div class='wrap upload'>"
         "<div class='sticky'>"
         + _section_head(ui["upload_eyebrow"], _title_pair(ui["upload_title"]), ui["upload_lead"])
         + f"<ul class='checks' data-reveal>{points}</ul></div>"
@@ -1407,7 +1437,7 @@ def _faq_html(copy: dict[str, Any], locale: str, *, retention_days: int) -> str:
         for question, answer in copy["faq"]
     )
     return (
-        "<section class='section' id='faq'><div class='wrap wrap-mid'>"
+        "<section class='section dark' id='faq'><div class='wrap wrap-mid'>"
         + _section_head(ui["faq_eyebrow"], f"<h2 class='h2'>{_e(copy['faq_title'])}</h2>")
         + f"<div class='faq' data-reveal>{items}</div></div></section>"
     )
@@ -1417,21 +1447,20 @@ def _final_cta(copy: dict[str, Any], locale: str, sample: str, *, joined: bool) 
     ui = _UI[locale]
     flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     return (
-        "<section class='section' style='padding-top:0'><div class='wrap'>"
-        "<div class='cta-band' data-reveal>" + grid_bg() + "<div class='center' "
-        "style='max-width:760px'>"
+        "<section class='section dark' style='padding-top:0'><div class='wrap'>"
+        "<div class='cta-band center' data-reveal style='max-width:900px'>"
         + _title_pair(ui["final_title"])
-        + f"<p class='lead' style='margin-top:18px'>{_e(ui['final_lead'])}</p>"
+        + f"<p class='lead' style='margin-top:24px'>{_e(ui['final_lead'])}</p>"
         "<div class='hero-cta' style='justify-content:center'>"
         f"<a class='btn btn-primary btn-lg' href='#subir'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
-        f"<a class='btn btn-ghost btn-lg' href='{_e(sample)}'>{_e(ui['nav_sample'])}</a></div>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
         f"<div class='news center' id='news'><p class='label'>{_e(copy['waitlist_title'])}</p>"
         f"{flash}<form class='inline-form' method='post' action='/waitlist'>"
         f"<input type='email' name='email' required placeholder='{_e(copy['email'])}' "
         f"aria-label='{_e(copy['email'])}'><input type='hidden' name='lang' value='{_e(locale)}'>"
-        f"<button class='btn' type='submit'>{_e(copy['join'])}</button></form></div>"
-        "</div></div></div></section>"
+        f"<button class='btn btn-ghost' type='submit'>{_e(copy['join'])}</button></form></div>"
+        "</div></div></section>"
     )
 
 
@@ -1461,7 +1490,7 @@ def landing(
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
     body = (
         _hero(locale, sample)
-        + _marquee(locale)
+        + _specs(locale)
         + _problems(locale)
         + _dimensions(locale, copy)
         + _evidence(locale, copy)
@@ -1649,23 +1678,17 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
         "<svg xmlns='http://www.w3.org/2000/svg' width='480' height='72' viewBox='0 0 480 72' "
         f"role='img' aria-label='{_e(f'{title} · {label} {overall} · {notice}')}'>"
         f"<title>{_e(f'{title} · {label} {overall} · {notice}')}</title>"
-        "<defs><linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>"
-        "<stop offset='0' stop-color='#0d121c'/><stop offset='1' stop-color='#05070b'/>"
-        "</linearGradient><linearGradient id='ac' x1='0' y1='0' x2='1' y2='0'>"
-        "<stop offset='0' stop-color='#9aa8ff'/><stop offset='1' stop-color='#6ee7d8'/>"
-        "</linearGradient></defs>"
-        "<rect x='.5' y='.5' width='479' height='71' rx='14' fill='url(#bg)' "
-        "stroke='#2a3140'/>"
-        "<rect x='8' y='8' width='56' height='56' rx='11' fill='#111722' "
+        "<rect x='.5' y='.5' width='479' height='71' rx='16' fill='#0b0b0d' stroke='#2a2a2f'/>"
+        "<rect x='8' y='8' width='56' height='56' rx='12' fill='#141416' "
         f"stroke='{colour}' stroke-width='2'/>"
-        f"<text x='36' y='50' font-family='Georgia,Times New Roman,serif' font-size='38' "
-        f"fill='{colour}' text-anchor='middle'>{_e(overall)}</text>"
-        f"<text x='78' y='26' font-family='{font}' font-size='15' font-weight='700' "
-        f"fill='#f4f6fb'>{_e(title)} · {_e(label)} {_e(overall)}</text>"
-        "<rect x='78' y='33' width='42' height='2' rx='1' fill='url(#ac)'/>"
-        f"<text x='128' y='37' font-family='{font}' font-size='10.5' fill='#aab3c2'>"
+        f"<text x='36' y='49' font-family='{font}' font-size='34' font-weight='600' "
+        f"fill='{colour}' text-anchor='middle' letter-spacing='-1'>{_e(overall)}</text>"
+        f"<text x='78' y='26' font-family='{font}' font-size='15' font-weight='650' "
+        f"fill='#f4f4f6' letter-spacing='-.3'>{_e(title)} · {_e(label)} {_e(overall)}</text>"
+        "<rect x='78' y='33' width='42' height='1.5' rx='.75' fill='#8a8a90'/>"
+        f"<text x='128' y='37' font-family='{font}' font-size='10.5' fill='#a3a3aa'>"
         f"{_e(audited_on)} · ID {_e(public_id)}</text>"
-        f"<text x='78' y='58' font-family='{font}' font-size='9' fill='#8a93a3' "
+        f"<text x='78' y='58' font-family='{font}' font-size='9' fill='#86868c' "
         f"textLength='390' lengthAdjust='spacingAndGlyphs'>{_e(notice)}</text>"
         "</svg>"
     )

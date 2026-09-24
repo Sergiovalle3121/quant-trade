@@ -34,7 +34,7 @@ def _client(tmp_path: Path) -> TestClient:
 def test_every_listed_static_file_exists_and_every_font_has_its_licence() -> None:
     for name in STATIC_FILES:
         assert (STATIC_DIR / name).is_file(), name
-    for licence in ("OFL-Inter.txt", "OFL-InstrumentSerif.txt", "OFL-JetBrainsMono.txt"):
+    for licence in ("OFL-Inter.txt", "OFL-JetBrainsMono.txt"):
         assert "Open Font License" in (STATIC_DIR / "fonts" / licence).read_text()
 
 
@@ -73,3 +73,21 @@ def test_navigation_has_a_phone_menu_and_links_the_comparison() -> None:
         assert nav.count(f"href='{compare}'") == 2
         footer = page.split("<footer", 1)[1]
         assert f"href='{compare}'" in footer
+
+
+def test_landing_leads_with_the_product_and_real_key_figures() -> None:
+    from quant_trade.audit.pages import PLATFORMS
+    from quant_trade.audit.prop_presets import PRESETS
+    from quant_trade.audit.redflags import FLAG_TITLES
+
+    for locale in ("es", "en"):
+        page = landing(locale=locale)
+        # The illustration sits under the headline and says it is synthetic.
+        assert page.index("<h1") < page.index("class='stage") < page.index("class='specs'")
+        assert ("sintéticos" if locale == "es" else "synthetic") in page
+        specs = page.split("class='specs'", 1)[1].split("</div></div>", 1)[0]
+        for count in (len(FLAG_TITLES), len(PRESETS), len(PLATFORMS)):
+            assert f"<b data-count>{count}</b>" in specs
+    # One sans family plus the mono; the old serif is gone from pages and static files.
+    assert "Instrument Serif" not in STYLE
+    assert not any("instrument" in name for name in STATIC_FILES)
