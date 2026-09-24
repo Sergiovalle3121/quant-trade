@@ -22,6 +22,7 @@ import base64
 import contextlib
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import re
@@ -251,14 +252,33 @@ def redact_secrets(text: str) -> str:
     return _SECRET_QUERY.sub(r"\1[redacted]", text)
 
 
+def shorten_client_address(address: str) -> str:
+    """``address`` (uvicorn's ``host:port``) without its port and host part:
+    the last IPv4 octet, or all but the first three IPv6 groups, become 0.
+    Enough to read traffic by network; not enough to name a customer."""
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
+    for candidate in (address.rsplit(":", 1)[0], address):
+        try:
+            ip = ipaddress.ip_address(candidate.strip("[]"))
+            break
+        except ValueError:
+            continue
+    if ip is None:
+        return "-"
+    prefix = 24 if ip.version == 4 else 48
+    return str(ipaddress.ip_network(f"{ip}/{prefix}", strict=False).network_address)
+
+
 class RedactSecretsFilter(logging.Filter):
-    """Access-log filter: uvicorn logs the full path, query string included."""
+    """Access-log filter: uvicorn logs the full path, query string included,
+    and the client's full address first; both are cut down here."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
-            record.args = tuple(
-                redact_secrets(arg) if isinstance(arg, str) else arg for arg in record.args
-            )
+            args = [redact_secrets(arg) if isinstance(arg, str) else arg for arg in record.args]
+            if record.name == "uvicorn.access" and args and isinstance(args[0], str):
+                args[0] = shorten_client_address(args[0])
+            record.args = tuple(args)
         record.msg = redact_secrets(str(record.msg))
         return True
 
@@ -1211,6 +1231,7 @@ __all__ = [
     "BodyLimitMiddleware",
     "RedactSecretsFilter",
     "redact_secrets",
+    "shorten_client_address",
     "uvicorn_log_config",
     "client_ip",
     "create_app",
