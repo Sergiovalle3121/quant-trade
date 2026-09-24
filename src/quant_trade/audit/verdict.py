@@ -759,6 +759,12 @@ MEANING: dict[str, dict[str, str]] = {
 }
 
 
+def class_text(overall: str, locale: str = "es") -> str:
+    """The fixed one-line explanation of a class (A to D)."""
+    texts = _TEXT.get(locale, _TEXT["es"])
+    return texts.get(overall, "")
+
+
 def meaning(name: str, status: str, locale: str = "es") -> str:
     """Two plain sentences on what a dimension's status means for the reader."""
     texts = MEANING.get(locale, MEANING["es"])
@@ -832,6 +838,7 @@ __all__ = [
     "assess_out_of_sample",
     "assess_statistical",
     "build_verdict",
+    "class_text",
     "meaning",
     "overall_class",
     "summary",

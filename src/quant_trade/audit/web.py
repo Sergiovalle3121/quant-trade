@@ -4,9 +4,14 @@ FastAPI, imported lazily so the core package never depends on the ``web``
 extra. Every report URL carries a per-audit secret token; a wrong token is
 a 404 (never a 403) so the service does not confirm that an id exists.
 Stripe is optional: without every Stripe variable the service is in free
-mode, serves watermarked reports and refuses to create checkouts. The
-webhook signature is verified locally with the documented HMAC scheme so
-the payment path needs no SDK to be trustworthy.
+mode, serves watermarked reports and refuses to create checkouts, unless the
+owner opts into selling access codes. The webhook signature is verified
+locally with the documented HMAC scheme so the payment path needs no SDK to
+be trustworthy.
+
+Growth routes: an owner can publish a verification page (``/v/{public_id}``)
+and its badge; those two routes are the only cacheable ones. ``/ejemplo``
+and ``/sample`` serve a full report of synthetic data.
 """
 
 # No ``from __future__ import annotations`` here: FastAPI resolves the route
@@ -17,6 +22,7 @@ import hashlib
 import hmac
 import json
 import secrets
+import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -25,8 +31,15 @@ from typing import Annotated, Any
 from pydantic import ValidationError
 
 from quant_trade.audit.engine import run_audit
-from quant_trade.audit.pages import error_page, landing
-from quant_trade.audit.report import render
+from quant_trade.audit.pages import (
+    SAMPLE_BANNER,
+    badge_svg,
+    error_page,
+    landing,
+    verification_page,
+)
+from quant_trade.audit.report import render, result_sha256
+from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import (
     AuditResult,
     DeclaredMetadata,
@@ -110,7 +123,33 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Los pagos no están activados en este servicio.",
         "en": "Payments are not enabled on this service.",
     },
+    "code_applied": {
+        "es": "Código de acceso aplicado: este es el informe completo.",
+        "en": "Access code applied: this is the full report.",
+    },
+    "code_rejected": {
+        "es": (
+            "No se pudo aplicar el código de acceso (no válido, agotado o caducado). "
+            "Esta es la vista previa."
+        ),
+        "en": (
+            "The access code could not be applied (invalid, used up or expired). "
+            "This is the preview."
+        ),
+    },
+    "codes_disabled": {
+        "es": "Este servicio no acepta códigos de acceso.",
+        "en": "This service does not accept access codes.",
+    },
+    "publish_locked": {
+        "es": "Solo se puede publicar la verificación de un informe completo.",
+        "en": "Only a full report can publish a verification.",
+    },
 }
+
+#: The only routes a browser or CDN may cache: public by design, no token.
+PUBLIC_CACHE_CONTROL = "public, max-age=300"
+_CODE_MAX = 40
 
 #: The file names as the error sentences use them.
 UPLOAD_NAMES: dict[str, dict[str, str]] = {
@@ -281,7 +320,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
-        response.headers["Cache-Control"] = "no-store"
+        public = request.url.path.startswith("/v/") and response.status_code == 200
+        response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
@@ -348,6 +388,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             price_usd=cfg.price_usd,
             joined=bool(joined),
             error=shown,
+            access_codes=cfg.access_codes_enabled,
+            card_payments=cfg.stripe_enabled,
+            contact_url=cfg.contact_url,
+            retention_days=cfg.retention_days,
         )
 
     @app.post("/waitlist")
@@ -363,7 +407,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ip: str,
         uploads: dict[str, bytes | None],
         report_name: str | None,
-    ) -> tuple[str, str]:
+        access_code: str | None,
+    ) -> tuple[str, str, bool]:
         """The CPU- and IO-bound part of an upload; runs in the thread pool."""
         now = datetime.now(UTC)
         result = run_audit(inputs, bootstrap_samples=cfg.bootstrap_samples, now=now)
@@ -382,7 +427,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             price_usd=cfg.price_usd,
             checkout_url=None,
         )
-        db.create_audit(
+        paid = db.create_audit(
             audit_id=result.audit_id,
             created_at=now,
             token_hash=hash_token(token),
@@ -397,8 +442,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             benchmark_csv=uploads["benchmark"],
             variants_csv=uploads["variants"],
             files=extra_files,
+            access_code=access_code,
         )
-        return result.audit_id, token
+        return result.audit_id, token, paid
 
     @app.post("/audits")
     async def create_audit(
@@ -418,6 +464,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         consent: Annotated[str, Form()] = "",
         challenge: Annotated[str, Form()] = "",
         initial_balance: Annotated[str, Form()] = "",
+        access_code: Annotated[str, Form()] = "",
     ) -> Response:
         loc = _locale(locale)
         if consent.lower() not in ("on", "yes", "true", "1"):
@@ -477,13 +524,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         except ValueError:
             return _html_error(request, 400, message("invalid_upload", loc), loc)
         report_name = report_digest_name(report_filename) if uploads["report"] else None
-        audit_id, token = await run_in_threadpool(_run_and_store, inputs, ip, uploads, report_name)
+        # A code is only redeemed where something is locked; in free mode it
+        # is ignored so no credit is spent on a report that is free anyway.
+        code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+        audit_id, token, paid = await run_in_threadpool(
+            _run_and_store, inputs, ip, uploads, report_name, code or None
+        )
         location = f"/audits/{audit_id}?token={token}"
+        if code:
+            location += "&code=" + ("applied" if paid else "rejected")
         if _wants_json(request):
-            return JSONResponse(
-                {"audit_id": audit_id, "token": token, "location": location},
-                status_code=201,
-            )
+            body: dict[str, Any] = {"audit_id": audit_id, "token": token, "location": location}
+            if code:
+                body["access_code"] = "applied" if paid else "rejected"
+            return JSONResponse(body, status_code=201)
         return RedirectResponse(location, status_code=303)
 
     def _load(audit_id: str, token: str | None) -> Any:
@@ -494,15 +548,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise HTTPException(status_code=410, detail="purged")
         return record
 
-    def _report_html(record: Any, token: str) -> str:
+    def _report_html(record: Any, token: str, *, notice: str | None = None) -> str:
         result = AuditResult.model_validate_json(record.result_json)
         unlockable = not record.paid and cfg.stripe_enabled
+        redeemable = not record.paid and cfg.access_codes_enabled
+        publishable = record.paid or cfg.free_mode
         html_text, _ = render(
             result,
             watermark=not record.paid,
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             checkout_url=f"/audits/{record.id}/checkout?token={token}" if unlockable else None,
+            redeem_url=f"/audits/{record.id}/redeem?token={token}" if redeemable else None,
+            publish_url=f"/audits/{record.id}/publish?token={token}" if publishable else None,
+            notice=notice,
         )
         return html_text
 
@@ -516,9 +575,140 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return Response(content=record.result_json, media_type="application/json")
 
     @app.get("/audits/{audit_id}", response_class=HTMLResponse)
-    def audit_page(audit_id: str, token: str | None = None) -> str:
+    def audit_page(audit_id: str, token: str | None = None, code: str | None = None) -> str:
         record = _load(audit_id, token)
-        return _report_html(record, token or "")
+        locale = _record_locale(record)
+        # Only the two known values are shown, so the query cannot inject text.
+        notice = None
+        if code == "applied" and record.paid:
+            notice = message("code_applied", locale)
+        elif code == "rejected" and not record.paid:
+            notice = message("code_rejected", locale)
+        return _report_html(record, token or "", notice=notice)
+
+    def _record_locale(record: Any) -> str:
+        try:
+            return _locale(json.loads(record.declared_json or "{}").get("locale"))
+        except ValueError:
+            return "es"
+
+    @app.post("/audits/{audit_id}/redeem")
+    def redeem(
+        request: Request,
+        audit_id: str,
+        code: Annotated[str, Form()],
+        token: str | None = None,
+    ) -> Response:
+        record = _load(audit_id, token)
+        if not cfg.access_codes_enabled:
+            raise HTTPException(status_code=404, detail="codes_disabled")
+        location = f"/audits/{audit_id}?token={token}"
+        if record.paid:
+            return RedirectResponse(location, status_code=303)
+        # Each attempt counts toward the hourly per-IP limit, like an upload.
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        now = datetime.now(UTC)
+        if _redeem_attempts(ip, now) >= cfg.max_uploads_per_hour_per_ip:
+            locale = _record_locale(record)
+            return _html_error(request, 429, message("rate_limited", locale), locale)
+        applied = db.redeem_for_audit(audit_id, code.strip()[:_CODE_MAX], at=now)
+        outcome = "applied" if applied else "rejected"
+        if _wants_json(request):
+            return JSONResponse({"access_code": outcome})
+        return RedirectResponse(f"{location}&code={outcome}", status_code=303)
+
+    redeem_log: dict[str, list[datetime]] = {}
+    redeem_lock = threading.Lock()
+
+    def _redeem_attempts(ip: str, now: datetime) -> int:
+        """Attempts in the last hour from ``ip``, this one included, plus its uploads."""
+        since = now - timedelta(hours=1)
+        with redeem_lock:
+            recent = [at for at in redeem_log.get(ip, []) if at >= since]
+            recent.append(now)
+            redeem_log[ip] = recent
+            attempts = len(recent) - 1
+        return attempts + db.count_uploads_since(ip, since)
+
+    @app.post("/audits/{audit_id}/publish")
+    def publish(request: Request, audit_id: str, token: str | None = None) -> Response:
+        record = _load(audit_id, token)
+        if not (record.paid or cfg.free_mode):
+            raise HTTPException(status_code=402, detail="publish_locked")
+        publication = db.publish(audit_id, at=datetime.now(UTC))
+        location = f"/v/{publication.public_id}?lang={_record_locale(record)}"
+        if _wants_json(request):
+            return JSONResponse(
+                {"public_id": publication.public_id, "location": location}, status_code=201
+            )
+        return RedirectResponse(location, status_code=303)
+
+    @app.post("/audits/{audit_id}/unpublish")
+    def unpublish(request: Request, audit_id: str, token: str | None = None) -> Response:
+        _load(audit_id, token)
+        removed = db.unpublish(audit_id)
+        if _wants_json(request):
+            return JSONResponse({"unpublished": removed})
+        return RedirectResponse(f"/audits/{audit_id}?token={token}", status_code=303)
+
+    def _published(public_id: str) -> tuple[Any, Any]:
+        publication = db.get_publication(public_id)
+        if publication is None:
+            raise _not_found()
+        record = db.get_audit(publication.audit_id)
+        if record is None:
+            raise _not_found()
+        if record.purged_at or not record.result_json:
+            raise HTTPException(status_code=410, detail="purged")
+        return publication, record
+
+    @app.get("/v/{public_id}/badge.svg")
+    def badge(public_id: str, lang: str | None = None) -> Response:
+        publication, record = _published(public_id)
+        svg = badge_svg(
+            overall=record.overall_class,
+            public_id=publication.public_id,
+            audited_on=record.created_at[:10],
+            locale=_locale(lang),
+        )
+        return Response(content=svg, media_type="image/svg+xml")
+
+    @app.get("/v/{public_id}", response_class=HTMLResponse)
+    def verification(public_id: str, lang: str | None = None) -> str:
+        publication, record = _published(public_id)
+        result = AuditResult.model_validate_json(record.result_json)
+        return verification_page(
+            result.model_dump(mode="json"),
+            public_id=publication.public_id,
+            published_at=publication.created_at,
+            result_sha256=result_sha256(result),
+            base_url=cfg.base_url,
+            locale=_locale(lang),
+        )
+
+    sample_cache: dict[str, str] = {}
+    sample_lock = threading.Lock()
+
+    def _sample_html(locale: str) -> str:
+        """Built once per locale and kept: the input and the clock are fixed."""
+        with sample_lock:
+            if locale not in sample_cache:
+                html_text, _ = render(
+                    sample_result(locale),
+                    watermark=False,
+                    free_mode=True,
+                    notice=SAMPLE_BANNER[locale],
+                )
+                sample_cache[locale] = html_text
+            return sample_cache[locale]
+
+    @app.get("/ejemplo", response_class=HTMLResponse)
+    async def sample_es(lang: str | None = None) -> str:
+        return await run_in_threadpool(_sample_html, _locale(lang or "es"))
+
+    @app.get("/sample", response_class=HTMLResponse)
+    async def sample_en(lang: str | None = None) -> str:
+        return await run_in_threadpool(_sample_html, _locale(lang or "en"))
 
     @app.post("/audits/{audit_id}/checkout")
     def checkout(audit_id: str, token: str | None = None) -> Response:

@@ -1,22 +1,60 @@
-"""Persistence for the audit service: audits, payments, waitlist, retention.
+"""Persistence for the audit service: audits, payments, access codes,
+publications, waitlist, retention.
 
-SQLAlchemy Core over two tables, SQLite by default and Postgres by URL. The
+SQLAlchemy Core over a handful of tables, SQLite by default and Postgres by URL. The
 uploaded bytes are stored so a paid report can be regenerated and so the
 retention purge has something concrete to delete; hashes and the verdict
 class survive the purge so a client can still prove what was audited.
 
 Timestamps are ISO-8601 UTC strings: they sort correctly on every backend
 and never lose their timezone in transit.
+
+Access codes are stored only as their SHA-256: the clear code is returned
+once by ``create_access_code`` and never again. Redemption is one
+conditional ``UPDATE`` in the same transaction that inserts the audit, so two
+uploads racing for the last credit cannot both win.
 """
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 REQUIRE_WEB = 'audit web requires: python -m pip install -e ".[web]"'
+
+#: No 0/O or 1/I/L: a code read aloud over the phone survives.
+CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+CODE_PREFIX = "AUD"
+CODE_GROUPS = 3
+CODE_GROUP_LENGTH = 4
+#: The reference a code-paid audit carries instead of a Stripe session.
+CODE_REFERENCE_PREFIX = "code:"
+
+
+def new_access_code() -> str:
+    """``AUD-XXXX-XXXX-XXXX`` from a CSPRNG (about 59 bits)."""
+    groups = [
+        "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_GROUP_LENGTH))
+        for _ in range(CODE_GROUPS)
+    ]
+    return "-".join([CODE_PREFIX, *groups])
+
+
+def normalise_access_code(code: str) -> str:
+    """Upper case, spaces and dashes ignored, prefix optional: what a client
+    types from a WhatsApp message still matches."""
+    compact = "".join(ch for ch in code.upper() if ch.isalnum())
+    if compact.startswith(CODE_PREFIX):
+        compact = compact[len(CODE_PREFIX) :]
+    return compact
+
+
+def hash_access_code(code: str) -> str:
+    return hashlib.sha256(normalise_access_code(code).encode("utf-8")).hexdigest()
 
 
 def _iso(value: datetime) -> str:
@@ -46,8 +84,36 @@ class AuditRecord:
     files: dict[str, bytes] | None = None
 
 
+@dataclass(frozen=True)
+class AccessCodeRecord:
+    """An access code as the owner may see it: never the code itself."""
+
+    id: str
+    note: str
+    credits_total: int
+    credits_used: int
+    created_at: str
+    expires_at: str | None
+    disabled: bool
+
+    @property
+    def credits_left(self) -> int:
+        return max(0, self.credits_total - self.credits_used)
+
+
+@dataclass(frozen=True)
+class PublicationRecord:
+    public_id: str
+    audit_id: str
+    created_at: str
+
+
+class _RedeemRace(RuntimeError):
+    """Raised inside a transaction to roll back a credit spent for nothing."""
+
+
 class Store:
-    """One engine, two tables, a handful of small transactions."""
+    """One engine, a few tables, a handful of small transactions."""
 
     def __init__(self, url: str) -> None:
         try:
@@ -102,6 +168,27 @@ class Store:
             sa.Column("created_at", sa.String(40), nullable=False),
             sa.Column("note", sa.Text, nullable=False, default=""),
         )
+        self.access_codes = sa.Table(
+            "access_codes",
+            self.metadata,
+            sa.Column("id", sa.String(32), primary_key=True),
+            sa.Column("code_sha256", sa.String(64), nullable=False, unique=True),
+            sa.Column("credits_total", sa.Integer, nullable=False),
+            sa.Column("credits_used", sa.Integer, nullable=False, default=0),
+            sa.Column("note", sa.Text, nullable=False, default=""),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("expires_at", sa.String(40)),
+            sa.Column("disabled", sa.Boolean, nullable=False, default=False),
+        )
+        # One row per published audit; the public id is unrelated to the
+        # audit id so a verification link never opens the private report.
+        self.publications = sa.Table(
+            "publications",
+            self.metadata,
+            sa.Column("public_id", sa.String(32), primary_key=True),
+            sa.Column("audit_id", sa.String(64), nullable=False, unique=True),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
         self.metadata.create_all(self.engine)
 
     # -- audits ------------------------------------------------------------
@@ -122,16 +209,27 @@ class Store:
         benchmark_csv: bytes | None = None,
         variants_csv: bytes | None = None,
         files: dict[str, bytes] | None = None,
-    ) -> None:
+        access_code: str | None = None,
+    ) -> bool:
         """Insert an audit. ``files`` maps a digest name (``report.html``,
-        ``optimization.xml``) to its bytes; its hash comes from ``digests``."""
+        ``optimization.xml``) to its bytes; its hash comes from ``digests``.
+
+        With ``access_code`` one credit is redeemed in the same transaction
+        and the audit is born paid. Returns whether it is paid; a code that is
+        unknown, used up, expired or disabled simply yields ``False``.
+        """
         with self.engine.begin() as conn:
+            code_id = self._redeem(conn, access_code, at=created_at) if access_code else None
             conn.execute(
                 self.audits.insert().values(
                     id=audit_id,
                     created_at=_iso(created_at),
                     token_hash=token_hash,
-                    paid=False,
+                    paid=code_id is not None,
+                    paid_at=_iso(created_at) if code_id is not None else None,
+                    stripe_session_id=(
+                        CODE_REFERENCE_PREFIX + code_id if code_id is not None else None
+                    ),
                     client_ip=client_ip,
                     declared_json=declared_json,
                     result_json=result_json,
@@ -153,6 +251,7 @@ class Store:
                         audit_id=audit_id, name=name, sha256=digests[name], data=data
                     )
                 )
+        return code_id is not None
 
     def get_audit(self, audit_id: str, *, with_blobs: bool = False) -> AuditRecord | None:
         with self.engine.connect() as conn:
@@ -222,6 +321,40 @@ class Store:
             )
             return bool(result.rowcount)
 
+    def redeem_for_audit(self, audit_id: str, code: str, *, at: datetime) -> bool:
+        """Unlock an existing unpaid audit with one credit of ``code``.
+
+        Both updates share one transaction: a credit is spent only when the
+        audit flips to paid, and an already paid audit spends nothing.
+        """
+        try:
+            with self.engine.begin() as conn:
+                unpaid = conn.execute(
+                    self._sa.select(self.audits.c.id)
+                    .where(self.audits.c.id == audit_id)
+                    .where(self.audits.c.paid.is_(False))
+                ).first()
+                if unpaid is None:
+                    return False
+                code_id = self._redeem(conn, code, at=at)
+                if code_id is None:
+                    return False
+                result = conn.execute(
+                    self.audits.update()
+                    .where(self.audits.c.id == audit_id)
+                    .where(self.audits.c.paid.is_(False))
+                    .values(
+                        paid=True,
+                        paid_at=_iso(at),
+                        stripe_session_id=CODE_REFERENCE_PREFIX + code_id,
+                    )
+                )
+                if not result.rowcount:
+                    raise _RedeemRace()
+                return True
+        except _RedeemRace:  # pragma: no cover - lost a race; the credit rolled back
+            return False
+
     def count_uploads_since(self, client_ip: str, since: datetime) -> int:
         sa = self._sa
         with self.engine.connect() as conn:
@@ -238,6 +371,153 @@ class Store:
         with self.engine.connect() as conn:
             value = conn.execute(sa.select(sa.func.count()).select_from(self.audits)).scalar()
         return int(value or 0)
+
+    # -- access codes ------------------------------------------------------
+    def create_access_code(
+        self,
+        *,
+        credits: int,
+        note: str,
+        at: datetime,
+        expires_days: int | None = None,
+    ) -> tuple[str, AccessCodeRecord]:
+        """A new code and its record. The clear code exists only in the
+        return value: print it once and hand it to the client."""
+        if credits < 1:
+            raise ValueError("credits must be at least 1")
+        if expires_days is not None and expires_days < 1:
+            raise ValueError("expires_days must be at least 1")
+        code = new_access_code()
+        code_id = secrets.token_hex(6)
+        expires = _iso(at + timedelta(days=expires_days)) if expires_days else None
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.access_codes.insert().values(
+                    id=code_id,
+                    code_sha256=hash_access_code(code),
+                    credits_total=credits,
+                    credits_used=0,
+                    note=note,
+                    created_at=_iso(at),
+                    expires_at=expires,
+                    disabled=False,
+                )
+            )
+        record = AccessCodeRecord(
+            id=code_id,
+            note=note,
+            credits_total=credits,
+            credits_used=0,
+            created_at=_iso(at),
+            expires_at=expires,
+            disabled=False,
+        )
+        return code, record
+
+    def list_access_codes(self) -> list[AccessCodeRecord]:
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    self._sa.select(self.access_codes).order_by(
+                        self.access_codes.c.created_at, self.access_codes.c.id
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            AccessCodeRecord(
+                id=row["id"],
+                note=row["note"],
+                credits_total=int(row["credits_total"]),
+                credits_used=int(row["credits_used"]),
+                created_at=row["created_at"],
+                expires_at=row["expires_at"],
+                disabled=bool(row["disabled"]),
+            )
+            for row in rows
+        ]
+
+    def disable_access_code(self, code_id: str) -> bool:
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                self.access_codes.update()
+                .where(self.access_codes.c.id == code_id)
+                .where(self.access_codes.c.disabled.is_(False))
+                .values(disabled=True)
+            )
+            return bool(result.rowcount)
+
+    def _redeem(self, conn: Any, code: str, *, at: datetime) -> str | None:
+        """Spend one credit inside ``conn``'s transaction; the code's id or ``None``.
+
+        The conditions live in the ``UPDATE`` itself, so the check and the
+        spend are one statement: no read-then-write window.
+        """
+        if not normalise_access_code(code):
+            return None
+        table = self.access_codes
+        digest = hash_access_code(code)
+        now = _iso(at)
+        condition = (
+            (table.c.code_sha256 == digest)
+            & (table.c.credits_used < table.c.credits_total)
+            & (table.c.disabled.is_(False))
+            & ((table.c.expires_at.is_(None)) | (table.c.expires_at > now))
+        )
+        result = conn.execute(
+            table.update().where(condition).values(credits_used=table.c.credits_used + 1)
+        )
+        if not result.rowcount:
+            return None
+        row = conn.execute(self._sa.select(table.c.id).where(table.c.code_sha256 == digest)).first()
+        return str(row[0]) if row else None
+
+    # -- publications ------------------------------------------------------
+    def publish(self, audit_id: str, *, at: datetime) -> PublicationRecord:
+        """The audit's publication, created on first call (idempotent)."""
+        existing = self.publication_for_audit(audit_id)
+        if existing is not None:
+            return existing
+        public_id = secrets.token_urlsafe(9)
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.publications.insert().values(
+                        public_id=public_id, audit_id=audit_id, created_at=_iso(at)
+                    )
+                )
+        except self._sa.exc.IntegrityError:
+            # A concurrent publish won; return its row.
+            winner = self.publication_for_audit(audit_id)
+            if winner is None:  # pragma: no cover - the constraint says it exists
+                raise
+            return winner
+        return PublicationRecord(public_id=public_id, audit_id=audit_id, created_at=_iso(at))
+
+    def unpublish(self, audit_id: str) -> bool:
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                self.publications.delete().where(self.publications.c.audit_id == audit_id)
+            )
+            return bool(result.rowcount)
+
+    def publication_for_audit(self, audit_id: str) -> PublicationRecord | None:
+        return self._publication(self.publications.c.audit_id == audit_id)
+
+    def get_publication(self, public_id: str) -> PublicationRecord | None:
+        return self._publication(self.publications.c.public_id == public_id)
+
+    def _publication(self, condition: Any) -> PublicationRecord | None:
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(self._sa.select(self.publications).where(condition)).mappings().first()
+            )
+        if row is None:
+            return None
+        return PublicationRecord(
+            public_id=row["public_id"], audit_id=row["audit_id"], created_at=row["created_at"]
+        )
 
     # -- waitlist ----------------------------------------------------------
     def add_waitlist(self, email: str, *, at: datetime, note: str = "") -> bool:
@@ -307,4 +587,15 @@ def make_store(url: str) -> Store:
     return Store(url)
 
 
-__all__ = ["REQUIRE_WEB", "AuditRecord", "Store", "make_store"]
+__all__ = [
+    "CODE_REFERENCE_PREFIX",
+    "REQUIRE_WEB",
+    "AccessCodeRecord",
+    "AuditRecord",
+    "PublicationRecord",
+    "Store",
+    "hash_access_code",
+    "make_store",
+    "new_access_code",
+    "normalise_access_code",
+]

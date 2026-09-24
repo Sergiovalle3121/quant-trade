@@ -191,9 +191,16 @@ quant-trade audit run --equity examples/audit/sample_equity.csv \
 python -m pip install -e ".[dev,web]" && quant-trade audit serve   # web form on :8000
 ```
 
+It reads the file the trader already has (MetaTrader 4/5 HTML reports,
+TradingView CSV/XLSX, NinjaTrader, QuantConnect, backtesting.py, vectorbt)
+and the MT5 optimisation XML, whose passes become the measured number of
+trials. The web adds a synthetic sample report (`/ejemplo`), public
+verification pages with a badge (`/v/{id}`), and access codes for selling
+without Stripe (`quant-trade audit codes create --credits N --note X`).
+
 `Dockerfile.web` and `railway.json` deploy the service on Railway in free
-mode (watermarked reports); Stripe payments switch on only when every
-Stripe variable is set. `docs/AUDIT_SAAS.md` has the estimators, thresholds,
+mode (watermarked reports); paid mode switches on only when every Stripe
+variable is set or the owner opts into access codes. `docs/AUDIT_SAAS.md` has the estimators, thresholds,
 assumptions and the deployment steps; `docs/AUDIT_TERMS_TEMPLATE.md` is a
 terms-of-service template to have reviewed before charging.
 

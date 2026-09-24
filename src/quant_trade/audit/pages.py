@@ -1,4 +1,5 @@
-"""Static HTML for the audit service: landing, upload form, error page.
+"""Static HTML for the audit service: landing, upload form, error page, the
+public verification page and its badge.
 
 Plain strings with ``html.escape`` on every dynamic value, no template
 engine, no JavaScript. The copy avoids every profit-claim pattern the guard
@@ -11,7 +12,53 @@ import html
 from typing import Any
 
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
-from quant_trade.audit.report import DISCLAIMER
+from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
+from quant_trade.audit.verdict import class_text, meaning
+
+#: The fixed wording of the badge and of the verification page's notice. It
+#: states what the audit is and denies what it is not; it never mentions
+#: growth, return or profit. Changing it needs a test and a line in
+#: docs/AUDIT_SAAS.md.
+BADGE_NOTICE: dict[str, str] = {
+    "es": (
+        "Auditoría estadística de datos aportados – no verificados con el bróker – "
+        "no garantiza resultados"
+    ),
+    "en": (
+        "Statistical audit of supplied data – not verified with a broker – "
+        "not a performance guarantee"
+    ),
+}
+
+VERIFICATION_NOTICE: dict[str, str] = {
+    "es": (
+        "Esta página resume una auditoría estadística de datos que aportó el cliente, no "
+        "verificados con el bróker. La clase describe la evidencia que había en el archivo "
+        "auditado en la fecha indicada; no garantiza resultados futuros, no es asesoría de "
+        "inversión y no avala a ningún vendedor ni producto. Los hashes permiten comprobar "
+        "que un archivo es exactamente el que se auditó."
+    ),
+    "en": (
+        "This page summarises a statistical audit of data the client supplied, not verified "
+        "with a broker. The class describes the evidence in the audited file on the date "
+        "shown; it is not a guarantee of future results, not investment advice and not an "
+        "endorsement of any vendor or product. The hashes let anyone check that a file is "
+        "exactly the one that was audited."
+    ),
+}
+
+SAMPLE_BANNER: dict[str, str] = {
+    "es": (
+        "Informe de ejemplo con datos sintéticos generados por ordenador: no es la cuenta ni "
+        "la estrategia de nadie. Así se ve un informe completo."
+    ),
+    "en": (
+        "Sample report built from computer-generated synthetic data: it is nobody's account "
+        "or strategy. This is what a full report looks like."
+    ),
+}
+
+CLASS_COLOURS: dict[str, str] = {"A": "#1b5e20", "B": "#2e7d32", "C": "#b26a00", "D": "#8b1a10"}
 
 _CSS = """
 body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:auto;padding:24px;
@@ -29,6 +76,18 @@ border-radius:6px;margin:.6em 0}.error{background:#fde2e1;color:#8b1a10;padding:
 border-radius:6px;margin:.6em 0}.disclaimer{background:#f7f7f7;border-left:4px solid #999;
 padding:10px 14px;margin:1.6em 0;font-size:.9rem}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+table{border-collapse:collapse;width:100%;margin:.4em 0;font-size:.92rem}
+th,td{border:1px solid #e3e3e3;padding:5px 8px;text-align:left;vertical-align:top}
+th{background:#f5f5f5}code{font-size:.85em;word-break:break-all}
+.cls{display:inline-block;font-size:2.4rem;font-weight:800;color:#fff;border-radius:8px;
+padding:2px 16px;margin-right:12px;vertical-align:middle}
+.status{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.8rem;font-weight:600;
+background:#eee;color:#333}.steps li{margin:.3em 0}
+.prices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.prices div{border:1px solid #ddd;border-radius:8px;padding:10px 14px}
+@media (max-width:640px){.prices{grid-template-columns:1fr}}
+details{border-bottom:1px solid #eee;padding:.4em 0}summary{font-weight:600;cursor:pointer}
+pre{white-space:pre-wrap;word-break:break-all;background:#f7f7f7;padding:8px 10px;border-radius:6px}
 @media (max-width:640px){.grid{grid-template-columns:1fr}}
 """
 
@@ -99,6 +158,99 @@ _COPY: dict[str, dict[str, Any]] = {
         "error_title": "No se pudo auditar",
         "back": "Volver",
         "disclaimer": "Aviso",
+        "sample_link": "Ver un informe de ejemplo completo (datos sintéticos)",
+        "how_title": "Cómo funciona",
+        "how": [
+            "Sube el informe de tu plataforma tal cual y, si lo tienes, el XML de optimización.",
+            "Recibe al momento la clase de A a D, las gráficas y qué significa cada dimensión "
+            "en lenguaje llano.",
+            "Si quieres todos los números, desbloquea el informe completo.",
+            "Si quieres, publica una página de verificación con sello para compartirla.",
+        ],
+        "prices_title": "Precios",
+        "price_free_title": "Vista previa: gratis",
+        "price_free": (
+            "Clase de A a D, explicación de cada dimensión, gráficas, banderas rojas y hashes."
+        ),
+        "price_full_title": "Informe completo: USD {price:.0f}",
+        "price_full": (
+            "Todo el detalle numérico sin marca de agua, simulador de reto, riesgo remuestreado, "
+            "preguntas para el vendedor y página de verificación pública con sello."
+        ),
+        "price_free_mode": (
+            "Ahora mismo el servicio está en modo gratuito: el informe completo se entrega con "
+            "marca de agua y sin coste."
+        ),
+        "pay_card": "Pago con tarjeta desde el propio informe.",
+        "pay_code": (
+            "Pago por transferencia, Mercado Pago o WhatsApp: recibes un código de acceso y lo "
+            "escribes en el formulario o en el informe."
+        ),
+        "contact": "Pedir un código",
+        "faq_title": "Preguntas frecuentes",
+        "faq": [
+            (
+                "¿Qué archivo subo?",
+                "El informe de tu plataforma tal cual: MetaTrader 5 o 4 (HTML), TradingView "
+                "(CSV o XLSX), NinjaTrader, QuantConnect, backtesting.py o vectorbt. También "
+                "sirve una curva de equity en CSV.",
+            ),
+            (
+                "¿Por qué subir el XML de optimización de MT5?",
+                "Porque cuenta las configuraciones que probaste. Con ese número real, el Sharpe "
+                "deflactado descuenta la suerte de haber elegido la mejor entre muchas.",
+            ),
+            (
+                "¿Qué significan MEASURED, DECLARED y NOT_MEASURED?",
+                "MEASURED se calculó desde tu archivo; DECLARED lo indicaste tú y no se pudo "
+                "comprobar; NOT_MEASURED no se pudo calcular con lo que subiste.",
+            ),
+            (
+                "¿Esto predice resultados o el desenlace de un reto de prop firm?",
+                "No. Mide la evidencia estadística del archivo que subes. El simulador de retos "
+                "y el riesgo remuestreado son estimaciones sobre tu propio historial, con sus "
+                "supuestos escritos, no predicciones.",
+            ),
+            (
+                "¿Comprobáis mis operaciones con el bróker?",
+                "No. Auditamos los datos que aportas; no nos conectamos a ningún bróker ni "
+                "pedimos claves. Por eso el sello dice que los datos no están comprobados con "
+                "el bróker.",
+            ),
+            (
+                "¿Qué pasa con mi archivo?",
+                "Se guarda para poder regenerar tu informe. Si no pagas, se borra a los "
+                "{retention} días y solo quedan la clase y los hashes. Nunca se publica: la "
+                "página de verificación muestra la clase, las dimensiones y los hashes, y solo "
+                "si tú la publicas.",
+            ),
+            (
+                "¿Cómo se usa el sello?",
+                "Publica la verificación desde tu informe y copia el código del sello en tu web, "
+                "Telegram o foro. El sello describe una auditoría estadística; no es una promesa "
+                "de resultados y no debe presentarse como tal.",
+            ),
+        ],
+        "v_title": "Verificación pública de auditoría",
+        "v_class": "Clase",
+        "v_audited": "Fecha de la auditoría",
+        "v_published": "Publicada",
+        "v_dimensions": "Dimensiones",
+        "v_dimension": "Dimensión",
+        "v_status": "Resultado",
+        "v_meaning": "Qué significa",
+        "v_inputs": "Hashes de los archivos auditados (SHA-256)",
+        "v_details": "Datos de la auditoría",
+        "v_format": "Formato del archivo",
+        "v_engine": "Motor",
+        "v_trials_declared": "Intentos declarados",
+        "v_trials_used": "Intentos usados en el Sharpe deflactado",
+        "v_result_sha": "SHA-256 del resultado",
+        "v_notice": "Aviso",
+        "v_badge": "Sello para tu web",
+        "v_badge_help": "Copia este código en tu web, Telegram o foro:",
+        "access_code": "Código de acceso (opcional)",
+        "access_code_help": "Si compraste un código, escríbelo y el informe nace completo.",
     },
     "en": {
         "title": "Backtest audit",
@@ -167,6 +319,96 @@ _COPY: dict[str, dict[str, Any]] = {
         "error_title": "Could not audit",
         "back": "Back",
         "disclaimer": "Notice",
+        "sample_link": "See a full sample report (synthetic data)",
+        "how_title": "How it works",
+        "how": [
+            "Upload your platform report as it is and, if you have it, the optimisation XML.",
+            "Get the A to D class, the charts and what each dimension means in plain language "
+            "right away.",
+            "If you want every number, unlock the full report.",
+            "If you want, publish a verification page with a badge to share it.",
+        ],
+        "prices_title": "Pricing",
+        "price_free_title": "Preview: free",
+        "price_free": ("A to D class, what each dimension means, charts, red flags and hashes."),
+        "price_full_title": "Full report: USD {price:.0f}",
+        "price_full": (
+            "Every number without a watermark, challenge simulator, resampled risk, questions "
+            "for the vendor and a public verification page with a badge."
+        ),
+        "price_free_mode": (
+            "The service is in free mode right now: the full report is delivered with a "
+            "watermark at no cost."
+        ),
+        "pay_card": "Card payment from the report itself.",
+        "pay_code": (
+            "Pay by bank transfer, Mercado Pago or WhatsApp: you receive an access code and "
+            "enter it in the form or in the report."
+        ),
+        "contact": "Ask for a code",
+        "faq_title": "Frequently asked questions",
+        "faq": [
+            (
+                "Which file do I upload?",
+                "Your platform report as it is: MetaTrader 5 or 4 (HTML), TradingView (CSV or "
+                "XLSX), NinjaTrader, QuantConnect, backtesting.py or vectorbt. An equity curve "
+                "in CSV works too.",
+            ),
+            (
+                "Why upload the MT5 optimisation XML?",
+                "Because it counts the configurations you tried. With that real number, the "
+                "deflated Sharpe discounts the luck of picking the best of many.",
+            ),
+            (
+                "What do MEASURED, DECLARED and NOT_MEASURED mean?",
+                "MEASURED was computed from your file; DECLARED is what you stated and could not "
+                "be checked; NOT_MEASURED could not be computed from what you uploaded.",
+            ),
+            (
+                "Does this predict results or the outcome of a prop-firm challenge?",
+                "No. It measures the statistical evidence in the file you upload. The challenge "
+                "simulator and the resampled risk are estimates from your own history, with "
+                "their assumptions written down, not predictions.",
+            ),
+            (
+                "Do you check my trades with the broker?",
+                "No. We audit the data you supply; we connect to no broker and ask for no keys. "
+                "That is why the badge says the data was not checked with a broker.",
+            ),
+            (
+                "What happens to my file?",
+                "It is kept so your report can be regenerated. If unpaid it is deleted after "
+                "{retention} days and only the class and the hashes remain. It is never "
+                "published: the verification page shows the class, the dimensions and the "
+                "hashes, and only if you publish it.",
+            ),
+            (
+                "How is the badge used?",
+                "Publish the verification from your report and copy the badge code to your "
+                "site, Telegram or forum. The badge describes a statistical audit; it is not a "
+                "promise of results and must not be presented as one.",
+            ),
+        ],
+        "v_title": "Public audit verification",
+        "v_class": "Class",
+        "v_audited": "Audit date",
+        "v_published": "Published",
+        "v_dimensions": "Dimensions",
+        "v_dimension": "Dimension",
+        "v_status": "Result",
+        "v_meaning": "What it means",
+        "v_inputs": "Hashes of the audited files (SHA-256)",
+        "v_details": "Audit details",
+        "v_format": "File format",
+        "v_engine": "Engine",
+        "v_trials_declared": "Trials declared",
+        "v_trials_used": "Trials used in the deflated Sharpe",
+        "v_result_sha": "SHA-256 of the result",
+        "v_notice": "Notice",
+        "v_badge": "Badge for your site",
+        "v_badge_help": "Copy this code to your site, Telegram or forum:",
+        "access_code": "Access code (optional)",
+        "access_code_help": "If you bought a code, enter it and the report is born complete.",
     },
 }
 
@@ -208,12 +450,24 @@ def landing(
     price_usd: float = 0.0,
     joined: bool = False,
     error: str | None = None,
+    access_codes: bool = False,
+    card_payments: bool = False,
+    contact_url: str = "",
+    retention_days: int = 30,
 ) -> str:
     locale = locale if locale in _COPY else "es"
     copy = _COPY[locale]
     other = "en" if locale == "es" else "es"
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
     measure = "".join(f"<li>{_e(item)}</li>" for item in copy["measure"])
+    sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
+    code_field = ""
+    if access_codes:
+        code_field = (
+            f"<label>{_e(copy['access_code'])}</label><input type='text' name='access_code' "
+            "maxlength='40' autocomplete='off' placeholder='AUD-XXXX-XXXX-XXXX'>"
+            f"<div class='muted'>{_e(copy['access_code_help'])}</div>"
+        )
     flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
     selected = {"es": "", "en": ""}
@@ -224,7 +478,17 @@ def landing(
         "</a></p>"
         + f"<h1>{_e(copy['headline'])}</h1><p>{_e(copy['pitch'])}</p>"
         + f"<h2>{_e(copy['measure_title'])}</h2><ul>{measure}</ul>"
+        + f"<p><a href='{_e(sample)}'>{_e(copy['sample_link'])}</a></p>"
         + f"<h2>{_e(copy['not_title'])}</h2><p>{_e(copy['not'])}</p>"
+        + _how_html(copy)
+        + _prices_html(
+            copy,
+            free_mode=free_mode,
+            price_usd=price_usd,
+            access_codes=access_codes,
+            card_payments=card_payments,
+            contact_url=contact_url,
+        )
         + f"<h2>{_e(copy['form_title'])}</h2>{flash}{err}<p class='muted'>{_e(note)}</p>"
         + "<form method='post' action='/audits' enctype='multipart/form-data'>"
         + f"<label>{_e(copy['report'])}</label><input type='file' name='report' "
@@ -261,6 +525,7 @@ def landing(
         f"<option value='es'{selected['es']}>Español</option>"
         f"<option value='en'{selected['en']}>English</option></select></div>"
         + "</div>"
+        + code_field
         + f"<label>{_e(copy['description'])}</label><textarea name='description' rows='3' "
         "maxlength='2000'></textarea>"
         + f"<label><input type='checkbox' name='consent' value='on' required> {_e(copy['consent'])}"
@@ -269,7 +534,166 @@ def landing(
         + f"<h2>{_e(copy['waitlist_title'])}</h2><form method='post' action='/waitlist'>"
         f"<label>{_e(copy['email'])}</label><input type='email' name='email' required>"
         f"<input type='hidden' name='lang' value='{_e(locale)}'>"
-        f"<button type='submit'>{_e(copy['join'])}</button></form>" + _footer(locale)
+        f"<button type='submit'>{_e(copy['join'])}</button></form>"
+        + _faq_html(copy, retention_days=retention_days)
+        + _footer(locale)
+    )
+
+
+def _how_html(copy: dict[str, Any]) -> str:
+    steps = "".join(f"<li>{_e(step)}</li>" for step in copy["how"])
+    return f"<h2>{_e(copy['how_title'])}</h2><ol class='steps'>{steps}</ol>"
+
+
+def _prices_html(
+    copy: dict[str, Any],
+    *,
+    free_mode: bool,
+    price_usd: float,
+    access_codes: bool,
+    card_payments: bool,
+    contact_url: str,
+) -> str:
+    if free_mode:
+        return f"<h2>{_e(copy['prices_title'])}</h2><p>{_e(copy['price_free_mode'])}</p>"
+    ways = []
+    if card_payments:
+        ways.append(f"<li>{_e(copy['pay_card'])}</li>")
+    if access_codes:
+        link = (
+            f" <a href='{_e(contact_url)}' rel='noopener'>{_e(copy['contact'])}</a>"
+            if contact_url
+            else ""
+        )
+        ways.append(f"<li>{_e(copy['pay_code'])}{link}</li>")
+    return (
+        f"<h2>{_e(copy['prices_title'])}</h2><div class='prices'>"
+        f"<div><strong>{_e(copy['price_free_title'])}</strong><p>{_e(copy['price_free'])}</p>"
+        "</div>"
+        f"<div><strong>{_e(copy['price_full_title'].format(price=price_usd))}</strong>"
+        f"<p>{_e(copy['price_full'])}</p></div></div>"
+        + (f"<ul>{''.join(ways)}</ul>" if ways else "")
+    )
+
+
+def _faq_html(copy: dict[str, Any], *, retention_days: int) -> str:
+    items = "".join(
+        f"<details><summary>{_e(question)}</summary>"
+        f"<p>{_e(answer.format(retention=retention_days))}</p></details>"
+        for question, answer in copy["faq"]
+    )
+    return f"<h2>{_e(copy['faq_title'])}</h2>{items}"
+
+
+def _evidence_value(item: Any) -> str:
+    if isinstance(item, dict) and "value" in item:
+        return f"{item.get('value')} ({item.get('evidence', '')})"
+    return "-" if item is None else str(item)
+
+
+def verification_page(
+    result: dict[str, Any],
+    *,
+    public_id: str,
+    published_at: str,
+    result_sha256: str,
+    base_url: str,
+    locale: str = "es",
+) -> str:
+    """The public page of a published audit.
+
+    Built from an allow-list of fields: class, dates, dimension statuses with
+    their fixed plain-language text, input hashes, source format, engine,
+    trial counts and a fixed notice. The description, trades, files and
+    token are never read here, so they cannot leak.
+    """
+    locale = locale if locale in _COPY else "es"
+    copy = _COPY[locale]
+    other = "en" if locale == "es" else "es"
+    verdict = result["verdict"]
+    overall = str(verdict["overall"])
+    titles = DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"])
+    statuses = STATUS_TEXT.get(locale, STATUS_TEXT["es"])
+    rows = "".join(
+        f"<tr><td>{_e(titles.get(d['name'], d['name']))}</td>"
+        f"<td><span class='status'>{_e(statuses.get(d['status'], d['status']))}</span></td>"
+        f"<td>{_e(meaning(d['name'], d['status'], locale))}</td></tr>"
+        for d in verdict["dimensions"]
+    )
+    inputs = result.get("inputs", {})
+    digests = dict(inputs.get("digests", {}))
+    if inputs.get("dataset_digest"):
+        digests["dataset_digest"] = inputs["dataset_digest"]
+    digest_rows = "".join(
+        f"<tr><td>{_e(name)}</td><td><code>{_e(value)}</code></td></tr>"
+        for name, value in digests.items()
+    )
+    engine = result.get("engine", {})
+    declared = result.get("declared", {})
+    trials_used = result.get("multiplicity", {}).get("trials_used")
+    details = [
+        (copy["v_format"], inputs.get("source_format") or inputs.get("source") or "-"),
+        (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
+        (copy["v_trials_declared"], _evidence_value(declared.get("trials"))),
+        (copy["v_trials_used"], _evidence_value(trials_used)),
+        (copy["v_result_sha"], result_sha256),
+    ]
+    detail_rows = "".join(
+        f"<tr><td>{_e(label)}</td><td><code>{_e(value)}</code></td></tr>"
+        for label, value in details
+    )
+    page_url = f"{base_url}/v/{public_id}"
+    badge_url = f"{page_url}/badge.svg?lang={locale}"
+    snippet = (
+        f"<a href='{page_url}'><img src='{badge_url}' alt='{BADGE_NOTICE[locale]}' "
+        "width='480' height='72'></a>"
+    )
+    colour = CLASS_COLOURS.get(overall, "#333")
+    return (
+        _head(f"{copy['v_title']} · {overall}", locale)
+        + f"<p class='muted'><a href='/v/{_e(public_id)}?lang={other}'>"
+        f"{'English' if locale == 'es' else 'Español'}</a></p>"
+        + f"<h1>{_e(copy['v_title'])}</h1>"
+        + f"<p><span class='cls' style='background:{colour}'>{_e(overall)}</span>"
+        f"{_e(class_text(overall, locale))}</p>"
+        + f"<p class='muted'>{_e(copy['v_audited'])}: {_e(result.get('generated_at_utc', ''))}"
+        f" · {_e(copy['v_published'])}: {_e(published_at)} · ID <code>{_e(public_id)}</code></p>"
+        + f"<div class='disclaimer'><strong>{_e(copy['v_notice'])}.</strong> "
+        f"{_e(VERIFICATION_NOTICE[locale])}</div>"
+        + f"<h2>{_e(copy['v_dimensions'])}</h2><table><tr><th>{_e(copy['v_dimension'])}</th>"
+        f"<th>{_e(copy['v_status'])}</th><th>{_e(copy['v_meaning'])}</th></tr>{rows}</table>"
+        + f"<h2>{_e(copy['v_inputs'])}</h2><table>{digest_rows}</table>"
+        + f"<h2>{_e(copy['v_details'])}</h2><table>{detail_rows}</table>"
+        + f"<h2>{_e(copy['v_badge'])}</h2>"
+        f"<p><img src='/v/{_e(public_id)}/badge.svg?lang={_e(locale)}' "
+        f"alt='{_e(BADGE_NOTICE[locale])}' width='480' height='72'></p>"
+        f"<p class='muted'>{_e(copy['v_badge_help'])}</p><pre><code>{_e(snippet)}</code></pre>"
+        + _footer(locale)
+    )
+
+
+def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "es") -> str:
+    """The badge: class, id, date and the fixed notice. Never a return figure."""
+    locale = locale if locale in BADGE_NOTICE else "es"
+    title = "Auditoría de backtest" if locale == "es" else "Backtest audit"
+    label = "Clase" if locale == "es" else "Class"
+    colour = CLASS_COLOURS.get(overall, "#333")
+    notice = BADGE_NOTICE[locale]
+    return (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='480' height='72' viewBox='0 0 480 72' "
+        f"role='img' aria-label='{_e(f'{title} · {label} {overall} · {notice}')}'>"
+        f"<title>{_e(f'{title} · {label} {overall} · {notice}')}</title>"
+        "<rect width='480' height='72' rx='8' fill='#ffffff' stroke='#999'/>"
+        f"<rect width='72' height='72' rx='8' fill='{colour}'/>"
+        "<text x='36' y='50' font-family='Segoe UI,Roboto,Arial,sans-serif' font-size='40' "
+        f"font-weight='800' fill='#fff' text-anchor='middle'>{_e(overall)}</text>"
+        "<text x='84' y='24' font-family='Segoe UI,Roboto,Arial,sans-serif' font-size='15' "
+        f"font-weight='700' fill='#1a1a1a'>{_e(title)} · {_e(label)} {_e(overall)}</text>"
+        "<text x='84' y='42' font-family='Segoe UI,Roboto,Arial,sans-serif' font-size='11' "
+        f"fill='#444'>{_e(audited_on)} · ID {_e(public_id)}</text>"
+        "<text x='84' y='60' font-family='Segoe UI,Roboto,Arial,sans-serif' font-size='9' "
+        f"fill='#666' textLength='388' lengthAdjust='spacingAndGlyphs'>{_e(notice)}</text>"
+        "</svg>"
     )
 
 
@@ -284,4 +708,12 @@ def error_page(message: str, *, locale: str = "es") -> str:
     )
 
 
-__all__ = ["error_page", "landing"]
+__all__ = [
+    "BADGE_NOTICE",
+    "SAMPLE_BANNER",
+    "VERIFICATION_NOTICE",
+    "badge_svg",
+    "error_page",
+    "landing",
+    "verification_page",
+]
