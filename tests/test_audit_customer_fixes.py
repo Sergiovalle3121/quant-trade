@@ -112,3 +112,45 @@ def test_landing_counts_every_red_flag(tmp_path: Path, path: str) -> None:
         follow_redirects=False,
     )
     assert blank.status_code == 303
+
+
+def test_short_histories_do_not_get_an_annual_return() -> None:
+    short = run_audit(
+        build_inputs(csv_bytes(positive_drift(40)), DeclaredMetadata()),
+        now=NOW,
+        audit_id="c1",
+        bootstrap_samples=50,
+    )
+    assert short.performance["cagr"]["evidence"] == NOT_MEASURED
+    assert "menos de un año" in render_html(short, watermark=False)
+    long = run_audit(
+        build_inputs(csv_bytes(positive_drift(400)), DeclaredMetadata()),
+        now=NOW,
+        audit_id="c2",
+        bootstrap_samples=50,
+    )
+    assert long.performance["cagr"]["evidence"] != NOT_MEASURED
+
+
+def test_spanish_reports_carry_no_internal_keys() -> None:
+    from audit_fixtures import synthetic_mt5_report
+
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(trials=3),
+        report_bytes=synthetic_mt5_report(),
+        report_filename="r.html",
+    )
+    page = render_html(
+        run_audit(inputs, now=NOW, audit_id="k1", bootstrap_samples=50), watermark=False
+    )
+    for key in (
+        "sharpe_per_period",
+        "trials_used",
+        "break_even_bps",
+        "dataset_digest",
+        "mt5_tester_html",
+        "method=",
+        "samples=",
+    ):
+        assert key not in page.split("<script")[0].replace("id='", ""), key

@@ -260,6 +260,11 @@ optimisation export, variants in a vectorbt report); the latter is tagged
 MEASURED. `TRIALS_BELOW_VARIANTS` warns when the declaration is lower; it
 stays silent when the customer left trials blank, since nothing was declared.
 
+Annual return: the compound annual return is NOT_MEASURED when the history
+spans less than a year (`engine.MIN_CAGR_DAYS = 365`); compounding a few
+good weeks into a year prints a return nobody earned, and the total return
+already says what happened.
+
 ## The verdict
 
 Six dimensions, each PASS, WEAK, FAIL, NOT_MEASURED or NOT_APPLICABLE, and a

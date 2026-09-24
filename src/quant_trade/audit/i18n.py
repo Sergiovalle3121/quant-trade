@@ -382,6 +382,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("no long trades", "no hay operaciones largas"),
     ("no short trades", "no hay operaciones cortas"),
     ("no trades uploaded", "no se subieron operaciones"),
+    (
+        "under a year of history; annualising it would exaggerate",
+        "menos de un año de historial; anualizarlo lo exageraría",
+    ),
     ("no variants uploaded", "no se subió la matriz de variantes"),
     ("fewer than ten returns", "menos de diez retornos"),
     (

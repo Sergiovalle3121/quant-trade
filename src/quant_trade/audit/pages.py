@@ -24,7 +24,7 @@ from quant_trade.audit.guides import (
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.redflags import FLAG_TITLES
-from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
+from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, SOURCE_NAMES, STATUS_TEXT
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.theme import (
@@ -1531,7 +1531,13 @@ def verification_page(
     declared = result.get("declared", {})
     trials_used = result.get("multiplicity", {}).get("trials_used")
     details = [
-        (copy["v_format"], inputs.get("source_format") or inputs.get("source") or "-"),
+        (
+            copy["v_format"],
+            SOURCE_NAMES.get(str(inputs.get("source_format")), "")
+            or inputs.get("source_format")
+            or inputs.get("source")
+            or "-",
+        ),
         (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
         (copy["v_trials_declared"], _evidence_value(declared.get("trials"))),
         (copy["v_trials_used"], _evidence_value(trials_used)),

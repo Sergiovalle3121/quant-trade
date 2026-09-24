@@ -111,6 +111,10 @@ def _annualised_sharpe(returns: pd.Series, ppy: float) -> float:
     return redflags.annualised_sharpe(returns, ppy)
 
 
+#: Shortest history whose compound annual return is reported.
+MIN_CAGR_DAYS = 365
+
+
 def _performance(frame: pd.DataFrame, trades: list[Any]) -> dict[str, Any]:
     metrics = calculate_performance(frame[["timestamp", "equity"]], trades)
     keys = (
@@ -124,6 +128,11 @@ def _performance(frame: pd.DataFrame, trades: list[Any]) -> dict[str, Any]:
         "trade_count",
     )
     out = {key: measured(metrics[key]) for key in keys}
+    span_days = (frame["timestamp"].iloc[-1] - frame["timestamp"].iloc[0]).days
+    if span_days < MIN_CAGR_DAYS:
+        # Compounding five good weeks into a year prints a four-digit
+        # "annual" return nobody earned; the total return says it plainly.
+        out["cagr"] = not_measured("under a year of history; annualising it would exaggerate")
     if not trades:
         out["win_rate"] = not_measured("no trades uploaded")
         out["trade_count"] = not_measured("no trades uploaded")
