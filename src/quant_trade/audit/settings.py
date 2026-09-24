@@ -68,6 +68,9 @@ class AuditSettings:
     access_codes: bool = False
     #: Where a client asks the owner for a code; shown on the landing page.
     contact_url: str = ""
+    #: Run the retention purge inside the web service (at start, then daily).
+    #: Turning it on is the owner's explicit confirmation of that delete.
+    auto_purge: bool = False
     #: Operator details for the terms and privacy pages. None has a default:
     #: until they are set the pages say so in place of a name.
     operator_name: str = ""
@@ -146,6 +149,7 @@ class AuditSettings:
             ),
             access_codes=access_codes,
             contact_url=_safe_url(env.get("AUDIT_CONTACT_URL", "")),
+            auto_purge=env.get("AUDIT_AUTO_PURGE", "").strip().lower() in TRUE_VALUES,
             operator_name=_text(env.get("AUDIT_OPERATOR_NAME", "")),
             operator_contact=_text(env.get("AUDIT_OPERATOR_CONTACT", "")),
             operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),

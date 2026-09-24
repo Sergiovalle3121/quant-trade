@@ -250,7 +250,7 @@ Routes:
 | `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
-| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. 410 once purged. |
+| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. |
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
@@ -274,7 +274,8 @@ with an empty value):
 | `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
 | `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. |
 | `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. |
-| `AUDIT_RETENTION_DAYS` | `30` | Shown on the form and the privacy page. `audit purge --days` must use the same number. |
+| `AUDIT_RETENTION_DAYS` | `30` | Shown on the form and the privacy page; the automatic purge uses it. A manual `audit purge --days` should use the same number. |
+| `AUDIT_AUTO_PURGE` | `false` | `true` runs the retention purge inside the service at startup and every 24 hours. Turning it on is the explicit confirmation the retention delete needs. |
 | `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. |
 | `AUDIT_OPERATOR_NAME` | empty | Legal name of whoever runs the service, shown on the terms and privacy pages. |
 | `AUDIT_OPERATOR_CONTACT` | empty | Contact for privacy and deletion requests (an e-mail address). |
@@ -293,7 +294,7 @@ with an empty value):
    The image runs as the non-root user `quant` and Railway mounts volumes
    owned by root, so with a volume also set `RAILWAY_RUN_UID=0`; otherwise
    SQLite cannot create the file and every upload fails. Postgres is the
-   simpler choice and the only one a separate cron service can share.
+   simpler choice; the in-service purge (`AUDIT_AUTO_PURGE`) works with either.
 3. Set `AUDIT_BASE_URL` to the public domain Railway assigns or to the
    custom domain you attach (it is also the address in the badge embed code
    of `/v/…` pages), and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
@@ -309,14 +310,18 @@ with an empty value):
    `https://<domain>/webhooks/stripe` for `checkout.session.completed`.
    Locally: `stripe listen --forward-to localhost:8000/webhooks/stripe`
    then `stripe trigger checkout.session.completed`.
-5. Retention: run `quant-trade audit purge --days 30 --yes` every day (a
-   Railway cron service with the same variables works with Postgres; with a
-   SQLite volume run it from `railway ssh`, since a volume attaches to one
-   service only), with the same number of days as `AUDIT_RETENTION_DAYS`.
-   The privacy page promises it, and nothing runs it automatically. Unpaid
-   uploads, reports and the client's description are deleted; id, digests
-   and class are kept so the record stays verifiable. The upload IP address
-   of every audit past the window, paid ones too, is cleared in the same run.
+5. Retention: set `AUDIT_AUTO_PURGE=true`. The service then runs the
+   purge itself, once at startup and every 24 hours, with
+   `AUDIT_RETENTION_DAYS`, which is the number `/privacidad` shows. Setting
+   the variable is the owner's explicit confirmation of the retention
+   delete; without it nothing is deleted automatically and
+   `quant-trade audit purge --days N --yes` remains the manual way.
+   `/health` reports `auto_purge`. Unpaid uploads, reports and the client's
+   description are deleted; id, digests and class are kept so the record
+   stays verifiable. The upload IP address of every audit past the window,
+   paid ones too, is cleared in the same run. A published audit keeps only
+   what its verification page shows (see "Public verification page and
+   badge").
 6. Set the four `AUDIT_OPERATOR_*`/`AUDIT_JURISDICTION` variables. Until
    they are set, `/terminos` and `/privacidad` show "[sin configurar]" and a
    warning, and `/health` reports `"legal_configured": false`.
@@ -380,7 +385,17 @@ dates, the six dimension statuses with their plain-language text, the input
 hashes and `dataset_digest`, the source format, the engine version, the
 declared trials and the trials used, the SHA-256 of the result, and a fixed
 notice. It never shows the files, the trades, the description or the token.
-Once the audit is purged the page and badge answer 410.
+The retention purge does not take a published page down: for a published
+unpaid audit it keeps, in the `publication_views` table, only the fields the
+page reads (class, dimension statuses, input hashes, source format, engine
+name and version, declared and used trials, the audit date) and the SHA-256
+of the full result, so the page, its result hash and an embedded badge stay
+exactly as they were. The description, client text findings, series,
+trades, statistics and files are deleted as for any other audit. The page
+goes away (404) when the owner unpublishes it (the private link still works
+for `unpublish` after the purge), when the operator runs
+`quant-trade audit unpublish ID` or `audit delete ID --yes`; an unpublished
+audit that was purged answers 410 on its private report.
 
 The badge (`/v/{public_id}/badge.svg`, `?lang=en` for English) shows the
 class, the id, the date and the fixed words:
@@ -422,8 +437,9 @@ What the privacy page promises, and how the operator keeps each promise:
 
 | Promise | How |
 |---|---|
-| Unpaid audits' files, report, declarations and description are deleted after `AUDIT_RETENTION_DAYS` | `quant-trade audit purge --days N --yes`, daily |
+| Unpaid audits' files, report, declarations and description are deleted after `AUDIT_RETENTION_DAYS` | `AUDIT_AUTO_PURGE=true` (in-service, at startup and daily); manually `quant-trade audit purge --days N --yes` |
 | The upload IP is deleted after the same window, paid audits too | the same purge run |
+| A published page keeps only what it shows, until withdrawn | the same purge run; `quant-trade audit unpublish ID` or the owner's `unpublish` link |
 | A client gets a copy of their data | `quant-trade audit export AUDIT_ID [--out DIR]` (writes to `outputs/`, git-ignored) |
 | A client's audit is deleted completely on request (files, report, hashes, class, verification page) | `quant-trade audit delete AUDIT_ID --yes` (without `--yes` it only shows what would go) |
 | A client leaves the updates list | `quant-trade audit waitlist-remove EMAIL --yes` |

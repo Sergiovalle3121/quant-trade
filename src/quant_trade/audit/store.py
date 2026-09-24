@@ -18,11 +18,15 @@ uploads racing for the last credit cannot both win.
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+from quant_trade.audit.schema import AuditResult
+from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
 
 REQUIRE_WEB = 'audit web requires: python -m pip install -e ".[web]"'
 
@@ -188,6 +192,17 @@ class Store:
             sa.Column("public_id", sa.String(32), primary_key=True),
             sa.Column("audit_id", sa.String(64), nullable=False, unique=True),
             sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        #: What a published verification page shows, kept when the retention
+        #: purge deletes the rest of an unpaid audit, so embedded badges and
+        #: /v pages stay up until the owner unpublishes or the audit is deleted.
+        self.publication_views = sa.Table(
+            "publication_views",
+            self.metadata,
+            sa.Column("audit_id", sa.String(64), primary_key=True),
+            sa.Column("result_sha256", sa.String(64), nullable=False),
+            sa.Column("view_json", sa.Text, nullable=False),
+            sa.Column("kept_at", sa.String(40), nullable=False),
         )
         self.metadata.create_all(self.engine)
 
@@ -497,6 +512,9 @@ class Store:
 
     def unpublish(self, audit_id: str) -> bool:
         with self.engine.begin() as conn:
+            conn.execute(
+                self.publication_views.delete().where(self.publication_views.c.audit_id == audit_id)
+            )
             result = conn.execute(
                 self.publications.delete().where(self.publications.c.audit_id == audit_id)
             )
@@ -504,6 +522,19 @@ class Store:
 
     def publication_for_audit(self, audit_id: str) -> PublicationRecord | None:
         return self._publication(self.publications.c.audit_id == audit_id)
+
+    def publication_view(self, audit_id: str) -> tuple[dict[str, Any], str] | None:
+        """``(view, result_sha256)`` kept for a purged, published audit."""
+        sa = self._sa
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(
+                    self.publication_views.c.view_json, self.publication_views.c.result_sha256
+                ).where(self.publication_views.c.audit_id == audit_id)
+            ).first()
+        if row is None:
+            return None
+        return json.loads(row[0]), str(row[1])
 
     def get_publication(self, public_id: str) -> PublicationRecord | None:
         return self._publication(self.publications.c.public_id == public_id)
@@ -558,6 +589,9 @@ class Store:
         """
         with self.engine.begin() as conn:
             conn.execute(self.publications.delete().where(self.publications.c.audit_id == audit_id))
+            conn.execute(
+                self.publication_views.delete().where(self.publication_views.c.audit_id == audit_id)
+            )
             conn.execute(self.audit_files.delete().where(self.audit_files.c.audit_id == audit_id))
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
         return bool(deleted.rowcount)
@@ -566,8 +600,10 @@ class Store:
     def purge_expired(self, now: datetime, *, retention_days: int, dry_run: bool = False) -> int:
         """Drop uploads, reports and declared text of unpaid audits older than
         the retention window. Hashes, class and id stay so the record remains
-        verifiable. The upload IP of every audit past the window is cleared,
-        paid or not. Returns how many unpaid audits were (or would be) purged."""
+        verifiable. A published audit keeps what its verification page shows
+        (``public_view``) so the page and badge survive. The upload IP of
+        every audit past the window is cleared, paid or not. Returns how many
+        unpaid audits were (or would be) purged."""
         sa = self._sa
         cutoff = _iso(now - timedelta(days=retention_days))
         condition = (
@@ -594,6 +630,29 @@ class Store:
             if count == 0:
                 return count
             expired = sa.select(self.audits.c.id).where(condition)
+            published = conn.execute(
+                sa.select(self.audits.c.id, self.audits.c.result_json)
+                .where(condition & self.audits.c.id.in_(sa.select(self.publications.c.audit_id)))
+                .where(self.audits.c.result_json.is_not(None))
+            ).all()
+            for audit_id, result_json in published:
+                try:
+                    view, digest = public_view(result_json)
+                except ValueError:  # an unreadable result keeps nothing; its page answers 410
+                    continue
+                conn.execute(
+                    self.publication_views.delete().where(
+                        self.publication_views.c.audit_id == audit_id
+                    )
+                )
+                conn.execute(
+                    self.publication_views.insert().values(
+                        audit_id=audit_id,
+                        result_sha256=digest,
+                        view_json=canonical_dumps(view),
+                        kept_at=_iso(now),
+                    )
+                )
             conn.execute(
                 self.audit_files.update()
                 .where(self.audit_files.c.audit_id.in_(expired))
@@ -616,6 +675,38 @@ class Store:
         return count
 
 
+def public_view(result_json: str) -> tuple[dict[str, Any], str]:
+    """The allow-listed fields the public verification page reads, and the
+    SHA-256 of the full result it came from.
+
+    Nothing else survives: no description, no client text findings, no
+    series, trades, statistics or files.
+    """
+    result = AuditResult.model_validate_json(result_json)
+    data = result.model_dump(mode="json")
+    inputs = data.get("inputs", {})
+    verdict = data["verdict"]
+    view = {
+        "generated_at_utc": data.get("generated_at_utc", ""),
+        "verdict": {
+            "overall": verdict["overall"],
+            "dimensions": [
+                {"name": d["name"], "status": d["status"]} for d in verdict["dimensions"]
+            ],
+        },
+        "inputs": {
+            key: inputs[key]
+            for key in ("digests", "dataset_digest", "source_format", "source")
+            if key in inputs
+        },
+        "engine": {key: data.get("engine", {}).get(key) for key in ("name", "package_version")},
+        "declared": {"trials": data.get("declared", {}).get("trials")},
+        "multiplicity": {"trials_used": data.get("multiplicity", {}).get("trials_used")},
+    }
+    digest = sha256_of_text(canonical_dumps(data))
+    return view, digest
+
+
 def make_store(url: str) -> Store:
     return Store(url)
 
@@ -631,4 +722,5 @@ __all__ = [
     "make_store",
     "new_access_code",
     "normalise_access_code",
+    "public_view",
 ]
