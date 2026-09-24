@@ -172,4 +172,4 @@ def test_a_report_switches_language_without_changing_the_result() -> None:
     assert "href='/x?lang=es'" in page and ">Español</a>" in page
     assert find_claims(page) == []
     default = render_html(spanish_result, watermark=False)
-    assert "<html lang='es'>" in default and "lang-switch" not in default
+    assert "<html lang='es'>" in default and "class='lang-switch'" not in default

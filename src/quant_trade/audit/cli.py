@@ -22,6 +22,7 @@ from quant_trade.audit.engine import run_audit
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import render
 from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs
+from quant_trade.audit.seo import BRAND
 from quant_trade.evidence.canonical_json import atomic_write_json, atomic_write_text
 from quant_trade.research.holdout_seal import HoldoutSeal, seal_holdout
 
@@ -57,7 +58,7 @@ def _read(path: Path | None, *, what: str) -> bytes | None:
 def _print_verdict(payload: dict[str, Any]) -> None:
     console = Console()
     verdict = payload["verdict"]
-    table = Table(title=f"Contraprueba · class {verdict['overall']}")
+    table = Table(title=f"{BRAND} · class {verdict['overall']}")
     table.add_column("dimension")
     table.add_column("status")
     table.add_column("reasons")

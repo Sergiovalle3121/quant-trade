@@ -47,6 +47,7 @@ from quant_trade.audit.store import (  # noqa: E402
     CODE_GROUPS,
     make_store,
 )
+from quant_trade.audit.theme import SCRIPT_SRC  # noqa: E402
 from quant_trade.audit.web import (  # noqa: E402
     CONTENT_SECURITY_POLICY,
     FORM_OVERHEAD_BYTES,
@@ -344,8 +345,11 @@ def test_every_response_carries_the_security_headers(tmp_path: Path, path: str) 
     for name, value in SECURITY_HEADERS.items():
         assert response.headers[name] == value
     assert "Strict-Transport-Security" not in response.headers
-    # Script runs only as the print button's handler, allowed by its hash.
-    assert "script-src 'unsafe-hashes' 'sha256-" in CONTENT_SECURITY_POLICY
+    # Script runs only from the site's own file and as the print button's
+    # handler, allowed by its hash; fonts are self-hosted.
+    assert "script-src 'self' 'unsafe-hashes' 'sha256-" in CONTENT_SECURITY_POLICY
+    assert "font-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "https:" not in CONTENT_SECURITY_POLICY.split("form-action")[0]
     assert "'unsafe-inline'" not in CONTENT_SECURITY_POLICY.split("style-src")[0]
 
 
@@ -416,14 +420,15 @@ def test_tokens_and_codes_have_enough_entropy(tmp_path: Path) -> None:
 
 
 class _TagScan(HTMLParser):
-    """Collects every script tag and event-handler attribute a browser would run."""
+    """Collects every script tag and event-handler attribute a browser would run,
+    except the site's own enhancement script (same origin, no inline code)."""
 
     def __init__(self) -> None:
         super().__init__()
         self.found: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "script":
+        if tag == "script" and dict(attrs).get("src") != SCRIPT_SRC:
             self.found.append(tag)
         self.found.extend(
             f"{tag}[{key}]"

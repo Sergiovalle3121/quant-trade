@@ -59,9 +59,10 @@ from quant_trade.audit.schema import (
     build_inputs,
     report_digest_name,
 )
-from quant_trade.audit.seo import DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
+from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
 from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings
 from quant_trade.audit.store import REQUIRE_WEB, Store, make_store
+from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps
 
 CheckoutFactory = Callable[[AuditSettings, str, str], str]
@@ -194,13 +195,16 @@ _CODE_MAX = 40
 PRINT_HANDLER = "window.print()"
 _PRINT_HANDLER_HASH = base64.b64encode(hashlib.sha256(PRINT_HANDLER.encode()).digest()).decode()
 
-#: No page runs script except the print handler above. Inline styles are
-#: the other relaxation (the report's CSS and chart colours are inline); forms
-#: post here, or leave for Stripe Checkout through a redirect, and no page can
-#: be framed.
+#: Script runs only from this site's own ``/static/app.js`` (progressive
+#: enhancement: every page works without it) and as the print handler above;
+#: no inline script and nothing from a third party. Fonts are self-hosted, so
+#: no visitor request leaves for a font service. Inline styles are the other
+#: relaxation (the report's CSS and chart colours are inline); forms post
+#: here, or leave for Stripe Checkout through a redirect, and no page can be
+#: framed.
 CONTENT_SECURITY_POLICY = (
-    f"default-src 'none'; script-src 'unsafe-hashes' 'sha256-{_PRINT_HANDLER_HASH}'; "
-    "style-src 'unsafe-inline'; img-src 'self' data:; "
+    f"default-src 'none'; script-src 'self' 'unsafe-hashes' 'sha256-{_PRINT_HANDLER_HASH}'; "
+    "style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; "
     "form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; "
     "base-uri 'none'"
 )
@@ -571,7 +575,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention.stop()
 
     app = FastAPI(
-        title="Contraprueba",
+        title=BRAND,
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
@@ -626,8 +630,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
-        public = request.url.path.startswith("/v/") and response.status_code == 200
-        response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
+        ok = response.status_code == 200
+        if request.url.path.startswith("/static/") and ok:
+            response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
+        else:
+            public = request.url.path.startswith("/v/") and ok
+            response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
         return _secure(response, path=request.url.path)
 
     def _site_url(request: Request) -> str:
@@ -711,6 +719,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "auto_purge": cfg.auto_purge,
         }
 
+    @app.get("/static/{name:path}")
+    def static(name: str) -> Response:
+        """Fonts and the enhancement script, looked up in a fixed allow-list."""
+        found = static_file(name)
+        if found is None:
+            raise _not_found()
+        content, media_type = found
+        return Response(content=content, media_type=media_type)
+
     @app.get("/robots.txt", response_class=PlainTextResponse)
     def robots(request: Request) -> str:
         return robots_txt(_site_url(request))
@@ -755,7 +772,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not _valid_email(email):
             return RedirectResponse(f"/?lang={locale}&error=email", status_code=303)
         db.add_waitlist(email, at=datetime.now(UTC))
-        return RedirectResponse(f"/?lang={locale}&joined=1", status_code=303)
+        return RedirectResponse(f"/?lang={locale}&joined=1#news", status_code=303)
 
     def _run_and_store(
         inputs: Any,

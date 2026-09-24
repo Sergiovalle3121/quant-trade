@@ -7,9 +7,10 @@ tooling sold as a second opinion. It is not investment advice, it executes
 nothing, it holds no funds and no keys, and it never claims that money was
 or will be made. The profit-claim guard refuses any report that does.
 
-The public name is **Contraprueba** (Spanish for an independent second test
-that confirms or refutes the first). `seo.BRAND` and `seo.TAGLINE` hold it; it
-shows in every page head, report title and badge. A new name must pass the
+The public name is **Rigor** (the same word in Spanish and English: statistical
+rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.
+`seo.BRAND` and `seo.TAGLINE` hold it; it shows in every page head, report
+title and badge. A new name must pass the
 guard in both languages and must not suggest verification, certification,
 approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
@@ -528,13 +529,29 @@ link carries the token, which only its owner holds.
 Recomputing the sha256 of the original file and re-running the audit with
 the same seed reproduces the JSON byte for byte.
 
+## Look and feel
+
+Every page shares one visual system in `audit/theme.py`: a dark, high-contrast
+shell with a light reading surface for reports and legal text, the
+self-hosted fonts Inter, Instrument Serif and JetBrains Mono (SIL Open Font
+License, files and licences in `audit/static/fonts/`), and CSS-only motion
+that honours `prefers-reduced-motion`. The stylesheet is inlined so a report
+saved to disk keeps its look (it falls back to system fonts offline).
+`/static/app.js` is the only script: it adds drag-and-drop and file names on
+the upload fields, scroll reveals, a "working" overlay while an audit runs and
+a copy button for the badge code. Every page works without it. `/static/`
+serves only the files listed in `theme.STATIC_FILES`. Printing always gets a
+light, static page. The landing's report illustration is labelled as
+synthetic data.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
 store is in `docs/AUDIT_SECURITY_REVIEW.md`: what was checked, what was
 changed, and what the operator sets on Railway. Every response carries a
-Content Security Policy (no script except the print button's handler,
-allowed by its hash), `X-Frame-Options: DENY` and, when `AUDIT_BASE_URL` is
+Content Security Policy (no script except the site's own `/static/app.js`
+and the print button's handler, allowed by its hash; fonts only from the
+site itself), `X-Frame-Options: DENY` and, when `AUDIT_BASE_URL` is
 `https`, HSTS. The access log redacts `token=` and `code=`.
 
 ## Safety rules for this code

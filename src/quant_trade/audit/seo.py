@@ -22,7 +22,7 @@ LOCALES: tuple[str, ...] = ("es", "en")
 #: The product name. It shows on every page, report and badge, so it must pass
 #: the profit-claim guard and never suggest verification, certification,
 #: approval, earnings or passing a challenge.
-BRAND = "Contraprueba"
+BRAND = "Rigor"
 TAGLINE: dict[str, str] = {
     "es": "Auditoría estadística independiente de backtests",
     "en": "Independent statistical backtest audit",
