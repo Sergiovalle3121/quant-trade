@@ -28,6 +28,7 @@ import pandas as pd
 
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
+from quant_trade.audit import stress as stress_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
 from quant_trade.audit.schema import (
@@ -531,8 +532,7 @@ def _costs(
         "break_even_bps": (
             measured(
                 be,
-                "extra cost per side, on top of the report's fees, at which the ledger "
-                "nets to zero"
+                "extra cost per side, on top of the report's fees, at which the ledger nets to zero"
                 if fees_reported
                 else "cost per side at which the ledger nets to zero",
             )
@@ -565,6 +565,15 @@ def _trade_stats(inputs: AuditInputs) -> dict[str, Any]:
         inputs.trades.trades, inputs.trades.sides, fees_total=max(fees, 0.0)
     )
     return {"status": "MEASURED", **stats}
+
+
+def _stress(inputs: AuditInputs, frame: pd.DataFrame) -> dict[str, Any]:
+    if inputs.trades is None:
+        trades: dict[str, Any] = {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    else:
+        fees = -sum(value for value in inputs.reported_fees.values())
+        trades = stress_lib.trades_stress(inputs.trades.trades, fees_total=max(fees, 0.0))
+    return {"returns": stress_lib.returns_stress(frame), "trades": trades}
 
 
 def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[str, Any]:
@@ -726,6 +735,7 @@ def run_audit(
             flags.extend(redflags.scan_trades_against_equity(inputs.trades, frame))
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
+    stress_tests = _stress(inputs, frame)
     risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
     challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
 
@@ -873,6 +883,7 @@ def run_audit(
         verdict=final,
         series=_series(frame, balance_only=inputs.balance_only),
         trade_stats=trade_stats,
+        stress=stress_tests,
         risk=risk,
         challenge=challenge,
         vendor_questions=questions,

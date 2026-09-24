@@ -773,6 +773,8 @@ class AuditResult(BaseModel):
     # Schema 2. Optional so that results stored under schema 1 still load.
     series: dict[str, Any] | None = None
     trade_stats: dict[str, Any] | None = None
+    #: Robustness stress tests (``audit/stress.py``); None on older results.
+    stress: dict[str, Any] | None = None
     risk: dict[str, Any] | None = None
     challenge: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)

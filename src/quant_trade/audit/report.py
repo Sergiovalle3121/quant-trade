@@ -173,6 +173,21 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_class": "Con esta dimensión en PASS y las demás igual, la clase sería",
         "plan_none": "Todas las dimensiones pasan: no queda ningún paso abierto.",
         "plan_locked": "pasos concretos, con las cifras de tu archivo, en el informe completo",
+        "stress": "Pruebas de estrés: sin los mejores resultados",
+        "stress_intro": (
+            "Quitamos los mejores periodos y operaciones de lo que subiste y medimos lo que "
+            "queda. Si el total cae a cero o menos, depende de unos pocos eventos que pueden "
+            "no repetirse. No es una previsión."
+        ),
+        "stress_curve": "Sobre la curva (retorno total compuesto)",
+        "stress_trades": "Sobre las operaciones cerradas (resultado neto tras comisiones y swap)",
+        "scenario": "Escenario",
+        "stress_result": "Queda",
+        "stress_change": "Cambio",
+        "stress_positive": "¿Sigue sobre cero?",
+        "original": "Original",
+        "stress_count": "de {total} escenarios quedan en cero o por debajo",
+        "top5_share": "Las 5 mejores operaciones suman este múltiplo del resultado neto",
     },
     "en": {
         "title": f"{BRAND} · Backtest audit",
@@ -295,6 +310,21 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_class": "With this dimension at PASS and the rest unchanged, the class would be",
         "plan_none": "Every dimension passes: no step is left open.",
         "plan_locked": "concrete steps, with your file's figures, in the full report",
+        "stress": "Stress tests: without the best outcomes",
+        "stress_intro": (
+            "We remove the best periods and trades from what you uploaded and measure what "
+            "is left. If the total falls to zero or below, it rests on a few events that may "
+            "not repeat. This is not a forecast."
+        ),
+        "stress_curve": "On the curve (compounded total return)",
+        "stress_trades": "On the closed trades (net result after commission and swap)",
+        "scenario": "Scenario",
+        "stress_result": "Left",
+        "stress_change": "Change",
+        "stress_positive": "Still above zero?",
+        "original": "Original",
+        "stress_count": "of {total} scenarios end at zero or below",
+        "top5_share": "The best 5 trades add up to this multiple of the net result",
     },
 }
 
@@ -519,6 +549,8 @@ def _status_line(section: dict[str, Any], labels: dict[str, str]) -> str:
 
 #: Spanish for the not-measured reasons the engine writes, beyond the verdict's.
 REASONS_ES: dict[str, str] = {
+    "the curve is too short or not positive": "la curva es muy corta o no es positiva",
+    "fewer than two closed trades": "menos de dos operaciones cerradas",
     **NOT_MEASURED_ES,
     "no trades uploaded": "no se subieron operaciones",
     "no variants uploaded": "no se subió la matriz de variantes",
@@ -652,6 +684,102 @@ def _plan_html(data: dict[str, Any], locale: str, labels: dict[str, str], *, loc
         else f"<p class='muted'>{_e(labels['plan_intro'])}</p>"
     )
     return intro + "<div class='meaning plan'>" + "".join(items) + "</div>"
+
+
+STRESS_SCENARIOS: dict[str, dict[str, str]] = {
+    "es": {
+        "best_1pct_periods": "Sin el mejor 1 % de periodos ({removed})",
+        "best_5_periods": "Sin los 5 mejores periodos",
+        "best_10_periods": "Sin los 10 mejores periodos",
+        "best_1_trades": "Sin la mejor operación",
+        "best_5_trades": "Sin las 5 mejores operaciones",
+        "best_10pct_trades": "Sin el mejor 10 % de operaciones ({removed})",
+        "best_month": "Sin el mejor mes ({month})",
+    },
+    "en": {
+        "best_1pct_periods": "Without the best 1 % of periods ({removed})",
+        "best_5_periods": "Without the best 5 periods",
+        "best_10_periods": "Without the best 10 periods",
+        "best_1_trades": "Without the best trade",
+        "best_5_trades": "Without the best 5 trades",
+        "best_10pct_trades": "Without the best 10 % of trades ({removed})",
+        "best_month": "Without the best month ({month})",
+    },
+}
+
+
+def _stress_value(value: Any, *, percent: bool, signed: bool = False) -> str:
+    if not isinstance(value, (int, float)):
+        return "—"
+    if percent:
+        return f"{value:+.1%}" if signed else f"{value:.1%}"
+    return f"{value:+,.2f}" if signed else f"{value:,.2f}"
+
+
+def _stress_table(
+    block: dict[str, Any], locale: str, labels: dict[str, str], *, percent: bool
+) -> str:
+    names = STRESS_SCENARIOS.get(locale, STRESS_SCENARIOS["es"])
+    original = block["original"]
+    rows = [
+        f"<tr><td>{_e(labels['original'])}</td>"
+        f"<td>{_stress_value(original['value'], percent=percent)} "
+        f"{_badge(original['evidence'])}</td>"
+        "<td></td><td></td></tr>"
+    ]
+    for row in block.get("rows", []):
+        name = names.get(row["scenario"], row["scenario"]).format(
+            removed=row.get("removed", ""), month=row.get("month", "")
+        )
+        ok = row.get("stays_positive")
+        rows.append(
+            f"<tr><td>{_e(name)}</td>"
+            f"<td>{_stress_value(row['result']['value'], percent=percent)}</td>"
+            f"<td>{_stress_value(row['change']['value'], percent=percent, signed=True)}</td>"
+            f"<td><span class='badge {'PASS' if ok else 'FAIL'}'>"
+            f"{_e((labels['yes'] if ok else labels['no']).capitalize())}</span></td></tr>"
+        )
+    return (
+        f"<table><tr><th>{_e(labels['scenario'])}</th><th>{_e(labels['stress_result'])}</th>"
+        f"<th>{_e(labels['stress_change'])}</th><th>{_e(labels['stress_positive'])}</th></tr>"
+        + "".join(rows)
+        + "</table>"
+    )
+
+
+def _stress_html(stress: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    if not stress:
+        return f"<p class='muted'>{_e(labels['none'])}</p>"
+    blocks = [
+        (labels["stress_curve"], stress.get("returns") or {}, True),
+        (labels["stress_trades"], stress.get("trades") or {}, False),
+    ]
+    measured_rows = [
+        row
+        for _, block, _ in blocks
+        if block.get("status") == "MEASURED"
+        for row in block.get("rows", [])
+    ]
+    out = f"<p class='muted'>{_e(labels['stress_intro'])}</p>"
+    if measured_rows:
+        broken = sum(1 for row in measured_rows if not row.get("stays_positive"))
+        out += (
+            f"<p><strong>{broken}</strong> "
+            f"{_e(labels['stress_count'].format(total=len(measured_rows)))}.</p>"
+        )
+    for title, block, percent in blocks:
+        out += f"<h3>{_e(title)}</h3>"
+        if block.get("status") != "MEASURED":
+            out += _status_line(block, labels)
+            continue
+        out += _stress_table(block, locale, labels, percent=percent)
+        share = block.get("top5_share")
+        if share:
+            out += (
+                f"<p>{_e(labels['top5_share'])}: {share['value']:.2f}x "
+                f"{_badge(share['evidence'])}</p>"
+            )
+    return out
 
 
 def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str, str]) -> str:
@@ -1120,6 +1248,7 @@ def render_html(
     detail: list[tuple[str, str]] = [
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
+        (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
         (labels["challenge"], _challenge_html(data.get("challenge"), locale, labels)),

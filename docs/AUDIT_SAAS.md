@@ -81,6 +81,25 @@ each with its evidence tag. "What it means for you" gives two plain
 sentences per dimension. The "Print / save PDF" button uses the print
 stylesheet, which hides the buttons and the forms.
 
+### Stress tests without the best outcomes
+
+`audit/stress.py` removes the best outcomes from what was uploaded and
+reports what is left (the JSON's `stress` block, MEASURED; older results
+have none and the section says so). Nothing is resampled or forecast.
+
+| Family | Scenarios | Result |
+|---|---|---|
+| Curve (`stress.returns`, always) | without the best 1 % of periods (at least one), the best 5 and the best 10 periods, and the best calendar month | compounded total return of the remaining periods |
+| Trades (`stress.trades`, with closed trades) | without the best trade, the best 5, the best 10 % (rounded up), and the best exit month | net result of the remaining trades minus the whole reported fees |
+
+Each row carries the change from the original and whether it stays above
+zero; the section counts the scenarios that end at zero or below.
+`top5_share` is the best five trades over the net result when that is
+positive. A row that would remove as many periods or trades as exist is
+left out. Fees cannot be attributed per trade, so removing trades keeps
+them whole, which errs on the strict side. These rows set no threshold and
+do not change the class.
+
 ### Plan to reach a better class
 
 `audit/plan.py` turns the verdict into one step per dimension that did not

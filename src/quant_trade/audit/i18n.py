@@ -397,6 +397,18 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("no commission or swap total supplied", "no se aportó el total de comisión o swap"),
     ("gross pnl minus reported fees", "resultado bruto menos los costes del informe"),
     (
+        "the uploaded history with its best outcomes removed; not a forecast",
+        "el historial subido sin sus mejores resultados; no es una previsión",
+    ),
+    ("compounded total return of the uploaded curve", "retorno total compuesto de la curva subida"),
+    (
+        "net result of the closed trades after reported fees",
+        "resultado neto de las operaciones cerradas tras los costes del informe",
+    ),
+    ("best five trades / net result", "cinco mejores operaciones / resultado neto"),
+    ("the curve is too short or not positive", "la curva es muy corta o no es positiva"),
+    ("fewer than two closed trades", "menos de dos operaciones cerradas"),
+    (
         "average net result per trade, account currency",
         "resultado neto medio por operación, en la divisa de la cuenta",
     ),
