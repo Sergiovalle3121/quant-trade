@@ -586,6 +586,10 @@ def _sentence(text: str) -> str:
     return text if text[-1] in ".!?" else text + "."
 
 
+#: Where the sample report's PDF is served, per language.
+SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf"}
+
+
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         import anyio
@@ -1263,9 +1267,50 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     legal_links=True,
                     switch_url="/sample?lang=en" if locale == "es" else "/ejemplo?lang=es",
                     head_meta=sample_meta(locale, base_url),
+                    pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
                 )
                 sample_cache[key] = html_text
             return sample_cache[key]
+
+    sample_pdfs: dict[str, bytes] = {}
+
+    def _sample_pdf(locale: str) -> Response:
+        """The sample report as the PDF a buyer gets, built once per language."""
+        with sample_lock:
+            if locale not in sample_pdfs:
+                page, _ = render(
+                    sample_result(locale),
+                    watermark=False,
+                    free_mode=True,
+                    notice=SAMPLE_BANNER[locale],
+                    legal_links=True,
+                    locale=locale,
+                )
+                try:
+                    sample_pdfs[locale] = pdf_lib.report_pdf(
+                        page, audit_id="ejemplo" if locale == "es" else "sample", locale=locale
+                    )
+                except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
+                    return HTMLResponse(
+                        error_page(message("pdf_busy", locale), locale=locale), status_code=503
+                    )
+        name = "rigor-ejemplo.pdf" if locale == "es" else "rigor-sample.pdf"
+        return Response(
+            content=sample_pdfs[locale],
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{name}"',
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
+    @app.get("/ejemplo.pdf")
+    async def sample_pdf_es() -> Response:
+        return await run_in_threadpool(_sample_pdf, "es")
+
+    @app.get("/sample.pdf")
+    async def sample_pdf_en() -> Response:
+        return await run_in_threadpool(_sample_pdf, "en")
 
     @app.get("/ejemplo", response_class=HTMLResponse)
     async def sample_es(request: Request, lang: str | None = None) -> str:

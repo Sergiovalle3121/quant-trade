@@ -267,7 +267,9 @@ answers 402. `audit/pdf.py` lays out the same report page with WeasyPrint
 fonts and `data:` URIs to the renderer; every other URL is refused, so a
 PDF never reaches the network. At most `MAX_CONCURRENT_PDFS = 2` render at
 once; a busy or missing renderer answers 503 with a hint to use print.
-The response is `private, no-store` and `noindex`.
+The response is `private, no-store` and `noindex`. The sample report offers the same
+download at `/ejemplo.pdf` and `/sample.pdf`, built once per language and
+cached, so a buyer sees the deliverable before paying.
 
 Annual return: the compound annual return is NOT_MEASURED when the history
 spans less than a year (`engine.MIN_CAGR_DAYS = 365`); compounding a few
