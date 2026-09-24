@@ -279,7 +279,7 @@ with an empty value):
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///state/audit/audit.db` | SQLite file or Railway Postgres (`postgres://` is normalised to `postgresql+psycopg://`). |
-| `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links. |
+| `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links, canonical and Open Graph links, the badge snippet, `robots.txt` and `sitemap.xml`. While it is left at the default, those links use the address the request reached (`https` when `AUDIT_TRUSTED_PROXY_HOPS` > 0). Set it to your domain in production. |
 | `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless all three Stripe variables are set or `AUDIT_ACCESS_CODES=true`. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` | empty | All three are needed for card payments. |
 | `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
@@ -423,6 +423,33 @@ certificates in product listings, so the badge is for the seller's own site,
 Telegram, forums and videos. The guard refuses "verificado", "certificado",
 "aprobado", "pasarás", "certified", "approved" and "verified track record"
 unless directly negated, which is what lets the fixed wording through.
+
+### Export guides, search engines and link previews
+
+Every platform the importers read has a short export guide in Spanish and
+English (`audit/guides.py`), written from
+`docs/research/audit_iteration4/formats_*.json`: `/guias` and `/guides` list
+them, and each lives at `/guias/<slug>` and `/guides/<slug>` (`mt5`,
+`mt5-optimization`, `mt4`, `tradingview`, `ninjatrader`, `quantconnect`,
+`backtesting-py`, `vectorbt`). The upload form links the right guide under
+the report and optimisation fields, the landing page links the list, and
+error pages link it too. A guide states only what the importer really
+does; change it when the importer changes.
+
+`audit/seo.py` gives every public page (landing, sample, guides, terms,
+privacy, in both languages) a title, a meta description, a canonical URL,
+`hreflang` alternates and Open Graph tags. `/robots.txt` disallows
+`/audits/` (report URLs carry the owner's token), `/webhooks/` and
+`/health`, and points to `/sitemap.xml`, which lists exactly those public
+pages in both languages and nothing else. Client reports, unpaid previews
+and error pages carry `<meta name="robots" content="noindex, nofollow">`,
+and `/audits/`, `/webhooks/`, `/health` and every error response also send
+the `X-Robots-Tag` header. A shared `/v/{id}` link previews its class, audit
+date and the fixed badge notice, built from the same allow-list as the page;
+the page itself is `noindex` so that an unpublished audit does not stay in
+search results. No page sets `og:image`: the badge is SVG, which most chat
+apps do not preview. Every new page must pass the guard in both languages
+(`tests/test_audit_guides_seo.py`).
 
 ### Terms and privacy
 

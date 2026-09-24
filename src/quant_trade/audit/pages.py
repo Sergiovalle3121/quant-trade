@@ -11,10 +11,19 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from quant_trade.audit.guides import (
+    GUIDES,
+    GUIDES_COPY,
+    REPORT_GUIDES,
+    Guide,
+    guide_url,
+    guides_index_url,
+)
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
+from quant_trade.audit.seo import PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.verdict import class_text, meaning
 
 #: The fixed wording of the badge and of the verification page's notice. It
@@ -168,6 +177,24 @@ _COPY: dict[str, dict[str, Any]] = {
         "back": "Volver",
         "disclaimer": "Aviso",
         "sample_link": "Ver un informe de ejemplo completo (datos sintéticos)",
+        "meta_description": (
+            "Sube el informe de MetaTrader, TradingView, NinjaTrader o Python y recibe un "
+            "veredicto de A a D sobre sobreajuste, costes, fuera de muestra y calidad de datos, "
+            "con cada número etiquetado según su evidencia."
+        ),
+        "sample_description": (
+            "Informe completo de ejemplo de la auditoría de backtests, hecho con datos "
+            "sintéticos: veredicto, gráficas, riesgo remuestreado y simulación de reto."
+        ),
+        "guides_title": "Qué archivo subir",
+        "guides_text": (
+            "Sube el archivo que ya guarda tu plataforma. Si no sabes cuál exportar, hay una "
+            "guía corta para cada una."
+        ),
+        "guides_link": "Ver las guías de exportación",
+        "guide_for": "¿Qué archivo exporto? Guía para",
+        "optimization_guide": "Cómo exportar el XML de optimización",
+        "v_description": "{cls_label} {overall} · auditada el {date} · {notice}.",
         "how_title": "Cómo funciona",
         "how": [
             "Sube el informe de tu plataforma tal cual y, si lo tienes, el XML de optimización.",
@@ -334,6 +361,24 @@ _COPY: dict[str, dict[str, Any]] = {
         "back": "Back",
         "disclaimer": "Notice",
         "sample_link": "See a full sample report (synthetic data)",
+        "meta_description": (
+            "Upload your MetaTrader, TradingView, NinjaTrader or Python report and get an A to "
+            "D verdict on overfitting, costs, out-of-sample and data quality, with every number "
+            "tagged by its evidence."
+        ),
+        "sample_description": (
+            "A full sample report of the backtest audit, built from synthetic data: verdict, "
+            "charts, resampled risk and challenge simulation."
+        ),
+        "guides_title": "Which file to upload",
+        "guides_text": (
+            "Upload the file your platform already saves. If you are not sure which one to "
+            "export, there is a short guide for each."
+        ),
+        "guides_link": "See the export guides",
+        "guide_for": "Which file do I export? Guide for",
+        "optimization_guide": "How to export the optimisation XML",
+        "v_description": "{cls_label} {overall} · audited on {date} · {notice}.",
         "how_title": "How it works",
         "how": [
             "Upload your platform report as it is and, if you have it, the optimisation XML.",
@@ -443,11 +488,36 @@ def _preset_options(locale: str) -> str:
     return "".join(options)
 
 
-def _head(title: str, locale: str) -> str:
+def _head(title: str, locale: str, meta_html: str = "") -> str:
+    """The page head. ``meta_html`` comes from ``seo``; without it the page is
+    private (``noindex``)."""
+    meta_html = meta_html or private_meta(title, locale)
     return (
         f"<!doctype html><html lang='{_e(locale)}'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-        f"<title>{_e(title)}</title><style>{_CSS}</style></head><body>"
+        f"<title>{_e(title)}</title>{meta_html}<style>{_CSS}</style></head><body>"
+    )
+
+
+def _public_meta(title: str, description: str, locale: str, path: str, base_url: str) -> str:
+    return head_meta(
+        PageMeta(title=title, description=description, locale=locale, paths=page_paths(path)),
+        base_url=base_url,
+    )
+
+
+def sample_meta(locale: str, base_url: str) -> str:
+    """Head tags for the sample report, the one indexable report page."""
+    locale = locale if locale in _COPY else "es"
+    copy = _COPY[locale]
+    title = f"{copy['sample_link']} · {copy['title']}"
+    path = "/ejemplo" if locale == "es" else "/sample"
+    return _public_meta(title, copy["sample_description"], locale, path, base_url)
+
+
+def _guide_links(locale: str) -> str:
+    return " · ".join(
+        f"<a href='{_e(guide_url(g.slug, locale))}'>{_e(g.platform)}</a>" for g in REPORT_GUIDES
     )
 
 
@@ -470,10 +540,14 @@ def landing(
     card_payments: bool = False,
     contact_url: str = "",
     retention_days: int = 30,
+    base_url: str = "",
 ) -> str:
     locale = locale if locale in _COPY else "es"
     copy = _COPY[locale]
     other = "en" if locale == "es" else "es"
+    meta = _public_meta(
+        copy["title"], copy["meta_description"], locale, "/" if locale == "es" else "/en", base_url
+    )
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
     measure = "".join(f"<li>{_e(item)}</li>" for item in copy["measure"])
     sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
@@ -489,7 +563,7 @@ def landing(
     selected = {"es": "", "en": ""}
     selected[locale] = " selected"
     return (
-        _head(copy["title"], locale)
+        _head(copy["title"], locale, meta)
         + f"<p class='muted'><a href='/?lang={other}'>{'English' if locale == 'es' else 'Español'}"
         "</a></p>"
         + f"<h1>{_e(copy['headline'])}</h1><p>{_e(copy['pitch'])}</p>"
@@ -497,6 +571,8 @@ def landing(
         + f"<p><a href='{_e(sample)}'>{_e(copy['sample_link'])}</a></p>"
         + f"<h2>{_e(copy['not_title'])}</h2><p>{_e(copy['not'])}</p>"
         + _how_html(copy)
+        + f"<h2>{_e(copy['guides_title'])}</h2><p>{_e(copy['guides_text'])} "
+        f"<a href='{_e(guides_index_url(locale))}'>{_e(copy['guides_link'])}</a></p>"
         + _prices_html(
             copy,
             free_mode=free_mode,
@@ -505,14 +581,16 @@ def landing(
             card_payments=card_payments,
             contact_url=contact_url,
         )
-        + f"<h2>{_e(copy['form_title'])}</h2>{flash}{err}<p class='muted'>{_e(note)}</p>"
+        + f"<h2 id='subir'>{_e(copy['form_title'])}</h2>{flash}{err}<p class='muted'>{_e(note)}</p>"
         + "<form method='post' action='/audits' enctype='multipart/form-data'>"
         + f"<label>{_e(copy['report'])}</label><input type='file' name='report' "
         "accept='.htm,.html,.csv,.xlsx,.txt'>"
         + f"<div class='muted'>{_e(copy['report_help'])}</div>"
+        + f"<div class='muted'>{_e(copy['guide_for'])}: {_guide_links(locale)}</div>"
         + f"<label>{_e(copy['optimization'])}</label><input type='file' name='optimization' "
-        "accept='.xml'>"
-        + f"<div class='muted'>{_e(copy['optimization_help'])}</div>"
+        "accept='.xml'>" + f"<div class='muted'>{_e(copy['optimization_help'])} "
+        f"<a href='{_e(guide_url('mt5-optimization', locale))}'>"
+        f"{_e(copy['optimization_guide'])}</a></div>"
         + f"<label>{_e(copy['equity'])}</label><input type='file' name='equity' "
         "accept='.csv,text/csv'>"
         + f"<div class='muted'>{_e(copy['equity_help'])}</div>"
@@ -668,9 +746,27 @@ def verification_page(
         "width='480' height='72'></a>"
     )
     colour = CLASS_COLOURS.get(overall, "#333")
+    title = f"{copy['v_title']} · {'Clase' if locale == 'es' else 'Class'} {overall}"
+    description = copy["v_description"].format(
+        cls_label="Clase" if locale == "es" else "Class",
+        overall=overall,
+        date=str(result.get("generated_at_utc", ""))[:10],
+        notice=BADGE_NOTICE[locale],
+    )
+    # Never indexed (an unpublished page should not linger in search), but it
+    # previews its class and date when the link is shared.
+    meta = head_meta(
+        PageMeta(
+            title=title,
+            description=description,
+            locale=locale,
+            paths={"es": f"/v/{public_id}", "en": f"/v/{public_id}?lang=en"},
+            index=False,
+        ),
+        base_url=base_url,
+    )
     return (
-        _head(f"{copy['v_title']} · {overall}", locale)
-        + f"<p class='muted'><a href='/v/{_e(public_id)}?lang={other}'>"
+        _head(title, locale, meta) + f"<p class='muted'><a href='/v/{_e(public_id)}?lang={other}'>"
         f"{'English' if locale == 'es' else 'Español'}</a></p>"
         + f"<h1>{_e(copy['v_title'])}</h1>"
         + f"<p><span class='cls' style='background:{colour}'>{_e(overall)}</span>"
@@ -716,18 +812,23 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
     )
 
 
-def legal_page(text: LegalText, *, locale: str = "es") -> str:
+def legal_page(
+    text: LegalText, *, locale: str = "es", kind: str = "terms", base_url: str = ""
+) -> str:
     """The terms or the privacy policy as one page, with a language switch."""
     locale = locale if locale in _COPY else "es"
     copy = _COPY[locale]
     other = "en" if locale == "es" else "es"
+    path = legal_url(kind, locale).split("?", 1)[0]
+    description = f"{text.title} · {copy['title']}. {DISCLAIMER[locale]}"
+    meta = _public_meta(text.title, description, locale, path, base_url)
     warning = f"<div class='error'>{_e(text.warning)}</div>" if text.warning else ""
     sections = "".join(
         f"<h2>{_e(heading)}</h2>" + "".join(f"<p>{_e(line)}</p>" for line in lines)
         for heading, lines in text.sections
     )
     return (
-        _head(text.title, locale)
+        _head(text.title, locale, meta)
         + f"<p class='muted'><a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a> · "
         f"<a href='?lang={other}'>{'English' if locale == 'es' else 'Español'}</a></p>"
         + f"<h1>{_e(text.title)}</h1>{warning}{sections}"
@@ -744,8 +845,65 @@ def error_page(message: str, *, locale: str = "es") -> str:
         _head(copy["error_title"], locale)
         + f"<h1>{_e(copy['error_title'])}</h1><div class='error'>{_e(message)}</div>"
         + f"<p><a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a> · "
+        f"<a href='{_e(guides_index_url(locale))}'>{_e(GUIDES_COPY[locale]['title'])}</a> · "
         f"<a href='/?lang={other}' hreflang='{other}'>{'English' if locale == 'es' else 'Español'}"
         "</a></p>" + _footer(locale)
+    )
+
+
+def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
+    """The list of export guides."""
+    locale = locale if locale in _COPY else "es"
+    copy = _COPY[locale]
+    words = GUIDES_COPY[locale]
+    other = "en" if locale == "es" else "es"
+    meta = _public_meta(
+        f"{words['title']} · {copy['title']}",
+        words["summary"],
+        locale,
+        guides_index_url(locale),
+        base_url,
+    )
+    items = "".join(
+        f"<li><a href='{_e(guide_url(g.slug, locale))}'>{_e(g.text[locale].title)}</a>"
+        f"<div class='muted'>{_e(g.text[locale].summary)}</div></li>"
+        for g in GUIDES
+    )
+    return (
+        _head(f"{words['title']} · {copy['title']}", locale, meta)
+        + f"<p class='muted'><a href='/?lang={_e(locale)}'>{_e(words['back'])}</a> · "
+        f"<a href='{_e(guides_index_url(other))}' hreflang='{other}'>"
+        f"{'English' if locale == 'es' else 'Español'}</a></p>"
+        + f"<h1>{_e(words['title'])}</h1><p>{_e(words['intro'])}</p>"
+        + f"<ul class='guides'>{items}</ul>"
+        + f"<p><a href='/?lang={_e(locale)}#subir'>{_e(words['form'])}</a></p>"
+        + _footer(locale)
+    )
+
+
+def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
+    """One platform's export guide."""
+    locale = locale if locale in _COPY else "es"
+    copy = _COPY[locale]
+    words = GUIDES_COPY[locale]
+    text = guide.text[locale]
+    other = "en" if locale == "es" else "es"
+    title = f"{text.title} · {copy['title']}"
+    meta = _public_meta(title, text.summary, locale, guide_url(guide.slug, locale), base_url)
+    steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    tips = "".join(f"<li>{_e(tip)}</li>" for tip in text.tips)
+    return (
+        _head(title, locale, meta)
+        + f"<p class='muted'><a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a>"
+        f" · <a href='{_e(guide_url(guide.slug, other))}' hreflang='{other}'>"
+        f"{'English' if locale == 'es' else 'Español'}</a></p>"
+        + f"<h1>{_e(text.title)}</h1><p>{_e(text.summary)}</p>"
+        + f"<h2>{_e(words['file'])}</h2><p>{_e(text.file)}</p>"
+        + f"<h2>{_e(words['steps'])}</h2><ol class='steps'>{steps}</ol>"
+        + f"<h2>{_e(words['upload'])}</h2><p>{_e(text.upload)}</p>"
+        + f"<h2>{_e(words['tips'])}</h2><ul>{tips}</ul>"
+        + f"<p><a href='/?lang={_e(locale)}#subir'>{_e(words['form'])}</a></p>"
+        + _footer(locale)
     )
 
 
@@ -755,7 +913,10 @@ __all__ = [
     "VERIFICATION_NOTICE",
     "badge_svg",
     "error_page",
+    "guide_page",
+    "guides_index_page",
     "landing",
     "legal_page",
+    "sample_meta",
     "verification_page",
 ]

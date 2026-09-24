@@ -32,13 +32,17 @@ from typing import Annotated, Any
 from pydantic import ValidationError
 
 from quant_trade.audit.engine import run_audit
+from quant_trade.audit.guides import GUIDES_BY_SLUG
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
 from quant_trade.audit.pages import (
     SAMPLE_BANNER,
     badge_svg,
     error_page,
+    guide_page,
+    guides_index_page,
     landing,
     legal_page,
+    sample_meta,
     verification_page,
 )
 from quant_trade.audit.report import render, result_sha256
@@ -51,7 +55,8 @@ from quant_trade.audit.schema import (
     build_inputs,
     report_digest_name,
 )
-from quant_trade.audit.settings import AuditSettings
+from quant_trade.audit.seo import DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
+from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings
 from quant_trade.audit.store import REQUIRE_WEB, Store, make_store
 from quant_trade.evidence.canonical_json import canonical_dumps
 
@@ -305,7 +310,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     try:
         from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
         from fastapi.exceptions import RequestValidationError
-        from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+        from fastapi.responses import (
+            HTMLResponse,
+            JSONResponse,
+            PlainTextResponse,
+            RedirectResponse,
+            Response,
+        )
         from starlette.concurrency import run_in_threadpool
         from starlette.exceptions import HTTPException as StarletteHTTPException
     except ImportError as exc:
@@ -343,7 +354,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+        if request.url.path.startswith(DISALLOWED_PATHS) or response.status_code >= 400:
+            response.headers["X-Robots-Tag"] = NOINDEX
         return response
+
+    def _site_url(request: Request) -> str:
+        """The public address for absolute links (canonical, previews, sitemap).
+
+        ``AUDIT_BASE_URL`` when it is set; otherwise the address this request
+        reached, with ``https`` assumed behind a trusted proxy.
+        """
+        if cfg.base_url != DEFAULT_BASE_URL:
+            return cfg.base_url
+        base = str(request.base_url).rstrip("/")
+        if cfg.trusted_proxy_hops > 0 and base.startswith("http://"):
+            base = "https://" + base[len("http://") :]
+        return base
 
     def _locale(value: str | None) -> str:
         return value if value in LOCALES else "es"
@@ -399,8 +425,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "auto_purge": cfg.auto_purge,
         }
 
+    @app.get("/robots.txt", response_class=PlainTextResponse)
+    def robots(request: Request) -> str:
+        return robots_txt(_site_url(request))
+
+    @app.get("/sitemap.xml")
+    def sitemap(request: Request) -> Response:
+        return Response(content=sitemap_xml(_site_url(request)), media_type="application/xml")
+
     @app.get("/", response_class=HTMLResponse)
-    def index(lang: str | None = None, joined: int = 0, error: str | None = None) -> str:
+    def index(
+        request: Request, lang: str | None = None, joined: int = 0, error: str | None = None
+    ) -> str:
         locale = _locale(lang)
         # Only known codes are shown, so the query string cannot inject text.
         shown = message("invalid_email", locale) if error == "email" else None
@@ -414,12 +450,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             card_payments=cfg.stripe_enabled,
             contact_url=cfg.contact_url,
             retention_days=cfg.retention_days,
+            base_url=_site_url(request),
         )
 
     @app.get("/en", response_class=HTMLResponse)
-    def index_en() -> str:
+    def index_en(request: Request) -> str:
         """A short address to share with English-speaking traders."""
-        return index(lang="en")
+        return index(request, lang="en")
 
     @app.post("/waitlist")
     def waitlist(email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es") -> Response:
@@ -732,24 +769,26 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return Response(content=svg, media_type="image/svg+xml")
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
-    def verification(public_id: str, lang: str | None = None) -> str:
+    def verification(request: Request, public_id: str, lang: str | None = None) -> str:
         publication, _, data, digest = _published(public_id)
         return verification_page(
             data,
             public_id=publication.public_id,
             published_at=publication.created_at,
             result_sha256=digest,
-            base_url=cfg.base_url,
+            base_url=_site_url(request),
             locale=_locale(lang),
         )
 
-    sample_cache: dict[str, str] = {}
+    sample_cache: dict[tuple[str, str], str] = {}
     sample_lock = threading.Lock()
 
-    def _sample_html(locale: str) -> str:
-        """Built once per locale and kept: the input and the clock are fixed."""
+    def _sample_html(locale: str, base_url: str) -> str:
+        """Built once per locale and address and kept: the input and the clock
+        are fixed."""
         with sample_lock:
-            if locale not in sample_cache:
+            key = (locale, base_url)
+            if key not in sample_cache:
                 html_text, _ = render(
                     sample_result(locale),
                     watermark=False,
@@ -757,17 +796,40 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     notice=SAMPLE_BANNER[locale],
                     legal_links=True,
                     switch_url="/sample?lang=en" if locale == "es" else "/ejemplo?lang=es",
+                    head_meta=sample_meta(locale, base_url),
                 )
-                sample_cache[locale] = html_text
-            return sample_cache[locale]
+                sample_cache[key] = html_text
+            return sample_cache[key]
 
     @app.get("/ejemplo", response_class=HTMLResponse)
-    async def sample_es(lang: str | None = None) -> str:
-        return await run_in_threadpool(_sample_html, _locale(lang or "es"))
+    async def sample_es(request: Request, lang: str | None = None) -> str:
+        return await run_in_threadpool(_sample_html, _locale(lang or "es"), _site_url(request))
 
     @app.get("/sample", response_class=HTMLResponse)
-    async def sample_en(lang: str | None = None) -> str:
-        return await run_in_threadpool(_sample_html, _locale(lang or "en"))
+    async def sample_en(request: Request, lang: str | None = None) -> str:
+        return await run_in_threadpool(_sample_html, _locale(lang or "en"), _site_url(request))
+
+    @app.get("/guias", response_class=HTMLResponse)
+    def guides_es(request: Request, lang: str | None = None) -> str:
+        return guides_index_page(locale=_locale(lang or "es"), base_url=_site_url(request))
+
+    @app.get("/guides", response_class=HTMLResponse)
+    def guides_en(request: Request, lang: str | None = None) -> str:
+        return guides_index_page(locale=_locale(lang or "en"), base_url=_site_url(request))
+
+    def _guide(request: Request, slug: str, locale: str) -> str:
+        guide = GUIDES_BY_SLUG.get(slug)
+        if guide is None:
+            raise _not_found()
+        return guide_page(guide, locale=locale, base_url=_site_url(request))
+
+    @app.get("/guias/{slug}", response_class=HTMLResponse)
+    def guide_es(request: Request, slug: str, lang: str | None = None) -> str:
+        return _guide(request, slug, _locale(lang or "es"))
+
+    @app.get("/guides/{slug}", response_class=HTMLResponse)
+    def guide_en(request: Request, slug: str, lang: str | None = None) -> str:
+        return _guide(request, slug, _locale(lang or "en"))
 
     def _legal_context() -> LegalContext:
         return LegalContext(
@@ -783,27 +845,37 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             max_uploads_per_hour_per_ip=cfg.max_uploads_per_hour_per_ip,
         )
 
-    def _terms(locale: str) -> str:
-        return legal_page(terms_text(_legal_context(), locale), locale=locale)
+    def _terms(request: Request, locale: str) -> str:
+        return legal_page(
+            terms_text(_legal_context(), locale),
+            locale=locale,
+            kind="terms",
+            base_url=_site_url(request),
+        )
 
-    def _privacy(locale: str) -> str:
-        return legal_page(privacy_text(_legal_context(), locale), locale=locale)
+    def _privacy(request: Request, locale: str) -> str:
+        return legal_page(
+            privacy_text(_legal_context(), locale),
+            locale=locale,
+            kind="privacy",
+            base_url=_site_url(request),
+        )
 
     @app.get("/terminos", response_class=HTMLResponse)
-    def terms_es(lang: str | None = None) -> str:
-        return _terms(_locale(lang or "es"))
+    def terms_es(request: Request, lang: str | None = None) -> str:
+        return _terms(request, _locale(lang or "es"))
 
     @app.get("/terms", response_class=HTMLResponse)
-    def terms_en(lang: str | None = None) -> str:
-        return _terms(_locale(lang or "en"))
+    def terms_en(request: Request, lang: str | None = None) -> str:
+        return _terms(request, _locale(lang or "en"))
 
     @app.get("/privacidad", response_class=HTMLResponse)
-    def privacy_es(lang: str | None = None) -> str:
-        return _privacy(_locale(lang or "es"))
+    def privacy_es(request: Request, lang: str | None = None) -> str:
+        return _privacy(request, _locale(lang or "es"))
 
     @app.get("/privacy", response_class=HTMLResponse)
-    def privacy_en(lang: str | None = None) -> str:
-        return _privacy(_locale(lang or "en"))
+    def privacy_en(request: Request, lang: str | None = None) -> str:
+        return _privacy(request, _locale(lang or "en"))
 
     @app.post("/audits/{audit_id}/checkout")
     def checkout(audit_id: str, token: str | None = None) -> Response:

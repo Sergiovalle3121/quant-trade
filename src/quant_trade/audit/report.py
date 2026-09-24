@@ -22,6 +22,7 @@ from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import legal_links_html
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
+from quant_trade.audit.seo import private_meta
 from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning, summary
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
@@ -830,13 +831,16 @@ def render_html(
     legal_links: bool = False,
     locale: str | None = None,
     switch_url: str | None = None,
+    head_meta: str | None = None,
 ) -> str:
     """The audit as one HTML document.
 
     ``locale`` shows the page in a language other than the one chosen at
     upload: the verdict sentence is rebuilt from its fixed templates and the
     engine's English notes are translated; the result itself is unchanged.
-    ``switch_url`` is the same page in the other language.
+    ``switch_url`` is the same page in the other language. ``head_meta`` is
+    the page's search and preview tags; without it the page is ``noindex``,
+    as every client report is.
 
     The verdict, the plain-language explanations, the charts, the input
     hashes and the list of red flags are always shown. In paid mode an
@@ -1177,13 +1181,16 @@ def render_html(
         f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>",
         legal_links_html(locale) if legal_links else "",
     ]
+    page_title = f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}"
     return (
         "<!doctype html><html lang='"
         + _e(locale)
         + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, "
         "initial-scale=1'><title>"
-        + _e(f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}")
-        + "</title><style>"
+        + _e(page_title)
+        + "</title>"
+        + (head_meta if head_meta is not None else private_meta(page_title, locale))
+        + "<style>"
         + _CSS
         + charts.CHART_CSS
         + "</style></head><body>"
@@ -1217,6 +1224,7 @@ def render(
     legal_links: bool = False,
     locale: str | None = None,
     switch_url: str | None = None,
+    head_meta: str | None = None,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1232,6 +1240,7 @@ def render(
         legal_links=legal_links,
         locale=locale,
         switch_url=switch_url,
+        head_meta=head_meta,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
