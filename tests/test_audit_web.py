@@ -19,7 +19,10 @@ from quant_trade.audit.pages import error_page, landing  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import (  # noqa: E402
+    MESSAGES,
+    client_ip,
     create_app,
+    message,
     sign_stripe_payload,
     verify_stripe_signature,
 )
@@ -111,7 +114,14 @@ def test_bad_uploads_are_refused_plainly(tmp_path: Path) -> None:
         "/audits", files={"equity": ("e.csv", b"a,b\n1,2\n", "text/csv")}, data={"consent": "on"}
     )
     assert bad.status_code == 400
-    assert "timestamp column" in bad.text
+    assert "columna de fecha" in bad.text
+    bad_en = client.post(
+        "/audits",
+        files={"equity": ("e.csv", b"a,b\n1,2\n", "text/csv")},
+        data={"consent": "on", "locale": "en"},
+    )
+    assert bad_en.status_code == 400
+    assert "timestamp column" in bad_en.text
     big = client.post(
         "/audits",
         files={"equity": ("e.csv", b"x" * 20_000, "text/csv")},
@@ -119,23 +129,118 @@ def test_bad_uploads_are_refused_plainly(tmp_path: Path) -> None:
         headers={"accept": "application/json"},
     )
     assert big.status_code == 413
+    assert "supera el límite" in big.json()["error"]
     bad_trials = _upload(_client(tmp_path / "b"), trials="0")
     assert bad_trials.status_code == 400
+    assert "número de intentos" in bad_trials.text
 
 
-def test_rate_limit_per_ip(tmp_path: Path) -> None:
-    client = _client(tmp_path, max_uploads_per_hour_per_ip=2)
-    assert _upload(client).status_code == 303
-    assert _upload(client).status_code == 303
-    assert _upload(client).status_code == 429
-    other = client.post(
+def test_every_web_error_is_spanish_by_default_and_passes_the_guard(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    no_consent = client.post(
+        "/audits", files={"equity": ("e.csv", b"timestamp,equity\n", "text/csv")}, data={}
+    )
+    assert "aceptar las condiciones" in no_consent.text
+    no_file = client.post("/audits", data={"consent": "on"})
+    assert no_file.status_code == 400
+    assert "curva de equity" in no_file.text
+    not_a_number = client.post(
+        "/audits",
+        files={"equity": ("e.csv", csv_bytes(positive_drift(50)), "text/csv")},
+        data={"consent": "on", "trials": "many"},
+    )
+    assert not_a_number.status_code == 400
+    assert "formulario" in not_a_number.text
+    missing = client.get("/audits/nothere?token=x")
+    assert missing.status_code == 404
+    assert "No encontramos esa auditoría" in missing.text
+    assert "could not find" in client.get("/audits/nothere?token=x&lang=en").text
+    as_json = client.get("/audits/nothere?token=x", headers={"accept": "application/json"})
+    assert as_json.status_code == 404 and "error" in as_json.json()
+    assert "no parece válida" in client.get("/?error=email").text
+    assert "<b>" not in client.get("/?error=%3Cb%3Ex").text
+    for key, texts in MESSAGES.items():
+        assert set(texts) == {"es", "en"}, key
+        for locale in ("es", "en"):
+            assert find_claims(message(key, locale, what="x", limit="1")) == [], key
+
+
+def test_the_audit_runs_off_the_event_loop(tmp_path: Path, monkeypatch) -> None:
+    import asyncio
+
+    from quant_trade.audit import web
+
+    loops: list[bool] = []
+    real_run_audit = web.run_audit
+    real_build_inputs = web.build_inputs
+
+    def _on_loop() -> bool:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return False
+        return True
+
+    def spy_run_audit(*args, **kwargs):
+        loops.append(_on_loop())
+        return real_run_audit(*args, **kwargs)
+
+    def spy_build_inputs(*args, **kwargs):
+        loops.append(_on_loop())
+        return real_build_inputs(*args, **kwargs)
+
+    monkeypatch.setattr(web, "run_audit", spy_run_audit)
+    monkeypatch.setattr(web, "build_inputs", spy_build_inputs)
+    assert _upload(_client(tmp_path)).status_code == 303
+    assert loops == [False, False]
+
+
+def _upload_from(client: TestClient, forwarded_for: str):
+    return client.post(
         "/audits",
         files={"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")},
         data={"consent": "on"},
-        headers={"x-forwarded-for": "8.8.8.8"},
+        headers={"x-forwarded-for": forwarded_for},
         follow_redirects=False,
     )
-    assert other.status_code == 303
+
+
+def test_rate_limit_per_ip_ignores_a_spoofed_header_by_default(tmp_path: Path) -> None:
+    client = _client(tmp_path, max_uploads_per_hour_per_ip=2)
+    assert _upload(client).status_code == 303
+    assert _upload(client).status_code == 303
+    limited = _upload(client)
+    assert limited.status_code == 429
+    assert "Demasiadas auditorías" in limited.text
+    # Without a trusted proxy the header is the client's to invent.
+    assert _upload_from(client, "8.8.8.8").status_code == 429
+
+
+def test_rate_limit_behind_one_trusted_proxy(tmp_path: Path) -> None:
+    client = _client(tmp_path, max_uploads_per_hour_per_ip=1, trusted_proxy_hops=1)
+    assert _upload_from(client, "1.1.1.1").status_code == 303
+    # A spoofed left-most entry does not help: the proxy's entry is the last one.
+    assert _upload_from(client, "9.9.9.9, 1.1.1.1").status_code == 429
+    assert _upload_from(client, "2.2.2.2").status_code == 303
+
+
+@pytest.mark.parametrize(
+    ("header", "hops", "expected"),
+    [
+        ("6.6.6.6", 0, "10.0.0.1"),
+        ("6.6.6.6, 1.1.1.1", 1, "1.1.1.1"),
+        ("6.6.6.6, 1.1.1.1, 10.0.0.2", 2, "1.1.1.1"),
+        ("1.1.1.1", 2, "10.0.0.1"),
+        ("", 1, "10.0.0.1"),
+        (None, 1, "10.0.0.1"),
+        ("6.6.6.6, ", 1, "10.0.0.1"),
+    ],
+)
+def test_client_ip_takes_the_nth_entry_from_the_right(
+    header: str | None, hops: int, expected: str
+) -> None:
+    assert client_ip(header, "10.0.0.1", trusted_proxy_hops=hops) == expected
+    assert client_ip(header, None, trusted_proxy_hops=0) == "unknown"
 
 
 def test_waitlist(tmp_path: Path) -> None:
