@@ -26,6 +26,7 @@ bar. A mandatory terminal close realizes everything back to cash.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -90,6 +91,7 @@ class LedgerResult:
     reconciled: bool
     reconciliation_error: float
     cashflows: list[dict[str, Any]] = field(default_factory=list)
+    rehedges: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -128,6 +130,8 @@ def run_carry_ledger(
     fill_fraction: float = 1.0,
     min_fill_rate: float = 0.9,
     cash_reserve_fraction: float = 0.05,
+    rehedge_below_margin_fraction: float | None = None,
+    size_on_equity: bool = False,
 ) -> LedgerResult:
     """Simulate the campaign as an explicit account. Fail closed on bad hedges.
 
@@ -136,6 +140,16 @@ def run_carry_ledger(
     are used. ``fill_fraction`` lets stress tests inject partial fills;
     entries whose two-leg execution cannot reach HEDGED are aborted, never
     assumed.
+
+    ``rehedge_below_margin_fraction`` models the operator's margin management:
+    when posted margin falls below that fraction of its level at entry (the
+    short perp has been paying variation margin into a rally), the whole
+    hedge is closed and, if the signal still wants it, reopened at current
+    prices — paying all four fills again. ``None`` (the default) never
+    re-hedges, so a long rally eventually exhausts cash and margin.
+    ``size_on_equity`` sizes each entry from current cash instead of the
+    initial capital, so an account that has lost money is not asked to fund
+    a position it can no longer afford.
     """
     if not snapshots:
         raise ValueError("no snapshots")
@@ -159,6 +173,11 @@ def run_carry_ledger(
         for previous, current in zip(settled_sorted, settled_sorted[1:], strict=False)
     ):
         raise ValueError("settlements must be strictly ordered with unique timestamps")
+    # Sorted stamps let each bar find its settlements by bisection instead of
+    # rescanning the whole history; the sums below add the same rates in the
+    # same order as a full scan, so results are bit-identical.
+    settle_stamps = [ts for ts, _rate in settled_sorted]
+    settle_rates = [rate for _ts, rate in settled_sorted]
 
     # --- the balance sheet: cash is mutated flow-by-flow --------------------
     cash = initial_capital
@@ -171,7 +190,7 @@ def run_carry_ledger(
 
     totals = LedgerTotals()
     position: _Position | None = None
-    entries = exits = aborted = 0
+    entries = exits = aborted = rehedges = 0
     max_margin = 0.0
     rows: list[dict[str, Any]] = []
 
@@ -185,7 +204,8 @@ def run_carry_ledger(
             + costs.conversion_withdrawal_cost
             + cash_reserve_fraction
         )
-        return initial_capital / (1.0 + perp_to_spot / perp_leverage + reserved_cost_fraction)
+        base = cash if size_on_equity else initial_capital
+        return base / (1.0 + perp_to_spot / perp_leverage + reserved_cost_fraction)
 
     def close_position(ts: Any, spot: float, perp: float) -> float:
         nonlocal position, exits
@@ -212,7 +232,7 @@ def run_carry_ledger(
                 position.margin_posted -= released
                 flow(ts, "margin_to_cash", released)
         if cash + amount < -1e-12 * max(1.0, initial_capital):
-            raise ValueError("position losses exhausted cash and posted margin")
+            raise ValueError(f"position losses exhausted cash and posted margin at {ts}")
         flow(ts, kind, amount)
 
     for i, snap in enumerate(ordered):
@@ -245,9 +265,8 @@ def run_carry_ledger(
             # settled funding causally in (t[i-1], t[i]]
             lo = times[i - 1] if i > 0 else None
             if settlements is not None:
-                settled = sum(
-                    r for ts, r in settled_sorted if (lo is None or ts > lo) and ts <= times[i]
-                )
+                first = 0 if lo is None else bisect_right(settle_stamps, lo)
+                settled = sum(settle_rates[first : bisect_right(settle_stamps, times[i])])
             else:
                 # legacy generators: one snapshot per interval == its settlement
                 settled = funding_quotes[i]
@@ -285,12 +304,26 @@ def run_carry_ledger(
                 net_return=(funding_pnl + spot_pnl + perp_pnl + cy - cc) / initial_capital,
             )
 
+        # --- margin management: re-hedge before the short is liquidated ---
+        if (
+            rehedge_below_margin_fraction is not None
+            and position is not None
+            and position.margin_posted
+            < rehedge_below_margin_fraction
+            * position.perp_qty
+            * position.perp_entry
+            / perp_leverage
+        ):
+            bar["fees"] = close_position(times[i], spot, perp)
+            rehedges += 1
+
         # --- signal (decoupled from quoted rates when settlements drive it)
         if settlements is not None:
-            known_settlements = [rate for ts, rate in settled_sorted if ts <= times[i]]
+            known = bisect_right(settle_stamps, times[i])
             want_position = (
-                len(known_settlements) >= trailing_window
-                and sum(known_settlements[-trailing_window:]) / trailing_window > entry_threshold
+                known >= trailing_window
+                and sum(settle_rates[known - trailing_window : known]) / trailing_window
+                > entry_threshold
             )
         elif i < trailing_window:
             want_position = False
@@ -300,6 +333,7 @@ def run_carry_ledger(
 
         # --- transitions ---------------------------------------------------
         if want_position and position is None:
+            reentry_fees = float(bar["fees"])
             target_notional = notional(spot, perp)
             spot_qty = target_notional / spot
             plan = TwoLegPlan(
@@ -343,7 +377,7 @@ def run_carry_ledger(
                 position = _Position(qty, qty, spot, perp, margin)
                 max_margin = max(max_margin, margin)
                 entries += 1
-                bar["fees"] = entry_fees + conv
+                bar["fees"] = reentry_fees + entry_fees + conv
         elif not want_position and position is not None:
             bar["fees"] = close_position(times[i], spot, perp)
 
@@ -392,4 +426,5 @@ def run_carry_ledger(
         reconciled=reconciliation_error <= 1e-9 * max(1.0, initial_capital),
         reconciliation_error=reconciliation_error,
         cashflows=journal,
+        rehedges=rehedges,
     )

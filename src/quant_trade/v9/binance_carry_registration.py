@@ -22,6 +22,7 @@ holdout that is decisive), because V8's walk-forward was found to be in-sample
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
@@ -154,10 +155,112 @@ def freeze_hash() -> str:
 #: Pinned at registration. A test fails if the registration moves.
 FROZEN_HASH = "19bdbd03b91fcfe2d5ad3b6e1a2c2a8bc4d91d78effc64417e7feeaf40a701d7"
 
+
+# --- amendment: H1-BIN-R, the same carry with margin management --------------
+#
+# Registered after H1-BIN ran and before H1-BIN-R ran. What was known when it
+# was written: every H1-BIN variant stopped with "position losses exhausted
+# cash and posted margin" (the 3x short perp paid variation margin through a
+# BTC rally and the ledger never moves value from the spot leg to the margin
+# account), and at 2x/3x costs some stopped with "entry sizing consumed more
+# cash than available" (entries were sized from the initial capital after the
+# account had lost money). No return, Sharpe or funding statistic of any
+# variant had been computed, because no ledger completed.
+#
+# The amendment changes only those two mechanics. Everything else — data,
+# signal, variants, costs, splits, gates — is H1-BIN's. Its four variants are
+# four more trials in the same ledger, so the deflated Sharpe of either
+# hypothesis is computed over all eight.
+
+REHEDGE_HYPOTHESIS_ID = "H1-BIN-R"
+REHEDGE_REGISTERED_AT_UTC = "2026-09-24T06:32:00Z"
+REHEDGE_EXECUTION: dict[str, Any] = {
+    **EXECUTION,
+    "rehedge_below_margin_fraction": 0.5,
+    "rehedge_rule": (
+        "when posted margin falls below half its level at entry, close both legs "
+        "and, if the signal still wants the position, reopen at current prices, "
+        "paying all four fills again"
+    ),
+    "size_on_equity": True,
+}
+REHEDGE_VARIANTS: tuple[dict[str, Any], ...] = tuple(
+    {
+        "variant_id": str(v["variant_id"]).replace("H1-BIN-", "H1-BIN-R-", 1),
+        "parameters": dict(v["parameters"]),
+    }
+    for v in VARIANTS
+)
+
+
+def registration_rehedge() -> dict[str, Any]:
+    payload = registration()
+    payload.update(
+        {
+            "artifact": "H1_BIN_R_PREREGISTRATION",
+            "registered_at_utc": REHEDGE_REGISTERED_AT_UTC,
+            "hypothesis_id": REHEDGE_HYPOTHESIS_ID,
+            "derived_from": HYPOTHESIS_ID,
+            "amends_registration_hash": FROZEN_HASH,
+            "title": "Binance BTC carry with margin re-hedging (official archive)",
+            "variants": list(REHEDGE_VARIANTS),
+            "execution": REHEDGE_EXECUTION,
+            "known_before_registration": (
+                "every H1-BIN variant stopped on exhausted margin or on entry "
+                "sizing; no return statistic of any variant had been computed"
+            ),
+        }
+    )
+    return payload
+
+
+def freeze_hash_rehedge() -> str:
+    return sha256_of_text(canonical_dumps(registration_rehedge()))
+
+
+FROZEN_HASH_REHEDGE = "2e81a8b8725b93320bdc6d696d9af80373e86886ddfeef3f4a189f95de081db7"
+
+
+@dataclass(frozen=True)
+class CampaignSpec:
+    """What the runner needs from one registration."""
+
+    hypothesis_id: str
+    variants: tuple[dict[str, Any], ...]
+    frozen_hash: str
+    current_hash: str
+    ledger_options: dict[str, Any]
+
+
+def campaign_spec(hypothesis_id: str) -> CampaignSpec:
+    if hypothesis_id == HYPOTHESIS_ID:
+        return CampaignSpec(HYPOTHESIS_ID, VARIANTS, FROZEN_HASH, freeze_hash(), {})
+    if hypothesis_id == REHEDGE_HYPOTHESIS_ID:
+        return CampaignSpec(
+            REHEDGE_HYPOTHESIS_ID,
+            REHEDGE_VARIANTS,
+            FROZEN_HASH_REHEDGE,
+            freeze_hash_rehedge(),
+            {
+                "rehedge_below_margin_fraction": float(
+                    REHEDGE_EXECUTION["rehedge_below_margin_fraction"]
+                ),
+                "size_on_equity": bool(REHEDGE_EXECUTION["size_on_equity"]),
+            },
+        )
+    raise ValueError(f"unknown hypothesis {hypothesis_id!r}")
+
+
 __all__ = [
     "FROZEN_HASH",
+    "FROZEN_HASH_REHEDGE",
     "HYPOTHESIS_ID",
+    "REHEDGE_HYPOTHESIS_ID",
     "VARIANTS",
+    "CampaignSpec",
+    "campaign_spec",
     "freeze_hash",
+    "freeze_hash_rehedge",
     "registration",
+    "registration_rehedge",
 ]
