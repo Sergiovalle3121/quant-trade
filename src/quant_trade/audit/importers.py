@@ -74,11 +74,15 @@ QUANTCONNECT_TRADES_CSV = "quantconnect_trades_csv"
 BACKTESTINGPY_CSV = "backtestingpy_csv"
 VECTORBT_CSV = "vectorbt_csv"
 MT5_OPTIMIZATION_XML = "mt5_optimization_xml"
+MT5_TESTER_XLSX = "mt5_tester_xlsx"
+MT5_HISTORY_XLSX = "mt5_history_xlsx"
 
 #: Every format ``import_report`` turns into trades and a balance curve.
 REPORT_FORMATS: tuple[str, ...] = (
     MT5_TESTER_HTML,
+    MT5_TESTER_XLSX,
     MT5_HISTORY_HTML,
+    MT5_HISTORY_XLSX,
     MT4_TESTER_HTML,
     MT4_STATEMENT_HTML,
     TRADINGVIEW_CSV,
@@ -101,6 +105,10 @@ FLOATING_DRAWDOWN_WARNING = (
     "(open-trade) drawdown, so the real drawdown was at least as deep"
 )
 CONTRACT_SIZE_WARNING = "contract size inferred from reported profit"
+CONVERSION_DRIFT_WARNING = (
+    "money per point changes with the conversion to the account currency, so the "
+    "size was inferred per trade from its reported profit"
+)
 NAIVE_TIME_WARNING = (
     "the file's times carry no timezone (platform or server time); they were read as UTC"
 )
@@ -672,13 +680,81 @@ def _is_mt4_tester_row(texts: list[str]) -> bool:
     )
 
 
-def _is_mt4_statement_trade(texts: list[str]) -> bool:
+#: Column positions of the MetaTrader 4 statement's closed trades, as build
+#: 600+ writes them (with "Taxes"). Other layouts are read from their header.
+_MT4_STATEMENT_COLUMNS = {
+    "open_time": 1,
+    "type": 2,
+    "size": 3,
+    "symbol": 4,
+    "open_price": 5,
+    "close_time": 8,
+    "close_price": 9,
+    "commission": 10,
+    "taxes": 11,
+    "swap": 12,
+    "profit": 13,
+}
+_MT4_STATEMENT_NAMES = {
+    "size": "size",
+    "lots": "size",
+    "item": "symbol",
+    "symbol": "symbol",
+    "commission": "commission",
+    "commis": "commission",
+    "taxes": "taxes",
+    "swap": "swap",
+    "profit": "profit",
+    "trade p/l": "profit",
+}
+
+
+def _mt4_statement_columns(texts: list[str]) -> dict[str, int] | None:
+    """Map a statement's "Closed Transactions" header, or ``None`` if it is not one.
+
+    Builds before 600 have no "Taxes" column (13 columns) and some brokers
+    add a row number and a comment (15 columns), so positions come from
+    the header whenever there is one.
+    """
+    names = [text.strip().lower() for text in texts]
+    if "ticket" not in names or "open time" not in names or "close time" not in names:
+        return None
+    columns: dict[str, int] = {
+        "open_time": names.index("open time"),
+        "close_time": names.index("close time"),
+    }
+    if "type" in names:
+        columns["type"] = names.index("type")
+    for index, name in enumerate(names):
+        if name == "price":
+            key = "open_price" if index < columns["close_time"] else "close_price"
+            columns.setdefault(key, index)
+        elif name in _MT4_STATEMENT_NAMES:
+            columns.setdefault(_MT4_STATEMENT_NAMES[name], index)
+    needed = {"type", "size", "symbol", "open_price", "close_price", "profit"}
+    return columns if needed <= columns.keys() else None
+
+
+def _is_mt4_statement_trade(
+    texts: list[str], columns: dict[str, int] = _MT4_STATEMENT_COLUMNS
+) -> bool:
     return (
-        len(texts) >= 14
-        and _is_mt_time(texts[1])
-        and texts[2].lower() in {"buy", "sell"}
-        and _is_mt_time(texts[8])
+        len(texts) > max(columns.values())
+        and _is_mt_time(texts[columns["open_time"]])
+        and texts[columns["type"]].lower() in {"buy", "sell"}
+        and _is_mt_time(texts[columns["close_time"]])
     )
+
+
+def _mt4_statement_rows(reader: _TableReader) -> Iterable[tuple[list[str], dict[str, int]]]:
+    """Every row with the column map of the closest header above it."""
+    columns = _MT4_STATEMENT_COLUMNS
+    for row in reader.rows:
+        found = _mt4_statement_columns(row.texts)
+        if found is not None:
+            columns = found
+            continue
+        yield row.texts, columns
 
 
 def _html_format(reader: _TableReader) -> str | None:
@@ -694,7 +770,9 @@ def _html_format(reader: _TableReader) -> str | None:
         return MT5_HISTORY_HTML if len(deals[0]) >= 14 else MT5_TESTER_HTML
     if any(_is_mt4_tester_row(row.texts) for row in reader.rows):
         return MT4_TESTER_HTML
-    if any(_is_mt4_statement_trade(row.texts) for row in reader.rows):
+    if any(
+        _is_mt4_statement_trade(texts, columns) for texts, columns in _mt4_statement_rows(reader)
+    ):
         return MT4_STATEMENT_HTML
     return None
 
@@ -724,11 +802,37 @@ class _Deal:
         return self.commission + self.fee + self.swap + self.profit
 
 
+#: Deals-table headers seen in real exports that are not the English names:
+#: build 1940 wrote "Trade" and "Profit Column"; a Russian terminal writes Russian.
+_MT5_DEAL_HEADER_ALIASES = {
+    "trade": "deal",
+    "profit column": "profit",
+    "время": "time",
+    "сделка": "deal",
+    "символ": "symbol",
+    "тип": "type",
+    "направление": "direction",
+    "объем": "volume",
+    "объём": "volume",
+    "цена": "price",
+    "ордер": "order",
+    "комиссия": "commission",
+    "сбор": "fee",
+    "своп": "swap",
+    "прибыль": "profit",
+    "баланс": "balance",
+    "комментарий": "comment",
+}
+_MT5_DEAL_REQUIRED = {"time", "type", "direction", "volume", "price", "profit", "balance"}
+
+
 def _mt5_column_map(header: list[str] | None, width: int) -> dict[str, int]:
     if header is not None:
         names = [text.strip().lower() for text in header]
-        if "direction" in names and "balance" in names:
-            return {name: index for index, name in enumerate(names) if name}
+        names = [_MT5_DEAL_HEADER_ALIASES.get(name, name) for name in names]
+        mapped = {name: index for index, name in enumerate(names) if name}
+        if mapped.keys() >= _MT5_DEAL_REQUIRED:
+            return mapped
     columns = _MT5_HISTORY_COLUMNS if width >= 14 else _MT5_TESTER_COLUMNS
     return {name: index for index, name in enumerate(columns)}
 
@@ -801,6 +905,31 @@ class _Fifo:
     unmatched_closes: int = 0
     closing_deals: int = 0
     forced_closes: int = 0
+    #: Contract size per symbol from a first pass. With it, a hedging close
+    #: picks the open entry of its own volume whose price explains the
+    #: deal's profit, instead of the oldest one (see ``_pair_mt5_deals``).
+    sizes: dict[str, float] = field(default_factory=dict)
+    #: Closes that could belong to more than one open entry of their volume.
+    ambiguous_closes: int = 0
+
+    def _order(self, deal: _Deal, side: str, volume: float, profit: float) -> list[_Lot]:
+        queue = self.lots.get(deal.symbol, [])
+        size = self.sizes.get(deal.symbol)
+        same = [lot for lot in queue if lot.side == side and lot.volume > _EPS]
+        exact = [lot for lot in same if abs(lot.volume - volume) <= 1e-9 * max(1.0, volume)]
+        if len(same) >= 2 and exact and (len(exact) > 1 or exact[0] is not same[0]):
+            self.ambiguous_closes += 1
+        if size is None or len(same) < 2 or not exact:
+            return queue
+        direction = 1.0 if side == "long" else -1.0
+
+        def error(lot: _Lot) -> float:
+            return abs((deal.price - lot.price) * direction * volume * size - profit)
+
+        best = min(exact, key=error)
+        if error(best) < error(same[0]) - 1e-9 * max(1.0, abs(profit)):
+            return [best, *(lot for lot in queue if lot is not best)]
+        return queue
 
     def open(self, deal: _Deal, side: str, volume: float, share: float) -> None:
         queue = self.lots.setdefault(deal.symbol, [])
@@ -827,7 +956,7 @@ class _Fifo:
         queue = self.lots.get(deal.symbol, [])
         slices: list[tuple[_Lot, float, float, float, float]] = []
         remaining = volume
-        for lot in queue:
+        for lot in self._order(deal, side, volume, profit):
             if remaining <= _EPS:
                 break
             if lot.side != side or lot.volume <= _EPS:
@@ -846,30 +975,26 @@ class _Fifo:
             self.unmatched_closes += 1
         if not slices:
             return
-        direction = 1.0 if side == "long" else -1.0
-        weights = [(deal.price - lot.price) * direction * take for lot, take, *_ in slices]
-        total_weight = sum(weights)
-        spread = sum(abs(weight) for weight in weights)
-        if spread <= 0 or abs(total_weight) < 1e-6 * spread:
-            weights = [take for _, take, *_ in slices]
-            total_weight = sum(weights)
-        for (lot, take, commission, fee, swap), weight in zip(slices, weights, strict=True):
-            share = take / volume * cost_share if volume > 0 else 0.0
-            self.trips.append(
-                _Trip(
-                    symbol=deal.symbol,
-                    side=side,
-                    volume=take,
-                    entry_time=lot.time,
-                    exit_time=deal.time,
-                    entry_price=lot.price,
-                    exit_price=deal.price,
-                    gross=profit * weight / total_weight if total_weight else 0.0,
-                    commission=commission + deal.commission * share,
-                    fee=fee + deal.fee * share,
-                    swap=swap + deal.swap * share,
-                )
+        # One closing deal is one trade, as the platform counts it ("Total
+        # Trades"), even when it closes several entries: the entry is their
+        # volume-weighted price and the earliest entry time.
+        taken = sum(take for _, take, *_ in slices)
+        share = taken / volume * cost_share if volume > 0 else 0.0
+        self.trips.append(
+            _Trip(
+                symbol=deal.symbol,
+                side=side,
+                volume=taken,
+                entry_time=min(lot.time for lot, *_ in slices),
+                exit_time=deal.time,
+                entry_price=sum(lot.price * take for lot, take, *_ in slices) / taken,
+                exit_price=deal.price,
+                gross=profit,
+                commission=sum(item[2] for item in slices) + deal.commission * share,
+                fee=sum(item[3] for item in slices) + deal.fee * share,
+                swap=sum(item[4] for item in slices) + deal.swap * share,
             )
+        )
 
     def apply(self, deal: _Deal) -> None:
         fill_side = "long" if deal.type == "buy" else "short"
@@ -898,12 +1023,36 @@ class _Fifo:
         return sum(1 for queue in self.lots.values() for lot in queue if lot.volume > _EPS)
 
 
+def _pair_mt5_deals(deals: list[_Deal]) -> _Fifo:
+    """Pair trade deals into round trips.
+
+    A netting account pairs exactly. A hedging account's report does not
+    say which entry a closing deal closes, so a first-in first-out pass
+    estimates each symbol's contract size, and a second pass lets every
+    close take the open entry of its own volume whose price explains the
+    deal's profit best (first in, first out among equals).
+    """
+    fifo = _Fifo()
+    for deal in deals:
+        fifo.apply(deal)
+    if not fifo.ambiguous_closes:
+        return fifo
+    sizes = _contract_sizes(fifo.trips)
+    rematched = _Fifo(sizes={trip.symbol: sizes[trip.symbol] for trip in fifo.trips})
+    for deal in deals:
+        rematched.apply(deal)
+    rematched.hedging = rematched.hedging or fifo.hedging
+    return rematched
+
+
 def _fifo_warnings(fifo: _Fifo) -> list[str]:
     warnings: list[str] = []
-    if fifo.hedging:
+    if fifo.hedging or fifo.ambiguous_closes:
         warnings.append(
-            "hedging account: entries were paired first-in first-out, so per-trade entry "
-            "price and holding time are approximate (money results stay exact)"
+            "hedging account: the report does not say which entry each close belongs to; "
+            "closes were matched to the open entry whose price explains their profit, "
+            "else first-in first-out, so per-trade entry price and holding time are "
+            "approximate (money results stay exact)"
         )
     if fifo.unmatched_closes:
         warnings.append(
@@ -943,15 +1092,60 @@ def _period_dates(value: str) -> tuple[str, str] | None:
     return None
 
 
+#: Summary labels by the English name the parsers use. Older builds and other
+#: terminal languages print other words for the same figure: the Russian
+#: names come from a real Russian report, the Spanish ones from the Spanish
+#: MetaTrader 5 help ("Informe de simulación"), matched without case.
+_MT5_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
+    "Expert": ("Советник", "Asesor", "Asesor Experto"),
+    "Symbol": ("Символ", "Símbolo"),
+    "Period": ("Период", "Período", "Periodo"),
+    "Company": ("Broker", "Брокер", "Компания", "Compañía", "Empresa"),
+    "Currency": ("Валюта", "Divisa", "Moneda"),
+    "Initial Deposit": ("Начальный депозит", "Depósito inicial"),
+    "Leverage": ("Плечо", "Apalancamiento"),
+    "History Quality": ("Качество истории", "Calidad del historial"),
+    "Total Net Profit": ("Net profit", "Чистая прибыль", "Beneficio Neto"),
+    "Total Trades": ("Всего трейдов", "Total de Trades"),
+    "Total Deals": ("Всего сделок", "Total de transacciones"),
+    "Balance Drawdown Maximal": (
+        "Максимальная просадка по балансу",
+        "Reducción Máxima del Saldo",
+    ),
+    "Equity Drawdown Maximal": (
+        "Максимальная просадка по средствам",
+        "Reducción máxima del capital",
+    ),
+    "Equity Drawdown Relative": (
+        "Relative equity drawdown",
+        "Относительная просадка по средствам",
+        "Reducción relativa del capital",
+    ),
+    "Sharpe Ratio": ("Коэффициент Шарпа", "Ratio de Sharpe", "El Ratio de Sharpe"),
+    "Profit Factor": ("Прибыльность", "Factor de Rentabilidad"),
+}
+
+
+def _mt5_labels(rows: Iterable[_Row]) -> dict[str, str]:
+    """``_labels`` plus the English name for every known alias found."""
+    found = _labels(rows)
+    lowered = {key.lower(): value for key, value in found.items()}
+    for english, aliases in _MT5_LABEL_ALIASES.items():
+        if english in found:
+            continue
+        for alias in aliases:
+            if alias.lower() in lowered:
+                found[english] = lowered[alias.lower()]
+                break
+    return found
+
+
 def _parse_mt5_tester(reader: _TableReader) -> _Draft:
     deals, invalid = _mt5_deals(reader)
-    labels = _labels(reader.rows)
+    labels = _mt5_labels(reader.rows)
     draft = _Draft(MT5_TESTER_HTML, [], invalid_rows=invalid)
     draft.itemised = {"commission", "swap"}
-    fifo = _Fifo()
-    for deal in deals:
-        if deal.type in {"buy", "sell"}:
-            fifo.apply(deal)
+    fifo = _pair_mt5_deals([deal for deal in deals if deal.type in {"buy", "sell"}])
     draft.trips = fifo.trips
     draft.cash = _deal_cash(deals)
     draft.warnings.extend(_fifo_warnings(fifo))
@@ -971,6 +1165,7 @@ def _parse_mt5_tester(reader: _TableReader) -> _Draft:
         ("Total Net Profit", "declared_total_net_profit"),
         ("Total Trades", "declared_total_trades"),
         ("Total Deals", "declared_total_deals"),
+        ("Balance Drawdown Maximal", "declared_balance_drawdown_maximal"),
         ("Equity Drawdown Maximal", "declared_equity_drawdown_maximal"),
         ("Equity Drawdown Relative", "declared_equity_drawdown_relative"),
         ("Sharpe Ratio", "declared_sharpe_ratio"),
@@ -1003,7 +1198,30 @@ def _parse_mt5_tester(reader: _TableReader) -> _Draft:
             deals[-1].balance - deposit,
             0.011,
         )
+        _compare(
+            draft.warnings,
+            "balance drawdown maximal",
+            _lead_num(labels.get("Balance Drawdown Maximal")),
+            _deal_balance_drawdown(deals),
+            0.011,
+        )
     return draft
+
+
+def _deal_balance_drawdown(deals: list[_Deal]) -> float:
+    """Deepest fall of the report's own Balance column, deal by deal, in money.
+
+    This is how the tester computes "Balance Drawdown Maximal", so the two
+    agree on an untouched report (checked on 13 real reports).
+    """
+    peak: float | None = None
+    deepest = 0.0
+    for deal in deals:
+        if deal.balance is None:
+            continue
+        peak = deal.balance if peak is None else max(peak, deal.balance)
+        deepest = max(deepest, peak - deal.balance)
+    return deepest
 
 
 def _mt5_inputs(rows: list[_Row]) -> list[str]:
@@ -1094,7 +1312,7 @@ def _mt5_positions(reader: _TableReader) -> tuple[list[_Trip], int]:
 def _parse_mt5_history(reader: _TableReader) -> _Draft:
     deals, invalid_deals = _mt5_deals(reader)
     positions, invalid_positions = _mt5_positions(reader)
-    labels = _labels(reader.rows)
+    labels = _mt5_labels(reader.rows)
     draft = _Draft(MT5_HISTORY_HTML, [], invalid_rows=invalid_deals + invalid_positions)
     draft.itemised = {"commission", "swap"}
     trade_deals = [deal for deal in deals if deal.type in {"buy", "sell"}]
@@ -1112,9 +1330,7 @@ def _parse_mt5_history(reader: _TableReader) -> _Draft:
                 f"{open_positions} position(s) opened in the report were not closed; excluded"
             )
     else:
-        fifo = _Fifo()
-        for deal in trade_deals:
-            fifo.apply(deal)
+        fifo = _pair_mt5_deals(trade_deals)
         draft.trips = fifo.trips
         draft.itemised.add("fee")
         draft.warnings.extend(_fifo_warnings(fifo))
@@ -1330,51 +1546,57 @@ def _parse_mt4_statement(reader: _TableReader) -> _Draft:
     cash: list[_Cash] = []
     credits = 0
     cancelled = 0
-    for row in reader.rows:
-        texts = row.texts
-        if _is_mt4_statement_trade(texts):
-            entry_time = _one_time(texts[1])
-            exit_time = _one_time(texts[8])
-            volume = _num(texts[3])
-            entry_price = _num(texts[5])
-            exit_price = _num(texts[9])
-            profit = _num(texts[13])
+    for texts, columns in _mt4_statement_rows(reader):
+        if _is_mt4_statement_trade(texts, columns):
+
+            def cell(name: str, texts: list[str] = texts, columns: dict[str, int] = columns) -> str:
+                index = columns.get(name)
+                return texts[index] if index is not None and index < len(texts) else ""
+
+            entry_time = _one_time(cell("open_time"))
+            exit_time = _one_time(cell("close_time"))
+            volume = _num(cell("size"))
+            entry_price = _num(cell("open_price"))
+            exit_price = _num(cell("close_price"))
+            profit = _num(cell("profit"))
             if None in (entry_time, exit_time, volume, entry_price, exit_price, profit):
                 draft.invalid_rows += 1
                 continue
             assert entry_time is not None and exit_time is not None
             trip = _Trip(
-                symbol=texts[4].upper(),
-                side="long" if texts[2].lower() == "buy" else "short",
+                symbol=cell("symbol").upper(),
+                side="long" if cell("type").lower() == "buy" else "short",
                 volume=volume or 0.0,
                 entry_time=entry_time,
                 exit_time=exit_time,
                 entry_price=entry_price or 0.0,
                 exit_price=exit_price or 0.0,
                 gross=profit or 0.0,
-                commission=_num(texts[10]) or 0.0,
-                fee=_num(texts[11]) or 0.0,
-                swap=_num(texts[12]) or 0.0,
+                commission=_num(cell("commission")) or 0.0,
+                fee=_num(cell("taxes")) or 0.0,
+                swap=_num(cell("swap")) or 0.0,
             )
             draft.trips.append(trip)
             cash.append(_Cash(exit_time, trip.net, False))
             continue
-        if (
-            len(texts) in {4, 5}
-            and _is_mt_time(texts[1])
-            and texts[2].lower() in {"balance", "credit"}
-        ):
-            moment = _one_time(texts[1])
-            amount = _num(texts[-1])
-            if moment is None or amount is None:
+        at = columns["open_time"]
+        kind = texts[columns["type"]].lower() if len(texts) > columns["type"] else ""
+        if kind in {"balance", "credit"} and _is_mt_time(texts[at]):
+            moment = _one_time(texts[at])
+            # The amount is the last number on the row: the Profit cell of a
+            # 4-5 cell row, or before the comment in the numbered layout.
+            amounts = [
+                value for value in (_num(text) for text in texts[at + 2 :]) if value is not None
+            ]
+            if moment is None or not amounts:
                 draft.invalid_rows += 1
-            elif texts[2].lower() == "credit":
+            elif kind == "credit":
                 credits += 1
             else:
-                cash.append(_Cash(moment, amount, True))
+                cash.append(_Cash(moment, amounts[-1], True))
             continue
         if any(text.lower() == "cancelled" for text in texts) and _is_mt_time(
-            texts[1] if len(texts) > 1 else ""
+            texts[at] if len(texts) > at else ""
         ):
             cancelled += 1
     cash.sort(key=lambda item: item.time)
@@ -2166,6 +2388,53 @@ def _contract_sizes(trips: list[_Trip]) -> dict[str, float]:
     return {trip.symbol: sizes.get(trip.symbol, 1.0) for trip in trips}
 
 
+#: A symbol whose recomputed gross P&L misses the reported one by more
+#: than this share of its gross, with one contract size, is re-sized per trade.
+CONVERSION_DRIFT_SHARE = 0.01
+#: A per-trade size is used only within this band around the symbol's size:
+#: account-currency conversion drifts slowly; a wider gap is something else.
+CONVERSION_DRIFT_BAND = (0.8, 1.25)
+
+
+def _trip_ratio(trip: _Trip) -> float | None:
+    move = abs(trip.exit_price - trip.entry_price)
+    if move > 0 and trip.volume > 0 and trip.gross != 0:
+        return abs(trip.gross) / (move * trip.volume)
+    return None
+
+
+def _trip_size(trip: _Trip, size: float) -> float:
+    ratio = _trip_ratio(trip)
+    low, high = CONVERSION_DRIFT_BAND
+    if ratio is not None and low <= ratio / size <= high:
+        return ratio
+    return size
+
+
+def _drifting_symbols(trips: list[_Trip], sizes: dict[str, float]) -> set[str]:
+    """Symbols whose money value per point changes during the report.
+
+    A pair quoted in another currency than the account's (USDJPY in a USD
+    account, an index CFD in AUD) pays a profit converted at each close's
+    rate, so one contract size cannot reproduce every gross P&L. Those
+    symbols get a per-trade size from the reported profit, within
+    ``CONVERSION_DRIFT_BAND``, so the audit's recomputed P&L matches the
+    platform's. Only for files whose P&L is gross of commission and swap.
+    """
+    missed: dict[str, float] = {}
+    gross: dict[str, float] = {}
+    for trip in trips:
+        direction = 1.0 if trip.side == "long" else -1.0
+        ours = (trip.exit_price - trip.entry_price) * direction * trip.volume * sizes[trip.symbol]
+        missed[trip.symbol] = missed.get(trip.symbol, 0.0) + abs(ours - trip.gross)
+        gross[trip.symbol] = gross.get(trip.symbol, 0.0) + abs(ours)
+    return {
+        symbol
+        for symbol, miss in missed.items()
+        if gross[symbol] > 0 and miss / gross[symbol] > CONVERSION_DRIFT_SHARE
+    }
+
+
 def _previous_day(day: date, business: bool) -> date:
     day -= timedelta(days=1)
     while business and day.weekday() >= 5:
@@ -2311,8 +2580,13 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     trade_fees: list[float] = []
     trade_symbols: list[str] = []
     invalid = draft.invalid_rows
+    drifting = _drifting_symbols(trips, sizes) if draft.itemised else set()
+    if drifting:
+        warnings.append(f"{CONVERSION_DRIFT_WARNING}: {', '.join(sorted(drifting))}")
     for trip in trips:
         quantity = trip.volume * sizes[trip.symbol]
+        if trip.symbol in drifting:
+            quantity = trip.volume * _trip_size(trip, sizes[trip.symbol])
         notional = trip.entry_price * quantity
         try:
             trade = Trade(
@@ -2383,6 +2657,50 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
 # ---------------------------------------------------------------------------
 
 
+def _sheet_reader(rows: list[list[Any]]) -> _TableReader:
+    """A MetaTrader 5 workbook sheet, as the HTML parsers read the report.
+
+    The terminal's "Report > Open XML (MS Office Excel)" export holds the
+    same rows as its HTML report; column headers lose their colour, so a
+    row is a header when it names the Deals or Positions columns.
+    """
+    reader = _TableReader()
+    width = 0
+    for values in rows:
+        texts = [_as_text(value) for value in values]
+        if not any(texts):
+            continue
+        names = {text.strip().lower() for text in texts}
+        names = {_MT5_DEAL_HEADER_ALIASES.get(name, name) for name in names}
+        is_header = {"time", "symbol", "type", "volume"} <= names
+        if is_header:
+            while texts and not texts[-1]:
+                texts.pop()
+            width = len(texts)
+        elif _is_mt_time(texts[0]):
+            # A workbook stores no cell for an empty trailing Comment.
+            texts.extend([""] * (width - len(texts)))
+        else:
+            # Summary rows merge each label and value over several columns:
+            # drop the empty cells so every "Label:" sits next to its value.
+            texts = [text for text in texts if text]
+        attrs = {"bgcolor": "#E5F0FC"} if is_header else {}
+        reader.rows.append(_Row(attrs, [_Cell(text, {}) for text in texts]))
+    first = reader.rows[0].texts[0] if reader.rows else ""
+    reader.title = first
+    return reader
+
+
+def _mt5_workbook(sheets: dict[str, list[list[Any]]]) -> tuple[str, _TableReader] | None:
+    """The MetaTrader 5 report in a workbook, as (format, reader), if any."""
+    for rows in sheets.values():
+        reader = _sheet_reader(rows)
+        found = _html_format(reader)
+        if found in {MT5_TESTER_HTML, MT5_HISTORY_HTML}:
+            return (MT5_TESTER_XLSX if found == MT5_TESTER_HTML else MT5_HISTORY_XLSX), reader
+    return None
+
+
 def _is_zip(data: bytes) -> bool:
     return data.startswith(b"PK\x03\x04")
 
@@ -2398,10 +2716,12 @@ def _unknown_format() -> ReportFormatError:
     return ReportFormatError(
         "unknown_format",
         "the file is not a supported report. Expected: a MetaTrader 5 or 4 report or "
-        "statement (HTML), a TradingView list of trades (CSV or XLSX), or a trades CSV "
-        "from NinjaTrader, QuantConnect, backtesting.py or vectorbt",
+        "statement (HTML, or XLSX for MetaTrader 5), a TradingView list of trades "
+        "(CSV or XLSX), or a trades CSV from NinjaTrader, QuantConnect, backtesting.py "
+        "or vectorbt",
         "el archivo no es un informe compatible. Se espera: un informe o estado de cuenta "
-        "de MetaTrader 5 o 4 (HTML), una lista de operaciones de TradingView (CSV o XLSX) "
+        "de MetaTrader 5 o 4 (HTML, o XLSX de MetaTrader 5), una lista de operaciones de "
+        "TradingView (CSV o XLSX) "
         "o un CSV de operaciones de NinjaTrader, QuantConnect, backtesting.py o vectorbt",
     )
 
@@ -2420,7 +2740,8 @@ def detect_format(data: bytes, filename: str | None = None) -> str | None:
             return None
         if any(rows and _is_tradingview_header(rows[0]) for rows in sheets.values()):
             return TRADINGVIEW_XLSX
-        return None
+        workbook = _mt5_workbook(sheets)
+        return workbook[0] if workbook is not None else None
     text = decode_text(data)
     stripped = text.lstrip()
     if stripped.startswith("<?xml") or stripped[:200].lower().startswith("<workbook"):
@@ -2450,9 +2771,19 @@ def import_report(
         # Read the workbook here so that its own errors (too large, damaged)
         # reach the client instead of a generic "unknown format".
         sheets = read_xlsx(data)
-        if not any(rows and _is_tradingview_header(rows[0]) for rows in sheets.values()):
+        if any(rows and _is_tradingview_header(rows[0]) for rows in sheets.values()):
+            return _assemble(_parse_tradingview_xlsx(sheets), initial_balance)
+        workbook = _mt5_workbook(sheets)
+        if workbook is None:
             raise _unknown_format()
-        return _assemble(_parse_tradingview_xlsx(sheets), initial_balance)
+        workbook_format, reader = workbook
+        workbook_draft = (
+            _parse_mt5_tester(reader)
+            if workbook_format == MT5_TESTER_XLSX
+            else _parse_mt5_history(reader)
+        )
+        workbook_draft.source_format = workbook_format
+        return _assemble(workbook_draft, initial_balance)
     source_format = detect_format(data, filename)
     if source_format == MT5_OPTIMIZATION_XML:
         raise ReportFormatError(
@@ -2605,8 +2936,10 @@ __all__ = [
     "MT4_STATEMENT_HTML",
     "MT4_TESTER_HTML",
     "MT5_HISTORY_HTML",
+    "MT5_HISTORY_XLSX",
     "MT5_OPTIMIZATION_XML",
     "MT5_TESTER_HTML",
+    "MT5_TESTER_XLSX",
     "NINJATRADER_CSV",
     "QUANTCONNECT_TRADES_CSV",
     "REPORT_FORMATS",

@@ -26,17 +26,35 @@ at least 30 return observations.
 ### Importers and their limits
 
 `audit/importers.py` detects the format by content (standard library only)
-and reads: MetaTrader 5 tester and account-history HTML reports (UTF-16 is
-common), MetaTrader 4 tester reports and detailed statements, TradingView
-"List of trades" CSV and XLSX, and the trade exports of NinjaTrader,
-QuantConnect, backtesting.py and vectorbt. Limits, each written into the
-report as a reading warning:
+and reads: MetaTrader 5 tester and account-history reports as HTML (UTF-16 is
+common) or as the terminal's XLSX export, MetaTrader 4 tester reports and
+statements (build 600+ with a Taxes column, older 13-column ones, and the
+numbered layout with a comment column), TradingView "List of trades" CSV and
+XLSX, and the trade exports of NinjaTrader, QuantConnect, backtesting.py and
+vectorbt. MetaTrader 5 summary labels are also read in Russian (from a real
+report), in Spanish (names from the Spanish MetaTrader 5 help, not yet seen
+in a real file) and as build 1940 wrote them ("Net profit", "Trade",
+"Profit Column"). The importers were checked against 23 real public
+MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
+Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating
   (open-trade) drawdown, so the real drawdown was at least as deep.
 - Report times carry no timezone; they are read as UTC.
 - Contract sizes are inferred from the reported profit when the file does
-  not state them.
+  not state them. When one size misses the reported gross P&L of a symbol
+  by more than 1 % (`CONVERSION_DRIFT_SHARE`: a pair quoted in another
+  currency than the account's, such as USDJPY in a USD account), that
+  symbol is sized per trade from its own profit, within 0.8x to 1.25x of
+  the symbol's size (`CONVERSION_DRIFT_BAND`), with a warning.
+- One closing deal is one trade, as the tester counts "Total Trades". A
+  hedging report does not say which entry a close belongs to: the close
+  takes the open entry of its own volume whose price explains its profit
+  (first in, first out among equals), so entry price and holding time are
+  approximate while the money stays exact.
+- The MT5 tester's own totals are cross-checked against the rows: Total
+  Trades, Total Net Profit and Balance Drawdown Maximal (the deepest fall
+  of the Balance column). A mismatch is a warning, never a silent repair.
 - A report without a starting balance uses the one the client declares,
   else 10,000 with a warning.
 - The MT5 optimisation pass count is what the optimiser tried; a genetic

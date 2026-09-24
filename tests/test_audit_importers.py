@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import random
+import re
 import zipfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -21,12 +22,15 @@ from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.importers import (
     BACKTESTINGPY_CSV,
     CONTRACT_SIZE_WARNING,
+    CONVERSION_DRIFT_WARNING,
     FLOATING_DRAWDOWN_WARNING,
     MT4_STATEMENT_HTML,
     MT4_TESTER_HTML,
     MT5_HISTORY_HTML,
+    MT5_HISTORY_XLSX,
     MT5_OPTIMIZATION_XML,
     MT5_TESTER_HTML,
+    MT5_TESTER_XLSX,
     NAIVE_TIME_WARNING,
     NINJATRADER_CSV,
     QUANTCONNECT_TRADES_CSV,
@@ -113,10 +117,11 @@ def test_unknown_files_are_not_detected() -> None:
 def test_mt5_tester_pairs_partial_closes_hedges_and_reversals(encode) -> None:  # type: ignore[no-untyped-def]
     report = import_report(encode(fixture("mt5_tester.html")))
     assert report.source_format == MT5_TESTER_HTML
-    # Six FIFO round trips from five closing deals: a partial close, two
-    # entries closed by one deal, and a netting reversal (in/out).
-    assert gross(report) == [25.0, -10.0, 27.5, 30.0, 20.0, -20.0]
-    assert report.trades.sides == ["long", "long", "short", "short", "long", "short"]
+    # One trade per closing deal, as the tester counts "Total Trades": a
+    # partial close, two entries closed by one deal (one trade at their
+    # volume-weighted entry), and a netting reversal (in/out).
+    assert gross(report) == [25.0, -10.0, 57.5, 20.0, -20.0]
+    assert report.trades.sides == ["long", "long", "short", "long", "short"]
     assert report.fees == {"commission": -8.4, "swap": -1.05}
     net = sum(gross(report)) + report.fees["commission"] + report.fees["swap"]
     assert net == pytest.approx(63.05)
@@ -166,7 +171,7 @@ def test_mt5_localised_titles_fall_back_to_structure() -> None:
         text = text.replace(english, other)
     report = import_report(text.encode("utf-8"))
     assert report.source_format == MT5_TESTER_HTML
-    assert gross(report) == [25.0, -10.0, 27.5, 30.0, 20.0, -20.0]
+    assert gross(report) == [25.0, -10.0, 57.5, 20.0, -20.0]
 
 
 def test_mt5_balance_break_is_reported_not_hidden() -> None:
@@ -813,3 +818,294 @@ def test_every_warning_and_error_message_passes_the_profit_claim_guard() -> None
             texts.extend([str(error), error.message_es])
     assert texts
     assert_report_clean(*texts)
+
+
+# ---------------------------------------------------------------------------
+# Layouts found in real public reports (docs/research/audit_iteration4/
+# real_reports_check.md). Each fixture below is synthetic: it reproduces the
+# structure of a real file, never its contents.
+# ---------------------------------------------------------------------------
+
+
+def _mt5_tester_variant(*replacements: tuple[str, str]) -> bytes:
+    text = fixture("mt5_tester.html").decode("utf-8")
+    for old, new in replacements:
+        assert old in text, old
+        text = text.replace(old, new)
+    return text.encode("utf-8")
+
+
+def test_mt5_build_1940_headers_trade_and_profit_column() -> None:
+    # Build 1940 wrote "Trade" and "Profit Column" in the Deals header,
+    # "Net profit" in the summary and the deals count under "Total Trades".
+    report = import_report(
+        _mt5_tester_variant(
+            ("<b>Deal</b>", "<b>Trade</b>"),
+            ("<b>Profit</b>", "<b>Profit Column</b>"),
+            ("Total Net Profit:", "Net profit:"),
+            ("Total Deals:", "Total Trades:"),
+        )
+    )
+    assert gross(report) == [25.0, -10.0, 57.5, 20.0, -20.0]
+    assert report.initial_balance == 10_000.0
+    assert equity_rows(report)[-1] == ("2024-01-08", pytest.approx(10_063.05))
+    assert report.metadata["declared_total_net_profit"] == "63.05"
+    assert report.metadata["declared_total_trades"] == "5"
+    assert not any("the report states" in w for w in report.warnings)
+
+
+RUSSIAN_MT5 = (
+    ("Expert:", "Советник:"),
+    ("Symbol:", "Символ:"),
+    ("Period:", "Период:"),
+    ("Currency:", "Валюта:"),
+    ("Initial Deposit:", "Начальный депозит:"),
+    ("Leverage:", "Плечо:"),
+    ("History Quality:", "Качество истории:"),
+    ("Total Net Profit:", "Чистая прибыль:"),
+    ("Total Trades:", "Всего трейдов:"),
+    ("Total Deals:", "Всего сделок:"),
+    ("<b>Deals</b>", "<b>Сделки</b>"),
+    ("<b>Deal</b>", "<b>Сделка</b>"),
+    ("<b>Direction</b>", "<b>Направление</b>"),
+    ("<b>Commission</b>", "<b>Комиссия</b>"),
+    ("<b>Swap</b>", "<b>Своп</b>"),
+    ("<b>Profit</b>", "<b>Прибыль</b>"),
+    ("<b>Balance</b>", "<b>Баланс</b>"),
+    ("Strategy Tester Report", "Отчет Тестера стратегий"),
+)
+SPANISH_MT5 = (
+    ("Initial Deposit:", "Depósito inicial:"),
+    ("Total Net Profit:", "Beneficio Neto:"),
+    ("Total Trades:", "Total de Trades:"),
+    ("Total Deals:", "Total de transacciones:"),
+)
+
+
+@pytest.mark.parametrize("labels", [RUSSIAN_MT5, SPANISH_MT5], ids=["ru", "es"])
+def test_mt5_summary_labels_in_other_languages(labels: tuple[tuple[str, str], ...]) -> None:
+    report = import_report(utf16(_mt5_tester_variant(*labels)))
+    assert report.source_format == MT5_TESTER_HTML
+    assert gross(report) == [25.0, -10.0, 57.5, 20.0, -20.0]
+    assert report.initial_balance == 10_000.0
+    assert report.metadata["declared_total_net_profit"] == "63.05"
+    assert report.metadata["declared_total_trades"] == "5"
+    assert report.metadata["declared_total_deals"] == "9"
+    assert report.currency == "USD"
+    assert not any("the report states" in w for w in report.warnings)
+
+
+BALANCE_DRAWDOWN_ROW = (
+    '<tr align="right"><td nowrap colspan="3">Total Deals:</td>',
+    '<tr align="right"><td nowrap colspan="3">Balance Drawdown Maximal:</td>'
+    "<td nowrap><b>{value} (0.22%)</b></td></tr>"
+    '<tr align="right"><td nowrap colspan="3">Total Deals:</td>',
+)
+
+
+def test_mt5_balance_drawdown_is_checked_against_the_deals() -> None:
+    old, new = BALANCE_DRAWDOWN_ROW
+    # The Balance column falls from 10 085.05 to 10 063.05: 22.00.
+    report = import_report(_mt5_tester_variant((old, new.format(value="22.00"))))
+    assert report.metadata["declared_balance_drawdown_maximal"] == "22.00 (0.22%)"
+    assert not any("the report states" in w for w in report.warnings)
+    edited = import_report(_mt5_tester_variant((old, new.format(value="12.00"))))
+    assert any(
+        "balance drawdown maximal: the report states 12.00 but the rows add up to 22.00" in w
+        for w in edited.warnings
+    )
+
+
+def _as_workbook_rows(html: bytes) -> list[list[object]]:
+    """The rows the terminal's XLSX export writes for the same report.
+
+    Summary labels and values are spread over merged cells (empty cells in
+    between) and numbers are typed; table rows keep their columns.
+    """
+    from quant_trade.audit.importers import _read_html, decode_text
+
+    rows: list[list[object]] = []
+    for row in _read_html(decode_text(html)).rows:
+        values: list[object] = []
+        for text in row.texts:
+            plain = text.replace(" ", "")
+            try:
+                number: object = float(plain)
+            except ValueError:
+                number = text or None
+            values.append(number)
+        if values and isinstance(values[0], str) and values[0].endswith(":"):
+            spread: list[object] = []
+            for value in values:
+                spread.extend([value, None, None])
+            values = spread
+        rows.append(values)
+    return rows
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("mt5_tester.html", MT5_TESTER_XLSX), ("mt5_history.html", MT5_HISTORY_XLSX)],
+)
+def test_mt5_xlsx_export_reads_like_the_html_report(name: str, expected: str) -> None:
+    html_report = import_report(fixture(name))
+    workbook = xlsx({"Sheet1": _as_workbook_rows(fixture(name))})
+    assert detect_format(workbook, "report.xlsx") == expected
+    report = import_report(workbook)
+    assert report.source_format == expected
+    assert gross(report) == gross(html_report)
+    assert report.initial_balance == html_report.initial_balance
+    assert report.fees == html_report.fees
+    assert equity_rows(report) == equity_rows(html_report)
+    assert report.metadata.get("declared_total_net_profit") is not None
+    assert not any("the report states" in w for w in report.warnings)
+
+
+def test_mt4_statement_before_build_600_has_no_taxes_column() -> None:
+    text = fixture("mt4_statement.htm").decode("utf-8")
+    text = text.replace("<td>Commission</td><td>Taxes</td>", "<td>Commission</td>")
+    text = re.sub(
+        r"(<td class=mspt>-?[\d.]+</td>)<td class=mspt>0\.00</td>(<td class=mspt>-?[\d.]+</td>"
+        r"<td class=mspt>-?[\d ,.]+</td></tr>)",
+        r"\1\2",
+        text,
+    )
+    report = import_report(text.encode("cp1252"))
+    modern = import_report(fixture("mt4_statement.htm"))
+    assert report.source_format == MT4_STATEMENT_HTML
+    assert gross(report) == gross(modern)
+    assert report.fees == {"commission": -14.0, "swap": -10.3, "fee": 0.0}
+    assert report.initial_balance == modern.initial_balance
+
+
+NUMBERED_MT4_STATEMENT = """<html><head><title>Statement: '000000 ', Name</title></head><body>
+<table>
+<tr><td>A/C No: 0000000</td><td>Name: Name</td><td>2024.03.08 18:30 (server time)</td></tr>
+<tr><td colspan=15><b>Closed Transactions:</b></td></tr>
+<tr><td>N</td><td>Ticket</td><td>Open Time</td><td>Type</td><td>Lots</td><td>Symbol</td>
+<td>Price</td><td>S/L</td><td>T/P</td><td>Close Time</td><td>Price</td><td>Commis</td>
+<td>Swap</td><td>Trade P/L</td><td>Comment</td></tr>
+<tr><td>1</td><td>100</td><td>2024.03.01 08:00</td><td>balance</td><td>Deposit</td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>25000.00</td>
+<td>Deposit</td></tr>
+<tr><td>2</td><td>101</td><td>2024.03.04 09:15</td><td>buy</td><td>1.00</td><td>eurusd</td>
+<td>1.0850</td><td>0.0000</td><td>0.0000</td><td>2024.03.04 11:40</td><td>1.0870</td>
+<td>-7.00</td><td>0.00</td><td>200.00</td><td>EA_one</td></tr>
+<tr><td>Total for:EA_one</td><td>200.00</td><td>Profit Factor: 0.00</td><td></td></tr>
+<tr><td>3</td><td>102</td><td>2024.03.05 10:00</td><td>sell</td><td>0.50</td><td>eurusd</td>
+<td>1.0900</td><td>0.0000</td><td>0.0000</td><td>2024.03.06 09:30</td><td>1.0930</td>
+<td>-3.50</td><td>-1.20</td><td>-150.00</td><td>EA_two</td></tr>
+</table></body></html>"""
+
+
+def test_mt4_statement_with_row_numbers_and_comments() -> None:
+    report = import_report(NUMBERED_MT4_STATEMENT.encode("cp1252"))
+    assert report.source_format == MT4_STATEMENT_HTML
+    assert gross(report) == [200.0, -150.0]
+    assert report.trades.sides == ["long", "short"]
+    assert report.initial_balance == 25_000.0
+    assert report.fees == {"commission": -10.5, "swap": -1.2, "fee": 0.0}
+    assert equity_rows(report)[-1][1] == pytest.approx(25_000 + 50 - 11.7)
+
+
+def _mt5_deals_report(deals: list[tuple[str, str, str, str, float, float, float]]) -> bytes:
+    """A minimal MT5 tester report: (time, symbol, type, direction, volume, price, profit)."""
+    balance = 10_000.0
+    rows = [
+        "<tr><td>2024.01.01 00:00:00</td><td>1</td><td></td><td>balance</td><td></td><td></td>"
+        "<td></td><td></td><td>0.00</td><td>0.00</td><td>10000.00</td><td>10000.00</td>"
+        "<td></td></tr>"
+    ]
+    for number, (moment, symbol, kind, direction, volume, price, profit) in enumerate(
+        deals, start=2
+    ):
+        balance += profit
+        rows.append(
+            f"<tr><td>{moment}</td><td>{number}</td><td>{symbol}</td><td>{kind}</td>"
+            f"<td>{direction}</td><td>{volume}</td><td>{price}</td><td>{number}</td>"
+            f"<td>0.00</td><td>0.00</td><td>{profit:.2f}</td><td>{balance:.2f}</td><td></td></tr>"
+        )
+    return (
+        "<html><head><title>Strategy Tester Report</title></head><body><table>"
+        "<tr><td>Initial Deposit:</td><td>10 000.00</td></tr>"
+        '<tr bgcolor="#E5F0FC"><td>Time</td><td>Deal</td><td>Symbol</td><td>Type</td>'
+        "<td>Direction</td><td>Volume</td><td>Price</td><td>Order</td><td>Commission</td>"
+        "<td>Swap</td><td>Profit</td><td>Balance</td><td>Comment</td></tr>"
+        + "".join(rows)
+        + "</table></body></html>"
+    ).encode("utf-8")
+
+
+def test_mt5_hedging_close_takes_the_entry_its_profit_explains() -> None:
+    # Two EURUSD buys of the same volume are open; the first close is at a
+    # profit only the SECOND entry explains (a hedging EA closing its newer
+    # position first). First-in first-out would pair it with the older one.
+    deals = [
+        ("2024.01.02 09:00:00", "EURUSD", "buy", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.02 10:00:00", "EURUSD", "sell", "out", 0.1, 1.1010, 10.0),
+        ("2024.01.02 11:00:00", "EURUSD", "buy", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.02 12:00:00", "EURUSD", "sell", "out", 0.1, 1.0990, -10.0),
+        ("2024.01.03 09:00:00", "EURUSD", "buy", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.03 09:30:00", "EURUSD", "buy", "in", 0.1, 1.1050, 0.0),
+        ("2024.01.03 10:00:00", "EURUSD", "sell", "out", 0.1, 1.1060, 10.0),
+        ("2024.01.03 11:00:00", "EURUSD", "sell", "out", 0.1, 1.1020, 20.0),
+        ("2024.01.04 09:00:00", "EURUSD", "sell", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.04 10:00:00", "EURUSD", "buy", "out", 0.1, 1.0970, 30.0),
+    ]
+    report = import_report(_mt5_deals_report(deals))
+    assert gross(report) == [10.0, -10.0, 10.0, 20.0, 30.0]
+    entries = [trade.entry_price for trade in report.trades.trades]
+    assert entries == pytest.approx([1.1000, 1.1000, 1.1050, 1.1000, 1.1000])
+    assert_recomputed_matches(report)
+    assert any(w.startswith("hedging account") for w in report.warnings)
+
+
+def test_mt5_conversion_drift_is_sized_per_trade() -> None:
+    # USDJPY in a USD account: 0.1 lot moving 0.50 yen pays 5 000 yen,
+    # converted at each close's own rate, so the USD per point drifts.
+    deals = []
+    for day, rate in enumerate((140.0, 145.0, 150.0, 155.0), start=2):
+        profit = round(0.5 * 0.1 * 100_000 / rate, 2)
+        deals += [
+            (f"2024.01.0{day} 09:00:00", "USDJPY", "buy", "in", 0.1, rate - 0.5, 0.0),
+            (f"2024.01.0{day} 15:00:00", "USDJPY", "sell", "out", 0.1, rate, profit),
+        ]
+    report = import_report(_mt5_deals_report(deals))
+    assert any(w.startswith(CONVERSION_DRIFT_WARNING) for w in report.warnings)
+    assert_recomputed_matches(report)
+    sizes = [trade.quantity for trade in report.trades.trades]
+    assert sizes[0] > sizes[-1]
+
+
+def test_one_contract_size_is_kept_when_profits_agree() -> None:
+    report = import_report(fixture("mt5_tester.html"))
+    assert not any(w.startswith(CONVERSION_DRIFT_WARNING) for w in report.warnings)
+
+
+def test_new_real_layout_warnings_have_spanish() -> None:
+    from quant_trade.audit.i18n import spanish
+
+    old, new = BALANCE_DRAWDOWN_ROW
+    drift = []
+    for day, rate in enumerate((140.0, 145.0, 150.0, 155.0), start=2):
+        profit = round(0.5 * 0.1 * 100_000 / rate, 2)
+        drift += [
+            (f"2024.01.0{day} 09:00:00", "USDJPY", "buy", "in", 0.1, rate - 0.5, 0.0),
+            (f"2024.01.0{day} 15:00:00", "USDJPY", "sell", "out", 0.1, rate, profit),
+        ]
+    hedged = [
+        ("2024.01.02 09:00:00", "EURUSD", "buy", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.02 09:30:00", "EURUSD", "buy", "in", 0.1, 1.1050, 0.0),
+        ("2024.01.02 10:00:00", "EURUSD", "sell", "out", 0.1, 1.1060, 10.0),
+        ("2024.01.02 11:00:00", "EURUSD", "sell", "out", 0.1, 1.1020, 20.0),
+    ]
+    reports = [
+        import_report(_mt5_tester_variant((old, new.format(value="12.00")))),
+        import_report(_mt5_deals_report(drift)),
+        import_report(_mt5_deals_report(hedged)),
+    ]
+    warnings = [w for report in reports for w in report.warnings]
+    assert any("balance drawdown maximal" in w for w in warnings)
+    assert any(w.startswith(CONVERSION_DRIFT_WARNING) for w in warnings)
+    assert any(w.startswith("hedging account") for w in warnings)
+    assert [w for w in warnings if spanish(w) is None] == []
