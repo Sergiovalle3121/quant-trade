@@ -1,0 +1,646 @@
+"""What a trader reads first: trade statistics, resampled risk and a
+prop-firm challenge simulator.
+
+Everything here is computed from the uploaded bytes and tagged ``MEASURED``;
+what cannot be computed is ``NOT_MEASURED`` with the reason. The resampled
+figures (drawdown risk and the challenge simulator) are estimates from a
+stationary block bootstrap of the uploaded history. They inherit every
+limitation of that history, they assume the future resembles it, and they
+are not predictions; each result carries that note in Spanish and English.
+
+Pure functions with explicit seeds: the same input and seed give the same
+numbers, so a report can be reproduced byte for byte.
+"""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Iterable, Sequence
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from quant_trade.audit.prop_presets import ChallengeRules
+from quant_trade.audit.schema import MIN_OBSERVATIONS, measured, not_measured
+from quant_trade.core.models import Trade
+from quant_trade.research.bootstrap import stationary_bootstrap_indices
+
+#: Van Tharp caps the trade count in SQN at 100 so large samples do not
+#: inflate it without bound.
+SQN_TRADE_CAP = 100
+DAYS_PER_MONTH = 365.25 / 12.0
+
+DRAWDOWN_THRESHOLDS: tuple[float, ...] = (0.10, 0.20, 0.30, 0.50)
+FAN_QUANTILES: tuple[int, ...] = (5, 25, 50, 75, 95)
+MAX_FAN_POINTS = 120
+#: Upper bound on resampled cells (samples x path length) so an intraday
+#: upload cannot pin the process; samples are reduced to fit and recorded.
+MAX_RESAMPLED_CELLS = 2_000_000
+DEFAULT_BLOCK_SIZE = 5.0
+BUSINESS_DAYS_PER_CALENDAR_DAY = 5.0 / 7.0
+
+NO_TRADES = "no trades uploaded"
+
+RESAMPLED_NOTE = "resampled from the uploaded history, not a forecast"
+
+RISK_ASSUMPTIONS: dict[str, list[str]] = {
+    "es": [
+        "Estimación remuestreada del historial aportado: no es una predicción.",
+        "Supone que el futuro se parece al historial; si el mercado cambia, la estimación no vale.",
+        "Una curva de cierres diarios no muestra el drawdown flotante dentro del día.",
+    ],
+    "en": [
+        "Resampled estimate from the supplied history: it is not a prediction.",
+        "It assumes the future resembles the history; if the market changes, it no longer holds.",
+        "A curve of daily closes does not show floating drawdown within the day.",
+    ],
+}
+
+CHALLENGE_ASSUMPTIONS: dict[str, list[str]] = {
+    "es": [
+        "Estimación remuestreada del historial aportado: no es una predicción.",
+        "Con datos diarios no se ve el drawdown flotante intradía, así que la estimación es "
+        "optimista frente a los límites diarios y totales.",
+        "Supone que el futuro se parece al historial y que cada día con retorno distinto de cero "
+        "cuenta como día operado.",
+        "Las reglas de la firma son las publicadas en la fecha indicada; pueden haber cambiado.",
+    ],
+    "en": [
+        "Resampled estimate from the supplied history: it is not a prediction.",
+        "Daily data cannot see intraday floating drawdown, so the estimate is optimistic "
+        "against the daily and total limits.",
+        "It assumes the future resembles the history and that every day with a non-zero return "
+        "counts as a trading day.",
+        "The firm's rules are those posted on the date shown; they may have changed.",
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
+# Trade statistics
+# ---------------------------------------------------------------------------
+
+_TRADE_STAT_KEYS: tuple[str, ...] = (
+    "trade_count",
+    "win_rate",
+    "gross_profit",
+    "gross_loss",
+    "fees_total",
+    "net_pnl",
+    "profit_factor",
+    "expectancy",
+    "average_win",
+    "average_loss",
+    "payoff_ratio",
+    "largest_win_share",
+    "max_consecutive_wins",
+    "max_consecutive_losses",
+    "mean_holding_hours",
+    "median_holding_hours",
+    "sqn",
+    "trades_per_month",
+)
+
+
+def _longest_run(flags: Sequence[bool]) -> int:
+    longest = run = 0
+    for flag in flags:
+        run = run + 1 if flag else 0
+        longest = max(longest, run)
+    return longest
+
+
+def _side_split(pnl: np.ndarray, sides: Sequence[str], side: str) -> dict[str, Any]:
+    mask = np.array([value == side for value in sides], dtype=bool)
+    count = int(mask.sum())
+    if count == 0:
+        reason = f"no {side} trades"
+        return {
+            "trade_count": measured(0),
+            "win_rate": not_measured(reason),
+            "net_pnl": not_measured(reason),
+        }
+    selected = pnl[mask]
+    return {
+        "trade_count": measured(count),
+        "win_rate": measured(float((selected > 0).mean())),
+        "net_pnl": measured(float(selected.sum()), "before commission and swap"),
+    }
+
+
+def trade_statistics(
+    trades: Sequence[Trade],
+    sides: Sequence[str],
+    *,
+    fees_total: float = 0.0,
+) -> dict[str, Any]:
+    """Per-trade statistics from closed round trips, ordered by exit time.
+
+    ``Trade.pnl`` is the gross result of each trade. ``fees_total`` (for
+    example commission plus swap from a platform report, as a positive cost)
+    cannot be attributed to single trades, so it enters ``net_pnl`` and
+    ``expectancy`` only; profit factor, averages and streaks use gross pnl.
+    A trade with exactly zero pnl is neither a win nor a loss.
+    """
+    if len(trades) != len(sides):
+        raise ValueError("trades and sides must have the same length")
+    if not trades:
+        out: dict[str, Any] = {key: not_measured(NO_TRADES) for key in _TRADE_STAT_KEYS}
+        out["long"] = {"trade_count": not_measured(NO_TRADES)}
+        out["short"] = {"trade_count": not_measured(NO_TRADES)}
+        return out
+
+    order = sorted(range(len(trades)), key=lambda i: (trades[i].exit_time, i))
+    ordered = [trades[i] for i in order]
+    ordered_sides = [sides[i] for i in order]
+    pnl = np.array([trade.pnl for trade in ordered], dtype=float)
+    n = int(len(pnl))
+    wins = pnl[pnl > 0]
+    losses = pnl[pnl < 0]
+    gross_profit = float(wins.sum())
+    gross_loss = float(losses.sum())
+    fees = float(fees_total)
+    net = float(pnl.sum()) - fees
+
+    out = {
+        "trade_count": measured(n),
+        "win_rate": measured(float(len(wins) / n), "share of trades with pnl > 0"),
+        "gross_profit": measured(gross_profit),
+        "gross_loss": measured(gross_loss),
+        "fees_total": measured(fees, "commission and swap as reported, a positive cost")
+        if fees
+        else not_measured("no commission or swap total supplied"),
+        "net_pnl": measured(net, "gross pnl minus reported fees"),
+        "expectancy": measured(net / n, "average net result per trade, account currency"),
+    }
+    if len(losses) and gross_loss < 0:
+        out["profit_factor"] = measured(gross_profit / abs(gross_loss), "gross profit / gross loss")
+    else:
+        out["profit_factor"] = not_measured("no losing trades; the ratio is undefined")
+    out["average_win"] = (
+        measured(float(wins.mean())) if len(wins) else not_measured("no winning trades")
+    )
+    out["average_loss"] = (
+        measured(float(losses.mean())) if len(losses) else not_measured("no losing trades")
+    )
+    if len(wins) and len(losses):
+        out["payoff_ratio"] = measured(
+            float(wins.mean() / abs(losses.mean())), "average win / average loss"
+        )
+    else:
+        out["payoff_ratio"] = not_measured("needs at least one win and one loss")
+    out["largest_win_share"] = (
+        measured(float(wins.max() / gross_profit), "largest single win / gross profit")
+        if gross_profit > 0
+        else not_measured("no winning trades")
+    )
+    out["max_consecutive_wins"] = measured(_longest_run([value > 0 for value in pnl]))
+    out["max_consecutive_losses"] = measured(_longest_run([value < 0 for value in pnl]))
+
+    hours = np.array(
+        [(t.exit_time - t.entry_time).total_seconds() / 3600.0 for t in ordered], dtype=float
+    )
+    out["mean_holding_hours"] = measured(float(hours.mean()))
+    out["median_holding_hours"] = measured(float(np.median(hours)))
+
+    std = float(pnl.std(ddof=1)) if n >= 2 else 0.0
+    if n >= 2 and std > 0:
+        out["sqn"] = measured(
+            math.sqrt(min(n, SQN_TRADE_CAP)) * float(pnl.mean()) / std,
+            f"sqrt(min(N, {SQN_TRADE_CAP})) x mean / std of per-trade gross pnl",
+        )
+    else:
+        out["sqn"] = not_measured("needs at least two trades with different results")
+
+    first = min(t.entry_time for t in ordered)
+    last = max(t.exit_time for t in ordered)
+    span_days = (last - first).total_seconds() / 86400.0
+    out["trades_per_month"] = (
+        measured(n / (span_days / DAYS_PER_MONTH), "first entry to last exit")
+        if span_days >= 1.0
+        else not_measured("trades span less than one day")
+    )
+    out["long"] = _side_split(pnl, ordered_sides, "long")
+    out["short"] = _side_split(pnl, ordered_sides, "short")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Resampled drawdown risk
+# ---------------------------------------------------------------------------
+
+
+def _clean(returns: pd.Series | np.ndarray | Sequence[float]) -> np.ndarray:
+    values = np.asarray(pd.to_numeric(pd.Series(returns), errors="coerce"), dtype=float)
+    values = values[np.isfinite(values)]
+    # A loss beyond -100 % has no meaning for an account; clip so equity stays >= 0.
+    return np.clip(values, -1.0, None)
+
+
+def _paths(
+    values: np.ndarray, *, length: int, samples: int, block_size: float, seed: int
+) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    block = min(max(float(block_size), 1.0), float(len(values)))
+    idx = stationary_bootstrap_indices(
+        len(values), length=length, samples=samples, expected_block_size=block, rng=rng
+    )
+    equity = np.cumprod(1.0 + values[idx], axis=1)
+    return np.concatenate([np.ones((samples, 1)), equity], axis=1)
+
+
+def _max_drawdowns(equity: np.ndarray) -> np.ndarray:
+    peaks = np.maximum.accumulate(equity, axis=1)
+    return 1.0 - (equity / peaks).min(axis=1)
+
+
+def _longest_underwater(equity: np.ndarray) -> np.ndarray:
+    under = equity < np.maximum.accumulate(equity, axis=1)
+    longest = np.zeros(equity.shape[0], dtype=np.int64)
+    run = np.zeros(equity.shape[0], dtype=np.int64)
+    for column in range(under.shape[1]):
+        run = np.where(under[:, column], run + 1, 0)
+        longest = np.maximum(longest, run)
+    return longest
+
+
+def _fan(equity: np.ndarray, points: int = MAX_FAN_POINTS) -> dict[str, list[float] | list[int]]:
+    length = equity.shape[1]
+    positions = np.unique(np.linspace(0, length - 1, min(points, length)).round().astype(int))
+    quantiles = np.percentile(equity[:, positions], FAN_QUANTILES, axis=0)
+    fan: dict[str, list[float] | list[int]] = {"period": [int(p) for p in positions]}
+    for q, row in zip(FAN_QUANTILES, quantiles, strict=True):
+        fan[f"p{q}"] = [round(float(value), 6) for value in row]
+    return fan
+
+
+def drawdown_risk(
+    returns: pd.Series | np.ndarray | Sequence[float],
+    *,
+    periods_per_year: float,
+    samples: int = 2000,
+    seed: int = 0,
+    block_size: float = DEFAULT_BLOCK_SIZE,
+    horizon_years: float = 1.0,
+    thresholds: Sequence[float] = DRAWDOWN_THRESHOLDS,
+) -> dict[str, Any]:
+    """Maximum drawdown over ``horizon_years`` of resampled paths.
+
+    Stationary block bootstrap of the uploaded returns (expected block
+    ``block_size`` periods, blocks wrap), ``samples`` paths of one horizon
+    each. Reports drawdown quantiles, the share of paths whose drawdown
+    reaches each threshold, the longest time under water, and a fan of the
+    equity path (p5 to p95, at most ``MAX_FAN_POINTS`` points, equity
+    starting at 1.0) for the charts.
+    """
+    values = _clean(returns)
+    thresholds = tuple(float(t) for t in thresholds)
+    length = max(2, int(round(periods_per_year * horizon_years)))
+    if len(values) < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
+        reason = (
+            f"needs at least {MIN_OBSERVATIONS} returns that are not all identical; "
+            f"{len(values)} supplied"
+        )
+        return {
+            "max_drawdown": {key: not_measured(reason) for key in ("p50", "p95", "p99")},
+            "probability_drawdown_at_least": {f"{t:.2f}": not_measured(reason) for t in thresholds},
+            "longest_underwater_periods": {key: not_measured(reason) for key in ("p50", "p95")},
+            "fan": None,
+            "method": None,
+            "assumptions": RISK_ASSUMPTIONS,
+        }
+    if samples < 1:
+        raise ValueError("samples must be positive")
+    used = int(min(samples, max(100, MAX_RESAMPLED_CELLS // length)))
+    equity = _paths(values, length=length, samples=used, block_size=block_size, seed=seed)
+    drawdowns = _max_drawdowns(equity)
+    underwater = _longest_underwater(equity)
+    note = RESAMPLED_NOTE
+    return {
+        "max_drawdown": {
+            f"p{q}": measured(float(np.percentile(drawdowns, q)), note) for q in (50, 95, 99)
+        },
+        "probability_drawdown_at_least": {
+            f"{t:.2f}": measured(float((drawdowns >= t).mean()), note) for t in thresholds
+        },
+        "longest_underwater_periods": {
+            f"p{q}": measured(float(np.percentile(underwater, q)), note) for q in (50, 95)
+        },
+        "fan": {"evidence": "MEASURED", "note": note, **_fan(equity)},
+        "method": {
+            "bootstrap": "stationary",
+            "expected_block_size": min(max(float(block_size), 1.0), float(len(values))),
+            "samples": used,
+            "samples_requested": int(samples),
+            "seed": int(seed),
+            "horizon_periods": length,
+            "periods_per_year": float(periods_per_year),
+            "observations": int(len(values)),
+        },
+        "assumptions": RISK_ASSUMPTIONS,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Prop-firm challenge simulator
+# ---------------------------------------------------------------------------
+
+
+def daily_returns_from_equity(frame: pd.DataFrame) -> pd.Series:
+    """Close-to-close daily returns from a ``timestamp``/``equity`` frame.
+
+    The last equity value of each UTC calendar day is its close; days
+    without a row are skipped, not filled.
+    """
+    stamps = pd.to_datetime(frame["timestamp"], utc=True)
+    equity = pd.Series(frame["equity"].to_numpy(dtype=float), index=stamps)
+    closes = equity.groupby(stamps.dt.floor("D").to_numpy()).last()
+    return closes.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
+
+
+def _wilson(successes: int, total: int, z: float = 1.959964) -> tuple[float, float]:
+    if total <= 0:
+        return 0.0, 1.0
+    p = successes / total
+    denominator = 1.0 + z * z / total
+    centre = (p + z * z / (2 * total)) / denominator
+    half = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / denominator
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def _day_limit(rules: ChallengeRules, max_days: int) -> int:
+    if rules.time_limit_days is None:
+        return int(max_days)
+    business = int(math.floor(rules.time_limit_days * BUSINESS_DAYS_PER_CALENDAR_DAY))
+    return max(1, min(int(max_days), business))
+
+
+def simulate_challenge(
+    daily_returns: pd.Series | np.ndarray | Sequence[float],
+    rules: ChallengeRules,
+    *,
+    samples: int = 5000,
+    seed: int = 0,
+    block_size: float = DEFAULT_BLOCK_SIZE,
+    max_days: int = 250,
+) -> dict[str, Any]:
+    """Walk resampled daily paths through one challenge phase.
+
+    Each path starts at a balance of 1.0 and is checked at every daily
+    close, in this order: the daily loss floor, the total loss floor, then
+    the target (reached once the balance is at or above
+    ``1 + profit_target`` and at least ``min_trading_days`` days had a
+    non-zero return). A path still running after the time limit (calendar
+    days converted to business days) or ``max_days`` is unfinished. The four
+    probabilities sum to one.
+    """
+    values = _clean(daily_returns)
+    outcome_keys = ("pass", "fail_daily_loss", "fail_total_loss", "unfinished")
+    base: dict[str, Any] = {"rules": rules.to_dict(), "assumptions": CHALLENGE_ASSUMPTIONS}
+    if len(values) < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
+        reason = (
+            f"needs at least {MIN_OBSERVATIONS} daily returns that are not all identical; "
+            f"{len(values)} supplied"
+        )
+        base["probability"] = {key: not_measured(reason) for key in outcome_keys}
+        base["pass_probability_ci95"] = {key: not_measured(reason) for key in ("low", "high")}
+        base["days_to_target"] = {key: not_measured(reason) for key in ("p25", "p50", "p75")}
+        base["method"] = None
+        return base
+    if samples < 1 or max_days < 1:
+        raise ValueError("samples and max_days must be positive")
+
+    horizon = _day_limit(rules, max_days)
+    rng = np.random.default_rng(seed)
+    block = min(max(float(block_size), 1.0), float(len(values)))
+    idx = stationary_bootstrap_indices(
+        len(values), length=horizon, samples=samples, expected_block_size=block, rng=rng
+    )
+    paths = values[idx]
+
+    target = 1.0 + rules.profit_target
+    total_allowance = rules.max_total_loss
+    balance = np.ones(samples)
+    peak = np.ones(samples)
+    traded = np.zeros(samples, dtype=np.int64)
+    # 0 running, 1 pass, 2 daily, 3 total
+    state = np.zeros(samples, dtype=np.int8)
+    day_done = np.full(samples, -1, dtype=np.int64)
+    for day in range(horizon):
+        running = state == 0
+        if not running.any():
+            break
+        start = balance.copy()
+        ret = paths[:, day]
+        balance = np.where(running, start * (1.0 + ret), balance)
+        traded = traded + (running & (ret != 0.0))
+
+        if rules.max_daily_loss is not None:
+            if rules.daily_loss_basis == "initial_balance":
+                daily_floor = start - rules.max_daily_loss
+            else:
+                daily_floor = start * (1.0 - rules.max_daily_loss)
+            hit = running & (balance < daily_floor - 1e-12)
+            state[hit] = 2
+            day_done[hit] = day + 1
+            running = running & ~hit
+
+        if rules.total_loss_type == "static":
+            total_floor = np.full(samples, 1.0 - total_allowance)
+        else:
+            total_floor = peak - total_allowance
+            if rules.total_loss_type == "trailing_eod_lock":
+                total_floor = np.minimum(total_floor, 1.0)
+        hit = running & (balance < total_floor - 1e-12)
+        state[hit] = 3
+        day_done[hit] = day + 1
+        running = running & ~hit
+
+        passed = running & (balance >= target - 1e-12) & (traded >= rules.min_trading_days)
+        state[passed] = 1
+        day_done[passed] = day + 1
+        peak = np.where(running, np.maximum(peak, balance), peak)
+
+    counts = {
+        "pass": int((state == 1).sum()),
+        "fail_daily_loss": int((state == 2).sum()),
+        "fail_total_loss": int((state == 3).sum()),
+        "unfinished": int((state == 0).sum()),
+    }
+    note = RESAMPLED_NOTE
+    base["probability"] = {key: measured(count / samples, note) for key, count in counts.items()}
+    low, high = _wilson(counts["pass"], samples)
+    ci_note = "Wilson 95 % interval over the resampled paths; it ignores model error"
+    base["pass_probability_ci95"] = {
+        "low": measured(low, ci_note),
+        "high": measured(high, ci_note),
+    }
+    days = day_done[state == 1]
+    if len(days):
+        base["days_to_target"] = {
+            f"p{q}": measured(float(np.percentile(days, q)), "business days, " + note)
+            for q in (25, 50, 75)
+        }
+    else:
+        reason = "no resampled path reached the target within the limits"
+        base["days_to_target"] = {key: not_measured(reason) for key in ("p25", "p50", "p75")}
+    base["method"] = {
+        "bootstrap": "stationary",
+        "expected_block_size": block,
+        "samples": int(samples),
+        "seed": int(seed),
+        "horizon_business_days": horizon,
+        "observations": int(len(values)),
+    }
+    return base
+
+
+# ---------------------------------------------------------------------------
+# Questions for the vendor of a trading robot
+# ---------------------------------------------------------------------------
+
+_QUESTIONS: dict[str, dict[str, str]] = {
+    "live_record": {
+        "es": "¿Hay una cuenta real o demo con al menos {months} meses de historial auditable "
+        "con el mismo robot y la misma configuración?",
+        "en": "Is there a live or demo account with at least {months} months of auditable "
+        "history, with the same robot and settings?",
+    },
+    "modelling": {
+        "es": "¿Con qué modo de modelado y calidad de históricos se hizo el backtest "
+        "(ticks reales, 1 minuto OHLC, solo precios de apertura)?",
+        "en": "Which modelling mode and history quality was the backtest run with "
+        "(real ticks, 1-minute OHLC, open prices only)?",
+    },
+    "trials": {
+        "es": "¿Cuántas combinaciones de parámetros se probaron antes de elegir esta? "
+        "Pida el archivo de optimización.",
+        "en": "How many parameter combinations were tried before choosing this one? "
+        "Ask for the optimisation file.",
+    },
+    "out_of_sample": {
+        "es": "¿Qué periodo quedó fuera de la optimización y cómo se comportó en él?",
+        "en": "Which period was left out of the optimisation, and how did it behave there?",
+    },
+    "costs": {
+        "es": "¿Qué spread, comisión y swap se usaron? ¿Son los de su bróker?",
+        "en": "Which spread, commission and swap were used? Are they your broker's?",
+    },
+    "equity_curve": {
+        "es": "Pida la curva de equity (flotante), no solo la de balance: el balance oculta "
+        "las pérdidas abiertas.",
+        "en": "Ask for the (floating) equity curve, not only the balance: the balance hides "
+        "open losses.",
+    },
+    "trades": {
+        "es": "Pida la lista completa de operaciones cerradas con tamaños, precios y fechas.",
+        "en": "Ask for the full list of closed trades with sizes, prices and dates.",
+    },
+    "martingale": {
+        "es": "¿El robot aumenta el tamaño después de una pérdida? ¿Cuál es el tamaño máximo "
+        "que puede llegar a abrir?",
+        "en": "Does the robot increase size after a loss? What is the largest size it can open?",
+    },
+    "grid": {
+        "es": "¿El robot abre posiciones adicionales en contra cuando el precio se aleja? "
+        "¿Cuántas como máximo?",
+        "en": "Does the robot add positions against the move when price moves away? "
+        "How many at most?",
+    },
+    "stop_loss": {
+        "es": "¿Cada operación tiene un stop de pérdida fijo? ¿Cuál fue la mayor pérdida "
+        "abierta registrada?",
+        "en": "Does every trade have a fixed stop loss? What was the largest open loss recorded?",
+    },
+    "payoff": {
+        "es": "La mayoría de operaciones ganan poco y unas pocas pierden mucho: "
+        "¿qué evita una pérdida mayor que las del historial?",
+        "en": "Most trades win a little and a few lose a lot: what prevents a loss larger "
+        "than those in the history?",
+    },
+    "data_quality": {
+        "es": "El historial tiene saltos, huecos o valores repetidos: ¿de dónde salen los datos "
+        "y cómo se limpiaron?",
+        "en": "The history has jumps, gaps or repeated values: where does the data come from "
+        "and how was it cleaned?",
+    },
+}
+
+_FLAG_QUESTIONS: dict[str, str] = {
+    "MARTINGALE_SIZING": "martingale",
+    "GRID_AVERAGING": "grid",
+    "MANY_CONCURRENT_POSITIONS": "grid",
+    "HIDDEN_FLOATING_DRAWDOWN": "equity_curve",
+    "NO_STOP_EVIDENCE": "stop_loss",
+    "NEGATIVE_PAYOFF_HIGH_WINRATE": "payoff",
+    "MAD_SPIKES": "data_quality",
+    "STALE_MARKS": "data_quality",
+    "LARGE_GAPS": "data_quality",
+    "ZERO_DECLARED_COSTS": "costs",
+    "TRIALS_BELOW_VARIANTS": "trials",
+}
+
+_QUESTION_ORDER: tuple[str, ...] = tuple(_QUESTIONS)
+
+
+def vendor_questions(
+    flag_codes: Iterable[str],
+    *,
+    has_trades: bool,
+    trials_measured: bool,
+    has_out_of_sample: bool,
+    has_costs: bool,
+    balance_only: bool,
+    min_track_record_months: float | None = None,
+) -> list[dict[str, str]]:
+    """Questions a buyer can put to the seller of a trading robot.
+
+    Driven by the red flags raised and by what the upload did not contain.
+    Neutral wording: a question is something to ask, not an accusation, and
+    the list never says whether to buy.
+    """
+    wanted: set[str] = {"live_record", "modelling"}
+    for code in flag_codes:
+        key = _FLAG_QUESTIONS.get(code)
+        if key:
+            wanted.add(key)
+    if not trials_measured:
+        wanted.add("trials")
+    if not has_out_of_sample:
+        wanted.add("out_of_sample")
+    if not has_costs:
+        wanted.add("costs")
+    if balance_only:
+        wanted.add("equity_curve")
+    if not has_trades:
+        wanted.add("trades")
+    months = 6
+    if min_track_record_months is not None and math.isfinite(min_track_record_months):
+        months = max(6, int(math.ceil(min_track_record_months)))
+    out: list[dict[str, str]] = []
+    for key in _QUESTION_ORDER:
+        if key in wanted:
+            text = _QUESTIONS[key]
+            out.append(
+                {
+                    "code": key,
+                    "es": text["es"].format(months=months),
+                    "en": text["en"].format(months=months),
+                }
+            )
+    return out
+
+
+__all__ = [
+    "CHALLENGE_ASSUMPTIONS",
+    "DRAWDOWN_THRESHOLDS",
+    "FAN_QUANTILES",
+    "MAX_FAN_POINTS",
+    "RISK_ASSUMPTIONS",
+    "daily_returns_from_equity",
+    "drawdown_risk",
+    "simulate_challenge",
+    "trade_statistics",
+    "vendor_questions",
+]

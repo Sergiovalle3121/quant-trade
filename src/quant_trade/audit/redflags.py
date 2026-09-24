@@ -12,6 +12,7 @@ one code at a time. Changing one is a documented decision, not a tweak.
 
 from __future__ import annotations
 
+import bisect
 import math
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
@@ -25,6 +26,7 @@ from quant_trade.audit.schema import (
     IngestedSeries,
     ParsedTrades,
 )
+from quant_trade.core.models import Trade
 
 Severity = Literal["FAIL", "WARN"]
 
@@ -320,6 +322,226 @@ def scan(
     return flags
 
 
+# ---------------------------------------------------------------------------
+# Trade-level patterns: martingale, grid, averaging down, missing stops
+# ---------------------------------------------------------------------------
+
+#: Median size of trades after a loss over the median after a win. 1.25x
+#: warns, 1.6x (with most post-loss trades larger than the loss) fails:
+#: growing size after losses is the martingale signature.
+MARTINGALE_WARN_RATIO = 1.25
+MARTINGALE_FAIL_RATIO = 1.6
+MARTINGALE_FAIL_INCREASE_SHARE = 0.6
+MARTINGALE_MIN_EACH = 5
+#: Share of trades opened while a same-direction position on the same symbol
+#: was open at a better price.
+GRID_WARN_SHARE = 0.2
+GRID_WARN_MIN = 5
+GRID_FAIL_SHARE = 0.4
+GRID_FAIL_MIN = 10
+CONCURRENT_WARN = 5
+HIGH_WINRATE = 0.85
+HIGH_WINRATE_LOSS_MULTIPLE = 3.0
+HIGH_WINRATE_MIN_TRADES = 20
+#: Largest loss (or adverse excursion) over the mean loss.
+NO_STOP_LOSS_MULTIPLE = 8.0
+NO_STOP_MIN_LOSSES = 10
+
+
+def _martingale(
+    order: list[int], trades: list[Trade], pnl: list[float]
+) -> tuple[float, float, int, int]:
+    """Median size of trades that follow a loss over the median size of
+    trades that follow a win, and the share of post-loss trades larger than
+    the losing trade. The previous outcome of a trade is the last trade
+    closed at or before its entry."""
+    after_loss: list[float] = []
+    after_win: list[float] = []
+    larger_after_loss: list[bool] = []
+    closed = sorted(order, key=lambda i: (trades[i].exit_time, i))
+    exits = [trades[i].exit_time for i in closed]
+    for i in order:
+        position = bisect.bisect_right(exits, trades[i].entry_time) - 1
+        if position < 0:
+            continue
+        previous = closed[position]
+        if previous == i:
+            continue
+        size = trades[i].quantity
+        if pnl[previous] < 0:
+            after_loss.append(size)
+            larger_after_loss.append(size > trades[previous].quantity * (1 + 1e-9))
+        elif pnl[previous] > 0:
+            after_win.append(size)
+    if len(after_loss) < MARTINGALE_MIN_EACH or len(after_win) < MARTINGALE_MIN_EACH:
+        return 1.0, 0.0, len(after_loss), len(after_win)
+    ratio = float(np.median(after_loss) / np.median(after_win))
+    increase_share = float(np.mean(larger_after_loss))
+    return ratio, increase_share, len(after_loss), len(after_win)
+
+
+def _grid_and_concurrency(
+    order: list[int], trades: list[Trade], sides: list[str], symbols: list[str]
+) -> tuple[int, int]:
+    """Trades added against the position (same symbol and side, worse
+    price, while an earlier one is open) and the most positions open at
+    once on one symbol."""
+    adds = 0
+    most = 0
+    for i in order:
+        trade = trades[i]
+        open_same_symbol = [
+            j
+            for j in order
+            if j != i
+            and symbols[j] == symbols[i]
+            and trades[j].entry_time <= trade.entry_time < trades[j].exit_time
+            and (trades[j].entry_time, j) < (trade.entry_time, i)
+        ]
+        most = max(most, len(open_same_symbol) + 1)
+        for j in open_same_symbol:
+            if sides[j] != sides[i]:
+                continue
+            worse = (
+                trade.entry_price < trades[j].entry_price
+                if sides[i] == "long"
+                else trade.entry_price > trades[j].entry_price
+            )
+            if worse:
+                adds += 1
+                break
+    return adds, most
+
+
+def scan_trade_patterns(
+    trades: ParsedTrades,
+    *,
+    symbols: list[str] | None = None,
+    adverse_excursion: list[float | None] | None = None,
+    balance_only: bool = False,
+) -> list[RedFlag]:
+    """Sizing and position patterns that hide risk from a balance curve.
+
+    Martingale sizing (larger after losses), grid or averaging down (adding
+    against an open position at worse prices), many positions open at once,
+    a high win rate paid for by rare large losses, and losses far beyond the
+    typical one (no evidence of a stop). ``symbols`` defaults to a single
+    instrument; ``adverse_excursion`` (per-trade maximum adverse excursion
+    in account currency, positive) is used when a report carries it; with
+    ``balance_only`` a curve rebuilt from closed trades that overlap is
+    flagged because floating losses are invisible in it. None of these
+    proves the strategy is a martingale or grid; each is a question to ask.
+    """
+    items = trades.trades
+    n = len(items)
+    if n == 0:
+        return []
+    sides = list(trades.sides)
+    names = list(symbols) if symbols is not None else ["*"] * n
+    if len(names) != n or len(sides) != n:
+        raise ValueError("symbols and sides must match the number of trades")
+    pnl = [trade.pnl for trade in items]
+    order = sorted(range(n), key=lambda i: (items[i].entry_time, i))
+    flags: list[RedFlag] = []
+
+    ratio, increase_share, n_loss, n_win = _martingale(order, items, pnl)
+    if ratio >= MARTINGALE_FAIL_RATIO and increase_share >= MARTINGALE_FAIL_INCREASE_SHARE:
+        flags.append(
+            RedFlag(
+                "MARTINGALE_SIZING",
+                "FAIL",
+                f"after a loss the next trade is typically {ratio:.2f}x the size used after a "
+                f"win, and {increase_share:.0%} of post-loss trades were larger "
+                f"({n_loss} after losses, {n_win} after wins)",
+                ratio,
+            )
+        )
+    elif ratio >= MARTINGALE_WARN_RATIO:
+        flags.append(
+            RedFlag(
+                "MARTINGALE_SIZING",
+                "WARN",
+                f"after a loss the next trade is typically {ratio:.2f}x the size used after a win",
+                ratio,
+            )
+        )
+
+    adds, most = _grid_and_concurrency(order, items, sides, names)
+    share = adds / n
+    if adds >= GRID_FAIL_MIN and share >= GRID_FAIL_SHARE:
+        flags.append(
+            RedFlag(
+                "GRID_AVERAGING",
+                "FAIL",
+                f"{adds} of {n} trades ({share:.0%}) were opened against an open position at a "
+                "worse price: grid or averaging down",
+                share,
+            )
+        )
+    elif adds >= GRID_WARN_MIN and share >= GRID_WARN_SHARE:
+        flags.append(
+            RedFlag(
+                "GRID_AVERAGING",
+                "WARN",
+                f"{adds} of {n} trades ({share:.0%}) were opened against an open position at a "
+                "worse price",
+                share,
+            )
+        )
+    if most >= CONCURRENT_WARN:
+        flags.append(
+            RedFlag(
+                "MANY_CONCURRENT_POSITIONS",
+                "WARN",
+                f"up to {most} positions were open at once on one symbol",
+                most,
+            )
+        )
+    if balance_only and most >= 2:
+        flags.append(
+            RedFlag(
+                "HIDDEN_FLOATING_DRAWDOWN",
+                "WARN",
+                "the curve is rebuilt from closed trades while positions overlapped; floating "
+                "losses of open positions are not visible in it",
+                most,
+            )
+        )
+
+    wins = [value for value in pnl if value > 0]
+    losses = [-value for value in pnl if value < 0]
+    if n >= HIGH_WINRATE_MIN_TRADES and wins and losses:
+        win_rate = len(wins) / n
+        multiple = float(np.mean(losses) / np.mean(wins))
+        if win_rate > HIGH_WINRATE and multiple >= HIGH_WINRATE_LOSS_MULTIPLE:
+            flags.append(
+                RedFlag(
+                    "NEGATIVE_PAYOFF_HIGH_WINRATE",
+                    "WARN",
+                    f"win rate {win_rate:.0%} with the average loss {multiple:.1f}x the average "
+                    "win: rare large losses carry the risk",
+                    multiple,
+                )
+            )
+    if len(losses) >= NO_STOP_MIN_LOSSES:
+        typical = float(np.mean(losses))
+        excursions = [abs(v) for v in (adverse_excursion or []) if v is not None]
+        worst = max([max(losses), *excursions])
+        if typical > 0 and worst / typical >= NO_STOP_LOSS_MULTIPLE:
+            from_excursion = bool(excursions) and max(excursions) >= max(losses)
+            source = "adverse excursion" if from_excursion else "loss"
+            flags.append(
+                RedFlag(
+                    "NO_STOP_EVIDENCE",
+                    "WARN",
+                    f"the largest {source} is {worst / typical:.1f}x the average loss; no sign of "
+                    "a fixed stop",
+                    worst / typical,
+                )
+            )
+    return flags
+
+
 __all__ = [
     "RedFlag",
     "Severity",
@@ -327,4 +549,5 @@ __all__ = [
     "detect_mad_spikes",
     "longest_stale_run",
     "scan",
+    "scan_trade_patterns",
 ]
