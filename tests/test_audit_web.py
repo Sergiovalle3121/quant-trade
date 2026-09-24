@@ -67,6 +67,7 @@ def test_health_and_landing_pages_pass_the_guard(tmp_path: Path) -> None:
         "access_codes": False,
         "database": "sqlite",
         "legal_configured": False,
+        "auto_purge": False,
     }
     for lang in ("es", "en"):
         page = client.get(f"/?lang={lang}")

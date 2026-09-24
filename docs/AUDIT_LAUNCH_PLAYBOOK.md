@@ -568,8 +568,10 @@ Reglas de trato:
   reproducible por hash y lo decide el motor.
 - Las opiniones que publiques hablan del informe (claridad, rapidez), nunca
   de resultados de trading.
-- Retención: ejecuta `quant-trade audit purge --days 30 --yes` (o el cron de
-  Railway con Postgres) para borrar los archivos no pagados.
+- Retención: pon `AUDIT_AUTO_PURGE=true` en Railway y el servicio borra solo
+  los archivos no pagados a diario (a mano: `quant-trade audit purge --days
+  30 --yes`). Las páginas de verificación publicadas y sus sellos siguen
+  funcionando después.
 
 Hoja de ventas (una fila por venta, sin datos sensibles): fecha, nombre de
 pila, canal por el que llegó, importe, medio de pago, referencia, id del

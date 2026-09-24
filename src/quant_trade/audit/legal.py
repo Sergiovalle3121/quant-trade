@@ -417,9 +417,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "days, for paid audits too.",
                     "Paid audits: kept so you can reopen the report, until you ask us to "
                     "delete them.",
-                    "Verification page: public until you withdraw it from your report or ask "
-                    "us to delete the audit. If the audit is cleaned up, the page stops "
-                    "showing it.",
+                    "Verification page: public until you withdraw it from your report or ask us to"
+                    " withdraw it or to delete the audit. If you published it, the clean-up keeps "
+                    "only what that page shows (class, dimension statuses, hashes, dates, trial "
+                    "counts and engine version), so the page and its badge keep working.",
                     "Updates list: until you ask to be removed.",
                 ),
             ),
@@ -504,9 +505,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "en las auditorías pagadas.",
                 "Auditorías pagadas: se conservan para que puedas volver a abrir el informe, "
                 "hasta que pidas borrarlas.",
-                "Página de verificación: pública hasta que la retires desde tu informe o "
-                "pidas borrar la auditoría. Si la auditoría se limpia, la página deja de "
-                "mostrarla.",
+                "Página de verificación: pública hasta que la retires desde tu informe o nos pidas"
+                " retirarla o borrar la auditoría. Si la publicaste, la limpieza conserva solo lo "
+                "que muestra esa página (clase, estado de cada dimensión, hashes, fechas, número "
+                "de intentos y versión del motor), para que la página y su sello sigan "
+                "funcionando.",
                 "Lista de avisos: hasta que pidas darte de baja.",
             ),
         ),

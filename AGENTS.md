@@ -76,7 +76,7 @@ Data lake code is research/backtesting only. Do not commit generated datasets, s
 - Web tests use `TestClient` with Stripe simulated by the HMAC helper; nothing reaches the network in tests.
 - A new red flag, threshold or dimension needs a test and a line in `docs/AUDIT_SAAS.md`.
 - Every customer page exists in Spanish (the default, URLs unchanged) and English with a language switch. A new English warning, note or red-flag detail needs its Spanish rule in `audit/i18n.py`.
-- Retention deletes require explicit confirmation (`audit purge --yes`).
+- Retention deletes require explicit confirmation (`audit purge --yes`, or `AUDIT_AUTO_PURGE=true` for the in-service daily purge). A purge never takes down a published verification page; it keeps only the fields that page shows.
 - Badge, verification page and challenge texts never imply future results. The badge shows class, id, date and the fixed notice only; never growth, return or profit.
 - The public verification page is built from an allow-list: it never shows files, trades, the description or the token.
 - Prop-firm presets carry their source URL and `as_of` date.
