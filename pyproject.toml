@@ -39,6 +39,7 @@ web = [
   "psycopg[binary]>=3.1",
   "stripe>=8.0",
   "httpx>=0.27",
+  "weasyprint>=70",
 ]
 
 dev = [

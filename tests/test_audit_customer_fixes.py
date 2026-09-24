@@ -151,6 +151,11 @@ def test_spanish_reports_carry_no_internal_keys() -> None:
         "dataset_digest",
         "mt5_tester_html",
         "method=",
+        "variance policy",
+        "psr_pass=",
+        "daily_trading",
+        "source=",
+        ">skewness<",
         "samples=",
     ):
         assert key not in page.split("<script")[0].replace("id='", ""), key
