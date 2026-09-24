@@ -277,6 +277,8 @@ def run_h1_bin(
     payload["ledger_failures"] = failures
     usable = [str(v["variant_id"]) for v in spec.variants if str(v["variant_id"]) in returns[1.0]]
     if not usable:
+        for record in records.values():
+            ledger.complete(record, oos_sharpe=None, oos_total_return=None, status="failed")
         payload["state"] = STATE_MEASURED_REJECTED
         payload["reason"] = "no pre-registered variant produced a ledger"
         return payload
