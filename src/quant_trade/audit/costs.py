@@ -20,6 +20,12 @@ from quant_trade.core.models import Trade
 #: something; ``CONSERVATIVE_COST_MODEL`` in ``backtest/costs.py`` totals
 #: 12 bps per side, so 10 bps is a mild assumption, and it is labelled one.
 REFERENCE_BPS_WHEN_ZERO = 10.0
+#: Used instead when the client declares zero cost but the platform report
+#: itemises the commission, swap and fees it charged. Those are already in
+#: the ledger, and a tester fills at bid/ask so the spread is in the prices;
+#: what is left is slippage, assumed at 0.5 bps per side (about half a pip on
+#: EURUSD at 1.10; 10 bps would be 11 pips) and labelled an assumption.
+REFERENCE_BPS_OVER_REPORTED_FEES = 0.5
 DEFAULT_MULTIPLIERS: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0)
 
 
@@ -38,12 +44,31 @@ class RecostRow:
         return asdict(self)
 
 
-def reference_bps(declared_bps: float) -> tuple[float, bool]:
+def reference_bps(declared_bps: float, *, fees_reported: bool = False) -> tuple[float, bool]:
     """The per-side cost the sensitivity is anchored on, and whether it is
-    the client's figure (``False``) or the zero-cost assumption (``True``)."""
+    the client's figure (``False``) or the zero-cost assumption (``True``).
+
+    With ``fees_reported`` the reference is charged on top of the costs the
+    report already itemises, so the assumption is slippage only."""
     if declared_bps > 0:
         return float(declared_bps), False
+    if fees_reported:
+        return REFERENCE_BPS_OVER_REPORTED_FEES, True
     return REFERENCE_BPS_WHEN_ZERO, True
+
+
+def reference_note(assumed: bool, fees_reported: bool) -> str:
+    """Where the reference cost comes from, in the audit's own words."""
+    if assumed and fees_reported:
+        return (
+            "assumed slippage: the client declared zero cost; charged on top of the fees "
+            "the report itemises"
+        )
+    if assumed:
+        return "assumed: client declared zero cost"
+    if fees_reported:
+        return "declared by the client; charged on top of the fees the report itemises"
+    return "declared by the client"
 
 
 def gross_pnl(trade: Trade, side: str) -> float:
@@ -67,10 +92,20 @@ def recost_trades(
     sides: list[str],
     bps_per_side: float,
     multipliers: tuple[float, ...] = DEFAULT_MULTIPLIERS,
+    *,
+    reported_costs: list[float] | None = None,
 ) -> list[RecostRow]:
-    """The ledger at each multiple of ``bps_per_side`` charged on entry and exit."""
+    """The ledger at each multiple of ``bps_per_side`` charged on entry and exit.
+
+    ``reported_costs`` are per-trade costs the platform already charged
+    (positive is a cost). They are part of every row, the 0x one included,
+    so a multiple only adds cost on top of what the report measured.
+    """
     if len(trades) != len(sides):
         raise ValueError("trades and sides must align")
+    charged = list(reported_costs) if reported_costs is not None else [0.0] * len(trades)
+    if len(charged) != len(trades):
+        raise ValueError("reported_costs and trades must align")
     if bps_per_side < 0:
         raise ValueError("bps_per_side must be non-negative")
     gross = gross_pnls(trades, sides)
@@ -79,7 +114,9 @@ def recost_trades(
         if multiplier < 0:
             raise ValueError("multipliers must be non-negative")
         bps = bps_per_side * multiplier
-        costs = [round_trip_cost(trade, bps) for trade in trades]
+        costs = [
+            round_trip_cost(trade, bps) + fee for trade, fee in zip(trades, charged, strict=True)
+        ]
         nets = [g - c for g, c in zip(gross, costs, strict=True)]
         rows.append(
             RecostRow(
@@ -96,27 +133,33 @@ def recost_trades(
     return rows
 
 
-def break_even_bps(trades: list[Trade], sides: list[str]) -> float | None:
+def break_even_bps(
+    trades: list[Trade], sides: list[str], *, reported_costs: list[float] | None = None
+) -> float | None:
     """Cost per side, in bps, at which the ledger's net pnl is exactly zero.
 
     Closed form: the cost is linear in bps over the traded notional, so
-    ``bps = 10_000 * sum(gross) / sum(entry_notional + exit_notional)``.
-    ``None`` when nothing was traded. Negative when the ledger loses money
-    before costs.
+    ``bps = 10_000 * (sum(gross) - sum(reported)) / sum(entry_notional +
+    exit_notional)``, the extra cost on top of what the report already
+    charged. ``None`` when nothing was traded. Negative when the ledger
+    loses money before any extra cost.
     """
     notional = sum(trade.quantity * (trade.entry_price + trade.exit_price) for trade in trades)
     if notional <= 0:
         return None
-    return 10_000.0 * sum(gross_pnls(trades, sides)) / notional
+    charged = sum(reported_costs) if reported_costs is not None else 0.0
+    return 10_000.0 * (sum(gross_pnls(trades, sides)) - charged) / notional
 
 
 __all__ = [
     "DEFAULT_MULTIPLIERS",
+    "REFERENCE_BPS_OVER_REPORTED_FEES",
     "REFERENCE_BPS_WHEN_ZERO",
     "RecostRow",
     "break_even_bps",
     "gross_pnl",
     "gross_pnls",
+    "reference_note",
     "recost_trades",
     "reference_bps",
     "round_trip_cost",

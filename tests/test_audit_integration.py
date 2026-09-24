@@ -410,3 +410,40 @@ def test_cli_lists_presets_with_source_and_date() -> None:
     assert DEFAULT_PRESET in result.output
     assert "ftmo-2step-phase1" in result.output
     assert "2026-09-24" in result.output
+
+
+def test_mt5_commission_is_measured_not_replaced_by_the_zero_cost_assumption() -> None:
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=synthetic_mt5_report(edge_pips=8.0),
+        report_filename="Report.html",
+    )
+    assert inputs.trades is not None and inputs.trades.reports_fees
+    assert sum(inputs.trades.fees or []) == pytest.approx(2800.0)
+    result = _run(inputs)
+    costs = result.costs
+    assert costs["reported_costs_in_rows"] is True
+    assert costs["reference_bps"]["value"] == pytest.approx(0.5)
+    assert "slippage" in costs["reference_bps"]["note"]
+    zero = costs["rows"][0]
+    # The 0x row is the report's own net: gross minus the commission it charged
+    # (gross recomputed from the rounded prices, so within a dollar).
+    assert result.trade_stats is not None
+    assert zero["net_pnl"]["value"] == pytest.approx(
+        result.trade_stats["net_pnl"]["value"], abs=1.0
+    )
+    assert zero["total_cost"]["value"] == pytest.approx(2800.0)
+    codes = {flag["code"] for flag in result.red_flags}
+    assert "ZERO_DECLARED_COSTS" not in codes
+
+
+def test_a_csv_trade_list_without_fees_keeps_the_ten_bps_reference() -> None:
+    frame = positive_drift(500)
+    inputs = build_inputs(
+        csv_bytes(frame), DeclaredMetadata(), trades_bytes=csv_bytes(trades_following(frame))
+    )
+    result = _run(inputs)
+    assert result.costs["reference_bps"]["value"] == pytest.approx(10.0)
+    assert result.costs["reported_costs_in_rows"] is False
+    assert "ZERO_DECLARED_COSTS" in {flag["code"] for flag in result.red_flags}

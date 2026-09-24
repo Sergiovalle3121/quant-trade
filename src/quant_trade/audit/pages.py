@@ -90,6 +90,8 @@ background:#eee;color:#333}.steps li{margin:.3em 0}
 details{border-bottom:1px solid #eee;padding:.4em 0}summary{font-weight:600;cursor:pointer}
 pre{white-space:pre-wrap;word-break:break-all;background:#f7f7f7;padding:8px 10px;border-radius:6px}
 @media (max-width:640px){.grid{grid-template-columns:1fr}}
+img,svg{max-width:100%;height:auto}
+@media (max-width:759px){body{padding:16px}table{display:block;overflow-x:auto}}
 """
 
 _COPY: dict[str, dict[str, Any]] = {

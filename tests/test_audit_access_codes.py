@@ -226,6 +226,13 @@ def test_an_upload_with_a_code_is_born_paid(tmp_path: Path) -> None:
     assert "class='lockbox'" in preview.text and "No se pudo aplicar el código" in preview.text
     assert "/redeem?token=" in preview.text
     assert find_claims(preview.text) == []
+    # A client without a working code is told where to buy one, and the price.
+    assert "¿No tienes código? Pídelo aquí (USD 49)" in preview.text
+    assert "href='https://wa.me/000'" in preview.text
+    assert client.get("/health").json()["access_codes"] is True
+    # Tables scroll inside the page on a phone instead of widening it.
+    for text in (landing.text, preview.text):
+        assert "table{display:block;overflow-x:auto}" in text
 
 
 def test_an_invalid_code_gives_a_preview_and_the_json_says_so(tmp_path: Path) -> None:

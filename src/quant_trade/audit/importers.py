@@ -2308,6 +2308,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     trades: list[Trade] = []
     sides: list[str] = []
     client_pnl: list[float | None] = []
+    trade_fees: list[float] = []
     trade_symbols: list[str] = []
     invalid = draft.invalid_rows
     for trip in trips:
@@ -2329,6 +2330,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         trades.append(trade)
         sides.append(trip.side)
         client_pnl.append(trip.gross)
+        trade_fees.append(-(trip.commission + trip.swap + trip.fee))
         trade_symbols.append(trip.symbol)
     if not trades:
         raise ReportFormatError(
@@ -2364,6 +2366,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
             client_pnl=client_pnl,
             invalid_rows=invalid,
             warnings=list(warnings),
+            fees=trade_fees if draft.itemised else None,
         ),
         equity_csv=equity_csv,
         initial_balance=initial,

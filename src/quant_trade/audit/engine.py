@@ -486,16 +486,20 @@ def _costs(
 ) -> tuple[dict[str, Any], list[cost_lib.RecostRow] | None, float | None, bool, list[float] | None]:
     if inputs.trades is None:
         return {"status": "NOT_MEASURED", "reason": "no trades uploaded"}, None, None, False, None
-    ref, assumed = cost_lib.reference_bps(inputs.declared.cost_bps_per_side)
-    rows = cost_lib.recost_trades(inputs.trades.trades, inputs.trades.sides, ref)
-    be = cost_lib.break_even_bps(inputs.trades.trades, inputs.trades.sides)
+    fees_reported = inputs.trades.reports_fees
+    charged = inputs.trades.fees if fees_reported else None
+    ref, assumed = cost_lib.reference_bps(
+        inputs.declared.cost_bps_per_side, fees_reported=fees_reported
+    )
+    rows = cost_lib.recost_trades(
+        inputs.trades.trades, inputs.trades.sides, ref, reported_costs=charged
+    )
+    be = cost_lib.break_even_bps(inputs.trades.trades, inputs.trades.sides, reported_costs=charged)
     gross = cost_lib.gross_pnls(inputs.trades.trades, inputs.trades.sides)
     section = {
         "status": "MEASURED",
-        "reference_bps": declared(
-            ref,
-            "assumed: client declared zero cost" if assumed else "declared by the client",
-        ),
+        "reference_bps": declared(ref, cost_lib.reference_note(assumed, fees_reported)),
+        "reported_costs_in_rows": fees_reported,
         "rows": [
             {
                 "multiplier": row.multiplier,
@@ -510,7 +514,13 @@ def _costs(
             for row in rows
         ],
         "break_even_bps": (
-            measured(be, "cost per side at which the ledger nets to zero")
+            measured(
+                be,
+                "extra cost per side, on top of the report's fees, at which the ledger "
+                "nets to zero"
+                if fees_reported
+                else "cost per side at which the ledger nets to zero",
+            )
             if be is not None
             else not_measured("no traded notional")
         ),
@@ -736,6 +746,7 @@ def run_audit(
             rows=rows,
             reference_bps=reference,
             reference_is_assumption=assumed,
+            fees_reported=inputs.trades is not None and inputs.trades.reports_fees,
             thresholds=thresholds,
         ),
         verdict.assess_out_of_sample(

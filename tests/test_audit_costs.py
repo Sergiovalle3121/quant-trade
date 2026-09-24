@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 
 from quant_trade.audit.costs import (
+    REFERENCE_BPS_OVER_REPORTED_FEES,
     REFERENCE_BPS_WHEN_ZERO,
     break_even_bps,
     recost_trades,
@@ -73,3 +74,30 @@ def test_recost_refuses_misaligned_or_negative_inputs() -> None:
         recost_trades([_trade(1.0, 2.0)], [], 1.0)
     with pytest.raises(ValueError):
         recost_trades([_trade(1.0, 2.0)], ["long"], -1.0)
+
+
+def test_reported_costs_sit_in_every_row_and_the_break_even() -> None:
+    # Gross +10 and -10; the platform charged 1.5 and 0.5 in commission.
+    trades = [_trade(100.0, 101.0), _trade(100.0, 99.0)]
+    sides = ["long", "long"]
+    rows = recost_trades(trades, sides, 10.0, reported_costs=[1.5, 0.5])
+    zero = rows[0]
+    assert zero.gross_pnl == pytest.approx(0.0)
+    assert zero.total_cost == pytest.approx(2.0)
+    assert zero.net_pnl == pytest.approx(-2.0)
+    one = rows[1]
+    assert one.total_cost == pytest.approx(2.0 + 2.01 + 1.99)
+    # Extra bps on top of the reported fees at which the ledger nets zero.
+    trades = [_trade(100.0, 102.0)]
+    be = break_even_bps(trades, ["long"], reported_costs=[5.0])
+    assert be == pytest.approx(10_000.0 * (20.0 - 5.0) / (1_000.0 + 1_020.0))
+    at_be = recost_trades(trades, ["long"], be, multipliers=(1.0,), reported_costs=[5.0])
+    assert at_be[0].net_pnl == pytest.approx(0.0, abs=1e-9)
+    with pytest.raises(ValueError):
+        recost_trades(trades, ["long"], 1.0, reported_costs=[])
+
+
+def test_reference_is_slippage_only_when_the_report_itemises_fees() -> None:
+    assert reference_bps(0.0, fees_reported=True) == (REFERENCE_BPS_OVER_REPORTED_FEES, True)
+    assert reference_bps(3.0, fees_reported=True) == (3.0, False)
+    assert REFERENCE_BPS_OVER_REPORTED_FEES < REFERENCE_BPS_WHEN_ZERO
