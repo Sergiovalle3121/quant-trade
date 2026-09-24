@@ -38,6 +38,7 @@ _COMPARED: dict[str, str] = {
     "net profit of closed positions": "resultado neto de las posiciones cerradas",
     "close rows vs Total trades": "filas de cierre frente a Total trades",
     "closed trade P/L": "P/L de las operaciones cerradas",
+    "balance drawdown maximal": "caída máxima del balance (Balance Drawdown Maximal)",
     "cumulative P&L": "P&L acumulado",
     "Cum. net profit": "Cum. net profit",
 }
@@ -83,11 +84,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # --- Parse warnings: platform reports (importers.py) ---
     (
-        "hedging account: entries were paired first-in first-out, so per-trade entry price "
-        "and holding time are approximate (money results stay exact)",
-        "cuenta con cobertura (hedging): las entradas se emparejaron por orden de llegada "
-        "(FIFO), así que el precio de entrada y la duración de cada operación son aproximados "
-        "(los importes de dinero son exactos)",
+        "hedging account: the report does not say which entry each close belongs to; closes "
+        "were matched to the open entry whose price explains their profit, else first-in "
+        "first-out, so per-trade entry price and holding time are approximate (money "
+        "results stay exact)",
+        "cuenta con cobertura (hedging): el informe no dice a qué entrada corresponde cada "
+        "cierre; cada cierre se emparejó con la entrada abierta cuyo precio explica su "
+        "beneficio, o si no por orden de llegada (FIFO), así que el precio de entrada y la "
+        "duración de cada operación son aproximados (los importes de dinero son exactos)",
     ),
     (
         "{n} closing deal(s) had no matching open volume; their money is in the balance but "
@@ -209,6 +213,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "contract size inferred from reported profit: {sizes}",
         "tamaño de contrato deducido del beneficio del informe: {sizes}",
+    ),
+    (
+        "money per point changes with the conversion to the account currency, so the size "
+        "was inferred per trade from its reported profit: {symbols}",
+        "el dinero por punto cambia con la conversión a la divisa de la cuenta, así que el "
+        "tamaño se dedujo operación por operación de su beneficio en el informe: {symbols}",
     ),
     (
         "the file's times carry no timezone (platform or server time); they were read as UTC",

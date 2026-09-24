@@ -1080,3 +1080,32 @@ def test_mt5_conversion_drift_is_sized_per_trade() -> None:
 def test_one_contract_size_is_kept_when_profits_agree() -> None:
     report = import_report(fixture("mt5_tester.html"))
     assert not any(w.startswith(CONVERSION_DRIFT_WARNING) for w in report.warnings)
+
+
+def test_new_real_layout_warnings_have_spanish() -> None:
+    from quant_trade.audit.i18n import spanish
+
+    old, new = BALANCE_DRAWDOWN_ROW
+    drift = []
+    for day, rate in enumerate((140.0, 145.0, 150.0, 155.0), start=2):
+        profit = round(0.5 * 0.1 * 100_000 / rate, 2)
+        drift += [
+            (f"2024.01.0{day} 09:00:00", "USDJPY", "buy", "in", 0.1, rate - 0.5, 0.0),
+            (f"2024.01.0{day} 15:00:00", "USDJPY", "sell", "out", 0.1, rate, profit),
+        ]
+    hedged = [
+        ("2024.01.02 09:00:00", "EURUSD", "buy", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.02 09:30:00", "EURUSD", "buy", "in", 0.1, 1.1050, 0.0),
+        ("2024.01.02 10:00:00", "EURUSD", "sell", "out", 0.1, 1.1060, 10.0),
+        ("2024.01.02 11:00:00", "EURUSD", "sell", "out", 0.1, 1.1020, 20.0),
+    ]
+    reports = [
+        import_report(_mt5_tester_variant((old, new.format(value="12.00")))),
+        import_report(_mt5_deals_report(drift)),
+        import_report(_mt5_deals_report(hedged)),
+    ]
+    warnings = [w for report in reports for w in report.warnings]
+    assert any("balance drawdown maximal" in w for w in warnings)
+    assert any(w.startswith(CONVERSION_DRIFT_WARNING) for w in warnings)
+    assert any(w.startswith("hedging account") for w in warnings)
+    assert [w for w in warnings if spanish(w) is None] == []
