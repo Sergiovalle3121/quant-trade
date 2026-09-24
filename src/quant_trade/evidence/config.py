@@ -44,8 +44,28 @@ def load_scorecard_policy(path: Path) -> ScorecardPolicy:
     weights = {
         name: float(payload.get("weights", {}).get(name, 1.0)) for name in SCORECARD_CATEGORIES
     }
+    raw_requirements = payload.get("metadata_requirements", {}) or {}
+    if not isinstance(raw_requirements, dict):
+        raise EvidenceConfigError("metadata_requirements must be a mapping")
+    requirements: dict[str, list[list[str]]] = {}
+    for category, groups in raw_requirements.items():
+        if category not in SCORECARD_CATEGORIES or not isinstance(groups, list):
+            raise EvidenceConfigError(f"Invalid metadata requirements for {category!r}")
+        normalized: list[list[str]] = []
+        for group in groups:
+            if (
+                not isinstance(group, list)
+                or not group
+                or not all(isinstance(k, str) for k in group)
+            ):
+                raise EvidenceConfigError(
+                    f"Metadata requirement groups for {category!r} must be non-empty string lists"
+                )
+            normalized.append(group)
+        requirements[category] = normalized
     return ScorecardPolicy(
         weights=weights,
         minimum_pass_score=float(payload.get("minimum_pass_score", 70.0)),
         minimum_category_score=float(payload.get("minimum_category_score", 50.0)),
+        metadata_requirements=requirements,
     )

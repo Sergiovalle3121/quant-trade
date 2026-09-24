@@ -16,7 +16,7 @@ from quant_trade.execution.bar_model import (
     cancel_order,
     execute_market_order_on_bar,
 )
-from quant_trade.metrics.performance import periods_per_year
+from quant_trade.metrics.performance import downside_deviation, elapsed_years, periods_per_year
 
 TRADING_DAYS = 252
 
@@ -140,10 +140,9 @@ def _metrics(eq: pd.DataFrame) -> dict[str, Any]:
     ret = equity.pct_change().dropna()
     total = float(equity.iloc[-1] / equity.iloc[0] - 1) if equity.iloc[0] else 0.0
     ppy = periods_per_year(eq["timestamp"]) if "timestamp" in eq else float(TRADING_DAYS)
-    years = max(len(equity) / ppy, 1 / ppy)
+    years = elapsed_years(eq.get("timestamp", []), len(equity))
     vol = float(ret.std(ddof=0) * math.sqrt(ppy)) if len(ret) > 1 else 0.0
-    downside = ret[ret < 0]
-    dvol = float(downside.std(ddof=0) * math.sqrt(ppy)) if len(downside) > 1 else 0.0
+    dvol = downside_deviation(ret, ppy)
     dd = equity / equity.cummax() - 1
     months = (
         eq.resample("ME", on="timestamp").last()["equity"].pct_change().dropna()
@@ -675,5 +674,3 @@ def run_multi_asset_backtest(
         _metrics(eq),
         pd.DataFrame(order_event_rows),
     )
-
-

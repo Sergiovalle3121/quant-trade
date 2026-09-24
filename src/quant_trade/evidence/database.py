@@ -99,9 +99,12 @@ def insert_artifact(conn: sqlite3.Connection, artifact: Any) -> None:
     upsert_strategy(conn, artifact.strategy_id)
     metadata_json = json.dumps(artifact.metadata, sort_keys=True)
     conn.execute(
-        "INSERT OR IGNORE INTO artifacts("
-        "path, artifact_type, sha256, strategy_id, metadata_json"
-        ") VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO artifacts(path, artifact_type, sha256, strategy_id, metadata_json) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(path) DO UPDATE SET "
+        "artifact_type=excluded.artifact_type, sha256=excluded.sha256, "
+        "strategy_id=excluded.strategy_id, metadata_json=excluded.metadata_json, "
+        "created_at=CURRENT_TIMESTAMP",
         (
             artifact.path,
             artifact.artifact_type,

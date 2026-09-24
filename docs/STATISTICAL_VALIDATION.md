@@ -5,6 +5,15 @@ something always looks spectacular in-sample. This layer quantifies how much
 of an observed Sharpe survives track-record length, non-normal returns, and —
 critically — the number of things that were tried.
 
+## Performance metric conventions
+
+Annualized volatility uses observed bar density, while CAGR uses the exact
+calendar span between the first and last valuation. Sortino uses a zero
+per-period minimum acceptable return and annualized semideviation
+`sqrt(mean(min(return, 0)^2))`; non-losing observations remain in the
+denominator as zero shortfalls. These diagnostics are not profitability
+evidence, and sparse samples remain especially uncertain.
+
 ## Components
 
 ### Trial ledger (`outputs/trial_ledger.jsonl`)
