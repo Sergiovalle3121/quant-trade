@@ -386,6 +386,7 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
 | `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
+| `AUDIT_PACK_PRICE_USD_CENTS` | `6900` | A 3-credit access code (`PACK_CREDITS`), shown on the pricing card, the locked report and the terms only when codes are sold and it costs less than three single audits; `0` hides it. Create the code with 3 credits on `/panel` or `audit codes create --credits 3`. |
 | `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. A whole request over six files' worth plus 1 MiB (`UPLOAD_FIELDS`, `FORM_OVERHEAD_BYTES`) is refused with 413 before it is written to disk. |
 | `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. Attempts that fail to parse count too, up to three times this number (`UPLOAD_ATTEMPTS_PER_UPLOAD`); waitlist sign-ups are limited to 5 per hour per address (`WAITLIST_PER_HOUR_PER_IP`). |
 | `AUDIT_MAX_CONCURRENT_AUDITS` | `2` | Uploads parsed and audited at the same time. Each one can use a few hundred MB on a long intraday curve. |
@@ -566,6 +567,12 @@ apps do not preview. Every new page must pass the guard in both languages
 (`tests/test_audit_guides_seo.py`).
 
 ### Terms and privacy
+
+Refund promise (sergio's decision, 2026-09-24): in paid mode the pricing
+section and the terms say that a full report that misreads the file
+(trades, balance or dates that do not match the platform) and cannot be
+fixed is refunded or replaced by a new credit. The operator honours it by
+hand (`quant-trade audit codes create --credits 1` or a transfer back).
 
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card

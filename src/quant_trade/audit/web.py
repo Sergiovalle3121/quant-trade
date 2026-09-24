@@ -831,6 +831,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             contact_url=cfg.contact_url,
             retention_days=cfg.retention_days,
             base_url=_site_url(request),
+            pack_price_usd=cfg.pack_price_usd,
         )
 
     @app.get("/en", response_class=HTMLResponse)
@@ -1041,6 +1042,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             publish_url=f"{base}/publish{query}" if publishable else None,
             notice=notice,
             contact_url=cfg.contact_url if redeemable else None,
+            pack_price_usd=cfg.pack_price_usd if redeemable else 0.0,
             legal_links=True,
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
@@ -1243,6 +1245,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             price_usd=cfg.price_usd,
             card_payments=cfg.stripe_enabled,
             access_codes=cfg.access_codes_enabled,
+            pack_price_usd=cfg.pack_price_usd,
             retention_days=cfg.retention_days,
             max_uploads_per_hour_per_ip=cfg.max_uploads_per_hour_per_ip,
         )

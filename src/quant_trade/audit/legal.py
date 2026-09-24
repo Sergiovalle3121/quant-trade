@@ -20,6 +20,8 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 
+from quant_trade.audit.settings import PACK_CREDITS
+
 #: Date of the current wording. Change it whenever a text below changes.
 LEGAL_UPDATED = "2026-09-24"
 
@@ -62,6 +64,7 @@ class LegalContext:
     price_usd: float = 0.0
     card_payments: bool = False
     access_codes: bool = False
+    pack_price_usd: float = 0.0
     retention_days: int = 30
     max_uploads_per_hour_per_ip: int = 10
 
@@ -132,6 +135,17 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
             "que acordemos) y recibir un código de acceso. Cada crédito del código desbloquea "
             "una auditoría. El código se entrega una sola vez: guárdalo."
         )
+        if ctx.pack_price_usd:
+            lines.append(
+                f"También vendemos códigos de {PACK_CREDITS} créditos por "
+                f"USD {ctx.pack_price_usd:.2f}; cada crédito desbloquea una auditoría."
+            )
+        lines.append(
+            "Si el informe completo lee mal tu archivo (operaciones, saldo o fechas que no "
+            "coinciden con lo que muestra tu plataforma) y no podemos corregirlo, escríbenos con "
+            "el identificador del informe: devolvemos el importe de ese informe o, si lo "
+            "prefieres, entregamos un crédito nuevo."
+        )
     lines.append(
         "Si pagaste y el informe completo no se generó por un fallo del servicio, escríbenos: "
         "devolvemos el importe o entregamos un código nuevo. Como el informe se entrega al "
@@ -158,6 +172,16 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
             "You can also pay outside the site (bank transfer, Mercado Pago or another method "
             "we agree on) and receive an access code. Each credit on the code unlocks one "
             "audit. The code is handed over once: keep it."
+        )
+        if ctx.pack_price_usd:
+            lines.append(
+                f"We also sell codes with {PACK_CREDITS} credits for USD {ctx.pack_price_usd:.2f}; "
+                "each credit unlocks one audit."
+            )
+        lines.append(
+            "If the full report misreads your file (trades, balance or dates that do not match "
+            "what your platform shows) and we cannot fix it, write to us with the report's "
+            "identifier: we refund that report or, if you prefer, issue a new credit."
         )
     lines.append(
         "If you paid and the full report was not produced because of a fault in the service, "

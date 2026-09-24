@@ -19,6 +19,11 @@ from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 DEFAULT_DATABASE_URL = "sqlite:///state/audit/audit.db"
 DEFAULT_BASE_URL = "http://localhost:8000"
 DEFAULT_PRICE_USD_CENTS = 4900
+#: A pack of ``PACK_CREDITS`` audits sold as one access code. It is shown only
+#: when codes are sold and it costs less than that many single audits;
+#: ``AUDIT_PACK_PRICE_USD_CENTS=0`` hides it.
+PACK_CREDITS = 3
+DEFAULT_PACK_PRICE_USD_CENTS = 6900
 DEFAULT_RETENTION_DAYS = 30
 DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP = 10
 DEFAULT_BOOTSTRAP_SAMPLES = 1000
@@ -67,6 +72,7 @@ class AuditSettings:
     max_upload_bytes: int = MAX_UPLOAD_BYTES
     max_uploads_per_hour_per_ip: int = DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP
     price_usd_cents: int = DEFAULT_PRICE_USD_CENTS
+    pack_price_usd_cents: int = DEFAULT_PACK_PRICE_USD_CENTS
     retention_days: int = DEFAULT_RETENTION_DAYS
     bootstrap_samples: int = DEFAULT_BOOTSTRAP_SAMPLES
     trusted_proxy_hops: int = DEFAULT_TRUSTED_PROXY_HOPS
@@ -134,6 +140,15 @@ class AuditSettings:
         return self.price_usd_cents / 100.0
 
     @property
+    def pack_price_usd(self) -> float:
+        """The pack's price when it is on sale, else 0."""
+        on_sale = (
+            self.access_codes_enabled
+            and 0 < self.pack_price_usd_cents < PACK_CREDITS * self.price_usd_cents
+        )
+        return self.pack_price_usd_cents / 100.0 if on_sale else 0.0
+
+    @property
     def database_kind(self) -> str:
         return "sqlite" if self.database_url.startswith("sqlite") else "postgresql"
 
@@ -163,6 +178,9 @@ class AuditSettings:
                 env.get("AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP", DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP)
             ),
             price_usd_cents=int(env.get("AUDIT_PRICE_USD_CENTS", DEFAULT_PRICE_USD_CENTS)),
+            pack_price_usd_cents=int(
+                env.get("AUDIT_PACK_PRICE_USD_CENTS", "").strip() or DEFAULT_PACK_PRICE_USD_CENTS
+            ),
             retention_days=int(env.get("AUDIT_RETENTION_DAYS", DEFAULT_RETENTION_DAYS)),
             bootstrap_samples=int(env.get("AUDIT_BOOTSTRAP_SAMPLES", DEFAULT_BOOTSTRAP_SAMPLES)),
             trusted_proxy_hops=int(

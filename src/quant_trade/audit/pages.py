@@ -26,6 +26,7 @@ from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
+from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -201,6 +202,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "escribes en el formulario o en el informe."
         ),
         "contact": "Pedir un código",
+        "price_pack": "Pack de {n} informes: USD {price:.0f} (USD {each:.0f} cada uno).",
+        "refund_note": (
+            "Si el informe lee mal tu archivo (operaciones, saldo o fechas que no coinciden con "
+            "tu plataforma) y no podemos corregirlo, te devolvemos el importe de ese informe."
+        ),
         "faq_title": "Preguntas frecuentes",
         "faq": [
             (
@@ -384,6 +390,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "enter it in the form or in the report."
         ),
         "contact": "Ask for a code",
+        "price_pack": "Pack of {n} reports: USD {price:.0f} (USD {each:.0f} each).",
+        "refund_note": (
+            "If the report misreads your file (trades, balance or dates that do not match your "
+            "platform) and we cannot fix it, we refund that report."
+        ),
         "faq_title": "Frequently asked questions",
         "faq": [
             (
@@ -1156,6 +1167,7 @@ def _prices_html(
     access_codes: bool,
     card_payments: bool,
     contact_url: str,
+    pack_price_usd: float = 0.0,
 ) -> str:
     ui = _UI[locale]
     head = _section_head(ui["pricing_eyebrow"], f"<h2 class='h2'>{_e(copy['prices_title'])}</h2>")
@@ -1193,9 +1205,21 @@ def _prices_html(
             f"</span><div class='price-amount'>USD {price_usd:.0f}"
             f"<small>{_e(ui['plan_full_note'])}</small></div>"
             f"<p class='muted'>{_e(copy['price_full'])}</p>"
+            + (
+                "<p class='price-pack'><strong>"
+                + _e(
+                    copy["price_pack"].format(
+                        n=PACK_CREDITS, price=pack_price_usd, each=pack_price_usd / PACK_CREDITS
+                    )
+                )
+                + "</strong></p>"
+                if pack_price_usd
+                else ""
+            )
             + _checks(ui["full_items"])
             + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta'])}</a></div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
+            + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
         )
     return f"<section class='section' id='pricing'><div class='wrap'>{head}{body}</div></section>"
 
@@ -1395,6 +1419,7 @@ def landing(
     contact_url: str = "",
     retention_days: int = 30,
     base_url: str = "",
+    pack_price_usd: float = 0.0,
 ) -> str:
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -1422,6 +1447,7 @@ def landing(
             access_codes=access_codes,
             card_payments=card_payments,
             contact_url=contact_url,
+            pack_price_usd=pack_price_usd,
         )
         + _upload_form(
             copy,
