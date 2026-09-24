@@ -112,13 +112,11 @@ class ReportFormatError(ParseError):
     """A platform file that cannot be imported, with a code and a Spanish message.
 
     ``str(error)`` is the English message, as for every ``ParseError``;
-    ``message_es`` is the same message for the Spanish page.
+    ``message_es`` and ``localized("es")`` give the Spanish one.
     """
 
     def __init__(self, code: str, message: str, message_es: str) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message_es = message_es
+        super().__init__(message, message_es=message_es, code=code)
 
 
 @dataclass(frozen=True)

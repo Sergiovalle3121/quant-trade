@@ -713,6 +713,8 @@ def test_unknown_and_oversized_files_raise_parse_errors() -> None:
     assert isinstance(info.value, ReportFormatError)
     assert info.value.code == "unknown_format"
     assert "MetaTrader" in str(info.value) and "MetaTrader" in info.value.message_es
+    assert info.value.localized("es") == info.value.message_es
+    assert info.value.localized("en") == str(info.value)
     with pytest.raises(ReportFormatError) as big:
         import_report(b"x" * (MAX_UPLOAD_BYTES + 1))
     assert big.value.code == "file_too_large"
