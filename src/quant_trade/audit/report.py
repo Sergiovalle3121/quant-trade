@@ -20,6 +20,7 @@ from quant_trade.audit import charts
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import legal_links_html
+from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
@@ -163,6 +164,15 @@ LABELS: dict[str, dict[str, str]] = {
         "horizon": "1 año",
         "reasons_detail": "Razones por dimensión",
         "fees": "Costes que detalla el informe",
+        "plan": "Plan para subir de clase",
+        "plan_intro": (
+            "Lo que las reglas de la auditoría necesitarían ver en cada dimensión abierta, "
+            "de lo más decisivo a lo menos. Una clase mejor significa que los archivos "
+            "responden más preguntas, no que la estrategia vaya a funcionar."
+        ),
+        "plan_class": "Con esta dimensión en PASS y las demás igual, la clase sería",
+        "plan_none": "Todas las dimensiones pasan: no queda ningún paso abierto.",
+        "plan_locked": "pasos concretos, con las cifras de tu archivo, en el informe completo",
     },
     "en": {
         "title": f"{BRAND} · Backtest audit",
@@ -276,6 +286,15 @@ LABELS: dict[str, dict[str, str]] = {
         "horizon": "1 year",
         "reasons_detail": "Reasons by dimension",
         "fees": "Costs the report itemises",
+        "plan": "Plan to reach a better class",
+        "plan_intro": (
+            "What the audit's rules would need to see in each open dimension, most decisive "
+            "first. A better class means the files answer more questions, not that the "
+            "strategy will work."
+        ),
+        "plan_class": "With this dimension at PASS and the rest unchanged, the class would be",
+        "plan_none": "Every dimension passes: no step is left open.",
+        "plan_locked": "concrete steps, with your file's figures, in the full report",
     },
 }
 
@@ -584,6 +603,55 @@ def _charts_html(data: dict[str, Any], locale: str) -> str:
         )
     )
     return "".join(figures)
+
+
+PLAN_CSS = (
+    ".plan{grid-template-columns:minmax(0,1fr)}"
+    ".plan .item h3{justify-content:flex-start;gap:12px}"
+    ".plan .item h3 .step-n{font-family:var(--mono);color:var(--text-3);font-weight:500}"
+    ".plan .item h3 .step-t{flex:1;min-width:0}"
+    ".plan .item ul{margin:10px 0 0;padding-left:1.1rem;color:var(--text-2);font-size:.92rem}"
+    ".plan .item li{margin:4px 0}"
+    ".plan .item .plan-class{margin-top:10px;font-size:.85rem;color:var(--text-3)}"
+)
+
+
+def _plan_html(data: dict[str, Any], locale: str, labels: dict[str, str], *, locked: bool) -> str:
+    """The improvement plan; locked pages show only each step's title."""
+    steps = improvement_plan(data, locale)
+    if not steps:
+        return f"<p class='muted'>{_e(labels['plan_none'])}</p>"
+    items = []
+    for number, step in enumerate(steps, start=1):
+        head = (
+            f"<h3><span class='step-n'>{number:02d}</span> "
+            f"<span class='step-t'>{_e(step.title)}</span> "
+            f"{_status_badge(step.status, locale)}</h3>"
+        )
+        if locked:
+            items.append(f"<div class='item s-{_e(step.status)}'>{head}</div>")
+            continue
+        actions = (
+            "<ul>" + "".join(f"<li>{_e(action)}</li>" for action in step.actions) + "</ul>"
+            if step.actions
+            else ""
+        )
+        better = (
+            f"<p class='plan-class'>{_e(labels['plan_class'])} "
+            f"<strong>{_e(step.class_if_passed)}</strong>.</p>"
+            if step.class_if_passed
+            else ""
+        )
+        items.append(
+            f"<div class='item s-{_e(step.status)}'>{head}<p>{_e(step.finding)}</p>"
+            f"{actions}{better}</div>"
+        )
+    intro = (
+        f"<p class='muted'>{len(steps)} {_e(labels['plan_locked'])}.</p>"
+        if locked
+        else f"<p class='muted'>{_e(labels['plan_intro'])}</p>"
+    )
+    return intro + "<div class='meaning plan'>" + "".join(items) + "</div>"
 
 
 def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str, str]) -> str:
@@ -1050,6 +1118,7 @@ def render_html(
         cost_html += f"<h3>{_e(labels['fees'])}</h3>" + _evidence_rows(fees, labels, skip=set())
 
     detail: list[tuple[str, str]] = [
+        (labels["plan"], _plan_html(data, locale, labels, locked=False)),
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
@@ -1146,6 +1215,7 @@ def render_html(
         section(labels["meaning"], _meaning_html(verdict, locale)),
         section(labels["charts"], _charts_html(data, locale)),
         section(labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels)),
+        section(labels["plan"], _plan_html(data, locale, labels, locked=True)) if locked else "",
         detail_html,
         publish_html,
         section(labels["inputs"], inputs_html + _source_html(data, labels)),
@@ -1166,6 +1236,7 @@ def render_html(
         + "<style>"
         + STYLE
         + charts.CHART_CSS
+        + PLAN_CSS
         + "</style>"
         + SCRIPT_TAG
         + "</head><body>"
