@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -146,16 +147,57 @@ def test_paid_mode_publishes_only_paid_audits(tmp_path: Path) -> None:
     assert published.status_code == 303
 
 
-def test_a_purged_audit_answers_410(tmp_path: Path) -> None:
+def test_a_purged_unpublished_audit_answers_410(tmp_path: Path) -> None:
     client, store = _client(tmp_path)
     audit_id, token = _upload(client)
     public_id = client.post(
         f"/audits/{audit_id}/publish?token={token}", headers={"accept": "application/json"}
     ).json()["public_id"]
+    client.post(f"/audits/{audit_id}/unpublish?token={token}")
     far = datetime(2100, 1, 1, tzinfo=UTC)
     assert store.purge_expired(far, retention_days=1) == 1  # type: ignore[attr-defined]
-    assert client.get(f"/v/{public_id}").status_code == 410
-    assert client.get(f"/v/{public_id}/badge.svg").status_code == 410
+    assert client.get(f"/v/{public_id}").status_code == 404
+    assert client.get(f"/audits/{audit_id}?token={token}").status_code == 410
+
+
+def test_a_purged_published_audit_keeps_only_its_public_page(tmp_path: Path) -> None:
+    client, store = _client(tmp_path)
+    audit_id, token = _upload(client)
+    public_id = client.post(
+        f"/audits/{audit_id}/publish?token={token}", headers={"accept": "application/json"}
+    ).json()["public_id"]
+    before = client.get(f"/v/{public_id}").text
+    badge_before = client.get(f"/v/{public_id}/badge.svg").text
+    far = datetime(2100, 1, 1, tzinfo=UTC)
+    assert store.purge_expired(far, retention_days=1) == 1  # type: ignore[attr-defined]
+
+    # The private report and the uploads are gone...
+    assert client.get(f"/audits/{audit_id}?token={token}").status_code == 410
+    record = store.get_audit(audit_id, with_blobs=True)  # type: ignore[attr-defined]
+    assert record.result_json is None and record.equity_csv is None
+    assert record.declared_json is None and record.client_ip == ""
+    # ...the public page and badge are unchanged, result hash included.
+    assert client.get(f"/v/{public_id}").text == before
+    assert client.get(f"/v/{public_id}/badge.svg").text == badge_before
+    view, _ = store.publication_view(audit_id)  # type: ignore[attr-defined]
+    assert SECRET_DESCRIPTION not in json.dumps(view)
+    assert set(view) == {
+        "generated_at_utc",
+        "verdict",
+        "inputs",
+        "engine",
+        "declared",
+        "multiplicity",
+    }
+    assert set(view["declared"]) == {"trials"}
+
+    # The owner can still withdraw it with the private link.
+    wrong = client.post(f"/audits/{audit_id}/unpublish?token=nope", follow_redirects=False)
+    assert wrong.status_code == 404
+    done = client.post(f"/audits/{audit_id}/unpublish?token={token}", follow_redirects=False)
+    assert done.status_code == 303 and done.headers["location"].startswith("/?lang=")
+    assert client.get(f"/v/{public_id}").status_code == 404
+    assert store.publication_view(audit_id) is None  # type: ignore[attr-defined]
 
 
 def test_sample_report_is_full_synthetic_and_guarded(tmp_path: Path) -> None:

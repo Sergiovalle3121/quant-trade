@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from quant_trade.audit.legal import (  # noqa: E402
     terms_text,
 )
 from quant_trade.audit.pages import error_page, landing, legal_page  # noqa: E402
+from quant_trade.audit.retention import RetentionWorker, run_retention  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -249,3 +251,72 @@ def test_cli_export_delete_and_waitlist_remove(tmp_path: Path, monkeypatch) -> N
     removed = runner.invoke(app, ["audit", "waitlist-remove", "ana@example.com", "--yes"])
     assert removed.exit_code == 0 and store.waitlist_emails() == []
     assert runner.invoke(app, ["audit", "waitlist-remove", "ana@example.com"]).exit_code == 1
+
+
+# -- the purge runs inside the service --------------------------------------
+
+
+def test_auto_purge_is_an_explicit_opt_in() -> None:
+    assert AuditSettings.from_env({}).auto_purge is False
+    assert AuditSettings.from_env({"AUDIT_AUTO_PURGE": "true"}).auto_purge is True
+
+
+def test_service_purges_at_startup_when_auto_purge_is_on(tmp_path: Path) -> None:
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", auto_purge=True)
+    store = make_store(settings.database_url)
+    _create(store, "old", at=datetime.now(UTC) - timedelta(days=40))
+    _create(store, "new", at=datetime.now(UTC))
+    with TestClient(create_app(settings, store)) as client:
+        assert client.get("/health").json()["auto_purge"] is True
+        worker = client.app.state.retention
+        for _ in range(200):
+            if worker.runs:
+                break
+            threading.Event().wait(0.01)
+        assert worker.runs >= 1
+    assert store.get_audit("old").purged_at is not None
+    assert store.get_audit("new").purged_at is None
+
+
+def test_service_never_purges_without_the_opt_in(tmp_path: Path) -> None:
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db")
+    store = make_store(settings.database_url)
+    _create(store, "old", at=datetime.now(UTC) - timedelta(days=40))
+    with TestClient(create_app(settings, store)) as client:
+        assert client.get("/health").json()["auto_purge"] is False
+        assert client.app.state.retention.runs == 0
+    assert store.get_audit("old").purged_at is None
+
+
+def test_worker_repeats_on_its_interval_and_survives_a_failure() -> None:
+    calls: list[datetime] = []
+
+    class FlakyStore:
+        def purge_expired(self, now: datetime, *, retention_days: int) -> int:
+            calls.append(now)
+            if len(calls) == 1:
+                raise RuntimeError("database away")
+            return 0
+
+    worker = RetentionWorker(
+        FlakyStore(), retention_days=30, interval_seconds=0.01, clock=lambda: NOW
+    )
+    worker.start()
+    for _ in range(500):
+        if len(calls) >= 3:
+            break
+        threading.Event().wait(0.01)
+    worker.stop()
+    assert len(calls) >= 3 and calls[0] == NOW
+    assert run_retention(FlakyStore(), retention_days=30, now=NOW) == 0
+
+
+def test_cli_unpublish(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/audit.db")
+    store = make_store(f"sqlite:///{tmp_path}/audit.db")
+    _create(store, "a1", at=NOW)
+    store.publish("a1", at=NOW)
+    runner = CliRunner()
+    assert runner.invoke(app, ["audit", "unpublish", "a1"]).exit_code == 0
+    assert store.publication_for_audit("a1") is None
+    assert runner.invoke(app, ["audit", "unpublish", "a1"]).exit_code == 1

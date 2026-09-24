@@ -1,6 +1,6 @@
 """``quant-trade audit``: run an audit from files, serve the web app, purge old
 uploads, and answer a client's privacy request (``export``, ``delete``,
-``waitlist-remove``).
+``unpublish``, ``waitlist-remove``).
 
 ``run`` is the whole product without a browser: the operator receives a CSV
 by e-mail, runs one command, and sends back ``report.html``. ``serve`` and
@@ -311,6 +311,18 @@ def delete(
         return
     store.delete_audit(audit_id)
     typer.echo(f"deleted {what}")
+
+
+@audit_app.command("unpublish")
+def unpublish(
+    audit_id: Annotated[str, typer.Argument(help="The audit id from the client's private link")],
+) -> None:
+    """Withdraw an audit's public verification page and badge (also after a purge)."""
+    if _store().unpublish(audit_id):
+        typer.echo(f"unpublished {audit_id}")
+    else:
+        typer.echo(f"audit {audit_id} has no public page", err=True)
+        raise typer.Exit(code=1)
 
 
 @audit_app.command("waitlist-remove")

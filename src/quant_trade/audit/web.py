@@ -18,13 +18,14 @@ and ``/sample`` serve a full report of synthetic data.
 # signatures at definition time, and the names it needs are imported inside
 # ``create_app`` so the module stays importable without the ``web`` extra.
 
+import contextlib
 import hashlib
 import hmac
 import json
 import secrets
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
@@ -41,6 +42,7 @@ from quant_trade.audit.pages import (
     verification_page,
 )
 from quant_trade.audit.report import render, result_sha256
+from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import (
     AuditResult,
@@ -309,14 +311,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     cfg = settings or AuditSettings.from_env()
     db = store or make_store(cfg.database_url)
+    retention = RetentionWorker(db, retention_days=cfg.retention_days)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_: Any) -> AsyncIterator[None]:
+        if cfg.auto_purge:
+            retention.start()
+        try:
+            yield
+        finally:
+            retention.stop()
+
     app = FastAPI(
         title="Backtest audit",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=lifespan,
     )
     app.state.settings = cfg
     app.state.store = db
+    app.state.retention = retention
     app.state.checkout_factory = stripe_checkout
 
     @app.middleware("http")
@@ -378,6 +393,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "stripe_enabled": cfg.stripe_enabled,
             "database": cfg.database_kind,
             "legal_configured": cfg.legal_configured,
+            "auto_purge": cfg.auto_purge,
         }
 
     @app.get("/", response_class=HTMLResponse)
@@ -649,13 +665,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.post("/audits/{audit_id}/unpublish")
     def unpublish(request: Request, audit_id: str, token: str | None = None) -> Response:
-        _load(audit_id, token)
+        # Only the token is checked: the owner can withdraw a page whose
+        # audit was already purged and kept only its public view.
+        record = db.get_audit(audit_id)
+        if record is None or not token_matches(record.token_hash, token):
+            raise _not_found()
         removed = db.unpublish(audit_id)
         if _wants_json(request):
             return JSONResponse({"unpublished": removed})
+        if record.purged_at:
+            return RedirectResponse(f"/?lang={_record_locale(record)}", status_code=303)
         return RedirectResponse(f"/audits/{audit_id}?token={token}", status_code=303)
 
-    def _published(public_id: str) -> tuple[Any, Any]:
+    def _published(public_id: str) -> tuple[Any, Any, dict[str, Any], str]:
+        """Publication, record, the page's data and the result's SHA-256.
+
+        A purged audit is served from the view the purge kept; without one
+        the page is gone (410).
+        """
         publication = db.get_publication(public_id)
         if publication is None:
             raise _not_found()
@@ -663,12 +690,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if record is None:
             raise _not_found()
         if record.purged_at or not record.result_json:
-            raise HTTPException(status_code=410, detail="purged")
-        return publication, record
+            kept = db.publication_view(record.id)
+            if kept is None:
+                raise HTTPException(status_code=410, detail="purged")
+            return publication, record, kept[0], kept[1]
+        result = AuditResult.model_validate_json(record.result_json)
+        return publication, record, result.model_dump(mode="json"), result_sha256(result)
 
     @app.get("/v/{public_id}/badge.svg")
     def badge(public_id: str, lang: str | None = None) -> Response:
-        publication, record = _published(public_id)
+        publication, record, _, _ = _published(public_id)
         svg = badge_svg(
             overall=record.overall_class,
             public_id=publication.public_id,
@@ -679,13 +710,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
     def verification(public_id: str, lang: str | None = None) -> str:
-        publication, record = _published(public_id)
-        result = AuditResult.model_validate_json(record.result_json)
+        publication, _, data, digest = _published(public_id)
         return verification_page(
-            result.model_dump(mode="json"),
+            data,
             public_id=publication.public_id,
             published_at=publication.created_at,
-            result_sha256=result_sha256(result),
+            result_sha256=digest,
             base_url=cfg.base_url,
             locale=_locale(lang),
         )
