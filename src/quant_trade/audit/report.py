@@ -118,6 +118,8 @@ LABELS: dict[str, dict[str, str]] = {
         "json_sha": "sha256 del JSON de la auditoría",
         "thresholds": "Umbrales aplicados",
         "print": "Imprimir / guardar PDF",
+        "pdf": "Descargar PDF",
+        "pdf_long": "Descargar el informe en PDF",
         "switch": "English",
         "yes": "sí",
         "no": "no",
@@ -280,6 +282,8 @@ LABELS: dict[str, dict[str, str]] = {
         "json_sha": "sha256 of the audit JSON",
         "thresholds": "Thresholds applied",
         "print": "Print / save PDF",
+        "pdf": "Download PDF",
+        "pdf_long": "Download the report as PDF",
         "switch": "Español",
         "yes": "yes",
         "no": "no",
@@ -1170,6 +1174,7 @@ def render_html(
     head_meta: str | None = None,
     compare_link: str | None = None,
     pack_price_usd: float = 0.0,
+    pdf_url: str | None = None,
 ) -> str:
     """The audit as one HTML document.
 
@@ -1521,9 +1526,16 @@ def render_html(
             f"<div class='watermark'>{_e(text)}</div><div class='banner'>{_e(text)}</div>"
         )
 
+    if pdf_url and not locked:
+        print_html = f"<a class='print-btn' href='{_e(pdf_url)}' download>{_e(labels['pdf'])}</a>"
+    else:
+        print_html = (
+            "<button type='button' class='print-btn' "
+            f"onclick='window.print()'>{_e(labels['print'])}</button>"
+        )
     toolbar = (
-        "<div class='nav-end no-print'><button type='button' class='print-btn' "
-        f"onclick='window.print()'>{_e(labels['print'])}</button>"
+        "<div class='nav-end no-print'>"
+        + print_html
         + (
             f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
             f"{_e(labels['switch'])}</a>"
@@ -1558,6 +1570,12 @@ def render_html(
         + class_ring(str(verdict["overall"]), size="lg")
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         f"<p class='verdict-text'>{_e(verdict['summary'])}</p></div></div>"
+        + (
+            f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
+            f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
+            if pdf_url and not locked
+            else ""
+        )
         + (
             f"<p class='rise' style='--i:4'><a class='btn btn-primary' href='#unlock'>"
             f"{_e(labels['unlock_jump'])}</a></p>"
@@ -1648,6 +1666,7 @@ def render(
     head_meta: str | None = None,
     compare_link: str | None = None,
     pack_price_usd: float = 0.0,
+    pdf_url: str | None = None,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1666,6 +1685,7 @@ def render(
         head_meta=head_meta,
         compare_link=compare_link,
         pack_price_usd=pack_price_usd,
+        pdf_url=pdf_url,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

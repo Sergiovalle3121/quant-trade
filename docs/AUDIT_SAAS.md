@@ -260,6 +260,15 @@ optimisation export, variants in a vectorbt report); the latter is tagged
 MEASURED. `TRIALS_BELOW_VARIANTS` warns when the declaration is lower; it
 stays silent when the customer left trials blank, since nothing was declared.
 
+PDF download: an unlocked report (paid, or any report in free mode) offers
+"Descargar el informe en PDF" at `/audits/{id}/pdf?token=…`, a locked one
+answers 402. `audit/pdf.py` lays out the same report page with WeasyPrint
+(needs Pango: `Dockerfile.web` installs it) and serves only the site's own
+fonts and `data:` URIs to the renderer; every other URL is refused, so a
+PDF never reaches the network. At most `MAX_CONCURRENT_PDFS = 2` render at
+once; a busy or missing renderer answers 503 with a hint to use print.
+The response is `private, no-store` and `noindex`.
+
 Annual return: the compound annual return is NOT_MEASURED when the history
 spans less than a year (`engine.MIN_CAGR_DAYS = 365`); compounding a few
 good weeks into a year prints a return nobody earned, and the total return
