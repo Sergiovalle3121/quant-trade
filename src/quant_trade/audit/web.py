@@ -35,6 +35,7 @@ from typing import Annotated, Any
 
 from pydantic import ValidationError
 
+from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
@@ -177,6 +178,20 @@ MESSAGES: dict[str, dict[str, str]] = {
             "vuelve a enviar el archivo en un minuto."
         ),
         "en": "The service is busy with other audits right now; submit the file again in a minute.",
+    },
+    "pdf_busy": {
+        "es": "Estamos preparando otros PDF en este momento. Vuelve a intentarlo en unos segundos.",
+        "en": "Other PDFs are being prepared right now. Try again in a few seconds.",
+    },
+    "pdf_unavailable": {
+        "es": (
+            "La descarga en PDF no está disponible ahora mismo. Usa el botón de imprimir de la "
+            "página del informe y elige guardar como PDF."
+        ),
+        "en": (
+            "PDF download is not available right now. Use the report page's print button and "
+            "choose save as PDF."
+        ),
     },
     "server_error": {
         "es": (
@@ -589,6 +604,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         raise ImportError(REQUIRE_WEB) from exc
 
     cfg = settings or AuditSettings.from_env()
+    # Checked once: WeasyPrint needs Pango, which a bare install may lack.
+    pdf_ok = pdf_lib.available()
     db = store or make_store(cfg.database_url)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
 
@@ -1059,8 +1076,41 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
             compare_link=f"{base}?token={token}" if record.paid or cfg.free_mode else None,
+            pdf_url=f"{base}/pdf{query}" if (record.paid or cfg.free_mode) and pdf_ok else None,
         )
         return html_text
+
+    @app.get("/audits/{audit_id}/pdf")
+    def audit_pdf(
+        request: Request, audit_id: str, token: str | None = None, lang: str | None = None
+    ) -> Response:
+        record = _load(audit_id, token)
+        locale = _view_locale(record, lang)
+        if not record.paid and not cfg.free_mode:
+            raise HTTPException(status_code=402, detail="payment_required")
+        result = AuditResult.model_validate_json(record.result_json)
+        page, _ = render(
+            result,
+            watermark=not record.paid,
+            free_mode=cfg.free_mode,
+            legal_links=True,
+            locale=locale,
+        )
+        try:
+            content = pdf_lib.report_pdf(page, audit_id=record.id, locale=locale)
+        except pdf_lib.PdfBusy:
+            return _html_error(request, 503, message("pdf_busy", locale), locale)
+        except pdf_lib.PdfUnavailable:
+            return _html_error(request, 503, message("pdf_unavailable", locale), locale)
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{pdf_lib.filename(record.id)}"',
+                "Cache-Control": "private, no-store",
+                "X-Robots-Tag": "noindex",
+            },
+        )
 
     # The ``.json`` route is registered first: ``{audit_id}`` would otherwise
     # swallow the suffix.
