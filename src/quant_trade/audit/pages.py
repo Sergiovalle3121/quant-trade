@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import DISCLAIMER
 
 _CSS = """
@@ -57,8 +58,20 @@ _COPY: dict[str, dict[str, Any]] = {
             "estrategias y no predecimos resultados. Auditamos el archivo que subes."
         ),
         "form_title": "Solicitar una auditoría",
-        "equity": "Curva de equity o serie de retornos (CSV, obligatorio)",
+        "report": "Informe de tu plataforma (recomendado)",
+        "report_help": (
+            "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4, "
+            "lista de operaciones de TradingView (CSV o XLSX), o el CSV de operaciones de "
+            "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 5 MB."
+        ),
+        "optimization": "Exportación de optimización de MT5 (XML, opcional)",
+        "optimization_help": (
+            "Cuenta las configuraciones que probaste: el Sharpe deflactado usa ese número real."
+        ),
+        "equity": "Curva de equity o serie de retornos (CSV; obligatoria si no subes un informe)",
         "equity_help": "Columnas: timestamp y equity (o return). Hasta 5 MB.",
+        "initial_balance": "Balance inicial (si el informe no lo indica)",
+        "challenge": "Reto de prop firm a simular",
         "trades": "Operaciones cerradas (CSV, opcional)",
         "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
         "benchmark": "Benchmark (CSV, opcional)",
@@ -113,8 +126,20 @@ _COPY: dict[str, dict[str, Any]] = {
             "no results. We audit the file you upload."
         ),
         "form_title": "Request an audit",
-        "equity": "Equity curve or return series (CSV, required)",
+        "report": "Your platform report (recommended)",
+        "report_help": (
+            "The file as it is: a MetaTrader 5 or 4 tester or history HTML report, a "
+            "TradingView list of trades (CSV or XLSX), or the trades CSV of NinjaTrader, "
+            "QuantConnect, backtesting.py or vectorbt. Up to 5 MB."
+        ),
+        "optimization": "MT5 optimisation export (XML, optional)",
+        "optimization_help": (
+            "Counts the configurations you tried: the deflated Sharpe uses that real number."
+        ),
+        "equity": "Equity curve or return series (CSV; required without a report)",
         "equity_help": "Columns: timestamp and equity (or return). Up to 5 MB.",
+        "initial_balance": "Starting balance (if the report does not state it)",
+        "challenge": "Prop-firm challenge to simulate",
         "trades": "Closed trades (CSV, optional)",
         "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
         "benchmark": "Benchmark (CSV, optional)",
@@ -148,6 +173,16 @@ _COPY: dict[str, dict[str, Any]] = {
 
 def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def _preset_options() -> str:
+    options = []
+    for key in sorted(PRESETS):
+        rules = PRESETS[key]
+        selected = " selected" if key == DEFAULT_PRESET else ""
+        label = f"{rules.firm} · {rules.program} · {rules.phase}"
+        options.append(f"<option value='{_e(key)}'{selected}>{_e(label)}</option>")
+    return "".join(options)
 
 
 def _head(title: str, locale: str) -> str:
@@ -192,7 +227,13 @@ def landing(
         + f"<h2>{_e(copy['not_title'])}</h2><p>{_e(copy['not'])}</p>"
         + f"<h2>{_e(copy['form_title'])}</h2>{flash}{err}<p class='muted'>{_e(note)}</p>"
         + "<form method='post' action='/audits' enctype='multipart/form-data'>"
-        + f"<label>{_e(copy['equity'])}</label><input type='file' name='equity' required "
+        + f"<label>{_e(copy['report'])}</label><input type='file' name='report' "
+        "accept='.htm,.html,.csv,.xlsx,.txt'>"
+        + f"<div class='muted'>{_e(copy['report_help'])}</div>"
+        + f"<label>{_e(copy['optimization'])}</label><input type='file' name='optimization' "
+        "accept='.xml'>"
+        + f"<div class='muted'>{_e(copy['optimization_help'])}</div>"
+        + f"<label>{_e(copy['equity'])}</label><input type='file' name='equity' "
         "accept='.csv,text/csv'>"
         + f"<div class='muted'>{_e(copy['equity_help'])}</div>"
         + f"<label>{_e(copy['trades'])}</label><input type='file' name='trades' "
@@ -211,6 +252,11 @@ def landing(
         + f"<div><label>{_e(copy['benchmark_applicable'])}</label>"
         f"<select name='benchmark_applicable'><option value='yes'>{_e(copy['yes'])}</option>"
         f"<option value='no'>{_e(copy['no'])}</option></select></div>"
+        + f"<div><label>{_e(copy['initial_balance'])}</label><input type='number' "
+        "name='initial_balance' min='0' step='0.01'></div>"
+        + f"<div><label>{_e(copy['challenge'])}</label><select name='challenge'>"
+        + _preset_options()
+        + "</select></div>"
         + f"<div><label>{_e(copy['locale'])}</label><select name='locale'>"
         f"<option value='es'{selected['es']}>Español</option>"
         f"<option value='en'{selected['en']}>English</option></select></div>"

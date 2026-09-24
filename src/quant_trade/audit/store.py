@@ -42,6 +42,8 @@ class AuditRecord:
     trades_csv: bytes | None = None
     benchmark_csv: bytes | None = None
     variants_csv: bytes | None = None
+    #: Other uploads by digest name (a platform report, an optimisation export).
+    files: dict[str, bytes] | None = None
 
 
 class Store:
@@ -82,6 +84,16 @@ class Store:
             sa.Column("variants_csv", sa.LargeBinary),
             sa.Column("purged_at", sa.String(40)),
         )
+        # Uploads beyond the four original CSVs, one row per file, so that new
+        # upload kinds never need a column migration on an existing database.
+        self.audit_files = sa.Table(
+            "audit_files",
+            self.metadata,
+            sa.Column("audit_id", sa.String(64), primary_key=True),
+            sa.Column("name", sa.String(64), primary_key=True),
+            sa.Column("sha256", sa.String(64), nullable=False),
+            sa.Column("data", sa.LargeBinary),
+        )
         self.waitlist = sa.Table(
             "waitlist",
             self.metadata,
@@ -105,11 +117,14 @@ class Store:
         report_html: str,
         overall_class: str,
         digests: dict[str, str],
-        equity_csv: bytes,
+        equity_csv: bytes | None,
         trades_csv: bytes | None = None,
         benchmark_csv: bytes | None = None,
         variants_csv: bytes | None = None,
+        files: dict[str, bytes] | None = None,
     ) -> None:
+        """Insert an audit. ``files`` maps a digest name (``report.html``,
+        ``optimization.xml``) to its bytes; its hash comes from ``digests``."""
         with self.engine.begin() as conn:
             conn.execute(
                 self.audits.insert().values(
@@ -132,6 +147,12 @@ class Store:
                     variants_csv=variants_csv,
                 )
             )
+            for name, data in sorted((files or {}).items()):
+                conn.execute(
+                    self.audit_files.insert().values(
+                        audit_id=audit_id, name=name, sha256=digests[name], data=data
+                    )
+                )
 
     def get_audit(self, audit_id: str, *, with_blobs: bool = False) -> AuditRecord | None:
         with self.engine.connect() as conn:
@@ -140,11 +161,18 @@ class Store:
                 .mappings()
                 .first()
             )
-        if row is None:
-            return None
-        return self._record(row, with_blobs=with_blobs)
+            if row is None:
+                return None
+            files = (
+                conn.execute(
+                    self._sa.select(self.audit_files).where(self.audit_files.c.audit_id == audit_id)
+                )
+                .mappings()
+                .all()
+            )
+        return self._record(row, with_blobs=with_blobs, files=files)
 
-    def _record(self, row: Any, *, with_blobs: bool) -> AuditRecord:
+    def _record(self, row: Any, *, with_blobs: bool, files: Any = ()) -> AuditRecord:
         digests = {
             name: row[column]
             for name, column in (
@@ -155,6 +183,8 @@ class Store:
             )
             if row[column]
         }
+        for file in files:
+            digests[file["name"]] = file["sha256"]
         return AuditRecord(
             id=row["id"],
             created_at=row["created_at"],
@@ -173,6 +203,11 @@ class Store:
             trades_csv=row["trades_csv"] if with_blobs else None,
             benchmark_csv=row["benchmark_csv"] if with_blobs else None,
             variants_csv=row["variants_csv"] if with_blobs else None,
+            files=(
+                {file["name"]: file["data"] for file in files if file["data"] is not None}
+                if with_blobs
+                else None
+            ),
         )
 
     def mark_paid(self, audit_id: str, *, stripe_session_id: str, at: datetime) -> bool:
@@ -245,6 +280,12 @@ class Store:
             )
             if dry_run or count == 0:
                 return count
+            expired = sa.select(self.audits.c.id).where(condition)
+            conn.execute(
+                self.audit_files.update()
+                .where(self.audit_files.c.audit_id.in_(expired))
+                .values(data=None)
+            )
             conn.execute(
                 self.audits.update()
                 .where(condition)

@@ -66,16 +66,12 @@ def test_statistical_not_measured() -> None:
     ],
 )
 def test_multiplicity_boundaries(dsr: float, pbo: float | None, expected: str) -> None:
-    dim = assess_multiplicity(
-        dsr_declared=dsr, declared_trials=10, pbo=pbo, statistical_status="PASS"
-    )
+    dim = assess_multiplicity(dsr=dsr, trials=10, pbo=pbo, statistical_status="PASS")
     assert dim.status == expected
 
 
 def test_multiplicity_follows_unmeasured_statistics() -> None:
-    dim = assess_multiplicity(
-        dsr_declared=None, declared_trials=1, pbo=None, statistical_status="NOT_MEASURED"
-    )
+    dim = assess_multiplicity(dsr=None, trials=1, pbo=None, statistical_status="NOT_MEASURED")
     assert dim.status == "NOT_MEASURED"
 
 
@@ -195,7 +191,7 @@ def test_summary_is_free_of_profit_claims(locale: str, overall: str) -> None:
         )
         for dim in dims:
             dim.reasons = ["motivo de prueba"]
-        text = summary(dims, overall, locale=locale, declared_trials=7)  # type: ignore[arg-type]
+        text = summary(dims, overall, locale=locale, trials=7)  # type: ignore[arg-type]
         assert find_claims(text) == []
         if status != "NOT_MEASURED":
             assert "7" in text

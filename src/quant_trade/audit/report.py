@@ -16,8 +16,11 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from quant_trade.audit import charts
 from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult
+from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
     pretty_dumps,
@@ -107,6 +110,44 @@ LABELS: dict[str, dict[str, str]] = {
         "disclaimer": "Aviso",
         "json_sha": "sha256 del JSON de la auditoría",
         "thresholds": "Umbrales aplicados",
+        "print": "Imprimir / guardar PDF",
+        "meaning": "Qué significa para ti",
+        "charts": "Gráficas",
+        "detail_heading": "Detalle",
+        "locked_intro": (
+            "El veredicto, las gráficas y las explicaciones son gratis. El detalle numérico de "
+            "estas secciones se entrega en el informe completo"
+        ),
+        "trade_stats": "Estadísticas de las operaciones",
+        "long": "Largos",
+        "short": "Cortos",
+        "risk": "Riesgo remuestreado a un año",
+        "risk_dd": "Drawdown máximo a un año",
+        "risk_prob": "Probabilidad de una caída de al menos",
+        "risk_underwater": "Periodos seguidos bajo el máximo",
+        "challenge": "Simulador de reto de prop firm",
+        "challenge_rules": "Reglas simuladas",
+        "outcome": "Resultado",
+        "probability": "Probabilidad",
+        "pass": "Llega al objetivo",
+        "fail_daily_loss": "Rompe la pérdida diaria",
+        "fail_total_loss": "Rompe la pérdida total",
+        "unfinished": "No termina a tiempo",
+        "ci95": "Intervalo del 95 % de llegar al objetivo",
+        "days_to_target": "Días hábiles hasta el objetivo (p25 / p50 / p75)",
+        "assumptions": "Supuestos",
+        "source": "Fuente",
+        "as_of": "leída el",
+        "questions": "Preguntas para hacerle al vendedor",
+        "flags_free": "Banderas rojas detectadas",
+        "report_source": "Formato del archivo",
+        "platform": "Datos que declara la plataforma",
+        "optimization": "Exportación de optimización",
+        "passes": "configuraciones probadas",
+        "trials_used": "Intentos usados en el Sharpe deflactado",
+        "horizon": "1 año",
+        "reasons_detail": "Razones por dimensión",
+        "fees": "Costes que detalla el informe",
     },
     "en": {
         "title": "Backtest audit",
@@ -171,6 +212,155 @@ LABELS: dict[str, dict[str, str]] = {
         "disclaimer": "Notice",
         "json_sha": "sha256 of the audit JSON",
         "thresholds": "Thresholds applied",
+        "print": "Print / save PDF",
+        "meaning": "What this means for you",
+        "charts": "Charts",
+        "detail_heading": "Detail",
+        "locked_intro": (
+            "The verdict, charts and explanations are free. The numeric detail of these "
+            "sections comes with the full report"
+        ),
+        "trade_stats": "Trade statistics",
+        "long": "Long",
+        "short": "Short",
+        "risk": "Resampled one-year risk",
+        "risk_dd": "Maximum drawdown over one year",
+        "risk_prob": "Probability of a fall of at least",
+        "risk_underwater": "Consecutive periods below the peak",
+        "challenge": "Prop-firm challenge simulator",
+        "challenge_rules": "Rules simulated",
+        "outcome": "Outcome",
+        "probability": "Probability",
+        "pass": "Reaches the target",
+        "fail_daily_loss": "Breaks the daily loss limit",
+        "fail_total_loss": "Breaks the total loss limit",
+        "unfinished": "Does not finish in time",
+        "ci95": "95 % interval of reaching the target",
+        "days_to_target": "Business days to the target (p25 / p50 / p75)",
+        "assumptions": "Assumptions",
+        "source": "Source",
+        "as_of": "read on",
+        "questions": "Questions to ask the vendor",
+        "flags_free": "Red flags found",
+        "report_source": "File format",
+        "platform": "Figures the platform states",
+        "optimization": "Optimisation export",
+        "passes": "configurations tried",
+        "trials_used": "Trials used in the deflated Sharpe",
+        "horizon": "1 year",
+        "reasons_detail": "Reasons by dimension",
+        "fees": "Costs the report itemises",
+    },
+}
+
+DIMENSION_TITLES: dict[str, dict[str, str]] = {
+    "es": {
+        "statistical_significance": "Significación estadística",
+        "multiplicity": "Número de intentos (Sharpe deflactado)",
+        "costs": "Costes",
+        "out_of_sample": "Fuera de muestra",
+        "data_quality": "Calidad de datos y forma de operar",
+        "benchmark": "Benchmark",
+    },
+    "en": {
+        "statistical_significance": "Statistical significance",
+        "multiplicity": "Number of trials (deflated Sharpe)",
+        "costs": "Costs",
+        "out_of_sample": "Out of sample",
+        "data_quality": "Data quality and trading pattern",
+        "benchmark": "Benchmark",
+    },
+}
+
+STATUS_TEXT: dict[str, dict[str, str]] = {
+    "es": {
+        "PASS": "Supera",
+        "WEAK": "Débil",
+        "FAIL": "No supera",
+        "NOT_MEASURED": "No medido",
+        "NOT_APPLICABLE": "No aplica",
+    },
+    "en": {
+        "PASS": "Pass",
+        "WEAK": "Weak",
+        "FAIL": "Fail",
+        "NOT_MEASURED": "Not measured",
+        "NOT_APPLICABLE": "Not applicable",
+    },
+}
+
+#: Reader-facing names of the numeric keys; the key itself when absent.
+KEY_LABELS: dict[str, dict[str, str]] = {
+    "es": {
+        "total_return": "Retorno total",
+        "cagr": "Retorno anual compuesto",
+        "volatility": "Volatilidad anual",
+        "sharpe": "Sharpe",
+        "sortino": "Sortino",
+        "max_drawdown": "Drawdown máximo",
+        "win_rate": "Aciertos",
+        "trade_count": "Operaciones",
+        "gross_profit": "Beneficio bruto de las ganadoras",
+        "gross_loss": "Pérdida bruta de las perdedoras",
+        "fees_total": "Comisiones y swap",
+        "net_pnl": "Resultado neto",
+        "profit_factor": "Factor de beneficio",
+        "expectancy": "Esperanza por operación",
+        "average_win": "Ganancia media",
+        "average_loss": "Pérdida media",
+        "payoff_ratio": "Ratio ganancia/pérdida media",
+        "largest_win_share": "Peso de la mayor ganadora",
+        "max_consecutive_wins": "Máximo de ganadoras seguidas",
+        "max_consecutive_losses": "Máximo de perdedoras seguidas",
+        "mean_holding_hours": "Horas medias por operación",
+        "median_holding_hours": "Horas medianas por operación",
+        "sqn": "SQN",
+        "trades_per_month": "Operaciones por mes",
+        "observations": "Observaciones",
+        "psr": "Sharpe probabilístico (PSR)",
+        "min_track_record_length": "Historial mínimo necesario",
+        "observations_short_by": "Observaciones que faltan",
+        "trials": "Intentos",
+        "cost_bps_per_side": "Coste por lado (pb)",
+        "oos_start": "Inicio fuera de muestra",
+        "benchmark_applicable": "Aplica benchmark",
+        "initial_balance": "Balance inicial",
+        "dsr_at_declared": "DSR con los intentos declarados",
+        "dsr_at_trials_used": "DSR con los intentos usados",
+        "trials_to_half": "Intentos que bajan el DSR a 0.5",
+    },
+    "en": {
+        "total_return": "Total return",
+        "cagr": "Compound annual return",
+        "volatility": "Annual volatility",
+        "max_drawdown": "Maximum drawdown",
+        "win_rate": "Win rate",
+        "trade_count": "Trades",
+        "gross_profit": "Gross profit of winners",
+        "gross_loss": "Gross loss of losers",
+        "fees_total": "Commission and swap",
+        "net_pnl": "Net result",
+        "profit_factor": "Profit factor",
+        "expectancy": "Expectancy per trade",
+        "average_win": "Average win",
+        "average_loss": "Average loss",
+        "payoff_ratio": "Average win / average loss",
+        "largest_win_share": "Share of the largest win",
+        "max_consecutive_wins": "Most consecutive wins",
+        "max_consecutive_losses": "Most consecutive losses",
+        "mean_holding_hours": "Mean hours per trade",
+        "median_holding_hours": "Median hours per trade",
+        "trades_per_month": "Trades per month",
+        "psr": "Probabilistic Sharpe (PSR)",
+        "min_track_record_length": "Minimum track record needed",
+        "observations_short_by": "Observations missing",
+        "cost_bps_per_side": "Cost per side (bps)",
+        "oos_start": "Out-of-sample start",
+        "benchmark_applicable": "Benchmark applies",
+        "initial_balance": "Initial balance",
+        "dsr_at_declared": "DSR at the declared trials",
+        "dsr_at_trials_used": "DSR at the trials used",
+        "trials_to_half": "Trials that bring DSR to 0.5",
     },
 }
 
@@ -197,7 +387,11 @@ PERCENT_KEYS = {
     "p5",
     "p50",
     "p95",
+    "p99",
     "point_estimate",
+    "largest_win_share",
+    "dsr_at_declared",
+    "dsr_at_trials_used",
 }
 
 _CSS = """
@@ -231,6 +425,23 @@ font-weight:600}
 .paybox{border:1px dashed #8b1a10;padding:10px 14px;margin:.6em 0;border-radius:6px}
 .paybox button{background:#8b1a10;color:#fff;border:0;padding:8px 14px;border-radius:5px;
 font-weight:600;cursor:pointer}
+.toolbar{display:flex;justify-content:flex-end;gap:8px;margin:.4em 0}
+.print-btn{background:#fff;color:#1a1a1a;border:1px solid #999;padding:6px 12px;border-radius:5px;
+font-weight:600;cursor:pointer}
+.meaning{display:grid;grid-template-columns:1fr;gap:8px;margin:.6em 0}
+.meaning .item{border:1px solid #e3e3e3;border-radius:6px;padding:8px 12px}
+.meaning .item h3{font-size:1rem;margin:0 0 .2em}
+.lockbox{border:1px dashed #8b1a10;border-radius:6px;padding:10px 14px;margin:1em 0}
+.lockbox ul{margin:.4em 0}
+@media (min-width:760px){.meaning{grid-template-columns:1fr 1fr}}
+@media print{
+.no-print,.paybox,.print-btn{display:none!important}
+body{max-width:none;padding:0;font-size:11pt}
+h2{break-after:avoid;page-break-after:avoid}
+table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
+.badge,.verdict{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.watermark{position:fixed}
+}
 """
 
 
@@ -270,13 +481,21 @@ def _is_evidence(value: Any) -> bool:
     return isinstance(value, dict) and "evidence" in value and "value" in value
 
 
+def _locale_of(labels: dict[str, str]) -> str:
+    return "es" if labels is LABELS["es"] else "en"
+
+
+def _key_label(key: str, labels: dict[str, str]) -> str:
+    return KEY_LABELS[_locale_of(labels)].get(key, key)
+
+
 def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set[str]) -> str:
     rows = []
     for key, value in section.items():
         if key in skip or not _is_evidence(value):
             continue
         rows.append(
-            f"<tr><td>{_e(key)}</td><td>{_fmt(value['value'], key=key)}</td>"
+            f"<tr><td>{_e(_key_label(key, labels))}</td><td>{_fmt(value['value'], key=key)}</td>"
             f"<td>{_badge(value['evidence'])}</td><td class='muted'>{_e(value.get('note', ''))}"
             "</td></tr>"
         )
@@ -294,19 +513,246 @@ def _status_line(section: dict[str, Any], labels: dict[str, str]) -> str:
     status = section.get("status")
     if status == "NOT_MEASURED":
         return (
-            f"<p>{_badge('NOT_MEASURED')} <span class='muted'>{_e(section.get('reason', ''))}"
+            f"<p>{_badge('NOT_MEASURED')} <span class='muted'>"
+            f"{_e(_localized_reason(section.get('reason', ''), _locale_of(labels)))}"
             "</span></p>"
         )
     return ""
 
 
-def _section(title: str, body: str, *, locked: bool, labels: dict[str, str]) -> str:
-    if locked:
-        return (
-            f"<h2>{_e(title)}</h2><p class='muted'>{_e(labels['locked'])}</p>"
-            f"<div class='locked'>{body}</div>"
+#: Spanish for the not-measured reasons the engine writes, beyond the verdict's.
+REASONS_ES: dict[str, str] = {
+    **NOT_MEASURED_ES,
+    "no trades uploaded": "no se subieron operaciones",
+    "no variants uploaded": "no se subió la matriz de variantes",
+    "fewer than ten returns": "menos de diez retornos",
+    "the simulator needs daily or finer data; the upload is coarser": (
+        "el simulador necesita datos diarios o más finos; los subidos son más gruesos"
+    ),
+}
+
+
+def _localized_reason(reason: str, locale: str) -> str:
+    return REASONS_ES.get(reason, reason) if locale == "es" else reason
+
+
+def _status_badge(status: str, locale: str) -> str:
+    text = STATUS_TEXT.get(locale, STATUS_TEXT["es"]).get(status, status)
+    return f'<span class="badge {_e(status)}">{_e(text)}</span>'
+
+
+def _dimension_title(name: str, locale: str) -> str:
+    return DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]).get(name, name)
+
+
+def _meaning_html(verdict: dict[str, Any], locale: str) -> str:
+    by_name = {d["name"]: d for d in verdict["dimensions"]}
+    items = []
+    for name in DIMENSION_ORDER:
+        dimension = by_name.get(name)
+        if dimension is None:
+            continue
+        items.append(
+            f"<div class='item'><h3>{_e(_dimension_title(name, locale))} "
+            f"{_status_badge(dimension['status'], locale)}</h3>"
+            f"<p>{_e(meaning(name, dimension['status'], locale))}</p></div>"
         )
-    return f"<h2>{_e(title)}</h2>{body}"
+    return "<div class='meaning'>" + "".join(items) + "</div>"
+
+
+def _reasons_html(verdict: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+    rows = []
+    for d in verdict["dimensions"]:
+        reasons = d.get("reasons_es") if locale == "es" and d.get("reasons_es") else d["reasons"]
+        rows.append(
+            f"<tr><td>{_e(_dimension_title(d['name'], locale))}</td>"
+            f"<td>{_status_badge(d['status'], locale)}</td><td>{_e('; '.join(reasons))}</td></tr>"
+        )
+    return (
+        f"<table><tr><th>{_e(labels['dimension'])}</th><th>{_e(labels['status'])}</th>"
+        f"<th>{_e(labels['reasons'])}</th></tr>{''.join(rows)}</table>"
+        f"<p class='muted'>{_e(labels['thresholds'])}: "
+        + _e(", ".join(f"{k}={v}" for k, v in verdict["thresholds"].items()))
+        + "</p>"
+    )
+
+
+def _charts_html(data: dict[str, Any], locale: str) -> str:
+    series = data.get("series")
+    if not series:
+        return ""
+    note = series.get("note") if series.get("note") != "as uploaded" else None
+    if note and locale == "es":
+        note = "Balance reconstruido con operaciones cerradas: no muestra el drawdown flotante."
+    figures = [
+        charts.equity_chart(series["timestamps"], series["equity"], locale=locale, note=note),
+        charts.drawdown_chart(series["timestamps"], series["equity"], locale=locale, note=note),
+    ]
+    risk = data.get("risk") or {}
+    fan = risk.get("fan")
+    if fan:
+        paths = {key: fan[key] for key in charts.FAN_PERCENTILES if key in fan}
+        figures.append(
+            charts.fan_chart(
+                paths, locale=locale, horizon_label=LABELS.get(locale, LABELS["es"])["horizon"]
+            )
+        )
+    figures.append(
+        charts.monthly_heatmap(
+            series["month_end_timestamps"], series["month_end_equity"], locale=locale
+        )
+    )
+    return "".join(figures)
+
+
+def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str, str]) -> str:
+    if not flags:
+        return f"<p class='muted'>{_e(labels['none'])}</p>"
+    return (
+        "<ul>"
+        + "".join(
+            f"<li>{_badge(flag['severity'])} {_e(flag_title(flag['code'], locale))} "
+            f"<code>{_e(flag['code'])}</code></li>"
+            for flag in flags
+        )
+        + "</ul>"
+    )
+
+
+def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    if not stats:
+        return f"<p class='muted'>{_e(labels['none'])}</p>"
+    html_text = _status_line(stats, labels)
+    if stats.get("status") != "MEASURED":
+        return html_text
+    html_text += _evidence_rows(stats, labels, skip={"long", "short"})
+    for side in ("long", "short"):
+        if isinstance(stats.get(side), dict):
+            html_text += f"<h3>{_e(labels[side])}</h3>" + _evidence_rows(
+                stats[side], labels, skip=set()
+            )
+    return html_text
+
+
+def _value_cell(item: dict[str, Any], *, percent: bool) -> str:
+    value = item.get("value")
+    shown = _fmt(value, key="p50" if percent else "")
+    return f"{shown} {_badge(item.get('evidence', 'NOT_MEASURED'))}"
+
+
+def _assumptions(block: Any, locale: str, labels: dict[str, str]) -> str:
+    if not isinstance(block, dict):
+        return ""
+    items = block.get(locale) or block.get("es") or []
+    return (
+        f"<p class='muted'>{_e(labels['assumptions'])}:</p><ul class='muted'>"
+        + "".join(f"<li>{_e(item)}</li>" for item in items)
+        + "</ul>"
+    )
+
+
+def _risk_html(risk: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    if not risk:
+        return f"<p class='muted'>{_e(labels['none'])}</p>"
+    html_text = _status_line(risk, labels)
+    if risk.get("status") == "MEASURED":
+        dd = risk["max_drawdown"]
+        html_text += (
+            f"<table><tr><th>{_e(labels['risk_dd'])}</th><th>p50</th><th>p95</th><th>p99</th></tr>"
+            f"<tr><td></td>"
+            + "".join(f"<td>{_value_cell(dd[q], percent=True)}</td>" for q in ("p50", "p95", "p99"))
+            + "</tr></table>"
+        )
+        probs = risk["probability_drawdown_at_least"]
+        html_text += (
+            f"<table><tr><th>{_e(labels['risk_prob'])}</th><th>{_e(labels['probability'])}</th>"
+            "</tr>"
+            + "".join(
+                f"<tr><td>{float(level):.0%}</td><td>{_value_cell(item, percent=True)}</td></tr>"
+                for level, item in probs.items()
+            )
+            + "</table>"
+        )
+        under = risk["longest_underwater_periods"]
+        html_text += (
+            f"<p>{_e(labels['risk_underwater'])}: p50 {_value_cell(under['p50'], percent=False)}"
+            f", p95 {_value_cell(under['p95'], percent=False)}</p>"
+        )
+    return html_text + _assumptions(risk.get("assumptions"), locale, labels)
+
+
+def _challenge_html(challenge: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    if not challenge:
+        return f"<p class='muted'>{_e(labels['none'])}</p>"
+    rules = challenge.get("rules", {})
+    html_text = (
+        f"<p><strong>{_e(labels['challenge_rules'])}:</strong> {_e(rules.get('firm', ''))} "
+        f"{_e(rules.get('program', ''))} {_e(rules.get('phase', ''))} "
+        f"(<code>{_e(challenge.get('preset', ''))}</code>). "
+        f"{_e(labels['source'])}: {_e(rules.get('source_url', ''))}, {_e(labels['as_of'])} "
+        f"{_e(rules.get('as_of', ''))}.</p>"
+    )
+    html_text += _status_line(challenge, labels)
+    if challenge.get("status") == "MEASURED":
+        probability = challenge["probability"]
+        html_text += (
+            f"<table><tr><th>{_e(labels['outcome'])}</th><th>{_e(labels['probability'])}</th></tr>"
+            + "".join(
+                f"<tr><td>{_e(labels[key])}</td>"
+                f"<td>{_value_cell(probability[key], percent=True)}</td></tr>"
+                for key in ("pass", "fail_daily_loss", "fail_total_loss", "unfinished")
+            )
+            + "</table>"
+        )
+        ci = challenge["pass_probability_ci95"]
+        days = challenge["days_to_target"]
+        html_text += (
+            f"<p>{_e(labels['ci95'])}: {_value_cell(ci['low'], percent=True)} – "
+            f"{_value_cell(ci['high'], percent=True)}</p>"
+            f"<p>{_e(labels['days_to_target'])}: "
+            + " / ".join(_value_cell(days[q], percent=False) for q in ("p25", "p50", "p75"))
+            + "</p>"
+        )
+    notes = rules.get("notes") or []
+    if notes:
+        html_text += "<ul class='muted'>" + "".join(f"<li>{_e(n)}</li>" for n in notes) + "</ul>"
+    return html_text + _assumptions(challenge.get("assumptions"), locale, labels)
+
+
+def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[str, str]) -> str:
+    if not questions:
+        return f"<p class='muted'>{_e(labels['none'])}</p>"
+    return (
+        "<ol>"
+        + "".join(f"<li>{_e(q.get(locale) or q.get('es', ''))}</li>" for q in questions)
+        + "</ol>"
+    )
+
+
+def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
+    inputs = data["inputs"]
+    out = ""
+    source_format = inputs.get("source_format")
+    if source_format and source_format != "csv":
+        out += f"<p>{_e(labels['report_source'])}: <code>{_e(source_format)}</code></p>"
+    optimization = inputs.get("optimization")
+    if optimization:
+        passes = optimization["passes"]
+        out += (
+            f"<p>{_e(labels['optimization'])}: {_fmt(passes['value'])} {_e(labels['passes'])} "
+            f"{_badge(passes['evidence'])}</p>"
+        )
+    metadata = inputs.get("report_metadata") or {}
+    if metadata:
+        out += (
+            f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
+            + "".join(
+                f"<tr><td>{_e(key)}</td><td>{_e(value)}</td></tr>"
+                for key, value in metadata.items()
+            )
+            + "</table>"
+        )
+    return out
 
 
 def render_html(
@@ -317,9 +763,14 @@ def render_html(
     price_usd: float | None = None,
     checkout_url: str | None = None,
 ) -> str:
-    """The audit as one HTML document. Detail sections are blurred when the
-    audit is unpaid in paid mode; everything is visible under a watermark in
-    free mode."""
+    """The audit as one HTML document.
+
+    The verdict, the plain-language explanations, the charts, the input
+    hashes and the list of red flags are always shown. In paid mode an
+    unpaid audit gets the detail sections as titles only: their numbers are
+    not rendered, so they are not in the page source either. Free mode shows
+    everything under a watermark.
+    """
     data = result.model_dump(mode="json")
     locale = data["declared"].get("locale", "es")
     labels = LABELS.get(locale, LABELS["es"])
@@ -334,19 +785,9 @@ def render_html(
             f"<button type='submit'>{_e(labels['pay'])}{_e(price)}</button></form>"
         )
 
-    dims = "".join(
-        f"<tr><td>{_e(d['name'])}</td><td>{_badge(d['status'])}</td>"
-        f"<td>{_e('; '.join(d['reasons']))}</td></tr>"
-        for d in verdict["dimensions"]
-    )
     verdict_html = (
         f"<div class='verdict'><span class='cls'>{_e(verdict['overall'])}</span>"
         f"<span>{_e(verdict['summary'])}</span></div>"
-        f"<table><tr><th>{_e(labels['dimension'])}</th><th>{_e(labels['status'])}</th>"
-        f"<th>{_e(labels['reasons'])}</th></tr>{dims}</table>"
-        f"<p class='muted'>{_e(labels['thresholds'])}: "
-        + _e(", ".join(f"{k}={v}" for k, v in verdict["thresholds"].items()))
-        + "</p>"
     )
 
     inputs_html = (
@@ -537,7 +978,7 @@ def render_html(
         )
 
     not_measured = [
-        f"{name}: {section.get('reason', '')}"
+        f"{labels[name]}: {_localized_reason(section.get('reason', ''), locale)}"
         for name, section in (
             ("significance", data["significance"]),
             ("multiplicity", data["multiplicity"]),
@@ -546,6 +987,8 @@ def render_html(
             ("costs", data["costs"]),
             ("benchmark", data["benchmark"]),
             ("cscv", data["cscv"]),
+            ("risk", data.get("risk") or {}),
+            ("challenge", data.get("challenge") or {}),
         )
         if section.get("status") == "NOT_MEASURED"
     ]
@@ -554,6 +997,47 @@ def render_html(
         if not_measured
         else f"<p class='muted'>{_e(labels['none'])}</p>"
     )
+
+    trials = data["multiplicity"].get("trials_used")
+    if trials:
+        multiplicity_html = (
+            f"<p>{_e(labels['trials_used'])}: {_fmt(trials['value'])} {_badge(trials['evidence'])}"
+            f" <span class='muted'>{_e(trials.get('note', ''))}</span></p>" + multiplicity_html
+        )
+    fees = data["costs"].get("reported_fees")
+    if fees:
+        cost_html += f"<h3>{_e(labels['fees'])}</h3>" + _evidence_rows(fees, labels, skip=set())
+
+    detail: list[tuple[str, str]] = [
+        (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
+        (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
+        (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
+        (labels["challenge"], _challenge_html(data.get("challenge"), locale, labels)),
+        (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
+        (labels["performance"], _evidence_rows(data["performance"], labels, skip=set())),
+        (
+            labels["significance"],
+            _status_line(data["significance"], labels)
+            + _evidence_rows(data["significance"], labels, skip=set()),
+        ),
+        (labels["multiplicity"], multiplicity_html),
+        (labels["bootstrap"], boot_html),
+        (labels["holdout"], hold_html),
+        (labels["costs"], cost_html),
+        (labels["benchmark"], bench_html),
+        (labels["cscv"], cscv_html),
+        (labels["subperiods"], sub_html),
+        (labels["rolling"], roll_html),
+        (labels["red_flags"], flags_html),
+    ]
+    if locked:
+        detail_html = (
+            f"<div class='lockbox'><p>{_e(labels['locked_intro'])}:</p><ul>"
+            + "".join(f"<li>{_e(title)}</li>" for title, _ in detail)
+            + f"</ul>{paybox}</div>"
+        )
+    else:
+        detail_html = "".join(f"<h2>{_e(title)}</h2>{body}" for title, body in detail)
 
     watermark_html = ""
     if watermark:
@@ -564,38 +1048,22 @@ def render_html(
 
     body = [
         watermark_html,
+        "<div class='toolbar no-print'><button type='button' class='print-btn' "
+        f"onclick='window.print()'>{_e(labels['print'])}</button></div>",
         f"<h1>{_e(labels['title'])} · {_e(verdict['overall'])}</h1>",
         f"<p class='muted'>{_e(labels['audit_id'])}: <code>{_e(data['audit_id'])}</code> · "
         f"{_e(labels['generated'])}: {_e(data['generated_at_utc'])} · engine "
         f"{_e(data['engine']['name'])} {_e(data['engine']['package_version'])} · seed "
         f"{_e(data['engine']['seed'])}</p>",
-        f"<h2>{_e(labels['verdict'])}</h2>{verdict_html}{paybox}",
-        f"<h2>{_e(labels['inputs'])}</h2>{inputs_html}",
+        f"<h2>{_e(labels['verdict'])}</h2>{verdict_html}{'' if locked else paybox}",
+        f"<h2>{_e(labels['meaning'])}</h2>{_meaning_html(verdict, locale)}",
+        f"<h2>{_e(labels['charts'])}</h2>{_charts_html(data, locale)}",
+        f"<h2>{_e(labels['flags_free'])}</h2>{_flags_free_html(data['red_flags'], locale, labels)}",
+        f"<h2>{_e(labels['inputs'])}</h2>{inputs_html}{_source_html(data, labels)}",
         f"<h2>{_e(labels['declared'])}</h2>{declared_html}",
-        _section(
-            labels["performance"],
-            _evidence_rows(data["performance"], labels, skip=set()),
-            locked=locked,
-            labels=labels,
-        ),
-        _section(
-            labels["significance"],
-            _status_line(data["significance"], labels)
-            + _evidence_rows(data["significance"], labels, skip=set()),
-            locked=locked,
-            labels=labels,
-        ),
-        _section(labels["multiplicity"], multiplicity_html, locked=locked, labels=labels),
-        _section(labels["bootstrap"], boot_html, locked=locked, labels=labels),
-        _section(labels["holdout"], hold_html, locked=locked, labels=labels),
-        _section(labels["costs"], cost_html, locked=locked, labels=labels),
-        _section(labels["benchmark"], bench_html, locked=locked, labels=labels),
-        _section(labels["cscv"], cscv_html, locked=locked, labels=labels),
-        _section(labels["subperiods"], sub_html, locked=locked, labels=labels),
-        _section(labels["rolling"], roll_html, locked=locked, labels=labels),
-        f"<h2>{_e(labels['red_flags'])}</h2>{flags_html}",
         f"<h2>{_e(labels['not_measured'])}</h2>{nm_html}",
         f"<h2>{_e(labels['seal'])}</h2>{seal_html}",
+        detail_html,
         f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>",
         f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>",
@@ -608,6 +1076,7 @@ def render_html(
         + _e(f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}")
         + "</title><style>"
         + _CSS
+        + charts.CHART_CSS
         + "</style></head><body>"
         + "".join(body)
         + "</body></html>"

@@ -30,7 +30,7 @@ from quant_trade.core.models import Trade
 from quant_trade.evidence.canonical_json import sha256_of_bytes
 from quant_trade.metrics.performance import periods_per_year
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 EvidenceClass = Literal["MEASURED", "DECLARED", "NOT_MEASURED"]
 MEASURED: EvidenceClass = "MEASURED"
@@ -67,7 +67,12 @@ FILE_NAMES_ES = {
     "benchmark": "del benchmark",
     "trades": "de operaciones",
     "variants": "de variantes",
+    "report": "del informe",
+    "optimization": "de optimización",
 }
+
+#: Report file extensions kept in the digest name; anything else is ``.bin``.
+REPORT_EXTENSIONS = ("html", "htm", "csv", "xlsx", "txt", "xml")
 
 
 class ParseError(ValueError):
@@ -138,6 +143,22 @@ class DeclaredMetadata(BaseModel):
     description: str = Field("", max_length=2000)
     benchmark_applicable: bool = True
     locale: Literal["es", "en"] = "es"
+    #: Starting balance, used only when an imported report does not state one.
+    initial_balance: float | None = Field(None, gt=0.0, le=1e12)
+    #: Prop-firm challenge preset to simulate; ``None`` means the default preset.
+    challenge: str | None = Field(None, max_length=64)
+
+    @field_validator("challenge")
+    @classmethod
+    def _known_preset(cls, value: str | None) -> str | None:
+        from quant_trade.audit.prop_presets import PRESETS
+
+        if value is None or not value.strip():
+            return None
+        key = value.strip()
+        if key not in PRESETS:
+            raise ValueError(f"unknown challenge preset {key!r}")
+        return key
 
     @field_validator("oos_start")
     @classmethod
@@ -545,20 +566,100 @@ class AuditInputs:
     benchmark: IngestedSeries | None = None
     variants: np.ndarray | None = None
     warnings: list[str] = field(default_factory=list)
+    #: ``csv`` for hand-made uploads, else the importer's format name.
+    source_format: str = "csv"
+    #: The instrument of each trade when the source names it.
+    trade_symbols: list[str] | None = None
+    #: Signed cost totals a platform report itemises (negative is a cost).
+    reported_fees: dict[str, float] = field(default_factory=dict)
+    #: The platform's descriptive fields and own summary figures (DECLARED).
+    report_metadata: dict[str, str] = field(default_factory=dict)
+    #: Starting balance of an imported report and where it came from.
+    initial_balance: float | None = None
+    #: True when the equity curve was rebuilt from closed trades.
+    balance_only: bool = False
+    #: Configurations an MT5 optimisation export lists (MEASURED trials).
+    optimization_passes: int | None = None
+    optimization_parameters: list[str] = field(default_factory=list)
+    #: Parameter variants a report says it holds (vectorbt), when more than one.
+    report_variants: int | None = None
+
+
+def report_digest_name(filename: str | None) -> str:
+    """``report.<ext>`` with the upload's extension when it is a known one."""
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if filename and "." in filename else ""
+    return f"report.{ext if ext in REPORT_EXTENSIONS else 'bin'}"
 
 
 def build_inputs(
-    equity_bytes: bytes,
+    equity_bytes: bytes | None,
     declared: DeclaredMetadata,
     *,
     trades_bytes: bytes | None = None,
     benchmark_bytes: bytes | None = None,
     variants_bytes: bytes | None = None,
+    report_bytes: bytes | None = None,
+    report_filename: str | None = None,
+    optimization_bytes: bytes | None = None,
 ) -> AuditInputs:
-    equity = parse_equity_csv(equity_bytes)
-    digests = {"equity.csv": sha256_of_bytes(equity_bytes)}
-    warnings = [f"equity: {w}" for w in equity.warnings]
+    """Parse and hash every upload.
+
+    A platform report (``report_bytes``) supplies the closed trades and, when
+    no equity file is uploaded, the closed-trade balance curve. An MT5
+    optimisation export (``optimization_bytes``) supplies the number of
+    configurations tried, which the deflated Sharpe uses as a MEASURED trial
+    count when it exceeds the declared one.
+    """
+    # Imported here: the importers build on this module's types.
+    from quant_trade.audit.importers import import_report, parse_optimization
+
+    digests: dict[str, str] = {}
+    warnings: list[str] = []
     trades = None
+    extra: dict[str, Any] = {}
+    imported = None
+    if report_bytes:
+        if trades_bytes:
+            raise ParseError(
+                "upload either a platform report or a trades file, not both",
+                message_es="Sube un informe de plataforma o un archivo de operaciones, no ambos.",
+                code="trades_and_report",
+            )
+        imported = import_report(
+            report_bytes, report_filename, initial_balance=declared.initial_balance
+        )
+        digests[report_digest_name(report_filename)] = sha256_of_bytes(report_bytes)
+        trades = imported.trades
+        warnings.extend(f"report: {w}" for w in imported.warnings)
+        extra = {
+            "source_format": imported.source_format,
+            "trade_symbols": list(imported.symbols) or None,
+            "reported_fees": dict(imported.fees),
+            "report_metadata": dict(imported.metadata),
+            "initial_balance": imported.initial_balance,
+        }
+        variants_in_report = imported.metadata.get("variants", "")
+        if variants_in_report.isdigit() and int(variants_in_report) > 1:
+            extra["report_variants"] = int(variants_in_report)
+    if equity_bytes:
+        equity = parse_equity_csv(equity_bytes)
+        digests["equity.csv"] = sha256_of_bytes(equity_bytes)
+        warnings[:0] = [f"equity: {w}" for w in equity.warnings]
+        if imported is not None:
+            warnings.append(
+                "equity: the uploaded equity file is used for returns; the report supplies "
+                "the trades"
+            )
+    elif imported is not None:
+        equity = parse_equity_csv(imported.equity_csv, what="report")
+        warnings.extend(f"equity: {w}" for w in equity.warnings)
+        extra["balance_only"] = True
+    else:
+        raise ParseError(
+            "an equity curve or a platform report is required",
+            message_es="Hace falta una curva de equity o un informe de la plataforma.",
+            code="equity_required",
+        )
     if trades_bytes:
         trades = parse_trades_csv(trades_bytes)
         digests["trades.csv"] = sha256_of_bytes(trades_bytes)
@@ -572,6 +673,12 @@ def build_inputs(
     if variants_bytes:
         variants = parse_variants_csv(variants_bytes)
         digests["variants.csv"] = sha256_of_bytes(variants_bytes)
+    if optimization_bytes:
+        summary = parse_optimization(optimization_bytes)
+        digests["optimization.xml"] = sha256_of_bytes(optimization_bytes)
+        warnings.extend(f"optimization: {w}" for w in summary.warnings)
+        extra["optimization_passes"] = summary.passes
+        extra["optimization_parameters"] = list(summary.parameters)
     ppy, label = infer_frequency(equity.frame["timestamp"])
     return AuditInputs(
         equity=equity,
@@ -583,6 +690,7 @@ def build_inputs(
         benchmark=benchmark,
         variants=variants,
         warnings=warnings,
+        **extra,
     )
 
 
@@ -594,7 +702,15 @@ class Dimension(BaseModel):
     name: str
     status: Literal["PASS", "WEAK", "FAIL", "NOT_MEASURED", "NOT_APPLICABLE"]
     reasons: list[str] = Field(default_factory=list)
+    #: The same reasons in Spanish; empty in results written before schema 2.
+    reasons_es: list[str] = Field(default_factory=list)
     inputs: dict[str, Any] = Field(default_factory=dict)
+
+    def reasons_in(self, locale: str) -> list[str]:
+        """The reasons in ``locale``; English when no Spanish text was stored."""
+        if locale == "es" and self.reasons_es:
+            return list(self.reasons_es)
+        return list(self.reasons)
 
 
 class Verdict(BaseModel):
@@ -631,6 +747,12 @@ class AuditResult(BaseModel):
     client_text_findings: list[dict[str, Any]]
     seal: dict[str, Any]
     verdict: Verdict
+    # Schema 2. Optional so that results stored under schema 1 still load.
+    series: dict[str, Any] | None = None
+    trade_stats: dict[str, Any] | None = None
+    risk: dict[str, Any] | None = None
+    challenge: dict[str, Any] | None = None
+    vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 
 __all__ = [
@@ -660,4 +782,5 @@ __all__ = [
     "parse_equity_csv",
     "parse_trades_csv",
     "parse_variants_csv",
+    "report_digest_name",
 ]

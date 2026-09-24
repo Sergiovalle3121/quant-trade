@@ -15,6 +15,7 @@ from audit_fixtures import (
     best_of_n_walks,
     csv_bytes,
     positive_drift,
+    trades_following,
     trades_frame,
     variants_bytes,
 )
@@ -77,7 +78,7 @@ def test_honest_curve_with_everything_declared_reaches_class_a() -> None:
     inputs = build_inputs(
         csv_bytes(positive_drift(n)),
         DeclaredMetadata(trials=3, cost_bps_per_side=5, oos_start="2023-01-01"),
-        trades_bytes=csv_bytes(trades_frame(60)),
+        trades_bytes=csv_bytes(trades_following(positive_drift(n))),
         benchmark_bytes=csv_bytes(benchmark_lower_drift(n)),
     )
     result = _run(inputs)

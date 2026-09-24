@@ -26,10 +26,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
-from quant_trade.audit import redflags, verdict
-from quant_trade.audit.guard import scan_client_text
+from quant_trade.audit.guard import find_claims, scan_client_text
+from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
 from quant_trade.audit.schema import (
+    DECLARED,
+    MEASURED,
     SCHEMA_VERSION,
     AuditInputs,
     AuditResult,
@@ -64,6 +67,12 @@ BENCHMARK_MIN_OVERLAP = 0.90
 HOLDOUT_MIN_OBSERVATIONS = 30
 BOOTSTRAP_PERCENTILES = (5.0, 50.0, 95.0)
 VARIANCE_POLICY = "max(observed across uploaded variants, sampling-variance floor)"
+RISK_SAMPLES = 2000
+CHALLENGE_SAMPLES = 5000
+#: The challenge simulator walks daily closes; coarser data cannot feed it.
+CHALLENGE_MIN_PERIODS_PER_YEAR = 200.0
+SERIES_MAX_POINTS = 400
+WITHHELD_TEXT = "[withheld: promotional wording]"
 
 
 def _package_version() -> str:
@@ -154,22 +163,52 @@ def _significance(returns: pd.Series) -> tuple[dict[str, Any], dict[str, float] 
     return section, {**moments, "psr": psr}
 
 
+def trial_count(inputs: AuditInputs) -> tuple[int, str, str]:
+    """The trial count the deflated Sharpe uses, its evidence and its source.
+
+    The larger of what the client declares and what the files prove: the
+    columns of an uploaded variants matrix, the passes of an MT5
+    optimisation export, or the variants a report holds. A declaration of 1
+    next to 100 uploaded variants cannot deflate by 1.
+    """
+    best = (inputs.declared.trials, DECLARED, "declared by the client")
+    measured_counts = [
+        (inputs.optimization_passes, "passes in the MT5 optimisation export"),
+        (
+            int(inputs.variants.shape[1]) if inputs.variants is not None else None,
+            "columns of the uploaded variants matrix",
+        ),
+        (inputs.report_variants, "parameter variants in the uploaded report"),
+    ]
+    for count, source in measured_counts:
+        if count is not None and count >= best[0]:
+            best = (int(count), MEASURED, source)
+    return best
+
+
 def _multiplicity(
     moments: dict[str, float] | None,
     *,
     declared_trials: int,
     variants: np.ndarray | None,
+    trials_used: int | None = None,
+    trials_evidence: str = DECLARED,
+    trials_source: str = "declared by the client",
 ) -> dict[str, Any]:
+    trials = trials_used if trials_used is not None else declared_trials
+    trials_record = {"value": trials, "evidence": trials_evidence, "note": trials_source}
     if moments is None:
         reason = "statistical significance not measured"
         return {
             "status": "NOT_MEASURED",
             "reason": reason,
+            "trials_used": trials_record,
             "sharpe_variance_used": not_measured(reason),
             "variance_policy": VARIANCE_POLICY,
             "floor": not_measured(reason),
             "observed_across_variants": not_measured(reason),
             "dsr_at_declared": not_measured(reason),
+            "dsr_at_trials_used": not_measured(reason),
             "sensitivity": [],
             "trials_to_half": not_measured(reason),
         }
@@ -194,7 +233,7 @@ def _multiplicity(
             sr, n, skew, kurt, benchmark_sharpe=expected_max_sharpe(trials, used)
         )
 
-    grid = sorted({*DSR_SENSITIVITY_TRIALS, declared_trials})
+    grid = sorted({*DSR_SENSITIVITY_TRIALS, declared_trials, trials})
     sensitivity = [
         {
             "n_trials": trials,
@@ -212,12 +251,16 @@ def _multiplicity(
         candidate *= 2
     return {
         "status": "MEASURED",
+        "trials_used": trials_record,
         "sharpe_variance_used": measured(used),
         "variance_policy": VARIANCE_POLICY,
         "floor": measured(floor, "sampling variance of the Sharpe estimator"),
         "observed_across_variants": observed_evidence,
         "dsr_at_declared": measured(
             dsr(declared_trials), f"PSR against E[max Sharpe] of {declared_trials} trial(s)"
+        ),
+        "dsr_at_trials_used": measured(
+            dsr(trials), f"PSR against E[max Sharpe] of {trials} trial(s), {trials_source}"
         ),
         "sensitivity": sensitivity,
         "trials_to_half": (
@@ -475,7 +518,91 @@ def _costs(
             measured(be / ref) if be is not None and ref > 0 else not_measured("undefined")
         ),
     }
+    if inputs.reported_fees:
+        section["reported_fees"] = {
+            name: measured(value, "signed total the report itemises; negative is a cost")
+            for name, value in sorted(inputs.reported_fees.items())
+        }
     return section, rows, ref, assumed, gross
+
+
+def _safe_text(text: str) -> str:
+    """Client-controlled text (report metadata, names echoed in warnings) is
+    kept out of the audit's own voice: wording the guard refuses is withheld."""
+    return WITHHELD_TEXT if find_claims(text) else text
+
+
+def _trade_stats(inputs: AuditInputs) -> dict[str, Any]:
+    if inputs.trades is None:
+        return {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    fees = -sum(value for value in inputs.reported_fees.values())
+    stats = analytics.trade_statistics(
+        inputs.trades.trades, inputs.trades.sides, fees_total=max(fees, 0.0)
+    )
+    return {"status": "MEASURED", **stats}
+
+
+def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[str, Any]:
+    risk = analytics.drawdown_risk(returns, periods_per_year=ppy, samples=samples, seed=seed)
+    status = "MEASURED" if risk.get("method") else "NOT_MEASURED"
+    out: dict[str, Any] = {"status": status, "horizon_years": 1.0, **risk}
+    if status == "NOT_MEASURED":
+        out["reason"] = risk["max_drawdown"]["p50"]["note"]
+    return out
+
+
+def _challenge(inputs: AuditInputs, *, samples: int, seed: int) -> dict[str, Any]:
+    key = inputs.declared.challenge or DEFAULT_PRESET
+    rules = get_preset(key)
+    selected_by = "client" if inputs.declared.challenge else "default"
+    if inputs.periods_per_year < CHALLENGE_MIN_PERIODS_PER_YEAR:
+        reason = "the simulator needs daily or finer data; the upload is coarser"
+        return {
+            "status": "NOT_MEASURED",
+            "reason": reason,
+            "preset": key,
+            "selected_by": selected_by,
+            "rules": rules.to_dict(),
+            "assumptions": analytics.CHALLENGE_ASSUMPTIONS,
+        }
+    daily = analytics.daily_returns_from_equity(inputs.equity.frame)
+    result = analytics.simulate_challenge(daily, rules, samples=samples, seed=seed)
+    status = "MEASURED" if result.get("method") else "NOT_MEASURED"
+    out: dict[str, Any] = {"status": status, "preset": key, "selected_by": selected_by, **result}
+    if status == "NOT_MEASURED":
+        out["reason"] = result["probability"]["pass"]["note"]
+    return out
+
+
+def _round(value: float) -> float:
+    return float(f"{value:.10g}")
+
+
+def _series(frame: pd.DataFrame, *, balance_only: bool) -> dict[str, Any]:
+    """What the charts need, small enough to store: the curve downsampled
+    with its extremes kept, and the month-end closes for the heatmap."""
+    stamps = pd.to_datetime(frame["timestamp"], utc=True)
+    equity = frame["equity"].astype(float).tolist()
+    keep = charts.downsample(equity, SERIES_MAX_POINTS)
+    month = stamps.dt.year.to_numpy() * 12 + stamps.dt.month.to_numpy()
+    last_of_month = [
+        i for i in range(len(month)) if i == len(month) - 1 or month[i + 1] != month[i]
+    ]
+    month_end = sorted({0, *last_of_month})
+    note = (
+        "balance rebuilt from closed trades; floating drawdown is not visible"
+        if balance_only
+        else "as uploaded"
+    )
+    return {
+        "evidence": MEASURED,
+        "note": note,
+        "points_total": int(len(frame)),
+        "timestamps": [_iso(stamps.iloc[i]) for i in keep],
+        "equity": [_round(equity[i]) for i in keep],
+        "month_end_timestamps": [_iso(stamps.iloc[i]) for i in month_end],
+        "month_end_equity": [_round(equity[i]) for i in month_end],
+    }
 
 
 def _seal(inputs: AuditInputs, *, audit_id: str, now: datetime, holdout_ok: bool) -> dict[str, Any]:
@@ -524,6 +651,8 @@ def run_audit(
     now: datetime | None = None,
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
     audit_id: str | None = None,
+    risk_samples: int = RISK_SAMPLES,
+    challenge_samples: int = CHALLENGE_SAMPLES,
 ) -> AuditResult:
     """Audit one upload. Pure, deterministic for a fixed ``seed``/``now``/``audit_id``."""
     clock = now.astimezone(UTC) if now is not None else datetime.now(UTC)
@@ -532,11 +661,17 @@ def run_audit(
     returns = inputs.equity.returns
     ppy = inputs.periods_per_year
     trades = inputs.trades.trades if inputs.trades is not None else []
+    trials_used, trials_evidence, trials_source = trial_count(inputs)
 
     performance = _performance(frame, trades)
     significance, moments = _significance(returns)
     multiplicity = _multiplicity(
-        moments, declared_trials=inputs.declared.trials, variants=inputs.variants
+        moments,
+        declared_trials=inputs.declared.trials,
+        variants=inputs.variants,
+        trials_used=trials_used,
+        trials_evidence=trials_evidence,
+        trials_source=trials_source,
     )
     bootstrap = _bootstrap(returns, samples=bootstrap_samples, seed=seed)
     subperiods = _subperiods(frame)
@@ -545,15 +680,29 @@ def run_audit(
     benchmark, benchmark_values, benchmark_reason = _benchmark(inputs.equity, inputs.benchmark)
     cscv, pbo = _cscv(inputs.variants)
     costs, rows, reference, assumed, gross = _costs(inputs)
+    measured_trials = trials_used if trials_evidence == MEASURED else 0
     flags = redflags.scan(
         inputs.equity,
         periods_per_year=ppy,
         declared=inputs.declared,
         trades=inputs.trades,
         recomputed_pnl=gross,
-        variants_columns=int(inputs.variants.shape[1]) if inputs.variants is not None else 0,
+        variants_columns=measured_trials,
     )
+    if inputs.trades is not None:
+        flags.extend(
+            redflags.scan_trade_patterns(
+                inputs.trades,
+                symbols=inputs.trade_symbols,
+                balance_only=inputs.balance_only,
+            )
+        )
+        if not inputs.balance_only:
+            flags.extend(redflags.scan_trades_against_equity(inputs.trades, frame))
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
+    trade_stats = _trade_stats(inputs)
+    risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
+    challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
 
     psr = float(moments["psr"]) if moments is not None else None
     p5 = (
@@ -568,16 +717,17 @@ def run_audit(
         thresholds=thresholds,
         not_measured_reason=significance.get("reason"),
     )
-    dsr_declared = (
-        float(multiplicity["dsr_at_declared"]["value"])
+    dsr_used = (
+        float(multiplicity["dsr_at_trials_used"]["value"])
         if multiplicity["status"] == "MEASURED"
         else None
     )
     dimensions = [
         statistical,
         verdict.assess_multiplicity(
-            dsr_declared=dsr_declared,
-            declared_trials=inputs.declared.trials,
+            dsr=dsr_used,
+            trials=trials_used,
+            trials_evidence=trials_evidence,
             pbo=pbo,
             statistical_status=statistical.status,
             thresholds=thresholds,
@@ -607,10 +757,27 @@ def run_audit(
     final = verdict.build_verdict(
         dimensions,
         locale=inputs.declared.locale,
-        declared_trials=inputs.declared.trials,
+        trials=trials_used,
+        trials_evidence=trials_evidence,
         thresholds=thresholds,
     )
+    mintrl = significance.get("min_track_record_length", {})
+    mintrl_value = mintrl.get("value") if mintrl.get("evidence") == MEASURED else None
+    questions = analytics.vendor_questions(
+        [flag.code for flag in flags],
+        has_trades=inputs.trades is not None,
+        trials_measured=trials_evidence == MEASURED,
+        has_out_of_sample=holdout["status"] == "MEASURED",
+        has_costs=inputs.declared.cost_bps_per_side > 0 or bool(inputs.reported_fees),
+        balance_only=inputs.balance_only,
+        min_track_record_months=(
+            float(mintrl_value) / ppy * 12.0 if mintrl_value is not None and ppy > 0 else None
+        ),
+    )
     oos = inputs.declared.oos_start
+    report_metadata = {
+        key: _safe_text(value) for key, value in sorted(inputs.report_metadata.items())
+    }
     return AuditResult(
         audit_id=identifier,
         schema_version=SCHEMA_VERSION,
@@ -620,23 +787,47 @@ def run_audit(
             "package_version": _package_version(),
             "seed": seed,
             "bootstrap_samples": bootstrap_samples,
+            "risk_samples": risk_samples,
+            "challenge_samples": challenge_samples,
         },
         inputs={
             "digests": dict(inputs.digests),
             "dataset_digest": seal["dataset_digest"],
             "source": inputs.equity.source,
+            "source_format": inputs.source_format,
+            "balance_only": inputs.balance_only,
             "observations": measured(int(len(returns))),
             "first_timestamp": _iso(frame["timestamp"].iloc[0]),
             "last_timestamp": _iso(frame["timestamp"].iloc[-1]),
             "periods_per_year": measured(ppy, "inferred from the timestamps"),
             "frequency_label": inputs.frequency_label,
-            "parse_warnings": list(inputs.warnings),
+            "parse_warnings": [_safe_text(w) for w in inputs.warnings],
+            "initial_balance": (
+                declared(inputs.initial_balance, "starting balance of the imported report")
+                if inputs.initial_balance is not None
+                else not_measured("no report imported")
+            ),
+            "report_metadata": report_metadata,
+            "optimization": (
+                {
+                    "passes": measured(inputs.optimization_passes, "rows of the export"),
+                    "parameters": [_safe_text(p) for p in inputs.optimization_parameters],
+                }
+                if inputs.optimization_passes is not None
+                else None
+            ),
         },
         declared={
             "trials": declared(inputs.declared.trials),
             "cost_bps_per_side": declared(inputs.declared.cost_bps_per_side),
             "oos_start": declared(_iso(oos)) if oos is not None else not_measured("not declared"),
             "benchmark_applicable": declared(inputs.declared.benchmark_applicable),
+            "initial_balance": (
+                declared(inputs.declared.initial_balance)
+                if inputs.declared.initial_balance is not None
+                else not_measured("not declared")
+            ),
+            "challenge": inputs.declared.challenge,
             "locale": inputs.declared.locale,
             "description": inputs.declared.description,
         },
@@ -654,7 +845,12 @@ def run_audit(
         client_text_findings=scan_client_text(inputs.declared.description),
         seal=seal,
         verdict=final,
+        series=_series(frame, balance_only=inputs.balance_only),
+        trade_stats=trade_stats,
+        risk=risk,
+        challenge=challenge,
+        vendor_questions=questions,
     )
 
 
-__all__ = ["ENGINE_NAME", "run_audit", "sharpe_sampling_variance"]
+__all__ = ["ENGINE_NAME", "run_audit", "sharpe_sampling_variance", "trial_count"]

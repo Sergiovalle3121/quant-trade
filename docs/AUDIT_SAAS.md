@@ -112,6 +112,19 @@ Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
 | `NEGATIVE_PAYOFF_HIGH_WINRATE` | ≥ 20 trades, win rate > 85 % and average loss ≥ 3x average win | — |
 | `NO_STOP_EVIDENCE` | ≥ 10 losses and the largest loss (or adverse excursion) ≥ 8x the average loss | — |
 
+Trades against an uploaded equity curve (`redflags.scan_trades_against_equity`;
+skipped when the curve was rebuilt from the same report):
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `TRADES_OUTSIDE_EQUITY` | > 10 % of trade exits fall outside the curve's dates (± 1 day) | — |
+| `TRADES_EQUITY_UNRELATED` | ≥ 6 months with trade exits and the monthly realised pnl correlates < 0.2 with the monthly equity change | — |
+
+Trials: the deflated Sharpe uses the larger of the declared trials and what
+the files prove (columns of the variants matrix, passes of an MT5
+optimisation export, variants in a vectorbt report); the latter is tagged
+MEASURED. `TRIALS_BELOW_VARIANTS` warns when the declaration is lower.
+
 ## The verdict
 
 Six dimensions, each PASS, WEAK, FAIL, NOT_MEASURED or NOT_APPLICABLE, and a
