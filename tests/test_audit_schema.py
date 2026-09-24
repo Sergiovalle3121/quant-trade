@@ -85,17 +85,26 @@ def test_epoch_timestamps_are_understood() -> None:
 
 
 @pytest.mark.parametrize(
-    ("payload", "message"),
+    ("payload", "message", "spanish", "code"),
     [
-        (b"", "empty"),
-        (b"a,b\n1,2\n", "timestamp column"),
-        (b"timestamp,foo\n2020-01-01,1\n", "equity column"),
-        (b"timestamp,equity\n2020-01-01,1\n", "fewer than two"),
+        (b"", "empty", "está vacío", "empty"),
+        (b"a,b\n1,2\n", "timestamp column", "columna de fecha", "missing_timestamp"),
+        (b"timestamp,foo\n2020-01-01,1\n", "equity column", "columna de equity", "missing_value"),
+        (b"timestamp,equity\n2020-01-01,1\n", "fewer than two", "menos de dos", "too_few_rows"),
     ],
 )
-def test_parse_errors_speak_plainly(payload: bytes, message: str) -> None:
-    with pytest.raises(ParseError, match=message):
+def test_parse_errors_speak_plainly(payload: bytes, message: str, spanish: str, code: str) -> None:
+    with pytest.raises(ParseError, match=message) as caught:
         parse_equity_csv(payload)
+    assert caught.value.code == code
+    assert spanish in caught.value.localized("es")
+    assert caught.value.localized("en") == str(caught.value)
+
+
+def test_parse_error_without_spanish_falls_back_to_english() -> None:
+    error = ParseError("plain english")
+    assert error.localized("es") == "plain english"
+    assert error.code == "parse"
 
 
 def test_size_and_row_limits() -> None:
