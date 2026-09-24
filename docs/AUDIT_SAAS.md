@@ -55,6 +55,63 @@ sampling error. With this floor, the best of 100 unskilled random walks has
 a PSR near 0.99 and a DSR near 0.5 at 100 declared trials, which is the
 behaviour the test suite pins.
 
+### Trade analytics, resampled risk and prop-firm challenges
+
+`audit/analytics.py` and `audit/prop_presets.py` (iteration 4; the engine
+and report wire them in during the integration step):
+
+- `trade_statistics`: win rate, gross profit and loss, net after reported
+  fees, profit factor, expectancy, average win and loss, payoff ratio,
+  largest-win share, longest win and loss streaks (trades ordered by exit),
+  mean and median holding hours, SQN (`sqrt(min(N, 100))·mean/std` of per-
+  trade gross pnl), trades per month and a long/short split. MEASURED, or
+  NOT_MEASURED with the reason (no trades, no losses, a single side).
+- `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
+  the uploaded returns over one year, 2,000 paths by default, capped at
+  2,000,000 resampled cells. Maximum drawdown p50/p95/p99, the share of
+  paths reaching 10/20/30/50 %, the longest time under water p50/p95, and a
+  p5–p95 fan of at most 120 points. Every figure is noted "resampled from
+  the uploaded history, not a forecast".
+- `simulate_challenge`: the same bootstrap over daily closes, 5,000 paths by
+  default, checked each day for the daily floor, then the total floor, then
+  the target with the minimum days (every day with a non-zero return counts
+  as a trading day). Pass, daily-loss failure, total-loss failure and
+  unfinished sum to one, with a Wilson 95 % interval and days to target.
+  Calendar time limits become business days at 5/7. Daily data cannot see
+  intraday floating drawdown, so the estimate is optimistic; fixed notes in
+  Spanish and English say so, and that it is not a prediction.
+- `vendor_questions`: neutral questions for the seller of a robot, driven by
+  the red flags and the missing inputs, in Spanish and English. It never
+  says whether to buy.
+
+Challenge presets (`quant-trade audit presets` after integration), each a
+transcription of the official page on its `as_of` date with its
+`source_url`; rules the simulator cannot model are in `notes`:
+
+| Key | Target | Daily loss | Max loss | Min days | Source (read 2026-09-24) |
+|---|---|---|---|---|---|
+| `generic-2step-phase1` (default) | 10 % | 5 % of initial | 10 % static | 4 | this plan |
+| `ftmo-2step-phase1` / `-phase2` | 10 % / 5 % | 5 % of initial | 10 % static | 4 | ftmo.com/en/trading-objectives |
+| `ftmo-1step` | 10 % | 3 % of initial | 10 % trailing EOD | 0 | same |
+| `fundednext-stellar-2step-phase1` / `-phase2` | 8 % / 5 % | 5 % of initial | 10 % static | 5 | fundednext.com/general-rules/cfds/trading-objectives |
+| `fundednext-stellar-1step` | 10 % | 3 % of initial | 6 % static | 2 | same |
+| `fundednext-stellar-lite-phase1` / `-phase2` | 8 % / 4 % | 4 % of initial | 8 % static | 5 | same |
+| `the5ers-high-stakes-step1` / `-step2` | 10 % / 5 % | 5 % of previous close | 10 % static | 3 | the5ers.com/high-stakes |
+| `the5ers-hyper-growth` | 10 % | pause only, not simulated | 6 % static | 0 | the5ers.com/hyper-growth |
+| `the5ers-bootcamp-step` | 6 % | none | 5 % static | 0 | the5ers.com/bootcamp |
+| `topstep-50k/100k/150k-combine` | 6 % | optional, not simulated | USD 2,000 / 3,000 / 4,500 trailing EOD, locks at start | 2 | help.topstep.com (maximum loss limit) |
+
+Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `MARTINGALE_SIZING` | median size after a loss ≥ 1.25x the median after a win (at least 5 of each) | ≥ 1.6x and ≥ 60 % of post-loss trades larger than the loss |
+| `GRID_AVERAGING` | ≥ 5 trades and ≥ 20 % opened against an open same-side position on the same symbol at a worse price | ≥ 10 trades and ≥ 40 % |
+| `MANY_CONCURRENT_POSITIONS` | ≥ 5 positions open at once on one symbol | — |
+| `HIDDEN_FLOATING_DRAWDOWN` | a balance-only curve while positions overlapped | — |
+| `NEGATIVE_PAYOFF_HIGH_WINRATE` | ≥ 20 trades, win rate > 85 % and average loss ≥ 3x average win | — |
+| `NO_STOP_EVIDENCE` | ≥ 10 losses and the largest loss (or adverse excursion) ≥ 8x the average loss | — |
+
 ## The verdict
 
 Six dimensions, each PASS, WEAK, FAIL, NOT_MEASURED or NOT_APPLICABLE, and a
