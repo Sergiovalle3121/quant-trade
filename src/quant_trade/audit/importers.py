@@ -53,12 +53,14 @@ import math
 import re
 import statistics
 import zipfile
+import zlib
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
 from xml.etree import ElementTree
+from xml.parsers import expat
 
 from quant_trade.audit.schema import MAX_TRADES, MAX_UPLOAD_BYTES, ParsedTrades, ParseError
 from quant_trade.core.models import Trade
@@ -1650,7 +1652,16 @@ def _read_delimited(text: str) -> tuple[list[str], list[list[str]], str]:
     head = lines[0]
     delimiter = max((",", ";", "\t"), key=head.count)
     reader = csv.reader(io.StringIO("\n".join(lines)), delimiter=delimiter)
-    rows = [[cell.strip() for cell in row] for row in reader]
+    try:
+        rows = [[cell.strip() for cell in row] for row in reader]
+    except csv.Error as exc:
+        # An unbalanced quote swallowing the file, or a cell past the
+        # module's field limit: not a trade list, and never a server error.
+        raise ReportFormatError(
+            "bad_csv",
+            "the file could not be read as a delimited list of trades",
+            "el archivo no se pudo leer como una lista de operaciones separada por comas",
+        ) from exc
     header = rows[0]
     return header, [row for row in rows[1:] if any(cell for cell in row)], delimiter
 
@@ -1658,13 +1669,41 @@ def _read_delimited(text: str) -> tuple[list[str], list[list[str]], str]:
 _XML_FORBIDDEN = re.compile(rb"<!DOCTYPE|<!ENTITY", re.IGNORECASE)
 
 
+def _xml_doctype_error() -> ReportFormatError:
+    return ReportFormatError(
+        "xml_doctype",
+        "the file declares a document type, which is refused for safety",
+        "el archivo declara un tipo de documento, que se rechaza por seguridad",
+    )
+
+
+class _DoctypeRefused(Exception):
+    """Raised from inside expat the moment a DOCTYPE or ENTITY appears."""
+
+
+def _refuse(*_: Any) -> None:
+    raise _DoctypeRefused
+
+
 def _xml(data: bytes) -> ElementTree.Element:
+    """Parse XML with no document type at all: no entity can be declared.
+
+    The byte check catches the ASCII spellings cheaply; a first streaming pass
+    with bare expat catches the rest (a UTF-16 or UTF-32 member inside a
+    workbook, where the bytes of ``<!DOCTYPE`` are interleaved with NULs) and
+    stops at the declaration, before any entity could be expanded.
+    """
     if _XML_FORBIDDEN.search(data):
-        raise ReportFormatError(
-            "xml_doctype",
-            "the file declares a document type, which is refused for safety",
-            "el archivo declara un tipo de documento, que se rechaza por seguridad",
-        )
+        raise _xml_doctype_error()
+    probe = expat.ParserCreate()
+    probe.StartDoctypeDeclHandler = _refuse
+    probe.EntityDeclHandler = _refuse
+    try:
+        probe.Parse(data, True)
+    except _DoctypeRefused as exc:
+        raise _xml_doctype_error() from exc
+    except expat.ExpatError:
+        pass  # malformed XML: the parse below reports it
     try:
         return ElementTree.fromstring(data)
     except ElementTree.ParseError as exc:
@@ -1700,7 +1739,7 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
     """Every sheet of a workbook as rows of text or numbers (standard library only)."""
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, EOFError, OSError, ValueError) as exc:
         raise ReportFormatError(
             "bad_xlsx", "the workbook could not be opened", "no se pudo abrir el libro de Excel"
         ) from exc
@@ -1715,7 +1754,24 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
         def load(name: str) -> ElementTree.Element | None:
             if name not in names:
                 return None
-            return _xml(archive.read(name))
+            try:
+                data = archive.read(name)
+            except (
+                zipfile.BadZipFile,
+                zlib.error,
+                EOFError,
+                NotImplementedError,
+                RuntimeError,
+            ) as exc:
+                # A damaged or encrypted member, or one whose declared size
+                # is a lie (the read stops at the declared size, then the CRC
+                # check fails): a clear refusal, never a server error.
+                raise ReportFormatError(
+                    "bad_xlsx",
+                    "the workbook is damaged or encrypted and could not be read",
+                    "el libro de Excel está dañado o cifrado y no se pudo leer",
+                ) from exc
+            return _xml(data)
 
         workbook = load("xl/workbook.xml")
         if workbook is None:
