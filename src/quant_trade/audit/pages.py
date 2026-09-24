@@ -11,6 +11,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
 from quant_trade.audit.verdict import class_text, meaning
@@ -146,8 +147,13 @@ _COPY: dict[str, dict[str, Any]] = {
         "description": "Descripción (opcional, no se publica en el informe)",
         "consent": (
             "Entiendo que esto es una herramienta de investigación estadística, no asesoría "
-            "de inversión, y que el archivo se borra a los 30 días si no se paga."
+            "de inversión, y que el archivo se borra a los {retention} días si no se paga. "
+            "Acepto los términos del servicio y la política de privacidad."
         ),
+        "consent_read": "Léelos antes de subir:",
+        "terms_link": "Términos del servicio",
+        "privacy_link": "Política de privacidad",
+        "legal_updated": "Última actualización",
         "submit": "Auditar",
         "free_note": "Modo gratuito: el informe completo se entrega con marca de agua.",
         "paid_note": "Vista previa gratuita; el informe completo cuesta USD {price:.0f}.",
@@ -307,8 +313,13 @@ _COPY: dict[str, dict[str, Any]] = {
         "description": "Description (optional, never shown in the report)",
         "consent": (
             "I understand this is a statistical research tool, not investment advice, and that "
-            "the file is deleted after 30 days if unpaid."
+            "the file is deleted after {retention} days if unpaid. I accept the terms of service "
+            "and the privacy policy."
         ),
+        "consent_read": "Read them before uploading:",
+        "terms_link": "Terms of service",
+        "privacy_link": "Privacy policy",
+        "legal_updated": "Last updated",
         "submit": "Audit",
         "free_note": "Free mode: the full report is delivered with a watermark.",
         "paid_note": "Free preview; the full report costs USD {price:.0f}.",
@@ -439,7 +450,7 @@ def _footer(locale: str) -> str:
     copy = _COPY[locale]
     return (
         f"<div class='disclaimer'><strong>{_e(copy['disclaimer'])}.</strong> "
-        f"{_e(DISCLAIMER[locale])}</div></body></html>"
+        f"{_e(DISCLAIMER[locale])}</div>{legal_links_html(locale)}</body></html>"
     )
 
 
@@ -528,8 +539,11 @@ def landing(
         + code_field
         + f"<label>{_e(copy['description'])}</label><textarea name='description' rows='3' "
         "maxlength='2000'></textarea>"
-        + f"<label><input type='checkbox' name='consent' value='on' required> {_e(copy['consent'])}"
-        "</label>"
+        + f"<label><input type='checkbox' name='consent' value='on' required> "
+        f"{_e(copy['consent'].format(retention=retention_days))}</label>"
+        + f"<div class='muted'>{_e(copy['consent_read'])} "
+        f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a> · "
+        f"<a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></div>"
         + f"<button type='submit'>{_e(copy['submit'])}</button></form>"
         + f"<h2>{_e(copy['waitlist_title'])}</h2><form method='post' action='/waitlist'>"
         f"<label>{_e(copy['email'])}</label><input type='email' name='email' required>"
@@ -697,6 +711,26 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
     )
 
 
+def legal_page(text: LegalText, *, locale: str = "es") -> str:
+    """The terms or the privacy policy as one page, with a language switch."""
+    locale = locale if locale in _COPY else "es"
+    copy = _COPY[locale]
+    other = "en" if locale == "es" else "es"
+    warning = f"<div class='error'>{_e(text.warning)}</div>" if text.warning else ""
+    sections = "".join(
+        f"<h2>{_e(heading)}</h2>" + "".join(f"<p>{_e(line)}</p>" for line in lines)
+        for heading, lines in text.sections
+    )
+    return (
+        _head(text.title, locale)
+        + f"<p class='muted'><a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a> · "
+        f"<a href='?lang={other}'>{'English' if locale == 'es' else 'Español'}</a></p>"
+        + f"<h1>{_e(text.title)}</h1>{warning}{sections}"
+        + f"<p class='muted'>{_e(copy['legal_updated'])}: {_e(text.updated)}</p>"
+        + _footer(locale)
+    )
+
+
 def error_page(message: str, *, locale: str = "es") -> str:
     locale = locale if locale in _COPY else "es"
     copy = _COPY[locale]
@@ -715,5 +749,6 @@ __all__ = [
     "badge_svg",
     "error_page",
     "landing",
+    "legal_page",
     "verification_page",
 ]

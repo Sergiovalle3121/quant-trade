@@ -18,6 +18,7 @@ from typing import Any
 
 from quant_trade.audit import charts
 from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.legal import legal_links_html
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult
 from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning
@@ -785,6 +786,7 @@ def render_html(
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
+    legal_links: bool = False,
 ) -> str:
     """The audit as one HTML document.
 
@@ -1107,6 +1109,7 @@ def render_html(
         f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>",
         f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>",
+        legal_links_html(locale) if legal_links else "",
     ]
     return (
         "<!doctype html><html lang='"
@@ -1144,6 +1147,7 @@ def render(
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
+    legal_links: bool = False,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1155,6 +1159,7 @@ def render(
         redeem_url=redeem_url,
         publish_url=publish_url,
         notice=notice,
+        legal_links=legal_links,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

@@ -80,3 +80,4 @@ Data lake code is research/backtesting only. Do not commit generated datasets, s
 - The public verification page is built from an allow-list: it never shows files, trades, the description or the token.
 - Prop-firm presets carry their source URL and `as_of` date.
 - Access codes are stored only as a hash and printed once; nothing lists or logs a clear code.
+- The terms and privacy pages (`audit/legal.py`) must pass the guard; operator details come from the environment with no real-looking default. Every privacy promise needs a command that keeps it and a test.

@@ -4,6 +4,12 @@ This is a template with placeholders, not legal advice. Have a lawyer in
 the jurisdiction where the service is offered review and adapt it before
 charging anyone. Replace every `[bracketed]` field.
 
+The web service now serves filled-in versions of these terms and a privacy
+policy at `/terminos` and `/privacidad` (`src/quant_trade/audit/legal.py`),
+taking the operator's details from `AUDIT_OPERATOR_*` variables. This file
+stays as the source they were written from; the served text is the one to
+review.
+
 ---
 
 ## Términos del servicio de auditoría de backtests
