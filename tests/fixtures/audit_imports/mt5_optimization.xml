@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Title>FixtureEA EURUSD,H1 2024.01.01-2024.06.30</Title>
+ </DocumentProperties>
+ <Worksheet ss:Name="Tester Optimizator Results">
+  <Table>
+   <Row><Cell><Data ss:Type="String">Pass</Data></Cell><Cell><Data ss:Type="String">Result</Data></Cell><Cell><Data ss:Type="String">Profit</Data></Cell><Cell><Data ss:Type="String">Expected Payoff</Data></Cell><Cell><Data ss:Type="String">Profit Factor</Data></Cell><Cell><Data ss:Type="String">Recovery Factor</Data></Cell><Cell><Data ss:Type="String">Sharpe Ratio</Data></Cell><Cell><Data ss:Type="String">Custom</Data></Cell><Cell><Data ss:Type="String">Equity DD %</Data></Cell><Cell><Data ss:Type="String">Trades</Data></Cell><Cell><Data ss:Type="String">FastMA</Data></Cell></Row>
+   <Row><Cell><Data ss:Type="Number">0</Data></Cell><Cell><Data ss:Type="Number">10063.05</Data></Cell><Cell><Data ss:Type="Number">63.05</Data></Cell><Cell><Data ss:Type="Number">12.61</Data></Cell><Cell><Data ss:Type="Number">1.8</Data></Cell><Cell><Data ss:Type="Number">0.5</Data></Cell><Cell><Data ss:Type="Number">0.9</Data></Cell><Cell><Data ss:Type="Number">0</Data></Cell><Cell><Data ss:Type="Number">1.2</Data></Cell><Cell><Data ss:Type="Number">5</Data></Cell><Cell><Data ss:Type="Number">12</Data></Cell></Row>
+  </Table>
+ </Worksheet>
+</Workbook>

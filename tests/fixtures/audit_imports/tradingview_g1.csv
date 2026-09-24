@@ -1,0 +1,5 @@
+Trade #,Type,Signal,Date/Time,Price USD,Contracts,Profit USD,Profit %,Cum. Profit USD,Cum. Profit %,Run-up USD,Run-up %,Drawdown USD,Drawdown %
+2,Exit Short,Close entry(s) order Short,2024-11-05 13:00,5342.75,3,-41.10,-0.26,8.50,0.01,12.75,0.08,45.00,0.28
+2,Entry Short,Short,2024-11-05 10:00,5330.25,3,-41.10,-0.26,8.50,0.01,12.75,0.08,45.00,0.28
+1,Exit Long,TP,2024-11-04 14:00,5321.50,2,49.60,0.47,49.60,0.05,60.00,0.57,18.00,0.17
+1,Entry Long,Long,2024-11-04 08:00,5295.50,2,49.60,0.47,49.60,0.05,60.00,0.57,18.00,0.17

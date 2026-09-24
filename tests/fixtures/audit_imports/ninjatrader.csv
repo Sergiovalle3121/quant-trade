@@ -1,0 +1,3 @@
+Trade number,Instrument,Account,Strategy,Market pos.,Qty,Entry price,Exit price,Entry time,Exit time,Entry name,Exit name,Profit,Cum. net profit,Commission,Clearing Fee,Exchange Fee,IP Fee,NFA Fee,MAE,MFE,ETD,Bars,
+1,ES 03-26,Backtest,DemoStrategy,Long,1,6010.25,6016.50,1/6/2026 9:35:00 AM,1/6/2026 10:05:00 AM,Long,Profit target,$307.42,$307.42,$5.08,$0.00,$0.00,$0.00,$0.00,$62.50,$325.00,$17.58,6,
+2,ES 03-26,Backtest,DemoStrategy,Short,2,6021.00,6025.00,1/7/2026 11:10:00 AM,1/7/2026 11:25:00 AM,Short,Stop loss,($410.16),($102.74),$10.16,$0.00,$0.00,$0.00,$0.00,$400.00,$75.00,$485.16,3,

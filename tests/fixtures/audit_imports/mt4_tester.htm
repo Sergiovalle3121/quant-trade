@@ -1,0 +1,41 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <title>Strategy Tester: FixtureEA</title>
+    <meta name="generator" content="MetaQuotes Software Corp.">
+    <meta name="version" content="Build 1420">
+    <meta name="server" content="SyntheticBroker-Demo">
+  </head>
+<body topmargin=1 marginheight=1>
+<div align=center>
+<div style="font: 20pt Times New Roman"><b>Strategy Tester Report</b></div>
+<div style="font: 16pt Times New Roman"><b>FixtureEA</b></div>
+<div style="font: 10pt Times New Roman"><b>SyntheticBroker-Demo (Build 1420)</b></div><br>
+<table width=820 cellspacing=1 cellpadding=3 border=0>
+<tr align=left><td colspan=2>Symbol</td><td colspan=4>EURUSD (Euro vs US Dollar)</td></tr>
+<tr align=left><td colspan=2>Period</td><td colspan=4>1 Hour (H1)  2024.01.02 00:00 - 2024.01.05 23:00    (2024.01.01 - 2024.01.06)</td></tr>
+<tr align=left><td colspan=2>Model</td><td colspan=4>Every tick (the most precise method based on all available least timeframes to generate each tick)</td></tr>
+<tr align=left><td colspan=2>Parameters</td><td colspan=4>Lots=0.1; StopLoss=50; TakeProfit=100; </td></tr>
+<tr align=left><td>Bars in test</td><td align=right>120</td><td>Ticks modelled</td><td align=right>250000</td><td>Modelling quality</td><td align=right>90.00%</td></tr>
+<tr align=left><td>Mismatched charts errors</td><td align=right>0</td><td></td><td align=right></td><td></td><td align=right></td></tr>
+<tr align=left><td>Initial deposit</td><td align=right>10000.00</td><td></td><td align=right></td><td>Spread</td><td align=right>Current (12)</td></tr>
+<tr align=left><td>Total net profit</td><td align=right>95.10</td><td>Gross profit</td><td align=right>125.50</td><td>Gross loss</td><td align=right>-30.40</td></tr>
+<tr align=left><td>Total trades</td><td align=right>4</td><td>Short positions (won %)</td><td align=right>1 (100.00%)</td><td>Long positions (won %)</td><td align=right>3 (33.33%)</td></tr>
+</table>
+<img src="StrategyTester.gif" width=820 height=200 border=0 alt="Graph"><br>
+<table width=820 cellspacing=1 cellpadding=3 border=0>
+<tr bgcolor="#C0C0C0" align=right><td>#</td><td>Time</td><td>Type</td><td>Order</td><td>Size</td><td>Price</td><td>S / L</td><td>T / P</td><td>Profit</td><td>Balance</td></tr>
+<tr align=right><td>1</td><td class=msdate>2024.01.02 09:00</td><td>buy</td><td>1</td><td class=mspt>0.10</td><td>1.10000</td><td align=right>1.09500</td><td align=right>1.11000</td><td colspan=2></td></tr>
+<tr bgcolor="#E0E0E0" align=right><td>2</td><td class=msdate>2024.01.02 12:00</td><td>modify</td><td>1</td><td class=mspt>0.10</td><td>1.10000</td><td align=right>1.10000</td><td align=right>1.11000</td><td colspan=2></td></tr>
+<tr align=right><td>3</td><td class=msdate>2024.01.02 15:00</td><td>s/l</td><td>1</td><td class=mspt>0.10</td><td>1.10000</td><td align=right>1.10000</td><td align=right>1.11000</td><td class=mspt>-0.40</td><td class=mspt>9999.60</td></tr>
+<tr bgcolor="#E0E0E0" align=right><td>4</td><td class=msdate>2024.01.03 08:00</td><td>sell limit</td><td>2</td><td class=mspt>0.10</td><td>1.10300</td><td align=right>1.10800</td><td align=right>1.09300</td><td colspan=2></td></tr>
+<tr align=right><td>5</td><td class=msdate>2024.01.03 10:00</td><td>sell</td><td>2</td><td class=mspt>0.10</td><td>1.10300</td><td align=right>1.10800</td><td align=right>1.09300</td><td colspan=2></td></tr>
+<tr bgcolor="#E0E0E0" align=right><td>6</td><td class=msdate>2024.01.04 11:00</td><td>t/p</td><td>2</td><td class=mspt>0.10</td><td>1.09300</td><td align=right>1.10800</td><td align=right>1.09300</td><td class=mspt>100.00</td><td class=mspt>10099.60</td></tr>
+<tr align=right><td>7</td><td class=msdate>2024.01.04 12:00</td><td>buy</td><td>3</td><td class=mspt>0.10</td><td>1.09400</td><td align=right>0.00000</td><td align=right>0.00000</td><td colspan=2></td></tr>
+<tr bgcolor="#E0E0E0" align=right><td>8</td><td class=msdate>2024.01.04 18:00</td><td>close</td><td>3</td><td class=mspt>0.10</td><td>1.09100</td><td align=right>0.00000</td><td align=right>0.00000</td><td class=mspt>-30.00</td><td class=mspt>10069.60</td></tr>
+<tr align=right><td>9</td><td class=msdate>2024.01.05 09:00</td><td>buy</td><td>4</td><td class=mspt>0.10</td><td>1.09400</td><td align=right>0.00000</td><td align=right>0.00000</td><td colspan=2></td></tr>
+<tr bgcolor="#E0E0E0" align=right><td>10</td><td class=msdate>2024.01.05 10:00</td><td>buy stop</td><td>5</td><td class=mspt>0.10</td><td>1.10500</td><td align=right>0.00000</td><td align=right>0.00000</td><td colspan=2></td></tr>
+<tr align=right><td>11</td><td class=msdate>2024.01.05 12:00</td><td>delete</td><td>5</td><td class=mspt>0.10</td><td>1.10500</td><td align=right>0.00000</td><td align=right>0.00000</td><td colspan=2></td></tr>
+<tr bgcolor="#E0E0E0" align=right><td>12</td><td class=msdate>2024.01.05 23:00</td><td>close at stop</td><td>4</td><td class=mspt>0.10</td><td>1.09655</td><td align=right>0.00000</td><td align=right>0.00000</td><td class=mspt>25.50</td><td class=mspt>10095.10</td></tr>
+</table>
+</div></body></html>

@@ -1,0 +1,4 @@
+,Exit Trade Id,Column,Size,Entry Timestamp,Avg Entry Price,Entry Fees,Exit Timestamp,Avg Exit Price,Exit Fees,PnL,Return,Direction,Status,Position Id
+0,0,BTC-USD,0.5,2024-01-02 00:00:00+00:00,44200.0,22.1,2024-01-09 00:00:00+00:00,46100.0,23.05,904.85,0.040944,Long,Closed,0
+1,1,BTC-USD,0.4,2024-01-15 00:00:00+00:00,42800.0,17.12,2024-01-20 00:00:00+00:00,41900.0,16.76,-393.88,-0.023007,Long,Closed,1
+2,2,BTC-USD,0.3,2024-01-25 00:00:00+00:00,40100.0,12.03,2024-01-31 00:00:00+00:00,42600.0,0.0,737.97,0.061344,Long,Open,2
