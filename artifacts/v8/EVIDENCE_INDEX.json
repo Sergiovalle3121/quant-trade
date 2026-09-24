@@ -115,14 +115,14 @@
         "mark: no rows",
         "index: no rows",
         "funding: no settlements",
-        "no ingestion receipts: provenance is unverifiable"
+        "709 raw page(s) missing or altered"
       ],
-      "provenance": "unverified_legacy",
+      "provenance": "real",
       "raw_bytes": 0,
       "raw_pages": 0,
       "realized_rate_rows": 0,
       "receipt_chain_clean": true,
-      "receipts": 0,
+      "receipts": 709,
       "span_days": 0.0,
       "symbol": "BTC-USDT",
       "unique_settlements": 0,
