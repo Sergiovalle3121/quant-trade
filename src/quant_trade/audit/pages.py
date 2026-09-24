@@ -476,6 +476,8 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_pricing": "Precios",
         "nav_guides": "Guías",
         "nav_faq": "Preguntas",
+        "nav_compare": "Comparar",
+        "nav_menu": "Menú",
         "cta": "Auditar mi backtest",
         "cta_short": "Auditar",
         "hero_a": "Sube tu backtest.",
@@ -641,6 +643,8 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_pricing": "Pricing",
         "nav_guides": "Guides",
         "nav_faq": "FAQ",
+        "nav_compare": "Compare",
+        "nav_menu": "Menu",
         "cta": "Audit my backtest",
         "cta_short": "Audit",
         "hero_a": "Upload your backtest.",
@@ -856,6 +860,10 @@ def _preset_options(locale: str) -> str:
     return "".join(options)
 
 
+def _compare_url(locale: str) -> str:
+    return "/comparar" if locale == "es" else "/compare"
+
+
 def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
     ui = _UI[locale]
     home = _home(locale)
@@ -865,20 +873,33 @@ def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
         f"<a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a>"
         f"<a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a>"
         f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
+        f"<a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a>"
         f"<a href='{home}#faq'>{_e(ui['nav_faq'])}</a>"
     )
+    other = "en" if locale == "es" else "es"
     switch = (
-        f"<a class='lang' href='{_e(switch_href)}' hreflang='{'en' if locale == 'es' else 'es'}' "
-        f">{_other_name(locale)}</a>"
+        f"<a class='lang' href='{_e(switch_href)}' hreflang='{other}'>{_other_name(locale)}</a>"
         if switch_href
         else ""
+    )
+    # Phones: the same links in a menu that opens without script (<details>).
+    menu = (
+        f"<details class='menu'><summary aria-label='{_e(ui['nav_menu'])}'>"
+        "<span class='burger' aria-hidden='true'><i></i><i></i><i></i></span></summary>"
+        f"<nav class='menu-panel' aria-label='{_e(ui['nav_menu'])}'>{links}"
+        + (
+            f"<a href='{_e(switch_href)}' hreflang='{other}'>{_other_name(locale)}</a>"
+            if switch_href
+            else ""
+        )
+        + f"<a class='btn btn-primary' href='{home}#subir'>{_e(ui['cta'])}</a></nav></details>"
     )
     return (
         f"<header class='nav{' nav-solid' if solid else ''}'><div class='wrap nav-in'>"
         + logo(home)
         + f"<nav class='nav-links' aria-label='{_e(BRAND)}'>{links}</nav>"
         + f"<div class='nav-end'>{switch}<a class='btn btn-sm' href='{home}#subir'>"
-        f"{_e(ui['cta_short'])}</a></div></div></header>"
+        f"{_e(ui['cta_short'])}</a>{menu}</div></div></header>"
     )
 
 
@@ -947,6 +968,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
+        f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
     )
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
