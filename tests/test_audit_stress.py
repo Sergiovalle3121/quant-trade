@@ -111,7 +111,7 @@ def test_engine_and_report_carry_the_stress_tests() -> None:
         assert find_claims(page) == []
     locked = render_html(result, watermark=True, free_mode=False, checkout_url="/c")
     assert "Pruebas de estrés" in locked  # listed in what payment unlocks
-    assert "Sin las 5 mejores operaciones" not in locked
+    assert "Sin el mejor mes" not in locked  # the table itself is locked
 
 
 def test_older_results_without_stress_still_render() -> None:

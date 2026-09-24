@@ -81,6 +81,34 @@ each with its evidence tag. "What it means for you" gives two plain
 sentences per dimension. The "Print / save PDF" button uses the print
 stylesheet, which hides the buttons and the forms.
 
+### Executive summary
+
+The report opens with up to eight key figures, each shown only when it was
+measured: total return, maximum drawdown, resampled one-year drawdown p95,
+annualised Sharpe, profit factor, trades and win rate, the extra cost per
+side that takes the trades to zero (red below 3x the reference, the costs
+bar) and the result without the best 5 trades and the best 5 periods (red
+at zero or below). An unpaid report in paid mode shows the tiles' names
+with no values.
+
+### Comparing two reports
+
+`/comparar` (Spanish) and `/compare` (English) take the links of two of the
+customer's own reports and show them side by side: class, period and file
+format, the six dimensions and the executive-summary figures, with the
+figures that differ in bold (`audit/compare.py`). Every unlocked report has
+a small form that fills in its own link. Rules:
+
+- the links travel in a POST body, never in a URL, so no token reaches a
+  log line; the id and token are read from the pasted address and checked
+  exactly like the report page (wrong token: 404, same report twice or an
+  unreadable link: 400);
+- only paid reports (or any report in free mode) can be compared: a locked
+  one gets 402 and the unlocked figures are never shown;
+- the page is private (`noindex`), passes the profit-claim guard and says
+  that a class difference shows which tests changed, not that one version
+  will work better.
+
 ### Stress tests without the best outcomes
 
 `audit/stress.py` removes the best outcomes from what was uploaded and

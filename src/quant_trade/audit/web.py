@@ -35,6 +35,8 @@ from typing import Annotated, Any
 
 from pydantic import ValidationError
 
+from quant_trade.audit.compare import COPY as COMPARE_COPY
+from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guides import GUIDES_BY_SLUG
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
@@ -50,6 +52,7 @@ from quant_trade.audit.owner import (
 from quant_trade.audit.pages import (
     SAMPLE_BANNER,
     badge_svg,
+    compare_page,
     error_page,
     guide_page,
     guides_index_page,
@@ -1041,6 +1044,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             legal_links=True,
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
+            compare_link=f"{base}?token={token}" if record.paid or cfg.free_mode else None,
         )
         return html_text
 
@@ -1258,6 +1262,69 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             kind="privacy",
             base_url=_site_url(request),
         )
+
+    def _compare_form_page(locale: str, *, error: str = "", status: int = 200) -> Response:
+        page = compare_page(compare_form(locale, error=error), locale=locale)
+        return HTMLResponse(page, status_code=status)
+
+    @app.get("/comparar", response_class=HTMLResponse)
+    def compare_es(lang: str | None = None) -> Response:
+        return _compare_form_page(_locale(lang or "es"))
+
+    @app.get("/compare", response_class=HTMLResponse)
+    def compare_en(lang: str | None = None) -> Response:
+        return _compare_form_page(_locale(lang or "en"))
+
+    def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
+        locale = _locale(lang or default)
+        copy = COMPARE_COPY[locale]
+        first, second = parse_report_link(link_a), parse_report_link(link_b)
+        if first is None or second is None:
+            return _compare_form_page(locale, error=copy["bad_link"], status=400)
+        parsed = [first, second]
+        if first[0] == second[0]:
+            return _compare_form_page(locale, error=copy["same"], status=400)
+        results = []
+        for audit_id, token in parsed:
+            record = db.get_audit(audit_id)
+            if (
+                record is None
+                or not token_matches(record.token_hash, token)
+                or record.purged_at
+                or not record.result_json
+            ):
+                return _compare_form_page(locale, error=copy["not_found"], status=404)
+            if not (record.paid or cfg.free_mode):
+                return _compare_form_page(locale, error=copy["locked"], status=402)
+            result = AuditResult.model_validate_json(record.result_json)
+            results.append((result.model_dump(mode="json"), f"/audits/{audit_id}?token={token}"))
+        (data_a, href_a), (data_b, href_b) = results
+        body = comparison_body(
+            data_a,
+            data_b,
+            href_a=f"{href_a}&lang={locale}",
+            href_b=f"{href_b}&lang={locale}",
+            locale=locale,
+        )
+        again = "/comparar" if locale == "es" else "/compare"
+        body += f"<p><a class='btn btn-ghost' href='{again}?lang={locale}'>{copy['again']}</a></p>"
+        return HTMLResponse(guard_page(compare_page(body, locale=locale)))
+
+    @app.post("/comparar", response_class=HTMLResponse)
+    def compare_post_es(
+        link_a: Annotated[str, Form(max_length=1000)],
+        link_b: Annotated[str, Form(max_length=1000)],
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return _compare(link_a, link_b, lang, "es")
+
+    @app.post("/compare", response_class=HTMLResponse)
+    def compare_post_en(
+        link_a: Annotated[str, Form(max_length=1000)],
+        link_b: Annotated[str, Form(max_length=1000)],
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return _compare(link_a, link_b, lang, "en")
 
     @app.get("/terminos", response_class=HTMLResponse)
     def terms_es(request: Request, lang: str | None = None) -> str:
