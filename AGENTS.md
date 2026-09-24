@@ -72,7 +72,11 @@ Data lake code is research/backtesting only. Do not commit generated datasets, s
 - Every verdict sentence, page and report must pass the profit-claim guard in English and Spanish (`audit/guard.py`); a sentence that fails it is a bug, not a report.
 - Every reported number carries an evidence tag (`MEASURED`, `DECLARED`, `NOT_MEASURED`). Do not report a client declaration as measured.
 - Uploads, the audit database and generated reports stay git-ignored (`state/`, `outputs/`). Never commit a client file.
-- No secret has a default. Stripe keys and `DATABASE_URL` come from the environment only; free mode is forced when any Stripe variable is missing.
+- No secret has a default. Stripe keys and `DATABASE_URL` come from the environment only; free mode is forced when any Stripe variable is missing, unless the owner explicitly opts into selling access codes (`AUDIT_ACCESS_CODES=true` with `AUDIT_FREE_MODE=false`).
 - Web tests use `TestClient` with Stripe simulated by the HMAC helper; nothing reaches the network in tests.
 - A new red flag, threshold or dimension needs a test and a line in `docs/AUDIT_SAAS.md`.
 - Retention deletes require explicit confirmation (`audit purge --yes`).
+- Badge, verification page and challenge texts never imply future results. The badge shows class, id, date and the fixed notice only; never growth, return or profit.
+- The public verification page is built from an allow-list: it never shows files, trades, the description or the token.
+- Prop-firm presets carry their source URL and `as_of` date.
+- Access codes are stored only as a hash and printed once; nothing lists or logs a clear code.

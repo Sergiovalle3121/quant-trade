@@ -111,6 +111,13 @@ LABELS: dict[str, dict[str, str]] = {
         "json_sha": "sha256 del JSON de la auditoría",
         "thresholds": "Umbrales aplicados",
         "print": "Imprimir / guardar PDF",
+        "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
+        "redeem_button": "Canjear código",
+        "publish": "Publicar verificación pública",
+        "publish_help": (
+            "Crea una página pública con la clase, las dimensiones y los hashes, y un sello "
+            "para tu web. Nunca muestra tus archivos, operaciones ni descripción."
+        ),
         "meaning": "Qué significa para ti",
         "charts": "Gráficas",
         "detail_heading": "Detalle",
@@ -213,6 +220,13 @@ LABELS: dict[str, dict[str, str]] = {
         "json_sha": "sha256 of the audit JSON",
         "thresholds": "Thresholds applied",
         "print": "Print / save PDF",
+        "redeem": "Have an access code? Enter it to see the full report",
+        "redeem_button": "Redeem code",
+        "publish": "Publish a public verification",
+        "publish_help": (
+            "Creates a public page with the class, the dimensions and the hashes, and a badge "
+            "for your site. It never shows your files, trades or description."
+        ),
         "meaning": "What this means for you",
         "charts": "Charts",
         "detail_heading": "Detail",
@@ -433,9 +447,15 @@ font-weight:600;cursor:pointer}
 .meaning .item h3{font-size:1rem;margin:0 0 .2em}
 .lockbox{border:1px dashed #8b1a10;border-radius:6px;padding:10px 14px;margin:1em 0}
 .lockbox ul{margin:.4em 0}
+.paybox input{padding:7px 9px;border:1px solid #bbb;border-radius:5px;margin-right:6px}
+.notice{background:#e8f0fe;color:#123a7a;padding:8px 12px;border-radius:6px;margin:.6em 0;
+font-weight:600}
+.publish{border:1px solid #ddd;border-radius:6px;padding:10px 14px;margin:1em 0}
+.publish button{background:#1b5e20;color:#fff;border:0;padding:8px 14px;border-radius:5px;
+font-weight:600;cursor:pointer}
 @media (min-width:760px){.meaning{grid-template-columns:1fr 1fr}}
 @media print{
-.no-print,.paybox,.print-btn{display:none!important}
+.no-print,.paybox,.print-btn,.publish{display:none!important}
 body{max-width:none;padding:0;font-size:11pt}
 h2{break-after:avoid;page-break-after:avoid}
 table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
@@ -762,6 +782,9 @@ def render_html(
     free_mode: bool = True,
     price_usd: float | None = None,
     checkout_url: str | None = None,
+    redeem_url: str | None = None,
+    publish_url: str | None = None,
+    notice: str | None = None,
 ) -> str:
     """The audit as one HTML document.
 
@@ -783,6 +806,21 @@ def render_html(
         paybox = (
             f"<form class='paybox' method='post' action='{_e(checkout_url)}'>"
             f"<button type='submit'>{_e(labels['pay'])}{_e(price)}</button></form>"
+        )
+    if locked and redeem_url:
+        paybox += (
+            f"<form class='paybox' method='post' action='{_e(redeem_url)}'>"
+            f"<label>{_e(labels['redeem'])}</label><br>"
+            "<input type='text' name='code' required maxlength='40' autocomplete='off' "
+            "placeholder='AUD-XXXX-XXXX-XXXX'>"
+            f"<button type='submit'>{_e(labels['redeem_button'])}</button></form>"
+        )
+    publish_html = ""
+    if publish_url and not locked:
+        publish_html = (
+            f"<form class='publish' method='post' action='{_e(publish_url)}'>"
+            f"<p class='muted'>{_e(labels['publish_help'])}</p>"
+            f"<button type='submit'>{_e(labels['publish'])}</button></form>"
         )
 
     verdict_html = (
@@ -1048,6 +1086,7 @@ def render_html(
 
     body = [
         watermark_html,
+        f"<div class='notice'>{_e(notice)}</div>" if notice else "",
         "<div class='toolbar no-print'><button type='button' class='print-btn' "
         f"onclick='window.print()'>{_e(labels['print'])}</button></div>",
         f"<h1>{_e(labels['title'])} · {_e(verdict['overall'])}</h1>",
@@ -1064,6 +1103,7 @@ def render_html(
         f"<h2>{_e(labels['not_measured'])}</h2>{nm_html}",
         f"<h2>{_e(labels['seal'])}</h2>{seal_html}",
         detail_html,
+        publish_html,
         f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>",
         f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>",
@@ -1101,6 +1141,9 @@ def render(
     free_mode: bool = True,
     price_usd: float | None = None,
     checkout_url: str | None = None,
+    redeem_url: str | None = None,
+    publish_url: str | None = None,
+    notice: str | None = None,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1109,6 +1152,9 @@ def render(
         free_mode=free_mode,
         price_usd=price_usd,
         checkout_url=checkout_url,
+        redeem_url=redeem_url,
+        publish_url=publish_url,
+        notice=notice,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

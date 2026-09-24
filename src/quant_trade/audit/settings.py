@@ -3,7 +3,9 @@
 Free mode is the safe default: without every Stripe variable the service
 serves watermarked reports and never creates a checkout session, so a
 misconfigured deployment degrades to "free preview", never to "charged but
-not delivered".
+not delivered". The one other way out of free mode is an explicit opt-in to
+selling with access codes (``AUDIT_ACCESS_CODES=true``): the owner is paid
+outside the service and hands out a code, so nothing is charged online.
 """
 
 from __future__ import annotations
@@ -37,6 +39,12 @@ def normalise_database_url(url: str) -> str:
     return url
 
 
+def _safe_url(value: str) -> str:
+    """Only an ``https://`` (or ``mailto:``) link is shown; anything else is dropped."""
+    value = value.strip()
+    return value if value.startswith(("https://", "mailto:")) else ""
+
+
 @dataclass(frozen=True)
 class AuditSettings:
     database_url: str = DEFAULT_DATABASE_URL
@@ -51,6 +59,10 @@ class AuditSettings:
     retention_days: int = DEFAULT_RETENTION_DAYS
     bootstrap_samples: int = DEFAULT_BOOTSTRAP_SAMPLES
     trusted_proxy_hops: int = DEFAULT_TRUSTED_PROXY_HOPS
+    #: The owner sells access codes (bank transfer, Mercado Pago, WhatsApp).
+    access_codes: bool = False
+    #: Where a client asks the owner for a code; shown on the landing page.
+    contact_url: str = ""
 
     def __post_init__(self) -> None:
         if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
@@ -68,6 +80,11 @@ class AuditSettings:
         return self.stripe_configured and not self.free_mode
 
     @property
+    def access_codes_enabled(self) -> bool:
+        """Codes unlock reports only in paid mode; in free mode nothing is locked."""
+        return self.access_codes and not self.free_mode
+
+    @property
     def price_usd(self) -> float:
         return self.price_usd_cents / 100.0
 
@@ -83,6 +100,7 @@ class AuditSettings:
         stripe_price_id = env.get("STRIPE_PRICE_ID", "").strip()
         configured = bool(stripe_secret_key and stripe_webhook_secret and stripe_price_id)
         requested_free = env.get("AUDIT_FREE_MODE", "true").strip().lower() in TRUE_VALUES
+        access_codes = env.get("AUDIT_ACCESS_CODES", "").strip().lower() in TRUE_VALUES
         return cls(
             database_url=normalise_database_url(
                 env.get("DATABASE_URL", DEFAULT_DATABASE_URL).strip() or DEFAULT_DATABASE_URL
@@ -92,8 +110,9 @@ class AuditSettings:
             stripe_secret_key=stripe_secret_key,
             stripe_webhook_secret=stripe_webhook_secret,
             stripe_price_id=stripe_price_id,
-            # Free mode is forced whenever Stripe is not fully configured.
-            free_mode=requested_free or not configured,
+            # Free mode is forced unless Stripe is fully configured or the
+            # owner opted into selling access codes.
+            free_mode=requested_free or not (configured or access_codes),
             max_upload_bytes=int(env.get("AUDIT_MAX_UPLOAD_BYTES", MAX_UPLOAD_BYTES)),
             max_uploads_per_hour_per_ip=int(
                 env.get("AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP", DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP)
@@ -104,6 +123,8 @@ class AuditSettings:
             trusted_proxy_hops=int(
                 env.get("AUDIT_TRUSTED_PROXY_HOPS", "").strip() or DEFAULT_TRUSTED_PROXY_HOPS
             ),
+            access_codes=access_codes,
+            contact_url=_safe_url(env.get("AUDIT_CONTACT_URL", "")),
         )
 
 

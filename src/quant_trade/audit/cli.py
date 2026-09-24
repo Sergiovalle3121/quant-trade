@@ -31,6 +31,15 @@ audit_app = typer.Typer(
     no_args_is_help=True,
 )
 
+codes_app = typer.Typer(
+    help=(
+        "Access codes: sell an audit outside the service (bank transfer, Mercado Pago, "
+        "WhatsApp) and hand out a code. Codes are stored hashed and printed once."
+    ),
+    no_args_is_help=True,
+)
+audit_app.add_typer(codes_app, name="codes")
+
 AUDIT_JSON = "audit.json"
 REPORT_HTML = "report.html"
 
@@ -215,4 +224,64 @@ def purge(
         typer.echo(f"{count} audit(s) older than {days} day(s) would be purged; pass --yes")
 
 
-__all__ = ["audit_app"]
+def _store() -> Any:
+    try:
+        from quant_trade.audit.settings import AuditSettings
+        from quant_trade.audit.store import make_store
+    except ImportError as exc:  # pragma: no cover - the web extra is missing
+        raise typer.BadParameter('audit codes requires: python -m pip install -e ".[web]"') from exc
+    return make_store(AuditSettings.from_env().database_url)
+
+
+@codes_app.command("create")
+def codes_create(
+    credits: Annotated[int, typer.Option(help="Audits this code unlocks", min=1)],
+    note: Annotated[str, typer.Option(help="Who bought it, how they paid")] = "",
+    expires_days: Annotated[
+        int | None, typer.Option(help="Days until the code expires (default: never)", min=1)
+    ] = None,
+) -> None:
+    """Create a code and print it once. It cannot be shown again."""
+    code, record = _store().create_access_code(
+        credits=credits, note=note, at=datetime.now(UTC), expires_days=expires_days
+    )
+    typer.echo(code)
+    expiry = record.expires_at or "never"
+    typer.echo(
+        f"id {record.id} · {record.credits_total} credit(s) · expires {expiry} · "
+        "copy the code now: only its hash is stored",
+        err=True,
+    )
+
+
+@codes_app.command("list")
+def codes_list() -> None:
+    """List codes by id with their credits. The codes themselves are never shown."""
+    table = Table(title="Access codes (codes are stored hashed and never shown)")
+    for column in ("id", "note", "used", "total", "left", "created", "expires", "state"):
+        table.add_column(column)
+    for record in _store().list_access_codes():
+        table.add_row(
+            record.id,
+            record.note,
+            str(record.credits_used),
+            str(record.credits_total),
+            str(record.credits_left),
+            record.created_at,
+            record.expires_at or "-",
+            "disabled" if record.disabled else "active",
+        )
+    Console(width=160).print(table)
+
+
+@codes_app.command("disable")
+def codes_disable(code_id: Annotated[str, typer.Argument(help="The id from codes list")]) -> None:
+    """Stop a code from unlocking anything more (for a leaked or refunded code)."""
+    if _store().disable_access_code(code_id):
+        typer.echo(f"disabled {code_id}")
+    else:
+        typer.echo(f"no active code with id {code_id}", err=True)
+        raise typer.Exit(code=1)
+
+
+__all__ = ["audit_app", "codes_app"]

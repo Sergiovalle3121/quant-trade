@@ -11,7 +11,9 @@ or will be made. The profit-claim guard refuses any report that does.
 
 | File | Required | Columns (aliases accepted, case-insensitive) |
 |---|---|---|
-| Equity or returns | yes | `timestamp` + `equity` (or `return`). `Date`/`NAV`, `%` returns, `;` separators and epoch timestamps are understood. |
+| Platform report | this or the equity file | The file as the platform writes it; see "Importers" below. One file gives both the closed trades and the balance curve. |
+| MT5 optimisation export | no | The XML the MT5 optimiser exports. Its passes become the MEASURED number of trials in the deflated Sharpe. |
+| Equity or returns | this or a report | `timestamp` + `equity` (or `return`). `Date`/`NAV`, `%` returns, `;` separators and epoch timestamps are understood. |
 | Closed trades | no | `entry_time, exit_time, quantity, entry_price, exit_price`, optional `side`, optional `pnl`. |
 | Benchmark | no | same shape as the equity file. |
 | Variants | no | one return column per parameter variant tried, same rows. |
@@ -20,6 +22,34 @@ Plus four declarations: trials tried before choosing this version, cost per
 side in basis points, an out-of-sample start date, and whether a benchmark
 applies. Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
 at least 30 return observations.
+
+### Importers and their limits
+
+`audit/importers.py` detects the format by content (standard library only)
+and reads: MetaTrader 5 tester and account-history HTML reports (UTF-16 is
+common), MetaTrader 4 tester reports and detailed statements, TradingView
+"List of trades" CSV and XLSX, and the trade exports of NinjaTrader,
+QuantConnect, backtesting.py and vectorbt. Limits, each written into the
+report as a reading warning:
+
+- The balance curve is rebuilt from closed trades. It cannot show floating
+  (open-trade) drawdown, so the real drawdown was at least as deep.
+- Report times carry no timezone; they are read as UTC.
+- Contract sizes are inferred from the reported profit when the file does
+  not state them.
+- A report without a starting balance uses the one the client declares,
+  else 10,000 with a warning.
+- The MT5 optimisation pass count is what the optimiser tried; a genetic
+  optimisation lists only the passes it evaluated. The deflated Sharpe uses
+  the largest of the declared trials, the uploaded variants and the passes.
+
+### Charts and printing
+
+The report embeds four SVG figures without JavaScript (`audit/charts.py`):
+equity, drawdown, the resampled scenario fan and the monthly return map,
+each with its evidence tag. "What it means for you" gives two plain
+sentences per dimension. The "Print / save PDF" button uses the print
+stylesheet, which hides the buttons and the forms.
 
 ## What is measured, and from where
 
@@ -199,11 +229,24 @@ curl -i -F equity=@examples/audit/sample_equity.csv -F trials=20 -F cost_bps=5 \
   -F consent=on localhost:8000/audits
 ```
 
-Routes: `GET /` landing and form (`?lang=en`), `POST /audits` upload,
-`GET /audits/{id}?token=…` report, `GET /audits/{id}.json?token=…` record,
-`POST /audits/{id}/checkout?token=…` Stripe Checkout (503 in free mode),
-`POST /webhooks/stripe` payment confirmation, `POST /waitlist`, `GET /health`.
-Every report URL carries a per-audit secret token; a wrong token is a 404.
+Routes:
+
+| Route | What it does |
+|---|---|
+| `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. |
+| `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
+| `GET /audits/{id}?token=…` | The report. `GET /audits/{id}.json?token=…` the record (402 while locked). |
+| `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). |
+| `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
+| `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
+| `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
+| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. 410 once purged. |
+| `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
+| `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
+
+Every private URL carries a per-audit secret token; a wrong token is a 404.
+Every response is `Cache-Control: no-store` except the two `/v/` routes,
+which are `public, max-age=300`.
 
 Configuration is by environment only (`.env.example` lists every variable
 with an empty value):
@@ -212,9 +255,11 @@ with an empty value):
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///state/audit/audit.db` | SQLite file or Railway Postgres (`postgres://` is normalised to `postgresql+psycopg://`). |
 | `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links. |
-| `AUDIT_FREE_MODE` | `true` | Serve watermarked reports and never create a checkout. Forced `true` when any Stripe variable is missing. |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` | empty | All three are needed for paid mode. |
-| `AUDIT_PRICE_USD_CENTS` | `4900` | Shown on the page; the Stripe price object decides what is charged. |
+| `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless all three Stripe variables are set or `AUDIT_ACCESS_CODES=true`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` | empty | All three are needed for card payments. |
+| `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
+| `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
+| `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
 | `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. |
 | `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. |
 | `AUDIT_RETENTION_DAYS` | `30` | Used by `audit purge`. |
@@ -232,8 +277,11 @@ with an empty value):
 3. Set `AUDIT_BASE_URL` to the public domain Railway assigns or to the
    custom domain you attach, and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
    hourly limit counts the visitor's address and not Railway's proxy.
-4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. For
-   paid mode create a Stripe price, add the three Stripe variables, set
+4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
+   sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
+   `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
+   `AUDIT_CONTACT_URL`, then create codes from a Railway shell (see
+   "Selling with access codes"). For card payments create a Stripe price, add the three Stripe variables, set
    `AUDIT_FREE_MODE=false`, and register the webhook endpoint
    `https://<domain>/webhooks/stripe` for `checkout.session.completed`.
    Locally: `stripe listen --forward-to localhost:8000/webhooks/stripe`
@@ -242,6 +290,76 @@ with an empty value):
    `--yes` (a Railway cron service works). Unpaid uploads, reports and the
    client's description are deleted; id, digests and class are kept so the
    record stays verifiable.
+
+### Testing a deployment on Railway
+
+1. Open `https://<domain>/health`: `free_mode` and `stripe_enabled` say
+   which mode the variables produced.
+2. Open `/ejemplo`: a full report of synthetic data renders with charts.
+3. Upload an MT5 tester report (`Report.html` as the terminal saves it) and,
+   if you have it, the optimisation XML. The report shows the class, the
+   charts and, under the file format, the passes counted.
+4. In free mode, or after unlocking, press "Publish a public verification"
+   at the bottom of the report and open the `/v/…` page and its
+   `badge.svg`. Check it shows no file, trade or description.
+5. With codes on: in a Railway shell run
+   `quant-trade audit codes create --credits 1 --note test`, upload a file
+   with that code in the "Access code" field, check the report is complete,
+   then upload again with the same code and check you get the preview.
+
+### Selling with access codes
+
+For clients who pay by bank transfer, Mercado Pago or WhatsApp:
+
+```
+quant-trade audit codes create --credits 3 --note "Juan, transfer 2026-09-24" --expires-days 90
+quant-trade audit codes list              # ids, notes, credits; never the codes
+quant-trade audit codes disable <id>      # a leaked or refunded code
+```
+
+- A code looks like `AUD-XXXX-XXXX-XXXX` (31 letters and digits, no 0/O or
+  1/I/L), is printed once, and only its SHA-256 is stored. Case, spaces and
+  dashes are ignored when the client types it.
+- Redemption is one conditional `UPDATE` (`credits_used < credits_total`,
+  not disabled, not expired) inside the transaction that inserts the audit
+  or unlocks it, so a credit is never spent twice or for nothing. The paid
+  audit's reference is `code:<id>`.
+- An invalid, used-up or expired code gives the preview with a message that
+  does not say which of the three it was. Redeem attempts count toward the
+  hourly per-IP limit together with uploads (attempt counting is in memory,
+  per process).
+- In free mode codes are ignored and nothing is spent.
+
+### Public verification page and badge
+
+The owner of an audit (whoever holds its token) can publish it. The page at
+`/v/{public_id}` uses a random id unrelated to the audit id and shows only:
+the class and its fixed one-line explanation, the audit and publication
+dates, the six dimension statuses with their plain-language text, the input
+hashes and `dataset_digest`, the source format, the engine version, the
+declared trials and the trials used, the SHA-256 of the result, and a fixed
+notice. It never shows the files, the trades, the description or the token.
+Once the audit is purged the page and badge answer 410.
+
+The badge (`/v/{public_id}/badge.svg`, `?lang=en` for English) shows the
+class, the id, the date and the fixed words:
+
+- es: "Auditoría estadística de datos aportados – no verificados con el
+  bróker – no garantiza resultados"
+- en: "Statistical audit of supplied data – not verified with a broker – not
+  a performance guarantee"
+
+It never shows growth, return or profit. MQL5 Market forbids third-party
+certificates in product listings, so the badge is for the seller's own site,
+Telegram, forums and videos. The guard refuses "verificado", "certificado",
+"aprobado", "pasarás", "certified", "approved" and "verified track record"
+unless directly negated, which is what lets the fixed wording through.
+
+### Terms and privacy: current state
+
+The terms exist only as `docs/AUDIT_TERMS_TEMPLATE.md`, with placeholders
+unfilled, and the site does not link them. There is no privacy page. Both
+should be filled in, reviewed and linked before charging.
 
 ### Verifying a report
 
@@ -261,3 +379,7 @@ the same seed reproduces the JSON byte for byte.
 - Web tests use `TestClient` with Stripe simulated; nothing here reaches the
   network in tests.
 - A new red flag or threshold needs a test and a line in this document.
+- Badge, verification and challenge texts never imply future results;
+  changing their fixed wording needs a test.
+- Access codes are stored hashed and printed once; `codes list` never shows
+  them.

@@ -49,6 +49,14 @@ decisiones tomadas con base en el informe.
 nuestros. Puede compartir el informe; no puede revender el servicio sin
 acuerdo escrito.
 
+**Sello y página de verificación.** Si usted publica la verificación, la
+página muestra la clase, las dimensiones, los hashes y un aviso fijo; nunca
+sus archivos, operaciones ni descripción. Puede usar el sello en su web,
+Telegram, foros o vídeos, siempre enlazado a la página de verificación. No
+puede presentarlo como garantía de resultados, como respaldo de un producto
+ni junto a afirmaciones de rentabilidad; si lo hace, podemos retirar la
+publicación.
+
 **Ley aplicable y jurisdicción.** [País / tribunales].
 
 **Cambios.** Publicaremos cualquier cambio en esta página con fecha.
@@ -94,6 +102,13 @@ the basis of the report.
 **Ownership.** The report is yours. The engine, wording and format are ours.
 You may share the report; you may not resell the service without written
 agreement.
+
+**Badge and verification page.** If you publish the verification, the page
+shows the class, the dimensions, the hashes and a fixed notice; never your
+files, trades or description. You may use the badge on your site, Telegram,
+forums or videos, always linked to the verification page. You may not
+present it as a guarantee of results, as an endorsement of a product, or
+next to return claims; if you do, we may remove the publication.
 
 **Governing law and venue.** [Country / courts].
 
