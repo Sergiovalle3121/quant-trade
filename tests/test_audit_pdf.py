@@ -101,3 +101,14 @@ def test_download_names_are_safe() -> None:
     assert pdf_lib.filename("abc123") == "rigor-abc123.pdf"
     assert pdf_lib.filename('a"b/../c') == "rigor-abc.pdf"
     assert pdf_lib.filename("") == "rigor-report.pdf"
+
+
+@needs_pdf
+def test_the_sample_report_downloads_as_pdf(tmp_path: Path) -> None:
+    client = _client(tmp_path, free_mode=False, access_codes=True, contact_url="https://wa.me/0")
+    for page_path, pdf_path in (("/ejemplo", "/ejemplo.pdf"), ("/sample", "/sample.pdf")):
+        assert f"href='{pdf_path}'" in client.get(page_path).text
+        response = client.get(pdf_path)
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
+        assert response.headers["content-disposition"].startswith("attachment")
