@@ -24,7 +24,7 @@ Every change below has an offline, deterministic test in
 | 7 | A delimited report with an unbalanced quote raised `csv.Error` (field larger than the limit), which is not a `ValueError`: another bare 500. | Medium | Refused as a `ReportFormatError` ("could not be read as a delimited list of trades"). |
 | 8 | Any exception the importers or the engine did not anticipate became Starlette's plain-text English 500. | Medium | An importer crash is the "check the file format" message (400); an engine or storage failure is a localised "something failed on our side, nothing new was saved" page (500). A last-resort handler does the same for any route. The traceback goes to the server log with the path only, never the query string, and never to the customer. |
 | 9 | XML with a document type was refused only when `<!DOCTYPE` or `<!ENTITY` appeared as ASCII bytes. An XLSX member in UTF-16 has a NUL after every byte and passed that check, so internal entities reached expat. Expat 2.6 limits entity amplification and ElementTree never fetches external entities, so this was defence in depth, not an open hole. | Low | A first streaming pass with bare expat stops at any DOCTYPE or ENTITY declaration in any encoding, before an entity can be expanded. |
-| 10 | uvicorn's access log wrote every report URL with its `?token=`: anyone who can read the Railway logs could open every customer's report. | High | `audit serve` runs uvicorn with a log filter that replaces the value of `token=` and `code=` with `[redacted]`, and without the `Server` header. |
+| 10 | uvicorn's access log wrote every report URL with its `?token=`: anyone who can read the Railway logs could open every customer's report. It also wrote every full client IP. | High | `audit serve` runs uvicorn with a log filter that replaces the value of `token=` and `code=` with `[redacted]` and shortens the client address (`shorten_client_address`: IPv4 /24, IPv6 /48), and without the `Server` header. |
 | 11 | No Content Security Policy and no framing protection: the publish and redeem buttons could be clickjacked from another site. | Medium | Every response, errors and the 413 included, carries `Content-Security-Policy` (`default-src 'none'`; script only as the print button's `window.print()` handler, allowed by its hash; inline styles; images from the site; forms to the site or Stripe Checkout; `frame-ancestors 'none'`; `base-uri 'none'`), `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `nosniff` and `no-referrer`. HSTS is added when `AUDIT_BASE_URL` is `https`. |
 | 12 | While `AUDIT_BASE_URL` is unset, canonical, Open Graph, badge-snippet, `robots.txt` and `sitemap.xml` links are built from the `Host` header, which the client chooses. The values were escaped, but a forged host would be echoed into a cacheable `/v/` page. | Low | A `Host` that is not a plain host name (letters, digits, dots, dashes, optional port) drops the absolute links instead of echoing it. Setting `AUDIT_BASE_URL` removes the dependency on `Host` entirely. |
 
@@ -74,10 +74,11 @@ Every change below has an offline, deterministic test in
 - An audit that has started cannot be interrupted: Python cannot stop a
   thread. The time bound comes from the input limits and the capped
   resampling, measured above, not from a timeout.
-- The access log still records the client address and the path (with the
-  token redacted), and Railway keeps its logs under its own retention. The
-  privacy page mentions the address only for the upload limit; the lawyer
-  review of `/privacidad` should cover server logs too.
+- The service's own access log keeps only a shortened client address (IPv4
+  /24, IPv6 /48) and the path with the token redacted. Railway keeps its own
+  request logs, with full addresses, under its own retention; `/privacidad`
+  and `/privacy` say so. Rate limiting still uses full addresses, in memory
+  and in the audit row that the retention purge clears.
 - A person with the report link has the report: the token is the only key,
   by design, so customers should share the `/v/` page instead.
 

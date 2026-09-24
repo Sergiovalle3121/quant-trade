@@ -393,9 +393,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 (
                     "We never ask for or store broker or exchange keys, trading account "
                     "passwords or card details. There are no user accounts, no cookies and "
-                    "no third-party analytics or advertising on these pages. Our hosting "
-                    "provider may record technical request data, such as the IP address, in "
-                    "its own logs.",
+                    "no third-party analytics or advertising on these pages. Our own access "
+                    "log keeps only a shortened address (the last part of the IP is "
+                    "removed) and never the report link's secret. Our hosting provider may "
+                    "keep its own request logs, with full IP addresses, for its own "
+                    "retention period.",
                 ),
             ),
             (
@@ -480,9 +482,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             (
                 "Nunca pedimos ni guardamos claves de bróker ni de exchange, contraseñas de "
                 "cuentas de trading ni datos de tarjeta. No hay cuentas de usuario, ni "
-                "cookies, ni analítica o publicidad de terceros en estas páginas. Nuestro "
-                "proveedor de alojamiento puede registrar datos técnicos de las peticiones, "
-                "como la IP, en sus propios registros.",
+                "cookies, ni analítica o publicidad de terceros en estas páginas. Nuestro propio "
+                "registro de accesos guarda solo una dirección acortada (se quita la última "
+                "parte de la IP) y nunca el secreto del enlace al informe. Nuestro proveedor "
+                "de alojamiento puede guardar sus propios registros de peticiones, con la IP "
+                "completa, durante su propio plazo de conservación.",
             ),
         ),
         (

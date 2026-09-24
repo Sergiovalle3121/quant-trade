@@ -496,3 +496,33 @@ def test_the_audit_slot_settings_come_from_the_environment() -> None:
     assert (defaults.max_concurrent_audits, defaults.audit_queue_seconds) == (2, 30)
     with pytest.raises(ValueError):
         AuditSettings(max_concurrent_audits=0)
+
+
+def test_the_access_log_keeps_only_a_shortened_client_address() -> None:
+    from quant_trade.audit.web import shorten_client_address
+
+    assert shorten_client_address("203.0.113.57:51234") == "203.0.113.0"
+    assert shorten_client_address("2001:db8:85a3:1:2:3:4:5:443") == "2001:db8:85a3::"
+    assert shorten_client_address("::1:8000") == "::"
+    assert shorten_client_address("testclient:50000") == "-"
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("203.0.113.57:51234", "GET", "/audits/abc?token=SECRET_T", "1.1", 200),
+        None,
+    )
+    assert RedactSecretsFilter().filter(record)
+    line = record.getMessage()
+    assert "203.0.113.57" not in line and line.startswith("203.0.113.0 - ")
+    assert "SECRET_T" not in line
+
+
+def test_the_privacy_page_says_what_the_logs_keep(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    spanish = client.get("/privacidad").text
+    english = client.get("/privacy").text
+    assert "dirección acortada" in spanish and "plazo de conservación" in spanish
+    assert "shortened address" in english and "retention period" in english
