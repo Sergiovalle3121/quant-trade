@@ -1,0 +1,44 @@
+# Pre-registered selection gate for H6 (trend following on crypto majors).
+#
+# Sealed before any signal was computed on real data. Reported BESIDE
+# conservative_daily.yaml, which is never edited.
+#
+# EXACTLY TWO criteria differ from conservative_daily.yaml, both derived, not
+# chosen:
+#
+#   max_test_drawdown: 0.20 -> 1.00 (disabled), replaced by
+#   max_drawdown_ratio_vs_benchmark: 1.0
+#     The benchmark is BTC buy-and-hold, which drew 76.6% on the study window
+#     (docs/CRYPTO_LOWCAP_COST_MODEL.md); an absolute 20% bar measures the
+#     market, not the strategy. Same reasoning and same number as the low-cap
+#     gate.
+#
+#   max_turnover: 3.0 -> 22.0
+#     Derived from the declared 200 bps/year drag budget: round trip cost
+#     under the research config is 2 x (10 + 2 + 1) = 26 bps, so the budget
+#     affords 200 / 26 = 7.7 full rotations a year; over a ~2.9-year holdout
+#     (30% of 2018-01 -> 2026-08) that is 22 total. The existing multi-asset
+#     runner does not report measured cost drag, so the budget is expressed in
+#     the turnover units it does report, with the arithmetic here.
+#
+# Everything else is byte-identical to conservative_daily.yaml, including the
+# deflated Sharpe threshold, which is NOT touched.
+
+min_test_sharpe: 0.5
+min_excess_return: 0.0
+max_test_drawdown: 1.00
+max_drawdown_ratio_vs_benchmark: 1.0
+max_turnover: 22.0
+require_beats_benchmark: true
+require_cost_sensitivity_pass: true
+require_subperiod_pass: false
+require_no_red_flags: false
+min_test_months: 12
+max_train_test_sharpe_gap: 1.0
+min_trade_count: 30
+min_probabilistic_sharpe: 0.90
+require_deflated_sharpe: true
+min_deflated_sharpe: 0.5
+require_walk_forward_overfitting_evidence: true
+max_walk_forward_pbo: 0.50
+min_walk_forward_windows: 4

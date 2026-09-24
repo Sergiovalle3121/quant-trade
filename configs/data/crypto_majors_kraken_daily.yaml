@@ -1,0 +1,14 @@
+# H6 dataset: daily spot OHLCV for liquid crypto majors from Kraken public
+# endpoints (research-only; no API keys). Run on a machine with egress:
+#   quant-trade data fetch --config configs/data/crypto_majors_kraken_daily.yaml
+# The fetch prints the cache path; its sha256 is what `seal-majors` binds to.
+# Symbols listed later than `start` simply carry no bars before listing; the
+# signal treats absence as zero weight, never as a price.
+provider: ccxt-kraken
+symbols: ["BTC-USD", "ETH-USD", "XRP-USD", "LTC-USD", "ADA-USD", "SOL-USD", "DOT-USD", "LINK-USD"]
+start: "2018-01-01"
+end: "2026-08-31"
+interval: "1d"
+adjusted: true
+output_dir: "data/cache"
+force_refresh: false

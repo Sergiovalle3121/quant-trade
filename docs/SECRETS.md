@@ -9,3 +9,7 @@ For future cloud deployment, store secrets in GitHub Actions secrets or AWS Secr
 ## Phase 7 cloud paper deployment note
 
 Scheduled cloud workflows are paper-only and fail closed. Defaults are dry-run; paper submission requires explicit config, official Alpaca Paper endpoint credentials from env or AWS Secrets Manager, kill switch clear, and reviewed operations. No live trading endpoints or real-money execution are supported.
+
+## Backtest audit service (Stripe)
+
+The audit web service reads `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_ID` from the environment only. Set them in the Railway service variables, never in a file in this repository; with any of the three missing the service runs in free mode and never creates a checkout. Rotate the webhook secret from the Stripe dashboard if it leaks and redeploy; the `DATABASE_URL` Railway injects is a secret too and stays out of logs and reports.

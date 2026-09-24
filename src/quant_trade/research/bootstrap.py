@@ -128,17 +128,46 @@ def _moving_block_indices(
     return idx.reshape(samples, n_blocks * block_size)[:, :n]
 
 
-def _stationary_indices(
-    n: int, samples: int, p: float, rng: np.random.Generator
+def stationary_bootstrap_indices(
+    n: int,
+    *,
+    length: int,
+    samples: int,
+    expected_block_size: float,
+    rng: np.random.Generator,
 ) -> np.ndarray:
-    idx = np.empty((samples, n), dtype=np.int64)
+    """A ``(samples, length)`` index matrix from the stationary bootstrap.
+
+    ``length`` may exceed ``n``: blocks wrap circularly, so a resampled path
+    can be longer than the observed history. That is what a capital-horizon
+    simulation needs, and it is also exactly the assumption it makes: that
+    the future is drawn from the observed window's return distribution and
+    dependence structure. With ``length == n`` this is the sampler every
+    confidence interval in this module uses, and consumes the generator in
+    the same order, so existing results are unchanged.
+    """
+    if int(length) != length or length < 1:
+        raise ValueError("length must be a positive integer")
+    if not np.isfinite(expected_block_size) or expected_block_size < 1:
+        raise ValueError("expected_block_size must be finite and >= 1")
+    p = 1.0 / float(expected_block_size)
+    length = int(length)
+    idx = np.empty((samples, length), dtype=np.int64)
     idx[:, 0] = rng.integers(0, n, size=samples)
-    restart = rng.random((samples, n)) < p
-    fresh = rng.integers(0, n, size=(samples, n))
-    for j in range(1, n):
+    restart = rng.random((samples, length)) < p
+    fresh = rng.integers(0, n, size=(samples, length))
+    for j in range(1, length):
         contiguous = (idx[:, j - 1] + 1) % n
         idx[:, j] = np.where(restart[:, j], fresh[:, j], contiguous)
     return idx
+
+
+def _stationary_indices(
+    n: int, samples: int, p: float, rng: np.random.Generator
+) -> np.ndarray:
+    return stationary_bootstrap_indices(
+        n, length=n, samples=samples, expected_block_size=1.0 / p, rng=rng
+    )
 
 
 def iid_bootstrap(

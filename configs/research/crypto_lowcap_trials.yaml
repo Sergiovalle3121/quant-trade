@@ -1,0 +1,110 @@
+# The declared trial grid for the low/mid-cap crypto campaign.
+#
+# Committed BEFORE any trial runs. Its sha256 is written into campaign_lock.json
+# on the first `quant-trade crypto-lowcap select`, and every later run must
+# present the same bytes. Editing this file after a run is a new search with a
+# new hash, and the lock says so.
+#
+# Every variant below counts against the max_trials its pre-registration
+# declared (4 + 4 + 4 + 3 + 4 = 19). Deflation uses the DECLARED total, spent
+# or not, and every sealed trial's Sharpe enters the cross-trial variance.
+schema_version: 1
+
+common:
+  order_notional_usd: 1000        # matches the cost model's calibration (ASSUMPTION, declared)
+  turnover_multiple: 50           # capacity screen: 90-day median venue turnover >= 50 x order
+  liquidity_window: 90
+  initial_capital_usd: 1000
+  quantile: p75                   # the conservative measured cost quantile
+  min_executable_fraction: 1.0    # every sampled book in the tier must have filled the size
+  cost_multipliers: [1.0, 2.0, 3.0]
+  bootstrap_seed: 20260812
+  bootstrap_samples: 1000
+  bootstrap_block_size: 20
+  cscv_partitions: 8
+
+walk_forward:
+  scheme: calendar_year_purged_wf_v1
+  test_years: [2019, 2020, 2021, 2022, 2023]   # 2023 ends at the selection boundary
+  embargo_days: 90                             # the longest lookback that affects eligibility
+  oos_start: "2019-01-01"
+
+turnover:
+  # The gate's max_turnover 3.0 is total-over-window; the pre-registration reads
+  # it against the 2.69-year holdout. The gate therefore scores
+  # annual_turnover x 2.69, and the raw total over the OOS window is reported
+  # beside it. DECLARED basis, not a tuning.
+  basis: annual_x_holdout_years
+  holdout_years: 2.69
+
+deflated_sharpe:
+  n_trials_declared: 19
+  sharpe_variance_floor: 0.0025817269775679735   # cross-trial variance of the 109-trial ETF ledger
+  etf_ledger: docs/real_data_evidence/trial_ledger.jsonl
+  primary_benchmark: ew_universe_buy_and_hold
+
+gates:
+  conservative: configs/selection/conservative_daily.yaml   # the unmodified ETF gate, always reported
+
+benchmarks:
+  ew_universe_buy_and_hold:
+    # The benchmark the pre-registrations name: equal weight of every eligible
+    # coin in the point-in-time universe, bought once and never rebalanced.
+    strategy: crypto_annual_equal_weight_rebalance
+    params: {top_n: 100000, rebalance_once: true}
+  ew_annual_top20:
+    # Annual equal-weight top-20 by market cap. Identical to H3 top_n=20, so it
+    # is a reference, never H3's benchmark.
+    strategy: crypto_annual_equal_weight_rebalance
+    params: {top_n: 20}
+  btc_buy_and_hold:
+    symbol: "BTC:1"
+
+hypotheses:
+  crypto_lowcap_h1_capacity_illiquidity:
+    strategy: crypto_capacity_illiquidity
+    gate: configs/selection/crypto_lowcap_preregistered.yaml
+    control: {liquid_band: true}
+    variants:
+      - {top_n: 10, turnover_multiple: 50}
+      - {top_n: 20, turnover_multiple: 50}
+      - {top_n: 10, turnover_multiple: 100}
+      - {top_n: 20, turnover_multiple: 100}
+  crypto_lowcap_h2_death_avoidance:
+    strategy: crypto_death_avoidance
+    gate: configs/selection/crypto_lowcap_preregistered.yaml
+    control: {screen_off: true}
+    control_shared: true
+    variants:
+      - {top_n: 20, max_rank_decay: 200, turnover_collapse_ratio: 0.25}
+      - {top_n: 20, max_rank_decay: 300, turnover_collapse_ratio: 0.25}
+      - {top_n: 20, max_rank_decay: 200, turnover_collapse_ratio: 0.5}
+      - {top_n: 20, max_rank_decay: 300, turnover_collapse_ratio: 0.5}
+  crypto_lowcap_h3_rebalancing_premium:
+    strategy: crypto_annual_equal_weight_rebalance
+    gate: configs/selection/crypto_lowcap_preregistered.yaml
+    control: {rebalance_once: true}
+    variants:
+      - {top_n: 10}
+      - {top_n: 20}
+      - {top_n: 40}
+      - {top_n: 80}
+  crypto_lowcap_h4_survival_duration:
+    strategy: crypto_survival_duration
+    gate: configs/selection/crypto_lowcap_preregistered.yaml
+    control_strategy: crypto_annual_equal_weight_rebalance
+    control: {top_n: 20}
+    variants:
+      - {top_n: 20, min_age_days: 365}
+      - {top_n: 20, min_age_days: 730}
+      - {top_n: 20, min_age_days: 1095}
+  crypto_lowcap_h5_midcap_momentum:
+    strategy: crypto_midcap_momentum
+    gate: configs/selection/crypto_lowcap_monthly_preregistered.yaml
+    control: {equal_weight_control: true}
+    refutation_checks: [beats_control, beats_ew_bh]
+    variants:
+      - {lookback_days: 28, top_n: 10, skip_days: 7, tier: mid}
+      - {lookback_days: 28, top_n: 20, skip_days: 7, tier: mid}
+      - {lookback_days: 84, top_n: 10, skip_days: 7, tier: mid}
+      - {lookback_days: 84, top_n: 20, skip_days: 7, tier: mid}
