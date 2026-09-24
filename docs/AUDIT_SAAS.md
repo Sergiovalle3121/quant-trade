@@ -206,6 +206,7 @@ with an empty value):
 | `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. |
 | `AUDIT_RETENTION_DAYS` | `30` | Used by `audit purge`. |
 | `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. |
+| `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
 
 ### Deploying on Railway
 
@@ -216,7 +217,8 @@ with an empty value):
    `DATABASE_URL`) or mount a volume at `/data` and set
    `DATABASE_URL=sqlite:////data/audit.db`.
 3. Set `AUDIT_BASE_URL` to the public domain Railway assigns or to the
-   custom domain you attach.
+   custom domain you attach, and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
+   hourly limit counts the visitor's address and not Railway's proxy.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. For
    paid mode create a Stripe price, add the three Stripe variables, set
    `AUDIT_FREE_MODE=false`, and register the webhook endpoint

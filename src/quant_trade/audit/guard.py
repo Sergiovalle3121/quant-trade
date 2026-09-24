@@ -9,6 +9,13 @@ verdict says.
 
 The client's free-text description is scanned too, but never blocks: it is
 their claim, reported back to them as a finding, and kept out of the HTML.
+
+Endorsement words ("verificado", "certificado", "aprobado", "certified")
+are refused as well: an audit of supplied data cannot certify a track record
+or approve a robot. A small set of patterns (``NEGATABLE_PATTERNS``) is
+allowed when directly negated, so the fixed disclaimers "no verificados con
+el bróker" and "no garantiza resultados" pass while "resultados verificados"
+does not.
 """
 
 from __future__ import annotations
@@ -31,7 +38,37 @@ SPANISH_CLAIM_PATTERNS: tuple[str, ...] = (
     r"\bdinero\s+seguro\b",
     r"\bgenera(?:r|rá|rán|n)?\s+(?:dinero|ganancias|ingresos|beneficios)\b",
     r"\bva(?:s|n)?\s+a\s+ganar\b",
+    r"\bverificad[oa]s?\b",
+    r"\bcertificad[oa]s?\b",
+    r"\bcertificado\s+de\s+rentabilidad\b",
+    r"\baprobad[oa]s?\b",
+    r"\bpasar[áa]s\b",
+    r"\bsuperar[áa]s\b",
+    r"\bva(?:s|n)?\s+a\s+(?:pasar|superar|aprobar)\b",
 )
+
+#: English endorsement and pass-the-challenge wording the V9 list lacks.
+ENGLISH_ENDORSEMENT_PATTERNS: tuple[str, ...] = (
+    r"\bverified\s+(?:track\s+record|results?|returns?|profits?|performance)\b",
+    r"\bcertified\b",
+    r"\bapproved\b",
+    r"\byou(?:'ll|\s+will)\s+pass\b",
+    r"\bguaranteed\s+to\s+pass\b",
+)
+
+#: Patterns that do not count when one of the two preceding words is a
+#: negation: the claim is being denied, not made.
+NEGATABLE_PATTERNS: frozenset[str] = frozenset(
+    {
+        r"\bgaranti[sz]a(?:do|da|dos|das|mos|n)?\b",
+        r"\bverificad[oa]s?\b",
+        r"\bcertificad[oa]s?\b",
+        r"\baprobad[oa]s?\b",
+        r"\bcertified\b",
+        r"\bapproved\b",
+    }
+)
+NEGATIONS: frozenset[str] = frozenset({"no", "not", "never", "nunca", "sin", "ni", "nor"})
 
 CONTEXT = "in_sample_backtest"
 SOURCE = "audit_report"
@@ -41,11 +78,20 @@ class AuditReportError(RuntimeError):
     """Raised when the audit's own text contains a profit claim."""
 
 
-def _spanish_findings(text: str, *, source: str) -> list[dict[str, Any]]:
+def _negated(lowered: str, start: int) -> bool:
+    preceding = re.findall(r"[^\W\d_]+", lowered[max(0, start - 40) : start])
+    return any(word in NEGATIONS for word in preceding[-2:])
+
+
+def _pattern_findings(
+    text: str, patterns: tuple[str, ...], *, source: str, language: str
+) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     lowered = text.lower()
-    for pattern in SPANISH_CLAIM_PATTERNS:
+    for pattern in patterns:
         for match in re.finditer(pattern, lowered):
+            if pattern in NEGATABLE_PATTERNS and _negated(lowered, match.start()):
+                continue
             start = max(0, match.start() - 60)
             end = min(len(text), match.end() + 60)
             findings.append(
@@ -54,7 +100,7 @@ def _spanish_findings(text: str, *, source: str) -> list[dict[str, Any]]:
                     "pattern": pattern,
                     "context": CONTEXT,
                     "reason": (
-                        f"{source}: a profit claim (Spanish) appears in a {CONTEXT} context, "
+                        f"{source}: a profit claim ({language}) appears in a {CONTEXT} context, "
                         "which carries no realized, reconciled money"
                     ),
                 }
@@ -68,7 +114,12 @@ def find_claims(text: str, *, source: str = SOURCE) -> list[dict[str, Any]]:
         finding.to_dict()
         for finding in scan_for_unsupported_claims(text, source=source, context=CONTEXT)
     ]
-    return english + _spanish_findings(text, source=source)
+    english += _pattern_findings(
+        text, ENGLISH_ENDORSEMENT_PATTERNS, source=source, language="English"
+    )
+    return english + _pattern_findings(
+        text, SPANISH_CLAIM_PATTERNS, source=source, language="Spanish"
+    )
 
 
 def assert_report_clean(*texts: str) -> None:
@@ -92,6 +143,8 @@ def scan_client_text(description: str) -> list[dict[str, Any]]:
 
 __all__ = [
     "CONTEXT",
+    "ENGLISH_ENDORSEMENT_PATTERNS",
+    "NEGATABLE_PATTERNS",
     "SPANISH_CLAIM_PATTERNS",
     "AuditReportError",
     "assert_report_clean",

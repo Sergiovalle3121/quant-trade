@@ -22,6 +22,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
+from pydantic import ValidationError
+
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.pages import error_page, landing
 from quant_trade.audit.report import render
@@ -34,6 +36,89 @@ CheckoutFactory = Callable[[AuditSettings, str, str], str]
 
 STRIPE_TOLERANCE_SECONDS = 300
 _EMAIL_MAX = 254
+
+#: Every message the service itself shows, in both locales. Parse errors
+#: carry their own Spanish text (``ParseError.localized``).
+MESSAGES: dict[str, dict[str, str]] = {
+    "consent_required": {
+        "es": "Tienes que aceptar las condiciones para enviar la auditoría.",
+        "en": "You must accept the terms to submit the audit.",
+    },
+    "rate_limited": {
+        "es": "Demasiadas auditorías desde esta dirección en la última hora; inténtalo más tarde.",
+        "en": "Too many audits from this address in the last hour; try again later.",
+    },
+    "too_large": {
+        "es": "El archivo {what} supera el límite de {limit} bytes.",
+        "en": "The {what} file exceeds {limit} bytes.",
+    },
+    "equity_required": {
+        "es": "Falta el archivo de la curva de equity: es obligatorio.",
+        "en": "The equity file is required.",
+    },
+    "invalid_declared": {
+        "es": (
+            "Algún dato declarado no es válido: el número de intentos debe ser 1 o más, "
+            "el coste no puede ser negativo, la descripción tiene como máximo 2000 caracteres "
+            "y la fecha fuera de muestra va como AAAA-MM-DD."
+        ),
+        "en": (
+            "A declared field is invalid: trials must be 1 or more, the cost cannot be "
+            "negative, the description is at most 2000 characters and the out-of-sample "
+            "date is YYYY-MM-DD."
+        ),
+    },
+    "invalid_form": {
+        "es": (
+            "El formulario llegó incompleto o con un valor no válido; revísalo y vuelve a enviarlo."
+        ),
+        "en": "The form arrived incomplete or with an invalid value; check it and submit again.",
+    },
+    "invalid_upload": {
+        "es": "No se pudo auditar lo que subiste tal como está; revisa el formato de los archivos.",
+        "en": "What you uploaded could not be audited as supplied; check the file format.",
+    },
+    "invalid_email": {
+        "es": "Esa dirección de correo no parece válida.",
+        "en": "That e-mail address does not look valid.",
+    },
+    "not_found": {
+        "es": "No encontramos esa auditoría. Revisa que el enlace esté completo.",
+        "en": "We could not find that audit. Check that the link is complete.",
+    },
+    "purged": {
+        "es": "Esta auditoría se borró al cumplirse el plazo de conservación.",
+        "en": "This audit was deleted when its retention period ended.",
+    },
+    "payment_required": {
+        "es": "El detalle completo de esta auditoría requiere el pago.",
+        "en": "The full detail of this audit requires payment.",
+    },
+    "payments_disabled": {
+        "es": "Los pagos no están activados en este servicio.",
+        "en": "Payments are not enabled on this service.",
+    },
+}
+
+#: The file names as the error sentences use them.
+UPLOAD_NAMES: dict[str, dict[str, str]] = {
+    "equity": {"es": "de la curva de equity", "en": "equity"},
+    "trades": {"es": "de operaciones", "en": "trades"},
+    "benchmark": {"es": "del benchmark", "en": "benchmark"},
+    "variants": {"es": "de variantes", "en": "variants"},
+}
+
+
+def message(key: str, locale: str, **values: Any) -> str:
+    """The service's own message ``key`` in ``locale`` (Spanish by default)."""
+    texts = MESSAGES[key]
+    return texts.get(locale, texts["es"]).format(**values)
+
+
+class UploadTooLarge(Exception):
+    def __init__(self, what: str) -> None:
+        super().__init__(what)
+        self.what = what
 
 
 def hash_token(token: str) -> str:
@@ -106,11 +191,35 @@ def stripe_checkout(settings: AuditSettings, audit_id: str, token: str) -> str:
     return str(session.url)
 
 
-def _client_ip(request: Any) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()[:64]
-    return (request.client.host if request.client else "unknown")[:64]
+def client_ip(
+    forwarded_for: str | None, socket_host: str | None, *, trusted_proxy_hops: int
+) -> str:
+    """The address the rate limit counts.
+
+    With no trusted proxy the header is client-controlled and ignored. Each
+    trusted proxy appends the address it received the request from, so the
+    N-th entry from the right is the first one a trusted hop wrote; anything
+    to its left is whatever the client chose to send. When the header is
+    shorter than the hop count, the request did not come through the
+    expected proxies and the socket address is used.
+    """
+    fallback = (socket_host or "unknown")[:64]
+    if trusted_proxy_hops <= 0 or not forwarded_for:
+        return fallback
+    entries = [entry.strip() for entry in forwarded_for.split(",")]
+    if len(entries) < trusted_proxy_hops:
+        return fallback
+    chosen = entries[-trusted_proxy_hops]
+    return chosen[:64] if chosen else fallback
+
+
+def _client_ip(request: Any, trusted_proxy_hops: int) -> str:
+    return client_ip(
+        # Repeated headers are one list per RFC 9110; the proxy's entry is last.
+        ", ".join(request.headers.getlist("x-forwarded-for")),
+        request.client.host if request.client else None,
+        trusted_proxy_hops=trusted_proxy_hops,
+    )
 
 
 def _wants_json(request: Any) -> bool:
@@ -125,7 +234,10 @@ def _valid_email(value: str) -> bool:
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+        from fastapi.exceptions import RequestValidationError
         from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+        from starlette.concurrency import run_in_threadpool
+        from starlette.exceptions import HTTPException as StarletteHTTPException
     except ImportError as exc:
         raise ImportError(REQUIRE_WEB) from exc
 
@@ -157,6 +269,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return JSONResponse({"error": message}, status_code=status)
         return HTMLResponse(error_page(message, locale=locale), status_code=status)
 
+    def _not_found() -> HTTPException:
+        return HTTPException(status_code=404, detail="not_found")
+
+    @app.exception_handler(RequestValidationError)
+    async def form_error(request: Request, exc: RequestValidationError) -> Response:
+        locale = _locale(request.query_params.get("lang"))
+        return _html_error(request, 400, message("invalid_form", locale), locale)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, exc: StarletteHTTPException) -> Response:
+        # Route errors carry a MESSAGES key as detail; anything else (a
+        # FastAPI-generated 404 or 405) is shown as the generic not-found.
+        key = str(exc.detail) if str(exc.detail) in MESSAGES else "not_found"
+        if exc.status_code == 400 and request.url.path.startswith("/webhooks/"):
+            return JSONResponse({"error": str(exc.detail)}, status_code=400)
+        locale = _locale(request.query_params.get("lang"))
+        return _html_error(request, exc.status_code, message(key, locale), locale)
+
     async def _read_limited(upload: UploadFile | None, *, what: str) -> bytes | None:
         if upload is None or not upload.filename:
             return None
@@ -168,10 +298,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 break
             size += len(chunk)
             if size > cfg.max_upload_bytes:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"the {what} file exceeds {cfg.max_upload_bytes:,} bytes",
-                )
+                raise UploadTooLarge(what)
             chunks.append(chunk)
         data = b"".join(chunks)
         return data or None
@@ -187,12 +314,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/", response_class=HTMLResponse)
     def index(lang: str | None = None, joined: int = 0, error: str | None = None) -> str:
+        locale = _locale(lang)
+        # Only known codes are shown, so the query string cannot inject text.
+        shown = message("invalid_email", locale) if error == "email" else None
         return landing(
-            locale=_locale(lang),
+            locale=locale,
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             joined=bool(joined),
-            error=error,
+            error=shown,
         )
 
     @app.post("/waitlist")
@@ -203,55 +333,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         db.add_waitlist(email, at=datetime.now(UTC))
         return RedirectResponse(f"/?lang={locale}&joined=1", status_code=303)
 
-    @app.post("/audits")
-    async def create_audit(
-        request: Request,
-        equity: Annotated[UploadFile, File()],
-        trades: Annotated[UploadFile | None, File()] = None,
-        benchmark: Annotated[UploadFile | None, File()] = None,
-        variants: Annotated[UploadFile | None, File()] = None,
-        trials: Annotated[int, Form()] = 1,
-        cost_bps: Annotated[float, Form()] = 0.0,
-        oos_start: Annotated[str, Form()] = "",
-        description: Annotated[str, Form()] = "",
-        benchmark_applicable: Annotated[str, Form()] = "yes",
-        locale: Annotated[str, Form()] = "es",
-        consent: Annotated[str, Form()] = "",
-    ) -> Response:
-        loc = _locale(locale)
-        if consent.lower() not in ("on", "yes", "true", "1"):
-            return _html_error(request, 400, "consent is required", loc)
-        ip = _client_ip(request)
-        since = datetime.now(UTC) - timedelta(hours=1)
-        if db.count_uploads_since(ip, since) >= cfg.max_uploads_per_hour_per_ip:
-            return _html_error(request, 429, "too many audits from this address; try later", loc)
-        try:
-            equity_bytes = await _read_limited(equity, what="equity")
-            trades_bytes = await _read_limited(trades, what="trades")
-            benchmark_bytes = await _read_limited(benchmark, what="benchmark")
-            variants_bytes = await _read_limited(variants, what="variants")
-        except HTTPException as exc:
-            return _html_error(request, exc.status_code, str(exc.detail), loc)
-        if not equity_bytes:
-            return _html_error(request, 400, "the equity file is required", loc)
-        try:
-            declared = DeclaredMetadata(
-                trials=trials,
-                cost_bps_per_side=cost_bps,
-                oos_start=oos_start.strip() or None,
-                description=description,
-                benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
-                locale=loc,
-            )
-            inputs = build_inputs(
-                equity_bytes,
-                declared,
-                trades_bytes=trades_bytes,
-                benchmark_bytes=benchmark_bytes,
-                variants_bytes=variants_bytes,
-            )
-        except (ParseError, ValueError) as exc:
-            return _html_error(request, 400, str(exc), loc)
+    def _run_and_store(
+        inputs: Any,
+        ip: str,
+        equity_bytes: bytes,
+        uploads: dict[str, bytes | None],
+    ) -> tuple[str, str]:
+        """The CPU- and IO-bound part of an upload; runs in the thread pool."""
         now = datetime.now(UTC)
         result = run_audit(inputs, bootstrap_samples=cfg.bootstrap_samples, now=now)
         token = secrets.token_urlsafe(32)
@@ -275,14 +363,82 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             overall_class=result.verdict.overall,
             digests=result.inputs["digests"],
             equity_csv=equity_bytes,
-            trades_csv=trades_bytes,
-            benchmark_csv=benchmark_bytes,
-            variants_csv=variants_bytes,
+            trades_csv=uploads["trades"],
+            benchmark_csv=uploads["benchmark"],
+            variants_csv=uploads["variants"],
         )
-        location = f"/audits/{result.audit_id}?token={token}"
+        return result.audit_id, token
+
+    @app.post("/audits")
+    async def create_audit(
+        request: Request,
+        equity: Annotated[UploadFile | None, File()] = None,
+        trades: Annotated[UploadFile | None, File()] = None,
+        benchmark: Annotated[UploadFile | None, File()] = None,
+        variants: Annotated[UploadFile | None, File()] = None,
+        trials: Annotated[int, Form()] = 1,
+        cost_bps: Annotated[float, Form()] = 0.0,
+        oos_start: Annotated[str, Form()] = "",
+        description: Annotated[str, Form()] = "",
+        benchmark_applicable: Annotated[str, Form()] = "yes",
+        locale: Annotated[str, Form()] = "es",
+        consent: Annotated[str, Form()] = "",
+    ) -> Response:
+        loc = _locale(locale)
+        if consent.lower() not in ("on", "yes", "true", "1"):
+            return _html_error(request, 400, message("consent_required", loc), loc)
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        since = datetime.now(UTC) - timedelta(hours=1)
+        recent = await run_in_threadpool(db.count_uploads_since, ip, since)
+        if recent >= cfg.max_uploads_per_hour_per_ip:
+            return _html_error(request, 429, message("rate_limited", loc), loc)
+        try:
+            uploads = {
+                "equity": await _read_limited(equity, what="equity"),
+                "trades": await _read_limited(trades, what="trades"),
+                "benchmark": await _read_limited(benchmark, what="benchmark"),
+                "variants": await _read_limited(variants, what="variants"),
+            }
+        except UploadTooLarge as exc:
+            text = message(
+                "too_large",
+                loc,
+                what=UPLOAD_NAMES[exc.what][loc],
+                limit=f"{cfg.max_upload_bytes:,}",
+            )
+            return _html_error(request, 413, text, loc)
+        equity_bytes = uploads["equity"]
+        if not equity_bytes:
+            return _html_error(request, 400, message("equity_required", loc), loc)
+        try:
+            declared = DeclaredMetadata(
+                trials=trials,
+                cost_bps_per_side=cost_bps,
+                oos_start=oos_start.strip() or None,
+                description=description,
+                benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
+                locale=loc,
+            )
+        except ValidationError:
+            return _html_error(request, 400, message("invalid_declared", loc), loc)
+        try:
+            inputs = await run_in_threadpool(
+                build_inputs,
+                equity_bytes,
+                declared,
+                trades_bytes=uploads["trades"],
+                benchmark_bytes=uploads["benchmark"],
+                variants_bytes=uploads["variants"],
+            )
+        except ParseError as exc:
+            return _html_error(request, 400, exc.localized(loc), loc)
+        except ValueError:
+            return _html_error(request, 400, message("invalid_upload", loc), loc)
+        audit_id, token = await run_in_threadpool(_run_and_store, inputs, ip, equity_bytes, uploads)
+        location = f"/audits/{audit_id}?token={token}"
         if _wants_json(request):
             return JSONResponse(
-                {"audit_id": result.audit_id, "token": token, "location": location},
+                {"audit_id": audit_id, "token": token, "location": location},
                 status_code=201,
             )
         return RedirectResponse(location, status_code=303)
@@ -290,9 +446,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _load(audit_id: str, token: str | None) -> Any:
         record = db.get_audit(audit_id)
         if record is None or not token_matches(record.token_hash, token):
-            raise HTTPException(status_code=404, detail="not found")
+            raise _not_found()
         if record.purged_at or not record.result_json:
-            raise HTTPException(status_code=410, detail="this audit was purged")
+            raise HTTPException(status_code=410, detail="purged")
         return record
 
     def _report_html(record: Any, token: str) -> str:
@@ -313,7 +469,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def audit_json(audit_id: str, token: str | None = None) -> Response:
         record = _load(audit_id, token)
         if not record.paid and not cfg.free_mode:
-            return JSONResponse({"error": "payment required"}, status_code=402)
+            raise HTTPException(status_code=402, detail="payment_required")
         return Response(content=record.result_json, media_type="application/json")
 
     @app.get("/audits/{audit_id}", response_class=HTMLResponse)
@@ -325,7 +481,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def checkout(audit_id: str, token: str | None = None) -> Response:
         record = _load(audit_id, token)
         if not cfg.stripe_enabled:
-            return JSONResponse({"error": "payments are not enabled"}, status_code=503)
+            raise HTTPException(status_code=503, detail="payments_disabled")
         if record.paid:
             return RedirectResponse(f"/audits/{audit_id}?token={token}", status_code=303)
         factory: CheckoutFactory = app.state.checkout_factory
@@ -335,7 +491,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.post("/webhooks/stripe")
     async def stripe_webhook(request: Request) -> Response:
         if not cfg.stripe_configured:
-            raise HTTPException(status_code=404, detail="not found")
+            raise _not_found()
         payload = await request.body()
         header = request.headers.get("stripe-signature")
         if not verify_stripe_signature(payload, header, cfg.stripe_webhook_secret):
@@ -348,7 +504,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = event.get("data", {}).get("object", {})
             audit_id = str((session.get("metadata") or {}).get("audit_id") or "")
             if audit_id:
-                db.mark_paid(
+                await run_in_threadpool(
+                    db.mark_paid,
                     audit_id,
                     stripe_session_id=str(session.get("id", "")),
                     at=datetime.now(UTC),
@@ -359,7 +516,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
 
 __all__ = [
+    "MESSAGES",
+    "client_ip",
     "create_app",
+    "message",
     "hash_token",
     "sign_stripe_payload",
     "stripe_checkout",

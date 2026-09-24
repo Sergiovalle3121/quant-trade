@@ -28,6 +28,18 @@ from quant_trade.audit.guard import (
         "this strategy is profitable",
         "it makes money every week",
         "guaranteed returns",
+        "resultados verificados por nuestro equipo",
+        "robot certificado",
+        "certificado de rentabilidad",
+        "estrategia aprobada",
+        "pasarás el reto",
+        "superarás la evaluación",
+        "vas a pasar la fase 1",
+        "a verified track record",
+        "certified strategy",
+        "approved by our analysts",
+        "you will pass the challenge",
+        "you'll pass",
     ],
 )
 def test_claims_are_found(text: str) -> None:
@@ -45,6 +57,13 @@ def test_claims_are_found(text: str) -> None:
         "the trades lose money net at the reference cost",
         "out of sample the Sharpe ratio is negative",
         "garantía de calidad de datos: sin duplicados",
+        "DECLARED lo afirmó el cliente y no se pudo verificar",
+        "Auditoría estadística de datos aportados – no verificados con el bróker – "
+        "no garantiza resultados",
+        "Statistical audit of supplied data – not verified with a broker – "
+        "not a performance guarantee",
+        "este informe no está certificado ni aprobado por ningún bróker",
+        "this report is not certified",
     ],
 )
 def test_neutral_text_passes(text: str) -> None:

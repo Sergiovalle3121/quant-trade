@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from quant_trade.audit.settings import AuditSettings, normalise_database_url
 
 STRIPE = {
@@ -46,3 +48,13 @@ def test_database_url_normalisation_and_base_url() -> None:
     )
     assert settings.database_kind == "postgresql"
     assert settings.base_url == "https://audit.example"
+
+
+def test_trusted_proxy_hops_defaults_to_zero_and_reads_the_environment() -> None:
+    assert AuditSettings.from_env({}).trusted_proxy_hops == 0
+    assert AuditSettings.from_env({"AUDIT_TRUSTED_PROXY_HOPS": ""}).trusted_proxy_hops == 0
+    assert AuditSettings.from_env({"AUDIT_TRUSTED_PROXY_HOPS": "1"}).trusted_proxy_hops == 1
+    with pytest.raises(ValueError):
+        AuditSettings.from_env({"AUDIT_TRUSTED_PROXY_HOPS": "-1"})
+    with pytest.raises(ValueError):
+        AuditSettings(trusted_proxy_hops=11)
