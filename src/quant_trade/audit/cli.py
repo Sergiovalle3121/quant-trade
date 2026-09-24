@@ -57,7 +57,7 @@ def _read(path: Path | None, *, what: str) -> bytes | None:
 def _print_verdict(payload: dict[str, Any]) -> None:
     console = Console()
     verdict = payload["verdict"]
-    table = Table(title=f"Backtest audit · class {verdict['overall']}")
+    table = Table(title=f"Contraprueba · class {verdict['overall']}")
     table.add_column("dimension")
     table.add_column("status")
     table.add_column("reasons")

@@ -19,7 +19,15 @@ from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 
 LOCALES: tuple[str, ...] = ("es", "en")
 
-SITE_NAME: dict[str, str] = {"es": "Auditoría de backtests", "en": "Backtest audit"}
+#: The product name. It shows on every page, report and badge, so it must pass
+#: the profit-claim guard and never suggest verification, certification,
+#: approval, earnings or passing a challenge.
+BRAND = "Contraprueba"
+TAGLINE: dict[str, str] = {
+    "es": "Auditoría estadística independiente de backtests",
+    "en": "Independent statistical backtest audit",
+}
+SITE_NAME: dict[str, str] = {locale: f"{BRAND} · {TAGLINE[locale]}" for locale in TAGLINE}
 OG_LOCALE: dict[str, str] = {"es": "es_ES", "en": "en_US"}
 
 NOINDEX = "noindex, nofollow"
@@ -123,11 +131,13 @@ def sitemap_xml(base_url: str) -> str:
 
 
 __all__ = [
+    "BRAND",
     "DISALLOWED_PATHS",
     "NOINDEX",
     "OG_LOCALE",
     "PUBLIC_PAGES",
     "SITE_NAME",
+    "TAGLINE",
     "PageMeta",
     "head_meta",
     "page_paths",

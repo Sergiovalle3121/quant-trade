@@ -23,7 +23,7 @@ from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
-from quant_trade.audit.seo import PageMeta, head_meta, page_paths, private_meta
+from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.verdict import class_text, meaning
 
 #: The fixed wording of the badge and of the verification page's notice. It
@@ -98,6 +98,7 @@ background:#eee;color:#333}.steps li{margin:.3em 0}
 .prices div{border:1px solid #ddd;border-radius:8px;padding:10px 14px}
 @media (max-width:640px){.prices{grid-template-columns:1fr}}
 details{border-bottom:1px solid #eee;padding:.4em 0}summary{font-weight:600;cursor:pointer}
+.brand{margin:0 0 .6em}.brand a{font-weight:800;font-size:1.15rem;color:#1a1a1a}
 pre{white-space:pre-wrap;word-break:break-all;background:#f7f7f7;padding:8px 10px;border-radius:6px}
 @media (max-width:640px){.grid{grid-template-columns:1fr}}
 img,svg{max-width:100%;height:auto}
@@ -106,7 +107,7 @@ img,svg{max-width:100%;height:auto}
 
 _COPY: dict[str, dict[str, Any]] = {
     "es": {
-        "title": "Auditoría de backtests",
+        "title": "Contraprueba · Auditoría de backtests",
         "headline": "Sube tu backtest. Te decimos si es estadísticamente real.",
         "pitch": (
             "La mayoría de los backtests que lucen bien en papel fallan en real por sobreajuste, "
@@ -290,7 +291,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "access_code_help": "Si compraste un código, escríbelo y el informe nace completo.",
     },
     "en": {
-        "title": "Backtest audit",
+        "title": "Contraprueba · Backtest audit",
         "headline": "Upload your backtest. We tell you whether it is statistically real.",
         "pitch": (
             "Most backtests that look good on paper fail live through overfitting, uncounted "
@@ -498,6 +499,16 @@ def _head(title: str, locale: str, meta_html: str = "") -> str:
         f"<!doctype html><html lang='{_e(locale)}'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>{_e(title)}</title>{meta_html}<style>{_CSS}</style></head><body>"
+        + _brand_bar(locale)
+    )
+
+
+def _brand_bar(locale: str) -> str:
+    home = "/en" if locale == "en" else "/"
+    tagline = TAGLINE.get(locale, TAGLINE["es"])
+    return (
+        f"<p class='brand'><a href='{home}'>{_e(BRAND)}</a> "
+        f"<span class='muted'>· {_e(tagline)}</span></p>"
     )
 
 
@@ -792,7 +803,7 @@ def verification_page(
 def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "es") -> str:
     """The badge: class, id, date and the fixed notice. Never a return figure."""
     locale = locale if locale in BADGE_NOTICE else "es"
-    title = "Auditoría de backtest" if locale == "es" else "Backtest audit"
+    title = BRAND
     label = "Clase" if locale == "es" else "Class"
     colour = CLASS_COLOURS.get(overall, "#333")
     notice = BADGE_NOTICE[locale]

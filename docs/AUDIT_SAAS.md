@@ -7,6 +7,12 @@ tooling sold as a second opinion. It is not investment advice, it executes
 nothing, it holds no funds and no keys, and it never claims that money was
 or will be made. The profit-claim guard refuses any report that does.
 
+The public name is **Contraprueba** (Spanish for an independent second test
+that confirms or refutes the first). `seo.BRAND` and `seo.TAGLINE` hold it; it
+shows in every page head, report title and badge. A new name must pass the
+guard in both languages and must not suggest verification, certification,
+approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
+
 ## What the client uploads
 
 | File | Required | Columns (aliases accepted, case-insensitive) |
