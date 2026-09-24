@@ -87,6 +87,33 @@ def http_get(url: str, *, timeout_seconds: float = 20.0) -> tuple[int, bytes, di
         return int(response.status), bytes(response.read()), headers
 
 
+class ChecksumMismatch(RuntimeError):
+    """An archive file's bytes differ from the venue's own published SHA-256."""
+
+
+def binance_archive_get(
+    url: str, *, timeout_seconds: float = 60.0
+) -> tuple[int, bytes, dict[str, str]]:
+    """GET one Binance archive ZIP and check it against the venue's checksum.
+
+    ``data.binance.vision`` publishes ``<file>.CHECKSUM`` beside every file,
+    holding the SHA-256 the venue computed. A file is accepted only when its
+    bytes hash to that value, so an archived page is exactly what the venue
+    published — not merely what the transport happened to deliver.
+    """
+    status, raw, headers = http_get(url, timeout_seconds=timeout_seconds)
+    if status != 200:
+        return status, raw, headers
+    _, checksum_raw, _ = http_get(url + ".CHECKSUM", timeout_seconds=timeout_seconds)
+    published = checksum_raw.decode("utf-8").split()[0].strip().lower()
+    actual = sha256_of_bytes(raw)
+    if published != actual:
+        raise ChecksumMismatch(
+            f"{url}: bytes hash to {actual}, venue CHECKSUM publishes {published}"
+        )
+    return status, raw, headers
+
+
 class RateLimiter:
     """Minimum-interval pacer. Read-only research traffic stays polite."""
 
@@ -532,6 +559,12 @@ def _walk_series(
     return result, rows_by_ts
 
 
+def _default_fetcher(venue: str) -> Fetcher:
+    if venue == "binance":
+        return lambda url: binance_archive_get(url)
+    return lambda url: http_get(url)
+
+
 def run_backfill(
     request: BackfillRequest,
     evidence_root: str | Path,
@@ -557,7 +590,7 @@ def run_backfill(
     session = _Session(
         directory=directory,
         venue=request.venue,
-        fetcher=fetcher or (lambda url: http_get(url)),
+        fetcher=fetcher or _default_fetcher(request.venue),
         limiter=RateLimiter(VENUE_RATE_LIMIT_RPS[request.venue], clock=clock, sleeper=sleeper),
         retry=retry or RetryPolicy(),
         sleeper=sleep,
@@ -577,8 +610,12 @@ def run_backfill(
     )
 
     # The venue's own clock, recorded once and stamped into every receipt.
+    # A source without a clock endpoint (the Binance archive) records none
+    # rather than borrowing another host's.
     time_url = server_time_url(request.venue)
     try:
+        if time_url is None:
+            raise LookupError(f"{request.venue} source publishes no server clock")
         raw_time, _ = session.get(
             time_url,
             _request_key(
@@ -597,6 +634,8 @@ def run_backfill(
     # Instrument metadata (contract terms, funding interval, listing date).
     inst_url = instruments_url(request.venue, request.symbol)
     try:
+        if inst_url is None:
+            raise LookupError(f"{request.venue} source publishes no instrument metadata")
         raw_inst, _ = session.get(
             inst_url,
             _request_key(
@@ -660,12 +699,14 @@ __all__ = [
     "STATUS_PARSE_REJECTED",
     "STATUS_VENUE_ERROR",
     "BackfillRequest",
+    "ChecksumMismatch",
     "BackfillResult",
     "Fetcher",
     "PageArchive",
     "RateLimiter",
     "RetryPolicy",
     "SeriesResult",
+    "binance_archive_get",
     "evidence_dir_for",
     "http_get",
     "run_backfill",

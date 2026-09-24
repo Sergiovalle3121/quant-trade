@@ -1,4 +1,4 @@
-"""Official public endpoints and pure parsers for Bybit and OKX.
+"""Official public endpoints and pure parsers for Bybit, OKX and Binance.
 
 Every URL here is an **official, documented, unauthenticated** market-data
 endpoint of the venue itself. No mirror, no scraper, no third-party
@@ -22,6 +22,15 @@ Parser discipline shared by both venues:
   realized value wins and the choice is recorded per row;
 - timestamps stay integer milliseconds since the UNIX epoch, UTC. No local
   timezone ever enters the pipeline.
+
+Binance is read from its **official public data archive**
+(``data.binance.vision``), not from its REST API. The archive is published by
+the venue itself as monthly ZIP files with a SHA-256 ``.CHECKSUM`` beside each
+one; the backfill refuses a file whose bytes do not match the venue's own
+checksum. It is the only first-party source of multi-year settled funding
+that answers from this research environment: the REST hosts of Bybit and
+Binance refuse the region, and OKX's REST funding history covers only its
+most recent three months.
 """
 
 from __future__ import annotations
@@ -54,15 +63,18 @@ OKX_FUNDING_URL = f"{OKX_HOST}/api/v5/public/funding-rate-history"
 OKX_INSTRUMENTS_URL = f"{OKX_HOST}/api/v5/public/instruments"
 OKX_TIME_URL = f"{OKX_HOST}/api/v5/public/time"
 
+BINANCE_ARCHIVE_HOST = "https://data.binance.vision"
+BINANCE_ARCHIVE_DATA = f"{BINANCE_ARCHIVE_HOST}/data"
+
 #: Series a complete carry panel needs from each venue.
 SERIES_KINDS = ("spot", "perp", "mark", "index", "funding")
 
-SUPPORTED_VENUES = ("bybit", "okx")
+SUPPORTED_VENUES = ("bybit", "okx", "binance")
 
 #: Documented public rate limits (requests per second) used to pace the
 #: engine. Deliberately below the published ceiling: this is read-only
 #: research traffic and must never look like an attack.
-VENUE_RATE_LIMIT_RPS = {"bybit": 5.0, "okx": 4.0}
+VENUE_RATE_LIMIT_RPS = {"bybit": 5.0, "okx": 4.0, "binance": 4.0}
 
 
 class IdentityMismatch(ValueError):
@@ -94,6 +106,12 @@ def okx_spot_inst_id(symbol: str) -> str:
 def okx_perp_inst_id(symbol: str) -> str:
     base, quote = parse_symbol(symbol)
     return f"{base}-{quote}-SWAP"
+
+
+def binance_symbol(symbol: str) -> str:
+    """Binance spells spot and USD-M perpetual the same way, e.g. ``BTCUSDT``."""
+    base, quote = parse_symbol(symbol)
+    return f"{base}{quote}"
 
 
 def okx_index_inst_id(symbol: str) -> str:
@@ -341,6 +359,102 @@ def parse_okx_server_time(raw: bytes) -> int:
     return int(payload["data"][0]["ts"])
 
 
+# --- Binance archive parsers -------------------------------------------------
+
+#: A Binance archive timestamp above this is in microseconds, not
+#: milliseconds (the spot archive switched units on 2025-01-01).
+_MICROSECOND_THRESHOLD = 10**14
+
+#: Settlement stamps in the funding archive can carry a few milliseconds of
+#: calculation latency (``...00001``). They are snapped to the minute so a
+#: settlement is identified by its instant, and the raw value is kept.
+_SETTLEMENT_SNAP_MS = 60_000
+
+
+def _binance_csv_rows(raw: bytes, *, expected_prefix: str) -> list[list[str]]:
+    """Open one archive ZIP, check the member name, return data rows.
+
+    The member file is named by the venue (``BTCUSDT-1h-2024-01.csv``,
+    ``BTCUSDT-fundingRate-2024-01.csv``), which is the archive's instrument
+    identity: a file for another symbol is refused rather than relabelled.
+    Older files have no header row and newer ones do; the header is skipped
+    by content, never by position alone.
+    """
+    import csv
+    import io
+    import zipfile
+
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(raw))
+    except zipfile.BadZipFile as exc:
+        raise VenueErrorResponse(f"binance archive payload is not a ZIP file: {exc}") from exc
+    names = archive.namelist()
+    if len(names) != 1:
+        raise VenueErrorResponse(f"binance archive ZIP holds {len(names)} members, expected 1")
+    name = names[0]
+    if not name.startswith(expected_prefix) or not name.endswith(".csv"):
+        raise IdentityMismatch(
+            f"requested {expected_prefix}*.csv, archive carries {name!r} — refusing to relabel"
+        )
+    text = archive.read(name).decode("utf-8")
+    rows = [row for row in csv.reader(io.StringIO(text)) if row]
+    if rows and not rows[0][0].strip().lstrip("-").isdigit():
+        rows = rows[1:]  # header row
+    return rows
+
+
+def _binance_ms(value: str) -> int:
+    stamp = int(value)
+    return stamp // 1000 if stamp >= _MICROSECOND_THRESHOLD else stamp
+
+
+def parse_binance_kline(raw: bytes, *, symbol: str, kind: str) -> list[dict[str, Any]]:
+    """Parse one monthly kline ZIP (spot, USD-M perp, mark or index)."""
+    native = binance_symbol(symbol)
+    rows: list[dict[str, Any]] = []
+    for entry in _binance_csv_rows(raw, expected_prefix=f"{native}-"):
+        row: dict[str, Any] = {
+            "start_ms": _binance_ms(entry[0]),
+            "open": float(entry[1]),
+            "high": float(entry[2]),
+            "low": float(entry[3]),
+            "close": float(entry[4]),
+        }
+        if kind in ("spot", "perp") and len(entry) >= 8:
+            row["volume"] = float(entry[5])
+            row["quote_volume"] = float(entry[7])
+        _validate_ohlc(row, venue="binance", kind=kind)
+        rows.append(row)
+    rows.sort(key=lambda r: r["start_ms"])
+    return rows
+
+
+def parse_binance_funding(raw: bytes, *, symbol: str, **_: Any) -> list[dict[str, Any]]:
+    """Parse one monthly ``fundingRate`` ZIP of settled USD-M funding.
+
+    ``last_funding_rate`` is the rate that settled at ``calc_time``; the
+    archive publishes no announced/predicted value, so nothing announced can
+    leak into realized P&L.
+    """
+    native = binance_symbol(symbol)
+    rows: list[dict[str, Any]] = []
+    for entry in _binance_csv_rows(raw, expected_prefix=f"{native}-fundingRate-"):
+        calc_ms = int(entry[0])
+        snapped = int(round(calc_ms / _SETTLEMENT_SNAP_MS)) * _SETTLEMENT_SNAP_MS
+        rows.append(
+            {
+                "settled_at_ms": snapped,
+                "calc_time_ms": calc_ms,
+                "rate": float(entry[2]),
+                "rate_field": "last_funding_rate",
+                "funding_interval_hours": float(entry[1]),
+                "instrument": native,
+            }
+        )
+    rows.sort(key=lambda r: r["settled_at_ms"])
+    return rows
+
+
 def _validate_ohlc(row: dict[str, Any], *, venue: str, kind: str) -> None:
     for name in ("open", "high", "low", "close"):
         value = float(row[name])
@@ -374,6 +488,8 @@ class SeriesSpec:
     parse: Callable[..., list[dict[str, Any]]]
 
     def native_instrument(self, symbol: str) -> str:
+        if self.venue == "binance":
+            return binance_symbol(symbol)
         if self.venue == "bybit":
             return bybit_spot_symbol(symbol) if self.kind == "spot" else bybit_perp_symbol(symbol)
         if self.kind == "spot":
@@ -429,7 +545,61 @@ def _okx_funding_url(*, symbol: str, cursor_ms: int, **_: Any) -> str:
     return f"{OKX_FUNDING_URL}?instId={okx_perp_inst_id(symbol)}&after={cursor_ms + 1}&limit=100"
 
 
+#: Archive path per series, relative to ``BINANCE_ARCHIVE_DATA``.
+_BINANCE_ARCHIVE_PATHS = {
+    "spot": "spot/monthly/klines",
+    "perp": "futures/um/monthly/klines",
+    "mark": "futures/um/monthly/markPriceKlines",
+    "index": "futures/um/monthly/indexPriceKlines",
+    "funding": "futures/um/monthly/fundingRate",
+}
+_BINANCE_INTERVALS = {1: "1m", 5: "5m", 15: "15m", 30: "30m", 60: "1h", 240: "4h", 1440: "1d"}
+
+
+def binance_interval(interval_minutes: int) -> str:
+    try:
+        return _BINANCE_INTERVALS[interval_minutes]
+    except KeyError as exc:
+        raise ValueError(
+            f"binance does not archive a {interval_minutes}m kline; "
+            f"supported: {sorted(_BINANCE_INTERVALS)}"
+        ) from exc
+
+
+def _month_of(cursor_ms: int) -> str:
+    import time
+
+    return time.strftime("%Y-%m", time.gmtime(cursor_ms / 1000.0))
+
+
+def _binance_archive_url(*, symbol: str, kind: str, cursor_ms: int, interval_minutes: int) -> str:
+    """The monthly file containing ``cursor_ms``.
+
+    The engine walks backwards: after a month is parsed its oldest row sits
+    on the first bar of the month, so the next cursor falls in the previous
+    month and the walk proceeds one file at a time.
+    """
+    native = binance_symbol(symbol)
+    month = _month_of(cursor_ms)
+    base = f"{BINANCE_ARCHIVE_DATA}/{_BINANCE_ARCHIVE_PATHS[kind]}/{native}"
+    if kind == "funding":
+        return f"{base}/{native}-fundingRate-{month}.zip"
+    interval = binance_interval(interval_minutes)
+    return f"{base}/{interval}/{native}-{interval}-{month}.zip"
+
+
 def _series(venue: str, kind: str) -> SeriesSpec:
+    if venue == "binance":
+        return SeriesSpec(
+            venue="binance",
+            kind=kind,
+            endpoint=f"{BINANCE_ARCHIVE_DATA}/{_BINANCE_ARCHIVE_PATHS[kind]}",
+            page_limit=0,  # one calendar month per file
+            timestamp_field="settled_at_ms" if kind == "funding" else "start_ms",
+            identity_verifiable=True,  # the ZIP member name carries the symbol
+            build_url=_binance_archive_url,
+            parse=parse_binance_funding if kind == "funding" else parse_binance_kline,
+        )
     if venue == "bybit":
         if kind == "funding":
             return SeriesSpec(
@@ -499,13 +669,22 @@ def series_identity_verifiable(venue: str, kind: str) -> bool:
     return series_spec(venue, kind).identity_verifiable
 
 
-def instruments_url(venue: str, symbol: str) -> str:
+def instruments_url(venue: str, symbol: str) -> str | None:
+    """Contract-metadata endpoint, or ``None`` where the venue source has none.
+
+    The Binance archive carries no instrument or clock endpoint, and the
+    Binance REST API refuses this region, so neither is fetched for it.
+    """
+    if venue == "binance":
+        return None
     if venue == "bybit":
         return f"{BYBIT_INSTRUMENTS_URL}?category=linear&symbol={bybit_perp_symbol(symbol)}"
     return f"{OKX_INSTRUMENTS_URL}?instType=SWAP&instId={okx_perp_inst_id(symbol)}"
 
 
-def server_time_url(venue: str) -> str:
+def server_time_url(venue: str) -> str | None:
+    if venue == "binance":
+        return None
     return BYBIT_TIME_URL if venue == "bybit" else OKX_TIME_URL
 
 
@@ -527,12 +706,16 @@ __all__ = [
     "IdentityMismatch",
     "SeriesSpec",
     "VenueErrorResponse",
+    "binance_interval",
+    "binance_symbol",
     "bybit_perp_symbol",
     "bybit_spot_symbol",
     "instruments_url",
     "okx_index_inst_id",
     "okx_perp_inst_id",
     "okx_spot_inst_id",
+    "parse_binance_funding",
+    "parse_binance_kline",
     "parse_bybit_funding",
     "parse_bybit_instruments",
     "parse_bybit_kline",

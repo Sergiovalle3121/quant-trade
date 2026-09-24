@@ -108,6 +108,9 @@ def test_only_official_venue_and_marketplace_hosts_appear() -> None:
         "api.bybit.nl",
         "aws.okx.com",
         "my.okx.com",
+        # Binance's own published archive and fee schedule page.
+        "data.binance.vision",
+        "www.binance.com",
     }
     found: set[str] = set()
     for path in sorted(Path("src/quant_trade/v8").glob("*.py")):

@@ -98,6 +98,14 @@ INSTRUMENT_SEED_METADATA: dict[tuple[str, str], dict[str, Any]] = {
         "quote_asset": "USDT",
         "settlement_asset": "USDT",
     },
+    ("binance", "BTC"): {
+        "native_spot_symbol": "BTCUSDT",
+        "native_perp_symbol": "BTCUSDT",
+        "funding_interval_hours": 8.0,
+        "contract_type": "linear_perpetual",
+        "quote_asset": "USDT",
+        "settlement_asset": "USDT",
+    },
     ("okx", "ETH"): {
         "native_spot_symbol": "ETH-USDT",
         "native_perp_symbol": "ETH-USDT-SWAP",

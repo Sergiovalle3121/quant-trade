@@ -61,7 +61,7 @@ def probe_network(
 
 @v8_app.command("evidence-backfill")
 def evidence_backfill(
-    venue: Annotated[str, typer.Option(help="bybit or okx.")],
+    venue: Annotated[str, typer.Option(help="bybit, okx or binance (official archive).")],
     symbol: Annotated[str, typer.Option(help="Canonical base, e.g. BTC.")] = "BTC",
     since: Annotated[str, typer.Option(help="ISO-8601 UTC lower bound.")] = "",
     until: Annotated[str, typer.Option(help="ISO-8601 UTC upper bound.")] = "",
