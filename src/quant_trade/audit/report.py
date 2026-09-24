@@ -113,6 +113,7 @@ LABELS: dict[str, dict[str, str]] = {
         "print": "Imprimir / guardar PDF",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
         "redeem_button": "Canjear código",
+        "buy_code": "¿No tienes código? Pídelo aquí",
         "publish": "Publicar verificación pública",
         "publish_help": (
             "Crea una página pública con la clase, las dimensiones y los hashes, y un sello "
@@ -222,6 +223,7 @@ LABELS: dict[str, dict[str, str]] = {
         "print": "Print / save PDF",
         "redeem": "Have an access code? Enter it to see the full report",
         "redeem_button": "Redeem code",
+        "buy_code": "No code yet? Ask for one here",
         "publish": "Publish a public verification",
         "publish_help": (
             "Creates a public page with the class, the dimensions and the hashes, and a badge "
@@ -454,9 +456,13 @@ font-weight:600}
 .publish button{background:#1b5e20;color:#fff;border:0;padding:8px 14px;border-radius:5px;
 font-weight:600;cursor:pointer}
 @media (min-width:760px){.meaning{grid-template-columns:1fr 1fr}}
+img,svg{max-width:100%;height:auto}
+@media (max-width:759px){body{padding:16px}table{display:block;overflow-x:auto}
+.watermark{font-size:2.4rem}}
 @media print{
 .no-print,.paybox,.print-btn,.publish{display:none!important}
 body{max-width:none;padding:0;font-size:11pt}
+table{display:table}
 h2{break-after:avoid;page-break-after:avoid}
 table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
 .badge,.verdict{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -785,6 +791,7 @@ def render_html(
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
+    contact_url: str | None = None,
 ) -> str:
     """The audit as one HTML document.
 
@@ -815,6 +822,13 @@ def render_html(
             "placeholder='AUD-XXXX-XXXX-XXXX'>"
             f"<button type='submit'>{_e(labels['redeem_button'])}</button></form>"
         )
+        if contact_url:
+            # Where a client without a code buys one (bank transfer, WhatsApp).
+            price = f" (USD {price_usd:,.0f})" if price_usd else ""
+            paybox += (
+                f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
+                f"target='_blank'>{_e(labels['buy_code'])}{_e(price)}</a></p>"
+            )
     publish_html = ""
     if publish_url and not locked:
         publish_html = (
@@ -1144,6 +1158,7 @@ def render(
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
+    contact_url: str | None = None,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1155,6 +1170,7 @@ def render(
         redeem_url=redeem_url,
         publish_url=publish_url,
         notice=notice,
+        contact_url=contact_url,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

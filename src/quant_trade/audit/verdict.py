@@ -21,7 +21,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from quant_trade.audit.costs import RecostRow
+from quant_trade.audit.costs import RecostRow, reference_note
 from quant_trade.audit.redflags import RedFlag, flag_title
 from quant_trade.audit.schema import Dimension, Verdict, measured, not_measured
 
@@ -216,6 +216,7 @@ def assess_costs(
     rows: list[RecostRow] | None,
     reference_bps: float | None,
     reference_is_assumption: bool,
+    fees_reported: bool = False,
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Dimension:
     if not rows:
@@ -232,9 +233,7 @@ def assess_costs(
         "reference_bps_per_side": {
             "value": reference_bps,
             "evidence": "DECLARED",
-            "note": "assumed because the client declared zero cost"
-            if reference_is_assumption
-            else "declared by the client",
+            "note": reference_note(reference_is_assumption, fees_reported),
         },
         "net_pnl_at_1x": measured(at_one.net_pnl) if at_one else not_measured("no 1x row"),
         f"net_pnl_at_{multiple}": (
