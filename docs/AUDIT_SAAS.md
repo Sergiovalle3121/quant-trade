@@ -27,7 +27,10 @@ approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
 Plus four declarations: trials tried before choosing this version, cost per
 side in basis points, an out-of-sample start date, and whether a benchmark
-applies. Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
+applies. Trials and cost may be left blank on the web form: blank trials
+means "not declared" (1 is assumed and tagged NOT_MEASURED), blank cost means
+no extra cost beyond what the uploaded report already lists (there is no
+hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
 at least 30 return observations.
 
 ### Importers and their limits
@@ -254,7 +257,8 @@ skipped when the curve was rebuilt from the same report):
 Trials: the deflated Sharpe uses the larger of the declared trials and what
 the files prove (columns of the variants matrix, passes of an MT5
 optimisation export, variants in a vectorbt report); the latter is tagged
-MEASURED. `TRIALS_BELOW_VARIANTS` warns when the declaration is lower.
+MEASURED. `TRIALS_BELOW_VARIANTS` warns when the declaration is lower; it
+stays silent when the customer left trials blank, since nothing was declared.
 
 ## The verdict
 

@@ -142,6 +142,9 @@ class DeclaredMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     trials: int = Field(1, ge=1, le=1_000_000)
+    #: False when the form's trials field was left blank: 1 is then assumed,
+    #: tagged NOT_MEASURED, and never held against the client.
+    trials_declared: bool = True
     cost_bps_per_side: float = Field(0.0, ge=0.0, le=1000.0)
     oos_start: datetime | None = None
     description: str = Field("", max_length=2000)

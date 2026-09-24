@@ -515,7 +515,7 @@ _QUESTIONS: dict[str, dict[str, str]] = {
     },
     "trials": {
         "es": "¿Cuántas combinaciones de parámetros se probaron antes de elegir esta? "
-        "Pida el archivo de optimización.",
+        "Pide el archivo de optimización.",
         "en": "How many parameter combinations were tried before choosing this one? "
         "Ask for the optimisation file.",
     },
@@ -528,13 +528,13 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "Which spread, commission and swap were used? Are they your broker's?",
     },
     "equity_curve": {
-        "es": "Pida la curva de equity (flotante), no solo la de balance: el balance oculta "
+        "es": "Pide la curva de equity (flotante), no solo la de balance: el balance oculta "
         "las pérdidas abiertas.",
         "en": "Ask for the (floating) equity curve, not only the balance: the balance hides "
         "open losses.",
     },
     "trades": {
-        "es": "Pida la lista completa de operaciones cerradas con tamaños, precios y fechas.",
+        "es": "Pide la lista completa de operaciones cerradas con tamaños, precios y fechas.",
         "en": "Ask for the full list of closed trades with sizes, prices and dates.",
     },
     "martingale": {

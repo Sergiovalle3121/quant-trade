@@ -34,6 +34,7 @@ from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
 from quant_trade.audit.schema import (
     DECLARED,
     MEASURED,
+    NOT_MEASURED,
     SCHEMA_VERSION,
     AuditInputs,
     AuditResult,
@@ -177,7 +178,11 @@ def trial_count(inputs: AuditInputs) -> tuple[int, str, str]:
     optimisation export, or the variants a report holds. A declaration of 1
     next to 100 uploaded variants cannot deflate by 1.
     """
-    best = (inputs.declared.trials, DECLARED, "declared by the client")
+    best = (
+        (inputs.declared.trials, DECLARED, "declared by the client")
+        if inputs.declared.trials_declared
+        else (1, NOT_MEASURED, "not declared; 1 assumed")
+    )
     measured_counts = [
         (inputs.optimization_passes, "passes in the MT5 optimisation export"),
         (
@@ -854,7 +859,11 @@ def run_audit(
             ),
         },
         declared={
-            "trials": declared(inputs.declared.trials),
+            "trials": (
+                declared(inputs.declared.trials)
+                if inputs.declared.trials_declared
+                else not_measured("not declared; 1 assumed")
+            ),
             "cost_bps_per_side": declared(inputs.declared.cost_bps_per_side),
             "oos_start": declared(_iso(oos)) if oos is not None else not_measured("not declared"),
             "benchmark_applicable": declared(inputs.declared.benchmark_applicable),

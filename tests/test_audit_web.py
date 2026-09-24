@@ -159,7 +159,7 @@ def test_every_web_error_is_spanish_by_default_and_passes_the_guard(tmp_path: Pa
         data={"consent": "on", "trials": "many"},
     )
     assert not_a_number.status_code == 400
-    assert "formulario" in not_a_number.text
+    assert "número de intentos" in not_a_number.text
     missing = client.get("/audits/nothere?token=x")
     assert missing.status_code == 404
     assert "No encontramos esa auditoría" in missing.text

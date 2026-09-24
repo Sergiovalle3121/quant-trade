@@ -146,8 +146,16 @@ def assess_statistical(
 
 
 TRIAL_SOURCE: dict[str, dict[str, str]] = {
-    "es": {"DECLARED": "declarado(s)", "MEASURED": "contado(s) en los archivos"},
-    "en": {"DECLARED": "declared", "MEASURED": "counted in the files"},
+    "es": {
+        "DECLARED": "declarado(s)",
+        "MEASURED": "contado(s) en los archivos",
+        "NOT_MEASURED": "supuesto(s), sin declarar",
+    },
+    "en": {
+        "DECLARED": "declared",
+        "MEASURED": "counted in the files",
+        "NOT_MEASURED": "assumed, not declared",
+    },
 }
 
 
@@ -466,8 +474,8 @@ _TEXT: dict[str, dict[str, str]] = {
             "produciría el mejor intento sin habilidad."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "Con {trials} intento(s) {trials_source}, el resultado es compatible con haber "
-            "elegido el mejor de varios intentos."
+            "Con {trials} intento(s) {trials_source}, el Sharpe deflactado no llega al umbral: "
+            "si se probaron más configuraciones, el resultado puede venir de elegir la mejor."
         ),
         f"{MULTIPLICITY}.FAIL": (
             "Con {trials} intento(s) {trials_source}, el resultado no supera lo que produciría "
@@ -526,8 +534,8 @@ _TEXT: dict[str, dict[str, str]] = {
             "unskilled trial would produce."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "With {trials} trial(s) {trials_source}, the result is consistent with having "
-            "picked the best of several attempts."
+            "With {trials} trial(s) {trials_source}, the deflated Sharpe misses the bar: if "
+            "more configurations were tried, the result may come from picking the best one."
         ),
         f"{MULTIPLICITY}.FAIL": (
             "With {trials} trial(s) {trials_source}, the result does not exceed what the best "

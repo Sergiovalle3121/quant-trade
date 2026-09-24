@@ -280,7 +280,7 @@ def scan(
                 "no trading cost declared; the cost dimension uses a reference assumption",
             )
         )
-    if variants_columns and declared.trials < variants_columns:
+    if variants_columns and declared.trials_declared and declared.trials < variants_columns:
         flags.append(
             RedFlag(
                 "TRIALS_BELOW_VARIANTS",
