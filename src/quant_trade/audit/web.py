@@ -56,6 +56,8 @@ from quant_trade.evidence.canonical_json import canonical_dumps
 CheckoutFactory = Callable[[AuditSettings, str, str], str]
 
 STRIPE_TOLERANCE_SECONDS = 300
+#: The page languages; Spanish is the default everywhere.
+LOCALES = ("es", "en")
 _EMAIL_MAX = 254
 
 #: Every message the service itself shows, in both locales. Parse errors
@@ -329,7 +331,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return response
 
     def _locale(value: str | None) -> str:
-        return value if value in ("es", "en") else "es"
+        return value if value in LOCALES else "es"
 
     def _html_error(request: Request, status: int, message: str, locale: str) -> Response:
         if _wants_json(request):
@@ -397,6 +399,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             contact_url=cfg.contact_url,
             retention_days=cfg.retention_days,
         )
+
+    @app.get("/en", response_class=HTMLResponse)
+    def index_en() -> str:
+        """A short address to share with English-speaking traders."""
+        return index(lang="en")
 
     @app.post("/waitlist")
     def waitlist(email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es") -> Response:
@@ -552,22 +559,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise HTTPException(status_code=410, detail="purged")
         return record
 
-    def _report_html(record: Any, token: str, *, notice: str | None = None) -> str:
+    def _report_html(record: Any, token: str, locale: str, *, notice: str | None = None) -> str:
         result = AuditResult.model_validate_json(record.result_json)
         unlockable = not record.paid and cfg.stripe_enabled
         redeemable = not record.paid and cfg.access_codes_enabled
         publishable = record.paid or cfg.free_mode
+        base = f"/audits/{record.id}"
+        query = f"?token={token}&lang={locale}"
+        other = "en" if locale == "es" else "es"
         html_text, _ = render(
             result,
             watermark=not record.paid,
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
-            checkout_url=f"/audits/{record.id}/checkout?token={token}" if unlockable else None,
-            redeem_url=f"/audits/{record.id}/redeem?token={token}" if redeemable else None,
-            publish_url=f"/audits/{record.id}/publish?token={token}" if publishable else None,
+            checkout_url=f"{base}/checkout{query}" if unlockable else None,
+            redeem_url=f"{base}/redeem{query}" if redeemable else None,
+            publish_url=f"{base}/publish{query}" if publishable else None,
             notice=notice,
             contact_url=cfg.contact_url if redeemable else None,
             legal_links=True,
+            locale=locale,
+            switch_url=f"{base}?token={token}&lang={other}",
         )
         return html_text
 
@@ -581,16 +593,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return Response(content=record.result_json, media_type="application/json")
 
     @app.get("/audits/{audit_id}", response_class=HTMLResponse)
-    def audit_page(audit_id: str, token: str | None = None, code: str | None = None) -> str:
+    def audit_page(
+        audit_id: str, token: str | None = None, code: str | None = None, lang: str | None = None
+    ) -> str:
         record = _load(audit_id, token)
-        locale = _record_locale(record)
+        locale = _view_locale(record, lang)
         # Only the two known values are shown, so the query cannot inject text.
         notice = None
         if code == "applied" and record.paid:
             notice = message("code_applied", locale)
         elif code == "rejected" and not record.paid:
             notice = message("code_rejected", locale)
-        return _report_html(record, token or "", notice=notice)
+        return _report_html(record, token or "", locale, notice=notice)
 
     def _record_locale(record: Any) -> str:
         try:
@@ -598,24 +612,29 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         except ValueError:
             return "es"
 
+    def _view_locale(record: Any, lang: str | None) -> str:
+        """The page language: ``lang`` when given, else the one chosen at upload."""
+        return _locale(lang) if lang in LOCALES else _record_locale(record)
+
     @app.post("/audits/{audit_id}/redeem")
     def redeem(
         request: Request,
         audit_id: str,
         code: Annotated[str, Form()],
         token: str | None = None,
+        lang: str | None = None,
     ) -> Response:
         record = _load(audit_id, token)
         if not cfg.access_codes_enabled:
             raise HTTPException(status_code=404, detail="codes_disabled")
-        location = f"/audits/{audit_id}?token={token}"
+        locale = _view_locale(record, lang)
+        location = f"/audits/{audit_id}?token={token}&lang={locale}"
         if record.paid:
             return RedirectResponse(location, status_code=303)
         # Each attempt counts toward the hourly per-IP limit, like an upload.
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         now = datetime.now(UTC)
         if _redeem_attempts(ip, now) >= cfg.max_uploads_per_hour_per_ip:
-            locale = _record_locale(record)
             return _html_error(request, 429, message("rate_limited", locale), locale)
         applied = db.redeem_for_audit(audit_id, code.strip()[:_CODE_MAX], at=now)
         outcome = "applied" if applied else "rejected"
@@ -637,12 +656,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return attempts + db.count_uploads_since(ip, since)
 
     @app.post("/audits/{audit_id}/publish")
-    def publish(request: Request, audit_id: str, token: str | None = None) -> Response:
+    def publish(
+        request: Request, audit_id: str, token: str | None = None, lang: str | None = None
+    ) -> Response:
         record = _load(audit_id, token)
         if not (record.paid or cfg.free_mode):
             raise HTTPException(status_code=402, detail="publish_locked")
         publication = db.publish(audit_id, at=datetime.now(UTC))
-        location = f"/v/{publication.public_id}?lang={_record_locale(record)}"
+        location = f"/v/{publication.public_id}?lang={_view_locale(record, lang)}"
         if _wants_json(request):
             return JSONResponse(
                 {"public_id": publication.public_id, "location": location}, status_code=201
@@ -705,6 +726,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     free_mode=True,
                     notice=SAMPLE_BANNER[locale],
                     legal_links=True,
+                    switch_url="/sample?lang=en" if locale == "es" else "/ejemplo?lang=es",
                 )
                 sample_cache[locale] = html_text
             return sample_cache[locale]

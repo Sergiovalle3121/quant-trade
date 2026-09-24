@@ -18,10 +18,11 @@ from typing import Any
 
 from quant_trade.audit import charts
 from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import legal_links_html
 from quant_trade.audit.redflags import flag_title
-from quant_trade.audit.schema import AuditResult
-from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning
+from quant_trade.audit.schema import AuditResult, Dimension
+from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning, summary
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
     pretty_dumps,
@@ -112,6 +113,9 @@ LABELS: dict[str, dict[str, str]] = {
         "json_sha": "sha256 del JSON de la auditoría",
         "thresholds": "Umbrales aplicados",
         "print": "Imprimir / guardar PDF",
+        "switch": "English",
+        "yes": "sí",
+        "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
         "redeem_button": "Canjear código",
         "buy_code": "¿No tienes código? Pídelo aquí",
@@ -222,6 +226,9 @@ LABELS: dict[str, dict[str, str]] = {
         "json_sha": "sha256 of the audit JSON",
         "thresholds": "Thresholds applied",
         "print": "Print / save PDF",
+        "switch": "Español",
+        "yes": "yes",
+        "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
         "redeem_button": "Redeem code",
         "buy_code": "No code yet? Ask for one here",
@@ -442,7 +449,7 @@ font-weight:600}
 .paybox{border:1px dashed #8b1a10;padding:10px 14px;margin:.6em 0;border-radius:6px}
 .paybox button{background:#8b1a10;color:#fff;border:0;padding:8px 14px;border-radius:5px;
 font-weight:600;cursor:pointer}
-.toolbar{display:flex;justify-content:flex-end;gap:8px;margin:.4em 0}
+.toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:12px;margin:.4em 0}
 .print-btn{background:#fff;color:#1a1a1a;border:1px solid #999;padding:6px 12px;border-radius:5px;
 font-weight:600;cursor:pointer}
 .meaning{display:grid;grid-template-columns:1fr;gap:8px;margin:.6em 0}
@@ -521,10 +528,12 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
     for key, value in section.items():
         if key in skip or not _is_evidence(value):
             continue
+        raw = value["value"]
+        shown = _e(labels["yes" if raw else "no"]) if isinstance(raw, bool) else _fmt(raw, key=key)
+        note = localize(value.get("note", ""), _locale_of(labels))
         rows.append(
-            f"<tr><td>{_e(_key_label(key, labels))}</td><td>{_fmt(value['value'], key=key)}</td>"
-            f"<td>{_badge(value['evidence'])}</td><td class='muted'>{_e(value.get('note', ''))}"
-            "</td></tr>"
+            f"<tr><td>{_e(_key_label(key, labels))}</td><td>{shown}</td>"
+            f"<td>{_badge(value['evidence'])}</td><td class='muted'>{_e(note)}</td></tr>"
         )
     if not rows:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
@@ -560,7 +569,9 @@ REASONS_ES: dict[str, str] = {
 
 
 def _localized_reason(reason: str, locale: str) -> str:
-    return REASONS_ES.get(reason, reason) if locale == "es" else reason
+    if locale != "es":
+        return reason
+    return REASONS_ES.get(reason) or localize(reason, locale)
 
 
 def _status_badge(status: str, locale: str) -> str:
@@ -713,8 +724,10 @@ def _challenge_html(challenge: dict[str, Any] | None, locale: str, labels: dict[
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     rules = challenge.get("rules", {})
     html_text = (
-        f"<p><strong>{_e(labels['challenge_rules'])}:</strong> {_e(rules.get('firm', ''))} "
-        f"{_e(rules.get('program', ''))} {_e(rules.get('phase', ''))} "
+        f"<p><strong>{_e(labels['challenge_rules'])}:</strong> "
+        f"{_e(localize(rules.get('firm', ''), locale))} "
+        f"{_e(localize(rules.get('program', ''), locale))} "
+        f"{_e(localize(rules.get('phase', ''), locale))} "
         f"(<code>{_e(challenge.get('preset', ''))}</code>). "
         f"{_e(labels['source'])}: {_e(rules.get('source_url', ''))}, {_e(labels['as_of'])} "
         f"{_e(rules.get('as_of', ''))}.</p>"
@@ -742,7 +755,11 @@ def _challenge_html(challenge: dict[str, Any] | None, locale: str, labels: dict[
         )
     notes = rules.get("notes") or []
     if notes:
-        html_text += "<ul class='muted'>" + "".join(f"<li>{_e(n)}</li>" for n in notes) + "</ul>"
+        html_text += (
+            "<ul class='muted'>"
+            + "".join(f"<li>{_e(localize(n, locale))}</li>" for n in notes)
+            + "</ul>"
+        )
     return html_text + _assumptions(challenge.get("assumptions"), locale, labels)
 
 
@@ -782,6 +799,22 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     return out
 
 
+def _other(locale: str) -> str:
+    return "en" if locale == "es" else "es"
+
+
+def _summary_in(data: dict[str, Any], locale: str) -> str:
+    """The verdict sentence rebuilt in ``locale`` from the stored dimensions."""
+    trials = data["multiplicity"].get("trials_used") or data["declared"].get("trials") or {}
+    return summary(
+        [Dimension.model_validate(d) for d in data["verdict"]["dimensions"]],
+        data["verdict"]["overall"],
+        locale="en" if locale == "en" else "es",
+        trials=int(trials.get("value") or 1),
+        trials_evidence=str(trials.get("evidence") or "DECLARED"),
+    )
+
+
 def render_html(
     result: AuditResult,
     *,
@@ -794,8 +827,15 @@ def render_html(
     notice: str | None = None,
     contact_url: str | None = None,
     legal_links: bool = False,
+    locale: str | None = None,
+    switch_url: str | None = None,
 ) -> str:
     """The audit as one HTML document.
+
+    ``locale`` shows the page in a language other than the one chosen at
+    upload: the verdict sentence is rebuilt from its fixed templates and the
+    engine's English notes are translated; the result itself is unchanged.
+    ``switch_url`` is the same page in the other language.
 
     The verdict, the plain-language explanations, the charts, the input
     hashes and the list of red flags are always shown. In paid mode an
@@ -804,10 +844,13 @@ def render_html(
     everything under a watermark.
     """
     data = result.model_dump(mode="json")
-    locale = data["declared"].get("locale", "es")
+    declared_locale = data["declared"].get("locale", "es")
+    locale = locale if locale in LABELS else declared_locale
     labels = LABELS.get(locale, LABELS["es"])
     locked = watermark and not free_mode
     verdict = data["verdict"]
+    if locale != declared_locale:
+        verdict = {**verdict, "summary": _summary_in(data, locale)}
 
     paybox = ""
     if locked and checkout_url:
@@ -864,7 +907,7 @@ def render_html(
     if data["inputs"]["parse_warnings"]:
         inputs_html += (
             f"<p class='muted'>{_e(labels['warnings'])}: "
-            + _e("; ".join(data["inputs"]["parse_warnings"]))
+            + _e("; ".join(localize(w, locale) for w in data["inputs"]["parse_warnings"]))
             + "</p>"
         )
 
@@ -1002,7 +1045,7 @@ def render_html(
         f"<th>{_e(labels['detail'])}</th></tr>"
         + "".join(
             f"<tr><td>{_e(flag['code'])}</td><td>{_badge(flag['severity'])}</td>"
-            f"<td>{_e(flag['detail'])}</td></tr>"
+            f"<td>{_e(localize(flag['detail'], locale))}</td></tr>"
             for flag in data["red_flags"]
         )
         + "</table>"
@@ -1056,7 +1099,8 @@ def render_html(
     if trials:
         multiplicity_html = (
             f"<p>{_e(labels['trials_used'])}: {_fmt(trials['value'])} {_badge(trials['evidence'])}"
-            f" <span class='muted'>{_e(trials.get('note', ''))}</span></p>" + multiplicity_html
+            f" <span class='muted'>{_e(localize(trials.get('note', ''), locale))}</span></p>"
+            + multiplicity_html
         )
     fees = data["costs"].get("reported_fees")
     if fees:
@@ -1104,7 +1148,14 @@ def render_html(
         watermark_html,
         f"<div class='notice'>{_e(notice)}</div>" if notice else "",
         "<div class='toolbar no-print'><button type='button' class='print-btn' "
-        f"onclick='window.print()'>{_e(labels['print'])}</button></div>",
+        f"onclick='window.print()'>{_e(labels['print'])}</button>"
+        + (
+            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
+            f"{_e(labels['switch'])}</a>"
+            if switch_url
+            else ""
+        )
+        + "</div>",
         f"<h1>{_e(labels['title'])} · {_e(verdict['overall'])}</h1>",
         f"<p class='muted'>{_e(labels['audit_id'])}: <code>{_e(data['audit_id'])}</code> · "
         f"{_e(labels['generated'])}: {_e(data['generated_at_utc'])} · engine "
@@ -1163,6 +1214,8 @@ def render(
     notice: str | None = None,
     contact_url: str | None = None,
     legal_links: bool = False,
+    locale: str | None = None,
+    switch_url: str | None = None,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -1176,6 +1229,8 @@ def render(
         notice=notice,
         contact_url=contact_url,
         legal_links=legal_links,
+        locale=locale,
+        switch_url=switch_url,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

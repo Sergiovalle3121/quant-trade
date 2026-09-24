@@ -1,0 +1,749 @@
+"""Spanish for the English sentences the audit writes into a result.
+
+The engine, the importers and the red-flag checks write their notes in
+English, and the result JSON keeps them that way: it is the evidence record
+and its hash must not depend on the reader's language. A Spanish page
+translates them when it is rendered, with the fixed templates below.
+
+Each rule is an English template with ``{name}`` placeholders, as the
+sentence appears in the source, and its Spanish twin. The placeholders catch
+the numbers and names the sentence carries (counts, symbols, file labels),
+which are copied unchanged. A sentence no rule knows is shown in English:
+a new warning degrades to English, never to an empty cell. The tests run
+every importer fixture and scenario through ``untranslated`` so a new
+English sentence without a rule fails the build.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Iterable
+from typing import Any
+
+from quant_trade.audit.verdict import NOT_MEASURED_ES
+
+#: Where a parse warning came from, as ``schema.build_inputs`` prefixes it.
+_PREFIXES: dict[str, str] = {
+    "report": "informe",
+    "equity": "curva de equity",
+    "trades": "operaciones",
+    "benchmark": "benchmark",
+    "optimization": "optimización",
+}
+
+#: Labels the importers put in front of a totals mismatch (``_compare``).
+_COMPARED: dict[str, str] = {
+    "closing deals vs Total Trades": "operaciones de cierre frente a Total Trades",
+    "net profit": "resultado neto",
+    "net profit of closed positions": "resultado neto de las posiciones cerradas",
+    "close rows vs Total trades": "filas de cierre frente a Total trades",
+    "closed trade P/L": "P/L de las operaciones cerradas",
+    "cumulative P&L": "P&L acumulado",
+    "Cum. net profit": "Cum. net profit",
+}
+
+#: Where the number of trials comes from (``engine._trials_used``).
+_TRIAL_SOURCES: dict[str, str] = {
+    "declared by the client": "declarado por el cliente",
+    "passes in the MT5 optimisation export": "pasadas de la exportación de optimización de MT5",
+    "columns of the uploaded variants matrix": "columnas de la matriz de variantes subida",
+    "parameter variants in the uploaded report": "variantes de parámetros del informe subido",
+}
+
+_RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # --- Parse warnings: equity, trades and benchmark CSV (schema.py) ---
+    ("both {a} and {b} present; using {c}", "hay columnas {a} y {b}; se usa {c}"),
+    (
+        "returns were percent-formatted; divided by 100",
+        "los retornos venían en %; se dividieron entre 100",
+    ),
+    (
+        "returns look like percentages (median |r| > 0.5); divided by 100",
+        "los retornos parecen porcentajes (mediana |r| > 0.5); se dividieron entre 100",
+    ),
+    (
+        "{n} row(s) with an unreadable timestamp or value dropped",
+        "se descartaron {n} fila(s) con fecha o valor ilegible",
+    ),
+    (
+        "no side column; every trade treated as long",
+        "no hay columna de lado; cada operación se trata como larga",
+    ),
+    (
+        "{n} trade row(s) with unreadable or non-positive fields dropped",
+        "se descartaron {n} fila(s) de operaciones con campos ilegibles o no positivos",
+    ),
+    (
+        "{n} row(s) with unreadable or non-positive fields dropped",
+        "se descartaron {n} fila(s) con campos ilegibles o no positivos",
+    ),
+    (
+        "the uploaded equity file is used for returns; the report supplies the trades",
+        "los retornos salen de la curva de equity subida; el informe aporta las operaciones",
+    ),
+    # --- Parse warnings: platform reports (importers.py) ---
+    (
+        "hedging account: entries were paired first-in first-out, so per-trade entry price "
+        "and holding time are approximate (money results stay exact)",
+        "cuenta con cobertura (hedging): las entradas se emparejaron por orden de llegada "
+        "(FIFO), así que el precio de entrada y la duración de cada operación son aproximados "
+        "(los importes de dinero son exactos)",
+    ),
+    (
+        "{n} closing deal(s) had no matching open volume; their money is in the balance but "
+        "not in the trade list",
+        "{n} cierre(s) no tenían volumen abierto con el que emparejarse; su dinero está en el "
+        "balance pero no en la lista de operaciones",
+    ),
+    (
+        "{n} position(s) still open at the end of the report; excluded from the closed trades",
+        "{n} posición(es) seguían abiertas al final del informe; quedan fuera de las "
+        "operaciones cerradas",
+    ),
+    (
+        "{n} deal(s) closed by the tester at the end of the test",
+        "el probador cerró {n} operación(es) al final de la prueba",
+    ),
+    (
+        "{n} trade(s) closed by the tester at the end of the test",
+        "el probador cerró {n} operación(es) al final de la prueba",
+    ),
+    (
+        "{what}: the report states {declared} but the rows add up to {measured}",
+        "{what}: el informe indica {declared} pero las filas suman {measured}",
+    ),
+    (
+        "the Deals table charges {amount} in fees that the Positions table does not itemise "
+        "per trade; they are in the balance curve only",
+        "la tabla de operaciones (Deals) cobra {amount} en comisiones que la tabla de "
+        "posiciones no desglosa por operación; solo están en la curva de balance",
+    ),
+    (
+        "{n} position(s) opened in the report were not closed; excluded",
+        "{n} posición(es) abiertas en el informe no se cerraron; quedan fuera",
+    ),
+    (
+        "MetaTrader 4 tester profit already includes swap and commission; costs are not "
+        "itemised, so the trade P&L is net",
+        "el beneficio del probador de MetaTrader 4 ya incluye swap y comisión; los costes no "
+        "vienen desglosados, así que el resultado de cada operación es neto",
+    ),
+    (
+        "{n} close row(s) referenced an unknown ticket and were linked to the one open ticket "
+        "with the same size",
+        "{n} fila(s) de cierre citaban un ticket desconocido y se unieron al único ticket "
+        "abierto del mismo tamaño",
+    ),
+    (
+        "{n} close row(s) could not be paired with an entry; their money is in the balance "
+        "but not in the trade list",
+        "{n} fila(s) de cierre no se pudieron emparejar con una entrada; su dinero está en el "
+        "balance pero no en la lista de operaciones",
+    ),
+    ("{n} position(s) never closed; excluded", "{n} posición(es) nunca se cerraron; quedan fuera"),
+    (
+        "{n} credit row(s) excluded: broker credit is not the trader's balance",
+        "se excluyeron {n} fila(s) de crédito: el crédito del bróker no es balance del trader",
+    ),
+    (
+        "this TradingView export does not itemise commission; trade P&L is net of the "
+        "commission set in the strategy properties",
+        "esta exportación de TradingView no desglosa la comisión; el resultado de cada "
+        "operación ya descuenta la comisión configurada en la estrategia",
+    ),
+    (
+        "{n} open trade(s) at the end of the export; excluded",
+        "{n} operación(es) abiertas al final de la exportación; quedan fuera",
+    ),
+    (
+        "{n} trade number(s) without one entry and one exit row",
+        "{n} número(s) de operación sin una fila de entrada y una de salida",
+    ),
+    (
+        "every trade has zero commission and fees",
+        "todas las operaciones tienen comisión y costes cero",
+    ),
+    (
+        "{n} multi-leg trade(s) kept as single trades",
+        "{n} operación(es) de varias patas se tratan como una sola",
+    ),
+    (
+        "this backtesting.py version folds commission into the fill prices; costs are not itemised",
+        "esta versión de backtesting.py incluye la comisión en los precios de ejecución; los "
+        "costes no vienen desglosados",
+    ),
+    (
+        "the file holds {n} parameter variants; only the first ({name}) was imported",
+        "el archivo contiene {n} variantes de parámetros; solo se importó la primera ({name})",
+    ),
+    ("{n} open trade(s) excluded", "se excluyeron {n} operación(es) abiertas"),
+    (
+        "the stated initial balance {stated} differs from the deposits before the first "
+        "trade ({deposits}); the deposits were used",
+        "el balance inicial indicado ({stated}) no coincide con los depósitos previos a la "
+        "primera operación ({deposits}); se usaron los depósitos",
+    ),
+    ("initial balance {amount} taken from {source}", "balance inicial {amount} tomado de {source}"),
+    (
+        "the file does not state a starting balance; {amount} was assumed, which scales every "
+        "return and drawdown",
+        "el archivo no indica un balance inicial; se supuso {amount}, lo que escala cada "
+        "retorno y cada drawdown",
+    ),
+    (
+        "{n} cash flow(s) after the last trade ignored",
+        "se ignoraron {n} movimiento(s) de dinero posteriores a la última operación",
+    ),
+    (
+        "{n} Balance cell(s) do not equal the previous balance plus the row's money; the "
+        "reported Balance was kept",
+        "{n} celda(s) de Balance no son el balance anterior más el dinero de la fila; se "
+        "mantuvo el Balance del informe",
+    ),
+    (
+        "deposits or withdrawals were removed: the curve is a flow-adjusted index that starts "
+        "at the initial balance",
+        "se quitaron depósitos y retiros: la curva es un índice ajustado por flujos que "
+        "empieza en el balance inicial",
+    ),
+    (
+        "contract size inferred from reported profit: {sizes}",
+        "tamaño de contrato deducido del beneficio del informe: {sizes}",
+    ),
+    (
+        "the file's times carry no timezone (platform or server time); they were read as UTC",
+        "las horas del archivo no indican zona horaria (hora de la plataforma o del "
+        "servidor); se leyeron como UTC",
+    ),
+    (
+        "the balance curve is built from closed trades only; it does not show floating "
+        "(open-trade) drawdown, so the real drawdown was at least as deep",
+        "la curva de balance se construye solo con operaciones cerradas; no muestra el "
+        "drawdown flotante (de las operaciones abiertas), así que el drawdown real fue al "
+        "menos igual de profundo",
+    ),
+    # --- Parse warnings: MT5 optimisation export ---
+    (
+        "{n} repeated pass number(s) counted once",
+        "{n} número(s) de pasada repetidos se contaron una vez",
+    ),
+    (
+        "the pass count is the number of configurations the optimiser tried; a genetic "
+        "optimisation lists only the passes it evaluated",
+        "el número de pasadas es el de configuraciones que probó el optimizador; una "
+        "optimización genética solo lista las pasadas que evaluó",
+    ),
+    # --- Red-flag details (redflags.py) ---
+    (
+        "{n} return observations; at least {m} are needed",
+        "{n} retornos observados; hacen falta al menos {m}",
+    ),
+    (
+        "{n} return observations; conclusions below {m} are fragile",
+        "{n} retornos observados; por debajo de {m} las conclusiones son frágiles",
+    ),
+    (
+        "{n} equity value(s) at or below zero; returns are undefined there",
+        "{n} valor(es) de equity en cero o por debajo; ahí los retornos no están definidos",
+    ),
+    (
+        "{n} duplicated timestamp(s); the last value was kept",
+        "{n} fecha(s) duplicadas; se conservó el último valor",
+    ),
+    (
+        "rows were not in chronological order; sorted before analysis",
+        "las filas no estaban en orden cronológico; se ordenaron antes del análisis",
+    ),
+    ("{n} of {m} rows could not be read", "no se pudieron leer {n} de {m} filas"),
+    (
+        "every return is identical; nothing to measure",
+        "todos los retornos son idénticos; no hay nada que medir",
+    ),
+    (
+        "{n} consecutive identical non-zero returns; looks forward-filled",
+        "{n} retornos distintos de cero idénticos seguidos; parece relleno hacia delante",
+    ),
+    (
+        "{n} consecutive identical non-zero returns",
+        "{n} retornos distintos de cero idénticos seguidos",
+    ),
+    (
+        "{n} single-period moves are extreme outliers (>{a} and >{b} robust sigmas)",
+        "{n} movimientos de un solo periodo son atípicos extremos (>{a} y >{b} sigmas robustas)",
+    ),
+    (
+        "{n} single-period move(s) are extreme outliers; check for bad prints",
+        "{n} movimiento(s) de un solo periodo son atípicos extremos; revisa si hay "
+        "precios erróneos",
+    ),
+    (
+        "annualised Sharpe {s} exceeds {t}; almost always a look-ahead or a costless fill "
+        "assumption",
+        "Sharpe anualizado {s} por encima de {t}; casi siempre indica mirar el futuro "
+        "(look-ahead) o suponer ejecuciones sin coste",
+    ),
+    (
+        "annualised Sharpe {s} exceeds {t}; rare outside intraday market making",
+        "Sharpe anualizado {s} por encima de {t}; raro fuera del market making intradía",
+    ),
+    (
+        "largest gap between rows is {m}x the median spacing",
+        "el mayor hueco entre filas es {m}x la separación mediana",
+    ),
+    (
+        "no trading cost declared; the cost dimension uses a reference assumption",
+        "no se declaró coste de operación; la dimensión de costes usa un supuesto de referencia",
+    ),
+    (
+        "{n} trial(s) declared but the files show {m} variants or optimisation passes; the "
+        "declared count is too low",
+        "se declararon {n} intento(s) pero los archivos muestran {m} variantes o pasadas de "
+        "optimización; el número declarado es demasiado bajo",
+    ),
+    (
+        "{n} trade row(s) dropped as unreadable",
+        "se descartaron {n} fila(s) de operaciones ilegibles",
+    ),
+    (
+        "client-reported pnl differs from recomputed pnl by {p} of gross; the trades file may "
+        "carry costs or a different contract size",
+        "el resultado que declara el archivo difiere del recalculado en un {p} del bruto; el "
+        "archivo puede incluir costes o usar otro tamaño de contrato",
+    ),
+    (
+        "after a loss the next trade is typically {r}x the size used after a win, and {p} of "
+        "post-loss trades were larger ({a} after losses, {b} after wins)",
+        "tras una pérdida la siguiente operación suele ser {r}x el tamaño usado tras una "
+        "ganancia, y el {p} de las operaciones tras pérdida fueron mayores ({a} tras "
+        "pérdidas, {b} tras ganancias)",
+    ),
+    (
+        "after a loss the next trade is typically {r}x the size used after a win",
+        "tras una pérdida la siguiente operación suele ser {r}x el tamaño usado tras una ganancia",
+    ),
+    (
+        "{a} of {n} trades ({p}) were opened against an open position at a worse price: grid "
+        "or averaging down",
+        "{a} de {n} operaciones ({p}) se abrieron contra una posición abierta a peor precio: "
+        "rejilla o promediar pérdidas",
+    ),
+    (
+        "{a} of {n} trades ({p}) were opened against an open position at a worse price",
+        "{a} de {n} operaciones ({p}) se abrieron contra una posición abierta a peor precio",
+    ),
+    (
+        "up to {n} positions were open at once on one symbol",
+        "hubo hasta {n} posiciones abiertas a la vez en un mismo símbolo",
+    ),
+    (
+        "the curve is rebuilt from closed trades while positions overlapped; floating losses "
+        "of open positions are not visible in it",
+        "la curva se reconstruye con operaciones cerradas mientras había posiciones "
+        "solapadas; las pérdidas flotantes de las posiciones abiertas no se ven en ella",
+    ),
+    (
+        "win rate {w} with the average loss {m}x the average win: rare large losses carry the risk",
+        "aciertos del {w} con la pérdida media {m}x la ganancia media: el riesgo está en "
+        "pérdidas grandes y poco frecuentes",
+    ),
+    (
+        "the largest adverse excursion is {m}x the average loss; no sign of a fixed stop",
+        "la mayor excursión adversa es {m}x la pérdida media; no hay señal de un stop fijo",
+    ),
+    (
+        "the largest loss is {m}x the average loss; no sign of a fixed stop",
+        "la mayor pérdida es {m}x la pérdida media; no hay señal de un stop fijo",
+    ),
+    (
+        "{a} of {n} trades ({p}) close outside the dates of the equity curve; the two files "
+        "may not describe the same account",
+        "{a} de {n} operaciones ({p}) cierran fuera de las fechas de la curva de equity; puede "
+        "que los dos archivos no describan la misma cuenta",
+    ),
+    (
+        "month by month the realised trade pnl and the equity change correlate at {c} over "
+        "{n} months; the trades may not belong to this equity curve, so the cost dimension "
+        "may not describe it",
+        "mes a mes, el resultado realizado de las operaciones y el cambio de la equity "
+        "tienen una correlación de {c} en {n} meses; puede que las operaciones no sean de "
+        "esta curva, y entonces la dimensión de costes no la describe",
+    ),
+    # --- Not-measured reasons and evidence notes (engine, analytics, costs) ---
+    ("no long trades", "no hay operaciones largas"),
+    ("no short trades", "no hay operaciones cortas"),
+    ("no trades uploaded", "no se subieron operaciones"),
+    ("no variants uploaded", "no se subió la matriz de variantes"),
+    ("fewer than ten returns", "menos de diez retornos"),
+    (
+        "the simulator needs daily or finer data; the upload is coarser",
+        "el simulador necesita datos diarios o más finos; los subidos son más gruesos",
+    ),
+    ("before commission and swap", "antes de comisión y swap"),
+    ("share of trades with pnl > 0", "proporción de operaciones con resultado > 0"),
+    (
+        "commission and swap as reported, a positive cost",
+        "comisión y swap del informe, como coste positivo",
+    ),
+    ("no commission or swap total supplied", "no se aportó el total de comisión o swap"),
+    ("gross pnl minus reported fees", "resultado bruto menos los costes del informe"),
+    (
+        "average net result per trade, account currency",
+        "resultado neto medio por operación, en la divisa de la cuenta",
+    ),
+    ("gross profit / gross loss", "beneficio bruto / pérdida bruta"),
+    (
+        "no losing trades; the ratio is undefined",
+        "no hay operaciones perdedoras; el ratio no está definido",
+    ),
+    ("no winning trades", "no hay operaciones ganadoras"),
+    ("no losing trades", "no hay operaciones perdedoras"),
+    ("average win / average loss", "ganancia media / pérdida media"),
+    ("needs at least one win and one loss", "necesita al menos una ganadora y una perdedora"),
+    ("largest single win / gross profit", "mayor ganadora / beneficio bruto"),
+    (
+        "sqrt(min(N, {cap})) x mean / std of per-trade gross pnl",
+        "raíz(mín(N, {cap})) x media / desviación del resultado bruto por operación",
+    ),
+    (
+        "needs at least two trades with different results",
+        "necesita al menos dos operaciones con resultados distintos",
+    ),
+    ("first entry to last exit", "de la primera entrada a la última salida"),
+    ("trades span less than one day", "las operaciones abarcan menos de un día"),
+    (
+        "needs at least {n} daily returns that are not all identical; {m} supplied",
+        "necesita al menos {n} retornos diarios que no sean todos idénticos; se aportaron {m}",
+    ),
+    (
+        "needs at least {n} returns that are not all identical; {m} supplied",
+        "necesita al menos {n} retornos que no sean todos idénticos; se aportaron {m}",
+    ),
+    (
+        "resampled from the uploaded history, not a forecast",
+        "remuestreado del historial aportado, no es una predicción",
+    ),
+    (
+        "business days, resampled from the uploaded history, not a forecast",
+        "días hábiles, remuestreado del historial aportado, no es una predicción",
+    ),
+    (
+        "Wilson 95 % interval over the resampled paths; it ignores model error",
+        "intervalo de Wilson al 95 % sobre las trayectorias remuestreadas; no incluye el "
+        "error del modelo",
+    ),
+    (
+        "no resampled path reached the target within the limits",
+        "ninguna trayectoria remuestreada alcanzó el objetivo dentro de los límites",
+    ),
+    (
+        "P[true Sharpe > 0] given length, skew and kurtosis",
+        "P[Sharpe real > 0] dada la longitud, la asimetría y la curtosis",
+    ),
+    (
+        "observations needed for PSR to reach 0.95",
+        "observaciones necesarias para que el PSR llegue a 0.95",
+    ),
+    (
+        "observed Sharpe <= 0; no track record length reaches 0.95",
+        "Sharpe observado <= 0; ninguna longitud de historial llega a 0.95",
+    ),
+    ("unreachable", "inalcanzable"),
+    ("variance across {n} variants", "varianza entre {n} variantes"),
+    ("sampling variance of the Sharpe estimator", "varianza de muestreo del estimador de Sharpe"),
+    (
+        "PSR against E[max Sharpe] of {n} trial(s)",
+        "PSR frente a E[Sharpe máximo] de {n} intento(s)",
+    ),
+    (
+        "PSR against E[max Sharpe] of {n} trial(s), {source}",
+        "PSR frente a E[Sharpe máximo] de {n} intento(s), {source}",
+    ),
+    (
+        "smallest power-of-two trial count with DSR < 0.5",
+        "menor número de intentos, en potencias de dos, con DSR < 0.5",
+    ),
+    ("DSR stays >= 0.5 up to {n} trials", "el DSR sigue >= 0.5 hasta {n} intentos"),
+    ("too short", "demasiado corto"),
+    ("declared by the client; not verifiable", "declarado por el cliente; no se puede comprobar"),
+    (
+        "in-sample minus out-of-sample annualised Sharpe",
+        "Sharpe anualizado dentro de muestra menos fuera de muestra",
+    ),
+    (
+        "strategy max drawdown over benchmark max drawdown",
+        "drawdown máximo de la estrategia entre el del benchmark",
+    ),
+    ("benchmark has no drawdown", "el benchmark no tiene drawdown"),
+    (
+        "benchmark overlaps only {p} of the strategy timestamps",
+        "el benchmark solo coincide con el {p} de las fechas de la estrategia",
+    ),
+    (
+        "fraction of CSCV splits where the IS winner is below the OOS median",
+        "fracción de divisiones CSCV en las que la mejor dentro de muestra queda por debajo "
+        "de la mediana fuera de muestra",
+    ),
+    (
+        "CSCV requires at least two parameter variants",
+        "el CSCV necesita al menos dos variantes de parámetros",
+    ),
+    (
+        "variant_returns must contain only finite values",
+        "la matriz de variantes solo puede contener valores finitos",
+    ),
+    (
+        "observations must be divisible into equal CSCV partitions ({n} observations, {m} "
+        "partitions)",
+        "las observaciones deben dividirse en particiones CSCV iguales ({n} observaciones, "
+        "{m} particiones)",
+    ),
+    (
+        "a side has fewer than {n} returns (in-sample {a}, out-of-sample {b})",
+        "uno de los tramos tiene menos de {n} retornos (dentro de muestra {a}, fuera de "
+        "muestra {b})",
+    ),
+    ("split failed: {error}", "no se pudo dividir la serie: {error}"),
+    (
+        "extra cost per side, on top of the report's fees, at which the ledger nets to zero",
+        "coste extra por lado, además de los costes del informe, con el que el resultado "
+        "queda en cero",
+    ),
+    (
+        "cost per side at which the ledger nets to zero",
+        "coste por lado con el que el resultado queda en cero",
+    ),
+    ("no traded notional", "no hay volumen operado"),
+    ("undefined", "no definido"),
+    (
+        "signed total the report itemises; negative is a cost",
+        "total con signo que desglosa el informe; negativo es un coste",
+    ),
+    (
+        "assumed slippage: the client declared zero cost; charged on top of the fees the "
+        "report itemises",
+        "deslizamiento supuesto: el cliente declaró coste cero; se cobra además de los "
+        "costes que desglosa el informe",
+    ),
+    ("assumed: client declared zero cost", "supuesto: el cliente declaró coste cero"),
+    (
+        "declared by the client; charged on top of the fees the report itemises",
+        "declarado por el cliente; se cobra además de los costes que desglosa el informe",
+    ),
+    ("inferred from the timestamps", "deducido de las fechas"),
+    ("starting balance of the imported report", "balance inicial del informe importado"),
+    ("no report imported", "no se importó un informe"),
+    ("rows of the export", "filas de la exportación"),
+    ("not declared", "no declarado"),
+    ("holdout not evaluated", "tramo fuera de muestra no evaluado"),
+    (
+        "balance rebuilt from closed trades; floating drawdown is not visible",
+        "balance reconstruido con operaciones cerradas; el drawdown flotante no se ve",
+    ),
+    ("as uploaded", "tal como se subió"),
+    ("[withheld: promotional wording]", "[omitido: lenguaje promocional]"),
+    # --- Prop-firm rule notes and generic names (prop_presets.py) ---
+    ("Generic", "Genérico"),
+    ("Two-step evaluation, phase 1", "Evaluación en dos fases, fase 1"),
+    ("each of steps 1-3", "cada una de las fases 1-3"),
+    (
+        "Reference rules typical of two-step evaluations; not any one firm's terms.",
+        "Reglas de referencia típicas de las evaluaciones en dos fases; no son las de "
+        "ninguna firma concreta.",
+    ),
+    (
+        "Daily loss: 5 % of the initial balance below the balance recorded at 00:00 CE(S)T.",
+        "Pérdida diaria: 5 % del balance inicial por debajo del balance registrado a las "
+        "00:00 CE(S)T.",
+    ),
+    ("No time limit ({url}).", "Sin límite de tiempo ({url})."),
+    (
+        "Maximum loss is an end-of-day trailing limit; whether it stops trailing was not "
+        "stated on the page read, so the simulator lets it trail (stricter).",
+        "La pérdida máxima es un límite que sigue al cierre de cada día; la página leída no "
+        "dice si deja de moverse, así que el simulador lo deja moverse (más estricto).",
+    ),
+    (
+        "Best Day Rule: the best day may not exceed 50 % of the positive days' profit; not "
+        "simulated.",
+        "Regla del mejor día: el mejor día no puede superar el 50 % del beneficio de los días "
+        "positivos; no se simula.",
+    ),
+    (
+        "No minimum trading days; no time limit ({url}).",
+        "Sin mínimo de días operados; sin límite de tiempo ({url}).",
+    ),
+    (
+        "Daily loss: a percentage of the initial balance below the start-of-day balance, "
+        "reset at 0:00 server time; it counts open losses, swap and commission.",
+        "Pérdida diaria: un porcentaje del balance inicial por debajo del balance al empezar "
+        "el día, que se reinicia a las 0:00 hora del servidor; cuenta pérdidas abiertas, "
+        "swap y comisión.",
+    ),
+    (
+        "No deadline; accounts with no trade for 60 days are deactivated.",
+        "Sin plazo; las cuentas sin operaciones durante 60 días se desactivan.",
+    ),
+    (
+        "Expert advisors are not allowed on this model.",
+        "Este modelo no permite asesores expertos (EA).",
+    ),
+    (
+        "Expert advisors allowed only on accounts below 50K.",
+        "Asesores expertos (EA) permitidos solo en cuentas de menos de 50K.",
+    ),
+    (
+        "Daily loss: 5 % below the higher of the previous day's closing balance or equity ({url}).",
+        "Pérdida diaria: 5 % por debajo del mayor entre el balance y la equity al cierre del "
+        "día anterior ({url}).",
+    ),
+    (
+        "Needs 3 days each closing at least 0.5 % of the initial balance in gain; the "
+        "simulator counts any day with a non-zero return, so it is optimistic here.",
+        "Exige 3 días que cierren cada uno con al menos un 0.5 % del balance inicial a favor; "
+        "el simulador cuenta cualquier día con retorno distinto de cero, así que aquí es "
+        "optimista.",
+    ),
+    (
+        "No trading from 2 minutes before to 2 minutes after high-impact news; not simulated.",
+        "No se opera desde 2 minutos antes hasta 2 minutos después de noticias de alto "
+        "impacto; no se simula.",
+    ),
+    (
+        "The 3 % daily limit suspends trading for the day instead of ending the account; not "
+        "simulated.",
+        "El límite diario del 3 % suspende la operativa ese día en lugar de cerrar la cuenta; "
+        "no se simula.",
+    ),
+    (
+        "Static stop-out at 6 %: stated on The5ers' blog, not on the rules page.",
+        "Stop-out fijo al 6 %: lo indica el blog de The5ers, no la página de reglas.",
+    ),
+    ("No minimum days; unlimited time.", "Sin mínimo de días; tiempo ilimitado."),
+    (
+        "No daily limit during the evaluation steps; static loss stated on The5ers' blog.",
+        "Sin límite diario en las fases de evaluación; la pérdida fija la indica el blog "
+        "de The5ers.",
+    ),
+    (
+        "No position may risk more than 2 % of the balance at its stop loss; not simulated.",
+        "Ninguna posición puede arriesgar más del 2 % del balance en su stop de pérdida; "
+        "no se simula.",
+    ),
+    (
+        "Unlimited time, but each level is reachable for 48 hours after the previous one.",
+        "Tiempo ilimitado, pero cada nivel solo se puede alcanzar durante 48 horas tras "
+        "el anterior.",
+    ),
+    (
+        "Maximum loss trails the highest end-of-day balance and locks once it reaches the "
+        "starting balance; it is monitored in real time, which daily data cannot see.",
+        "La pérdida máxima sigue al mayor balance de cierre diario y se fija al llegar al "
+        "balance inicial; se vigila en tiempo real, cosa que los datos diarios no ven.",
+    ),
+    (
+        "The daily loss limit is optional and not simulated.",
+        "El límite de pérdida diaria es opcional y no se simula.",
+    ),
+    (
+        "Consistency target: the best day must stay at or below 55 % of the profit target, "
+        "otherwise the target rises; not simulated.",
+        "Objetivo de consistencia: el mejor día debe quedar en el 55 % del objetivo de "
+        "beneficio o menos; si no, el objetivo sube; no se simula.",
+    ),
+    ("No time limit stated on the pages read.", "Las páginas leídas no indican límite de tiempo."),
+    (
+        "Source for the target and consistency rule: {url}",
+        "Fuente del objetivo y de la regla de consistencia: {url}",
+    ),
+)
+
+_PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+
+def _compile(english: str) -> re.Pattern[str]:
+    parts: list[str] = []
+    position = 0
+    for match in _PLACEHOLDER.finditer(english):
+        parts.append(re.escape(english[position : match.start()]))
+        parts.append(f"(?P<{match.group(1)}>.+?)")
+        position = match.end()
+    parts.append(re.escape(english[position:]))
+    return re.compile("".join(parts), re.DOTALL)
+
+
+_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (_compile(english), spanish) for english, spanish in _RULES_SOURCE
+)
+
+
+def _translate_values(values: dict[str, str]) -> dict[str, str]:
+    """Placeholders that are themselves fixed English phrases."""
+    out = dict(values)
+    if "what" in out:
+        out["what"] = _COMPARED.get(out["what"], out["what"])
+    if "source" in out:
+        out["source"] = _TRIAL_SOURCES.get(out["source"], out["source"])
+    return out
+
+
+def spanish(text: str) -> str | None:
+    """The Spanish for one of the audit's English sentences, or ``None``."""
+    head, sep, rest = text.partition(": ")
+    if sep and head in _PREFIXES:
+        inner = spanish(rest)
+        return None if inner is None else f"{_PREFIXES[head]}: {inner}"
+    if text in NOT_MEASURED_ES:
+        return NOT_MEASURED_ES[text]
+    if text in _TRIAL_SOURCES:
+        return _TRIAL_SOURCES[text]
+    for pattern, template in _RULES:
+        match = pattern.fullmatch(text)
+        if match:
+            return template.format(**_translate_values(match.groupdict()))
+    return None
+
+
+def localize(text: str, locale: str) -> str:
+    """``text`` in ``locale``: Spanish when a rule knows it, else unchanged."""
+    if locale != "es" or not text:
+        return text
+    translated = spanish(text)
+    return text if translated is None else translated
+
+
+def _result_sentences(data: dict[str, Any]) -> Iterable[str]:
+    """Every engine-written English sentence a Spanish page may show."""
+    inputs = data.get("inputs", {})
+    yield from inputs.get("parse_warnings", [])
+    for flag in data.get("red_flags", []):
+        yield flag.get("detail", "")
+    challenge = data.get("challenge") or {}
+    yield from (challenge.get("rules") or {}).get("notes") or []
+
+    def walk(node: Any) -> Iterable[str]:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in ("note", "reason") and isinstance(value, str):
+                    yield value
+                elif key not in ("declared", "rules", "assumptions", "vendor_questions"):
+                    yield from walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from walk(item)
+
+    for key, value in data.items():
+        if key not in ("declared", "verdict", "red_flags", "vendor_questions"):
+            yield from walk(value)
+    yield from walk(data.get("declared", {}))
+
+
+def untranslated(data: dict[str, Any]) -> list[str]:
+    """Sentences of a result (as JSON) that no Spanish rule covers."""
+    missing: list[str] = []
+    for text in _result_sentences(data):
+        if text and spanish(text) is None and text not in missing:
+            missing.append(text)
+    return missing
+
+
+__all__ = ["localize", "spanish", "untranslated"]
