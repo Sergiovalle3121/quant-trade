@@ -62,3 +62,14 @@ def test_pages_use_self_hosted_fonts_and_no_third_party() -> None:
         page = landing(locale=locale)
         assert "fonts.googleapis" not in page and "cdn." not in page
         assert find_claims(page) == []
+
+
+def test_navigation_has_a_phone_menu_and_links_the_comparison() -> None:
+    for locale, compare in (("es", "/comparar"), ("en", "/compare")):
+        page = landing(locale=locale)
+        nav = page.split("<header", 1)[1].split("</header>", 1)[0]
+        # The menu opens without script, and holds the same links.
+        assert "<details class='menu'>" in nav and "class='menu-panel'" in nav
+        assert nav.count(f"href='{compare}'") == 2
+        footer = page.split("<footer", 1)[1]
+        assert f"href='{compare}'" in footer

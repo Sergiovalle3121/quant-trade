@@ -243,8 +243,26 @@ border-radius:999px;transition:color .2s,background .2s}
 border:1px solid rgba(255,255,255,.16);padding:7px 11px;border-radius:999px;
 transition:border-color .2s,color .2s}
 .lang:hover{color:#fff;border-color:rgba(255,255,255,.4)}
-@media (max-width:900px){.nav-links{display:none}}
-@media (max-width:520px){.nav-end .btn{display:none}.nav-in{height:62px}}
+.menu{display:none;position:relative}
+.menu>summary{list-style:none;cursor:pointer;width:42px;height:42px;border-radius:12px;display:grid;
+place-items:center;border:1px solid rgba(255,255,255,.16);transition:background .2s}
+.menu>summary::-webkit-details-marker{display:none}
+.menu>summary:hover{background:rgba(255,255,255,.07)}
+.burger{display:grid;gap:4px;width:18px}
+.burger i{display:block;height:2px;border-radius:2px;background:#f4f6fb;transition:transform .3s var(--ease),opacity .2s}
+.menu[open] .burger i:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.menu[open] .burger i:nth-child(2){opacity:0}
+.menu[open] .burger i:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.menu-panel{position:absolute;right:0;top:calc(100% + 10px);width:min(300px,calc(100vw - 32px));
+display:grid;gap:2px;padding:10px;border-radius:18px;border:1px solid rgba(255,255,255,.14);
+background:rgba(10,14,21,.97);box-shadow:0 30px 60px -20px rgba(0,0,0,.8);
+backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);animation:drop .3s var(--ease)}
+.menu-panel a{text-decoration:none;color:#dfe5ee;font-size:.98rem;padding:12px 14px;border-radius:12px}
+.menu-panel a:hover{background:rgba(255,255,255,.07)}
+.menu-panel .btn{margin-top:8px;color:#060914}
+@media (max-width:900px){.nav-links{display:none}.menu{display:block}}
+@media (max-width:520px){.nav-end>.lang{display:none}}
+@media (max-width:520px){.nav-end>.btn{display:none}.nav-in{height:62px}}
 """
 
 BUTTONS = """
@@ -746,6 +764,7 @@ MOTION = """
 transition-delay:calc(var(--i,0) * 80ms)}
 .js [data-reveal]:not(.in){opacity:0;transform:translateY(28px)}
 @keyframes rise{to{opacity:1;transform:none}}
+@keyframes drop{from{opacity:0;transform:translateY(-8px)}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @keyframes on{to{opacity:1;color:#f4f6fb}}
 @keyframes draw{to{stroke-dashoffset:0}}
