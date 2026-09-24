@@ -38,6 +38,15 @@ from pydantic import ValidationError
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guides import GUIDES_BY_SLUG
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
+from quant_trade.audit.owner import (
+    MAX_CREDITS,
+    MAX_EXPIRES_DAYS,
+    MAX_FAILED_LOGINS_PER_HOUR,
+    MAX_NOTE_CHARS,
+    PANEL_PATH,
+    login_page,
+    panel_page,
+)
 from quant_trade.audit.pages import (
     SAMPLE_BANNER,
     badge_svg,
@@ -329,6 +338,12 @@ class AttemptLog:
             self._log[key] = recent
         return before
 
+    def count(self, key: str, now: datetime) -> int:
+        """How many attempts ``key`` has in the window, without recording one."""
+        since = now - self.window
+        with self._lock:
+            return sum(1 for at in self._log.get(key, []) if at >= since)
+
     def __len__(self) -> int:
         with self._lock:
             return len(self._log)
@@ -588,7 +603,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     upload_attempts = AttemptLog()
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
-    app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts)
+    panel_failures = AttemptLog()
+    app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
     # Waiting for a slot happens in the event loop (an await, not a blocked
     # thread), so a queue of uploads never starves the pages that share the
     # thread pool.
@@ -718,6 +734,64 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "legal_configured": cfg.legal_configured,
             "auto_purge": cfg.auto_purge,
         }
+
+    @app.get(PANEL_PATH, response_class=HTMLResponse)
+    def panel_login() -> str:
+        if not cfg.admin_enabled:
+            raise _not_found()
+        return login_page()
+
+    @app.post(PANEL_PATH, response_class=HTMLResponse)
+    def panel(
+        request: Request,
+        key: Annotated[str, Form()],
+        action: Annotated[str, Form()] = "list",
+        credits: Annotated[str, Form()] = "1",
+        note: Annotated[str, Form()] = "",
+        expires_days: Annotated[str, Form()] = "",
+        code_id: Annotated[str, Form()] = "",
+    ) -> Response:
+        """The owner panel. The key comes in the body on every request, is
+        compared in constant time, and wrong keys are limited per address."""
+        if not cfg.admin_enabled:
+            raise _not_found()
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        now = datetime.now(UTC)
+        if panel_failures.count(ip, now) >= MAX_FAILED_LOGINS_PER_HOUR:
+            return HTMLResponse(login_page(error="too_many"), status_code=429)
+        if not hmac.compare_digest(key.encode(), cfg.admin_key.encode()):
+            panel_failures.hit(ip, now)
+            return HTMLResponse(login_page(error="wrong_key"), status_code=403)
+        new_code = flash = error = ""
+        if action == "create":
+            try:
+                total = int(credits)
+                days = int(expires_days) if expires_days.strip() else None
+            except ValueError:
+                total, days = 0, None
+            clean_note = note.strip()
+            if (
+                1 <= total <= MAX_CREDITS
+                and len(clean_note) <= MAX_NOTE_CHARS
+                and (days is None or 1 <= days <= MAX_EXPIRES_DAYS)
+            ):
+                new_code, _ = db.create_access_code(
+                    credits=total, note=clean_note, at=now, expires_days=days
+                )
+            else:
+                error = "invalid"
+        elif action == "disable":
+            flash = "disabled" if db.disable_access_code(code_id.strip()[:64]) else ""
+            error = "" if flash else "not_found"
+        return HTMLResponse(
+            panel_page(
+                key=key,
+                codes=db.list_access_codes(),
+                new_code=new_code,
+                flash=flash,
+                error=error,
+            )
+        )
 
     @app.get("/static/{name:path}")
     def static(name: str) -> Response:

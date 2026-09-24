@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 
@@ -31,6 +31,9 @@ DEFAULT_MAX_CONCURRENT_AUDITS = 2
 DEFAULT_AUDIT_QUEUE_SECONDS = 30
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
+#: The owner panel (``/panel``) stays off unless ``AUDIT_ADMIN_KEY`` is at
+#: least this long: a short key could be guessed within the attempt limit.
+MIN_ADMIN_KEY_LENGTH = 32
 
 
 def normalise_database_url(url: str) -> str:
@@ -84,6 +87,9 @@ class AuditSettings:
     operator_contact: str = ""
     operator_address: str = ""
     jurisdiction: str = ""
+    #: Secret for the owner panel where codes are created from a browser.
+    #: No default: empty (or shorter than MIN_ADMIN_KEY_LENGTH) turns it off.
+    admin_key: str = field(default="", repr=False)
 
     def __post_init__(self) -> None:
         if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
@@ -108,6 +114,10 @@ class AuditSettings:
     def access_codes_enabled(self) -> bool:
         """Codes unlock reports only in paid mode; in free mode nothing is locked."""
         return self.access_codes and not self.free_mode
+
+    @property
+    def admin_enabled(self) -> bool:
+        return len(self.admin_key) >= MIN_ADMIN_KEY_LENGTH
 
     @property
     def legal_configured(self) -> bool:
@@ -171,7 +181,8 @@ class AuditSettings:
             operator_contact=_text(env.get("AUDIT_OPERATOR_CONTACT", "")),
             operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
+            admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
         )
 
 
-__all__ = ["AuditSettings", "normalise_database_url"]
+__all__ = ["MIN_ADMIN_KEY_LENGTH", "AuditSettings", "normalise_database_url"]

@@ -326,6 +326,7 @@ with an empty value):
 | `AUDIT_OPERATOR_CONTACT` | empty | Contact for privacy and deletion requests (an e-mail address). |
 | `AUDIT_OPERATOR_ADDRESS` | empty | Postal address of the operator. |
 | `AUDIT_JURISDICTION` | empty | Governing law and courts, for example "Leyes de México; tribunales de la Ciudad de México". |
+| `AUDIT_ADMIN_KEY` | empty | Secret for the owner panel at `/panel` (create, list and disable codes from a phone). Shorter than 32 characters or empty turns the panel off (404). |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
 
 ### Deploying on Railway
@@ -420,6 +421,16 @@ quant-trade audit codes disable <id>      # a leaked or refunded code
   hourly per-IP limit together with uploads (attempt counting is in memory,
   per process).
 - In free mode codes are ignored and nothing is spent.
+
+Without a terminal, the owner panel does the same from a browser: set
+`AUDIT_ADMIN_KEY` to a random secret of at least 32 characters, open
+`/panel` and type it. The panel creates a code (shown once), lists ids, notes
+and credits (never a code or its hash) and disables a code. The key travels
+only in POST bodies, never in a URL, so it is not in the access log; it is
+compared in constant time, and five wrong keys from one address in an hour
+lock that address out for the hour (in memory, per process). Pages are
+`no-store` and `noindex`. The panel is for the owner, so it is Spanish only.
+Tests: `tests/test_audit_owner_panel.py`.
 
 ### Public verification page and badge
 
