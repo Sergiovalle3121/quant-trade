@@ -66,6 +66,11 @@ CSCV_PARTITIONS = 8
 BENCHMARK_MIN_OVERLAP = 0.90
 HOLDOUT_MIN_OBSERVATIONS = 30
 BOOTSTRAP_PERCENTILES = (5.0, 50.0, 95.0)
+#: Upper bound on bootstrap cells (samples x returns). A 200,000-row intraday
+#: curve at 1,000 samples is 200 million cells (about 38 s and 1.5 GB); above
+#: the budget the samples are reduced to fit and both counts are recorded.
+BOOTSTRAP_MAX_CELLS = 10_000_000
+BOOTSTRAP_MIN_SAMPLES = 50
 VARIANCE_POLICY = "max(observed across uploaded variants, sampling-variance floor)"
 RISK_SAMPLES = 2000
 CHALLENGE_SAMPLES = 5000
@@ -271,8 +276,17 @@ def _multiplicity(
     }
 
 
+def bootstrap_samples_used(requested: int, observations: int) -> int:
+    """The samples the bootstrap draws: ``requested`` unless that would pass
+    ``BOOTSTRAP_MAX_CELLS``, never fewer than ``BOOTSTRAP_MIN_SAMPLES``."""
+    budget = BOOTSTRAP_MAX_CELLS // max(observations, 1)
+    return int(min(requested, max(BOOTSTRAP_MIN_SAMPLES, budget)))
+
+
 def _bootstrap(returns: pd.Series, *, samples: int, seed: int) -> dict[str, Any]:
     n = int(len(returns))
+    requested = samples
+    samples = bootstrap_samples_used(requested, n)
     if n < 10:
         reason = "fewer than ten returns"
         return {
@@ -307,6 +321,7 @@ def _bootstrap(returns: pd.Series, *, samples: int, seed: int) -> dict[str, Any]
         "status": "MEASURED",
         "method": "stationary",
         "samples": samples,
+        "samples_requested": requested,
         "block_size": block,
         "sharpe_per_period": band("sharpe"),
         "total_return": band("total_return"),

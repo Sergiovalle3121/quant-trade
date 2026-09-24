@@ -43,6 +43,10 @@ MAX_UPLOAD_BYTES = 5_000_000
 MAX_ROWS = 200_000
 MAX_TRADES = 50_000
 MAX_VARIANTS = 500
+#: Longest CSV line read. Pandas infers columns in time that grows with the
+#: square of their count, and a 5 MB line of fields pins a worker for minutes;
+#: a header of 500 variant names, or a row of 500 returns, fits in 32 KB.
+MAX_CSV_LINE_BYTES = 32_768
 MIN_OBSERVATIONS = 30
 
 TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha")
@@ -242,6 +246,16 @@ def _read_csv(data: bytes, *, what: str) -> pd.DataFrame:
                 f"el límite es {MAX_UPLOAD_BYTES:,}."
             ),
             code="too_large",
+        )
+    if max(len(line) for line in data.splitlines()) > MAX_CSV_LINE_BYTES:
+        raise ParseError(
+            f"a line of the {what} file is longer than {MAX_CSV_LINE_BYTES:,} bytes; "
+            "it does not look like a CSV with one row per line",
+            message_es=(
+                f"Una línea del archivo {_file_es(what)} supera los {MAX_CSV_LINE_BYTES:,} "
+                "bytes; no parece un CSV con una fila por línea."
+            ),
+            code="line_too_long",
         )
     try:
         frame = pd.read_csv(io.BytesIO(data), sep=None, engine="python", encoding="utf-8-sig")
@@ -769,6 +783,7 @@ __all__ = [
     "MAX_ROWS",
     "MAX_TRADES",
     "MAX_UPLOAD_BYTES",
+    "MAX_CSV_LINE_BYTES",
     "MAX_VARIANTS",
     "MEASURED",
     "MIN_OBSERVATIONS",

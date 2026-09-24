@@ -57,6 +57,11 @@ Limits, each written into the report as a reading warning:
   of the Balance column). A mismatch is a warning, never a silent repair.
 - A report without a starting balance uses the one the client declares,
   else 10,000 with a warning.
+- A CSV line longer than 32 KB (`MAX_CSV_LINE_BYTES`) is refused: no real
+  export has one, and pandas takes minutes on a 5 MB line of fields.
+- XML (the optimisation export and every XLSX member) is refused when it
+  declares a document type, in any encoding; a damaged, encrypted or
+  size-lying workbook gets a plain "could not be read" message.
 - The MT5 optimisation pass count is what the optimiser tried; a genetic
   optimisation lists only the passes it evaluated. The deflated Sharpe uses
   the largest of the declared trials, the uploaded variants and the passes.
@@ -303,11 +308,13 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
 | `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
-| `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. |
-| `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. |
+| `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. A whole request over six files' worth plus 1 MiB (`UPLOAD_FIELDS`, `FORM_OVERHEAD_BYTES`) is refused with 413 before it is written to disk. |
+| `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. Attempts that fail to parse count too, up to three times this number (`UPLOAD_ATTEMPTS_PER_UPLOAD`); waitlist sign-ups are limited to 5 per hour per address (`WAITLIST_PER_HOUR_PER_IP`). |
+| `AUDIT_MAX_CONCURRENT_AUDITS` | `2` | Uploads parsed and audited at the same time. Each one can use a few hundred MB on a long intraday curve. |
+| `AUDIT_QUEUE_SECONDS` | `30` | How long an upload waits for a free slot before it gets a 503 "busy, try again in a minute" page. |
 | `AUDIT_RETENTION_DAYS` | `30` | Shown on the form and the privacy page; the automatic purge uses it. A manual `audit purge --days` should use the same number. |
 | `AUDIT_AUTO_PURGE` | `false` | `true` runs the retention purge inside the service at startup and every 24 hours. Turning it on is the explicit confirmation the retention delete needs. |
-| `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. |
+| `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. Above 10 million cells (samples x returns, `BOOTSTRAP_MAX_CELLS`) the samples are reduced to fit, never below 50; the report records both counts. |
 | `AUDIT_OPERATOR_NAME` | empty | Legal name of whoever runs the service, shown on the terms and privacy pages. |
 | `AUDIT_OPERATOR_CONTACT` | empty | Contact for privacy and deletion requests (an e-mail address). |
 | `AUDIT_OPERATOR_ADDRESS` | empty | Postal address of the operator. |
@@ -514,6 +521,15 @@ link carries the token, which only its owner holds.
 `dataset_digest` over them, the engine version and seed, and the thresholds.
 Recomputing the sha256 of the original file and re-running the audit with
 the same seed reproduces the JSON byte for byte.
+
+## Security
+
+The security and robustness review of the web service, the importers and the
+store is in `docs/AUDIT_SECURITY_REVIEW.md`: what was checked, what was
+changed, and what the operator sets on Railway. Every response carries a
+Content Security Policy (no script except the print button's handler,
+allowed by its hash), `X-Frame-Options: DENY` and, when `AUDIT_BASE_URL` is
+`https`, HSTS. The access log redacts `token=` and `code=`.
 
 ## Safety rules for this code
 

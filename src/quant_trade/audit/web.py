@@ -18,10 +18,13 @@ and ``/sample`` serve a full report of synthetic data.
 # signatures at definition time, and the names it needs are imported inside
 # ``create_app`` so the module stays importable without the ``web`` extra.
 
+import base64
 import contextlib
 import hashlib
 import hmac
 import json
+import logging
+import re
 import secrets
 import threading
 import time
@@ -61,6 +64,8 @@ from quant_trade.audit.store import REQUIRE_WEB, Store, make_store
 from quant_trade.evidence.canonical_json import canonical_dumps
 
 CheckoutFactory = Callable[[AuditSettings, str, str], str]
+
+logger = logging.getLogger("quant_trade.audit.web")
 
 STRIPE_TOLERANCE_SECONDS = 300
 #: The page languages; Spanish is the default everywhere.
@@ -152,6 +157,27 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Este servicio no acepta códigos de acceso.",
         "en": "This service does not accept access codes.",
     },
+    "busy": {
+        "es": (
+            "El servicio está calculando otras auditorías en este momento; "
+            "vuelve a enviar el archivo en un minuto."
+        ),
+        "en": "The service is busy with other audits right now; submit the file again in a minute.",
+    },
+    "server_error": {
+        "es": (
+            "Algo falló de nuestro lado al procesar la petición. No se guardó nada nuevo; "
+            "inténtalo de nuevo y, si se repite, escríbenos."
+        ),
+        "en": (
+            "Something failed on our side while handling the request. Nothing new was saved; "
+            "try again and, if it happens again, contact us."
+        ),
+    },
+    "body_too_large": {
+        "es": "La petición supera el tamaño máximo de {limit} bytes.",
+        "en": "The request exceeds the maximum size of {limit} bytes.",
+    },
     "publish_locked": {
         "es": "Solo se puede publicar la verificación de un informe completo.",
         "en": "Only a full report can publish a verification.",
@@ -161,6 +187,46 @@ MESSAGES: dict[str, dict[str, str]] = {
 #: The only routes a browser or CDN may cache: public by design, no token.
 PUBLIC_CACHE_CONTROL = "public, max-age=300"
 _CODE_MAX = 40
+
+#: The one piece of script on any page: the report's "print / save PDF"
+#: button handler. The policy allows exactly this handler by its hash.
+PRINT_HANDLER = "window.print()"
+_PRINT_HANDLER_HASH = base64.b64encode(hashlib.sha256(PRINT_HANDLER.encode()).digest()).decode()
+
+#: No page runs script except the print handler above. Inline styles are
+#: the other relaxation (the report's CSS and chart colours are inline); forms
+#: post here, or leave for Stripe Checkout through a redirect, and no page can
+#: be framed.
+CONTENT_SECURITY_POLICY = (
+    f"default-src 'none'; script-src 'unsafe-hashes' 'sha256-{_PRINT_HANDLER_HASH}'; "
+    "style-src 'unsafe-inline'; img-src 'self' data:; "
+    "form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; "
+    "base-uri 'none'"
+)
+SECURITY_HEADERS: dict[str, str] = {
+    "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
+HSTS = "max-age=31536000"
+
+#: Every upload attempt counts, whether or not it becomes an audit, up to
+#: this multiple of the hourly upload limit: a customer can retry a file that
+#: failed to parse, a script cannot spin the parsers without end.
+UPLOAD_ATTEMPTS_PER_UPLOAD = 3
+#: Waitlist sign-ups per address per hour.
+WAITLIST_PER_HOUR_PER_IP = 5
+#: Room for the form fields and multipart boundaries on top of the files.
+FORM_OVERHEAD_BYTES = 1 << 20
+#: How many upload fields ``POST /audits`` takes.
+UPLOAD_FIELDS = 6
+
+_HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
+#: Query values that are secrets: the owner token and an access code.
+_SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code)=)[^&\s\"]*", re.IGNORECASE)
 
 #: The file names as the error sentences use them.
 UPLOAD_NAMES: dict[str, dict[str, str]] = {
@@ -177,6 +243,154 @@ def message(key: str, locale: str, **values: Any) -> str:
     """The service's own message ``key`` in ``locale`` (Spanish by default)."""
     texts = MESSAGES[key]
     return texts.get(locale, texts["es"]).format(**values)
+
+
+def redact_secrets(text: str) -> str:
+    """``text`` with the value of every ``token=`` and ``code=`` query parameter
+    replaced, so an access log line never carries an owner token."""
+    return _SECRET_QUERY.sub(r"\1[redacted]", text)
+
+
+class RedactSecretsFilter(logging.Filter):
+    """Access-log filter: uvicorn logs the full path, query string included."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                redact_secrets(arg) if isinstance(arg, str) else arg for arg in record.args
+            )
+        record.msg = redact_secrets(str(record.msg))
+        return True
+
+
+def uvicorn_log_config() -> dict[str, Any]:
+    """uvicorn's default logging with the access log redacted."""
+    import copy
+
+    from uvicorn.config import LOGGING_CONFIG
+
+    config = copy.deepcopy(LOGGING_CONFIG)
+    config.setdefault("filters", {})["redact_secrets"] = {"()": RedactSecretsFilter}
+    for handler in config["handlers"].values():
+        handler.setdefault("filters", []).append("redact_secrets")
+    return config
+
+
+class AttemptLog:
+    """Attempts per key in a sliding hour, in memory and thread-safe.
+
+    Per process, like the service itself (one Railway replica). Keys whose
+    attempts have all expired are dropped, so the table cannot grow without
+    bound.
+    """
+
+    def __init__(self, window: timedelta = timedelta(hours=1)) -> None:
+        self.window = window
+        self._log: dict[str, list[datetime]] = {}
+        self._lock = threading.Lock()
+        self._next_sweep: datetime | None = None
+
+    def hit(self, key: str, now: datetime) -> int:
+        """Record an attempt; return how many came before it in the window."""
+        since = now - self.window
+        with self._lock:
+            if self._next_sweep is None or now >= self._next_sweep:
+                self._log = {
+                    k: kept for k, v in self._log.items() if (kept := [t for t in v if t >= since])
+                }
+                self._next_sweep = now + self.window
+            recent = [at for at in self._log.get(key, []) if at >= since]
+            before = len(recent)
+            recent.append(now)
+            self._log[key] = recent
+        return before
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._log)
+
+
+async def _take_slot(slots: Any, wait_seconds: float) -> bool:
+    """Take one of ``slots`` (an anyio ``CapacityLimiter``), waiting at most
+    ``wait_seconds``; ``False`` when none came free in time."""
+    import anyio
+
+    try:
+        slots.acquire_nowait()
+        return True
+    except anyio.WouldBlock:
+        pass
+    if wait_seconds <= 0:
+        return False
+    with anyio.move_on_after(wait_seconds):
+        await slots.acquire()
+        return True
+    return False
+
+
+class BodyTooLarge(Exception):
+    """The request body passed the service's limit while it was being read."""
+
+
+class BodyLimitMiddleware:
+    """Refuse a request body over ``limit`` bytes before anything spools it.
+
+    Starlette writes every multipart file to a temporary file before the
+    route runs, so the per-file limit in the route comes too late to protect
+    the disk. A declared ``Content-Length`` over the limit is refused at
+    once; a chunked body is counted as it streams and cut off at the limit.
+    """
+
+    def __init__(self, app: Any, *, limit: int, reject: Callable[[Any], Any]) -> None:
+        self.app = app
+        self.limit = limit
+        self.reject = reject
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        declared = dict(scope.get("headers") or []).get(b"content-length")
+        if declared is not None:
+            try:
+                too_big = int(declared) > self.limit
+            except ValueError:
+                too_big = True
+            if too_big:
+                await self.reject(scope)(scope, receive, send)
+                return
+        seen = 0
+        started = False
+        exceeded = False
+
+        async def counted_receive() -> Any:
+            nonlocal seen, exceeded
+            message = await receive()
+            if message["type"] == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > self.limit:
+                    exceeded = True
+                    raise BodyTooLarge
+            return message
+
+        async def tracked_send(message: Any) -> None:
+            nonlocal started
+            if exceeded:
+                # Whatever the app answers to a cut-off body is replaced below.
+                return
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, counted_receive, tracked_send)
+        except Exception:
+            # The framework may wrap the cut-off in its own error; only an
+            # error unrelated to the limit is re-raised.
+            if not exceeded:
+                raise
+        if exceeded and not started:
+            await self.reject(scope)(scope, receive, send)
 
 
 class UploadTooLarge(Exception):
@@ -308,6 +522,7 @@ def _valid_email(value: str) -> bool:
 
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
+        import anyio
         from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import (
@@ -346,17 +561,54 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.store = db
     app.state.retention = retention
     app.state.checkout_factory = stripe_checkout
+    upload_attempts = AttemptLog()
+    redeem_attempts = AttemptLog()
+    waitlist_attempts = AttemptLog()
+    app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts)
+    # Waiting for a slot happens in the event loop (an await, not a blocked
+    # thread), so a queue of uploads never starves the pages that share the
+    # thread pool.
+    audit_slots = anyio.CapacityLimiter(cfg.max_concurrent_audits)
+    app.state.audit_slots = audit_slots
+    body_limit = cfg.max_upload_bytes * UPLOAD_FIELDS + FORM_OVERHEAD_BYTES
+
+    def _secure(response: Any, *, path: str = "") -> Any:
+        """The headers every response carries, errors included."""
+        for name, value in SECURITY_HEADERS.items():
+            response.headers[name] = value
+        if cfg.base_url.startswith("https://"):
+            response.headers["Strict-Transport-Security"] = HSTS
+        if "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
+        if path.startswith(DISALLOWED_PATHS) or response.status_code >= 400:
+            response.headers["X-Robots-Tag"] = NOINDEX
+        return response
+
+    def _scope_locale(scope: Any) -> str:
+        query = scope.get("query_string", b"").decode("latin-1")
+        match = re.search(r"(?:^|&)lang=(es|en)(?:&|$)", query)
+        return match.group(1) if match else "es"
+
+    def _too_large_response(scope: Any) -> Any:
+        locale = _scope_locale(scope)
+        text = message("body_too_large", locale, limit=f"{body_limit:,}")
+        accept = dict(scope.get("headers") or []).get(b"accept", b"").decode("latin-1")
+        response: Any
+        if "application/json" in accept:
+            response = JSONResponse({"error": text}, status_code=413)
+        else:
+            response = HTMLResponse(error_page(text, locale=locale), status_code=413)
+        response.headers["Connection"] = "close"
+        return _secure(response, path=scope.get("path", ""))
+
+    app.add_middleware(BodyLimitMiddleware, limit=body_limit, reject=_too_large_response)
 
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
         public = request.url.path.startswith("/v/") and response.status_code == 200
         response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        if request.url.path.startswith(DISALLOWED_PATHS) or response.status_code >= 400:
-            response.headers["X-Robots-Tag"] = NOINDEX
-        return response
+        return _secure(response, path=request.url.path)
 
     def _site_url(request: Request) -> str:
         """The public address for absolute links (canonical, previews, sitemap).
@@ -366,6 +618,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """
         if cfg.base_url != DEFAULT_BASE_URL:
             return cfg.base_url
+        # The Host header is the client's to choose: anything but a plain
+        # host name drops the absolute links rather than echoing it.
+        if not _HOST.match(request.url.netloc or ""):
+            return ""
         base = str(request.base_url).rstrip("/")
         if cfg.trusted_proxy_hops > 0 and base.startswith("http://"):
             base = "https://" + base[len("http://") :]
@@ -386,6 +642,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     async def form_error(request: Request, exc: RequestValidationError) -> Response:
         locale = _locale(request.query_params.get("lang"))
         return _html_error(request, 400, message("invalid_form", locale), locale)
+
+    @app.exception_handler(Exception)
+    async def server_error(request: Request, exc: Exception) -> Response:
+        # Logged with the path only: the query string may hold the token.
+        logger.exception("unhandled error on %s %s", request.method, request.url.path)
+        locale = _locale(request.query_params.get("lang"))
+        return _secure(
+            _html_error(request, 500, message("server_error", locale), locale),
+            path=request.url.path,
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException) -> Response:
@@ -459,8 +725,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return index(request, lang="en")
 
     @app.post("/waitlist")
-    def waitlist(email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es") -> Response:
+    def waitlist(
+        request: Request, email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es"
+    ) -> Response:
         locale = _locale(lang)
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        if waitlist_attempts.hit(ip, datetime.now(UTC)) >= WAITLIST_PER_HOUR_PER_IP:
+            return _html_error(request, 429, message("rate_limited", locale), locale)
         if not _valid_email(email):
             return RedirectResponse(f"/?lang={locale}&error=email", status_code=303)
         db.add_waitlist(email, at=datetime.now(UTC))
@@ -534,9 +805,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if consent.lower() not in ("on", "yes", "true", "1"):
             return _html_error(request, 400, message("consent_required", loc), loc)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
-        since = datetime.now(UTC) - timedelta(hours=1)
+        now = datetime.now(UTC)
+        since = now - timedelta(hours=1)
+        attempts = upload_attempts.hit(ip, now)
         recent = await run_in_threadpool(db.count_uploads_since, ip, since)
-        if recent >= cfg.max_uploads_per_hour_per_ip:
+        if (
+            recent >= cfg.max_uploads_per_hour_per_ip
+            or attempts >= cfg.max_uploads_per_hour_per_ip * UPLOAD_ATTEMPTS_PER_UPLOAD
+        ):
             return _html_error(request, 429, message("rate_limited", loc), loc)
         try:
             uploads = {
@@ -571,29 +847,50 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         except (ValidationError, ValueError):
             return _html_error(request, 400, message("invalid_declared", loc), loc)
         report_filename = report.filename if report is not None and uploads["report"] else None
-        try:
-            inputs = await run_in_threadpool(
-                build_inputs,
-                uploads["equity"],
-                declared,
-                trades_bytes=uploads["trades"],
-                benchmark_bytes=uploads["benchmark"],
-                variants_bytes=uploads["variants"],
-                report_bytes=uploads["report"],
-                report_filename=report_filename,
-                optimization_bytes=uploads["optimization"],
-            )
-        except ParseError as exc:
-            return _html_error(request, 400, exc.localized(loc), loc)
-        except ValueError:
-            return _html_error(request, 400, message("invalid_upload", loc), loc)
         report_name = report_digest_name(report_filename) if uploads["report"] else None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
-        audit_id, token, paid = await run_in_threadpool(
-            _run_and_store, inputs, ip, uploads, report_name, code or None
-        )
+
+        def parse_and_audit() -> tuple[str, str, bool] | Response:
+            """Parse, audit and store; runs in the thread pool under a slot."""
+            try:
+                inputs = build_inputs(
+                    uploads["equity"],
+                    declared,
+                    trades_bytes=uploads["trades"],
+                    benchmark_bytes=uploads["benchmark"],
+                    variants_bytes=uploads["variants"],
+                    report_bytes=uploads["report"],
+                    report_filename=report_filename,
+                    optimization_bytes=uploads["optimization"],
+                )
+            except ParseError as exc:
+                return _html_error(request, 400, exc.localized(loc), loc)
+            except ValueError:
+                return _html_error(request, 400, message("invalid_upload", loc), loc)
+            except Exception:
+                # A file no importer anticipated: the customer gets the
+                # format message, the operator gets the traceback.
+                logger.exception("upload could not be parsed")
+                return _html_error(request, 400, message("invalid_upload", loc), loc)
+            try:
+                return _run_and_store(inputs, ip, uploads, report_name, code or None)
+            except Exception:
+                logger.exception("audit failed")
+                return _html_error(request, 500, message("server_error", loc), loc)
+
+        # The slot bounds CPU and memory: a burst of uploads waits here and,
+        # past the queue time, is told the service is busy instead of piling up.
+        if not await _take_slot(audit_slots, cfg.audit_queue_seconds):
+            return _html_error(request, 503, message("busy", loc), loc)
+        try:
+            outcome = await run_in_threadpool(parse_and_audit)
+        finally:
+            audit_slots.release()
+        if not isinstance(outcome, tuple):
+            return outcome
+        audit_id, token, paid = outcome
         location = f"/audits/{audit_id}?token={token}"
         if code:
             location += "&code=" + ("applied" if paid else "rejected")
@@ -687,26 +984,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # Each attempt counts toward the hourly per-IP limit, like an upload.
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         now = datetime.now(UTC)
-        if _redeem_attempts(ip, now) >= cfg.max_uploads_per_hour_per_ip:
+        attempts = redeem_attempts.hit(ip, now) + db.count_uploads_since(
+            ip, now - timedelta(hours=1)
+        )
+        if attempts >= cfg.max_uploads_per_hour_per_ip:
             return _html_error(request, 429, message("rate_limited", locale), locale)
         applied = db.redeem_for_audit(audit_id, code.strip()[:_CODE_MAX], at=now)
         outcome = "applied" if applied else "rejected"
         if _wants_json(request):
             return JSONResponse({"access_code": outcome})
         return RedirectResponse(f"{location}&code={outcome}", status_code=303)
-
-    redeem_log: dict[str, list[datetime]] = {}
-    redeem_lock = threading.Lock()
-
-    def _redeem_attempts(ip: str, now: datetime) -> int:
-        """Attempts in the last hour from ``ip``, this one included, plus its uploads."""
-        since = now - timedelta(hours=1)
-        with redeem_lock:
-            recent = [at for at in redeem_log.get(ip, []) if at >= since]
-            recent.append(now)
-            redeem_log[ip] = recent
-            attempts = len(recent) - 1
-        return attempts + db.count_uploads_since(ip, since)
 
     @app.post("/audits/{audit_id}/publish")
     def publish(
@@ -916,7 +1203,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
 
 __all__ = [
+    "CONTENT_SECURITY_POLICY",
     "MESSAGES",
+    "PRINT_HANDLER",
+    "SECURITY_HEADERS",
+    "AttemptLog",
+    "BodyLimitMiddleware",
+    "RedactSecretsFilter",
+    "redact_secrets",
+    "uvicorn_log_config",
     "client_ip",
     "create_app",
     "message",

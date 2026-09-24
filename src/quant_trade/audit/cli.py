@@ -196,10 +196,14 @@ def serve(
     try:
         import uvicorn
 
-        from quant_trade.audit.web import create_app
+        from quant_trade.audit.web import create_app, uvicorn_log_config
     except ImportError as exc:
         raise typer.BadParameter('audit serve requires: python -m pip install -e ".[web]"') from exc
-    uvicorn.run(create_app(), host=host, port=port)
+    # The access log redacts ``token=`` and ``code=``: report links carry the
+    # owner token in the query string, and logs outlive the audit.
+    uvicorn.run(
+        create_app(), host=host, port=port, log_config=uvicorn_log_config(), server_header=False
+    )
 
 
 @audit_app.command("purge")

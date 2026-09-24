@@ -26,6 +26,9 @@ DEFAULT_BOOTSTRAP_SAMPLES = 1000
 #: reverse proxy (Railway) set ``AUDIT_TRUSTED_PROXY_HOPS=1``.
 DEFAULT_TRUSTED_PROXY_HOPS = 0
 MAX_TRUSTED_PROXY_HOPS = 10
+#: Audits computed at the same time; more wait, then get a "busy" page.
+DEFAULT_MAX_CONCURRENT_AUDITS = 2
+DEFAULT_AUDIT_QUEUE_SECONDS = 30
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -64,6 +67,10 @@ class AuditSettings:
     retention_days: int = DEFAULT_RETENTION_DAYS
     bootstrap_samples: int = DEFAULT_BOOTSTRAP_SAMPLES
     trusted_proxy_hops: int = DEFAULT_TRUSTED_PROXY_HOPS
+    #: How many uploads are parsed and audited at once, and how long another
+    #: upload waits for a free slot before it is told the service is busy.
+    max_concurrent_audits: int = DEFAULT_MAX_CONCURRENT_AUDITS
+    audit_queue_seconds: int = DEFAULT_AUDIT_QUEUE_SECONDS
     #: The owner sells access codes (bank transfer, Mercado Pago, WhatsApp).
     access_codes: bool = False
     #: Where a client asks the owner for a code; shown on the landing page.
@@ -84,6 +91,10 @@ class AuditSettings:
                 f"trusted_proxy_hops must be between 0 and {MAX_TRUSTED_PROXY_HOPS}, "
                 f"got {self.trusted_proxy_hops}"
             )
+        if self.max_concurrent_audits < 1:
+            raise ValueError("max_concurrent_audits must be at least 1")
+        if self.audit_queue_seconds < 0:
+            raise ValueError("audit_queue_seconds cannot be negative")
 
     @property
     def stripe_configured(self) -> bool:
@@ -146,6 +157,12 @@ class AuditSettings:
             bootstrap_samples=int(env.get("AUDIT_BOOTSTRAP_SAMPLES", DEFAULT_BOOTSTRAP_SAMPLES)),
             trusted_proxy_hops=int(
                 env.get("AUDIT_TRUSTED_PROXY_HOPS", "").strip() or DEFAULT_TRUSTED_PROXY_HOPS
+            ),
+            max_concurrent_audits=int(
+                env.get("AUDIT_MAX_CONCURRENT_AUDITS", "").strip() or DEFAULT_MAX_CONCURRENT_AUDITS
+            ),
+            audit_queue_seconds=int(
+                env.get("AUDIT_QUEUE_SECONDS", "").strip() or DEFAULT_AUDIT_QUEUE_SECONDS
             ),
             access_codes=access_codes,
             contact_url=_safe_url(env.get("AUDIT_CONTACT_URL", "")),
