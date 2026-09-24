@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from quant_trade.audit.guard import assert_report_clean
-from quant_trade.audit.report import LABELS, STATUS_TEXT, _dimension_title, _kpi_list
+from quant_trade.audit.report import LABELS, SOURCE_NAMES, STATUS_TEXT, _dimension_title, _kpi_list
 from quant_trade.audit.theme import class_ring
 from quant_trade.audit.verdict import DIMENSION_ORDER
 
@@ -146,13 +146,15 @@ def _card(data: dict[str, Any], name: str, href: str, locale: str) -> str:
     inputs = data.get("inputs") or {}
     first = str(inputs.get("first_timestamp", ""))[:10]
     last = str(inputs.get("last_timestamp", ""))[:10]
-    source = inputs.get("source_format") or "csv"
+    source = SOURCE_NAMES.get(
+        str(inputs.get("source_format")), inputs.get("source_format") or "CSV"
+    )
     overall = str(data["verdict"]["overall"])
     return (
         "<div class='cmp-card'>" + class_ring(overall) + f"<div><div class='k'>{_e(name)}</div>"
         f"<strong>{_e(copy['class'])} {_e(overall)}</strong>"
         f"<p>{_e(copy['period'])}: {_e(first)} → {_e(last)} · {_e(copy['source'])}: "
-        f"<code>{_e(source)}</code></p>"
+        f"{_e(source)}</p>"
         f"<p><a href='{_e(href)}'>{_e(copy['open'])}</a></p></div></div>"
     )
 

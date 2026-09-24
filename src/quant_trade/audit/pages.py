@@ -21,10 +21,10 @@ from quant_trade.audit.guides import (
     guide_url,
     guides_index_url,
 )
-from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
-from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
-from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
+from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS, preset_label
+from quant_trade.audit.redflags import FLAG_TITLES
+from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, SOURCE_NAMES, STATUS_TEXT
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.theme import (
@@ -99,7 +99,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Cuánto sobrevive después de descontar el número de intentos que declaras.",
             "Qué pasa a 1x, 2x y 3x el coste de operación, y el coste de equilibrio.",
             "Si el tramo fuera de muestra que declaras aguanta.",
-            "Catorce banderas rojas de calidad de datos: duplicados, picos, marcas congeladas.",
+            f"{len(FLAG_TITLES)} banderas rojas: datos duplicados, picos, marcas congeladas y más.",
             "Comparación con el benchmark que aportes, si aportas uno.",
         ],
         "not_title": "Qué no hacemos",
@@ -128,8 +128,11 @@ _COPY: dict[str, dict[str, Any]] = {
         "benchmark": "Benchmark (CSV, opcional)",
         "variants": "Matriz de variantes (CSV, opcional)",
         "variants_help": "Una columna de retornos por variante probada; habilita el PBO.",
-        "trials": "Intentos probados antes de elegir esta versión",
-        "cost_bps": "Coste por lado en puntos básicos (comisión + deslizamiento)",
+        "trials": "Configuraciones probadas antes de elegir esta (vacío = sin declarar)",
+        "cost_bps": (
+            "Coste extra por lado en puntos básicos, además del que ya detalla tu informe "
+            "(vacío = 0)"
+        ),
         "oos_start": "Inicio del tramo fuera de muestra (opcional)",
         "benchmark_applicable": "¿Aplica un benchmark?",
         "yes": "Sí",
@@ -289,7 +292,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "How much survives after discounting the number of trials you declare.",
             "What happens at 1x, 2x and 3x the trading cost, and the break-even cost.",
             "Whether the out-of-sample window you declare holds up.",
-            "Fourteen data-quality red flags: duplicates, spikes, frozen marks.",
+            f"{len(FLAG_TITLES)} red flags: duplicate data, spikes, frozen marks and more.",
             "A comparison against the benchmark you supply, if you supply one.",
         ],
         "not_title": "What we do not do",
@@ -318,8 +321,11 @@ _COPY: dict[str, dict[str, Any]] = {
         "benchmark": "Benchmark (CSV, optional)",
         "variants": "Variant matrix (CSV, optional)",
         "variants_help": "One return column per variant tried; enables the PBO.",
-        "trials": "Trials tried before choosing this version",
-        "cost_bps": "Cost per side in basis points (commission + slippage)",
+        "trials": "Configurations tried before choosing this one (blank = not declared)",
+        "cost_bps": (
+            "Extra cost per side in basis points, on top of what your report already itemises "
+            "(blank = 0)"
+        ),
         "oos_start": "Out-of-sample start (optional)",
         "benchmark_applicable": "Does a benchmark apply?",
         "yes": "Yes",
@@ -845,9 +851,7 @@ def _preset_options(locale: str) -> str:
     for key in sorted(PRESETS):
         rules = PRESETS[key]
         selected = " selected" if key == DEFAULT_PRESET else ""
-        label = " · ".join(
-            localize(part, locale) for part in (rules.firm, rules.program, rules.phase)
-        )
+        label = preset_label(rules.firm, rules.program, rules.phase, locale)
         options.append(f"<option value='{_e(key)}'{selected}>{_e(label)}</option>")
     return "".join(options)
 
@@ -1299,10 +1303,12 @@ def _upload_form(
         + "<div class='form-grid'>"
         + _drop("benchmark", copy["benchmark"], ".csv,text/csv", "", locale)
         + _drop("variants", copy["variants"], ".csv,text/csv", _e(copy["variants_help"]), locale)
-        + _field(copy["trials"], "<input type='number' name='trials' min='1' value='1' required>")
+        + _field(
+            copy["trials"], "<input type='number' name='trials' min='1' step='1' placeholder='1'>"
+        )
         + _field(
             copy["cost_bps"],
-            "<input type='number' name='cost_bps' min='0' step='0.1' value='5'>",
+            "<input type='number' name='cost_bps' min='0' step='0.1' placeholder='0'>",
         )
         + _field(copy["oos_start"], "<input type='date' name='oos_start'>")
         + _field(
@@ -1340,7 +1346,7 @@ def _upload_form(
         + _drop(
             "report",
             copy["report"],
-            ".htm,.html,.csv,.xlsx,.txt",
+            ".htm,.html,.csv,.xlsx",
             report_help,
             locale,
             main=True,
@@ -1525,7 +1531,13 @@ def verification_page(
     declared = result.get("declared", {})
     trials_used = result.get("multiplicity", {}).get("trials_used")
     details = [
-        (copy["v_format"], inputs.get("source_format") or inputs.get("source") or "-"),
+        (
+            copy["v_format"],
+            SOURCE_NAMES.get(str(inputs.get("source_format")), "")
+            or inputs.get("source_format")
+            or inputs.get("source")
+            or "-",
+        ),
         (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
         (copy["v_trials_declared"], _evidence_value(declared.get("trials"))),
         (copy["v_trials_used"], _evidence_value(trials_used)),

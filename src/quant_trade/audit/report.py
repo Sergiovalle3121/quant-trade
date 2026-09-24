@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import html
 from typing import Any
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import legal_links_html
 from quant_trade.audit.plan import improvement_plan
+from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
@@ -122,6 +124,18 @@ LABELS: dict[str, dict[str, str]] = {
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
         "redeem_button": "Canjear código",
         "buy_code": "¿No tienes código? Pídelo aquí",
+        "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
+        "unlock_jump": "Desbloquear el informe completo",
+        "boot_line": "Bootstrap estacionario por bloques, remuestreos:",
+        "boot_block": "bloque",
+        "point": "Estimación",
+        "engine": "motor",
+        "seed": "semilla",
+        "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
+        "keep_link": (
+            "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
+            "No pedimos correo ni cuenta."
+        ),
         "pack": "pack de 3 informes: USD {price:.0f}",
         "publish": "Publicar verificación pública",
         "publish_help": (
@@ -272,6 +286,18 @@ LABELS: dict[str, dict[str, str]] = {
         "redeem": "Have an access code? Enter it to see the full report",
         "redeem_button": "Redeem code",
         "buy_code": "No code yet? Ask for one here",
+        "generic_rules": "Generic reference rules, not any one firm's terms.",
+        "unlock_jump": "Unlock the full report",
+        "boot_line": "Stationary block bootstrap, resamples:",
+        "boot_block": "block",
+        "point": "Estimate",
+        "engine": "engine",
+        "seed": "seed",
+        "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
+        "keep_link": (
+            "Save this page's link: it is the only way back to your report. "
+            "We ask for no email and no account."
+        ),
         "pack": "pack of 3 reports: USD {price:.0f}",
         "publish": "Publish a public verification",
         "publish_help": (
@@ -429,6 +455,14 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dsr_at_declared": "DSR con los intentos declarados",
         "dsr_at_trials_used": "DSR con los intentos usados",
         "trials_to_half": "Intentos que bajan el DSR a 0.5",
+        "trials_used": "Intentos usados",
+        "observed_across_variants": "Observado en las variantes",
+        "sharpe_variance_used": "Varianza del Sharpe usada",
+        "sharpe_per_period": "Sharpe por periodo",
+        "break_even_bps": "Coste de equilibrio (pb por lado)",
+        "break_even_multiple": "Múltiplo de coste de equilibrio",
+        "reference_bps": "Coste de referencia (pb por lado)",
+        "dataset_digest": "Huella del conjunto de datos",
     },
     "en": {
         "total_return": "Total return",
@@ -462,6 +496,14 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dsr_at_declared": "DSR at the declared trials",
         "dsr_at_trials_used": "DSR at the trials used",
         "trials_to_half": "Trials that bring DSR to 0.5",
+        "trials_used": "Trials used",
+        "observed_across_variants": "Observed across variants",
+        "sharpe_variance_used": "Sharpe variance used",
+        "sharpe_per_period": "Sharpe per period",
+        "break_even_bps": "Break-even cost (bps per side)",
+        "break_even_multiple": "Break-even cost multiple",
+        "reference_bps": "Reference cost (bps per side)",
+        "dataset_digest": "Dataset digest",
     },
 }
 
@@ -518,6 +560,8 @@ def _fmt(value: Any, *, key: str = "") -> str:
     if isinstance(value, float):
         if key in PERCENT_KEYS:
             return f"{value:.2%}"
+        if value.is_integer() and abs(value) < 1e15:
+            return f"{int(value):,}"
         if abs(value) >= 1000:
             return f"{value:,.1f}"
         return f"{value:.4f}"
@@ -534,6 +578,23 @@ def _is_evidence(value: Any) -> bool:
 
 def _locale_of(labels: dict[str, str]) -> str:
     return "es" if labels is LABELS["es"] else "en"
+
+
+#: What the customer's file was, as they know it; the same in both languages.
+SOURCE_NAMES: dict[str, str] = {
+    "mt5_tester_html": "MetaTrader 5 Strategy Tester (HTML)",
+    "mt5_tester_xlsx": "MetaTrader 5 Strategy Tester (Excel)",
+    "mt5_history_html": "MetaTrader 5 history (HTML)",
+    "mt5_history_xlsx": "MetaTrader 5 history (Excel)",
+    "mt4_tester_html": "MetaTrader 4 Strategy Tester (HTML)",
+    "mt4_statement_html": "MetaTrader 4 statement (HTML)",
+    "tradingview_csv": "TradingView (CSV)",
+    "tradingview_xlsx": "TradingView (Excel)",
+    "ninjatrader_csv": "NinjaTrader (CSV)",
+    "quantconnect_trades_csv": "QuantConnect (CSV)",
+    "backtestingpy_csv": "backtesting.py (CSV)",
+    "vectorbt_csv": "vectorbt (CSV)",
+}
 
 
 def _key_label(key: str, labels: dict[str, str]) -> str:
@@ -969,12 +1030,21 @@ def _challenge_html(challenge: dict[str, Any] | None, locale: str, labels: dict[
     rules = challenge.get("rules", {})
     html_text = (
         f"<p><strong>{_e(labels['challenge_rules'])}:</strong> "
-        f"{_e(localize(rules.get('firm', ''), locale))} "
-        f"{_e(localize(rules.get('program', ''), locale))} "
-        f"{_e(localize(rules.get('phase', ''), locale))} "
-        f"(<code>{_e(challenge.get('preset', ''))}</code>). "
-        f"{_e(labels['source'])}: {_e(rules.get('source_url', ''))}, {_e(labels['as_of'])} "
-        f"{_e(rules.get('as_of', ''))}.</p>"
+        + _e(
+            preset_label(
+                str(rules.get("firm", "")),
+                str(rules.get("program", "")),
+                str(rules.get("phase", "")),
+                locale,
+            )
+        )
+        + f" (<code>{_e(challenge.get('preset', ''))}</code>). "
+        + (
+            f"{_e(labels['source'])}: {_e(rules.get('source_url', ''))}, {_e(labels['as_of'])} "
+            f"{_e(rules.get('as_of', ''))}.</p>"
+            if str(rules.get("source_url", "")).startswith("https://")
+            else f"{_e(labels['generic_rules'])}</p>"
+        )
     )
     html_text += _status_line(challenge, labels)
     if challenge.get("status") == "MEASURED":
@@ -1022,7 +1092,8 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     out = ""
     source_format = inputs.get("source_format")
     if source_format and source_format != "csv":
-        out += f"<p>{_e(labels['report_source'])}: <code>{_e(source_format)}</code></p>"
+        shown = SOURCE_NAMES.get(source_format, source_format)
+        out += f"<p>{_e(labels['report_source'])}: {_e(shown)}</p>"
     optimization = inputs.get("optimization")
     if optimization:
         passes = optimization["passes"]
@@ -1056,6 +1127,29 @@ def _summary_in(data: dict[str, Any], locale: str) -> str:
         locale="en" if locale == "en" else "es",
         trials=int(trials.get("value") or 1),
         trials_evidence=str(trials.get("evidence") or "DECLARED"),
+    )
+
+
+def _prefilled(contact_url: str, message: str) -> str:
+    """A WhatsApp link that opens with ``message`` typed; other links unchanged."""
+    parts = urlsplit(contact_url)
+    if parts.netloc not in {"wa.me", "api.whatsapp.com"} or "text=" in parts.query:
+        return contact_url
+    query = (parts.query + "&" if parts.query else "") + "text=" + quote(message)
+    return urlunsplit(parts._replace(query=query))
+
+
+def _short_time(stamp: str) -> str:
+    """``2026-09-24T19:40:12.123456Z`` as ``2026-09-24 19:40 UTC``."""
+    stamp = str(stamp)
+    return f"{stamp[:10]} {stamp[11:16]} UTC" if len(stamp) >= 16 else stamp
+
+
+def _only_unmeasured(body: str) -> bool:
+    """True when a section has nothing but NOT_MEASURED marks to show."""
+    return "badge NOT_MEASURED" in body and not any(
+        f"badge {tag}" in body
+        for tag in ('MEASURED"', "MEASURED'", "DECLARED", "PASS", "WEAK", "FAIL")
     )
 
 
@@ -1120,6 +1214,9 @@ def render_html(
         )
         if contact_url:
             # Where a client without a code buys one (bank transfer, WhatsApp).
+            contact_url = _prefilled(
+                contact_url, labels["code_request"].format(id=data["audit_id"])
+            )
             price = f" (USD {price_usd:,.0f})" if price_usd else ""
             paybox += (
                 f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
@@ -1165,7 +1262,8 @@ def render_html(
             for name, digest in data["inputs"]["digests"].items()
         )
         + (
-            f"<tr><td>dataset_digest</td><td><code>{_e(data['inputs']['dataset_digest'])}</code>"
+            f"<tr><td>{_e(_key_label('dataset_digest', labels))}</td>"
+            f"<td><code>{_e(data['inputs']['dataset_digest'])}</code>"
             "</td></tr></table>"
         )
     )
@@ -1216,15 +1314,16 @@ def render_html(
     boot_html = _status_line(boot, labels)
     if boot.get("status") == "MEASURED":
         boot_html += (
-            f"<p class='muted'>method={_e(boot['method'])}, samples={_fmt(boot['samples'])}, "
-            f"block={_fmt(boot['block_size'])}</p><table><tr><th></th><th>point</th><th>p5</th>"
+            f"<p class='muted'>{_e(labels['boot_line'])}"
+            f" {_fmt(boot['samples'])} · {_e(labels['boot_block'])} {_fmt(boot['block_size'])}</p>"
+            f"<table><tr><th></th><th>{_e(labels['point'])}</th><th>p5</th>"
             "<th>p50</th><th>p95</th></tr>"
         )
         for stat in ("sharpe_per_period", "total_return"):
             band = boot[stat]
             key = "p5" if stat == "total_return" else ""
             boot_html += (
-                f"<tr><td>{_e(stat)}</td>"
+                f"<tr><td>{_e(_key_label(stat, labels))}</td>"
                 + "".join(
                     f"<td>{_fmt(band[p]['value'], key=key)} {_badge(band[p]['evidence'])}</td>"
                     for p in ("point_estimate", "p5", "p50", "p95")
@@ -1403,8 +1502,10 @@ def render_html(
     ]
     if locked:
         detail_html = (
-            f"<div class='lockbox'><p>{_e(labels['locked_intro'])}:</p><ul>"
-            + "".join(f"<li>{_e(title)}</li>" for title, _ in detail)
+            f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
+            + "".join(
+                f"<li>{_e(title)}</li>" for title, body in detail if not _only_unmeasured(body)
+            )
             + f"</ul>{paybox}</div>"
         )
     else:
@@ -1439,9 +1540,9 @@ def render_html(
     engine = data["engine"]
     meta = (
         f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
-        f"<span>{_e(labels['generated'])} {_e(data['generated_at_utc'])}</span>"
-        f"<span>engine {_e(engine['name'])} {_e(engine['package_version'])}</span>"
-        f"<span>seed {_e(engine['seed'])}</span>"
+        f"<span>{_e(labels['generated'])} {_e(_short_time(data['generated_at_utc']))}</span>"
+        f"<span>{_e(labels['engine'])} {_e(engine['name'])} {_e(engine['package_version'])}</span>"
+        f"<span>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
     hero = (
         "<section class='report-hero'>"
@@ -1457,7 +1558,13 @@ def render_html(
         + class_ring(str(verdict["overall"]), size="lg")
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         f"<p class='verdict-text'>{_e(verdict['summary'])}</p></div></div>"
-        + ("" if locked else paybox)
+        + (
+            f"<p class='rise' style='--i:4'><a class='btn btn-primary' href='#unlock'>"
+            f"{_e(labels['unlock_jump'])}</a></p>"
+            f"<p class='muted keep-link rise' style='--i:4'>{_e(labels['keep_link'])}</p>"
+            if locked and (redeem_url or checkout_url)
+            else ""
+        )
         + "</div></section>"
     )
 

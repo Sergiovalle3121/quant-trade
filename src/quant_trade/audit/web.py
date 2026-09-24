@@ -562,6 +562,15 @@ def _valid_email(value: str) -> bool:
     return 3 <= len(value) <= _EMAIL_MAX and "@" in value and "." in value.rsplit("@", 1)[-1]
 
 
+def _sentence(text: str) -> str:
+    """An error message as a sentence: capitalised and ending in a full stop."""
+    text = text.strip()
+    if not text:
+        return text
+    text = text[0].upper() + text[1:]
+    return text if text[-1] in ".!?" else text + "."
+
+
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         import anyio
@@ -905,8 +914,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         trades: Annotated[UploadFile | None, File()] = None,
         benchmark: Annotated[UploadFile | None, File()] = None,
         variants: Annotated[UploadFile | None, File()] = None,
-        trials: Annotated[int, Form()] = 1,
-        cost_bps: Annotated[float, Form()] = 0.0,
+        trials: Annotated[str, Form(max_length=12)] = "",
+        cost_bps: Annotated[str, Form(max_length=20)] = "",
         oos_start: Annotated[str, Form()] = "",
         description: Annotated[str, Form()] = "",
         benchmark_applicable: Annotated[str, Form()] = "yes",
@@ -949,9 +958,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not uploads["equity"] and not uploads["report"]:
             return _html_error(request, 400, message("equity_required", loc), loc)
         try:
+            # A blank field is not a declaration: 1 trial is assumed (and never
+            # held against the client) and no extra cost is added.
             declared = DeclaredMetadata(
-                trials=trials,
-                cost_bps_per_side=cost_bps,
+                trials=int(trials) if trials.strip() else 1,
+                trials_declared=bool(trials.strip()),
+                cost_bps_per_side=float(cost_bps) if cost_bps.strip() else 0.0,
                 oos_start=oos_start.strip() or None,
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
@@ -981,7 +993,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     optimization_bytes=uploads["optimization"],
                 )
             except ParseError as exc:
-                return _html_error(request, 400, exc.localized(loc), loc)
+                return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
             except ValueError:
                 return _html_error(request, 400, message("invalid_upload", loc), loc)
             except Exception:

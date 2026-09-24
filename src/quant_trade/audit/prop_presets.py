@@ -384,7 +384,26 @@ def get_preset(key: str) -> ChallengeRules:
         ) from None
 
 
+def preset_label(firm: str, program: str, phase: str, locale: str = "es") -> str:
+    """``firm · program · phase`` for a reader, without a phase that says nothing.
+
+    The phase is shown only when another preset shares the firm and program
+    (a two-step evaluation) or when it is not a bare number.
+    """
+    from quant_trade.audit.i18n import localize
+
+    siblings = sum(1 for r in PRESETS.values() if (r.firm, r.program) == (firm, program))
+    parts = [localize(firm, locale), localize(program, locale)]
+    if phase and (siblings > 1 or not phase.isdigit()):
+        word = "fase" if locale == "es" else "phase"
+        parts.append(
+            f"{word} {localize(phase, locale)}" if phase[0].isdigit() else localize(phase, locale)
+        )
+    return " · ".join(part for part in parts if part)
+
+
 __all__ = [
+    "preset_label",
     "DAILY_LOSS_BASES",
     "DEFAULT_PRESET",
     "AS_OF",
