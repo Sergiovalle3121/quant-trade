@@ -75,6 +75,7 @@ class ScorecardPolicy:
     weights: dict[str, float]
     minimum_pass_score: float = 70.0
     minimum_category_score: float = 50.0
+    metadata_requirements: dict[str, list[list[str]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

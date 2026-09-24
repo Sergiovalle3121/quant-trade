@@ -1,0 +1,8 @@
+src/quant_trade/evidence/config.py
+src/quant_trade/evidence/database.py
+src/quant_trade/evidence/ingest.py
+src/quant_trade/evidence/models.py
+src/quant_trade/evidence/scorecard.py
+tests/test_evidence_database.py
+tests/test_evidence_ingest.py
+tests/test_evidence_scorecard.py

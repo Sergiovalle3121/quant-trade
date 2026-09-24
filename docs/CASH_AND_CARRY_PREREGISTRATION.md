@@ -4,6 +4,13 @@ Registered **before** looking at any real results, so the analysis cannot be
 tuned to a favourable outcome. Research-only: no orders, no live venues, no
 funds movement. Wallets (if ever used) are watch-only.
 
+## Multiple-testing evidence
+
+A promotable campaign requires a configured, existing, non-empty and intact
+global trial ledger. If that history is absent or corrupt, PSR may still be
+reported as a diagnostic, but DSR is unavailable and the campaign fails
+closed. Unknown search breadth is never treated as a single independent trial.
+
 ## Hypothesis
 
 A delta-neutral two-leg position — **long spot, short perpetual** of the same

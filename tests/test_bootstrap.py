@@ -208,6 +208,12 @@ def test_infinite_values_raise():
         iid_bootstrap(r, samples=10, seed=1)
 
 
+@pytest.mark.parametrize("invalid_return", [-1.0, -1.01])
+def test_returns_that_make_wealth_non_positive_raise(invalid_return):
+    with pytest.raises(ValueError, match="greater than -1"):
+        iid_bootstrap(pd.Series([0.01, invalid_return]), samples=10, seed=1)
+
+
 def test_invalid_samples_and_block_size():
     r = pd.Series(_ar1(50, 0.3, seed=1))
     with pytest.raises(ValueError, match="samples"):

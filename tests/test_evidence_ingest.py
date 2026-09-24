@@ -2,7 +2,7 @@ import json
 
 from quant_trade.evidence.config import EvidenceConfig
 from quant_trade.evidence.database import connect
-from quant_trade.evidence.ingest import ingest_path
+from quant_trade.evidence.ingest import ingest_path, sanitize_metadata
 
 
 def cfg(tmp_path):
@@ -26,3 +26,16 @@ def test_ingests_artifacts_and_redacts_secret_files(tmp_path):
     with connect(tmp_path / "evidence.sqlite") as conn:
         rows = list(conn.execute("SELECT * FROM artifacts WHERE strategy_id='s1'"))
     assert rows
+
+
+def test_sanitizer_preserves_bounded_nested_metadata_and_redacts_nested_secrets():
+    metadata = sanitize_metadata(
+        {
+            "strategy_id": "s1",
+            "dataset_binding": {"data_sha256": "abc", "api_key": "do-not-store"},
+            "test_metrics": {"sharpe": 0.5},
+        }
+    )
+    assert metadata["dataset_binding"]["data_sha256"] == "abc"
+    assert metadata["dataset_binding"]["api_key"] == "[REDACTED]"
+    assert metadata["test_metrics"]["sharpe"] == 0.5

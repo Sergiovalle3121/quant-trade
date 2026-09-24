@@ -11,3 +11,25 @@ weights:
   risk_control: 1.2
   governance_completeness: 1.0
   human_review_completeness: 1.0
+metadata_requirements:
+  research_quality:
+    - [strategy_id, strategy, strategy_name]
+    - [dataset_binding, data_sha256, dataset_sha]
+  out_of_sample_performance:
+    - [test_metrics, test_total_return, oos_metrics]
+  robustness:
+    - [bootstrap, overfitting_evidence, cost_sensitivity]
+  stress_resilience:
+    - [scenario, scenarios, stress_results]
+  paper_trial_performance:
+    - [paper_metrics, equity, reconciliation]
+  operational_reliability:
+    - [heartbeat, reliability, incident_count]
+  execution_quality:
+    - [fill_rate, slippage, reconciliation]
+  risk_control:
+    - [risk_limits, kill_switch, max_drawdown]
+  governance_completeness:
+    - [decision, decision_status, real_money_approved]
+  human_review_completeness:
+    - [reviewer, human_notes, reviewed_at]

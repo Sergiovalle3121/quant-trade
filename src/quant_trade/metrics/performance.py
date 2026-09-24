@@ -31,6 +31,25 @@ def periods_per_year(timestamps: Any) -> float:
     return max(1.0, (len(ts) - 1) * _SECONDS_PER_YEAR / span_seconds)
 
 
+def elapsed_years(timestamps: Any, observations: int) -> float:
+    """Return the observed calendar span in years, with a sparse-data fallback."""
+    ts = pd.to_datetime(pd.Series(timestamps), utc=True, errors="coerce").dropna().sort_values()
+    if len(ts) >= 2:
+        span_seconds = (ts.iloc[-1] - ts.iloc[0]).total_seconds()
+        if span_seconds > 0:
+            return span_seconds / _SECONDS_PER_YEAR
+    return max(observations - 1, 1) / TRADING_DAYS
+
+
+def downside_deviation(returns: pd.Series, periods: float, mar: float = 0.0) -> float:
+    """Annualized semideviation relative to a per-period minimum return."""
+    values = pd.to_numeric(returns, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if values.empty:
+        return 0.0
+    shortfalls = np.minimum(values.to_numpy(dtype=float) - mar, 0.0)
+    return float(np.sqrt(np.mean(np.square(shortfalls))) * math.sqrt(periods))
+
+
 def calculate_performance(equity_curve: pd.DataFrame, trades: list[Trade]) -> dict[str, Any]:
     """Calculate performance metrics while safely handling sparse or empty data."""
     if equity_curve.empty or "equity" not in equity_curve:
@@ -46,11 +65,10 @@ def calculate_performance(equity_curve: pd.DataFrame, trades: list[Trade]) -> di
     )
     returns = equity.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
     total_return = float(equity.iloc[-1] / equity.iloc[0] - 1)
-    years = max(len(equity) / ppy, 1 / ppy)
+    years = elapsed_years(equity_curve.get("timestamp", []), len(equity))
     cagr = float((equity.iloc[-1] / equity.iloc[0]) ** (1 / years) - 1) if len(equity) > 1 else 0.0
     volatility = float(returns.std(ddof=0) * math.sqrt(ppy)) if len(returns) > 1 else 0.0
-    downside = returns[returns < 0]
-    downside_vol = float(downside.std(ddof=0) * math.sqrt(ppy)) if len(downside) > 1 else 0.0
+    downside_vol = downside_deviation(returns, ppy)
     sharpe = float((returns.mean() * ppy) / volatility) if volatility > 0 else 0.0
     sortino = float((returns.mean() * ppy) / downside_vol) if downside_vol > 0 else 0.0
     drawdown = equity / equity.cummax() - 1
