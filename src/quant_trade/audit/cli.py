@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from quant_trade.audit.engine import run_audit
+from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import render
 from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs
 from quant_trade.evidence.canonical_json import atomic_write_json, atomic_write_text
@@ -61,8 +62,30 @@ def _print_verdict(payload: dict[str, Any]) -> None:
 
 @audit_app.command("run")
 def run(
-    equity: Annotated[Path, typer.Option(help="CSV with timestamp + equity (or return)")],
     output_dir: Annotated[Path, typer.Option(help="Where audit.json and report.html go")],
+    equity: Annotated[
+        Path | None,
+        typer.Option(help="CSV with timestamp + equity (or return); optional with --report"),
+    ] = None,
+    report: Annotated[
+        Path | None,
+        typer.Option(
+            help="Platform report: MT5/MT4 HTML, TradingView CSV/XLSX, NinjaTrader, "
+            "QuantConnect, backtesting.py or vectorbt trades"
+        ),
+    ] = None,
+    optimization: Annotated[
+        Path | None,
+        typer.Option(help="MT5 optimisation XML; its passes become the MEASURED trial count"),
+    ] = None,
+    challenge: Annotated[
+        str | None,
+        typer.Option(help=f"Prop-firm preset to simulate (default {DEFAULT_PRESET})"),
+    ] = None,
+    initial_balance: Annotated[
+        float | None,
+        typer.Option(help="Starting balance, used only when the report states none", min=0),
+    ] = None,
     trades: Annotated[Path | None, typer.Option(help="CSV of closed trades")] = None,
     benchmark: Annotated[Path | None, typer.Option(help="CSV with a benchmark equity")] = None,
     variants: Annotated[Path | None, typer.Option(help="CSV matrix of variant returns")] = None,
@@ -76,7 +99,17 @@ def run(
     bootstrap_samples: Annotated[int, typer.Option(help="Bootstrap samples", min=10)] = 1000,
     paid: Annotated[bool, typer.Option("--paid/--preview", help="Full report or preview")] = False,
 ) -> None:
-    """Audit one backtest and write ``audit.json`` and ``report.html``."""
+    """Audit one backtest and write ``audit.json`` and ``report.html``.
+
+    Give ``--equity`` (a curve), ``--report`` (the platform's own file), or
+    both: the report then supplies the trades and the equity file the curve.
+    """
+    if equity is None and report is None:
+        raise typer.BadParameter("give --equity, --report, or both")
+    if challenge is not None and challenge not in PRESETS:
+        raise typer.BadParameter(
+            f"unknown challenge preset {challenge!r}; see: quant-trade audit presets"
+        )
     try:
         declared = DeclaredMetadata(
             trials=trials,
@@ -85,16 +118,21 @@ def run(
             description=description,
             benchmark_applicable=benchmark_applicable,
             locale=locale,
+            initial_balance=initial_balance or None,
+            challenge=challenge,
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     try:
         inputs = build_inputs(
-            _read(equity, what="equity") or b"",
+            _read(equity, what="equity"),
             declared,
             trades_bytes=_read(trades, what="trades"),
             benchmark_bytes=_read(benchmark, what="benchmark"),
             variants_bytes=_read(variants, what="variants"),
+            report_bytes=_read(report, what="report"),
+            report_filename=report.name if report is not None else None,
+            optimization_bytes=_read(optimization, what="optimization"),
         )
     except ParseError as exc:
         typer.echo(f"cannot audit: {exc}", err=True)
@@ -113,6 +151,29 @@ def run(
         seal_holdout(output_dir, HoldoutSeal(**{k: v for k, v in seal.items() if k in known}))
     _print_verdict(payload)
     typer.echo(f"wrote {output_dir / AUDIT_JSON} and {output_dir / REPORT_HTML}")
+
+
+@audit_app.command("presets")
+def presets() -> None:
+    """List the prop-firm challenge presets, with their source and date."""
+    table = Table(title="Prop-firm challenge presets (rules as posted on the date shown)")
+    for column in ("key", "firm / program / phase", "target", "daily", "total", "min days"):
+        table.add_column(column)
+    table.add_column("source, read on")
+    for key in sorted(PRESETS):
+        rules = PRESETS[key]
+        daily = "-" if rules.max_daily_loss is None else f"{rules.max_daily_loss:.1%}"
+        marker = " (default)" if key == DEFAULT_PRESET else ""
+        table.add_row(
+            key + marker,
+            f"{rules.firm} / {rules.program} / {rules.phase}",
+            f"{rules.profit_target:.1%}",
+            f"{daily} ({rules.daily_loss_basis})",
+            f"{rules.max_total_loss:.1%} ({rules.total_loss_type})",
+            str(rules.min_trading_days),
+            f"{rules.source_url}, {rules.as_of}",
+        )
+    Console(width=200).print(table)
 
 
 @audit_app.command("serve")

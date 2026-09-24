@@ -22,7 +22,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from quant_trade.audit.costs import RecostRow
-from quant_trade.audit.redflags import RedFlag
+from quant_trade.audit.redflags import RedFlag, flag_title
 from quant_trade.audit.schema import Dimension, Verdict, measured, not_measured
 
 Status = Literal["PASS", "WEAK", "FAIL", "NOT_MEASURED", "NOT_APPLICABLE"]
@@ -54,6 +54,60 @@ class Thresholds(BaseModel):
 DEFAULT_THRESHOLDS = Thresholds()
 
 
+Reason = tuple[str, str]
+
+
+def _same(text: str) -> Reason:
+    """A reason made only of numbers and symbols reads the same in both languages."""
+    return (text, text)
+
+
+#: The engine's fixed not-measured reasons, in Spanish.
+NOT_MEASURED_ES: dict[str, str] = {
+    "fewer than three returns": "menos de tres retornos",
+    "zero variance": "varianza cero",
+    "PSR not computed": "PSR no calculado",
+    "statistical significance not measured": "significación estadística no medida",
+    "no trades uploaded; costs cannot be re-applied": (
+        "no se subieron operaciones; no se pueden volver a aplicar los costes"
+    ),
+    "cost rows missing": "faltan filas de costes",
+    "no out-of-sample start declared": "no se declaró un inicio fuera de muestra",
+    "declared out-of-sample start lies outside the uploaded series": (
+        "el inicio fuera de muestra declarado cae fuera de la serie subida"
+    ),
+    "out-of-sample window not evaluated": "tramo fuera de muestra no evaluado",
+    "no benchmark uploaded": "no se subió un benchmark",
+    "client declared no applicable benchmark": "el cliente declaró que no aplica benchmark",
+    "no red flags": "sin banderas rojas",
+}
+
+
+def _reason(text: str) -> Reason:
+    """An engine reason with its Spanish twin (itself when there is none)."""
+    if text in NOT_MEASURED_ES:
+        return (text, NOT_MEASURED_ES[text])
+    if text.startswith("a side has fewer than"):
+        return (text, "uno de los tramos tiene menos retornos de los necesarios: " + text)
+    if text.startswith("benchmark overlaps only"):
+        return (text, "el benchmark cubre muy pocas fechas de la estrategia: " + text)
+    if text.startswith("split failed"):
+        return (text, "no se pudo dividir la serie: " + text)
+    return (text, text)
+
+
+def _dimension(
+    name: str, status: Status, reasons: list[Reason], inputs: dict[str, Any]
+) -> Dimension:
+    return Dimension(
+        name=name,
+        status=status,
+        reasons=[english for english, _ in reasons],
+        reasons_es=[spanish for _, spanish in reasons],
+        inputs=inputs,
+    )
+
+
 def assess_statistical(
     *,
     psr: float | None,
@@ -72,75 +126,81 @@ def assess_statistical(
         "observations": measured(observations),
     }
     if not_measured_reason or psr is None:
-        return Dimension(
-            name=STATISTICAL,
-            status="NOT_MEASURED",
-            reasons=[not_measured_reason or "PSR not computed"],
-            inputs=inputs,
-        )
+        reason = _reason(not_measured_reason or "PSR not computed")
+        return _dimension(STATISTICAL, "NOT_MEASURED", [reason], inputs)
     p5_positive = bootstrap_p5_sharpe is not None and bootstrap_p5_sharpe > 0
+    p5: Reason = (
+        ("bootstrap p5 Sharpe > 0", "Sharpe p5 del bootstrap > 0")
+        if p5_positive
+        else ("bootstrap p5 Sharpe <= 0", "Sharpe p5 del bootstrap <= 0")
+    )
     if psr >= thresholds.psr_pass and p5_positive:
-        return Dimension(
-            name=STATISTICAL,
-            status="PASS",
-            reasons=[f"PSR {psr:.3f} >= {thresholds.psr_pass}", "bootstrap p5 Sharpe > 0"],
-            inputs=inputs,
+        return _dimension(
+            STATISTICAL, "PASS", [_same(f"PSR {psr:.3f} >= {thresholds.psr_pass}"), p5], inputs
         )
     if psr >= thresholds.psr_weak or p5_positive:
-        reasons = [f"PSR {psr:.3f}"]
-        reasons.append("bootstrap p5 Sharpe > 0" if p5_positive else "bootstrap p5 Sharpe <= 0")
-        return Dimension(name=STATISTICAL, status="WEAK", reasons=reasons, inputs=inputs)
-    return Dimension(
-        name=STATISTICAL,
-        status="FAIL",
-        reasons=[f"PSR {psr:.3f} < {thresholds.psr_weak}", "bootstrap p5 Sharpe <= 0"],
-        inputs=inputs,
+        return _dimension(STATISTICAL, "WEAK", [_same(f"PSR {psr:.3f}"), p5], inputs)
+    return _dimension(
+        STATISTICAL, "FAIL", [_same(f"PSR {psr:.3f} < {thresholds.psr_weak}"), p5], inputs
     )
+
+
+TRIAL_SOURCE: dict[str, dict[str, str]] = {
+    "es": {"DECLARED": "declarado(s)", "MEASURED": "contado(s) en los archivos"},
+    "en": {"DECLARED": "declared", "MEASURED": "counted in the files"},
+}
 
 
 def assess_multiplicity(
     *,
-    dsr_declared: float | None,
-    declared_trials: int,
+    dsr: float | None,
+    trials: int,
     pbo: float | None,
     statistical_status: Status,
+    trials_evidence: str = "DECLARED",
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Dimension:
+    """Deflated Sharpe at ``trials`` (the larger of the declared count and
+    what the files show) and, when variants were uploaded, the PBO."""
     inputs = {
-        "dsr_at_declared_trials": (
-            measured(dsr_declared) if dsr_declared is not None else not_measured("not computed")
-        ),
-        "declared_trials": {"value": declared_trials, "evidence": "DECLARED", "note": ""},
+        "dsr_at_trials_used": (measured(dsr) if dsr is not None else not_measured("not computed")),
+        "trials_used": {"value": trials, "evidence": trials_evidence, "note": ""},
         "pbo": measured(pbo) if pbo is not None else not_measured("no variants uploaded"),
     }
-    if statistical_status == "NOT_MEASURED" or dsr_declared is None:
-        return Dimension(
-            name=MULTIPLICITY,
-            status="NOT_MEASURED",
-            reasons=["statistical significance not measured"],
-            inputs=inputs,
+    if statistical_status == "NOT_MEASURED" or dsr is None:
+        return _dimension(
+            MULTIPLICITY,
+            "NOT_MEASURED",
+            [_reason("statistical significance not measured")],
+            inputs,
         )
+    source_en = TRIAL_SOURCE["en"].get(trials_evidence, "declared")
+    source_es = TRIAL_SOURCE["es"].get(trials_evidence, "declarado(s)")
+
+    def dsr_reason(relation: str) -> Reason:
+        return (
+            f"DSR at {trials} {source_en} trial(s) {dsr:.3f} {relation}",
+            f"DSR con {trials} intento(s) {source_es} {dsr:.3f} {relation}",
+        )
+
     pbo_bad = pbo is not None and pbo >= thresholds.pbo_max
-    if dsr_declared < thresholds.dsr_weak or pbo_bad:
-        reasons = [f"DSR({declared_trials}) {dsr_declared:.3f} < {thresholds.dsr_weak}"]
+    if dsr < thresholds.dsr_weak or pbo_bad:
+        reasons: list[Reason] = []
         if pbo_bad:
-            reasons = [f"PBO {pbo:.2f} >= {thresholds.pbo_max}"] + (
-                reasons if dsr_declared < thresholds.dsr_weak else []
-            )
-        return Dimension(name=MULTIPLICITY, status="FAIL", reasons=reasons, inputs=inputs)
-    if dsr_declared >= thresholds.dsr_pass:
-        reasons = [f"DSR({declared_trials}) {dsr_declared:.3f} >= {thresholds.dsr_pass}"]
+            reasons.append(_same(f"PBO {pbo:.2f} >= {thresholds.pbo_max}"))
+        if dsr < thresholds.dsr_weak or not pbo_bad:
+            reasons.append(dsr_reason(f"< {thresholds.dsr_weak}"))
+        return _dimension(MULTIPLICITY, "FAIL", reasons, inputs)
+    if dsr >= thresholds.dsr_pass:
+        reasons = [dsr_reason(f">= {thresholds.dsr_pass}")]
         if pbo is not None:
-            reasons.append(f"PBO {pbo:.2f} < {thresholds.pbo_max}")
-        return Dimension(name=MULTIPLICITY, status="PASS", reasons=reasons, inputs=inputs)
-    return Dimension(
-        name=MULTIPLICITY,
-        status="WEAK",
-        reasons=[
-            f"DSR({declared_trials}) {dsr_declared:.3f} in [{thresholds.dsr_weak}, "
-            f"{thresholds.dsr_pass})"
-        ],
-        inputs=inputs,
+            reasons.append(_same(f"PBO {pbo:.2f} < {thresholds.pbo_max}"))
+        return _dimension(MULTIPLICITY, "PASS", reasons, inputs)
+    return _dimension(
+        MULTIPLICITY,
+        "WEAK",
+        [dsr_reason(f"in [{thresholds.dsr_weak}, {thresholds.dsr_pass})")],
+        inputs,
     )
 
 
@@ -159,14 +219,15 @@ def assess_costs(
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Dimension:
     if not rows:
-        return Dimension(
-            name=COSTS,
-            status="NOT_MEASURED",
-            reasons=["no trades uploaded; costs cannot be re-applied"],
-            inputs={"reference_bps": not_measured("no trades uploaded")},
+        return _dimension(
+            COSTS,
+            "NOT_MEASURED",
+            [_reason("no trades uploaded; costs cannot be re-applied")],
+            {"reference_bps": not_measured("no trades uploaded")},
         )
     at_one = _row_at(rows, 1.0)
     at_pass = _row_at(rows, thresholds.cost_pass_multiplier)
+    multiple = f"{thresholds.cost_pass_multiplier:g}x"
     inputs: dict[str, Any] = {
         "reference_bps_per_side": {
             "value": reference_bps,
@@ -176,42 +237,49 @@ def assess_costs(
             else "declared by the client",
         },
         "net_pnl_at_1x": measured(at_one.net_pnl) if at_one else not_measured("no 1x row"),
-        f"net_pnl_at_{thresholds.cost_pass_multiplier:g}x": (
+        f"net_pnl_at_{multiple}": (
             measured(at_pass.net_pnl) if at_pass else not_measured("no pass-multiplier row")
         ),
     }
     if at_one is None or at_pass is None:
-        return Dimension(
-            name=COSTS,
-            status="NOT_MEASURED",
-            reasons=["cost rows missing"],
-            inputs=inputs,
-        )
+        return _dimension(COSTS, "NOT_MEASURED", [_reason("cost rows missing")], inputs)
     if at_one.net_pnl <= 0:
-        return Dimension(
-            name=COSTS,
-            status="FAIL",
-            reasons=[f"net pnl at 1x the reference cost is {at_one.net_pnl:.2f} <= 0"],
-            inputs=inputs,
+        return _dimension(
+            COSTS,
+            "FAIL",
+            [
+                (
+                    f"net pnl at 1x the reference cost is {at_one.net_pnl:.2f} <= 0",
+                    f"el resultado neto a 1x el coste de referencia es {at_one.net_pnl:.2f} <= 0",
+                )
+            ],
+            inputs,
         )
     if at_pass.net_pnl > 0:
-        return Dimension(
-            name=COSTS,
-            status="PASS",
-            reasons=[
-                f"net pnl at {thresholds.cost_pass_multiplier:g}x the reference cost is "
-                f"{at_pass.net_pnl:.2f} > 0"
+        return _dimension(
+            COSTS,
+            "PASS",
+            [
+                (
+                    f"net pnl at {multiple} the reference cost is {at_pass.net_pnl:.2f} > 0",
+                    f"el resultado neto a {multiple} el coste de referencia es "
+                    f"{at_pass.net_pnl:.2f} > 0",
+                )
             ],
-            inputs=inputs,
+            inputs,
         )
-    return Dimension(
-        name=COSTS,
-        status="WEAK",
-        reasons=[
-            f"net pnl at 1x is {at_one.net_pnl:.2f} > 0 but at "
-            f"{thresholds.cost_pass_multiplier:g}x is {at_pass.net_pnl:.2f} <= 0"
+    return _dimension(
+        COSTS,
+        "WEAK",
+        [
+            (
+                f"net pnl at 1x is {at_one.net_pnl:.2f} > 0 but at {multiple} is "
+                f"{at_pass.net_pnl:.2f} <= 0",
+                f"el resultado neto a 1x es {at_one.net_pnl:.2f} > 0 pero a {multiple} es "
+                f"{at_pass.net_pnl:.2f} <= 0",
+            )
         ],
-        inputs=inputs,
+        inputs,
     )
 
 
@@ -231,49 +299,56 @@ def assess_out_of_sample(
         ),
     }
     if not_measured_reason or oos_sharpe is None or gap is None:
-        return Dimension(
-            name=OUT_OF_SAMPLE,
-            status="NOT_MEASURED",
-            reasons=[not_measured_reason or "out-of-sample window not evaluated"],
-            inputs=inputs,
-        )
+        reason = _reason(not_measured_reason or "out-of-sample window not evaluated")
+        return _dimension(OUT_OF_SAMPLE, "NOT_MEASURED", [reason], inputs)
+    oos: Reason = (
+        f"out-of-sample Sharpe {oos_sharpe:.2f}",
+        f"Sharpe fuera de muestra {oos_sharpe:.2f}",
+    )
     if oos_sharpe <= 0:
-        return Dimension(
-            name=OUT_OF_SAMPLE,
-            status="FAIL",
-            reasons=[f"out-of-sample Sharpe {oos_sharpe:.2f} <= 0"],
-            inputs=inputs,
-        )
+        return _dimension(OUT_OF_SAMPLE, "FAIL", [(oos[0] + " <= 0", oos[1] + " <= 0")], inputs)
     if oos_sharpe >= thresholds.oos_sharpe_pass and gap <= thresholds.oos_gap_max:
-        return Dimension(
-            name=OUT_OF_SAMPLE,
-            status="PASS",
-            reasons=[
-                f"out-of-sample Sharpe {oos_sharpe:.2f} >= {thresholds.oos_sharpe_pass}",
-                f"in-sample minus out-of-sample gap {gap:.2f} <= {thresholds.oos_gap_max}",
+        return _dimension(
+            OUT_OF_SAMPLE,
+            "PASS",
+            [
+                (
+                    f"{oos[0]} >= {thresholds.oos_sharpe_pass}",
+                    f"{oos[1]} >= {thresholds.oos_sharpe_pass}",
+                ),
+                (
+                    f"in-sample minus out-of-sample gap {gap:.2f} <= {thresholds.oos_gap_max}",
+                    f"diferencia entre dentro y fuera de muestra {gap:.2f} <= "
+                    f"{thresholds.oos_gap_max}",
+                ),
             ],
-            inputs=inputs,
+            inputs,
         )
-    return Dimension(
-        name=OUT_OF_SAMPLE,
-        status="WEAK",
-        reasons=[f"out-of-sample Sharpe {oos_sharpe:.2f} > 0", f"gap {gap:.2f}"],
-        inputs=inputs,
+    return _dimension(
+        OUT_OF_SAMPLE,
+        "WEAK",
+        [(oos[0] + " > 0", oos[1] + " > 0"), (f"gap {gap:.2f}", f"diferencia {gap:.2f}")],
+        inputs,
     )
 
 
 def assess_data_quality(flags: list[RedFlag]) -> Dimension:
+    """Flag codes are the English reasons; their Spanish names the Spanish ones."""
     fails = sorted({flag.code for flag in flags if flag.severity == "FAIL"})
     warns = sorted({flag.code for flag in flags if flag.severity == "WARN"})
     inputs = {
         "fail_flags": {"value": ",".join(fails), "evidence": "MEASURED", "note": ""},
         "warn_flags": {"value": ",".join(warns), "evidence": "MEASURED", "note": ""},
     }
+
+    def named(codes: list[str]) -> list[Reason]:
+        return [(code, flag_title(code, "es")) for code in codes]
+
     if fails:
-        return Dimension(name=DATA_QUALITY, status="FAIL", reasons=fails, inputs=inputs)
+        return _dimension(DATA_QUALITY, "FAIL", named(fails), inputs)
     if warns:
-        return Dimension(name=DATA_QUALITY, status="WEAK", reasons=warns, inputs=inputs)
-    return Dimension(name=DATA_QUALITY, status="PASS", reasons=["no red flags"], inputs=inputs)
+        return _dimension(DATA_QUALITY, "WEAK", named(warns), inputs)
+    return _dimension(DATA_QUALITY, "PASS", [_reason("no red flags")], inputs)
 
 
 def assess_benchmark(
@@ -297,47 +372,50 @@ def assess_benchmark(
         ),
     }
     if not applicable:
-        return Dimension(
-            name=BENCHMARK,
-            status="NOT_APPLICABLE",
-            reasons=["client declared no applicable benchmark"],
-            inputs=inputs,
+        return _dimension(
+            BENCHMARK,
+            "NOT_APPLICABLE",
+            [_reason("client declared no applicable benchmark")],
+            inputs,
         )
     if not_measured_reason or excess_return is None:
-        return Dimension(
-            name=BENCHMARK,
-            status="NOT_MEASURED",
-            reasons=[not_measured_reason or "no benchmark uploaded"],
-            inputs=inputs,
-        )
+        reason = _reason(not_measured_reason or "no benchmark uploaded")
+        return _dimension(BENCHMARK, "NOT_MEASURED", [reason], inputs)
+    excess: Reason = (
+        f"excess return {excess_return:.2%}",
+        f"retorno en exceso {excess_return:.2%}",
+    )
     if excess_return <= 0:
-        return Dimension(
-            name=BENCHMARK,
-            status="FAIL",
-            reasons=[f"excess return {excess_return:.2%} <= 0"],
-            inputs=inputs,
-        )
+        return _dimension(BENCHMARK, "FAIL", [(excess[0] + " <= 0", excess[1] + " <= 0")], inputs)
     dd_ok = drawdown_ratio is not None and drawdown_ratio <= thresholds.benchmark_drawdown_ratio_max
     ir_ok = information_ratio is not None and information_ratio > 0
     if dd_ok and ir_ok:
-        return Dimension(
-            name=BENCHMARK,
-            status="PASS",
-            reasons=[
-                f"excess return {excess_return:.2%} > 0",
-                f"drawdown ratio {drawdown_ratio:.2f} <= {thresholds.benchmark_drawdown_ratio_max}",
-                f"information ratio {information_ratio:.2f} > 0",
+        return _dimension(
+            BENCHMARK,
+            "PASS",
+            [
+                (excess[0] + " > 0", excess[1] + " > 0"),
+                (
+                    f"drawdown ratio {drawdown_ratio:.2f} <= "
+                    f"{thresholds.benchmark_drawdown_ratio_max}",
+                    f"ratio de drawdown {drawdown_ratio:.2f} <= "
+                    f"{thresholds.benchmark_drawdown_ratio_max}",
+                ),
+                (
+                    f"information ratio {information_ratio:.2f} > 0",
+                    f"information ratio {information_ratio:.2f} > 0",
+                ),
             ],
-            inputs=inputs,
+            inputs,
         )
-    return Dimension(
-        name=BENCHMARK,
-        status="WEAK",
-        reasons=[f"excess return {excess_return:.2%} > 0"]
-        + ([] if dd_ok else ["drawdown deeper than the benchmark"])
-        + ([] if ir_ok else ["information ratio <= 0"]),
-        inputs=inputs,
-    )
+    reasons: list[Reason] = [(excess[0] + " > 0", excess[1] + " > 0")]
+    if not dd_ok:
+        reasons.append(
+            ("drawdown deeper than the benchmark", "drawdown más profundo que el del benchmark")
+        )
+    if not ir_ok:
+        reasons.append(("information ratio <= 0", "information ratio <= 0"))
+    return _dimension(BENCHMARK, "WEAK", reasons, inputs)
 
 
 def overall_class(dimensions: list[Dimension]) -> Literal["A", "B", "C", "D"]:
@@ -385,16 +463,16 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{STATISTICAL}.FAIL": "El Sharpe observado no se distingue de cero.",
         f"{STATISTICAL}.NOT_MEASURED": "Significación no medida: {reason}.",
         f"{MULTIPLICITY}.PASS": (
-            "Con {trials} intento(s) declarado(s), el resultado sigue por encima de lo que "
+            "Con {trials} intento(s) {trials_source}, el resultado sigue por encima de lo que "
             "produciría el mejor intento sin habilidad."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "Con {trials} intento(s) declarado(s), el resultado es compatible con haber elegido "
-            "el mejor de varios intentos."
+            "Con {trials} intento(s) {trials_source}, el resultado es compatible con haber "
+            "elegido el mejor de varios intentos."
         ),
         f"{MULTIPLICITY}.FAIL": (
-            "Con {trials} intento(s) declarado(s), el resultado no supera lo que produciría el "
-            "mejor de esos intentos sin habilidad."
+            "Con {trials} intento(s) {trials_source}, el resultado no supera lo que produciría "
+            "el mejor de esos intentos sin habilidad."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicidad no medida: {reason}.",
         f"{COSTS}.PASS": (
@@ -445,16 +523,16 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{STATISTICAL}.FAIL": "The observed Sharpe ratio is not distinguishable from zero.",
         f"{STATISTICAL}.NOT_MEASURED": "Significance not measured: {reason}.",
         f"{MULTIPLICITY}.PASS": (
-            "With {trials} declared trial(s), the result stays above what the best unskilled "
-            "trial would produce."
+            "With {trials} trial(s) {trials_source}, the result stays above what the best "
+            "unskilled trial would produce."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "With {trials} declared trial(s), the result is consistent with having picked the "
-            "best of several attempts."
+            "With {trials} trial(s) {trials_source}, the result is consistent with having "
+            "picked the best of several attempts."
         ),
         f"{MULTIPLICITY}.FAIL": (
-            "With {trials} declared trial(s), the result does not exceed what the best of "
-            "those trials would produce without skill."
+            "With {trials} trial(s) {trials_source}, the result does not exceed what the best "
+            "of those trials would produce without skill."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicity not measured: {reason}.",
         f"{COSTS}.PASS": "Net of 3x the reference cost, the trade ledger stays positive.",
@@ -479,15 +557,225 @@ _TEXT: dict[str, dict[str, str]] = {
 }
 
 
+#: "What this means for you": two plain sentences per dimension and status,
+#: fixed templates in both languages. They explain, they never promise.
+MEANING: dict[str, dict[str, str]] = {
+    "es": {
+        f"{STATISTICAL}.PASS": (
+            "Con tantos datos, un resultado así es difícil de obtener por pura suerte. "
+            "Eso no dice nada de lo que pasará después: solo que el historial no es ruido."
+        ),
+        f"{STATISTICAL}.WEAK": (
+            "El resultado podría deberse en parte a la suerte: no hay datos suficientes para "
+            "separarlo del azar. Más historial, o historial real, lo aclararía."
+        ),
+        f"{STATISTICAL}.FAIL": (
+            "Con estos datos, el resultado no se distingue de lanzar una moneda. "
+            "La curva puede verse bien y aun así ser azar."
+        ),
+        f"{STATISTICAL}.NOT_MEASURED": (
+            "No hubo datos suficientes para medir si el resultado supera al azar. "
+            "Sube una curva más larga para obtener esta respuesta."
+        ),
+        f"{MULTIPLICITY}.PASS": (
+            "Aun descontando las configuraciones probadas, el resultado sigue en pie. "
+            "Si se probaron más de las indicadas, esta conclusión se debilita."
+        ),
+        f"{MULTIPLICITY}.WEAK": (
+            "Parte del resultado puede venir de elegir la mejor de muchas configuraciones. "
+            "Pregunta cuántas se probaron y pide el archivo de optimización."
+        ),
+        f"{MULTIPLICITY}.FAIL": (
+            "Probando tantas configuraciones, un resultado así aparece aunque ninguna tenga "
+            "ventaja real. Es la señal clásica de un backtest sobreajustado."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED": (
+            "No se pudo descontar el número de intentos porque la significación no se midió. "
+            "Con una curva más larga se puede calcular."
+        ),
+        f"{COSTS}.PASS": (
+            "Las operaciones aguantan aunque los costes se tripliquen. "
+            "Los costes reales dependen de tu bróker y de la ejecución."
+        ),
+        f"{COSTS}.WEAK": (
+            "Con costes normales el resultado sigue positivo, pero con costes altos desaparece. "
+            "Un spread o una comisión mayores que los supuestos lo borrarían."
+        ),
+        f"{COSTS}.FAIL": (
+            "Con el coste de referencia, las operaciones pierden dinero en neto. "
+            "El resultado del backtest depende de no pagar costes."
+        ),
+        f"{COSTS}.NOT_MEASURED": (
+            "Sin la lista de operaciones no se pueden volver a aplicar los costes. "
+            "Sube el informe de la plataforma para medirlos."
+        ),
+        f"{OUT_OF_SAMPLE}.PASS": (
+            "En el tramo que no se usó para ajustar, el comportamiento se mantiene parecido. "
+            "Solo vale si ese tramo de verdad no se miró al optimizar."
+        ),
+        f"{OUT_OF_SAMPLE}.WEAK": (
+            "Fuera de muestra el resultado sigue positivo, pero bastante peor que dentro. "
+            "Es habitual en estrategias algo sobreajustadas."
+        ),
+        f"{OUT_OF_SAMPLE}.FAIL": (
+            "En el tramo que no se usó para ajustar, el resultado es negativo. "
+            "Lo que funcionó en el ajuste no se repitió fuera de él."
+        ),
+        f"{OUT_OF_SAMPLE}.NOT_MEASURED": (
+            "No se indicó un tramo fuera de muestra, así que no hay prueba sobre datos nuevos. "
+            "Indica la fecha en la que termina la optimización para medirlo."
+        ),
+        f"{DATA_QUALITY}.PASS": (
+            "No encontramos saltos, huecos ni patrones de riesgo oculto en los archivos. "
+            "Eso no descarta errores que los archivos no muestren."
+        ),
+        f"{DATA_QUALITY}.WEAK": (
+            "Hay avisos en los datos que conviene aclarar antes de confiar en las cifras. "
+            "Revisa la lista de banderas rojas y las preguntas para el vendedor."
+        ),
+        f"{DATA_QUALITY}.FAIL": (
+            "Hay problemas graves en los datos o en la forma de operar. "
+            "Las cifras principales no se pueden tomar tal cual."
+        ),
+        f"{BENCHMARK}.PASS": (
+            "Supera a la referencia aportada sin caer más que ella. "
+            "Compara con otra referencia si esta no representa tu alternativa real."
+        ),
+        f"{BENCHMARK}.WEAK": (
+            "Supera a la referencia en retorno, pero con más riesgo. "
+            "Parte de la diferencia puede ser solo riesgo adicional."
+        ),
+        f"{BENCHMARK}.FAIL": (
+            "No supera a la referencia aportada. "
+            "Una alternativa pasiva habría dado un resultado igual o mejor en ese periodo."
+        ),
+        f"{BENCHMARK}.NOT_MEASURED": (
+            "No se aportó una referencia con la que comparar. "
+            "Sube la curva de un índice o de comprar y mantener para medirlo."
+        ),
+        f"{BENCHMARK}.NOT_APPLICABLE": (
+            "Se declaró que no hay una referencia aplicable. "
+            "La comparación con una alternativa pasiva queda fuera de este informe."
+        ),
+    },
+    "en": {
+        f"{STATISTICAL}.PASS": (
+            "With this much data, a result like this is hard to get by pure luck. "
+            "That says nothing about what happens next: only that the history is not noise."
+        ),
+        f"{STATISTICAL}.WEAK": (
+            "The result could partly be luck: there is not enough data to separate it from "
+            "chance. More history, or live history, would settle it."
+        ),
+        f"{STATISTICAL}.FAIL": (
+            "With this data, the result cannot be told apart from coin flips. "
+            "The curve can look good and still be chance."
+        ),
+        f"{STATISTICAL}.NOT_MEASURED": (
+            "There was not enough data to measure whether the result beats chance. "
+            "Upload a longer curve to get this answer."
+        ),
+        f"{MULTIPLICITY}.PASS": (
+            "Even after discounting the configurations tried, the result still stands. "
+            "If more were tried than stated, this conclusion weakens."
+        ),
+        f"{MULTIPLICITY}.WEAK": (
+            "Part of the result may come from picking the best of many configurations. "
+            "Ask how many were tried and request the optimisation file."
+        ),
+        f"{MULTIPLICITY}.FAIL": (
+            "Trying this many configurations produces a result like this even when none has "
+            "a real edge. It is the classic sign of an overfitted backtest."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED": (
+            "The number of trials could not be discounted because significance was not "
+            "measured. A longer curve makes it computable."
+        ),
+        f"{COSTS}.PASS": (
+            "The trades hold up even if costs triple. "
+            "Real costs depend on your broker and on execution."
+        ),
+        f"{COSTS}.WEAK": (
+            "At normal costs the result stays positive, but at high costs it disappears. "
+            "A wider spread or higher commission than assumed would erase it."
+        ),
+        f"{COSTS}.FAIL": (
+            "At the reference cost, the trades lose money net. "
+            "The backtest result depends on paying no costs."
+        ),
+        f"{COSTS}.NOT_MEASURED": (
+            "Without the list of trades the costs cannot be re-applied. "
+            "Upload the platform report to measure them."
+        ),
+        f"{OUT_OF_SAMPLE}.PASS": (
+            "In the stretch not used for tuning, behaviour stays similar. "
+            "It only counts if that stretch was truly not looked at while optimising."
+        ),
+        f"{OUT_OF_SAMPLE}.WEAK": (
+            "Out of sample the result stays positive, but much worse than in sample. "
+            "This is common in somewhat overfitted strategies."
+        ),
+        f"{OUT_OF_SAMPLE}.FAIL": (
+            "In the stretch not used for tuning, the result is negative. "
+            "What worked during tuning did not repeat outside it."
+        ),
+        f"{OUT_OF_SAMPLE}.NOT_MEASURED": (
+            "No out-of-sample stretch was given, so there is no test on unseen data. "
+            "State the date the optimisation ends to measure it."
+        ),
+        f"{DATA_QUALITY}.PASS": (
+            "We found no jumps, gaps or hidden-risk patterns in the files. "
+            "That does not rule out errors the files do not show."
+        ),
+        f"{DATA_QUALITY}.WEAK": (
+            "There are warnings in the data worth clearing up before trusting the figures. "
+            "Check the red flags and the questions for the vendor."
+        ),
+        f"{DATA_QUALITY}.FAIL": (
+            "There are serious problems in the data or in the way it trades. "
+            "The headline figures cannot be taken as they stand."
+        ),
+        f"{BENCHMARK}.PASS": (
+            "It beats the supplied reference without falling further than it. "
+            "Compare with another reference if this one is not your real alternative."
+        ),
+        f"{BENCHMARK}.WEAK": (
+            "It beats the reference on return, but with more risk. "
+            "Part of the difference may be extra risk only."
+        ),
+        f"{BENCHMARK}.FAIL": (
+            "It does not beat the supplied reference. "
+            "A passive alternative gave an equal or better result over that period."
+        ),
+        f"{BENCHMARK}.NOT_MEASURED": (
+            "No reference was supplied to compare against. "
+            "Upload an index or buy-and-hold curve to measure it."
+        ),
+        f"{BENCHMARK}.NOT_APPLICABLE": (
+            "No applicable reference was declared. "
+            "A comparison with a passive alternative is outside this report."
+        ),
+    },
+}
+
+
+def meaning(name: str, status: str, locale: str = "es") -> str:
+    """Two plain sentences on what a dimension's status means for the reader."""
+    texts = MEANING.get(locale, MEANING["es"])
+    return texts.get(f"{name}.{status}", "")
+
+
 def summary(
     dimensions: list[Dimension],
     overall: str,
     *,
     locale: Locale = "es",
-    declared_trials: int = 1,
+    trials: int = 1,
+    trials_evidence: str = "DECLARED",
 ) -> str:
     """Plain-language summary from fixed templates; never a promise."""
     text = _TEXT[locale]
+    source = TRIAL_SOURCE[locale].get(trials_evidence, TRIAL_SOURCE[locale]["DECLARED"])
     lines = [text[overall]]
     by_name = {dimension.name: dimension for dimension in dimensions}
     for name in DIMENSION_ORDER:
@@ -495,12 +783,13 @@ def summary(
         if dimension is None:
             continue
         template = text.get(f"{name}.{dimension.status}", f"{name}: {dimension.status}.")
-        reason = dimension.reasons[0] if dimension.reasons else ""
+        reasons = dimension.reasons_in(locale)
         lines.append(
             template.format(
-                reason=reason,
-                trials=declared_trials,
-                codes=", ".join(dimension.reasons) if dimension.reasons else "",
+                reason=reasons[0] if reasons else "",
+                trials=trials,
+                trials_source=source,
+                codes=", ".join(reasons),
             )
         )
     return " ".join(lines)
@@ -510,13 +799,16 @@ def build_verdict(
     dimensions: list[Dimension],
     *,
     locale: Locale,
-    declared_trials: int,
+    trials: int,
+    trials_evidence: str = "DECLARED",
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Verdict:
     overall = overall_class(dimensions)
     return Verdict(
         overall=overall,
-        summary=summary(dimensions, overall, locale=locale, declared_trials=declared_trials),
+        summary=summary(
+            dimensions, overall, locale=locale, trials=trials, trials_evidence=trials_evidence
+        ),
         thresholds=thresholds.model_dump(),
         dimensions=dimensions,
     )
@@ -528,6 +820,7 @@ __all__ = [
     "DATA_QUALITY",
     "DEFAULT_THRESHOLDS",
     "DIMENSION_ORDER",
+    "MEANING",
     "MULTIPLICITY",
     "OUT_OF_SAMPLE",
     "STATISTICAL",
@@ -539,6 +832,7 @@ __all__ = [
     "assess_out_of_sample",
     "assess_statistical",
     "build_verdict",
+    "meaning",
     "overall_class",
     "summary",
 ]

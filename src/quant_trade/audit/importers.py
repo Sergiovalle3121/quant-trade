@@ -137,6 +137,9 @@ class ImportedReport:
     fees: dict[str, float]
     warnings: list[str]
     metadata: dict[str, str]
+    #: The instrument of each trade in ``trades`` (empty string when unknown),
+    #: so the grid and concurrency flags never mix symbols.
+    symbols: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -2305,6 +2308,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     trades: list[Trade] = []
     sides: list[str] = []
     client_pnl: list[float | None] = []
+    trade_symbols: list[str] = []
     invalid = draft.invalid_rows
     for trip in trips:
         quantity = trip.volume * sizes[trip.symbol]
@@ -2325,6 +2329,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         trades.append(trade)
         sides.append(trip.side)
         client_pnl.append(trip.gross)
+        trade_symbols.append(trip.symbol)
     if not trades:
         raise ReportFormatError(
             "no_closed_trades",
@@ -2366,6 +2371,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         fees=fees,
         warnings=warnings,
         metadata=metadata,
+        symbols=trade_symbols,
     )
 
 

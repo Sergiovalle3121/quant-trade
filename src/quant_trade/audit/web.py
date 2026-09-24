@@ -27,7 +27,13 @@ from pydantic import ValidationError
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.pages import error_page, landing
 from quant_trade.audit.report import render
-from quant_trade.audit.schema import AuditResult, DeclaredMetadata, ParseError, build_inputs
+from quant_trade.audit.schema import (
+    AuditResult,
+    DeclaredMetadata,
+    ParseError,
+    build_inputs,
+    report_digest_name,
+)
 from quant_trade.audit.settings import AuditSettings
 from quant_trade.audit.store import REQUIRE_WEB, Store, make_store
 from quant_trade.evidence.canonical_json import canonical_dumps
@@ -53,19 +59,25 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "The {what} file exceeds {limit} bytes.",
     },
     "equity_required": {
-        "es": "Falta el archivo de la curva de equity: es obligatorio.",
-        "en": "The equity file is required.",
+        "es": (
+            "Falta el archivo: sube el informe de tu plataforma (MetaTrader, TradingView...) "
+            "o una curva de equity."
+        ),
+        "en": "A file is missing: upload your platform report (MetaTrader, TradingView...) "
+        "or an equity curve.",
     },
     "invalid_declared": {
         "es": (
             "Algún dato declarado no es válido: el número de intentos debe ser 1 o más, "
-            "el coste no puede ser negativo, la descripción tiene como máximo 2000 caracteres "
+            "el coste no puede ser negativo, el balance inicial debe ser positivo, el reto "
+            "debe ser uno de la lista, la descripción tiene como máximo 2000 caracteres "
             "y la fecha fuera de muestra va como AAAA-MM-DD."
         ),
         "en": (
             "A declared field is invalid: trials must be 1 or more, the cost cannot be "
-            "negative, the description is at most 2000 characters and the out-of-sample "
-            "date is YYYY-MM-DD."
+            "negative, the starting balance must be positive, the challenge must be one "
+            "from the list, the description is at most 2000 characters and the "
+            "out-of-sample date is YYYY-MM-DD."
         ),
     },
     "invalid_form": {
@@ -106,6 +118,8 @@ UPLOAD_NAMES: dict[str, dict[str, str]] = {
     "trades": {"es": "de operaciones", "en": "trades"},
     "benchmark": {"es": "del benchmark", "en": "benchmark"},
     "variants": {"es": "de variantes", "en": "variants"},
+    "report": {"es": "del informe", "en": "report"},
+    "optimization": {"es": "de optimización", "en": "optimisation"},
 }
 
 
@@ -226,6 +240,17 @@ def _wants_json(request: Any) -> bool:
     return "application/json" in request.headers.get("accept", "")
 
 
+def _positive_or_none(value: str) -> float | None:
+    """A form number that is optional: blank means not declared."""
+    text = value.strip().replace(",", ".")
+    if not text:
+        return None
+    number = float(text)  # ValueError reaches the caller as an invalid field
+    if not number > 0:
+        raise ValueError("must be positive")
+    return number
+
+
 def _valid_email(value: str) -> bool:
     value = value.strip()
     return 3 <= len(value) <= _EMAIL_MAX and "@" in value and "." in value.rsplit("@", 1)[-1]
@@ -336,12 +361,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _run_and_store(
         inputs: Any,
         ip: str,
-        equity_bytes: bytes,
         uploads: dict[str, bytes | None],
+        report_name: str | None,
     ) -> tuple[str, str]:
         """The CPU- and IO-bound part of an upload; runs in the thread pool."""
         now = datetime.now(UTC)
         result = run_audit(inputs, bootstrap_samples=cfg.bootstrap_samples, now=now)
+        extra_files: dict[str, bytes] = {}
+        if uploads["report"] and report_name:
+            extra_files[report_name] = uploads["report"]
+        if uploads["optimization"]:
+            extra_files["optimization.xml"] = uploads["optimization"]
         token = secrets.token_urlsafe(32)
         # Stored without any checkout link: the token must never be persisted
         # in clear, so the page is re-rendered per request with the caller's.
@@ -362,10 +392,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             report_html=html_text,
             overall_class=result.verdict.overall,
             digests=result.inputs["digests"],
-            equity_csv=equity_bytes,
+            equity_csv=uploads["equity"],
             trades_csv=uploads["trades"],
             benchmark_csv=uploads["benchmark"],
             variants_csv=uploads["variants"],
+            files=extra_files,
         )
         return result.audit_id, token
 
@@ -373,6 +404,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     async def create_audit(
         request: Request,
         equity: Annotated[UploadFile | None, File()] = None,
+        report: Annotated[UploadFile | None, File()] = None,
+        optimization: Annotated[UploadFile | None, File()] = None,
         trades: Annotated[UploadFile | None, File()] = None,
         benchmark: Annotated[UploadFile | None, File()] = None,
         variants: Annotated[UploadFile | None, File()] = None,
@@ -383,6 +416,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         benchmark_applicable: Annotated[str, Form()] = "yes",
         locale: Annotated[str, Form()] = "es",
         consent: Annotated[str, Form()] = "",
+        challenge: Annotated[str, Form()] = "",
+        initial_balance: Annotated[str, Form()] = "",
     ) -> Response:
         loc = _locale(locale)
         if consent.lower() not in ("on", "yes", "true", "1"):
@@ -395,6 +430,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         try:
             uploads = {
                 "equity": await _read_limited(equity, what="equity"),
+                "report": await _read_limited(report, what="report"),
+                "optimization": await _read_limited(optimization, what="optimization"),
                 "trades": await _read_limited(trades, what="trades"),
                 "benchmark": await _read_limited(benchmark, what="benchmark"),
                 "variants": await _read_limited(variants, what="variants"),
@@ -407,8 +444,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 limit=f"{cfg.max_upload_bytes:,}",
             )
             return _html_error(request, 413, text, loc)
-        equity_bytes = uploads["equity"]
-        if not equity_bytes:
+        if not uploads["equity"] and not uploads["report"]:
             return _html_error(request, 400, message("equity_required", loc), loc)
         try:
             declared = DeclaredMetadata(
@@ -418,23 +454,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
                 locale=loc,
+                initial_balance=_positive_or_none(initial_balance),
+                challenge=challenge.strip() or None,
             )
-        except ValidationError:
+        except (ValidationError, ValueError):
             return _html_error(request, 400, message("invalid_declared", loc), loc)
+        report_filename = report.filename if report is not None and uploads["report"] else None
         try:
             inputs = await run_in_threadpool(
                 build_inputs,
-                equity_bytes,
+                uploads["equity"],
                 declared,
                 trades_bytes=uploads["trades"],
                 benchmark_bytes=uploads["benchmark"],
                 variants_bytes=uploads["variants"],
+                report_bytes=uploads["report"],
+                report_filename=report_filename,
+                optimization_bytes=uploads["optimization"],
             )
         except ParseError as exc:
             return _html_error(request, 400, exc.localized(loc), loc)
         except ValueError:
             return _html_error(request, 400, message("invalid_upload", loc), loc)
-        audit_id, token = await run_in_threadpool(_run_and_store, inputs, ip, equity_bytes, uploads)
+        report_name = report_digest_name(report_filename) if uploads["report"] else None
+        audit_id, token = await run_in_threadpool(_run_and_store, inputs, ip, uploads, report_name)
         location = f"/audits/{audit_id}?token={token}"
         if _wants_json(request):
             return JSONResponse(

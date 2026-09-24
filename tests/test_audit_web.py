@@ -7,7 +7,13 @@ import time
 from pathlib import Path
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift, trades_frame
+from audit_fixtures import (
+    csv_bytes,
+    positive_drift,
+    synthetic_mt5_optimization,
+    synthetic_mt5_report,
+    trades_frame,
+)
 
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
@@ -265,7 +271,7 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     audit_id, token = _id_and_token(_upload(client).headers["location"])
 
     locked = client.get(f"/audits/{audit_id}?token={token}")
-    assert "class='locked'" in locked.text
+    assert "class='lockbox'" in locked.text
     assert f"/audits/{audit_id}/checkout?token={token}" in locked.text
     assert client.get(f"/audits/{audit_id}.json?token={token}").status_code == 402
 
@@ -298,7 +304,7 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     assert again.status_code == 200  # idempotent
 
     unlocked = client.get(f"/audits/{audit_id}?token={token}")
-    assert "class='locked'" not in unlocked.text
+    assert "class='lockbox'" not in unlocked.text
     assert "PREVIEW" not in unlocked.text and "VISTA PREVIA" not in unlocked.text
     assert client.get(f"/audits/{audit_id}.json?token={token}").status_code == 200
     assert (
@@ -331,3 +337,64 @@ def test_purged_audit_is_gone(tmp_path: Path) -> None:
     future = datetime.now(UTC) + timedelta(days=45)
     assert store.purge_expired(future, retention_days=30) == 1
     assert client.get(f"/audits/{audit_id}?token={token}").status_code == 410
+
+
+def test_a_platform_report_alone_is_audited_and_stored(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    files = {
+        "report": ("ReportTester.html", synthetic_mt5_report(days=120), "text/html"),
+        "optimization": ("opt.xml", synthetic_mt5_optimization(30), "application/xml"),
+    }
+    data = {"consent": "on", "challenge": "ftmo-2step-phase1", "locale": "es"}
+    response = client.post("/audits", files=files, data=data, follow_redirects=False)
+    assert response.status_code == 303, response.text
+    audit_id, token = _id_and_token(response.headers["location"])
+    page = client.get(f"/audits/{audit_id}?token={token}")
+    assert page.status_code == 200
+    assert "Qué significa para ti" in page.text and "<svg" in page.text
+    assert find_claims(page.text) == []
+    body = client.get(f"/audits/{audit_id}.json?token={token}").json()
+    assert body["inputs"]["source_format"] == "mt5_tester_html"
+    assert body["multiplicity"]["trials_used"]["value"] == 30
+    assert body["challenge"]["preset"] == "ftmo-2step-phase1"
+    store = client.app.state.store  # type: ignore[attr-defined]
+    record = store.get_audit(audit_id, with_blobs=True)
+    assert record.equity_csv is None
+    assert set(record.files) == {"report.html", "optimization.xml"}
+    assert record.digests["report.html"] == body["inputs"]["digests"]["report.html"]
+
+
+def test_report_uploads_are_purged_with_their_audit(tmp_path: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    client = _client(tmp_path)
+    files = {"report": ("r.html", synthetic_mt5_report(days=60), "text/html")}
+    response = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
+    audit_id, _ = _id_and_token(response.headers["location"])
+    store = client.app.state.store  # type: ignore[attr-defined]
+    later = datetime.now(UTC) + timedelta(days=40)
+    assert store.purge_expired(later, retention_days=30) == 1
+    record = store.get_audit(audit_id, with_blobs=True)
+    assert record.files == {}
+    assert "report.html" in record.digests
+
+
+def test_bad_report_fields_are_refused_in_the_form_locale(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    nothing = client.post("/audits", data={"consent": "on"}, follow_redirects=False)
+    assert nothing.status_code == 400 and "informe de tu plataforma" in nothing.text
+    files = {"report": ("r.html", synthetic_mt5_report(days=60), "text/html")}
+    for field, value in (("challenge", "nope"), ("initial_balance", "-5")):
+        bad = client.post(
+            "/audits", files=files, data={"consent": "on", field: value}, follow_redirects=False
+        )
+        assert bad.status_code == 400
+        assert "reto" in bad.text
+    unreadable = client.post(
+        "/audits",
+        files={"report": ("r.html", b"<html><body>hola</body></html>", "text/html")},
+        data={"consent": "on", "locale": "es"},
+        follow_redirects=False,
+    )
+    assert unreadable.status_code == 400
+    assert "informe compatible" in unreadable.text

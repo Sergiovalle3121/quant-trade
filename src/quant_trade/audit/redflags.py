@@ -283,8 +283,8 @@ def scan(
             RedFlag(
                 "TRIALS_BELOW_VARIANTS",
                 "WARN",
-                f"{declared.trials} trial(s) declared but {variants_columns} variants uploaded; "
-                "the declared count is too low",
+                f"{declared.trials} trial(s) declared but the files show {variants_columns} "
+                "variants or optimisation passes; the declared count is too low",
                 variants_columns,
             )
         )
@@ -542,12 +542,152 @@ def scan_trade_patterns(
     return flags
 
 
+# ---------------------------------------------------------------------------
+# Trades against the equity curve
+# ---------------------------------------------------------------------------
+
+#: Share of trade exits that may fall outside the equity curve's dates.
+TRADES_OUTSIDE_WARN_SHARE = 0.10
+#: Months with trade exits needed before the monthly comparison is made.
+TRADES_EQUITY_MIN_MONTHS = 6
+#: Correlation between monthly realised trade pnl and monthly equity change
+#: below which the two files do not look like the same account.
+TRADES_EQUITY_MIN_CORRELATION = 0.2
+
+
+def scan_trades_against_equity(trades: ParsedTrades, frame: pd.DataFrame) -> list[RedFlag]:
+    """Do the uploaded trades and the uploaded equity curve describe the same
+    account? Two cheap checks: the trades close inside the curve's dates, and
+    month by month the realised trade pnl moves with the curve. A curve that
+    marks open positions daily still moves with its realised pnl over a month,
+    so a correlation near zero means the files are unrelated or one of them
+    is wrong. Skipped when the curve was rebuilt from the same trades."""
+    items = trades.trades
+    if not items or len(frame) < 2:
+        return []
+    stamps = pd.to_datetime(frame["timestamp"], utc=True)
+    first = stamps.iloc[0] - pd.Timedelta(days=1)
+    last = stamps.iloc[-1] + pd.Timedelta(days=1)
+    exits = pd.to_datetime(pd.Series([trade.exit_time for trade in items]), utc=True)
+    outside = int(((exits < first) | (exits > last)).sum())
+    flags: list[RedFlag] = []
+    share = outside / len(items)
+    if share > TRADES_OUTSIDE_WARN_SHARE:
+        flags.append(
+            RedFlag(
+                "TRADES_OUTSIDE_EQUITY",
+                "WARN",
+                f"{outside} of {len(items)} trades ({share:.0%}) close outside the dates of the "
+                "equity curve; the two files may not describe the same account",
+                share,
+            )
+        )
+    inside = (exits >= first) & (exits <= last)
+    pnl = pd.Series([trade.pnl for trade in items], dtype=float)[inside.to_numpy()]
+    if pnl.empty:
+        return flags
+    month_of_exit = exits[inside].dt.year.to_numpy() * 12 + exits[inside].dt.month.to_numpy()
+    realised = pnl.groupby(month_of_exit).sum()
+    equity = pd.Series(frame["equity"].to_numpy(dtype=float))
+    month_of_row = stamps.dt.year.to_numpy() * 12 + stamps.dt.month.to_numpy()
+    month_end = equity.groupby(month_of_row).last()
+    change = month_end.diff()
+    change.iloc[0] = month_end.iloc[0] - float(equity.iloc[0])
+    joined = pd.concat([realised.rename("pnl"), change.rename("equity")], axis=1).dropna()
+    joined = joined[joined["pnl"] != 0]
+    if len(joined) < TRADES_EQUITY_MIN_MONTHS:
+        return flags
+    if float(joined["pnl"].std()) <= 0 or float(joined["equity"].std()) <= 0:
+        return flags
+    correlation = float(joined["pnl"].corr(joined["equity"]))
+    if math.isfinite(correlation) and correlation < TRADES_EQUITY_MIN_CORRELATION:
+        flags.append(
+            RedFlag(
+                "TRADES_EQUITY_UNRELATED",
+                "WARN",
+                f"month by month the realised trade pnl and the equity change correlate at "
+                f"{correlation:.2f} over {len(joined)} months; the trades may not belong to "
+                "this equity curve, so the cost dimension may not describe it",
+                correlation,
+            )
+        )
+    return flags
+
+
+#: Short names of every red flag, for readers of the report.
+FLAG_TITLES: dict[str, dict[str, str]] = {
+    "TOO_FEW_OBSERVATIONS": {
+        "es": "Muy pocas observaciones",
+        "en": "Too few observations",
+    },
+    "NON_POSITIVE_EQUITY": {"es": "Equity en cero o negativa", "en": "Zero or negative equity"},
+    "DUPLICATE_TIMESTAMPS": {"es": "Fechas duplicadas", "en": "Duplicated timestamps"},
+    "NON_MONOTONIC_TIMESTAMPS": {"es": "Fechas desordenadas", "en": "Timestamps out of order"},
+    "UNPARSEABLE_ROWS": {"es": "Filas ilegibles", "en": "Unreadable rows"},
+    "ZERO_VARIANCE": {"es": "Retornos sin variación", "en": "Returns without variation"},
+    "STALE_MARKS": {"es": "Valores congelados", "en": "Frozen marks"},
+    "MAD_SPIKES": {"es": "Saltos extremos", "en": "Extreme jumps"},
+    "IMPLAUSIBLE_SHARPE": {"es": "Sharpe inverosímil", "en": "Implausible Sharpe ratio"},
+    "LARGE_GAPS": {"es": "Huecos grandes entre filas", "en": "Large gaps between rows"},
+    "ZERO_DECLARED_COSTS": {"es": "Costes declarados en cero", "en": "Zero declared costs"},
+    "TRIALS_BELOW_VARIANTS": {
+        "es": "Menos intentos declarados que los que muestran los archivos",
+        "en": "Fewer trials declared than the files show",
+    },
+    "INVALID_TRADE_ROWS": {"es": "Operaciones ilegibles", "en": "Unreadable trades"},
+    "TRADE_PNL_MISMATCH": {
+        "es": "El resultado declarado por operación no cuadra",
+        "en": "Reported per-trade result does not match",
+    },
+    "MARTINGALE_SIZING": {
+        "es": "Tamaño que crece tras pérdidas (martingala)",
+        "en": "Size grows after losses (martingale)",
+    },
+    "GRID_AVERAGING": {
+        "es": "Rejilla o promediar pérdidas",
+        "en": "Grid or averaging down",
+    },
+    "MANY_CONCURRENT_POSITIONS": {
+        "es": "Muchas posiciones abiertas a la vez",
+        "en": "Many positions open at once",
+    },
+    "HIDDEN_FLOATING_DRAWDOWN": {
+        "es": "Drawdown flotante oculto",
+        "en": "Hidden floating drawdown",
+    },
+    "NEGATIVE_PAYOFF_HIGH_WINRATE": {
+        "es": "Muchos aciertos pequeños y pérdidas grandes",
+        "en": "Many small wins and large losses",
+    },
+    "NO_STOP_EVIDENCE": {"es": "Sin señal de stop de pérdida", "en": "No sign of a stop loss"},
+    "TRADES_OUTSIDE_EQUITY": {
+        "es": "Operaciones fuera de las fechas de la curva",
+        "en": "Trades outside the curve's dates",
+    },
+    "TRADES_EQUITY_UNRELATED": {
+        "es": "Operaciones que no se mueven con la curva",
+        "en": "Trades that do not move with the curve",
+    },
+}
+
+
+def flag_title(code: str, locale: str) -> str:
+    """A reader's name for a flag code; the code itself when unknown."""
+    titles = FLAG_TITLES.get(code)
+    if titles is None:
+        return code
+    return titles.get(locale, titles["en"])
+
+
 __all__ = [
+    "FLAG_TITLES",
     "RedFlag",
     "Severity",
     "annualised_sharpe",
     "detect_mad_spikes",
     "longest_stale_run",
+    "flag_title",
     "scan",
     "scan_trade_patterns",
+    "scan_trades_against_equity",
 ]

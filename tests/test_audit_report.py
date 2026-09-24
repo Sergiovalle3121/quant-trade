@@ -40,7 +40,7 @@ def test_html_carries_disclaimer_hashes_and_watermark_toggle() -> None:
         assert digest in preview
     assert result_sha256(result) in preview
     assert "abc123" in preview
-    assert "class='locked'" not in preview  # free mode blurs nothing
+    assert "class='lockbox'" not in preview  # free mode locks nothing
 
 
 def test_paid_mode_locks_detail_until_paid() -> None:
@@ -52,11 +52,22 @@ def test_paid_mode_locks_detail_until_paid() -> None:
         price_usd=49,
         checkout_url="/audits/abc123/checkout",
     )
-    assert "class='locked'" in unpaid
+    assert "class='lockbox'" in unpaid
     assert "/audits/abc123/checkout" in unpaid
     assert "49" in unpaid
     paid = render_html(result, watermark=False, free_mode=False)
-    assert "class='locked'" not in paid
+    assert "class='lockbox'" not in paid
+    # Locked detail is not blurred: its numbers are absent from the page source.
+    psr = f"{result.significance['psr']['value']:.2%}"
+    cagr = f"{result.performance['cagr']['value']:.2%}"
+    assert psr in paid and cagr in paid
+    assert psr not in unpaid and cagr not in unpaid
+    assert "PSR " not in unpaid
+    # The verdict, the explanations and the charts stay free.
+    for page in (unpaid, paid):
+        assert "Qué significa para ti" in page
+        assert "<svg" in page
+        assert result.verdict.summary[:40] in page
 
 
 def test_client_description_never_reaches_the_html() -> None:
@@ -83,7 +94,7 @@ def test_rendered_reports_pass_the_guard(locale: str) -> None:
         html_text, json_text = render(result, watermark=True)
         assert find_claims(html_text) == []
         assert json_text.endswith("\n")
-        assert '"schema_version": 1' in json_text
+        assert '"schema_version": 2' in json_text
 
 
 def test_guard_refuses_an_injected_claim() -> None:
