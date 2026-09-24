@@ -261,9 +261,9 @@ Routes:
 
 | Route | What it does |
 |---|---|
-| `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. |
+| `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. `GET /en` is the English landing, a short address to share. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
-| `GET /audits/{id}?token=…` | The report. `GET /audits/{id}.json?token=…` the record (402 while locked). |
+| `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). |
 | `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
@@ -273,6 +273,19 @@ Routes:
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
+
+Languages. Spanish is the default on every route, and the Spanish URLs and
+texts are the ones already shared. Every page (landing, form, preview, full
+report, `/v/{id}` and its badge, sample, terms, privacy, error pages) has an
+English version and a link to switch. The report's language is chosen at
+upload and can be switched later with `&lang=`: the verdict sentence is
+rebuilt from its fixed templates in that language and the result JSON does
+not change. The engine, the importers and the red flags write their notes
+and file-reading warnings in English, which is what the JSON keeps as the
+evidence record; a Spanish page translates them with the fixed rules in
+`audit/i18n.py`. A sentence with no rule stays in English rather than
+disappearing, and `tests/test_audit_i18n.py` fails when any importer fixture
+or test scenario produces one, so a new warning needs its Spanish rule.
 
 Every private URL carries a per-audit secret token; a wrong token is a 404.
 Every response is `Cache-Control: no-store` except the two `/v/` routes,
@@ -486,6 +499,8 @@ the same seed reproduces the JSON byte for byte.
 - Web tests use `TestClient` with Stripe simulated; nothing here reaches the
   network in tests.
 - A new red flag or threshold needs a test and a line in this document.
+- A new English warning, note or red-flag detail needs its Spanish rule in
+  `audit/i18n.py`; the Spanish text passes the guard too.
 - Badge, verification and challenge texts never imply future results;
   changing their fixed wording needs a test.
 - Access codes are stored hashed and printed once; `codes list` never shows

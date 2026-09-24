@@ -11,6 +11,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, STATUS_TEXT
@@ -432,12 +433,14 @@ def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
 
 
-def _preset_options() -> str:
+def _preset_options(locale: str) -> str:
     options = []
     for key in sorted(PRESETS):
         rules = PRESETS[key]
         selected = " selected" if key == DEFAULT_PRESET else ""
-        label = f"{rules.firm} · {rules.program} · {rules.phase}"
+        label = " · ".join(
+            localize(part, locale) for part in (rules.firm, rules.program, rules.phase)
+        )
         options.append(f"<option value='{_e(key)}'{selected}>{_e(label)}</option>")
     return "".join(options)
 
@@ -534,7 +537,7 @@ def landing(
         + f"<div><label>{_e(copy['initial_balance'])}</label><input type='number' "
         "name='initial_balance' min='0' step='0.01'></div>"
         + f"<div><label>{_e(copy['challenge'])}</label><select name='challenge'>"
-        + _preset_options()
+        + _preset_options(locale)
         + "</select></div>"
         + f"<div><label>{_e(copy['locale'])}</label><select name='locale'>"
         f"<option value='es'{selected['es']}>Español</option>"
@@ -738,11 +741,13 @@ def legal_page(text: LegalText, *, locale: str = "es") -> str:
 def error_page(message: str, *, locale: str = "es") -> str:
     locale = locale if locale in _COPY else "es"
     copy = _COPY[locale]
+    other = "en" if locale == "es" else "es"
     return (
         _head(copy["error_title"], locale)
         + f"<h1>{_e(copy['error_title'])}</h1><div class='error'>{_e(message)}</div>"
-        + f"<p><a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a></p>"
-        + _footer(locale)
+        + f"<p><a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a> · "
+        f"<a href='/?lang={other}' hreflang='{other}'>{'English' if locale == 'es' else 'Español'}"
+        "</a></p>" + _footer(locale)
     )
 
 
