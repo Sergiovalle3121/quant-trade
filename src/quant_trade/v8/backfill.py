@@ -87,6 +87,38 @@ def http_get(url: str, *, timeout_seconds: float = 20.0) -> tuple[int, bytes, di
         return int(response.status), bytes(response.read()), headers
 
 
+class ChecksumMismatch(RuntimeError):
+    """An archive file's bytes differ from the venue's own published SHA-256."""
+
+
+def binance_archive_get(
+    url: str, *, timeout_seconds: float = 60.0
+) -> tuple[int, bytes, dict[str, str]]:
+    """GET one Binance archive ZIP and check it against the venue's checksum.
+
+    ``data.binance.vision`` publishes ``<file>.CHECKSUM`` beside every file,
+    holding the SHA-256 the venue computed. A file is accepted only when its
+    bytes hash to that value, so an archived page is exactly what the venue
+    published — not merely what the transport happened to deliver.
+    """
+    try:
+        status, raw, headers = http_get(url, timeout_seconds=timeout_seconds)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return 404, b"", {}  # the archive has no such file: not retryable
+        raise
+    if status != 200:
+        return status, raw, headers
+    _, checksum_raw, _ = http_get(url + ".CHECKSUM", timeout_seconds=timeout_seconds)
+    published = checksum_raw.decode("utf-8").split()[0].strip().lower()
+    actual = sha256_of_bytes(raw)
+    if published != actual:
+        raise ChecksumMismatch(
+            f"{url}: bytes hash to {actual}, venue CHECKSUM publishes {published}"
+        )
+    return status, raw, headers
+
+
 class RateLimiter:
     """Minimum-interval pacer. Read-only research traffic stays polite."""
 
@@ -518,7 +550,9 @@ def _walk_series(
         if oldest <= request.since_ms:
             result.reached_lower_bound = True
             break
-        next_cursor = oldest - 1
+        next_cursor = (
+            spec.next_cursor(cursor, oldest) if spec.next_cursor is not None else oldest - 1
+        )
         if next_cursor >= cursor:
             break  # cursor is not advancing; stop rather than loop forever
         cursor = next_cursor
@@ -530,6 +564,92 @@ def _walk_series(
         if result.oldest_ms <= request.since_ms + request.interval_minutes * 60_000:
             result.reached_lower_bound = True
     return result, rows_by_ts
+
+
+def _default_fetcher(venue: str) -> Fetcher:
+    if venue == "binance":
+        return lambda url: binance_archive_get(url)
+    return lambda url: http_get(url)
+
+
+def _fill_missing_days(
+    session: _Session,
+    spec: SeriesSpec,
+    request: BackfillRequest,
+    rows_by_ts: dict[int, dict[str, Any]],
+    conflicts: list[dict[str, Any]],
+) -> list[int]:
+    """Consult the venue's daily file for every UTC day with missing bars.
+
+    Returns the bar stamps that are still absent after the daily file was
+    read (or after the venue answered that no daily file exists): venue
+    outages, confirmed by two venue files. They are recorded, never filled.
+    """
+    from quant_trade.v8.venues import binance_daily_url
+
+    step = request.interval_minutes * 60_000
+    first = request.since_ms + (-request.since_ms) % step
+    missing = [t for t in range(first, request.until_ms + 1, step) if t not in rows_by_ts]
+    days = sorted({t - t % 86_400_000 for t in missing})
+    for day in days:
+        url = binance_daily_url(
+            symbol=request.symbol,
+            kind=spec.kind,
+            day_ms=day,
+            interval_minutes=request.interval_minutes,
+        )
+        key = sha256_of_text(
+            canonical_dumps(
+                {
+                    "venue": spec.venue,
+                    "kind": spec.kind,
+                    "symbol": request.symbol.upper(),
+                    "granularity": "daily",
+                    "day_ms": day,
+                    "interval_minutes": request.interval_minutes,
+                    "parser_version": PARSER_VERSION,
+                }
+            )
+        )
+        try:
+            raw, _replayed = session.get(url, key)
+        except RuntimeError:
+            continue  # the venue publishes no daily file for that day
+        page_rows = spec.parse(raw, symbol=request.symbol, kind=spec.kind)
+        session.write_receipt(
+            url=url,
+            params={
+                "venue": spec.venue,
+                "kind": spec.kind,
+                "instrument": spec.native_instrument(request.symbol),
+                "granularity": "daily",
+                "day_ms": day,
+                "interval_minutes": request.interval_minutes,
+                "identity_verified_in_body": spec.identity_verifiable,
+            },
+            raw=raw,
+            rows=page_rows,
+            adapter=f"v8.backfill.{spec.venue}.{spec.kind}",
+        )
+        for row in page_rows:
+            stamp = int(row["start_ms"])
+            if not request.since_ms <= stamp <= request.until_ms:
+                continue
+            if stamp in rows_by_ts:
+                # The monthly page stands; the daily file only fills absences.
+                # A disagreement is recorded, never resolved silently.
+                if rows_by_ts[stamp] != row:
+                    conflicts.append(
+                        {
+                            "kind": spec.kind,
+                            "start_ms": stamp,
+                            "monthly": rows_by_ts[stamp],
+                            "daily": row,
+                        }
+                    )
+                continue
+            rows_by_ts[stamp] = row
+    return [t for t in missing if t not in rows_by_ts]
 
 
 def run_backfill(
@@ -557,7 +677,7 @@ def run_backfill(
     session = _Session(
         directory=directory,
         venue=request.venue,
-        fetcher=fetcher or (lambda url: http_get(url)),
+        fetcher=fetcher or _default_fetcher(request.venue),
         limiter=RateLimiter(VENUE_RATE_LIMIT_RPS[request.venue], clock=clock, sleeper=sleeper),
         retry=retry or RetryPolicy(),
         sleeper=sleep,
@@ -577,8 +697,12 @@ def run_backfill(
     )
 
     # The venue's own clock, recorded once and stamped into every receipt.
+    # A source without a clock endpoint (the Binance archive) records none
+    # rather than borrowing another host's.
     time_url = server_time_url(request.venue)
     try:
+        if time_url is None:
+            raise LookupError(f"{request.venue} source publishes no server clock")
         raw_time, _ = session.get(
             time_url,
             _request_key(
@@ -597,6 +721,8 @@ def run_backfill(
     # Instrument metadata (contract terms, funding interval, listing date).
     inst_url = instruments_url(request.venue, request.symbol)
     try:
+        if inst_url is None:
+            raise LookupError(f"{request.venue} source publishes no instrument metadata")
         raw_inst, _ = session.get(
             inst_url,
             _request_key(
@@ -626,9 +752,23 @@ def run_backfill(
 
     series_dir = directory / "series"
     series_dir.mkdir(parents=True, exist_ok=True)
+    outages: dict[str, list[int]] = {}
+    archive_conflicts: list[dict[str, Any]] = []
     for kind in request.kinds:
         spec = series_spec(request.venue, kind)
         series_result, rows_by_ts = _walk_series(session, spec, request)
+        if request.venue == "binance" and kind != "funding" and series_result.status == STATUS_OK:
+            try:
+                outages[kind] = _fill_missing_days(
+                    session, spec, request, rows_by_ts, archive_conflicts
+                )
+            except (ValueError, KeyError, IndexError, IdentityMismatch) as exc:
+                series_result.status = STATUS_PARSE_REJECTED
+                series_result.error = f"daily fill: {type(exc).__name__}: {exc}"
+            series_result.rows = len(rows_by_ts)
+            if rows_by_ts:
+                series_result.oldest_ms = min(rows_by_ts)
+                series_result.newest_ms = max(rows_by_ts)
         result.series[kind] = series_result
         if rows_by_ts:
             ordered = [rows_by_ts[k] for k in sorted(rows_by_ts)]
@@ -643,6 +783,23 @@ def run_backfill(
         if kind == "funding":
             result.settlements = series_result.rows
 
+    if outages:
+        # Bars the venue itself never published, confirmed by both its monthly
+        # and daily files. Recorded so validation can tell a venue outage from
+        # a download gap; nothing is ever filled in for them.
+        atomic_write_json(
+            directory / "venue_outages.json",
+            {
+                "artifact": "VENUE_OUTAGES",
+                "venue": request.venue,
+                "symbol": request.symbol.upper(),
+                "interval_minutes": request.interval_minutes,
+                "confirmed_by": "monthly and daily venue archive files",
+                "bars": {kind: stamps for kind, stamps in sorted(outages.items())},
+                "monthly_daily_conflicts": archive_conflicts,
+                "conflict_rule": "monthly bar kept; daily file only fills absences",
+            },
+        )
     result.attempts = session.attempts
     result.blocked_hosts = list(session.blocked_hosts)
     result.finished_at_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -660,12 +817,14 @@ __all__ = [
     "STATUS_PARSE_REJECTED",
     "STATUS_VENUE_ERROR",
     "BackfillRequest",
+    "ChecksumMismatch",
     "BackfillResult",
     "Fetcher",
     "PageArchive",
     "RateLimiter",
     "RetryPolicy",
     "SeriesResult",
+    "binance_archive_get",
     "evidence_dir_for",
     "http_get",
     "run_backfill",

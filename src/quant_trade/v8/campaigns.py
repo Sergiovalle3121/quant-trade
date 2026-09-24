@@ -273,8 +273,13 @@ def _run_ledger(
     trailing_window: int,
     multiplier: float = 1.0,
     provenance: str,
+    **ledger_options: Any,
 ):
-    """Run the V7 reconciled ledger over a slice of panel rows."""
+    """Run the V7 reconciled ledger over a slice of panel rows.
+
+    ``ledger_options`` pass through to ``run_carry_ledger`` (e.g. margin
+    re-hedging); V8's own campaigns pass none.
+    """
     import pandas as pd
 
     from quant_trade.carry.data import load_snapshots_from_records
@@ -298,6 +303,7 @@ def _run_ledger(
         collateral_yield_annual=0.0,
         settlements=settlements,
         signal_rates=signal,
+        **ledger_options,
     )
 
 

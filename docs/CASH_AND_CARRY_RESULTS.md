@@ -4,6 +4,9 @@ Research-only. No orders were placed on any venue. No real funds moved.
 
 ## Real-data campaign
 
+> **Update 2026-09-24:** the carry has now been measured on six years of real
+> Binance data and rejected. See `docs/CRYPTO_FUNDING_CARRY_V9_RESULTS.md`.
+
 **`TRADING_EDGE (cash-and-carry): NOT-RUN — REAL DATA REQUIRED`**
 
 No real funding/spot/perp history was available in this environment (outbound

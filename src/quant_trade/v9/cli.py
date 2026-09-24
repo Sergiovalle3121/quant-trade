@@ -321,6 +321,38 @@ def claim_guard(
     _echo(report.to_dict())
 
 
+@v9_app.command("h1-bin-run")
+def h1_bin_run(
+    hypothesis: Annotated[str, typer.Option(help="H1-BIN or H1-BIN-R.")] = "H1-BIN",
+    evidence_root: Annotated[str, typer.Option()] = "data/v8_evidence",
+    ledger_path: Annotated[str, typer.Option()] = "data/v9_evidence/trials.jsonl",
+    output: Annotated[
+        str, typer.Option(help="Defaults to artifacts/v9/<ID>_CARRY_RESULTS.json.")
+    ] = "",
+) -> None:
+    """Run the pre-registered H1-BIN carry on the Binance archive panel.
+
+    Reads only files the backfill already verified. Registers every variant in
+    the trial ledger before running it and reveals the holdout exactly once.
+    """
+    from quant_trade.v9.binance_carry import run_h1_bin, write_h1_bin
+
+    payload = run_h1_bin(
+        evidence_root=evidence_root, ledger_path=ledger_path, hypothesis_id=hypothesis
+    )
+    output = output or (
+        f"{DEFAULT_ARTIFACT_DIR}/{hypothesis.upper().replace('-', '_')}_CARRY_RESULTS.json"
+    )
+    write_h1_bin(payload, output)
+    _echo(
+        {
+            "state": payload.get("state"),
+            "failed_gates": payload.get("failed_gates"),
+            "output": output,
+        }
+    )
+
+
 @v9_app.command("safety-report")
 def safety_report() -> None:
     """State the execution boundary as data, so it can be checked rather than trusted."""

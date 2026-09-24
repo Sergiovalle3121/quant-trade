@@ -92,6 +92,7 @@ class PanelAudit:
     settlements: int = 0
     expected_bars: int = 0
     missing_bars: int = 0
+    venue_outage_bars: int = 0
     gap_ranges: list[str] = field(default_factory=list)
     coverage_ratio: float = 0.0
     provenance: str = "unverified_legacy"
@@ -127,11 +128,15 @@ def build_carry_panel(
     interval_minutes: int = 60,
     requested_since_ms: int | None = None,
     requested_until_ms: int | None = None,
+    venue_outages_ms: set[int] | None = None,
 ) -> tuple[list[dict[str, Any]], PanelAudit]:
     """Join the four kline series + settlements into point-in-time panel rows.
 
     A row exists ONLY at bars where all four series have data — nothing is
-    forward-filled. Settled funding is attached to its exact settlement
+    forward-filled. ``venue_outages_ms`` are bars the venue itself never
+    published (verified by the caller); they are counted as
+    ``venue_outage_bars`` instead of ``missing_bars`` and still get no row.
+    Settled funding is attached to its exact settlement
     instant (`funding_settlements` per row lists events in ``(prev, t]``).
     """
     meta = instrument_metadata(venue, symbol)
@@ -153,7 +158,10 @@ def build_carry_panel(
         audit.problems.append("requested range is not aligned to the panel interval")
     expected = range(expected_start, expected_end + step_ms, step_ms)
     expected_set = set(expected)
-    missing = sorted(expected_set - set(all_ts))
+    outages = set(venue_outages_ms or ()) & expected_set
+    absent = expected_set - set(all_ts)
+    missing = sorted(absent - outages)
+    audit.venue_outage_bars = len(absent & outages)
     audit.expected_bars = len(expected_set)
     audit.missing_bars = len(missing)
     audit.gap_ranges = [_iso(ms) for ms in missing[:20]]
@@ -298,6 +306,39 @@ def _deduplicate_rebuilt_rows(
     return [deduplicated[key] for key in sorted(deduplicated)]
 
 
+def _verified_outages(
+    context: dict[str, Any],
+    series: dict[str, list[dict[str, Any]]],
+    receipts: list[dict[str, Any]],
+) -> set[int]:
+    """Check every declared venue-outage bar before the rebuild honours it.
+
+    A declared outage is accepted only if the bar is really absent from the
+    rebuilt series of that kind AND a receipt shows the venue's daily file for
+    that day was read. Otherwise the declaration could hide a download gap.
+    """
+    declared = context.get("venue_outage_ms") or {}
+    if not isinstance(declared, dict):
+        raise ValueError("venue_outage_ms must map series kind to bar stamps")
+    daily_read = {
+        (str(r["request_parameters"].get("kind")), int(r["request_parameters"]["day_ms"]))
+        for r in receipts
+        if isinstance(r.get("request_parameters"), dict)
+        and r["request_parameters"].get("granularity") == "daily"
+    }
+    accepted: set[int] = set()
+    for kind, stamps in declared.items():
+        present = {int(row["start_ms"]) for row in series.get(str(kind), [])}
+        for stamp in stamps:
+            stamp = int(stamp)
+            if stamp in present:
+                raise ValueError(f"declared outage {_iso(stamp)} has a {kind} bar")
+            if (str(kind), stamp - stamp % 86_400_000) not in daily_read:
+                raise ValueError(f"declared outage {_iso(stamp)} has no daily-file receipt")
+            accepted.add(stamp)
+    return accepted
+
+
 def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], PanelAudit]:
     """Rebuild raw pages and require byte-identical panel, manifest, and audit."""
     root = Path(panel_dir)
@@ -339,6 +380,7 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
             + "; ".join(provenance.problems[:3])
         )
     rebuilt_by_kind: dict[str, list[dict[str, Any]]] = {kind: [] for kind in KLINE_KINDS}
+    daily_by_kind: dict[str, list[dict[str, Any]]] = {kind: [] for kind in KLINE_KINDS}
     funding_rows: list[dict[str, Any]] = []
     for receipt in load_receipts(receipts_path):
         params = receipt.get("request_parameters", {})
@@ -352,6 +394,8 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
         normalized = rebuild_normalized_rows(receipt, raw_path.read_bytes())
         if kind == "funding":
             funding_rows.extend(normalized)
+        elif kind in rebuilt_by_kind and params.get("granularity") == "daily":
+            daily_by_kind[kind].extend(normalized)
         elif kind in rebuilt_by_kind:
             rebuilt_by_kind[kind].extend(normalized)
         else:
@@ -360,6 +404,20 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
         kind: _deduplicate_rebuilt_rows(series, identity_key="start_ms")
         for kind, series in rebuilt_by_kind.items()
     }
+    # Daily archive files only supply bars the primary pages lack; where both
+    # carry a bar the primary one stands, exactly as in the backfill.
+    for kind, daily in daily_by_kind.items():
+        if not daily:
+            continue
+        present = {int(row["start_ms"]) for row in canonical_series[kind]}
+        extra = [
+            row
+            for row in _deduplicate_rebuilt_rows(daily, identity_key="start_ms")
+            if int(row["start_ms"]) not in present
+        ]
+        canonical_series[kind] = sorted(
+            canonical_series[kind] + extra, key=lambda row: int(row["start_ms"])
+        )
     settlements = _rebuild_settlements(funding_rows)
     context = manifest.get("build_context")
     if not isinstance(context, dict) or not context:
@@ -382,6 +440,7 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
         for row in settlements
         if requested_since_ms <= int(row["settled_at_ms"]) <= requested_until_ms
     ]
+    outages = _verified_outages(context, canonical_series, load_receipts(receipts_path))
     rebuilt, rebuilt_audit = build_carry_panel(
         venue=str(context["venue"]),
         symbol=str(context["symbol"]),
@@ -393,6 +452,7 @@ def verify_panel_bundle(panel_dir: str | Path) -> tuple[list[dict[str, Any]], Pa
         interval_minutes=int(context["interval_minutes"]),
         requested_since_ms=requested_since_ms,
         requested_until_ms=requested_until_ms,
+        venue_outages_ms=outages,
     )
     rebuilt_audit.provenance = provenance.provenance
     rebuilt_payload = "".join(canonical_dumps(row) + "\n" for row in rebuilt).encode()

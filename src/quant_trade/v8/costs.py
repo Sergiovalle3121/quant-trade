@@ -224,6 +224,7 @@ def _bps(
 FEE_SCHEDULE_SOURCES = {
     "bybit": "https://api.bybit.com/v5/market/instruments-info (+ published fee schedule)",
     "okx": "https://www.okx.com/api/v5/public/instruments (+ published fee schedule)",
+    "binance": "https://www.binance.com/en/fee/schedule (published retail fee schedule)",
 }
 
 
@@ -248,10 +249,10 @@ def conservative_cost_stack(
     does not have.
     """
     source = FEE_SCHEDULE_SOURCES[venue]
-    # Published retail taker fees: Bybit linear perp 0.055%, OKX perp 0.050%;
-    # spot taker 0.100% on both. Taker on every fill, because a hedge that
+    # Published retail taker fees: Bybit linear perp 0.055%, OKX and Binance
+    # USD-M perp 0.050%; spot taker 0.100% on all three. Taker on every fill, because a hedge that
     # must stay delta-neutral cannot wait for a resting maker fill.
-    perp_taker_bps = {"bybit": 5.5, "okx": 5.0}[venue]
+    perp_taker_bps = {"bybit": 5.5, "okx": 5.0, "binance": 5.0}[venue]
     components = [
         _bps(
             "spot_taker_fee" if spot_leg else "perp_taker_fee_second_leg",

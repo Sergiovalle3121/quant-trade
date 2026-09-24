@@ -1,0 +1,1837 @@
+{
+  "artifact": "BINANCE_CARRY_RESULTS",
+  "cost_stack": {
+    "annual_carrying_fraction": 0.045,
+    "by_category": {
+      "collateral_opportunity_cost": 0.04,
+      "conversion_and_withdrawal": 0.0005,
+      "emergency_unwind_reserve": 0.001,
+      "half_spread": 0.0004,
+      "latency_and_partial_fill": 0.0002,
+      "market_impact": 0.0004,
+      "perp_margin_maintenance_drag": 0.005,
+      "perp_taker_fee": 0.001,
+      "slippage": 0.0004,
+      "spot_taker_fee": 0.002
+    },
+    "components": [
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "spot",
+        "name": "spot_taker_fee",
+        "note": "published retail spot taker rate; VIP tiers are cheaper",
+        "promotable": false,
+        "source": "https://www.binance.com/en/fee/schedule (published retail fee schedule)",
+        "unit": "bps_per_fill",
+        "value": 10.0
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "perp",
+        "name": "perp_taker_fee",
+        "note": "published retail linear-perp taker rate",
+        "promotable": false,
+        "source": "https://www.binance.com/en/fee/schedule (published retail fee schedule)",
+        "unit": "bps_per_fill",
+        "value": 5.0
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "half_spread",
+        "note": "BTC/USDT is among the deepest books; 1bp is pessimistic",
+        "promotable": false,
+        "source": "conservative desk assumption for BTC top-of-book",
+        "unit": "bps_per_fill",
+        "value": 1.0
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "slippage",
+        "note": "beyond the touch, at research size",
+        "promotable": false,
+        "source": "conservative desk assumption",
+        "unit": "bps_per_fill",
+        "value": 1.0
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "market_impact",
+        "note": "temporary impact at research size",
+        "promotable": false,
+        "source": "conservative desk assumption",
+        "unit": "bps_per_fill",
+        "value": 1.0
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "latency_and_partial_fill",
+        "note": "adverse selection between the two legs of the hedge",
+        "promotable": false,
+        "source": "conservative desk assumption",
+        "unit": "bps_per_fill",
+        "value": 0.5
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "collateral_opportunity_cost",
+        "note": "margin and spot inventory are immobilised and earn nothing",
+        "promotable": false,
+        "source": "cash baseline yield (configs/opportunities/cash_baseline_v7.json)",
+        "unit": "annual_fraction",
+        "value": 0.04
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "perp_margin_maintenance_drag",
+        "note": "buffer capital held against variation margin calls",
+        "promotable": false,
+        "source": "conservative desk assumption",
+        "unit": "annual_fraction",
+        "value": 0.005
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "conversion_and_withdrawal",
+        "note": "fiat/stable conversion in and out of the position",
+        "promotable": false,
+        "source": "conservative desk assumption",
+        "unit": "one_off_fraction",
+        "value": 0.0005
+      },
+      {
+        "evidence_class": "ASSUMPTION_UNVERIFIED",
+        "leg": "both",
+        "name": "emergency_unwind_reserve",
+        "note": "priced allowance for unwinding both legs into a stressed book",
+        "promotable": false,
+        "source": "conservative desk assumption",
+        "unit": "one_off_fraction",
+        "value": 0.001
+      }
+    ],
+    "evidence_class": "ASSUMPTION",
+    "multiplier": 1.0,
+    "per_fill_bps": 11.0,
+    "promotable": false,
+    "round_trip_bps": 44.0,
+    "round_trip_fraction": 0.005900000000000001,
+    "venue": "binance",
+    "weakest_evidence_class": "ASSUMPTION_UNVERIFIED"
+  },
+  "evaluated_at_utc": "2026-09-24T06:32:13Z",
+  "evidence": {
+    "directory": "data/v8_evidence/binance_btc_usdt",
+    "provenance": "real",
+    "raw_files": 437,
+    "receipts": 437,
+    "settlements": {
+      "first_utc": "2020-01-01T00:00:00Z",
+      "last_utc": "2026-08-31T16:00:00Z",
+      "span_days": 2434.6666666666665,
+      "unique_settlements": 7305
+    },
+    "sufficiency": {
+      "content_sha256": "cda1963259b5fa099ec2de49cc03db5d6377bffdc88edfdb323b06190ef4b2ba",
+      "provenance": "real",
+      "required_days": 730.0,
+      "required_settlements": 1000,
+      "shortfalls": [],
+      "span_days": 2434.6666666666665,
+      "sufficient": true,
+      "unique_settlements": 7305
+    },
+    "validation_clean": true,
+    "validation_problems": []
+  },
+  "evidence_class": "MEASURED",
+  "failed_gates": [
+    "holdout_net_positive",
+    "holdout_positive_at_2x_costs",
+    "bootstrap_p05_positive",
+    "probabilistic_sharpe",
+    "deflated_sharpe",
+    "walk_forward_majority_positive",
+    "beats_cash_on_holdout",
+    "cost_evidence_promotable"
+  ],
+  "full_sample_frozen_variant": {
+    "btc_hold": {
+      "annualised_return": 0.431678566254982,
+      "bars": 58409,
+      "max_drawdown": -0.771984866324393,
+      "sharpe_annualised": 0.89364286371562,
+      "sharpe_per_period": 0.009544721446507885,
+      "total_return": 9.924939075739466
+    },
+    "carry": {
+      "annualised_return": 0.019022561930381876,
+      "bars": 58409,
+      "max_drawdown": -0.026415763354194488,
+      "sharpe_annualised": 0.9376010757141284,
+      "sharpe_per_period": 0.010014225435011532,
+      "total_return": 0.13378243303782011
+    },
+    "cash": {
+      "annualised_return": 0.04,
+      "bars": 58409,
+      "total_return": 0.29865968524612097
+    },
+    "in_sample_warning": "the variant was chosen on this data; context only",
+    "per_year": [
+      {
+        "btc_hold_total_return": 3.0211721594188727,
+        "carry_total_return": 0.020060980158469466,
+        "year": "2020"
+      },
+      {
+        "btc_hold_total_return": 0.5943817797588125,
+        "carry_total_return": 0.11862465284310564,
+        "year": "2021"
+      },
+      {
+        "btc_hold_total_return": -0.642857568940555,
+        "carry_total_return": 0.0,
+        "year": "2022"
+      },
+      {
+        "btc_hold_total_return": 1.5504526119022382,
+        "carry_total_return": -0.01085822426788241,
+        "year": "2023"
+      },
+      {
+        "btc_hold_total_return": 1.2081915965242112,
+        "carry_total_return": 0.004524787850382683,
+        "year": "2024"
+      },
+      {
+        "btc_hold_total_return": -0.06540672853779927,
+        "carry_total_return": 0.0,
+        "year": "2025"
+      },
+      {
+        "btc_hold_total_return": -0.1054181562915768,
+        "carry_total_return": 0.0,
+        "year": "2026"
+      }
+    ]
+  },
+  "gate_results": [
+    {
+      "gate": "holdout_net_positive",
+      "observed": 0.0,
+      "passed": false,
+      "required": "> 0"
+    },
+    {
+      "gate": "holdout_positive_at_2x_costs",
+      "observed": 0.0,
+      "passed": false,
+      "required": "> 0"
+    },
+    {
+      "gate": "bootstrap_p05_positive",
+      "observed": 0.0,
+      "passed": false,
+      "required": "> 0"
+    },
+    {
+      "gate": "probabilistic_sharpe",
+      "observed": 0.0,
+      "passed": false,
+      "required": ">= 0.95"
+    },
+    {
+      "gate": "deflated_sharpe",
+      "observed": 4.91914674932703e-06,
+      "passed": false,
+      "required": ">= 0.95"
+    },
+    {
+      "gate": "walk_forward_windows",
+      "observed": 73,
+      "passed": true,
+      "required": ">= 5"
+    },
+    {
+      "gate": "walk_forward_majority_positive",
+      "observed": "7/73",
+      "passed": false,
+      "required": "> half"
+    },
+    {
+      "gate": "zero_ledger_failures",
+      "observed": 0,
+      "passed": true,
+      "required": 0
+    },
+    {
+      "gate": "ledgers_reconciled",
+      "observed": true,
+      "passed": true,
+      "required": true
+    },
+    {
+      "gate": "beats_cash_on_holdout",
+      "observed": 0.0,
+      "passed": false,
+      "required": "> 0.0536622083066145"
+    },
+    {
+      "gate": "beats_buy_and_hold_btc_on_holdout",
+      "observed": 0.0,
+      "passed": true,
+      "required": "> -0.19116340537976806"
+    },
+    {
+      "gate": "cost_evidence_promotable",
+      "observed": "ASSUMPTION_UNVERIFIED",
+      "passed": false,
+      "required": "REAL"
+    }
+  ],
+  "holdout": {
+    "bootstrap_stationary_1000": {
+      "block_10h": {
+        "total_return_p05": 0.0,
+        "total_return_p50": 0.0,
+        "total_return_p95": 0.0
+      },
+      "block_168h": {
+        "total_return_p05": 0.0,
+        "total_return_p50": 0.0,
+        "total_return_p95": 0.0
+      }
+    },
+    "btc_hold_same_bars": {
+      "annualised_return": -0.14716302852472074,
+      "bars": 11683,
+      "max_drawdown": -0.5374206479139346,
+      "sharpe_annualised": -0.18026470366310926,
+      "sharpe_per_period": -0.0019253512258216824,
+      "total_return": -0.19116340537976806
+    },
+    "carry": {
+      "1x": {
+        "annualised_return": 0.0,
+        "bars": 11683,
+        "max_drawdown": 0.0,
+        "sharpe_annualised": 0.0,
+        "sharpe_per_period": 0.0,
+        "total_return": 0.0
+      },
+      "2x": {
+        "annualised_return": 0.0,
+        "bars": 11683,
+        "max_drawdown": 0.0,
+        "sharpe_annualised": 0.0,
+        "sharpe_per_period": 0.0,
+        "total_return": 0.0
+      },
+      "3x": {
+        "annualised_return": 0.0,
+        "bars": 11683,
+        "max_drawdown": 0.0,
+        "sharpe_annualised": 0.0,
+        "sharpe_per_period": 0.0,
+        "total_return": 0.0
+      }
+    },
+    "cash_same_bars": {
+      "annualised_return": 0.04,
+      "bars": 11683,
+      "total_return": 0.0536622083066145
+    },
+    "deflated_sharpe": 4.91914674932703e-06,
+    "end_utc": "2026-08-31T23:00:00Z",
+    "frozen_variant": "H1-BIN-R-t10-w6",
+    "position_carried_in": false,
+    "probabilistic_sharpe": 0.0,
+    "seal": {
+      "freeze_hash": "44b0ac2600c31609284491430c8986baeda7fbc2ff26cc5aeb94d9a99fdfa8b6",
+      "frozen": true,
+      "frozen_variant": "H1-BIN-R-t10-w6",
+      "plan": {
+        "fractions": {
+          "holdout": 0.2,
+          "train": 0.5,
+          "walk_forward": 0.3
+        },
+        "holdout_rows": 11683,
+        "holdout_start_index": 46726,
+        "total_rows": 58409,
+        "train_end_index": 29204,
+        "train_rows": 29204,
+        "walk_forward_end_index": 46726,
+        "walk_forward_rows": 17522
+      },
+      "reveal_count": 1,
+      "reveals": [
+        {
+          "freeze_hash": "44b0ac2600c31609284491430c8986baeda7fbc2ff26cc5aeb94d9a99fdfa8b6",
+          "reason": "final out-of-sample scoring of the frozen H1-BIN variant"
+        }
+      ]
+    },
+    "selection_scores_before_holdout": {
+      "H1-BIN-R-t10-w3": 0.007921500977197793,
+      "H1-BIN-R-t10-w6": 0.13378243303782011,
+      "H1-BIN-R-t5-w3": -0.4758195851500635,
+      "H1-BIN-R-t5-w6": -0.15996872868758416
+    },
+    "start_utc": "2025-05-02T05:00:00Z",
+    "trial_ledger": {
+      "chain_intact": true,
+      "chain_problems": [],
+      "distinct_trials": 8,
+      "duplicate_reproductions": 0,
+      "evaluated_trials": 4,
+      "failed_trials": 0,
+      "sharpe_variance": 0.0007858603543699005,
+      "sharpes": [
+        -0.06380271220870143,
+        -0.029726081895612263,
+        -0.01474634772739805,
+        0.0020926756760634396
+      ],
+      "total_records": 12
+    }
+  },
+  "hypothesis_id": "H1-BIN-R",
+  "ledger_failures": {},
+  "note": "Research backtest only. BACKTEST_CANDIDATE would at most justify a supervised paper trial; it never authorises real money.",
+  "panel": {
+    "dataset_sha256": "6a063d484f9cf0101286c4d0281683798c7b6ac9d8586396aa6da812acac2aea",
+    "first_utc": "2020-01-01T00:00:00Z",
+    "last_utc": "2026-08-31T23:00:00Z",
+    "rows": 58409
+  },
+  "preregistration_hash": "2e81a8b8725b93320bdc6d696d9af80373e86886ddfeef3f4a189f95de081db7",
+  "real_money_approved": false,
+  "research_only": true,
+  "schema_version": 1,
+  "state": "MEASURED_REJECTED",
+  "variants": {
+    "H1-BIN-R-t10-w3": {
+      "aborted_entries": 0,
+      "borrow_costs": 0.0,
+      "carrying_costs": 0.040724829087307866,
+      "collateral_yield": 0.0,
+      "conversion_costs": 0.08821750638988793,
+      "entries": 79,
+      "exits": 79,
+      "final_equity": 1.00792150097721,
+      "full_sample": {
+        "annualised_return": 0.0011848731525689882,
+        "bars": 58409,
+        "max_drawdown": -0.09587778481783904,
+        "sharpe_annualised": 0.06723687037517279,
+        "sharpe_per_period": 0.0007181360974535863,
+        "total_return": 0.007921500977197793
+      },
+      "funding_settled": 0.3833303908224745,
+      "initial_capital": 1.0,
+      "max_margin_used": 0.26528902784177305,
+      "net_pnl": 0.007921500977212122,
+      "perp_leg_pnl": -0.42553651473618864,
+      "reconciled": true,
+      "reconciliation_error": 2.1163626406917047e-15,
+      "rehedges": 6,
+      "spot_leg_pnl": 0.4388667720323432,
+      "time_in_market": 0.17863685390950024,
+      "trading_fees": 0.25979681166422114,
+      "unwind_costs": 0.0
+    },
+    "H1-BIN-R-t10-w6": {
+      "aborted_entries": 0,
+      "borrow_costs": 0.0,
+      "carrying_costs": 0.04867631013343151,
+      "collateral_yield": 0.0,
+      "conversion_costs": 0.06291883980126327,
+      "entries": 54,
+      "exits": 54,
+      "final_equity": 1.1337824330378268,
+      "full_sample": {
+        "annualised_return": 0.019022561930381876,
+        "bars": 58409,
+        "max_drawdown": -0.026415763354194488,
+        "sharpe_annualised": 0.9376010757141284,
+        "sharpe_per_period": 0.010014225435011532,
+        "total_return": 0.13378243303782011
+      },
+      "funding_settled": 0.41734947111817916,
+      "initial_capital": 1.0,
+      "max_margin_used": 0.2754685205536525,
+      "net_pnl": 0.13378243303782592,
+      "perp_leg_pnl": -0.5870140514973206,
+      "reconciled": true,
+      "reconciliation_error": 8.604228440844963e-16,
+      "rehedges": 7,
+      "spot_leg_pnl": 0.6009665995990753,
+      "time_in_market": 0.20161276515605472,
+      "trading_fees": 0.18592443624741323,
+      "unwind_costs": 0.0
+    },
+    "H1-BIN-R-t5-w3": {
+      "aborted_entries": 0,
+      "borrow_costs": 0.0,
+      "carrying_costs": 0.1084256750407498,
+      "collateral_yield": 0.0,
+      "conversion_costs": 0.2664122933398766,
+      "entries": 343,
+      "exits": 343,
+      "final_equity": 0.3621546045778877,
+      "full_sample": {
+        "annualised_return": -0.14138398484121162,
+        "bars": 58409,
+        "max_drawdown": -0.6800766581263523,
+        "sharpe_annualised": -4.9148738147700275,
+        "sharpe_per_period": -0.05249423837131857,
+        "total_return": -0.6378453954221277
+      },
+      "funding_settled": 0.5018963552650781,
+      "initial_capital": 1.0,
+      "max_margin_used": 0.2705329517007607,
+      "net_pnl": -0.6378453954221228,
+      "perp_leg_pnl": -0.5090669258352088,
+      "reconciled": true,
+      "reconciliation_error": 1.0436096431476471e-14,
+      "rehedges": 18,
+      "spot_leg_pnl": 0.5266964165090001,
+      "time_in_market": 0.6286702391754695,
+      "trading_fees": 0.7825332729803657,
+      "unwind_costs": 0.0
+    },
+    "H1-BIN-R-t5-w6": {
+      "aborted_entries": 0,
+      "borrow_costs": 0.0,
+      "carrying_costs": 0.13134730268117617,
+      "collateral_yield": 0.0,
+      "conversion_costs": 0.19319080293071605,
+      "entries": 190,
+      "exits": 190,
+      "final_equity": 0.6906341859364558,
+      "full_sample": {
+        "annualised_return": -0.054036426645326596,
+        "bars": 58409,
+        "max_drawdown": -0.4161646993019651,
+        "sharpe_annualised": -2.0475412045924988,
+        "sharpe_per_period": -0.021869150688257233,
+        "total_return": -0.309365814063568
+      },
+      "funding_settled": 0.5696057785112195,
+      "initial_capital": 1.0,
+      "max_margin_used": 0.2827037039104309,
+      "net_pnl": -0.3093658140635397,
+      "perp_leg_pnl": -0.7316025899888772,
+      "reconciled": true,
+      "reconciliation_error": 4.551914400963142e-15,
+      "rehedges": 18,
+      "spot_leg_pnl": 0.7454385375936073,
+      "time_in_market": 0.6193566060024996,
+      "trading_fees": 0.5682694345675972,
+      "unwind_costs": 0.0
+    }
+  },
+  "walk_forward": {
+    "btc_hold_same_bars": {
+      "annualised_return": 0.8428726403298992,
+      "bars": 17520,
+      "max_drawdown": -0.32310690722077495,
+      "sharpe_annualised": 1.5049525954420329,
+      "sharpe_per_period": 0.01607393053413828,
+      "total_return": 2.3933386335999614
+    },
+    "cash_same_bars": {
+      "annualised_return": 0.04,
+      "bars": 17520,
+      "total_return": 0.08154193020593148
+    },
+    "distinct_variants_selected": 1,
+    "method": "anchored walk-forward; each window selects on data strictly before its own test block, minus purge and embargo, and only test-block returns are concatenated",
+    "oos": {
+      "1x": {
+        "annualised_return": 0.0020681106133695337,
+        "bars": 17520,
+        "max_drawdown": -0.017838656066844538,
+        "sharpe_annualised": 0.19594195880209975,
+        "sharpe_per_period": 0.002092795111319006,
+        "total_return": 0.004137658436586422
+      },
+      "2x": {
+        "annualised_return": -0.029342669041544256,
+        "bars": 17520,
+        "max_drawdown": -0.05924728178682037,
+        "sharpe_annualised": -1.6373393592211216,
+        "sharpe_per_period": -0.017487912377200533,
+        "total_return": -0.05778593348634864
+      },
+      "3x": {
+        "annualised_return": -0.059679269376621935,
+        "bars": 17520,
+        "max_drawdown": -0.11572243886057099,
+        "sharpe_annualised": -2.3629831206318936,
+        "sharpe_per_period": -0.025238287670597492,
+        "total_return": -0.11572243886057099
+      }
+    },
+    "oos_end_utc": "2025-05-02T02:00:00Z",
+    "oos_observations": 17520,
+    "oos_start_utc": "2023-05-03T03:00:00Z",
+    "oos_total_return": 0.004137658436586422,
+    "positive_windows": 7,
+    "problems": [],
+    "switch_charge_fraction": 0.0044,
+    "variant_switches": 0,
+    "window_count": 73,
+    "windows": [
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 0,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 29197,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 29444,
+        "test_observations": 240,
+        "test_start_index": 29204,
+        "test_start_utc": "2023-05-03T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 1,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 29437,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 29684,
+        "test_observations": 240,
+        "test_start_index": 29444,
+        "test_start_utc": "2023-05-13T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 2,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 29677,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 29924,
+        "test_observations": 240,
+        "test_start_index": 29684,
+        "test_start_utc": "2023-05-23T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 3,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 29917,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 30164,
+        "test_observations": 240,
+        "test_start_index": 29924,
+        "test_start_utc": "2023-06-02T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 4,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 30157,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 30404,
+        "test_observations": 240,
+        "test_start_index": 30164,
+        "test_start_utc": "2023-06-12T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 5,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 30397,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 30644,
+        "test_observations": 240,
+        "test_start_index": 30404,
+        "test_start_utc": "2023-06-22T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 6,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 30637,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 30884,
+        "test_observations": 240,
+        "test_start_index": 30644,
+        "test_start_utc": "2023-07-02T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 7,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 30877,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 31124,
+        "test_observations": 240,
+        "test_start_index": 30884,
+        "test_start_utc": "2023-07-12T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 8,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 31117,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 31364,
+        "test_observations": 240,
+        "test_start_index": 31124,
+        "test_start_utc": "2023-07-22T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 9,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 31357,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 31604,
+        "test_observations": 240,
+        "test_start_index": 31364,
+        "test_start_utc": "2023-08-01T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 10,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 31597,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 31844,
+        "test_observations": 240,
+        "test_start_index": 31604,
+        "test_start_utc": "2023-08-11T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 11,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 31837,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 32084,
+        "test_observations": 240,
+        "test_start_index": 31844,
+        "test_start_utc": "2023-08-21T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 12,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 32077,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 32324,
+        "test_observations": 240,
+        "test_start_index": 32084,
+        "test_start_utc": "2023-08-31T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 13,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 32317,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 32564,
+        "test_observations": 240,
+        "test_start_index": 32324,
+        "test_start_utc": "2023-09-10T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 14,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 32557,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 32804,
+        "test_observations": 240,
+        "test_start_index": 32564,
+        "test_start_utc": "2023-09-20T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 15,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 32797,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 33044,
+        "test_observations": 240,
+        "test_start_index": 32804,
+        "test_start_utc": "2023-09-30T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 16,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 33037,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 33284,
+        "test_observations": 240,
+        "test_start_index": 33044,
+        "test_start_utc": "2023-10-10T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 17,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 33277,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 33524,
+        "test_observations": 240,
+        "test_start_index": 33284,
+        "test_start_utc": "2023-10-20T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 18,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 33517,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 33764,
+        "test_observations": 240,
+        "test_start_index": 33524,
+        "test_start_utc": "2023-10-30T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 19,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 33757,
+        "selection_score": 0.12911055920668035,
+        "test_end_index": 34004,
+        "test_observations": 240,
+        "test_start_index": 33764,
+        "test_start_utc": "2023-11-09T03:00:00Z",
+        "test_total_return": -0.0019309508445147783
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 20,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 33997,
+        "selection_score": 0.12693030221883017,
+        "test_end_index": 34244,
+        "test_observations": 240,
+        "test_start_index": 34004,
+        "test_start_utc": "2023-11-19T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 21,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 34237,
+        "selection_score": 0.12693030221883017,
+        "test_end_index": 34484,
+        "test_observations": 240,
+        "test_start_index": 34244,
+        "test_start_utc": "2023-11-29T03:00:00Z",
+        "test_total_return": -0.002450327909292338
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 22,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 34477,
+        "selection_score": 0.12432904038869363,
+        "test_end_index": 34724,
+        "test_observations": 240,
+        "test_start_index": 34484,
+        "test_start_utc": "2023-12-09T03:00:00Z",
+        "test_total_return": -0.002463839357476183
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 23,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 34717,
+        "selection_score": 0.1214921196862162,
+        "test_end_index": 34964,
+        "test_observations": 240,
+        "test_start_index": 34724,
+        "test_start_utc": "2023-12-19T03:00:00Z",
+        "test_total_return": 0.004336208241578543
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 24,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 34957,
+        "selection_score": 0.1256304175231564,
+        "test_end_index": 35204,
+        "test_observations": 240,
+        "test_start_index": 34964,
+        "test_start_utc": "2023-12-29T03:00:00Z",
+        "test_total_return": 0.00321089359257698
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 25,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 35197,
+        "selection_score": 0.12987810891341423,
+        "test_end_index": 35444,
+        "test_observations": 240,
+        "test_start_index": 35204,
+        "test_start_utc": "2024-01-08T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 26,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 35437,
+        "selection_score": 0.12987810891341423,
+        "test_end_index": 35684,
+        "test_observations": 240,
+        "test_start_index": 35444,
+        "test_start_utc": "2024-01-18T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 27,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 35677,
+        "selection_score": 0.12987810891341423,
+        "test_end_index": 35924,
+        "test_observations": 240,
+        "test_start_index": 35684,
+        "test_start_utc": "2024-01-28T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 28,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 35917,
+        "selection_score": 0.12987810891341423,
+        "test_end_index": 36164,
+        "test_observations": 240,
+        "test_start_index": 35924,
+        "test_start_utc": "2024-02-07T03:00:00Z",
+        "test_total_return": -0.00398237963602277
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 29,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 36157,
+        "selection_score": 0.12537850534128903,
+        "test_end_index": 36404,
+        "test_observations": 240,
+        "test_start_index": 36164,
+        "test_start_utc": "2024-02-17T03:00:00Z",
+        "test_total_return": -0.001719672695762564
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 30,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 36397,
+        "selection_score": 0.12447020436561296,
+        "test_end_index": 36644,
+        "test_observations": 240,
+        "test_start_index": 36404,
+        "test_start_utc": "2024-02-27T03:00:00Z",
+        "test_total_return": 0.006465212389545449
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 31,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 36637,
+        "selection_score": 0.13058344093177476,
+        "test_end_index": 36884,
+        "test_observations": 240,
+        "test_start_index": 36644,
+        "test_start_utc": "2024-03-08T03:00:00Z",
+        "test_total_return": 0.007967013734905493
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 32,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 36877,
+        "selection_score": 0.13970661301769005,
+        "test_end_index": 37124,
+        "test_observations": 240,
+        "test_start_index": 36884,
+        "test_start_utc": "2024-03-18T03:00:00Z",
+        "test_total_return": 0.0036180074804907925
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 33,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 37117,
+        "selection_score": 0.1437597422358825,
+        "test_end_index": 37364,
+        "test_observations": 240,
+        "test_start_index": 37124,
+        "test_start_utc": "2024-03-28T03:00:00Z",
+        "test_total_return": 0.0028021822472124036
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 34,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 37357,
+        "selection_score": 0.1470436166136857,
+        "test_end_index": 37604,
+        "test_observations": 240,
+        "test_start_index": 37364,
+        "test_start_utc": "2024-04-07T03:00:00Z",
+        "test_total_return": -0.0020742521892395116
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 35,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 37597,
+        "selection_score": 0.14466435888077056,
+        "test_end_index": 37844,
+        "test_observations": 240,
+        "test_start_index": 37604,
+        "test_start_utc": "2024-04-17T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 36,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 37837,
+        "selection_score": 0.14466435888077056,
+        "test_end_index": 38084,
+        "test_observations": 240,
+        "test_start_index": 37844,
+        "test_start_utc": "2024-04-27T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 37,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 38077,
+        "selection_score": 0.14466435888077056,
+        "test_end_index": 38324,
+        "test_observations": 240,
+        "test_start_index": 38084,
+        "test_start_utc": "2024-05-07T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 38,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 38317,
+        "selection_score": 0.14466435888077056,
+        "test_end_index": 38564,
+        "test_observations": 240,
+        "test_start_index": 38324,
+        "test_start_utc": "2024-05-17T03:00:00Z",
+        "test_total_return": -0.0037474441185286755
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 39,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 38557,
+        "selection_score": 0.14037479316139256,
+        "test_end_index": 38804,
+        "test_observations": 240,
+        "test_start_index": 38564,
+        "test_start_utc": "2024-05-27T03:00:00Z",
+        "test_total_return": -0.0014835232452430347
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 40,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 38797,
+        "selection_score": 0.13882032184318782,
+        "test_end_index": 39044,
+        "test_observations": 240,
+        "test_start_index": 38804,
+        "test_start_utc": "2024-06-06T03:00:00Z",
+        "test_total_return": -0.0009338209118630036
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 41,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 39037,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 39284,
+        "test_observations": 240,
+        "test_start_index": 39044,
+        "test_start_utc": "2024-06-16T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 42,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 39277,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 39524,
+        "test_observations": 240,
+        "test_start_index": 39284,
+        "test_start_utc": "2024-06-26T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 43,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 39517,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 39764,
+        "test_observations": 240,
+        "test_start_index": 39524,
+        "test_start_utc": "2024-07-06T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 44,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 39757,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 40004,
+        "test_observations": 240,
+        "test_start_index": 39764,
+        "test_start_utc": "2024-07-16T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 45,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 39997,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 40244,
+        "test_observations": 240,
+        "test_start_index": 40004,
+        "test_start_utc": "2024-07-26T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 46,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 40237,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 40484,
+        "test_observations": 240,
+        "test_start_index": 40244,
+        "test_start_utc": "2024-08-05T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 47,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 40477,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 40724,
+        "test_observations": 240,
+        "test_start_index": 40484,
+        "test_start_utc": "2024-08-15T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 48,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 40717,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 40964,
+        "test_observations": 240,
+        "test_start_index": 40724,
+        "test_start_utc": "2024-08-25T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 49,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 40957,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 41204,
+        "test_observations": 240,
+        "test_start_index": 40964,
+        "test_start_utc": "2024-09-04T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 50,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 41197,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 41444,
+        "test_observations": 240,
+        "test_start_index": 41204,
+        "test_start_utc": "2024-09-14T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 51,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 41437,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 41684,
+        "test_observations": 240,
+        "test_start_index": 41444,
+        "test_start_utc": "2024-09-24T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 52,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 41677,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 41924,
+        "test_observations": 240,
+        "test_start_index": 41684,
+        "test_start_utc": "2024-10-04T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 53,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 41917,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 42164,
+        "test_observations": 240,
+        "test_start_index": 41924,
+        "test_start_utc": "2024-10-14T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 54,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 42157,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 42404,
+        "test_observations": 240,
+        "test_start_index": 42164,
+        "test_start_utc": "2024-10-24T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 55,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 42397,
+        "selection_score": 0.13761969463078239,
+        "test_end_index": 42644,
+        "test_observations": 240,
+        "test_start_index": 42404,
+        "test_start_utc": "2024-11-03T03:00:00Z",
+        "test_total_return": -0.0013673425473001988
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 56,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 42637,
+        "selection_score": 0.1359373792969889,
+        "test_end_index": 42884,
+        "test_observations": 240,
+        "test_start_index": 42644,
+        "test_start_utc": "2024-11-13T03:00:00Z",
+        "test_total_return": -0.0038018433129254348
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 57,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 42877,
+        "selection_score": 0.1317450408183678,
+        "test_end_index": 43124,
+        "test_observations": 240,
+        "test_start_index": 42884,
+        "test_start_utc": "2024-11-23T03:00:00Z",
+        "test_total_return": -0.0002888873023871863
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 58,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 43117,
+        "selection_score": 0.1315354258797885,
+        "test_end_index": 43364,
+        "test_observations": 240,
+        "test_start_index": 43124,
+        "test_start_utc": "2024-12-03T03:00:00Z",
+        "test_total_return": 0.0020897129042980467
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 59,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 43357,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 43604,
+        "test_observations": 240,
+        "test_start_index": 43364,
+        "test_start_utc": "2024-12-13T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 60,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 43597,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 43844,
+        "test_observations": 240,
+        "test_start_index": 43604,
+        "test_start_utc": "2024-12-23T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 61,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 43837,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 44084,
+        "test_observations": 240,
+        "test_start_index": 43844,
+        "test_start_utc": "2025-01-02T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 62,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 44077,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 44324,
+        "test_observations": 240,
+        "test_start_index": 44084,
+        "test_start_utc": "2025-01-12T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 63,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 44317,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 44564,
+        "test_observations": 240,
+        "test_start_index": 44324,
+        "test_start_utc": "2025-01-22T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 64,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 44557,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 44804,
+        "test_observations": 240,
+        "test_start_index": 44564,
+        "test_start_utc": "2025-02-01T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 65,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 44797,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 45044,
+        "test_observations": 240,
+        "test_start_index": 44804,
+        "test_start_utc": "2025-02-11T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 66,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 45037,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 45284,
+        "test_observations": 240,
+        "test_start_index": 45044,
+        "test_start_utc": "2025-02-21T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 67,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 45277,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 45524,
+        "test_observations": 240,
+        "test_start_index": 45284,
+        "test_start_utc": "2025-03-03T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 68,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 45517,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 45764,
+        "test_observations": 240,
+        "test_start_index": 45524,
+        "test_start_utc": "2025-03-13T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 69,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 45757,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 46004,
+        "test_observations": 240,
+        "test_start_index": 45764,
+        "test_start_utc": "2025-03-23T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 70,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 45997,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 46244,
+        "test_observations": 240,
+        "test_start_index": 46004,
+        "test_start_utc": "2025-04-02T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 71,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 46237,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 46484,
+        "test_observations": 240,
+        "test_start_index": 46244,
+        "test_start_utc": "2025-04-12T03:00:00Z",
+        "test_total_return": 0.0
+      },
+      {
+        "candidates_considered": [
+          "H1-BIN-R-t5-w3",
+          "H1-BIN-R-t5-w6",
+          "H1-BIN-R-t10-w3",
+          "H1-BIN-R-t10-w6"
+        ],
+        "index": 72,
+        "selected_variant": "H1-BIN-R-t10-w6",
+        "selection_end_index": 46477,
+        "selection_score": 0.13378243303782011,
+        "test_end_index": 46724,
+        "test_observations": 240,
+        "test_start_index": 46484,
+        "test_start_utc": "2025-04-22T03:00:00Z",
+        "test_total_return": 0.0
+      }
+    ]
+  }
+}

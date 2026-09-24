@@ -149,6 +149,7 @@ class SeriesValidation:
     span_days: float = 0.0
     expected_rows: int = 0
     missing_rows: int = 0
+    venue_outage_rows: int = 0
     coverage_ratio: float = 0.0
     duplicate_stamps: int = 0
     conflicting_duplicates: int = 0
@@ -176,8 +177,14 @@ def validate_bar_series(
     until_ms: int,
     interval_minutes: int,
     max_reported_gaps: int = 20,
+    venue_outages_ms: set[int] | None = None,
 ) -> SeriesValidation:
-    """Validate a kline/candle series against its requested window."""
+    """Validate a kline/candle series against its requested window.
+
+    ``venue_outages_ms`` are bars the venue never published, as recorded by
+    the backfill after consulting a second venue file. They are reported as
+    ``venue_outage_rows`` rather than missing rows; nothing is filled in.
+    """
     report = SeriesValidation(kind=kind)
     step = interval_minutes * 60_000
     if not rows:
@@ -221,7 +228,10 @@ def validate_bar_series(
 
     ordered = sorted(seen)
     report.expected_rows = int((ordered[-1] - ordered[0]) // step) + 1
-    report.missing_rows = report.expected_rows - len(ordered)
+    grid = set(range(ordered[0], ordered[-1] + step, step))
+    absent = grid - set(ordered)
+    report.venue_outage_rows = len(absent & set(venue_outages_ms or ()))
+    report.missing_rows = report.expected_rows - len(ordered) - report.venue_outage_rows
     report.coverage_ratio = len(ordered) / report.expected_rows if report.expected_rows else 0.0
     for a, b in zip(ordered[:-1], ordered[1:], strict=True):
         if b - a > step * GAP_TOLERANCE and len(report.gap_ranges) < max_reported_gaps:
@@ -366,10 +376,18 @@ def validate_evidence_dir(
         report.problems.append(f"evidence directory {root} does not exist")
         return report
 
+    outages: dict[str, list[int]] = {}
+    outage_path = root / "venue_outages.json"
+    if outage_path.exists():
+        outages = {
+            str(k): [int(t) for t in v]
+            for k, v in json.loads(outage_path.read_text(encoding="utf-8")).get("bars", {}).items()
+        }
     for kind in ("spot", "perp", "mark", "index"):
         rows = _read_jsonl(root / "series" / f"{kind}.jsonl")
         series_report = validate_bar_series(
             rows,
+            venue_outages_ms=set(outages.get(kind, [])),
             kind=kind,
             since_ms=since_ms,
             until_ms=until_ms,

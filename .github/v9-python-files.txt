@@ -24,3 +24,6 @@ tests/test_v9_p0_defects.py
 tests/test_v9_paper_durability.py
 tests/test_v9_safety.py
 tests/test_v9_small_capital.py
+src/quant_trade/v9/binance_carry.py
+src/quant_trade/v9/binance_carry_registration.py
+tests/test_binance_carry.py

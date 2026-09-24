@@ -98,6 +98,17 @@ def build_panel_from_evidence(
         {"settled_at_ms": stamp, "rate": rate} for stamp, rate in sorted(by_time.items())
     ]
 
+    outage_file = root / "venue_outages.json"
+    outages_by_kind: dict[str, list[int]] = {}
+    if outage_file.exists():
+        loaded = json.loads(outage_file.read_text(encoding="utf-8"))
+        outages_by_kind = {
+            str(kind): sorted(int(t) for t in stamps)
+            for kind, stamps in loaded.get("bars", {}).items()
+            if stamps
+        }
+    outage_stamps = {t for stamps in outages_by_kind.values() for t in stamps}
+
     rows, audit = build_carry_panel(
         venue=venue,
         symbol=symbol,
@@ -109,6 +120,7 @@ def build_panel_from_evidence(
         interval_minutes=interval_minutes,
         requested_since_ms=since_ms,
         requested_until_ms=until_ms,
+        venue_outages_ms=outage_stamps,
     )
     audit.provenance = provenance
     if not rows:
@@ -128,6 +140,7 @@ def build_panel_from_evidence(
             "requested_since_ms": since_ms,
             "requested_until_ms": until_ms,
             "builder": "v8.panel_builder",
+            **({"venue_outage_ms": outages_by_kind} if outages_by_kind else {}),
         },
     )
     result.rows = len(rows)

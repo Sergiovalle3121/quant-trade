@@ -1,0 +1,57 @@
+{
+  "artifact": "H1_BIN_CARRY_RESULTS",
+  "evaluated_at_utc": "2026-09-24T06:23:33Z",
+  "evidence": {
+    "directory": "data/v8_evidence/binance_btc_usdt",
+    "provenance": "real",
+    "raw_files": 437,
+    "receipts": 437,
+    "settlements": {
+      "first_utc": "2020-01-01T00:00:00Z",
+      "last_utc": "2026-08-31T16:00:00Z",
+      "span_days": 2434.6666666666665,
+      "unique_settlements": 7305
+    },
+    "sufficiency": {
+      "content_sha256": "cda1963259b5fa099ec2de49cc03db5d6377bffdc88edfdb323b06190ef4b2ba",
+      "provenance": "real",
+      "required_days": 730.0,
+      "required_settlements": 1000,
+      "shortfalls": [],
+      "span_days": 2434.6666666666665,
+      "sufficient": true,
+      "unique_settlements": 7305
+    },
+    "validation_clean": true,
+    "validation_problems": []
+  },
+  "evidence_class": "MEASURED",
+  "hypothesis_id": "H1-BIN",
+  "ledger_failures": {
+    "H1-BIN-t10-w3@1x": "ValueError: position losses exhausted cash and posted margin",
+    "H1-BIN-t10-w3@2x": "ValueError: entry sizing consumed more cash than available",
+    "H1-BIN-t10-w3@3x": "ValueError: entry sizing consumed more cash than available",
+    "H1-BIN-t10-w6@1x": "ValueError: position losses exhausted cash and posted margin",
+    "H1-BIN-t10-w6@2x": "ValueError: entry sizing consumed more cash than available",
+    "H1-BIN-t10-w6@3x": "ValueError: entry sizing consumed more cash than available",
+    "H1-BIN-t5-w3@1x": "ValueError: position losses exhausted cash and posted margin",
+    "H1-BIN-t5-w3@2x": "ValueError: entry sizing consumed more cash than available",
+    "H1-BIN-t5-w3@3x": "ValueError: position losses exhausted cash and posted margin",
+    "H1-BIN-t5-w6@1x": "ValueError: position losses exhausted cash and posted margin",
+    "H1-BIN-t5-w6@2x": "ValueError: position losses exhausted cash and posted margin",
+    "H1-BIN-t5-w6@3x": "ValueError: entry sizing consumed more cash than available"
+  },
+  "panel": {
+    "dataset_sha256": "6a063d484f9cf0101286c4d0281683798c7b6ac9d8586396aa6da812acac2aea",
+    "first_utc": "2020-01-01T00:00:00Z",
+    "last_utc": "2026-08-31T23:00:00Z",
+    "rows": 58409
+  },
+  "preregistration_hash": "19bdbd03b91fcfe2d5ad3b6e1a2c2a8bc4d91d78effc64417e7feeaf40a701d7",
+  "real_money_approved": false,
+  "reason": "no pre-registered variant produced a ledger",
+  "research_only": true,
+  "schema_version": 1,
+  "state": "MEASURED_REJECTED",
+  "variants": {}
+}
