@@ -119,6 +119,13 @@ LABELS: dict[str, dict[str, str]] = {
         "thresholds": "Umbrales aplicados",
         "print": "Imprimir / guardar PDF",
         "pdf": "Descargar PDF",
+        "obs": "observaciones",
+        "source_equity": "curva de equity",
+        "source_returns": "serie de retornos",
+        "variance_policy": (
+            "Varianza usada: la mayor entre la observada en las variantes que subiste y la "
+            "que produce el error de muestreo."
+        ),
         "pdf_long": "Descargar el informe en PDF",
         "switch": "English",
         "yes": "sí",
@@ -283,6 +290,13 @@ LABELS: dict[str, dict[str, str]] = {
         "thresholds": "Thresholds applied",
         "print": "Print / save PDF",
         "pdf": "Download PDF",
+        "obs": "observations",
+        "source_equity": "equity curve",
+        "source_returns": "return series",
+        "variance_policy": (
+            "Variance used: the larger of the one observed across the variants you uploaded "
+            "and the one sampling error produces."
+        ),
         "pdf_long": "Download the report as PDF",
         "switch": "Español",
         "yes": "yes",
@@ -460,6 +474,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dsr_at_trials_used": "DSR con los intentos usados",
         "trials_to_half": "Intentos que bajan el DSR a 0.5",
         "trials_used": "Intentos usados",
+        "skewness": "Asimetría",
+        "kurtosis": "Curtosis",
+        "floor": "Mínimo por error de muestreo",
         "observed_across_variants": "Observado en las variantes",
         "sharpe_variance_used": "Varianza del Sharpe usada",
         "sharpe_per_period": "Sharpe por periodo",
@@ -501,6 +518,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dsr_at_trials_used": "DSR at the trials used",
         "trials_to_half": "Trials that bring DSR to 0.5",
         "trials_used": "Trials used",
+        "skewness": "Skewness",
+        "kurtosis": "Kurtosis",
+        "floor": "Sampling-error floor",
         "observed_across_variants": "Observed across variants",
         "sharpe_variance_used": "Sharpe variance used",
         "sharpe_per_period": "Sharpe per period",
@@ -601,6 +621,54 @@ SOURCE_NAMES: dict[str, str] = {
 }
 
 
+#: How often the uploaded series is sampled, as ``schema.infer_frequency`` labels it.
+FREQUENCY_TEXT: dict[str, dict[str, str]] = {
+    "es": {
+        "monthly": "mensual",
+        "weekly": "semanal",
+        "daily_trading": "diario (días hábiles)",
+        "daily_calendar": "diario (todos los días)",
+        "hourly": "por hora",
+        "intraday": "intradía",
+    },
+    "en": {
+        "monthly": "monthly",
+        "weekly": "weekly",
+        "daily_trading": "daily (trading days)",
+        "daily_calendar": "daily (calendar days)",
+        "hourly": "hourly",
+        "intraday": "intraday",
+    },
+}
+
+
+#: The verdict's thresholds as a reader names them.
+THRESHOLD_LABELS: dict[str, dict[str, str]] = {
+    "es": {
+        "psr_pass": "PSR para superar",
+        "psr_weak": "PSR mínimo",
+        "dsr_pass": "DSR para superar",
+        "dsr_weak": "DSR mínimo",
+        "pbo_max": "PBO máximo",
+        "cost_pass_multiplier": "múltiplo de coste que debe aguantar",
+        "oos_sharpe_pass": "Sharpe fuera de muestra mínimo",
+        "oos_gap_max": "caída máxima del Sharpe fuera de muestra",
+        "benchmark_drawdown_ratio_max": "drawdown máximo frente al benchmark (veces)",
+    },
+    "en": {
+        "psr_pass": "PSR to pass",
+        "psr_weak": "minimum PSR",
+        "dsr_pass": "DSR to pass",
+        "dsr_weak": "minimum DSR",
+        "pbo_max": "maximum PBO",
+        "cost_pass_multiplier": "cost multiple it must withstand",
+        "oos_sharpe_pass": "minimum out-of-sample Sharpe",
+        "oos_gap_max": "maximum out-of-sample Sharpe drop",
+        "benchmark_drawdown_ratio_max": "maximum drawdown versus the benchmark (times)",
+    },
+}
+
+
 def _key_label(key: str, labels: dict[str, str]) -> str:
     return KEY_LABELS[_locale_of(labels)].get(key, key)
 
@@ -695,7 +763,12 @@ def _reasons_html(verdict: dict[str, Any], locale: str, labels: dict[str, str]) 
         f"<table><tr><th>{_e(labels['dimension'])}</th><th>{_e(labels['status'])}</th>"
         f"<th>{_e(labels['reasons'])}</th></tr>{''.join(rows)}</table>"
         f"<p class='muted'>{_e(labels['thresholds'])}: "
-        + _e(", ".join(f"{k}={v}" for k, v in verdict["thresholds"].items()))
+        + _e(
+            " · ".join(
+                f"{THRESHOLD_LABELS[locale].get(k, k)} {v:g}"
+                for k, v in verdict["thresholds"].items()
+            )
+        )
         + "</p>"
     )
 
@@ -1273,10 +1346,11 @@ def render_html(
         )
     )
     inputs_html += (
-        f"<p class='muted'>{_e(data['inputs']['first_timestamp'])} → "
-        f"{_e(data['inputs']['last_timestamp'])}, {_e(data['inputs']['frequency_label'])}, "
-        f"{_fmt(data['inputs']['observations']['value'])} obs, "
-        f"source={_e(data['inputs']['source'])}</p>"
+        f"<p class='muted'>{_e(_short_time(data['inputs']['first_timestamp'])[:10])} → "
+        f"{_e(_short_time(data['inputs']['last_timestamp'])[:10])} · "
+        f"{_e(FREQUENCY_TEXT[locale].get(data['inputs']['frequency_label'], ''))} · "
+        f"{_fmt(data['inputs']['observations']['value'])} {_e(labels['obs'])} · "
+        f"{_e(labels['source_' + data['inputs']['source']])}</p>"
     )
     if data["inputs"]["parse_warnings"]:
         inputs_html += (
@@ -1311,7 +1385,7 @@ def render_html(
     multiplicity_html = (
         _status_line(data["multiplicity"], labels)
         + _evidence_rows(data["multiplicity"], labels, skip={"sensitivity"})
-        + f"<p class='muted'>variance policy: {_e(data['multiplicity']['variance_policy'])}</p>"
+        + f"<p class='muted'>{_e(labels['variance_policy'])}</p>"
         + sens_html
     )
 
