@@ -31,11 +31,13 @@ from typing import Annotated, Any
 from pydantic import ValidationError
 
 from quant_trade.audit.engine import run_audit
+from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
 from quant_trade.audit.pages import (
     SAMPLE_BANNER,
     badge_svg,
     error_page,
     landing,
+    legal_page,
     verification_page,
 )
 from quant_trade.audit.report import render, result_sha256
@@ -376,6 +378,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "stripe_enabled": cfg.stripe_enabled,
             "access_codes": cfg.access_codes_enabled,
             "database": cfg.database_kind,
+            "legal_configured": cfg.legal_configured,
         }
 
     @app.get("/", response_class=HTMLResponse)
@@ -564,6 +567,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             publish_url=f"/audits/{record.id}/publish?token={token}" if publishable else None,
             notice=notice,
             contact_url=cfg.contact_url if redeemable else None,
+            legal_links=True,
         )
         return html_text
 
@@ -700,6 +704,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     watermark=False,
                     free_mode=True,
                     notice=SAMPLE_BANNER[locale],
+                    legal_links=True,
                 )
                 sample_cache[locale] = html_text
             return sample_cache[locale]
@@ -711,6 +716,42 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/sample", response_class=HTMLResponse)
     async def sample_en(lang: str | None = None) -> str:
         return await run_in_threadpool(_sample_html, _locale(lang or "en"))
+
+    def _legal_context() -> LegalContext:
+        return LegalContext(
+            operator_name=cfg.operator_name,
+            operator_contact=cfg.operator_contact,
+            operator_address=cfg.operator_address,
+            jurisdiction=cfg.jurisdiction,
+            free_mode=cfg.free_mode,
+            price_usd=cfg.price_usd,
+            card_payments=cfg.stripe_enabled,
+            access_codes=cfg.access_codes_enabled,
+            retention_days=cfg.retention_days,
+            max_uploads_per_hour_per_ip=cfg.max_uploads_per_hour_per_ip,
+        )
+
+    def _terms(locale: str) -> str:
+        return legal_page(terms_text(_legal_context(), locale), locale=locale)
+
+    def _privacy(locale: str) -> str:
+        return legal_page(privacy_text(_legal_context(), locale), locale=locale)
+
+    @app.get("/terminos", response_class=HTMLResponse)
+    def terms_es(lang: str | None = None) -> str:
+        return _terms(_locale(lang or "es"))
+
+    @app.get("/terms", response_class=HTMLResponse)
+    def terms_en(lang: str | None = None) -> str:
+        return _terms(_locale(lang or "en"))
+
+    @app.get("/privacidad", response_class=HTMLResponse)
+    def privacy_es(lang: str | None = None) -> str:
+        return _privacy(_locale(lang or "es"))
+
+    @app.get("/privacy", response_class=HTMLResponse)
+    def privacy_en(lang: str | None = None) -> str:
+        return _privacy(_locale(lang or "en"))
 
     @app.post("/audits/{audit_id}/checkout")
     def checkout(audit_id: str, token: str | None = None) -> Response:

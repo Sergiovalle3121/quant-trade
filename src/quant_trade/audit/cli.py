@@ -1,8 +1,10 @@
-"""``quant-trade audit``: run an audit from files, serve the web app, purge old uploads.
+"""``quant-trade audit``: run an audit from files, serve the web app, purge old
+uploads, and answer a client's privacy request (``export``, ``delete``,
+``waitlist-remove``).
 
 ``run`` is the whole product without a browser: the operator receives a CSV
 by e-mail, runs one command, and sends back ``report.html``. ``serve`` and
-``purge`` need the ``web`` extra and import it lazily so the core CLI never
+the store commands need the ``web`` extra and import it lazily so the core CLI never
 depends on it.
 """
 
@@ -224,12 +226,112 @@ def purge(
         typer.echo(f"{count} audit(s) older than {days} day(s) would be purged; pass --yes")
 
 
+@audit_app.command("export")
+def export(
+    audit_id: Annotated[str, typer.Argument(help="The audit id from the client's private link")],
+    out: Annotated[Path | None, typer.Option(help="Output directory")] = None,
+) -> None:
+    """Write everything held on one audit to a folder (a client's access request).
+
+    Check the client's private link before answering: the id alone is not
+    proof that the audit is theirs. The folder lands under ``outputs/`` by
+    default, which git ignores.
+    """
+    store = _store()
+    record = store.get_audit(audit_id, with_blobs=True)
+    if record is None:
+        typer.echo(f"no audit with id {audit_id}", err=True)
+        raise typer.Exit(code=1)
+    target = out or Path("outputs") / "audit_export" / audit_id
+    target.mkdir(parents=True, exist_ok=True)
+    publication = store.publication_for_audit(audit_id)
+    summary = {
+        "id": record.id,
+        "created_at": record.created_at,
+        "paid": record.paid,
+        "paid_at": record.paid_at,
+        "payment_reference": record.stripe_session_id,
+        "client_ip": record.client_ip,
+        "overall_class": record.overall_class,
+        "file_sha256": record.digests,
+        "purged_at": record.purged_at,
+        "published_at": publication.created_at if publication else None,
+        "public_id": publication.public_id if publication else None,
+    }
+    atomic_write_json(target / "record.json", summary)
+    written = ["record.json"]
+    if record.declared_json:
+        atomic_write_text(target / "declared.json", record.declared_json)
+        written.append("declared.json")
+    if record.result_json:
+        atomic_write_text(target / AUDIT_JSON, record.result_json)
+        written.append(AUDIT_JSON)
+    if record.report_html:
+        atomic_write_text(target / REPORT_HTML, record.report_html)
+        written.append(REPORT_HTML)
+    uploads = {
+        "equity.csv": record.equity_csv,
+        "trades.csv": record.trades_csv,
+        "benchmark.csv": record.benchmark_csv,
+        "variants.csv": record.variants_csv,
+        **(record.files or {}),
+    }
+    for name, data in sorted(uploads.items()):
+        if data is None:
+            continue
+        safe = Path(name).name or "upload"
+        (target / f"upload_{safe}").write_bytes(data)
+        written.append(f"upload_{safe}")
+    typer.echo(f"wrote {len(written)} file(s) to {target}: {', '.join(written)}")
+
+
+@audit_app.command("delete")
+def delete(
+    audit_id: Annotated[str, typer.Argument(help="The audit id from the client's private link")],
+    yes: Annotated[bool, typer.Option("--yes", help="Actually delete")] = False,
+) -> None:
+    """Delete one audit completely at its client's request: files, report,
+    hashes, class and verification page.
+
+    Without ``--yes`` only shows what would be deleted. Check the client's
+    private link first: the id alone is not proof that the audit is theirs.
+    """
+    store = _store()
+    record = store.get_audit(audit_id)
+    if record is None:
+        typer.echo(f"no audit with id {audit_id}", err=True)
+        raise typer.Exit(code=1)
+    published = store.publication_for_audit(audit_id) is not None
+    what = (
+        f"audit {audit_id} (created {record.created_at}, class {record.overall_class}, "
+        f"{'paid' if record.paid else 'unpaid'}, {'published' if published else 'not published'})"
+    )
+    if not yes:
+        typer.echo(f"would delete {what}; pass --yes")
+        return
+    store.delete_audit(audit_id)
+    typer.echo(f"deleted {what}")
+
+
+@audit_app.command("waitlist-remove")
+def waitlist_remove(
+    email: Annotated[str, typer.Argument(help="The address to remove")],
+    yes: Annotated[bool, typer.Option("--yes", help="Actually delete")] = False,
+) -> None:
+    """Remove an e-mail from the updates list. Without ``--yes`` only checks it."""
+    store = _store()
+    if not store.remove_waitlist(email, dry_run=not yes):
+        typer.echo("that address is not on the list", err=True)
+        raise typer.Exit(code=1)
+    typer.echo("removed from the list" if yes else "on the list; pass --yes to remove it")
+
+
 def _store() -> Any:
     try:
         from quant_trade.audit.settings import AuditSettings
         from quant_trade.audit.store import make_store
     except ImportError as exc:  # pragma: no cover - the web extra is missing
-        raise typer.BadParameter('audit codes requires: python -m pip install -e ".[web]"') from exc
+        raise typer.BadParameter('requires: python -m pip install -e ".[web]"') from exc
     return make_store(AuditSettings.from_env().database_url)
 
 

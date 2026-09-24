@@ -45,6 +45,11 @@ def _safe_url(value: str) -> str:
     return value if value.startswith(("https://", "mailto:")) else ""
 
 
+def _text(value: str) -> str:
+    """A one-line operator detail, trimmed and bounded."""
+    return " ".join(value.split())[:300]
+
+
 @dataclass(frozen=True)
 class AuditSettings:
     database_url: str = DEFAULT_DATABASE_URL
@@ -63,6 +68,12 @@ class AuditSettings:
     access_codes: bool = False
     #: Where a client asks the owner for a code; shown on the landing page.
     contact_url: str = ""
+    #: Operator details for the terms and privacy pages. None has a default:
+    #: until they are set the pages say so in place of a name.
+    operator_name: str = ""
+    operator_contact: str = ""
+    operator_address: str = ""
+    jurisdiction: str = ""
 
     def __post_init__(self) -> None:
         if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
@@ -83,6 +94,16 @@ class AuditSettings:
     def access_codes_enabled(self) -> bool:
         """Codes unlock reports only in paid mode; in free mode nothing is locked."""
         return self.access_codes and not self.free_mode
+
+    @property
+    def legal_configured(self) -> bool:
+        """Every operator detail the terms and privacy pages need is set."""
+        return bool(
+            self.operator_name
+            and self.operator_contact
+            and self.operator_address
+            and self.jurisdiction
+        )
 
     @property
     def price_usd(self) -> float:
@@ -125,6 +146,10 @@ class AuditSettings:
             ),
             access_codes=access_codes,
             contact_url=_safe_url(env.get("AUDIT_CONTACT_URL", "")),
+            operator_name=_text(env.get("AUDIT_OPERATOR_NAME", "")),
+            operator_contact=_text(env.get("AUDIT_OPERATOR_CONTACT", "")),
+            operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),
+            jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
         )
 
 

@@ -201,8 +201,10 @@ without Stripe (`quant-trade audit codes create --credits N --note X`).
 `Dockerfile.web` and `railway.json` deploy the service on Railway in free
 mode (watermarked reports); paid mode switches on only when every Stripe
 variable is set or the owner opts into access codes. `docs/AUDIT_SAAS.md` has the estimators, thresholds,
-assumptions and the deployment steps; `docs/AUDIT_TERMS_TEMPLATE.md` is a
-terms-of-service template to have reviewed before charging.
+assumptions and the deployment steps. The site serves terms (`/terminos`)
+and a privacy policy (`/privacidad`) filled from the `AUDIT_OPERATOR_*`
+variables; have a lawyer review both before charging. `quant-trade audit
+export|delete|waitlist-remove` answer a client's privacy request.
 
 ## Session C: the low/mid-cap crypto campaign, and two more sealed hypotheses
 
