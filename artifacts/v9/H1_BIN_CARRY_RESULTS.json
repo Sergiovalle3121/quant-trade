@@ -13,7 +13,7 @@
       "unique_settlements": 7305
     },
     "sufficiency": {
-      "evidence_sha256": "cda1963259b5fa099ec2de49cc03db5d6377bffdc88edfdb323b06190ef4b2ba",
+      "content_sha256": "cda1963259b5fa099ec2de49cc03db5d6377bffdc88edfdb323b06190ef4b2ba",
       "provenance": "real",
       "required_days": 730.0,
       "required_settlements": 1000,
@@ -25,6 +25,7 @@
     "validation_clean": true,
     "validation_problems": []
   },
+  "evidence_class": "MEASURED",
   "hypothesis_id": "H1-BIN",
   "ledger_failures": {
     "H1-BIN-t10-w3@1x": "ValueError: position losses exhausted cash and posted margin",
@@ -41,7 +42,7 @@
     "H1-BIN-t5-w6@3x": "ValueError: entry sizing consumed more cash than available"
   },
   "panel": {
-    "byte_sha256": "6a063d484f9cf0101286c4d0281683798c7b6ac9d8586396aa6da812acac2aea",
+    "dataset_sha256": "6a063d484f9cf0101286c4d0281683798c7b6ac9d8586396aa6da812acac2aea",
     "first_utc": "2020-01-01T00:00:00Z",
     "last_utc": "2026-08-31T23:00:00Z",
     "rows": 58409

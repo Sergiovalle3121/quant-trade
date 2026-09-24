@@ -175,6 +175,9 @@ def run_h1_bin(
         "evaluated_at_utc": evaluated_at_utc or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "research_only": True,
         "real_money_approved": False,
+        # Returns are measured on receipt-verified venue data; the cost inputs
+        # inside ``cost_stack`` carry their own ASSUMPTION class.
+        "evidence_class": "MEASURED",
     }
 
     directory = evidence_dir_for(evidence_root, reg.VENUE, reg.SYMBOL)
@@ -217,7 +220,7 @@ def run_h1_bin(
         "rows": len(rows),
         "first_utc": rows[0]["timestamp_utc"],
         "last_utc": rows[-1]["timestamp_utc"],
-        "byte_sha256": dataset_sha,
+        "dataset_sha256": dataset_sha,
     }
     provenance = validation.provenance
 
@@ -506,8 +509,21 @@ def run_h1_bin(
     return payload
 
 
+def _rename_keys(value: Any, renames: dict[str, str]) -> Any:
+    if isinstance(value, dict):
+        return {renames.get(k, k): _rename_keys(v, renames) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_rename_keys(v, renames) for v in value]
+    return value
+
+
 def write_h1_bin(payload: dict[str, Any], path: str | Path) -> Path:
-    return atomic_write_json(Path(path), payload)
+    # The holdout seal's hash is a hash of in-memory canonical content (the
+    # frozen configuration), which the provenance guard knows as freeze_hash.
+    return atomic_write_json(
+        Path(path),
+        _rename_keys(payload, {"frozen_hash": "freeze_hash", "evidence_sha256": "content_sha256"}),
+    )
 
 
 __all__ = [

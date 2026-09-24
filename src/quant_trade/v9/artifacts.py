@@ -436,9 +436,13 @@ def generate_v9_artifacts(
     ledger = GlobalTrialLedger(ledger_path)
     ledger_summary = ledger.summary()
     ledger_summary["evaluated_at_utc"] = EVALUATED_AT_UTC
-    ledger_summary["state"] = STATE_NOT_MEASURED
+    # The ledger is measured the moment it records a trial: its counts and
+    # Sharpes are observations of what was run, not placeholders.
+    measured = int(ledger_summary.get("distinct_trials", 0) or 0) > 0
+    ledger_summary["state"] = "MEASURED" if measured else STATE_NOT_MEASURED
+    ledger_summary["evidence_class"] = "MEASURED" if measured else STATE_NOT_MEASURED
     ledger_summary["v8_erratum_addressed"] = "E4"
-    ledger_summary["v8_erratum_closure_state"] = STATE_NOT_MEASURED
+    ledger_summary["v8_erratum_closure_state"] = "MEASURED" if measured else STATE_NOT_MEASURED
     ledger_summary["deflation_note"] = (
         "The deflated Sharpe requires this ledger. With trial_registry=None or a "
         "zero cross-trial variance it degenerates into the probabilistic Sharpe, "
