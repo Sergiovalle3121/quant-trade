@@ -486,6 +486,10 @@ class SeriesSpec:
     identity_verifiable: bool
     build_url: Callable[..., str]
     parse: Callable[..., list[dict[str, Any]]]
+    #: ``(cursor_ms, oldest_ms) -> next cursor``. ``None`` means the default
+    #: ``oldest - 1``. File-per-month sources step to the previous month
+    #: instead, so a month whose first rows are absent cannot stall the walk.
+    next_cursor: Callable[[int, int], int] | None = None
 
     def native_instrument(self, symbol: str) -> str:
         if self.venue == "binance":
@@ -588,6 +592,30 @@ def _binance_archive_url(*, symbol: str, kind: str, cursor_ms: int, interval_min
     return f"{base}/{interval}/{native}-{interval}-{month}.zip"
 
 
+def _previous_month_cursor(cursor_ms: int, _oldest_ms: int) -> int:
+    """One millisecond before the first instant of ``cursor_ms``'s month."""
+    import calendar
+    import time
+
+    year, month = time.gmtime(cursor_ms / 1000.0)[:2]
+    return calendar.timegm((year, month, 1, 0, 0, 0)) * 1000 - 1
+
+
+def binance_daily_url(*, symbol: str, kind: str, day_ms: int, interval_minutes: int) -> str:
+    """The daily archive file for the UTC day containing ``day_ms``.
+
+    Monthly files occasionally omit whole days that the venue's daily files
+    carry; the backfill consults the daily file for any day with missing bars.
+    """
+    import time
+
+    native = binance_symbol(symbol)
+    day = time.strftime("%Y-%m-%d", time.gmtime(day_ms / 1000.0))
+    path = _BINANCE_ARCHIVE_PATHS[kind].replace("/monthly/", "/daily/")
+    interval = binance_interval(interval_minutes)
+    return f"{BINANCE_ARCHIVE_DATA}/{path}/{native}/{interval}/{native}-{interval}-{day}.zip"
+
+
 def _series(venue: str, kind: str) -> SeriesSpec:
     if venue == "binance":
         return SeriesSpec(
@@ -599,6 +627,7 @@ def _series(venue: str, kind: str) -> SeriesSpec:
             identity_verifiable=True,  # the ZIP member name carries the symbol
             build_url=_binance_archive_url,
             parse=parse_binance_funding if kind == "funding" else parse_binance_kline,
+            next_cursor=_previous_month_cursor,
         )
     if venue == "bybit":
         if kind == "funding":
@@ -706,6 +735,7 @@ __all__ = [
     "IdentityMismatch",
     "SeriesSpec",
     "VenueErrorResponse",
+    "binance_daily_url",
     "binance_interval",
     "binance_symbol",
     "bybit_perp_symbol",

@@ -1,24 +1,15 @@
 {
-  "attempts": 710,
-  "blocked_hosts": [],
-  "errors": [],
-  "evidence_dir": "data/v8_evidence/okx_btc_usdt",
-  "finished_at_utc": "2026-09-24T05:57:39Z",
-  "instrument_metadata": [
-    {
-      "contract_type": "linear",
-      "contract_value": "0.01",
-      "contract_value_asset": "BTC",
-      "instrument": "BTC-USDT-SWAP",
-      "launch_time_ms": 1573557408000,
-      "lot_size": "0.01",
-      "min_order_qty": "0.01",
-      "quote_asset": "USDT",
-      "settle_asset": "USDT",
-      "status": "live",
-      "tick_size": "0.1"
-    }
+  "attempts": 438,
+  "blocked_hosts": [
+    "data.binance.vision"
   ],
+  "errors": [
+    "server_time: LookupError: binance source publishes no server clock",
+    "instruments: LookupError: binance source publishes no instrument metadata"
+  ],
+  "evidence_dir": "data/v8_evidence/binance_btc_usdt",
+  "finished_at_utc": "2026-09-24T06:22:50Z",
+  "instrument_metadata": [],
   "interval_minutes": 60,
   "provenance": "live",
   "series": {
@@ -27,11 +18,11 @@
       "error": "",
       "kind": "funding",
       "newest_ms": 1788192000000,
-      "oldest_ms": 1782115200000,
-      "pages_fetched": 4,
+      "oldest_ms": 1577836800000,
+      "pages_fetched": 80,
       "pages_replayed": 0,
-      "reached_lower_bound": false,
-      "rows": 212,
+      "reached_lower_bound": true,
+      "rows": 7305,
       "status": "OK"
     },
     "index": {
@@ -39,11 +30,11 @@
       "error": "",
       "kind": "index",
       "newest_ms": 1788217200000,
-      "oldest_ms": 1725148800000,
-      "pages_fetched": 176,
+      "oldest_ms": 1577836800000,
+      "pages_fetched": 80,
       "pages_replayed": 0,
       "reached_lower_bound": true,
-      "rows": 17520,
+      "rows": 58440,
       "status": "OK"
     },
     "mark": {
@@ -51,11 +42,11 @@
       "error": "",
       "kind": "mark",
       "newest_ms": 1788217200000,
-      "oldest_ms": 1725148800000,
-      "pages_fetched": 176,
+      "oldest_ms": 1577836800000,
+      "pages_fetched": 80,
       "pages_replayed": 0,
       "reached_lower_bound": true,
-      "rows": 17520,
+      "rows": 58440,
       "status": "OK"
     },
     "perp": {
@@ -63,11 +54,11 @@
       "error": "",
       "kind": "perp",
       "newest_ms": 1788217200000,
-      "oldest_ms": 1725148800000,
-      "pages_fetched": 176,
+      "oldest_ms": 1577836800000,
+      "pages_fetched": 80,
       "pages_replayed": 0,
       "reached_lower_bound": true,
-      "rows": 17520,
+      "rows": 58440,
       "status": "OK"
     },
     "spot": {
@@ -75,20 +66,20 @@
       "error": "",
       "kind": "spot",
       "newest_ms": 1788217200000,
-      "oldest_ms": 1725148800000,
-      "pages_fetched": 176,
+      "oldest_ms": 1577836800000,
+      "pages_fetched": 80,
       "pages_replayed": 0,
       "reached_lower_bound": true,
-      "rows": 17520,
+      "rows": 58409,
       "status": "OK"
     }
   },
-  "server_time_ms": 1790229193439,
-  "settlements": 212,
-  "since_ms": 1725148800000,
-  "started_at_utc": "2026-09-24T05:53:12Z",
+  "server_time_ms": null,
+  "settlements": 7305,
+  "since_ms": 1577836800000,
+  "started_at_utc": "2026-09-24T06:16:07Z",
   "status": "OK",
   "symbol": "BTC",
   "until_ms": 1788217200000,
-  "venue": "okx"
+  "venue": "binance"
 }
