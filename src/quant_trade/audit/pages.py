@@ -122,7 +122,8 @@ _COPY: dict[str, dict[str, Any]] = {
         "form_title": "Solicitar una auditoría",
         "report": "Informe de tu plataforma (recomendado)",
         "report_help": (
-            "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4, "
+            "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4 "
+            "(o el XLSX que exporta MetaTrader 5), "
             "lista de operaciones de TradingView (CSV o XLSX), o el CSV de operaciones de "
             "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 5 MB."
         ),
@@ -288,7 +289,8 @@ _COPY: dict[str, dict[str, Any]] = {
         "form_title": "Request an audit",
         "report": "Your platform report (recommended)",
         "report_help": (
-            "The file as it is: a MetaTrader 5 or 4 tester or history HTML report, a "
+            "The file as it is: a MetaTrader 5 or 4 tester or history HTML report (or the "
+            "XLSX MetaTrader 5 exports), a "
             "TradingView list of trades (CSV or XLSX), or the trades CSV of NinjaTrader, "
             "QuantConnect, backtesting.py or vectorbt. Up to 5 MB."
         ),
