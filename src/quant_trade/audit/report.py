@@ -449,7 +449,8 @@ font-weight:600}
 .paybox{border:1px dashed #8b1a10;padding:10px 14px;margin:.6em 0;border-radius:6px}
 .paybox button{background:#8b1a10;color:#fff;border:0;padding:8px 14px;border-radius:5px;
 font-weight:600;cursor:pointer}
-.toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:12px;margin:.4em 0}
+.toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:12px;
+margin:.4em 0}
 .print-btn{background:#fff;color:#1a1a1a;border:1px solid #999;padding:6px 12px;border-radius:5px;
 font-weight:600;cursor:pointer}
 .meaning{display:grid;grid-template-columns:1fr;gap:8px;margin:.6em 0}
