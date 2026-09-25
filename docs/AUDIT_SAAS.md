@@ -1654,9 +1654,20 @@ changes what a report says.
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
   after); 10 failed sign-ins per hour per (address, e-mail) pair, with
   ceilings of 50 per address and 50 per e-mail (a slow-down against guesses
-  spread over many addresses), and 5 sign-ups per hour per
-  address; a password change or reset signs out the other
-  sessions; `next` only returns to `/audits/` or `/cuenta` paths.
+  spread over many addresses; past the e-mail ceiling an address gets
+  `SIGNIN_TRIES_PAST_EMAIL_CEILING = 2` tries on that e-mail, so a stranger
+  who knows it cannot lock the owner out), and 5 sign-ups per hour per
+  address. These counters and the panel's wrong-key limit live in the
+  `attempts` table (keys hashed, rows older than the hour deleted), so a
+  deploy does not reset them. A password change or reset signs out the other
+  sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
+  `/` and `/en` (with an anchor). POST `/audits` answers 403 to a browser
+  post from another site, a second layer beside the `SameSite=Lax` cookie:
+  `Sec-Fetch-Site` decides when present (only `same-origin` and `none` pass;
+  `same-site` is refused, as other apps on the parent domain count as same
+  site); without it, the Origin (else Referer) must be this service. Our
+  pages send `Referrer-Policy: no-referrer`, so a real form post carries
+  `Origin: null`; that, like no header at all (scripts), is no signal.
 - **No e-mail service yet**. Nothing sends e-mail and addresses are not
   confirmed. A customer who forgets the password writes to the owner
   (WhatsApp link on `/olvide`); after checking the request comes from the
