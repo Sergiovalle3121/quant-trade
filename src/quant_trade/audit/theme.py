@@ -824,7 +824,7 @@ color:#fff;font-variant-numeric:tabular-nums}
 .buy-price span{display:block;margin-top:8px;color:var(--text-2);font-size:.9rem}
 .buy-price span::first-letter{text-transform:uppercase}
 .paybox.buy a.btn{color:var(--btn-fg);gap:10px}
-@media (max-width:620px){.paybox.buy{padding:20px}.paybox.buy a.btn{width:100%;padding:0 14px;font-size:.93rem}.paybox.buy a.btn svg{display:none}}
+@media (max-width:620px){.paybox.buy{padding:20px}.paybox.buy .btn{width:100%;padding:0 14px;font-size:.93rem;white-space:normal;text-align:center}.paybox.buy a.btn svg{display:none}}
 .publish{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;
 padding:26px 28px;border-radius:var(--r-lg);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04);
 margin:0 0 40px}

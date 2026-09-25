@@ -115,8 +115,8 @@ LABELS: dict[str, dict[str, str]] = {
             "promesa de resultados detectadas en ella"
         ),
         "seal": "Sello del holdout declarado",
-        "pay": "Pagar con tarjeta y ver el informe completo",
-        "pay_pack": "Paquete de 3 informes: USD {price:.0f} (este y 2 más)",
+        "pay": "Pagar con tarjeta",
+        "pay_pack": "Comprar el paquete de 3 (USD {price:.0f})",
         "pay_secure": (
             "Pago seguro con Stripe. Ves el informe completo en cuanto se confirma el pago; "
             "nosotros no vemos ni guardamos los datos de tu tarjeta."
@@ -337,8 +337,8 @@ LABELS: dict[str, dict[str, str]] = {
             "expressions detected in it"
         ),
         "seal": "Declared holdout seal",
-        "pay": "Pay by card and see the full report",
-        "pay_pack": "Pack of 3 reports: USD {price:.0f} (this one and 2 more)",
+        "pay": "Pay by card",
+        "pay_pack": "Buy the pack of 3 (USD {price:.0f})",
         "pay_secure": (
             "Secure payment with Stripe. You see the full report as soon as the payment is "
             "confirmed; we never see or store your card details."

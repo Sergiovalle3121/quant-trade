@@ -198,8 +198,8 @@ def test_locked_report_puts_card_payment_first_with_the_pack_and_keeps_codes(
     audit_id, token = _upload(client)
     assert client.get("/health").json()["card_mode"] == "test"
     for lang, pay, pack, alt in (
-        ("es", "Pagar con tarjeta", "Paquete de 3 informes: USD 69", "Prefieres pagar por"),
-        ("en", "Pay by card", "Pack of 3 reports: USD 69", "Prefer a bank transfer"),
+        ("es", "Pagar con tarjeta", "Comprar el paquete de 3 (USD 69)", "Prefieres pagar por"),
+        ("en", "Pay by card", "Buy the pack of 3 (USD 69)", "Prefer a bank transfer"),
     ):
         page = client.get(f"/audits/{audit_id}?token={token}&lang={lang}").text
         assert pay in page and pack in page and alt in page
