@@ -69,12 +69,17 @@ def _upload(client: TestClient) -> tuple[str, str]:
     return path.rsplit("/", 1)[1], query.split("token=")[1].split("&")[0]
 
 
+PAID = {PLAN_SINGLE: 2900, PLAN_PACK: 6900}
+
+
 def _session(audit_id: str, *, plan: str = PLAN_SINGLE, sid: str = "cs_test_1", **extra: Any):
     return {
         "id": sid,
         "payment_status": "paid",
         "livemode": True,
-        "metadata": {"audit_id": audit_id, "plan": plan},
+        "currency": "usd",
+        "amount_total": PAID[plan],
+        "metadata": {"audit_id": audit_id, "plan": plan, "app": "rigor"},
         **extra,
     }
 
@@ -119,7 +124,7 @@ def test_checkout_params_price_each_plan_and_come_back_to_the_report(tmp_path: P
     (line,) = single["line_items"]
     assert line["price_data"]["unit_amount"] == 2900
     assert line["price_data"]["currency"] == "usd"
-    assert single["metadata"] == {"audit_id": "a1", "plan": PLAN_SINGLE}
+    assert single["metadata"] == {"audit_id": "a1", "plan": PLAN_SINGLE, "app": "rigor"}
     assert single["success_url"] == (
         "https://rigor.example/audits/a1?token=tok&lang=es&session_id={CHECKOUT_SESSION_ID}"
     )
@@ -397,7 +402,9 @@ def test_report_links_carry_the_audit_and_the_webhook_unlocks_it(tmp_path: Path)
         "payment_status": "paid",
         "livemode": True,
         "client_reference_id": audit_id,
-        "metadata": {"plan": PLAN_PACK},
+        "currency": "usd",
+        "amount_total": 6900,
+        "metadata": {"plan": PLAN_PACK, "app": "rigor"},
     }
     assert _webhook(client, link_session) == 200
     done = client.get(f"/audits/{audit_id}?token={token}&pay=done").text
@@ -413,3 +420,81 @@ def test_test_mode_links_are_shown_only_on_listed_audits(tmp_path: Path) -> None
     assert "Stripe" not in client.get("/").text.split("id='pricing'")[-1]
     listed = _client(tmp_path, **test_links, stripe_test_audits={audit_id})
     assert "buy.stripe.com/test_abc" in listed.get(f"/audits/{audit_id}?token={token}").text
+
+
+# -- only a full-price payment from Rigor's own links unlocks -------------------
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"amount_total": 100},  # a USD 1 link
+        {"amount_total": 0, "payment_status": "no_payment_required"},  # 100% off
+        {"currency": "mxn"},  # 2900 of another currency
+        {"amount_total": None},
+        {"amount_total": "2900"},
+        {"metadata": {"plan": PLAN_SINGLE}},  # another link or app on the account
+        {"metadata": {"plan": PLAN_SINGLE, "app": "other"}},
+    ],
+)
+def test_a_session_that_is_not_a_full_rigor_payment_unlocks_nothing(
+    tmp_path: Path, change: dict[str, Any]
+) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    session = {**_session(audit_id), "client_reference_id": audit_id, **change}
+    assert _webhook(client, session) == 200
+    assert "class='lockbox'" in client.get(f"/audits/{audit_id}?token={token}").text
+
+
+def test_a_single_report_price_never_grants_a_pack(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    audit_id, _ = _upload(client)
+    store = client.app.state.store
+    cheap_pack = _session(audit_id, plan=PLAN_PACK, amount_total=PAID[PLAN_SINGLE])
+    assert fulfil(store, settings, cheap_pack, at=NOW) is None
+    assert not store.get_audit(audit_id).paid and store.list_access_codes() == []
+    assert fulfil(store, settings, _session(audit_id, plan=PLAN_PACK), at=NOW) == audit_id
+    assert len(store.list_access_codes()) == 1
+
+
+def test_a_payment_in_the_buyers_currency_unlocks_by_its_usd_amount(tmp_path: Path) -> None:
+    """Adaptive Pricing: a buyer in Mexico pays in MXN for a USD price."""
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    presented = {"presentment_amount": 52900, "presentment_currency": "mxn"}
+    assert _webhook(client, _session(audit_id, presentment_details=presented)) == 200
+    assert "class='lockbox'" not in client.get(f"/audits/{audit_id}?token={token}").text
+
+    legacy_id, legacy_token = _upload(client)
+    converted = {"source_currency": "usd", "amount_total": 2900}
+    legacy = _session(
+        legacy_id,
+        sid="cs_legacy",
+        currency="mxn",
+        amount_total=52900,
+        currency_conversion=converted,
+    )
+    assert _webhook(client, legacy) == 200
+    assert "class='lockbox'" not in client.get(f"/audits/{legacy_id}?token={legacy_token}").text
+
+    short_id, short_token = _upload(client)
+    short = {**converted, "amount_total": 100}
+    cheap = _session(
+        short_id, sid="cs_short", currency="mxn", amount_total=52900, currency_conversion=short
+    )
+    assert _webhook(client, cheap) == 200
+    assert "class='lockbox'" in client.get(f"/audits/{short_id}?token={short_token}").text
+
+
+def test_a_refused_paid_session_leaves_a_log_line_without_amounts(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    client = _client(tmp_path)
+    audit_id, _ = _upload(client)
+    with caplog.at_level("WARNING", logger="quant_trade.audit.payments"):
+        assert _webhook(client, _session(audit_id, amount_total=100)) == 200
+        assert _webhook(client, _session("x\ny", sid="cs_2")) == 200
+    lines = [r.getMessage() for r in caplog.records]
+    assert any("cs_test_1" in line and audit_id in line and "below" in line for line in lines)
+    assert any("xy" in line and "unknown audit" in line for line in lines)
+    assert not any("\n" in line for line in lines)

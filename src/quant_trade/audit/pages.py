@@ -2553,7 +2553,8 @@ def audience_page(
         for item, guide in text.uploads
     )
     checks = "".join(
-        f"<li>{icon('check')}<span><strong>{_e(name)}.</strong> {_e(body)}</span></li>"
+        f"<li>{icon('check')}<span><strong>{_e(name)}{'' if name.endswith(('?', '.')) else '.'}"
+        f"</strong> {_e(body)}</span></li>"
         for name, body in text.checks
     )
     limits = "".join(f"<li>{icon('minus')}<span>{_e(item)}</span></li>" for item in text.limits)
@@ -2568,7 +2569,7 @@ def audience_page(
     )
     others = "".join(
         f"<li><a href='{_e(audience_url(page.slug, locale))}'>"
-        f"{_e(page.text[locale].title)}</a></li>"
+        f"<span>{_e(page.text[locale].title)}</span>{icon('arrow')}</a></li>"
         for page in AUDIENCE_PAGES
         if page.slug != audience.slug
     )
@@ -2589,13 +2590,13 @@ def audience_page(
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
             [
-                (words["pains"], f"<ul class='checks'>{pains}</ul>"),
+                (words["pains"], f"<ul class='checks aud-pains'>{pains}</ul>"),
                 (words["uploads"], f"<ul class='checks'>{uploads}</ul>"),
-                (words["checks"], f"<ul class='checks'>{checks}</ul>"),
+                (words["checks"], f"<ul class='checks aud-checks'>{checks}</ul>"),
                 (words["limits"], f"<ul class='checks'>{limits}</ul>"),
-                (words["price"], f"<p>{_e(price)}</p>{buttons}"),
+                (words["price"], f"<div class='aud-price'><p>{_e(price)}</p>{buttons}</div>"),
                 (words["faq"], f"<div class='faq'>{faq}</div>"),
-                (words["others"], f"<ul>{others}</ul>"),
+                (words["others"], f"<ul class='aud-others'>{others}</ul>"),
             ],
             locale,
             lead=buttons,

@@ -210,6 +210,12 @@ Limits, each written into the report as a reading warning:
   a 1e308 profit overflowed every later sum and the report page failed.
   The capital section is not measured when its reference fall is not a
   finite number.
+- A date more than a day after the upload (`FUTURE_SLACK`, for time
+  zones) is refused in the equity, report, trades, benchmark and live files
+  (`future_dates`, ES and EN): a record in 2150 is a damaged file. A monthly
+  series may hold this month (dated by its last day), and a fund table's
+  months that have not happened yet are dropped when they are blank, a
+  dash or 0; a future month that moves the account is still refused.
 - NUL characters are dropped when a report is decoded (`decode_text`) and
   from the stored report page: PostgreSQL refuses text holding one, so a
   stray NUL in a robot's name failed the upload with a server error. A
@@ -499,6 +505,12 @@ and report wire them in during the integration step):
   after its own fees, the same rule as the weekday, hour, instrument and
   losing-streak tables; the gross share stays as "Aciertos antes de
   comisiones", and the annualised table no longer repeats the win rate.
+  The long/short net results use the same fees, so they add up to the
+  trades' net. The cost table recomputes each trade from price and size;
+  when its no-extra-cost row differs from the trades' net, a note gives the
+  gap (price rounding, currency conversion). The resampled time under the
+  peak reads "median" and "in 1 of every 20" instead of p50/p95, and the
+  header names the engine version and simulation seed in words.
 - `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
   the uploaded returns over one year, 2,000 paths by default, capped at
   2,000,000 resampled cells. A curve finer than 10,000 periods a year
@@ -1211,8 +1223,9 @@ Stripe reports with `livemode: false` never unlocks any other audit.
 
 #### Without a secret key: Payment Links
 
-1. Create two Payment Links in Stripe: one for a report (USD 29) and one
-   for the pack (USD 69) with metadata `plan=pack`. Leave the confirmation
+1. Create two Payment Links in Stripe: one for a report (USD 29) with
+   metadata `app=rigor` and one for the pack (USD 69) with metadata
+   `app=rigor` and `plan=pack`, card only and no promotion codes. Leave the confirmation
    page as Stripe's own; the buyer comes back to the report tab.
 2. Create the webhook endpoint as above and put its signing secret in
    `STRIPE_WEBHOOK_SECRET`.
@@ -1229,12 +1242,27 @@ The payment is confirmed by the signed webhook and, when the buyer comes
 back, by asking Stripe for the session in the return link; either one is
 enough and both are idempotent (`audit/payments.py`, `fulfil`). A session
 unlocks only the audit named in its own metadata, and only when Stripe
-reports it `paid`. The pack's code is derived with HMAC from the session id
+reports it `paid` (a 100%-off `no_payment_required` session never unlocks;
+free reports go through access codes), in `usd`, for at least the plan's
+price (`AUDIT_PRICE_USD_CENTS`, or `AUDIT_PACK_PRICE_USD_CENTS` for a pack),
+and with metadata `app=rigor`. The buyer controls `client_reference_id`
+through the link URL and the webhook hears every Checkout on the Stripe
+account, so a cheaper link, another app's link on the same account or a
+single-report payment tagged as a pack unlocks nothing. Sessions the service
+creates carry `app=rigor` themselves; Payment Links must carry it in their
+metadata, in test and live mode alike. A buyer who pays in their own currency
+through Stripe's Adaptive Pricing still unlocks: since API 2025-03-31 the
+session stays in USD (the local amount is under `presentment_details`), and
+on older API versions the USD amount is read from `currency_conversion`. The pack's code is derived with HMAC from the session id
 and the webhook secret, so only its hash is stored and the paid report can
 still show it, with its credits left, to whoever holds the report token.
 Rotating the webhook secret hides earlier pack codes from their reports
 (the codes keep working). Refunds are made from the Stripe dashboard and do
 not lock a report again; disable a pack code from `/panel` if needed.
+A paid session that does not unlock (wrong amount, currency or marker, an
+unlisted test audit, an unknown audit) is logged as a warning with the
+session id, the audit id and the reason, never an amount or an email, so a
+charged buyer who stays locked can be found and refunded or unlocked.
 
 ### Selling with access codes
 
@@ -1663,6 +1691,14 @@ Redesign pass 42 sets the live-account line under the verdict (`.verdict-live`)
 apart with a hairline and a dot in the outcome's tone (green holds, amber on the
 edge, red does not hold), keeps its link muted, and prints it black at the
 verdict's size in the PDF.
+
+Redesign pass 43 styles the fund calendar from #202. On a phone the table scrolls inside its own frame and the year column stays fixed, so every row keeps its year. The last column is headed "Total" ("Full year" in English) and sits apart with a rule and a light fill. Missing months are hatched. In the PDF the table drops its screen width and fits the page at a smaller size.
+
+Redesign pass 44 turns the column lines from #203 into a column map. For a CSV or Excel file from any platform, the report used to repeat "Column read as …" once per column inside the platform table. It now shows one block, "How each column of your file was read", with each of the customer's column names beside what Rigor read it as, in a trader's order (symbol, side, size, times, prices, result, costs). Three columns on a desktop, one on a phone, two in the PDF.
+
+The same pass styles the buyer's "What to do now" box from #207. Each step is a card with its number in a dark disc and the link to its section in bold with an arrow. The last step (keep the report and its id) is dashed and quieter. The MEASURED/DECLARED/NOT_MEASURED legend under the verdict sits in smaller print. The PDF keeps the cards at 9 pt.
+
+Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…) more shape without changing their words or order. The problems are cards with an amber warning icon. "What Rigor checks" is a grid of cards, two per row on a desktop, each with its name in bold. The price sits in a panel with its buttons. "Other cases" are link cards with an arrow. A check whose name is a question no longer gets an extra full stop ("¿Pico aislado o meseta?.").
 
 ## Security
 

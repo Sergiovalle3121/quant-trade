@@ -845,12 +845,51 @@ color:var(--text-3)}
 line-height:1;font-variant-numeric:tabular-nums}
 .fact p{margin:10px 0 0;color:var(--text-2);font-size:.92rem}
 .paper table.timing{table-layout:fixed}
-.fund-cal-wrap{overflow-x:auto;margin:18px 0 8px;-webkit-overflow-scrolling:touch}
-.paper table.fund-cal{min-width:720px;font-size:.78rem;font-variant-numeric:tabular-nums}
-.fund-cal th,.fund-cal td{padding:8px 6px!important;text-align:right;white-space:nowrap}
-.fund-cal th:first-child{text-align:left}
+.prose .aud-pains,.prose .aud-checks,.prose .aud-others{padding-left:0}
+.prose .aud-pains li,.prose .aud-checks li,.prose .aud-others li{margin:0}
+.aud-pains li{padding:14px 16px;background:#fff;border:1px solid var(--border);border-radius:14px;color:var(--text)}
+.aud-pains li svg{color:var(--warn)}
+.aud-checks li{padding:16px 18px;background:#fff;border:1px solid var(--border);border-radius:14px;line-height:1.55}
+.aud-checks li svg{color:var(--ok)}
+.aud-checks strong{display:block;margin-bottom:2px;color:var(--text)}
+@media (min-width:760px){.aud-checks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.aud-price{padding:22px 24px 12px;background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.aud-price>p{margin:0 0 6px;color:var(--text);line-height:1.6}
+.aud-others{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.aud-others a{display:flex;align-items:center;justify-content:space-between;height:100%;min-height:44px;padding:14px 16px;background:#fff;border:1px solid var(--border);border-radius:14px;color:var(--text);font-weight:500;line-height:1.4;text-decoration:none;transition:border-color .2s,transform .35s var(--ease)}
+.aud-others a:hover{border-color:var(--text-3);transform:translateY(-1px)}
+.aud-others svg{flex:none;width:16px;height:16px;margin-left:12px;color:var(--text-3)}
+.next-steps{list-style:none;counter-reset:ns;margin:16px 0 8px;padding:0}
+.next-steps li{counter-increment:ns;position:relative;margin:0 0 10px;padding:16px 18px 16px 62px;background:#fff;border:1px solid var(--border);border-radius:14px;line-height:1.55;color:var(--text)}
+.next-steps li::before{content:counter(ns);position:absolute;left:18px;top:14px;width:28px;height:28px;border-radius:50%;background:var(--text);color:#fff;font:600 .8rem/28px var(--mono);text-align:center}
+.next-steps li:last-child{margin-bottom:0;background:transparent;border-style:dashed;color:var(--text-2)}
+.next-steps li:last-child::before{background:transparent;color:var(--text-3);box-shadow:inset 0 0 0 1px var(--border)}
+.next-steps a{margin-left:2px;font-weight:600;color:var(--text);text-decoration:none;white-space:nowrap}
+.next-steps a::after{content:' \\2192'}
+.next-steps a:hover{text-decoration:underline;text-underline-offset:3px}
+.evidence-legend{margin:12px 0 0;font-size:.8rem;line-height:1.55}
+@media (max-width:620px){.next-steps li{padding:14px 14px 14px 52px}.next-steps li::before{left:14px;top:13px;width:26px;height:26px;line-height:26px}}
+@media print{.next-steps li{break-inside:avoid;font-size:9pt;padding:8px 10px 8px 40px;margin-bottom:6px;border-radius:8px}.next-steps li::before{left:10px;top:7px;width:20px;height:20px;font-size:7pt;line-height:20px}.next-steps a{color:#444}}
+.colmap{margin:14px 0 18px;padding:16px 18px;background:#fff;border:1px solid var(--border);border-radius:16px}
+.colmap-title{margin:0 0 10px;font-weight:600;font-size:.92rem;color:var(--text)}
+.colmap-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px 24px}
+.colmap-list li{display:flex;align-items:center;min-width:0;padding:5px 0;font-size:.9rem}
+.colmap-list code{flex:none;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;border-radius:8px;background:#f4f4f6;border:1px solid var(--border);font:500 .78rem var(--mono);color:var(--text)}
+.colmap-list svg{flex:none;width:15px;height:15px;margin:0 10px;color:var(--text-3)}
+.colmap-list span{min-width:0;color:var(--text-2)}
+@media print{.colmap{break-inside:avoid;padding:10px 12px}.colmap-list{display:block}.colmap-list li{display:inline-block;width:48%;margin-right:2%;padding:3px 0}.colmap-list li>*{vertical-align:middle}.colmap-list code{display:inline-block;max-width:none;font-size:7pt}.colmap-list svg{display:inline-block;width:10px;height:10px;margin:0 6px}.colmap-list span{font-size:8pt}}
+.fund-cal-wrap{overflow-x:auto;margin:18px 0 8px;-webkit-overflow-scrolling:touch;background:#fff;border:1px solid var(--border);border-radius:16px}
+.paper .fund-cal-wrap table.fund-cal{display:table;overflow:visible;min-width:720px;margin:0;border:0;border-radius:0;font-size:.78rem;font-variant-numeric:tabular-nums}
+.fund-cal th,.fund-cal td{padding:9px 7px!important;text-align:right;vertical-align:middle;white-space:nowrap}
+.fund-cal th:first-child{text-align:left;padding-left:14px!important}
+.fund-cal th[scope=row]{position:sticky;left:0;z-index:1;background:#fafafb;color:var(--text-2);letter-spacing:.04em;box-shadow:inset -1px 0 0 var(--border)}
+.fund-cal thead th:first-child{position:sticky;left:0;z-index:2;box-shadow:inset -1px 0 0 var(--border)}
 .fund-cal td.neg{color:#b42318}.fund-cal td.pos{color:#1a7f4b}
-.fund-cal td.tot{font-weight:650}
+.fund-cal td.empty{background:repeating-linear-gradient(135deg,transparent 0 4px,#f1f1f3 4px 5px)}
+.fund-cal th.tot,.fund-cal td.tot{padding-right:14px!important;border-left:1px solid var(--border)}
+.fund-cal td.tot{font-weight:650;background:#fafafb}
+.paper .fund-cal tr:hover>td{background:#f6f6f8}
+@media print{.fund-cal-wrap{overflow:visible;break-inside:avoid;border-radius:10px}.paper .fund-cal-wrap table.fund-cal{min-width:0;width:100%;table-layout:auto;font-size:7pt}.fund-cal th,.fund-cal td{padding:5px 2px!important}.fund-cal th{font-size:6pt;letter-spacing:0}.fund-cal th:first-child{padding-left:8px!important}.fund-cal th.tot,.fund-cal td.tot{padding-right:8px!important}.fund-cal th[scope=row],.fund-cal thead th:first-child{position:static;box-shadow:none;border-right:1px solid #ddd}}
 .paper table.stress{table-layout:fixed}
 .stress .c-n{width:17%}.stress .c-b{width:190px}
 .stress .val{text-align:right;padding-right:28px;white-space:nowrap}

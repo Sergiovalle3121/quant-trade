@@ -137,11 +137,18 @@ def _side_split(
             "win_rate": not_measured(reason),
             "net_pnl": not_measured(reason),
         }
-    selected = pnl[mask]
+    if wins_on is None:
+        return {
+            "trade_count": measured(count),
+            "win_rate": measured(float((pnl[mask] > 0).mean())),
+            "net_pnl": measured(float(pnl[mask].sum()), "before commission and swap"),
+        }
     return {
         "trade_count": measured(count),
-        "win_rate": measured(float(((pnl if wins_on is None else wins_on)[mask] > 0).mean())),
-        "net_pnl": measured(float(selected.sum()), "before commission and swap"),
+        "win_rate": measured(float((wins_on[mask] > 0).mean())),
+        "net_pnl": measured(
+            float(wins_on[mask].sum()), "after the fees the file itemises per trade"
+        ),
     }
 
 
