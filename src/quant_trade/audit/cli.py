@@ -19,6 +19,7 @@ from rich.console import Console
 from rich.table import Table
 
 from quant_trade.audit.engine import run_audit
+from quant_trade.audit.market import MarketData
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.report import render
 from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs
@@ -113,6 +114,12 @@ def run(
     benchmark_applicable: Annotated[bool, typer.Option(help="Benchmark applies")] = True,
     seed: Annotated[int, typer.Option(help="Bootstrap seed")] = 12345,
     bootstrap_samples: Annotated[int, typer.Option(help="Bootstrap samples", min=10)] = 1000,
+    public_data: Annotated[
+        bool,
+        typer.Option(
+            help="Read public FRED closes to compare with holding the market the file trades"
+        ),
+    ] = False,
     paid: Annotated[bool, typer.Option("--paid/--preview", help="Full report or preview")] = False,
 ) -> None:
     """Audit one backtest and write ``audit.json`` and ``report.html``.
@@ -156,7 +163,11 @@ def run(
         typer.echo(f"cannot audit: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     result = run_audit(
-        inputs, seed=seed, bootstrap_samples=bootstrap_samples, now=datetime.now(UTC)
+        inputs,
+        seed=seed,
+        bootstrap_samples=bootstrap_samples,
+        now=datetime.now(UTC),
+        market=MarketData().closes if public_data else None,
     )
     html_text, json_text = render(result, watermark=not paid, free_mode=True)
     output_dir.mkdir(parents=True, exist_ok=True)

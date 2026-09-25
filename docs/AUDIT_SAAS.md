@@ -1122,6 +1122,36 @@ positive. One finding, as a question: `fell_more_in_crises` when, over at
 least two windows with a benchmark, the fund did worse in two thirds or more
 of them. No red flag and no class change.
 
+Against holding the market it trades (`audit/holding.py`, `audit/market.py`).
+When at least two thirds of a file's trades are on the S&P 500, the Nasdaq 100
+or bitcoin (by symbol name: `US500`, `SPX500`, `ES` futures; `US100`,
+`USTEC`, `NAS100`, `NQ` futures; `BTCUSD`, `BTCUSDT`, `XBTUSD`; broker
+suffixes dropped), or a tester report names one of them, the report puts the
+strategy's daily closes beside the market's public closes from FRED
+(`SP500`, `NASDAQ100`, `CBBTCUSD`) on the same days: return, worst fall and
+Sharpe ratio for both, plus correlation and beta of the daily returns. It
+needs 60 shared days (`MIN_DAYS`) spanning 90 calendar days
+(`MIN_SPAN_DAYS`); a market close more than 5 days before a strategy day is
+not paired (`MAX_GAP_DAYS`). One finding, as a question, no red flag and no
+class change: `rides_the_market` when the correlation is 0.7 or more
+(`CLOSE_MOVE`) and the strategy's Sharpe is less than 0.1 (`SHARPE_EDGE`)
+above holding's. Sharpe is used because it does not change with position
+size, so a leveraged copy of the index scores the same as the index. Neither
+Sharpe subtracts a cash rate. On a balance-only file a line says the
+strategy's correlation and worst fall read short. The closes are read at
+run time (`MarketData`, kept in memory for six hours, Python's default
+User-Agent because FRED stalls custom ones), never stored in the repository;
+the service reads them unless `AUDIT_PUBLIC_DATA=false`, the CLI only with
+`--public-data`, and the tests block the download (`tests/conftest.py`).
+The public data can never hold a report back: the service downloads the
+three series in a background thread when it starts (`warm`); a read has a
+total deadline of 5 seconds (`TIMEOUT`, a server that trickles bytes is cut
+off too) and a 4 MB cap; while one audit downloads a series, others use what
+is cached or nothing, without waiting; after a failure (down, slow, rate
+limited, not a CSV) the series is not asked for again for 10 minutes
+(`RETRY_AFTER`). When the closes cannot be read the section says so in one
+NOT_MEASURED line and the audit goes on.
+
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section
 "How did it do in the known crises?". The curve is taken at month ends. On
