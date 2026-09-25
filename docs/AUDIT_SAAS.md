@@ -949,6 +949,12 @@ serves only the files listed in `theme.STATIC_FILES`. Printing always gets a
 light, static page. The landing's report illustration, including its three
 figures, is labelled as synthetic data.
 
+The prop-firm simulator shows its 95 % range and its days to target as two
+fact cards with one evidence tag each. When the platform's open-trade drawdown
+already passes the challenge's total loss limit, that warning is a red-edged
+callout above the table. The break-even cost tile shows one number (basis points
+per side) and puts the pips in its label, so the figure does not wrap.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

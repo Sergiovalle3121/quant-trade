@@ -164,3 +164,32 @@ def test_every_footer_and_the_landing_link_the_methodology(tmp_path: Path) -> No
         assert "class='investor'" in page and INVESTOR_COPY[locale]["title"] in page
         assert "/cuenta-proveedor'" in page
         assert find_claims(page) == []
+
+
+def test_prop_simulator_ranges_are_cards_and_open_losses_a_callout() -> None:
+    from dataclasses import replace
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import synthetic_mt5_report
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=synthetic_mt5_report(200),
+        report_filename="ReportTester.html",
+    )
+    deep = {"declared_equity_drawdown_relative": "40.51% (1 027.00)"}
+    inputs = replace(inputs, report_metadata={**inputs.report_metadata, **deep})
+    result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, challenge_samples=200)
+    for locale in ("es", "en"):
+        page = render_html(result, watermark=False, locale=locale)
+        challenge = page.split("class='live-verdict lv-FAIL'", 1)[1]
+        # The 95 % range and the days to target read as two fact cards, one tag each.
+        facts = challenge.split("<div class='facts'>", 1)[1].split("</div></div>", 1)[0]
+        assert facts.count("<div class='fact'>") == 2 and " – " in facts and " / " in facts
+        assert facts.count('class="badge MEASURED"') == 2
+        # The break-even tile keeps one short number; the pips go in its label.
+        assert re.search(r"<b>[\d.,]+</b><span>[^<]*pips\)</span>", page)
+        assert find_claims(page) == []
