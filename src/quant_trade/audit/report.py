@@ -1393,20 +1393,28 @@ def _reading_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     rows = _reading_rows(data)
     if not rows:
         return ""
+
+    def number(key: str, value: float) -> str:
+        return f"{value:,.0f}" if key == "trade_count" else f"{value:,.2f}"
+
     body = "".join(
-        f"<tr><td>{_e(_key_label(key, labels))}</td>"
-        f"<td>{_e(f'{declared:,.0f}' if key == 'trade_count' else f'{declared:,.2f}')}</td>"
-        f"<td>{_e(f'{measured:,.0f}' if key == 'trade_count' else f'{measured:,.2f}')}</td>"
-        f"<td><span class='badge {'PASS' if ok else 'FAIL'}'>"
-        f"{_e(labels['reading_ok'] if ok else labels['reading_bad'])}</span></td></tr>"
+        f"<div class='recon-row {'ok' if ok else 'bad'}'>"
+        f"<div class='recon-k'>{_e(_key_label(key, labels))}</div>"
+        f"<div class='recon-v'><span><small>{_e(labels['reading_platform'])}</small>"
+        f"<b>{_e(number(key, declared))}</b></span>"
+        f"<i aria-hidden='true'>{'=' if ok else '≠'}</i>"
+        f"<span><small>{_e(labels['reading_rows'])}</small>"
+        f"<b>{_e(number(key, measured))}</b></span></div>"
+        f"<span class='badge {'PASS' if ok else 'FAIL'}'>"
+        f"{_e(labels['reading_ok'] if ok else labels['reading_bad'])}</span></div>"
         for key, declared, measured, ok in rows
     )
     all_ok = all(ok for *_, ok in rows)
     return (
         f"<p class='muted'>{_e(labels['reading_intro'])}</p>"
-        f"<table><tr><th></th><th>{_e(labels['reading_platform'])}</th>"
-        f"<th>{_e(labels['reading_rows'])}</th><th></th></tr>{body}</table>"
-        f"<p class='muted'>{_e(labels['reading_all_ok' if all_ok else 'reading_some_bad'])}</p>"
+        f"<div class='recon'>{body}</div>"
+        f"<p class='recon-foot {'ok' if all_ok else 'bad'}'>"
+        f"{_e(labels['reading_all_ok' if all_ok else 'reading_some_bad'])}</p>"
     )
 
 
