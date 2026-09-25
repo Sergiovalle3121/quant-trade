@@ -775,6 +775,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "parte de las operaciones tras una ganancia abiertas en menos de 15 minutos",
     ),
     (
+        "after the fees the file itemises per trade",
+        "después de los costes que el archivo detalla por operación",
+    ),
+    (
         "share of trades with a net profit after the fees the file itemises",
         "parte de las operaciones con resultado neto positivo, después de los costes que "
         "detalla el archivo",

@@ -113,6 +113,11 @@ LABELS: dict[str, dict[str, str]] = {
         "expected_max": "Sharpe máximo esperado sin habilidad",
         "dsr": "Sharpe deflactado (DSR)",
         "multiplier": "Multiplicador",
+        "cost_recomputed": (
+            "Esta tabla recalcula cada operación con sus precios y su tamaño: sin coste "
+            "extra da {table}, {gap} de diferencia con el resultado neto de las operaciones "
+            "({trades}), por el redondeo de precios o la conversión de divisa."
+        ),
         "bps": "pb por lado",
         "gross": "Bruto",
         "cost": "Coste",
@@ -262,7 +267,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_limit": "Si aceptas perder hasta",
         "capital_needed": "Capital necesario al tamaño del backtest",
-        "capital_scale": "Tamaño sobre un balance de {balance}",
+        "capital_scale": "Tamaño sobre el balance inicial del archivo ({balance})",
         "capital_scale_plain": "Tamaño sobre el balance inicial",
         "capital_scale_help": (
             "1x es el tamaño de lote del backtest; 0.50x es la mitad. Por encima de 1x la "
@@ -348,7 +353,10 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_early": "Media por operación antes del {date}",
         "recent_late": "Media por operación desde el {date}",
         "recent_net": "Resultado neto desde el {date} ({n} operaciones)",
-        "recent_z": "Distancia entre ambas medias, en errores estándar",
+        "recent_z": (
+            "Distancia entre ambas medias, en errores estándar (-2 o menos: una caída "
+            "que el azar difícilmente explica)"
+        ),
         "recent_held": (
             "El último tercio del historial no muestra una caída a pérdidas que el azar no "
             "explique."
@@ -559,8 +567,8 @@ LABELS: dict[str, dict[str, str]] = {
         "boot_line": "Bootstrap estacionario por bloques, remuestreos:",
         "boot_block": "bloque",
         "point": "Estimación",
-        "engine": "motor",
-        "seed": "semilla",
+        "engine": "versión del motor",
+        "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
         "keep_link": (
             "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
@@ -637,7 +645,9 @@ LABELS: dict[str, dict[str, str]] = {
         "risk": "Riesgo remuestreado a un año",
         "risk_dd": "Drawdown máximo a un año",
         "risk_prob": "Probabilidad de una caída de al menos",
-        "risk_underwater": "Periodos seguidos bajo el máximo",
+        "risk_underwater": "Periodos seguidos bajo el máximo, en las simulaciones",
+        "risk_under_median": "mediana",
+        "risk_under_p95": "en 1 de cada 20",
         "challenge": "Simulador de reto de prop firm",
         "challenge_rules": "Reglas simuladas",
         "open_loss_badge": "Pérdidas abiertas",
@@ -756,6 +766,11 @@ LABELS: dict[str, dict[str, str]] = {
         "expected_max": "Expected max Sharpe without skill",
         "dsr": "Deflated Sharpe (DSR)",
         "multiplier": "Multiplier",
+        "cost_recomputed": (
+            "This table recomputes each trade from its prices and size: with no extra cost "
+            "it gives {table}, {gap} away from the trades' net result ({trades}), from "
+            "price rounding or currency conversion."
+        ),
         "bps": "bps per side",
         "gross": "Gross",
         "cost": "Cost",
@@ -902,7 +917,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_limit": "If you accept losing up to",
         "capital_needed": "Capital needed at the backtest's size",
-        "capital_scale": "Size on a {balance} balance",
+        "capital_scale": "Size on the file's starting balance ({balance})",
         "capital_scale_plain": "Size on the starting balance",
         "capital_scale_help": (
             "1x is the backtest's lot size; 0.50x is half of it. Above 1x the fall in money "
@@ -983,7 +998,10 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_early": "Average per trade before {date}",
         "recent_late": "Average per trade since {date}",
         "recent_net": "Net result since {date} ({n} trades)",
-        "recent_z": "Distance between the two averages, in standard errors",
+        "recent_z": (
+            "Distance between the two averages, in standard errors (-2 or lower: a drop "
+            "chance hardly explains)"
+        ),
         "recent_held": (
             "The last third of the history shows no drop into losses beyond what chance explains."
         ),
@@ -1186,8 +1204,8 @@ LABELS: dict[str, dict[str, str]] = {
         "boot_line": "Stationary block bootstrap, resamples:",
         "boot_block": "block",
         "point": "Estimate",
-        "engine": "engine",
-        "seed": "seed",
+        "engine": "engine version",
+        "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
         "keep_link": (
             "Save this page's link: it is the only way back to your report. "
@@ -1260,7 +1278,9 @@ LABELS: dict[str, dict[str, str]] = {
         "risk": "Resampled one-year risk",
         "risk_dd": "Maximum drawdown over one year",
         "risk_prob": "Probability of a fall of at least",
-        "risk_underwater": "Consecutive periods below the peak",
+        "risk_underwater": "Consecutive periods below the peak, in the simulations",
+        "risk_under_median": "median",
+        "risk_under_p95": "in 1 of every 20",
         "challenge": "Prop-firm challenge simulator",
         "challenge_rules": "Rules simulated",
         "open_loss_badge": "Open losses",
@@ -2485,10 +2505,29 @@ def _risk_html(
         )
         under = risk["longest_underwater_periods"]
         html_text += (
-            f"<p>{_e(labels['risk_underwater'])}: p50 {_value_cell(under['p50'], percent=False)}"
-            f", p95 {_value_cell(under['p95'], percent=False)}</p>"
+            f"<p>{_e(labels['risk_underwater'])}: {_e(labels['risk_under_median'])} "
+            f"{_value_cell(under['p50'], percent=False)}, {_e(labels['risk_under_p95'])} "
+            f"{_value_cell(under['p95'], percent=False)}</p>"
         )
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
+
+
+def _cost_gap_note(
+    rows: list[dict[str, Any]], stats: dict[str, Any], labels: dict[str, str]
+) -> str:
+    """Say why the cost table's no-extra-cost row can differ from the trade net."""
+    base = next((row for row in rows if float(row.get("multiplier", -1)) == 0.0), None)
+    trades_net = _ev_value(stats.get("net_pnl"))
+    table_net = _ev_value((base or {}).get("net_pnl"))
+    if trades_net is None or table_net is None or abs(table_net - trades_net) < 0.005:
+        return ""
+    return "<p class='muted'>" + _e(
+        labels["cost_recomputed"].format(
+            table=_fmt(table_net, key="net_pnl"),
+            gap=_fmt(abs(table_net - trades_net), key="net_pnl"),
+            trades=_fmt(trades_net, key="net_pnl"),
+        )
+    ) + "</p>"
 
 
 def _open_loss_note(
@@ -4045,6 +4084,7 @@ def render_html(
             )
             + "</table></div>"
         )
+        cost_html += _cost_gap_note(cost["rows"], data.get("trade_stats") or {}, labels)
 
     bench_html = _status_line(data["benchmark"], labels) + _evidence_rows(
         data["benchmark"], labels, skip=set()
@@ -4332,8 +4372,7 @@ def render_html(
     meta = (
         f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
         f"<span>{_e(labels['generated'])} {_e(_short_time(data['generated_at_utc']))}</span>"
-        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['name'])} "
-        f"{_e(engine['package_version'])}</span>"
+        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['package_version'])}</span>"
         f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
     live_anchor = next(

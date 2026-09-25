@@ -138,3 +138,29 @@ def test_the_sample_shows_the_net_win_rate_once_in_the_tiles_and_tables() -> Non
     # The gross share (55.54%) shows once, on its own labelled row, not
     # again in the annualised table.
     assert page.count("55.54%") == 1
+
+
+def test_figures_carry_their_unit_and_plain_names() -> None:
+    page = _page("es")
+    # Header: the engine version and seed say what they are.
+    assert "versión del motor 0.1.0" in page and "semilla de las simulaciones" in page
+    assert "quant_trade.audit" not in page
+    # Resampled time under the peak says median and 1 in 20, not p50/p95.
+    assert "Periodos seguidos bajo el máximo, en las simulaciones: mediana" in page
+    assert "en 1 de cada 20" in page
+    # The capital cards say whose balance they scale to.
+    assert "Tamaño sobre el balance inicial del archivo (10,000)" in page
+    # The drop distance says which values matter.
+    assert "(-2 o menos: una caída que el azar difícilmente explica)" in page
+    # The cost table explains its few cents of difference with the trades' net.
+    assert "sin coste extra da 6,425.50, 0.47 de diferencia" in page
+    english = _page("en")
+    assert "engine version 0.1.0" in english and "in 1 of every 20" in english
+    assert "with no extra cost it gives 6,425.50" in english
+
+
+def test_long_and_short_results_are_net_after_itemised_fees() -> None:
+    page = _page("es")
+    # Long plus short now add up to the trades' net result.
+    assert "después de los costes que el archivo detalla por operación" in page
+    assert "antes de comisión y swap" not in page
