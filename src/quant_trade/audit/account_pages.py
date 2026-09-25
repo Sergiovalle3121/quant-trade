@@ -450,7 +450,15 @@ box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .acct-terms a{color:var(--text);text-underline-offset:3px}
 .acct-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
 margin-bottom:8px}
-.acct-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 28px}
+.acct-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;
+margin:18px 0 28px}
+.acct-gift b{font-size:1.3rem;line-height:1.5}
+.acct-gift.is-on{border-color:color-mix(in srgb,var(--ok) 45%,var(--border));
+background:color-mix(in srgb,var(--ok) 7%,#fff)}
+.acct-gift.is-on b{color:var(--ok)}
+.acct-box span{display:inline-flex;align-items:center;gap:6px}
+.acct-box svg{width:16px;height:16px;flex:none}
+.acct-gate{text-align:left}.acct-gate .inline-form{display:flex;flex-wrap:wrap;gap:10px}
 .acct-kpi{border:1px solid var(--border);border-radius:16px;padding:16px 18px;
 background:#fff}
 .acct-kpi b{display:block;font-size:1.9rem;line-height:1.1}
@@ -473,7 +481,10 @@ border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:14px 
 font-size:.92rem;background:var(--surface-2)}
 .acct-box form{margin:0}
 .acct-box .btn{margin:0}
-@media (max-width:760px){.acct-grid{grid-template-columns:1fr}.acct-kpis{gap:8px}
+@media (max-width:760px){.acct-grid{grid-template-columns:1fr}
+.acct-kpis{gap:8px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.acct-gift.is-on{grid-column:1/-1}.acct-gift b{font-size:1.15rem}
+.acct-gate .btn{width:100%;justify-content:center}
 .acct-kpi{padding:12px}.acct-kpi b{font-size:1.5rem}.acct-kpi span{display:block;font-size:.76rem;
 line-height:1.35}.acct-form{padding:20px}}
 @media (max-width:620px){.acct-reports thead{display:none}
@@ -682,7 +693,10 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
             f"{_e(copy['gate_buy'])}</a>"
             f"<a class='btn btn-ghost btn-lg' href='{home}'>{_e(copy['gate_back'])}</a>"
         )
-    body = f"<div class='wrap-narrow'><div class='inline-form'>{buttons}</div></div>"
+    body = (
+        "<div class='wrap-narrow'><div class='acct-card acct-gate'>"
+        f"<div class='inline-form'>{buttons}</div></div></div>"
+    )
     return _shell(
         locale,
         copy[f"gate_{reason}_title"].format(limit=limit),
@@ -920,22 +934,26 @@ def account_page(
         f"{_e(copy['new_audit'])}</a>{signout}</div></div>"
     )
     free_value = copy["free_left_value"].format(left=free_left, limit=free_limit)
+    # The free first report leads while it is unused: it is what a new account came for.
+    gift = (
+        f"<div class='acct-kpi acct-gift{' is-on' if welcome == 'available' else ''}'>"
+        f"<b>{_e(copy['welcome_' + welcome])}</b>"
+        f"<span>{_e(copy['welcome_kpi'])}</span></div>"
+        if welcome in ("available", "used")
+        else ""
+    )
     kpis = (
         "<div class='acct-kpis'>"
-        f"<div class='acct-kpi'><b>{credits}</b><span>{_e(copy['credits'])}. "
-        f"{_e(copy['credits_help'])}</span></div>"
+        + (gift if welcome == "available" else "")
         + (
             f"<div class='acct-kpi'><b>{_e(free_value)}</b>"
             f"<span>{_e(copy['free_left'])}</span></div>"
             if free_limit
             else ""
         )
-        + (
-            f"<div class='acct-kpi'><b>{_e(copy['welcome_' + welcome])}</b>"
-            f"<span>{_e(copy['welcome_kpi'])}</span></div>"
-            if welcome in ("available", "used")
-            else ""
-        )
+        + f"<div class='acct-kpi'><b>{credits}</b><span>{_e(copy['credits'])}. "
+        f"{_e(copy['credits_help'])}</span></div>"
+        + (gift if welcome != "available" else "")
         + f"<div class='acct-kpi'><b>{len(audits)}</b><span>{_e(copy['reports'])}</span></div>"
         f"<div class='acct-kpi'><b>{sum(1 for a in audits if a.paid)}</b>"
         f"<span>{_e(copy['paid_reports'])}</span></div></div>"

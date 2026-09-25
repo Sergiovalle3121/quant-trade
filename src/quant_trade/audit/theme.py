@@ -410,7 +410,9 @@ transition:color .3s}
 .platforms li:hover{color:var(--text)}
 .platforms .platforms-also{font:400 .92rem/1.6 var(--sans);letter-spacing:0;text-transform:none;
 color:var(--text-3);max-width:760px;margin:26px auto 0}
-.platforms .platforms-also a{color:var(--text-2);text-decoration-color:rgba(255,255,255,.22);text-underline-offset:4px;transition:color .2s,text-decoration-color .2s}
+.platforms .platforms-also a{color:var(--text-2);text-decoration:none;transition:color .2s}
+.platforms .platforms-also a::after{content:' \\2192';color:var(--text-3);transition:color .2s}
+.platforms .platforms-also a:hover{text-decoration:underline;text-decoration-color:rgba(255,255,255,.35);text-underline-offset:4px}
 .platforms .platforms-also a:hover{color:var(--text);text-decoration-color:currentColor}
 .statement{font-size:clamp(1.6rem,3.2vw,2.6rem);font-weight:560;letter-spacing:-.034em;
 line-height:1.22;max-width:1000px;margin:0 0 clamp(56px,7vw,96px);color:var(--text)}
@@ -519,6 +521,8 @@ box-shadow:0 60px 120px -60px rgba(255,255,255,.18)}
 .price-amount{font-size:clamp(3rem,5.4vw,4.4rem);font-weight:600;line-height:1;margin:16px 0 8px;
 letter-spacing:-.055em}
 .price-amount small{font-size:1rem;font-weight:450;color:var(--text-3);margin-left:8px;letter-spacing:-.01em}
+/* A long note (the free card's) drops under the price whole instead of splitting beside it. */
+@media screen{.price-amount{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:8px}.price-amount small{margin-left:0;line-height:1.4;flex:0 1 auto;min-width:0}}
 .price .checks{margin:26px 0 30px;flex:1;align-content:start}
 .price-pack{margin:6px 0 0;padding:12px 14px;border-radius:14px;background:var(--surface-2);
 color:var(--text);font-size:.92rem}
@@ -938,6 +942,8 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .tbar-track span{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--text)}
 .tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
 @media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
+.crises td small{display:block;margin-top:2px;font-weight:400;font-size:.8rem}.crises td.val.neg{color:#b42318}.crises td.val.muted{white-space:normal;font-weight:400;font-size:.86rem;color:var(--text-3)}
+@media screen and (max-width:620px){.paper table.crises{display:table;width:100%}.crises td:first-child{white-space:normal!important}.crises td.val.muted{max-width:9.5em}}
 .live .val{text-align:right;white-space:nowrap}.live th{white-space:normal}.live td:first-child{font-weight:500}
 .live-verdict{margin:18px 0;padding:16px 20px;border-radius:16px;background:#fff;border:1px solid var(--border);border-left:4px solid #9a9aa2;line-height:1.6}
 .lv-PASS{border-left-color:#16a34a}.lv-WEAK{border-left-color:#d97706}.lv-FAIL{border-left-color:#dc2626}

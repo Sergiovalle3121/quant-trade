@@ -4634,7 +4634,10 @@ def _crises_html(
             f"<th class='val'>{_e(subject)}</th>"
             + (f"<th class='val'>{_e(labels['fund_stress_index'])}</th>" if with_index else "")
         )
-        out += f"<table class='timing'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+        out += (
+            f"<table class='timing crises'><thead><tr>{head}</tr></thead>"
+            f"<tbody>{body}</tbody></table>"
+        )
     else:
         out += f"<p class='muted'>{_e(labels['fund_stress_none'])}</p>"
     if stress.get("worst_12m"):
