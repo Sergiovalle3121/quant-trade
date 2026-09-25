@@ -1815,6 +1815,14 @@ Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…
 
 Redesign pass 46 tidies the "Name its columns" step from #212 on the upload form. The twelve fields sit in three labelled groups: one row per trade, one row per fill, and either way. On a phone they sit two per row. Once a CSV is picked, the file's own column names show as chips above the fields (read in the browser by `app.js`, the same header row that feeds the suggestions), so the customer can copy them without opening the file.
 
+Redesign pass 47 polishes the screens from the first-sales rewrite (#223). In the locked preview, each padlock sits beside the first line of its item instead of floating between two lines. On a phone the WhatsApp button wraps to two roomy lines, and "Redeem code" fills its row. On the landing, the "And it reads the export format of…" line keeps a quiet underline that brightens on hover. The price cards needed nothing.
+
+Redesign pass 48 styles the account screens from #205. On sign-up and sign-in, the form sits in a white card beside the tinted list of what an account gives. On "My account", the three counts are white tiles, three across even on a phone. On a phone each report is a card with its class, date and "Open" on one row and its status and description below. "Delete my account" is outlined and titled in red, so it does not read like the password card beside it. On sign-up, the words "terms of service" and "privacy policy" are themselves the links to those pages; the line used to link only a lone "›" and left privacy unlinked.
+
+Redesign pass 49 checks the upload form after #230 (report first, extras in a closed "Add more files" box) and the pricing line about the optional account; both needed nothing on a phone or desktop. It adds a quiet "or" rule between the platform report and the equity curve, so it reads that one of the two is enough.
+
+Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, two reports picked from "My reports"). On a phone the dimension and figure tables now use tighter cells and smaller badges, so a "Fails" badge in the second report no longer spills past the card. It also checks the fund benchmark block and the plain lines under the headline figures on /ejemplo; both read well and needed nothing.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
