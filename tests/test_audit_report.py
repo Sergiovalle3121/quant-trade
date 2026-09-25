@@ -184,3 +184,26 @@ def test_locked_preview_links_the_full_sample_in_a_new_tab() -> None:
         assert f"<a href='{href}' target='_blank' rel='noopener'>{words}" in unpaid
         assert "lee mal tu archivo" in unpaid if locale == "es" else "misreads your file" in unpaid
     assert "class='lock-sample'" not in render_html(result, watermark=False, free_mode=False)
+
+
+def test_lockbox_lists_what_the_buyer_gets_in_plain_words() -> None:
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.report import LABELS, LOCKED_GAINS
+
+    assert LOCKED_GAINS["es"].keys() == LOCKED_GAINS["en"].keys()
+    assert set(LOCKED_GAINS["es"]) <= set(LABELS["es"])
+    result = _result()
+    for locale in ("es", "en"):
+        unpaid = render_html(
+            result,
+            watermark=True,
+            free_mode=False,
+            price_usd=29,
+            checkout_url="/audits/abc123/checkout",
+            locale=locale,
+        )
+        box = unpaid.split("class='lockbox'", 1)[1].split("class='lock-sample'", 1)[0]
+        assert LOCKED_GAINS[locale]["significance"] in box
+        for technical in ("bootstrap", "multiplicity", "cscv", "rolling"):
+            assert LABELS[locale][technical] not in box
+        assert find_claims(box) == []

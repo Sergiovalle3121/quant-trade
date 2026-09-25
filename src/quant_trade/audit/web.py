@@ -34,11 +34,13 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
+from urllib.parse import quote
 
 from pydantic import ValidationError
 
+from quant_trade.audit import account_pages, payments, universal
+from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
-from quant_trade.audit import payments, universal
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
@@ -85,7 +87,15 @@ from quant_trade.audit.schema import (
 )
 from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
 from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings
-from quant_trade.audit.store import REQUIRE_WEB, Store, make_store
+from quant_trade.audit.store import (
+    CODE_REFERENCE_PREFIX,
+    REQUIRE_WEB,
+    VIA_PAID,
+    VIA_SAVED,
+    VIA_UPLOAD,
+    Store,
+    make_store,
+)
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps
 
@@ -741,7 +751,7 @@ SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf"}
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         import anyio
-        from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+        from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import (
             HTMLResponse,
@@ -967,6 +977,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         note: Annotated[str, Form()] = "",
         expires_days: Annotated[str, Form()] = "",
         code_id: Annotated[str, Form()] = "",
+        email: Annotated[str, Form(max_length=320)] = "",
     ) -> Response:
         """The owner panel. The key comes in the body on every request, is
         compared in constant time, and wrong keys are limited per address."""
@@ -1002,6 +1013,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         elif action == "disable":
             flash = "disabled" if db.disable_access_code(code_id.strip()[:64]) else ""
             error = "" if flash else "not_found"
+        reset_link = ""
+        if action == "reset":
+            account = db.find_account(acct.normalise_email(email))
+            if account is None:
+                error = "reset_unknown"
+            else:
+                secret = acct.new_secret()
+                db.create_reset(
+                    account.id,
+                    token_sha256=acct.hash_secret(secret),
+                    at=now,
+                    hours=acct.RESET_HOURS,
+                )
+                reset_path = account_pages.path("reset", account.locale)
+                reset_link = f"{_site_url(request)}{reset_path}?token={secret}"
         return HTMLResponse(
             panel_page(
                 key=key,
@@ -1010,6 +1036,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 new_code=new_code,
                 flash=flash,
                 error=error,
+                reset_link=reset_link,
+                accounts=db.count_accounts(),
             )
         )
 
@@ -1068,6 +1096,450 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(f"/?lang={locale}&error=email", status_code=303)
         db.add_waitlist(email, at=datetime.now(UTC))
         return RedirectResponse(f"/?lang={locale}&joined=1#news", status_code=303)
+
+    # -- customer accounts -------------------------------------------------
+    secure_cookies = cfg.base_url.startswith("https://")
+    signin_failures = AttemptLog()
+    signin_email_failures = AttemptLog()
+    signin_ip_failures = AttemptLog()
+    signup_attempts = AttemptLog()
+    account_actions = AttemptLog()
+
+    def _session(request: Request) -> tuple[Any, str, str] | None:
+        """``(account, csrf, session hash)`` for a signed-in request, else ``None``."""
+        token = request.cookies.get(acct.SESSION_COOKIE) or ""
+        if not token or len(token) > 128:
+            return None
+        digest = acct.hash_secret(token)
+        found = db.session_account(digest, datetime.now(UTC))
+        return (found[0], found[1], digest) if found else None
+
+    def _cookie(response: Any, name: str, value: str, *, max_age: int) -> None:
+        response.set_cookie(
+            name,
+            value,
+            max_age=max_age,
+            httponly=True,
+            secure=secure_cookies,
+            samesite="lax",
+            path="/",
+        )
+
+    def _anon_csrf(request: Request) -> str:
+        """The double-submit token for forms shown before sign-in."""
+        current = request.cookies.get(acct.CSRF_COOKIE) or ""
+        return current if 20 <= len(current) <= 128 else acct.new_secret()
+
+    def _anon_page(page: str, csrf: str, status: int = 200) -> Response:
+        response = HTMLResponse(page, status_code=status)
+        _cookie(response, acct.CSRF_COOKIE, csrf, max_age=2 * 3600)
+        return response
+
+    def _anon_ok(request: Request, field: str) -> bool:
+        return acct.same_secret(request.cookies.get(acct.CSRF_COOKIE), field)
+
+    def _start_session(response: Any, account: Any) -> None:
+        token = acct.new_secret()
+        now = datetime.now(UTC)
+        db.create_session(
+            account.id,
+            token_sha256=acct.hash_secret(token),
+            csrf=acct.new_secret(),
+            at=now,
+            days=acct.SESSION_DAYS,
+        )
+        _cookie(response, acct.SESSION_COOKIE, token, max_age=acct.SESSION_DAYS * 86400)
+        response.delete_cookie(acct.CSRF_COOKIE, path="/")
+
+    def _account_redirect(locale: str, done: str = "") -> Response:
+        target = account_pages.path("account", locale) + (f"?done={done}" if done else "")
+        return RedirectResponse(target, status_code=303)
+
+    def _signin_redirect(locale: str, *, done: str = "", next_path: str = "") -> Response:
+        query = []
+        if done:
+            query.append(f"done={done}")
+        if next_path:
+            query.append("next=" + quote(next_path, safe=""))
+        target = account_pages.path("signin", locale) + ("?" + "&".join(query) if query else "")
+        return RedirectResponse(target, status_code=303)
+
+    def _account_locale(path_locale: str, lang: str | None) -> str:
+        return _locale(lang) if lang in LOCALES else path_locale
+
+    #: Flash keys a redirect may name; anything else in ``done`` is ignored.
+    signin_flashes = ("signed_out", "deleted", "reset_done")
+    account_flashes = ("welcome", "code_linked", "password_changed")
+    account_errors = ("code_already", "code_other", "code_unknown", "wrong", "csrf", "too_many")
+
+    def _signup_get(path_locale: str) -> Callable[..., Response]:
+        def handler(request: Request, lang: str | None = None, next: str = "") -> Response:
+            locale = _account_locale(path_locale, lang)
+            if _session(request):
+                return _account_redirect(locale)
+            csrf = _anon_csrf(request)
+            page = account_pages.signup_page(
+                locale=locale, csrf=csrf, next_path=acct.safe_next(next)
+            )
+            return _anon_page(page, csrf)
+
+        return handler
+
+    def _signup_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            email: Annotated[str, Form(max_length=320)] = "",
+            password: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            next: Annotated[str, Form(max_length=1000)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            clean = acct.normalise_email(email)
+            new_csrf = _anon_csrf(request)
+
+            def again(error: str, status: int) -> Response:
+                page = account_pages.signup_page(
+                    locale=locale,
+                    csrf=new_csrf,
+                    error=error,
+                    email=clean if acct.valid_email(clean) else "",
+                    next_path=next_path,
+                )
+                return _anon_page(page, new_csrf, status)
+
+            if not _anon_ok(request, csrf):
+                return again("csrf", 400)
+            ip = _client_ip(request, cfg.trusted_proxy_hops)
+            now = datetime.now(UTC)
+            if signup_attempts.hit(ip, now) > acct.MAX_SIGNUPS_PER_HOUR:
+                return again("too_many", 429)
+            if not acct.valid_email(clean):
+                return again("email_bad", 400)
+            problem = acct.password_problem(password)
+            if problem:
+                return again(problem, 400)
+            account = db.create_account(
+                email=clean, password_hash=acct.hash_password(password), locale=locale, at=now
+            )
+            if account is None:
+                return again("taken", 409)
+            if next_path:
+                response: Response = RedirectResponse(next_path, status_code=303)
+            else:
+                response = _account_redirect(locale, "welcome")
+            _start_session(response, account)
+            return response
+
+        return handler
+
+    def _signin_get(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request, lang: str | None = None, next: str = "", done: str = ""
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            if _session(request):
+                return (
+                    RedirectResponse(next_path, status_code=303)
+                    if next_path
+                    else _account_redirect(locale)
+                )
+            csrf = _anon_csrf(request)
+            page = account_pages.signin_page(
+                locale=locale,
+                csrf=csrf,
+                flash=done if done in signin_flashes else "",
+                next_path=next_path,
+            )
+            return _anon_page(page, csrf)
+
+        return handler
+
+    def _signin_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            email: Annotated[str, Form(max_length=320)] = "",
+            password: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            next: Annotated[str, Form(max_length=1000)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            clean = acct.normalise_email(email)
+            new_csrf = _anon_csrf(request)
+
+            def again(error: str, status: int) -> Response:
+                page = account_pages.signin_page(
+                    locale=locale,
+                    csrf=new_csrf,
+                    error=error,
+                    email=clean if acct.valid_email(clean) else "",
+                    next_path=next_path,
+                )
+                return _anon_page(page, new_csrf, status)
+
+            if not _anon_ok(request, csrf):
+                return again("csrf", 400)
+            ip = _client_ip(request, cfg.trusted_proxy_hops)
+            now = datetime.now(UTC)
+            # Keyed on (address, e-mail) so that failures from elsewhere never
+            # lock the real owner out; the per-address and per-e-mail ceilings
+            # are much higher and only stop wide guessing.
+            pair = f"{ip}|{clean}"
+            if (
+                signin_failures.count(pair, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
+                or signin_ip_failures.count(ip, now) >= acct.MAX_FAILED_SIGNINS_PER_IP
+                or signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_EMAIL
+            ):
+                return again("too_many", 429)
+            found = db.account_with_hash(clean) if acct.valid_email(clean) else None
+            if found is None:
+                acct.burn_time(password)
+                ok = False
+            else:
+                ok = acct.verify_password(found[1], password)
+            if not ok or found is None:
+                signin_failures.hit(pair, now)
+                signin_ip_failures.hit(ip, now)
+                signin_email_failures.hit(clean, now)
+                return again("wrong", 401)
+            db.purge_sessions(now)
+            if next_path:
+                response: Response = RedirectResponse(next_path, status_code=303)
+            else:
+                response = _account_redirect(found[0].locale if lang is None else locale)
+            _start_session(response, found[0])
+            return response
+
+        return handler
+
+    def _signout_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            session = _session(request)
+            if session is None:
+                return _signin_redirect(locale)
+            if not acct.same_secret(session[1], csrf):
+                return _account_redirect(locale)
+            db.delete_session(session[2])
+            response = _signin_redirect(locale, done="signed_out")
+            response.delete_cookie(acct.SESSION_COOKIE, path="/")
+            return response
+
+        return handler
+
+    def _account_get(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request, lang: str | None = None, done: str = "", error: str = ""
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            session = _session(request)
+            if session is None:
+                return _signin_redirect(locale, next_path=account_pages.path("account", locale))
+            account, csrf, _ = session
+            now = datetime.now(UTC)
+            return HTMLResponse(
+                account_pages.account_page(
+                    locale=locale,
+                    account=account,
+                    audits=db.account_audits_list(account.id),
+                    codes=db.account_codes_list(account.id),
+                    credits=db.account_credits(account.id, now),
+                    csrf=csrf,
+                    now=now.isoformat().replace("+00:00", "Z"),
+                    flash=done if done in account_flashes else "",
+                    error=error if error in account_errors else "",
+                    access_codes=cfg.access_codes_enabled,
+                    card_payments=cfg.stripe_enabled,
+                    contact_url=cfg.contact_url,
+                )
+            )
+
+        return handler
+
+    def _signed_in_action(
+        request: Request, path_locale: str, lang: str | None, csrf: str
+    ) -> tuple[Any, str, str, str] | Response:
+        """The session behind an account form, or the redirect that answers it."""
+        locale = _account_locale(path_locale, lang)
+        session = _session(request)
+        if session is None:
+            return _signin_redirect(locale, next_path=account_pages.path("account", locale))
+        if not acct.same_secret(session[1], csrf):
+            return RedirectResponse(
+                account_pages.path("account", locale) + "?error=csrf", status_code=303
+            )
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        if account_actions.hit(ip, datetime.now(UTC)) > acct.MAX_ACCOUNT_ACTIONS_PER_HOUR:
+            return RedirectResponse(
+                account_pages.path("account", locale) + "?error=too_many", status_code=303
+            )
+        return session[0], session[2], locale, ip
+
+    def _code_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            code: Annotated[str, Form(max_length=200)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            code_id = db.code_id(code.strip()[:_CODE_MAX])
+            if code_id is None:
+                return RedirectResponse(f"{base}?error=code_unknown", status_code=303)
+            outcome = db.link_code(account.id, code_id, at=datetime.now(UTC))
+            if outcome == "linked":
+                return RedirectResponse(f"{base}?done=code_linked", status_code=303)
+            return RedirectResponse(f"{base}?error=code_{outcome}", status_code=303)
+
+        return handler
+
+    def _password_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            current: Annotated[str, Form(max_length=1024)] = "",
+            password: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, session_hash, locale, _ = checked
+            base = account_pages.path("account", locale)
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return RedirectResponse(f"{base}?error=wrong", status_code=303)
+            if acct.password_problem(password):
+                return RedirectResponse(f"{base}?error=wrong", status_code=303)
+            db.set_password(account.id, acct.hash_password(password))
+            db.delete_sessions(account.id, keep=session_hash)
+            return RedirectResponse(f"{base}?done=password_changed", status_code=303)
+
+        return handler
+
+    def _delete_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            current: Annotated[str, Form(max_length=1024)] = "",
+            with_reports: Annotated[str, Form(max_length=10)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return RedirectResponse(
+                    account_pages.path("account", locale) + "?error=wrong", status_code=303
+                )
+            db.delete_account(account.id, with_reports=with_reports == "yes")
+            response = _signin_redirect(locale, done="deleted")
+            response.delete_cookie(acct.SESSION_COOKIE, path="/")
+            return response
+
+        return handler
+
+    def _forgot_get(path_locale: str) -> Callable[..., Response]:
+        def handler(lang: str | None = None) -> Response:
+            locale = _account_locale(path_locale, lang)
+            return HTMLResponse(
+                account_pages.forgot_page(locale=locale, contact_url=cfg.contact_url)
+            )
+
+        return handler
+
+    def _reset_get(path_locale: str) -> Callable[..., Response]:
+        def handler(request: Request, token: str = "", lang: str | None = None) -> Response:
+            locale = _account_locale(path_locale, lang)
+            csrf = _anon_csrf(request)
+            valid = (
+                bool(token)
+                and len(token) <= 128
+                and (db.reset_account(acct.hash_secret(token), datetime.now(UTC)) is not None)
+            )
+            page = account_pages.reset_page(
+                locale=locale, csrf=csrf, token=token if valid else "", valid=valid
+            )
+            return _anon_page(page, csrf, 200 if valid else 410)
+
+        return handler
+
+    def _reset_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            token: Annotated[str, Form(max_length=200)] = "",
+            password: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            new_csrf = _anon_csrf(request)
+            now = datetime.now(UTC)
+            digest = acct.hash_secret(token) if token else ""
+            if not token or db.reset_account(digest, now) is None:
+                page = account_pages.reset_page(locale=locale, csrf=new_csrf, token="", valid=False)
+                return _anon_page(page, new_csrf, 410)
+            error = "csrf" if not _anon_ok(request, csrf) else acct.password_problem(password)
+            if error:
+                page = account_pages.reset_page(
+                    locale=locale, csrf=new_csrf, token=token, error=error
+                )
+                return _anon_page(page, new_csrf, 400)
+            account_id = db.use_reset(digest, now)
+            if account_id is None:  # pragma: no cover - spent between the two reads
+                page = account_pages.reset_page(locale=locale, csrf=new_csrf, token="", valid=False)
+                return _anon_page(page, new_csrf, 410)
+            db.set_password(account_id, acct.hash_password(password))
+            db.delete_sessions(account_id)
+            return _signin_redirect(locale, done="reset_done")
+
+        return handler
+
+    for path_locale in LOCALES:
+        paths = account_pages.PATHS[path_locale]
+        html_get = {"methods": ["GET"], "response_class": HTMLResponse}
+        app.add_api_route(paths["signup"], _signup_get(path_locale), **html_get)
+        app.add_api_route(paths["signup"], _signup_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["signin"], _signin_get(path_locale), **html_get)
+        app.add_api_route(paths["signin"], _signin_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["signout"], _signout_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["account"], _account_get(path_locale), **html_get)
+        app.add_api_route(paths["account"] + "/codigo", _code_post(path_locale), methods=["POST"])
+        app.add_api_route(
+            paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]
+        )
+        app.add_api_route(paths["account"] + "/borrar", _delete_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["forgot"], _forgot_get(path_locale), **html_get)
+        app.add_api_route(paths["reset"], _reset_get(path_locale), **html_get)
+        app.add_api_route(paths["reset"], _reset_post(path_locale), methods=["POST"])
+
+    def _link_to_session(
+        request: Request, audit_id: str, reference: str | None = None, *, via: str = VIA_SAVED
+    ) -> None:
+        """Put a report (and the code that paid it) on the signed-in account, if any.
+
+        ``via`` says whether it is the account's own report (uploaded or paid
+        while signed in) or only saved there; only its own can be deleted with it.
+        """
+        session = _session(request)
+        if session is None:
+            return
+        now = datetime.now(UTC)
+        db.link_audit(session[0].id, audit_id, at=now, via=via)
+        if reference and reference.startswith(CODE_REFERENCE_PREFIX):
+            db.link_code(session[0].id, reference[len(CODE_REFERENCE_PREFIX) :], at=now)
 
     def _run_and_store(
         inputs: Any,
@@ -1263,6 +1735,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not isinstance(outcome, tuple):
             return outcome
         audit_id, token, paid = outcome
+        if paid or _session(request) is not None:
+            linked = db.get_audit(audit_id)
+            _link_to_session(
+                request, audit_id, linked.stripe_session_id if linked else None, via=VIA_UPLOAD
+            )
         location = f"/audits/{audit_id}?token={token}"
         if code:
             location += "&code=" + ("applied" if paid else "rejected")
@@ -1276,9 +1753,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             location += "#canjear"
         return RedirectResponse(location, status_code=303)
 
-    def _load(audit_id: str, token: str | None) -> Any:
+    def _owns(request: Request | None, audit_id: str) -> bool:
+        """Whether the signed-in account holds this report."""
+        if request is None:
+            return False
+        session = _session(request)
+        return session is not None and db.account_for_audit(audit_id) == session[0].id
+
+    def _load(audit_id: str, token: str | None, request: Request | None = None) -> Any:
+        """The audit, opened by its private token or by the account that holds it."""
         record = db.get_audit(audit_id)
-        if record is None or not token_matches(record.token_hash, token):
+        if record is None or not (
+            token_matches(record.token_hash, token) or _owns(request, record.id)
+        ):
             raise _not_found()
         if record.purged_at or not record.result_json:
             raise HTTPException(status_code=410, detail="purged")
@@ -1292,6 +1779,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         notice: str | None = None,
         code_error: bool = False,
         notice_ok: bool = False,
+        account_box: str = "",
     ) -> str:
         result = AuditResult.model_validate_json(record.result_json)
         unlockable = not record.paid and cfg.stripe_enabled and cfg.card_for(record.id)
@@ -1329,7 +1817,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             legal_links=True,
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
-            compare_link=f"{base}?token={token}" if record.paid or cfg.free_mode else None,
+            compare_link=(
+                f"{base}?token={token}" if token and (record.paid or cfg.free_mode) else None
+            ),
+            account_box=account_box,
             pdf_url=f"{base}/pdf{query}" if (record.paid or cfg.free_mode) and pdf_ok else None,
         )
         return html_text
@@ -1341,7 +1832,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def audit_pdf(
         request: Request, audit_id: str, token: str | None = None, lang: str | None = None
     ) -> Response:
-        record = _load(audit_id, token)
+        record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
         if not record.paid and not cfg.free_mode:
             raise HTTPException(status_code=402, detail="payment_required")
@@ -1385,8 +1876,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # The ``.json`` route is registered first: ``{audit_id}`` would otherwise
     # swallow the suffix.
     @app.get("/audits/{audit_id}.json")
-    def audit_json(audit_id: str, token: str | None = None) -> Response:
-        record = _load(audit_id, token)
+    def audit_json(request: Request, audit_id: str, token: str | None = None) -> Response:
+        record = _load(audit_id, token, request)
         if not record.paid and not cfg.free_mode:
             raise HTTPException(status_code=402, detail="payment_required")
         content = record.result_json.encode("utf-8")
@@ -1395,14 +1886,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/audits/{audit_id}", response_class=HTMLResponse)
     def audit_page(
+        request: Request,
         audit_id: str,
         token: str | None = None,
         code: str | None = None,
         lang: str | None = None,
         session_id: str | None = None,
         pay: str | None = None,
+        acct_done: Annotated[str | None, Query(alias="acct")] = None,
     ) -> str:
-        record = _load(audit_id, token)
+        record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
         # Only known values are shown, so the query cannot inject text.
         notice = None
@@ -1417,16 +1910,113 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = message("card_cancelled", locale)
         elif code == "applied" and record.paid:
             notice = message("code_applied", locale)
+        elif acct_done == "credit" and record.paid:
+            notice = account_pages.COPY[locale]["credit_used"]
+        elif acct_done == "saved":
+            notice = account_pages.COPY[locale]["saved_notice"]
+        elif acct_done == "nocredit" and not record.paid:
+            notice = account_pages.COPY[locale]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.
         code_error = code == "rejected" and not record.paid
+        valid_token = token if token_matches(record.token_hash, token) else ""
         return _report_html(
             record,
-            token or "",
+            valid_token or "",
             locale,
             notice=notice,
             code_error=code_error,
-            notice_ok=record.paid and notice is not None,
+            notice_ok=(record.paid or acct_done == "saved") and notice is not None,
+            account_box=_account_box(request, record, valid_token or "", locale),
         )
+
+    def _account_box(request: Request, record: Any, token: str, locale: str) -> str:
+        """The account line on a report: sign up, save, saved, or unlock with a credit."""
+        session = _session(request)
+        owner = db.account_for_audit(record.id)
+        query = f"?token={token}&lang={locale}" if token else f"?lang={locale}"
+        locked = not record.paid and cfg.access_codes_enabled
+        if session is None:
+            if not token:
+                return ""
+            return account_pages.report_box(
+                locale=locale,
+                state="anon",
+                audit_id=record.id,
+                query=query,
+                next_path=f"/audits/{record.id}{query}",
+            )
+        account, csrf, _ = session
+        state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
+        credits = db.account_credits(account.id, datetime.now(UTC)) if locked else 0
+        return account_pages.report_box(
+            locale=locale,
+            state=state,
+            audit_id=record.id,
+            query=query,
+            csrf=csrf,
+            credits=credits,
+            locked=locked,
+        )
+
+    def _report_action(
+        request: Request, audit_id: str, token: str | None, csrf: str
+    ) -> tuple[Any, Any] | Response:
+        """The audit and the session behind a report's account form."""
+        record = _load(audit_id, token, request)
+        session = _session(request)
+        locale = _view_locale(record, request.query_params.get("lang"))
+        back = f"/audits/{audit_id}?token={token}" if token else f"/audits/{audit_id}?"
+        if session is None:
+            return _signin_redirect(locale, next_path=f"{back}&lang={locale}")
+        if not acct.same_secret(session[1], csrf):
+            return RedirectResponse(f"{back}&lang={locale}", status_code=303)
+        return record, session
+
+    @app.post("/audits/{audit_id}/save")
+    def save_to_account(
+        request: Request,
+        audit_id: str,
+        csrf: Annotated[str, Form(max_length=200)] = "",
+        token: str | None = None,
+        lang: str | None = None,
+    ) -> Response:
+        checked = _report_action(request, audit_id, token, csrf)
+        if not isinstance(checked, tuple):
+            return checked
+        record, session = checked
+        locale = _view_locale(record, lang)
+        outcome = db.link_audit(session[0].id, record.id, at=datetime.now(UTC))
+        back = f"/audits/{audit_id}?token={token}" if token else f"/audits/{audit_id}?"
+        done = "&acct=saved" if outcome in ("linked", "already") else ""
+        return RedirectResponse(f"{back}&lang={locale}{done}", status_code=303)
+
+    @app.post("/audits/{audit_id}/credit")
+    def unlock_with_credit(
+        request: Request,
+        audit_id: str,
+        csrf: Annotated[str, Form(max_length=200)] = "",
+        token: str | None = None,
+        lang: str | None = None,
+    ) -> Response:
+        checked = _report_action(request, audit_id, token, csrf)
+        if not isinstance(checked, tuple):
+            return checked
+        record, session = checked
+        if not cfg.access_codes_enabled:
+            raise HTTPException(status_code=404, detail="codes_disabled")
+        locale = _view_locale(record, lang)
+        back = f"/audits/{audit_id}?token={token}" if token else f"/audits/{audit_id}?"
+        if record.paid:
+            return RedirectResponse(f"{back}&lang={locale}", status_code=303)
+        now = datetime.now(UTC)
+        account_id = session[0].id
+        if db.link_audit(account_id, record.id, at=now) == "other":
+            return RedirectResponse(f"{back}&lang={locale}", status_code=303)
+        applied = db.redeem_with_account(record.id, account_id, at=now)
+        if applied:
+            db.link_audit(account_id, record.id, at=now, via=VIA_PAID)
+        done = "credit" if applied else "nocredit"
+        return RedirectResponse(f"{back}&lang={locale}&acct={done}", status_code=303)
 
     def _confirm_card_payment(record: Any, session_id: str) -> Any:
         """Back from Stripe: ask Stripe about that session and unlock what it paid.
@@ -1466,11 +2056,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         token: str | None = None,
         lang: str | None = None,
     ) -> Response:
-        record = _load(audit_id, token)
+        record = _load(audit_id, token, request)
         if not cfg.access_codes_enabled:
             raise HTTPException(status_code=404, detail="codes_disabled")
         locale = _view_locale(record, lang)
-        location = f"/audits/{audit_id}?token={token}&lang={locale}"
+        location = f"/audits/{audit_id}?token={token or ''}&lang={locale}"
         if record.paid:
             return RedirectResponse(location, status_code=303)
         # Each attempt counts toward the hourly per-IP limit, like an upload.
@@ -1482,6 +2072,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if attempts >= cfg.max_uploads_per_hour_per_ip:
             return _html_error(request, 429, message("rate_limited", locale), locale)
         applied = db.redeem_for_audit(audit_id, code.strip()[:_CODE_MAX], at=now)
+        if applied:
+            paid_record = db.get_audit(audit_id)
+            _link_to_session(
+                request,
+                audit_id,
+                paid_record.stripe_session_id if paid_record else None,
+                via=VIA_PAID,
+            )
         outcome = "applied" if applied else "rejected"
         if _wants_json(request):
             return JSONResponse({"access_code": outcome})
@@ -1491,7 +2089,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def publish(
         request: Request, audit_id: str, token: str | None = None, lang: str | None = None
     ) -> Response:
-        record = _load(audit_id, token)
+        record = _load(audit_id, token, request)
         if not (record.paid or cfg.free_mode):
             raise HTTPException(status_code=402, detail="publish_locked")
         publication = db.publish(audit_id, at=datetime.now(UTC))
@@ -1863,15 +2461,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.post("/audits/{audit_id}/checkout")
     def checkout(
+        request: Request,
         audit_id: str,
         token: str | None = None,
         lang: str | None = None,
         plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
     ) -> Response:
-        record = _load(audit_id, token)
+        record = _load(audit_id, token, request)
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
             raise HTTPException(status_code=503, detail="payments_disabled")
         locale = _view_locale(record, lang)
+        # Bought while signed in: the report (and a pack's code) lands on the account.
+        _link_to_session(request, audit_id)
         if record.paid:
             return RedirectResponse(
                 f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303

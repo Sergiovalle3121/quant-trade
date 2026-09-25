@@ -8,6 +8,9 @@ is confirmed twice, and either path is enough on its own:
 * the return URL, which carries the Checkout session id; the service asks
   Stripe for that session before showing anything as paid.
 
+When the report is on a customer account, a pack's code goes on that
+account too, so its credits show in "My reports".
+
 Both paths call :func:`fulfil`, which is idempotent.
 
 A pack unlocks the report it was bought from and adds an access code with
@@ -260,12 +263,18 @@ def fulfil(
         return None
     store.mark_paid(audit_id, stripe_session_id=session_id, at=at)
     if plan == PLAN_PACK and settings.stripe_webhook_secret:
+        code = pack_code(settings.stripe_webhook_secret, session_id)
         store.ensure_access_code(
-            pack_code(settings.stripe_webhook_secret, session_id),
+            code,
             credits=PACK_CREDITS - 1,
             note=f"Paquete pagado con tarjeta desde el informe {audit_id}",
             at=at,
         )
+        # A pack bought from a report on an account puts its credits on that account.
+        owner = store.account_for_audit(audit_id)
+        code_id = store.code_id(code) if owner else None
+        if owner and code_id:
+            store.link_code(owner, code_id, at=at)
     return audit_id
 
 

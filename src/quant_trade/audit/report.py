@@ -22,6 +22,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
 from quant_trade.audit.account import is_account_history
+from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
@@ -76,6 +77,73 @@ DISCLAIMER = {
 #: The full sample report, linked from a locked preview.
 SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample"}
 
+#: What each locked section tells the buyer, in plain words: the lockbox lists
+#: these instead of the sections' technical titles, which stay in the report.
+LOCKED_GAINS: dict[str, dict[str, str]] = {
+    "es": {
+        "plan": "Qué cambiar para subir de clase, con tus cifras",
+        "reasons_detail": "Por qué recibió cada nota, dimensión por dimensión",
+        "account": "Cuánto es resultado de operar y cuánto son depósitos",
+        "live": "Si la cuenta real se parece a su backtest",
+        "test_data": "Con qué datos y qué calidad de ticks se hizo la prueba",
+        "stress": "Qué queda sin sus mejores operaciones y meses",
+        "timing": "En qué horas y días se concentra el resultado",
+        "recent": "Si sigue funcionando en el periodo más reciente",
+        "behaviour": "Si sube el riesgo después de perder (martingala, promediar)",
+        "fund": "Calendario año por mes, peor mes, caída más profunda y tiempo en recuperarse",
+        "instruments": "Si funciona en cada mercado o uno carga con el resto",
+        "trade_stats": "Tasa de acierto, operación media y rachas",
+        "risk": "Caídas posibles en un año, según miles de historias remuestreadas",
+        "plateau": "Si los parámetros elegidos son un pico aislado o una zona estable",
+        "forward": "Si aguanta en el tramo forward que no se usó para ajustarla",
+        "capital": "Qué capital pide y a qué tamaño de posición",
+        "challenge": "Con qué frecuencia tocaría los límites de un reto de prop firm",
+        "questions": "Qué preguntarle al vendedor o al gestor",
+        "performance": "Rentabilidad anual, volatilidad y caída máxima medidas",
+        "significance": "Si el resultado se distingue de la suerte",
+        "multiplicity": "Cuánto queda al descontar las configuraciones que se probaron",
+        "bootstrap": "El rango de resultados plausibles, con intervalos de confianza",
+        "cscv": "La probabilidad de que la mejor configuración sea sobreajuste",
+        "subperiods": "El resultado año por año",
+        "rolling": "Cómo cambia el resultado a lo largo del tiempo",
+        "red_flags": "Cada bandera roja con sus cifras y qué hacer",
+        "costs": "Qué pasa con costes más altos",
+        "holdout": "El tramo fuera de muestra que declaraste, medido aparte",
+        "benchmark": "La comparación con el benchmark que subiste",
+    },
+    "en": {
+        "plan": "What to change to reach a better class, with your figures",
+        "reasons_detail": "Why each dimension got its grade",
+        "account": "How much is trading result and how much is deposits",
+        "live": "Whether the live account looks like its backtest",
+        "test_data": "What data and tick quality the test ran on",
+        "stress": "What is left without its best trades and months",
+        "timing": "Which hours and days the result comes from",
+        "recent": "Whether it still works in the most recent period",
+        "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
+        "fund": "Year-by-month calendar, worst month, deepest fall and time to recover",
+        "instruments": "Whether it works on each market or one carries the rest",
+        "trade_stats": "Hit rate, average trade and streaks",
+        "risk": "Possible falls within a year, from thousands of resampled histories",
+        "plateau": "Whether the chosen settings are a lone peak or a stable area",
+        "forward": "Whether it holds in the forward period not used for tuning",
+        "capital": "How much capital it needs and at what position size",
+        "challenge": "How often it would hit a prop-firm challenge's limits",
+        "questions": "What to ask the vendor or manager",
+        "performance": "Annual return, volatility and maximum drawdown as measured",
+        "significance": "Whether the result stands out from luck",
+        "multiplicity": "What is left after discounting the configurations tried",
+        "bootstrap": "The range of plausible results, with confidence intervals",
+        "cscv": "The probability that the best configuration is overfit",
+        "subperiods": "The result year by year",
+        "rolling": "How the result changes over time",
+        "red_flags": "Each red flag with its figures and what to do",
+        "costs": "What happens with higher costs",
+        "holdout": "The out-of-sample period you declared, measured separately",
+        "benchmark": "The comparison with the benchmark you uploaded",
+    },
+}
+
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
@@ -116,6 +184,11 @@ LABELS: dict[str, dict[str, str]] = {
         "expected_max": "Sharpe máximo esperado sin habilidad",
         "dsr": "Sharpe deflactado (DSR)",
         "multiplier": "Multiplicador",
+        "cost_recomputed": (
+            "Esta tabla recalcula cada operación con sus precios y su tamaño: sin coste "
+            "extra da {table}, {gap} de diferencia con el resultado neto de las operaciones "
+            "({trades}), por el redondeo de precios o la conversión de divisa."
+        ),
         "bps": "pb por lado",
         "gross": "Bruto",
         "cost": "Coste",
@@ -179,6 +252,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
+        "my_account": "Mi cuenta",
         "yes": "sí",
         "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
@@ -265,7 +339,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_limit": "Si aceptas perder hasta",
         "capital_needed": "Capital necesario al tamaño del backtest",
-        "capital_scale": "Tamaño sobre un balance de {balance}",
+        "capital_scale": "Tamaño sobre el balance inicial del archivo ({balance})",
         "capital_scale_plain": "Tamaño sobre el balance inicial",
         "capital_scale_help": (
             "1x es el tamaño de lote del backtest; 0.50x es la mitad. Por encima de 1x la "
@@ -351,7 +425,10 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_early": "Media por operación antes del {date}",
         "recent_late": "Media por operación desde el {date}",
         "recent_net": "Resultado neto desde el {date} ({n} operaciones)",
-        "recent_z": "Distancia entre ambas medias, en errores estándar",
+        "recent_z": (
+            "Distancia entre ambas medias, en errores estándar (-2 o menos: una caída "
+            "que el azar difícilmente explica)"
+        ),
         "recent_held": (
             "El último tercio del historial no muestra una caída a pérdidas que el azar no "
             "explique."
@@ -361,6 +438,12 @@ LABELS: dict[str, dict[str, str]] = {
             "que el azar difícilmente explica. Lo verás también en las banderas rojas."
         ),
         "recent_badge_held": "Se mantiene",
+        "recent_badge_weaker": "Más débil",
+        "recent_weaker": (
+            "La media por operación bajó de {early} a {late} ({change}) en el último tercio. "
+            "Sigue sobre cero y la caída cabe en lo que el azar explica, pero conviene "
+            "vigilarla."
+        ),
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
         "fund": "Lo que revisaría quien invierte en un fondo",
@@ -396,6 +479,41 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_clean": "Ni suavizado ni falta de meses con pérdida pequeña.",
         "fund_badge_clean": "Sin patrones",
+        "fund_bench": "Frente a su índice de referencia",
+        "fund_bench_file": (
+            "Del {first} al {last}, {n} meses en común con el índice que trae el propio archivo, "
+            "con sus cifras tal como vienen."
+        ),
+        "fund_bench_upload": (
+            "Del {first} al {last}, {n} meses en común con el archivo de benchmark que subiste."
+        ),
+        "fund_bench_gross": (
+            "Si las cifras del fondo son antes de comisiones, esta comparación lo favorece."
+        ),
+        "fund_bench_excess": "Diferencia anual frente al índice (fondo {fund}, índice {index})",
+        "fund_bench_beat": "Meses en que superó al índice",
+        "fund_bench_te": "Error de seguimiento anual (ratio de información {ir})",
+        "fund_bench_beta": "Beta frente al índice (correlación {corr})",
+        "fund_bench_up": "Captura al alza: parte de las subidas del índice que recoge",
+        "fund_bench_down": "Captura a la baja: parte de las caídas del índice que recoge",
+        "fund_bench_trails": (
+            "Rindió menos que su índice: {excess} al año en los meses en común. Pregunta qué "
+            "justifica pagar una gestión activa frente a un fondo indexado."
+        ),
+        "fund_bench_index_like": (
+            "Sigue a su índice muy de cerca (correlación {corr}, error de seguimiento {te} al "
+            "año), lo que los estudios llaman gestión indexada encubierta. Pregunta qué aportan "
+            "sus comisiones que no dé un fondo indexado."
+        ),
+        "fund_bench_worse": (
+            "Recoge menos de las subidas del índice ({up}) y más de sus caídas ({down}). "
+            "Pregunta en qué tipo de mercado espera el gestor hacerlo mejor."
+        ),
+        "fund_bench_clean": (
+            "Por delante de su índice en los meses en común y sin seguirlo como un fondo indexado."
+        ),
+        "fund_bench_badge_clean": "Por delante",
+        "fund_bench_nm": "Comparación con el índice:",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
@@ -563,8 +681,8 @@ LABELS: dict[str, dict[str, str]] = {
         "boot_line": "Bootstrap estacionario por bloques, remuestreos:",
         "boot_block": "bloque",
         "point": "Estimación",
-        "engine": "motor",
-        "seed": "semilla",
+        "engine": "versión del motor",
+        "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
         "keep_link": (
             "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
@@ -632,8 +750,8 @@ LABELS: dict[str, dict[str, str]] = {
         "charts": "Gráficas",
         "detail_heading": "Detalle",
         "locked_intro": (
-            "El veredicto, las gráficas y las explicaciones son gratis. El detalle numérico de "
-            "estas secciones se entrega en el informe completo"
+            "El veredicto, las gráficas y las explicaciones son gratis. El informe completo "
+            "te dice, con las cifras de tu archivo"
         ),
         "sample_full": "Ver cómo es un informe completo (ejemplo con datos sintéticos)",
         "trade_stats": "Estadísticas de las operaciones",
@@ -642,7 +760,9 @@ LABELS: dict[str, dict[str, str]] = {
         "risk": "Riesgo remuestreado a un año",
         "risk_dd": "Drawdown máximo a un año",
         "risk_prob": "Probabilidad de una caída de al menos",
-        "risk_underwater": "Periodos seguidos bajo el máximo",
+        "risk_underwater": "Periodos seguidos bajo el máximo, en las simulaciones",
+        "risk_under_median": "mediana",
+        "risk_under_p95": "en 1 de cada 20",
         "challenge": "Simulador de reto de prop firm",
         "challenge_rules": "Reglas simuladas",
         "open_loss_badge": "Pérdidas abiertas",
@@ -762,6 +882,11 @@ LABELS: dict[str, dict[str, str]] = {
         "expected_max": "Expected max Sharpe without skill",
         "dsr": "Deflated Sharpe (DSR)",
         "multiplier": "Multiplier",
+        "cost_recomputed": (
+            "This table recomputes each trade from its prices and size: with no extra cost "
+            "it gives {table}, {gap} away from the trades' net result ({trades}), from "
+            "price rounding or currency conversion."
+        ),
         "bps": "bps per side",
         "gross": "Gross",
         "cost": "Cost",
@@ -825,6 +950,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
         "pdf_check_link": "How they check",
         "switch": "Español",
+        "my_account": "My account",
         "yes": "yes",
         "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
@@ -908,7 +1034,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_limit": "If you accept losing up to",
         "capital_needed": "Capital needed at the backtest's size",
-        "capital_scale": "Size on a {balance} balance",
+        "capital_scale": "Size on the file's starting balance ({balance})",
         "capital_scale_plain": "Size on the starting balance",
         "capital_scale_help": (
             "1x is the backtest's lot size; 0.50x is half of it. Above 1x the fall in money "
@@ -989,7 +1115,10 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_early": "Average per trade before {date}",
         "recent_late": "Average per trade since {date}",
         "recent_net": "Net result since {date} ({n} trades)",
-        "recent_z": "Distance between the two averages, in standard errors",
+        "recent_z": (
+            "Distance between the two averages, in standard errors (-2 or lower: a drop "
+            "chance hardly explains)"
+        ),
         "recent_held": (
             "The last third of the history shows no drop into losses beyond what chance explains."
         ),
@@ -998,6 +1127,12 @@ LABELS: dict[str, dict[str, str]] = {
             "hardly explains. You will also see it in the red flags."
         ),
         "recent_badge_held": "Holds",
+        "recent_badge_weaker": "Weaker",
+        "recent_weaker": (
+            "The average per trade fell from {early} to {late} ({change}) in the last third. "
+            "It stays above zero and the drop is within what chance explains, but it is "
+            "worth watching."
+        ),
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
         "fund": "What a fund investor would check",
@@ -1032,6 +1167,39 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_clean": "No smoothing and no shortage of months with a small loss.",
         "fund_badge_clean": "No pattern",
+        "fund_bench": "Against its benchmark",
+        "fund_bench_file": (
+            "From {first} to {last}, {n} months shared with the benchmark the file itself "
+            "carries, with its figures as they come."
+        ),
+        "fund_bench_upload": (
+            "From {first} to {last}, {n} months shared with the benchmark file you uploaded."
+        ),
+        "fund_bench_gross": ("If the fund's figures are before fees, this comparison flatters it."),
+        "fund_bench_excess": "Annual difference against the benchmark (fund {fund}, index {index})",
+        "fund_bench_beat": "Months it beat the benchmark",
+        "fund_bench_te": "Annual tracking error (information ratio {ir})",
+        "fund_bench_beta": "Beta to the benchmark (correlation {corr})",
+        "fund_bench_up": "Up capture: share of the benchmark's rises it takes",
+        "fund_bench_down": "Down capture: share of the benchmark's falls it takes",
+        "fund_bench_trails": (
+            "It returned less than its benchmark: {excess} a year over the shared months. Ask "
+            "what justifies paying for active management over an index fund."
+        ),
+        "fund_bench_index_like": (
+            "It follows its benchmark very closely (correlation {corr}, tracking error {te} a "
+            "year), what studies call closet indexing. Ask what its fees buy that an index fund "
+            "does not."
+        ),
+        "fund_bench_worse": (
+            "It takes less of the benchmark's rises ({up}) and more of its falls ({down}). Ask "
+            "in which kind of market the manager expects to do better."
+        ),
+        "fund_bench_clean": (
+            "Ahead of its benchmark over the shared months, without tracking it like an index fund."
+        ),
+        "fund_bench_badge_clean": "Ahead",
+        "fund_bench_nm": "Comparison with the benchmark:",
         "instruments": "Does it work on each instrument?",
         "ins_intro": (
             "When a robot or a signal trades several markets, the total can come from one of "
@@ -1193,8 +1361,8 @@ LABELS: dict[str, dict[str, str]] = {
         "boot_line": "Stationary block bootstrap, resamples:",
         "boot_block": "block",
         "point": "Estimate",
-        "engine": "engine",
-        "seed": "seed",
+        "engine": "engine version",
+        "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
         "keep_link": (
             "Save this page's link: it is the only way back to your report. "
@@ -1258,8 +1426,8 @@ LABELS: dict[str, dict[str, str]] = {
         "charts": "Charts",
         "detail_heading": "Detail",
         "locked_intro": (
-            "The verdict, charts and explanations are free. The numeric detail of these "
-            "sections comes with the full report"
+            "The verdict, charts and explanations are free. The full report tells you, with "
+            "your file's figures"
         ),
         "sample_full": "See what a full report looks like (sample built from synthetic data)",
         "trade_stats": "Trade statistics",
@@ -1268,7 +1436,9 @@ LABELS: dict[str, dict[str, str]] = {
         "risk": "Resampled one-year risk",
         "risk_dd": "Maximum drawdown over one year",
         "risk_prob": "Probability of a fall of at least",
-        "risk_underwater": "Consecutive periods below the peak",
+        "risk_underwater": "Consecutive periods below the peak, in the simulations",
+        "risk_under_median": "median",
+        "risk_under_p95": "in 1 of every 20",
         "challenge": "Prop-firm challenge simulator",
         "challenge_rules": "Rules simulated",
         "open_loss_badge": "Open losses",
@@ -2494,10 +2664,29 @@ def _risk_html(
         )
         under = risk["longest_underwater_periods"]
         html_text += (
-            f"<p>{_e(labels['risk_underwater'])}: p50 {_value_cell(under['p50'], percent=False)}"
-            f", p95 {_value_cell(under['p95'], percent=False)}</p>"
+            f"<p>{_e(labels['risk_underwater'])}: {_e(labels['risk_under_median'])} "
+            f"{_value_cell(under['p50'], percent=False)}, {_e(labels['risk_under_p95'])} "
+            f"{_value_cell(under['p95'], percent=False)}</p>"
         )
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
+
+
+def _cost_gap_note(
+    rows: list[dict[str, Any]], stats: dict[str, Any], labels: dict[str, str]
+) -> str:
+    """Say why the cost table's no-extra-cost row can differ from the trade net."""
+    base = next((row for row in rows if float(row.get("multiplier", -1)) == 0.0), None)
+    trades_net = _ev_value(stats.get("net_pnl"))
+    table_net = _ev_value((base or {}).get("net_pnl"))
+    if trades_net is None or table_net is None or abs(table_net - trades_net) < 0.005:
+        return ""
+    return "<p class='muted'>" + _e(
+        labels["cost_recomputed"].format(
+            table=_fmt(table_net, key="net_pnl"),
+            gap=_fmt(abs(table_net - trades_net), key="net_pnl"),
+            trades=_fmt(trades_net, key="net_pnl"),
+        )
+    ) + "</p>"
 
 
 def _open_loss_note(
@@ -3401,7 +3590,19 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
             f"{_e(localize(reason, locale))}</span></p>"
         )
     out = f"<p class='muted'>{_e(labels['recent_intro'])}</p>"
-    if recent.get("clean"):
+    early_mean = _ev_value(recent["early"].get("mean"))
+    late_mean = _ev_value(recent["recent"].get("mean"))
+    if is_weaker(recent) and early_mean is not None and late_mean is not None:
+        text = labels["recent_weaker"].format(
+            early=_signed_amount(early_mean),
+            late=_signed_amount(late_mean),
+            change=f"{late_mean / early_mean - 1:+.0%}",
+        )
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['recent_badge_weaker'])}</span> {_e(text)}</p>"
+        )
+    elif recent.get("clean"):
         out += (
             f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
             f"{_e(labels['recent_badge_held'])}</span> {_e(labels['recent_held'])}</p>"
@@ -3691,12 +3892,107 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     ]
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
+    out += _fund_benchmark_html(fund, locale, labels)
     if fund.get("net_of_fees"):
         out += (
             f"<p class='muted'>{_badge(fund['net_of_fees']['evidence'])} "
             f"{_e(labels['fund_net'])}</p>"
         )
     out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
+    return out
+
+
+def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+    """The fund against the benchmark its file carries or the customer uploaded."""
+    bench = fund.get("benchmark")
+    if not bench:
+        return ""
+    out = f"<h3>{_e(labels['fund_bench'])}</h3>"
+    if bench.get("status") != "MEASURED":
+        return out + (
+            f"<p class='muted'>{_e(labels['fund_bench_nm'])} {_badge('NOT_MEASURED')} "
+            f"{_e(_sentence(localize(bench.get('reason', ''), locale)))}</p>"
+        )
+    intro = labels["fund_bench_upload" if bench.get("source") == "upload" else "fund_bench_file"]
+    out += (
+        "<p class='muted'>"
+        + _e(
+            intro.format(first=bench["first"], last=bench["last"], n=int(bench["months"]["value"]))
+        )
+        + ("" if fund.get("net_of_fees") else f" {_e(labels['fund_bench_gross'])}")
+        + "</p>"
+    )
+    excess = float(bench["excess"]["value"])
+    corr = f"{float(bench['correlation']['value']):.2f}"
+    te = f"{float(bench['tracking_error']['value']):.1%}"
+    up = (bench.get("up_capture") or {}).get("value")
+    down = (bench.get("down_capture") or {}).get("value")
+    findings = list(bench.get("findings") or [])
+    if findings:
+        texts = {
+            "trails": labels["fund_bench_trails"].format(excess=_fund_pct(excess)),
+            "index_like": labels["fund_bench_index_like"].format(corr=corr, te=te),
+            "worse_both_ways": labels["fund_bench_worse"].format(
+                up=f"{float(up or 0):.0%}", down=f"{float(down or 0):.0%}"
+            ),
+        }
+        items = "".join(_behaviour_ask(texts[code]) for code in findings)
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>{items}</ul></div>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['fund_bench_badge_clean'])}</span> {_e(labels['fund_bench_clean'])}</p>"
+        )
+
+    def tile(value: str, text: str, evidence: str, *, neg: bool = False) -> str:
+        return (
+            f"<div class='fact{' neg' if neg else ''}'><b>{_e(value)}</b>"
+            f"<p>{_e(text)} {_badge(evidence)}</p></div>"
+        )
+
+    ir = (bench.get("information_ratio") or {}).get("value")
+    facts = [
+        tile(
+            _fund_pct(excess),
+            labels["fund_bench_excess"].format(
+                fund=_fund_pct(float(bench["fund_cagr"]["value"])),
+                index=_fund_pct(float(bench["index_cagr"]["value"])),
+            ),
+            bench["excess"]["evidence"],
+            neg=excess < 0,
+        ),
+        tile(
+            f"{float(bench['beat_share']['value']):.0%}",
+            labels["fund_bench_beat"],
+            bench["beat_share"]["evidence"],
+        ),
+        tile(
+            te,
+            labels["fund_bench_te"].format(ir=f"{float(ir):.2f}" if ir is not None else "—"),
+            bench["tracking_error"]["evidence"],
+        ),
+        tile(
+            f"{float(bench['beta']['value']):.2f}",
+            labels["fund_bench_beta"].format(corr=corr),
+            bench["beta"]["evidence"],
+        ),
+    ]
+    for key, label in (("up_capture", "fund_bench_up"), ("down_capture", "fund_bench_down")):
+        item = bench.get(key) or {}
+        if item.get("evidence") == "MEASURED" and item.get("value") is not None:
+            facts.append(
+                tile(
+                    f"{float(item['value']):.0%}",
+                    labels[label],
+                    item["evidence"],
+                    neg="worse_both_ways" in findings,
+                )
+            )
+    out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    out += f"<p class='muted'>{_e(_sentence(localize(bench.get('note', ''), locale)))}</p>"
     return out
 
 
@@ -3760,6 +4056,18 @@ def _ladder_html(current: str, labels: dict[str, str]) -> str:
     )
 
 
+def _locked_gains(titles: list[str], labels: dict[str, str], locale: str) -> list[str]:
+    """Each locked section as what it tells the buyer, in the report's order."""
+    gains = LOCKED_GAINS.get(locale, LOCKED_GAINS["es"])
+    by_title = {labels[key]: text for key, text in gains.items() if key in labels}
+    out: list[str] = []
+    for title in titles:
+        gain = by_title.get(title, title)
+        if gain not in out:
+            out.append(gain)
+    return out
+
+
 def _only_unmeasured(body: str) -> bool:
     """True when a section has nothing but NOT_MEASURED marks to show."""
     return "badge NOT_MEASURED" in body and not any(
@@ -3815,6 +4123,7 @@ def render_html(
     code_error: bool = False,
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
+    account_box: str = "",
 ) -> str:
     """The audit as one HTML document.
 
@@ -4080,6 +4389,7 @@ def render_html(
             )
             + "</table></div>"
         )
+        cost_html += _cost_gap_note(cost["rows"], data.get("trade_stats") or {}, labels)
 
     bench_html = _status_line(data["benchmark"], labels) + _evidence_rows(
         data["benchmark"], labels, skip=set()
@@ -4320,7 +4630,12 @@ def render_html(
         detail_html = (
             f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
             + "".join(
-                f"<li>{_e(title)}</li>" for title, body in detail if not _only_unmeasured(body)
+                f"<li>{_e(gain)}</li>"
+                for gain in _locked_gains(
+                    [title for title, body in detail if not _only_unmeasured(body)],
+                    labels,
+                    locale,
+                )
             )
             + "</ul>"
             f"<p class='lock-sample'><a href='{sample_href}' target='_blank' rel='noopener'>"
@@ -4351,8 +4666,10 @@ def render_html(
             "<button type='button' class='print-btn' "
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
+    account_href = "/account" if locale == "en" else "/cuenta"
     toolbar = (
         "<div class='nav-end no-print'>"
+        + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
             f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
@@ -4371,8 +4688,7 @@ def render_html(
     meta = (
         f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
         f"<span>{_e(labels['generated'])} {_e(_short_time(data['generated_at_utc']))}</span>"
-        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['name'])} "
-        f"{_e(engine['package_version'])}</span>"
+        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['package_version'])}</span>"
         f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
     live_anchor = next(
@@ -4386,6 +4702,7 @@ def render_html(
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
         + _pack_notice(labels, pack_code, pack_credits_left)
+        + account_box
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
         + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
@@ -4630,6 +4947,7 @@ def render(
     code_error: bool = False,
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
+    account_box: str = "",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -4654,6 +4972,7 @@ def render(
         code_error=code_error,
         pay_links=pay_links,
         notice_ok=notice_ok,
+        account_box=account_box,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

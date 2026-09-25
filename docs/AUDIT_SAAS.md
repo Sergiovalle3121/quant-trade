@@ -210,6 +210,12 @@ Limits, each written into the report as a reading warning:
   a 1e308 profit overflowed every later sum and the report page failed.
   The capital section is not measured when its reference fall is not a
   finite number.
+- A date more than a day after the upload (`FUTURE_SLACK`, for time
+  zones) is refused in the equity, report, trades, benchmark and live files
+  (`future_dates`, ES and EN): a record in 2150 is a damaged file. A monthly
+  series may hold this month (dated by its last day), and a fund table's
+  months that have not happened yet are dropped when they are blank, a
+  dash or 0; a future month that moves the account is still refused.
 - NUL characters are dropped when a report is decoded (`decode_text`) and
   from the stored report page: PostgreSQL refuses text holding one, so a
   stray NUL in a robot's name failed the upload with a server error. A
@@ -499,6 +505,12 @@ and report wire them in during the integration step):
   after its own fees, the same rule as the weekday, hour, instrument and
   losing-streak tables; the gross share stays as "Aciertos antes de
   comisiones", and the annualised table no longer repeats the win rate.
+  The long/short net results use the same fees, so they add up to the
+  trades' net. The cost table recomputes each trade from price and size;
+  when its no-extra-cost row differs from the trades' net, a note gives the
+  gap (price rounding, currency conversion). The resampled time under the
+  peak reads "median" and "in 1 of every 20" instead of p50/p95, and the
+  header names the engine version and simulation seed in words.
 - `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
   the uploaded returns over one year, 2,000 paths by default, capped at
   2,000,000 resampled cells. A curve finer than 10,000 periods a year
@@ -523,6 +535,11 @@ and report wire them in during the integration step):
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
+  The report's own findings add questions too: one instrument carrying the
+  result (`one_carries`, `mostly_one`), losers held longer, re-entering fast
+  or doing worse after losses, a recent average per trade under half the
+  earlier one, and a cost dimension that is WEAK or FAIL (the costs question
+  then shows even when the file lists fees).
   For an account history the backtest questions (modelling, trials, held-out
   period, assumed costs, "is there a live account") give way to two for an
   investor: whether other accounts of the same strategy were closed or
@@ -713,6 +730,11 @@ year of exit (trades, net result, hit rate).
 |---|---|---|
 | `EDGE_FADING` | the earlier trades average a profit, the recent ones zero or a loss, and the recent average sits 2 or more standard errors below the earlier one | — |
 
+Without the flag, a recent average per trade under half the earlier one
+(`decay.WEAKER_SHARE`, still above zero or within chance) shows as "Más
+débil" / "Weaker" instead of "Se mantiene", with the two averages and the
+change. Display and seller question only; no flag and no class change.
+
 Limitations: the thirds are cut by time, so a history whose pace changed
 has periods of different sizes; trades are treated as independent, which
 understates the noise of a strategy whose trades cluster; it describes the
@@ -797,6 +819,45 @@ DECLARED and says Rigor did not measure costs, and the report is titled
 "Auditoría de historial de fondo". Anywhere else the box is ignored with a
 warning and costs are checked as usual. The observation thresholds do not
 change, and the costs dimension stays NOT_MEASURED.
+
+Against its benchmark. Factsheets print the benchmark's months next to the
+fund's, so the equity file may carry it:
+
+- a dated file: a column named `benchmark`, `bench`, `bmk`, `index`,
+  `indice`, `índice` or `referencia` (optionally with a suffix, e.g.
+  `benchmark_return`), read like the fund's own column (returns beside
+  returns, levels beside levels, the same percent scaling). A column of
+  row numbers (0, 1, 2...) is not a benchmark.
+- a factsheet table: rows whose label names the benchmark ("Benchmark",
+  "Index", "Índice", or an index family such as MSCI, S&P, FTSE, STOXX,
+  Russell, Nasdaq, IBEX, DAX, Bloomberg, HFRI, IPC...) in a label column, in
+  a row under the fund's year with no year of its own, or in a block opened
+  by a short heading row naming the benchmark. A label naming the fund
+  ("Fund", "Fondo", "Portfolio", "Cartera", "Strategy"...) wins, so "Acme
+  Index Fund" stays the fund. Rows of differences ("Excess", "Relative",
+  "Difference", "Alpha", "+/-", "Diferencia"...) are left out and counted in
+  a warning. A year repeated within the fund's rows, or within the
+  benchmark's, is still refused.
+
+An uploaded benchmark file is used instead when there is one. Over the
+months both share (at least 24), MEASURED: each one's compound annual
+return and the difference, the share of months the fund beat the
+benchmark, the annual tracking error and information ratio, beta and
+correlation, and up and down capture (Morningstar's definition: geometric
+mean monthly return in the benchmark's up, or down, months over the
+benchmark's; each needs 6 such months). Findings, as questions:
+
+- `trails`: the fund's compound annual return is below the benchmark's;
+- `index_like`: correlation 0.95 or more and tracking error under 3 % a
+  year, the closet-indexing pattern (Cremers and Petajisto, 2009);
+- `worse_both_ways`: up capture under 100 % and down capture over 100 %.
+
+No index data is bundled: the benchmark is the customer's, as supplied, and
+the note says Rigor did not check it against the index. When the fund's
+figures are not declared net of fees, the section says the comparison
+flatters a fund whose figures are before fees. It never feeds the benchmark
+dimension (that reads only the uploaded benchmark file, as before), so the
+class does not move.
 
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
@@ -1289,6 +1350,55 @@ lock that address out for the hour (in memory, per process). Pages are
 `no-store` and `noindex`. The panel is for the owner, so it is Spanish only.
 Tests: `tests/test_audit_owner_panel.py`.
 
+### Customer accounts (`audit/accounts.py`, `/registro`, `/cuenta`)
+
+A customer can create an account with an e-mail and a password to find, in
+one place, the reports they uploaded or saved, the access codes they
+redeemed or added (with the credits left), and what they paid for. The
+account is optional: the free preview and each report's private link work
+without one, and an account never changes what a report says.
+
+- **Pages** (Spanish default, English paths): `/registro` `/signup`,
+  `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
+  `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
+  Every page links "Mi cuenta" from the navigation and the report header.
+- **What lands on an account**: an upload made while signed in; a report
+  opened by its link and saved with "Guardar en mi cuenta"; the code that
+  unlocked a report while signed in; a code added by hand; a card purchase
+  started while signed in (the report, and a pack's code with its credits).
+  A report or a code belongs to one account at most.
+- **Credits**: a locked report of a signed-in customer shows "Desbloquear con
+  1 crédito de tu cuenta" when their codes have credits left. The code that
+  expires first is spent first; the credit and the unlock share one
+  transaction, as with a typed code.
+- **Opening a report**: the owner opens `/audits/{id}` without the token; any
+  other visitor still needs the token (a wrong one is a 404).
+- **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
+  session cookie `rigor_session`, 256-bit, `HttpOnly`, `SameSite=Lax`,
+  `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
+  form (double-submit cookie `rigor_csrf` before sign-in, the session's token
+  after); 10 failed sign-ins per hour per (address, e-mail) pair, with
+  ceilings of 50 per address and 200 per e-mail, and 5 sign-ups per hour per
+  address; a password change or reset signs out the other
+  sessions; `next` only returns to `/audits/` or `/cuenta` paths.
+- **No e-mail service yet**. Nothing sends e-mail and addresses are not
+  confirmed. A customer who forgets the password writes to the owner
+  (WhatsApp link on `/olvide`); after checking the request comes from the
+  account's address, the owner creates a one-time reset link (24 hours) in
+  `/panel` or with `quant-trade audit account-reset EMAIL`. To add e-mail
+  confirmation and reset by e-mail later, the owner needs a transactional
+  mail provider (for example Resend, Postmark or Amazon SES), a verified
+  sending domain, and its API key as a Railway variable; the hooks are listed
+  in `accounts.EMAIL_HOOKS`.
+- **Deletion**: the customer deletes the account from `/cuenta` (password
+  required), optionally with the reports they uploaded while signed in; a
+  report saved or paid for from someone else's link is only unlinked; the owner does it with
+  `quant-trade audit account-delete EMAIL [--with-reports] --yes`. Deleting an
+  audit (`audit delete ID --yes`) also removes it from its account.
+- **Storage**: five new tables (`accounts`, `account_sessions`,
+  `account_audits`, `account_codes`, `account_resets`), created on start; no
+  column is added to an existing table.
+
 ### Public verification page and badge
 
 The owner of an audit (whoever holds its token) can publish it. The page at
@@ -1642,6 +1752,8 @@ Redesign pass 44 turns the column lines from #203 into a column map. For a CSV o
 The same pass styles the buyer's "What to do now" box from #207. Each step is a card with its number in a dark disc and the link to its section in bold with an arrow. The last step (keep the report and its id) is dashed and quieter. The MEASURED/DECLARED/NOT_MEASURED legend under the verdict sits in smaller print. The PDF keeps the cards at 9 pt.
 
 Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…) more shape without changing their words or order. The problems are cards with an amber warning icon. "What Rigor checks" is a grid of cards, two per row on a desktop, each with its name in bold. The price sits in a panel with its buttons. "Other cases" are link cards with an arrow. A check whose name is a question no longer gets an extra full stop ("¿Pico aislado o meseta?.").
+
+Redesign pass 46 tidies the "Name its columns" step from #212 on the upload form. The twelve fields sit in three labelled groups: one row per trade, one row per fill, and either way. On a phone they sit two per row. Once a CSV is picked, the file's own column names show as chips above the fields (read in the browser by `app.js`, the same header row that feeds the suggestions), so the customer can copy them without opening the file.
 
 ## Security
 

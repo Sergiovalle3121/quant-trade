@@ -55,6 +55,16 @@ TEXT: dict[str, str] = {
     "refused_lead": "Stripe cobró estos pagos, pero Rigor no abrió ningún informe. Búscalo "
     "en Stripe por el id de sesión y reembolsa, o crea un código para el cliente.",
     "refused_cols": "Fecha|Sesión de Stripe|Informe|Motivo",
+    "reset_title": "Restablecer la contraseña de un cliente",
+    "reset_lead": (
+        "Crea un enlace de un solo uso (caduca en 24 horas) para un cliente que olvidó su "
+        "contraseña. Antes, confirma que te escribe desde el correo de su cuenta."
+    ),
+    "reset_email": "Correo de la cuenta",
+    "reset_create": "Crear enlace",
+    "reset_link": "Enlace creado. Cópialo y envíalo ahora: no se puede volver a mostrar.",
+    "reset_unknown": "No hay ninguna cuenta con ese correo.",
+    "accounts": "Cuentas de clientes",
 }
 
 #: The panel is in Spanish; ``payments.refusal`` reasons are logged in English.
@@ -157,6 +167,8 @@ def panel_page(
     new_code: str = "",
     flash: str = "",
     error: str = "",
+    reset_link: str = "",
+    accounts: int = 0,
 ) -> str:
     """The panel after a correct key: the create form, a new code once, the list."""
     shown = ""
@@ -187,7 +199,26 @@ def panel_page(
     )
     listing = f"<h2 style='margin-top:40px'>{_e(TEXT['codes_title'])}</h2>"
     listing += _codes_table(key, codes)
-    return _shell(err + shown + notice + _refused_table(refused) + create + listing)
+    reset_shown = ""
+    if reset_link:
+        reset_shown = (
+            f"<div class='flash'>{_e(TEXT['reset_link'])}</div>"
+            f"<p><code style='user-select:all;word-break:break-all'>{_e(reset_link)}</code></p>"
+        )
+    reset = (
+        f"<h2 style='margin-top:40px'>{_e(TEXT['reset_title'])}</h2>"
+        f"<p class='muted'>{_e(TEXT['accounts'])}: {accounts}</p>"
+        f"<p>{_e(TEXT['reset_lead'])}</p>"
+        + reset_shown
+        + f"<form method='post' action='{PANEL_PATH}'>{_key_field(key)}"
+        "<input type='hidden' name='action' value='reset'>"
+        + _field(
+            TEXT["reset_email"],
+            "<input type='email' name='email' maxlength='254' autocomplete='off' required>",
+        )
+        + f"<button class='btn btn-dark' type='submit'>{_e(TEXT['reset_create'])}</button></form>"
+    )
+    return _shell(err + shown + notice + _refused_table(refused) + create + listing + reset)
 
 
 __all__ = [

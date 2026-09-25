@@ -86,6 +86,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "se descartaron {n} fila(s) con fecha o valor ilegible",
     ),
     (
+        "{n} future period(s) with no change dropped (they have not happened yet)",
+        "se descartaron {n} periodo(s) futuros sin cambio (todavía no han ocurrido)",
+    ),
+    (
         "no side column; every trade treated as long",
         "no hay columna de lado; cada operación se trata como larga",
     ),
@@ -775,6 +779,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "parte de las operaciones tras una ganancia abiertas en menos de 15 minutos",
     ),
     (
+        "after the fees the file itemises per trade",
+        "después de los costes que el archivo detalla por operación",
+    ),
+    (
         "share of trades with a net profit after the fees the file itemises",
         "parte de las operaciones con resultado neto positivo, después de los costes que "
         "detalla el archivo",
@@ -841,6 +849,53 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "{count} unreadable month(s) left out of the table: {cells}",
         "{count} mes(es) ilegibles fuera de la tabla: {cells}",
+    ),
+    (
+        "benchmark rows read from the table: the fund section compares the fund with them",
+        "filas del índice de referencia leídas de la tabla: la sección de fondos compara el "
+        "fondo con ellas",
+    ),
+    (
+        "{n} row(s) of differences between the fund and its benchmark left out",
+        "{n} fila(s) de diferencias entre el fondo y su índice de referencia fuera del análisis",
+    ),
+    (
+        "benchmark column {column} read: the fund section compares the fund with it",
+        "columna de índice de referencia {column} leída: la sección de fondos compara el fondo "
+        "con ella",
+    ),
+    (
+        "the benchmark column {column} could not be read; left out",
+        "la columna de índice de referencia {column} no se pudo leer; queda fuera",
+    ),
+    (
+        "the benchmark's returns as supplied; Rigor did not check them against the index",
+        "rentabilidades del índice de referencia tal como se aportaron; Rigor no las comprobó "
+        "con el índice",
+    ),
+    (
+        "needs at least {n} months shared with the benchmark",
+        "necesita al menos {n} meses en común con el índice de referencia",
+    ),
+    (
+        "the benchmark's monthly returns do not vary",
+        "las rentabilidades mensuales del índice de referencia no varían",
+    ),
+    (
+        "needs at least {n} months with the benchmark up",
+        "necesita al menos {n} meses con el índice de referencia al alza",
+    ),
+    (
+        "needs at least {n} months with the benchmark down",
+        "necesita al menos {n} meses con el índice de referencia a la baja",
+    ),
+    (
+        "fund's compound annual return minus the benchmark's",
+        "rentabilidad anual compuesta del fondo menos la del índice de referencia",
+    ),
+    (
+        "annualised standard deviation of the monthly differences",
+        "desviación típica anualizada de las diferencias mensuales",
     ),
     (
         "the stated year total does not match its months for {years}",
@@ -1287,6 +1342,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
 #: (English singular, Spanish singular). The result JSON keeps the ``(s)``
 #: form; a page shows the singular for one item and the plural otherwise.
 _SINGULAR: dict[str, tuple[str, str]] = {
+    "{n} row(s) of differences between the fund and its benchmark left out": (
+        "{n} row of differences between the fund and its benchmark left out",
+        "{n} fila de diferencias entre el fondo y su índice de referencia fuera del análisis",
+    ),
+    "{n} future period(s) with no change dropped (they have not happened yet)": (
+        "{n} future period with no change dropped (it has not happened yet)",
+        "se descartó {n} periodo futuro sin cambio (todavía no ha ocurrido)",
+    ),
     "{n} row(s) with an unreadable timestamp or value dropped": (
         "{n} row with an unreadable timestamp or value dropped",
         "se descartó {n} fila con fecha o valor ilegible",

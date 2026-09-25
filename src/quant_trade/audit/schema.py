@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import io
 import math
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+import re
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import numpy as np
@@ -205,6 +206,10 @@ class IngestedSeries:
     unparseable_rows: int
     non_monotonic: bool
     warnings: list[str] = field(default_factory=list)
+    #: A benchmark the same file carries (``timestamp``, ``ret``): a column
+    #: beside the returns, or a factsheet's benchmark rows. Read only by the
+    #: fund section; it never feeds the benchmark dimension.
+    benchmark: pd.DataFrame | None = None
 
     @property
     def observations(self) -> int:
@@ -382,7 +387,9 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     warnings: list[str] = []
     ts_col = _pick(raw, TIMESTAMP_ALIASES)
     grid = _factsheet_grid(raw) if ts_col is None else None
+    companion: pd.DataFrame | None = None
     if grid is not None:
+        companion = grid.benchmark
         # A factsheet's year-by-month table becomes a dated return series.
         raw = pd.DataFrame(
             {
@@ -439,6 +446,15 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         elif values.abs().median() > 0.5:
             values = values / 100.0
             warnings.append("returns look like percentages (median |r| > 0.5); divided by 100")
+    if grid is None:
+        companion = _benchmark_column(
+            raw,
+            timestamps,
+            source,
+            divided=source == "returns" and bool(values_divided(warnings)),
+            skip={ts_col, value_col},
+            warnings=warnings,
+        )
     # "inf" and "1e400" read as numbers but are not values an account can hold.
     values = values.where(np.isfinite(values.astype(float)))
     frame = pd.DataFrame({"timestamp": timestamps, "value": values})
@@ -524,6 +540,58 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         unparseable_rows=unparseable,
         non_monotonic=non_monotonic,
         warnings=warnings,
+        benchmark=companion,
+    )
+
+
+def values_divided(warnings: list[str]) -> bool:
+    """Whether the returns column was read as percentages (see the warnings above)."""
+    return any("divided by 100" in w for w in warnings)
+
+
+#: A column that carries a benchmark beside the fund's own values.
+BENCHMARK_COLUMN = re.compile(r"^(benchmark|bench|bmk|index|indice|índice|referencia)(_\S*)?$")
+
+
+def _benchmark_column(
+    raw: pd.DataFrame,
+    timestamps: pd.Series,
+    source: str,
+    *,
+    divided: bool,
+    skip: set[str | None],
+    warnings: list[str],
+) -> pd.DataFrame | None:
+    """A benchmark column's returns (``timestamp``, ``ret``), read like the
+    fund's own column: returns beside returns, levels beside levels."""
+    column = next(
+        (str(c) for c in raw.columns if str(c) not in skip and BENCHMARK_COLUMN.match(str(c))),
+        None,
+    )
+    if column is None:
+        return None
+    values, percent = _to_numeric(raw[column])
+    numbers = values.dropna()
+    counter = numbers.to_numpy()
+    if len(counter) and np.array_equal(counter, np.arange(counter[0], counter[0] + len(counter))):
+        return None  # a row number, not a benchmark
+    if source == "returns" and (percent or divided):
+        values = values / 100.0
+    frame = pd.DataFrame({"timestamp": timestamps, "value": values})
+    frame = frame[np.isfinite(frame["value"].astype(float))].dropna()
+    frame = frame.sort_values("timestamp", kind="stable").drop_duplicates("timestamp", keep="last")
+    if source == "equity":
+        valid = bool((frame["value"] > 0).all())
+        ret = frame["value"].astype(float).pct_change()
+    else:
+        valid = bool((frame["value"] > -1).all())
+        ret = frame["value"].astype(float)
+    if len(frame) < 2 or not valid:
+        warnings.append(f"the benchmark column {column!r} could not be read; left out")
+        return None
+    warnings.append(f"benchmark column {column!r} read: the fund section compares the fund with it")
+    return (
+        pd.DataFrame({"timestamp": frame["timestamp"], "ret": ret}).dropna().reset_index(drop=True)
     )
 
 
@@ -767,6 +835,65 @@ def live_digest_name(filename: str | None) -> str:
     return report_digest_name(filename, "live")
 
 
+#: A date this far past the moment of the upload is not a record: a file
+#: written in a server's time zone can be up to a day ahead of UTC.
+FUTURE_SLACK = timedelta(days=1)
+FUTURE_FLAT_WARNING = "future period(s) with no change dropped (they have not happened yet)"
+
+_FILE_EN = {"equity": "equity", "report": "report", "benchmark": "benchmark",
+            "trades": "trades", "live": "live account statement"}  # fmt: skip
+_FILE_ES = {"equity": "de la curva de equity", "report": "del informe",
+            "benchmark": "del benchmark", "trades": "de operaciones",
+            "live": "del estado de cuenta real"}  # fmt: skip
+
+
+def _future_error(what: str, when: datetime) -> ParseError:
+    day = when.strftime("%Y-%m-%d")
+    return ParseError(
+        f"the {_FILE_EN[what]} file has a date in the future ({day}): a track record can "
+        "only hold dates that have already happened; check the file's dates and upload it again",
+        message_es=(
+            f"El archivo {_FILE_ES[what]} tiene una fecha en el futuro ({day}): un historial "
+            "solo puede tener fechas que ya pasaron; revisa las fechas del archivo y vuelve a "
+            "subirlo."
+        ),
+        code="future_dates",
+    )
+
+
+def _without_future(series: IngestedSeries, what: str, now: datetime) -> tuple[IngestedSeries, int]:
+    """The series without its trailing flat future rows, and how many were
+    dropped; refused if a future row moves the account.
+
+    A fund's year-by-month table prints this year's months that have not
+    happened yet as 0; they say nothing and are dropped. Any other future
+    date is a damaged file. A monthly series dates each month by its last
+    day, so this month's row is not in the future.
+    """
+    frame = series.frame
+    cutoff = now + FUTURE_SLACK
+    if len(frame) >= 3 and infer_frequency(frame["timestamp"])[0] < 20:
+        month_end = (pd.Timestamp(now) + pd.offsets.MonthEnd(0)).to_pydatetime()
+        cutoff = max(cutoff, month_end + FUTURE_SLACK)
+    future = frame["timestamp"] > cutoff
+    if not bool(future.any()):
+        return series, 0
+    flat = future & (frame["ret"] == 0)
+    first_future = int(future.to_numpy().argmax())
+    if bool(flat.iloc[first_future:].all()) and first_future >= 2:
+        kept = frame.iloc[:first_future].reset_index(drop=True)
+        return replace(series, frame=kept), int(len(frame) - first_future)
+    raise _future_error(what, frame.loc[future.to_numpy().argmax(), "timestamp"].to_pydatetime())
+
+
+def _refuse_future_trades(trades: ParsedTrades | None, what: str, cutoff: datetime) -> None:
+    if trades is None:
+        return
+    late = [trade.exit_time for trade in trades.trades if trade.exit_time > cutoff]
+    if late:
+        raise _future_error(what, min(late))
+
+
 def build_inputs(
     equity_bytes: bytes | None,
     declared: DeclaredMetadata,
@@ -780,6 +907,7 @@ def build_inputs(
     live_bytes: bytes | None = None,
     live_filename: str | None = None,
     report_columns: dict[str, str] | None = None,
+    now: datetime | None = None,
 ) -> AuditInputs:
     """Parse and hash every upload.
 
@@ -792,6 +920,7 @@ def build_inputs(
     trades only and compared with the backtest; it changes no other figure.
     ``report_columns`` is the customer's own mapping of the report's columns
     (``universal.ROLES`` to column names), for a platform no importer knows.
+    A date more than a day after ``now`` (the upload's time) is refused.
     """
     # Imported here: the importers build on this module's types.
     from quant_trade.audit.importers import (
@@ -911,6 +1040,20 @@ def build_inputs(
         extra["live_cash_flows"] = list(live.cash_flows)
         extra["live_metadata"] = dict(live.metadata)
         extra["live_equity_csv"] = live.equity_csv
+    now = now or datetime.now(UTC)
+    cutoff = now + FUTURE_SLACK
+    equity, dropped = _without_future(
+        equity, "report" if extra.get("balance_only") else "equity", now
+    )
+    if dropped:
+        warnings.append(f"equity: {dropped} {FUTURE_FLAT_WARNING}")
+    if benchmark is not None:
+        benchmark, dropped = _without_future(benchmark, "benchmark", now)
+        if dropped:
+            warnings.append(f"benchmark: {dropped} {FUTURE_FLAT_WARNING}")
+    _refuse_future_trades(trades, "trades" if trades_bytes else "report", cutoff)
+    if "live_trades" in extra:
+        _refuse_future_trades(extra["live_trades"], "live", cutoff)
     ppy, label = infer_frequency(equity.frame["timestamp"])
     return AuditInputs(
         equity=equity,
