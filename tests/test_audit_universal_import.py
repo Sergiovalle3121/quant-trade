@@ -7,6 +7,7 @@ exports of common brokers, exchanges and journals; the rows are made up.
 from __future__ import annotations
 
 import pytest
+from test_audit_importers import xlsx
 
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import untranslated
@@ -19,7 +20,6 @@ from quant_trade.audit.importers import (
     import_report,
 )
 from quant_trade.audit.universal import guess_columns, normalise
-from tests.test_audit_importers import xlsx
 
 
 def _net(report) -> list[float]:  # type: ignore[no-untyped-def]
@@ -233,3 +233,14 @@ def test_a_repeated_time_column_holds_entry_and_exit_on_one_row() -> None:
     trade = report.trades.trades[0]
     assert (trade.entry_price, trade.exit_price) == (2400, 2395)
     assert trade.exit_time.hour == 12
+
+
+def test_a_fred_series_names_its_dates_observation_date() -> None:
+    from quant_trade.audit.schema import parse_equity_csv
+
+    rows = [f"2020-{m:02d}-01,{100 + m}" for m in range(1, 13)]
+    rows += [f"2021-{m:02d}-01,{112 + m}" for m in range(1, 13)]
+    rows += [f"2022-{m:02d}-01,{124 + m}" for m in range(1, 13)]
+    data = ("observation_date,SP500\n" + "\n".join(rows) + "\n").encode()
+    series = parse_equity_csv(data.replace(b"SP500", b"value"))
+    assert len(series.frame) == 36
