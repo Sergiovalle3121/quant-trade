@@ -1522,8 +1522,8 @@ def _upload_form(
             f"<select name='locale'><option value='es'{selected['es']}>Español</option>"
             f"<option value='en'{selected['en']}>English</option></select>",
         )
-        + "</div>"
         + code_field
+        + "</div>"
         + advanced
         + "<label class='check'><input type='checkbox' name='consent' value='on' required>"
         f"<span>{_e(copy['consent'].format(retention=retention_days))} "
