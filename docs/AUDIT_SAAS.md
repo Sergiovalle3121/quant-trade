@@ -490,6 +490,12 @@ printed with it: fixed sizes (no compounding), independent trades, the
 uploaded costs, not a forecast. It is in money on closed trades, so it is a
 different measure from the percentage drawdown of the resampled risk
 section (equity curve, block bootstrap) and does not replace it.
+Because it sees closed trades only, it carries an "Open losses" callout
+with both figures when the platform prints an open-trade drawdown at least
+half a point deeper than the closed-trade one (a real MT5 GBPUSD report:
+40.5 % against 29.0 %), and a plain note when the curve is a closed-trade
+balance. For an account history the sizes read as "the size the account
+used" instead of the backtest's.
 
 ### What data the test ran on (`audit/testdata.py`)
 
