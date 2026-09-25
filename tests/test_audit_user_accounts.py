@@ -1432,3 +1432,12 @@ def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> N
     assert "aunque borres tu cuenta y sin tu correo" in es
     assert "your free first full report: kept" in en
     assert "even if you delete your account and without your e-mail" in en
+
+
+def test_portuguese_visitors_get_the_account_screens_in_english(tmp_path: Path) -> None:
+    from quant_trade.audit import account_pages
+
+    assert account_pages.path("signup", "pt") == "/signup"
+    client, _, _ = _client(tmp_path)
+    page = client.get("/registro?lang=pt").text
+    assert "<html lang='en'" in page and "Create" in page

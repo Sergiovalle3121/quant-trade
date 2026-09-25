@@ -585,7 +585,15 @@ grid-column:1/-1}
 
 
 def _locale(locale: str) -> str:
-    return locale if locale in COPY else "es"
+    # A language the account screens do not have yet (Portuguese) reads in
+    # English, never in Spanish; anything unknown keeps the Spanish default.
+    if locale in COPY:
+        return locale
+    return "en" if locale in _ENGLISH_FALLBACK else "es"
+
+
+#: Languages whose visitors see the account screens in English for now.
+_ENGLISH_FALLBACK = ("pt",)
 
 
 def path(kind: str, locale: str) -> str:

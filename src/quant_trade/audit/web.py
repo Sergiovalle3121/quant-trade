@@ -1218,7 +1218,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return found.email if found is not None else ""
 
     def _account_locale(path_locale: str, lang: str | None) -> str:
-        return _locale(lang) if lang in LOCALES else path_locale
+        if lang in LOCALES:
+            return _locale(lang)
+        # Portuguese visitors get the English account screens until they exist in pt.
+        return "en" if lang == "pt" else path_locale
 
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
     signin_flashes = ("signed_out", "deleted", "reset_done")
