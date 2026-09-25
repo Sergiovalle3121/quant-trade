@@ -1059,6 +1059,53 @@ lock that address out for the hour (in memory, per process). Pages are
 `no-store` and `noindex`. The panel is for the owner, so it is Spanish only.
 Tests: `tests/test_audit_owner_panel.py`.
 
+### Customer accounts (`audit/accounts.py`, `/registro`, `/cuenta`)
+
+A customer can create an account with an e-mail and a password to find, in
+one place, the reports they uploaded or saved, the access codes they
+redeemed or added (with the credits left), and what they paid for. The
+account is optional: the free preview and each report's private link work
+without one, and an account never changes what a report says.
+
+- **Pages** (Spanish default, English paths): `/registro` `/signup`,
+  `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
+  `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
+  Every page links "Mi cuenta" from the navigation and the report header.
+- **What lands on an account**: an upload made while signed in; a report
+  opened by its link and saved with "Guardar en mi cuenta"; the code that
+  unlocked a report while signed in; a code added by hand; a card purchase
+  started while signed in (the report, and a pack's code with its credits).
+  A report or a code belongs to one account at most.
+- **Credits**: a locked report of a signed-in customer shows "Desbloquear con
+  1 crédito de tu cuenta" when their codes have credits left. The code that
+  expires first is spent first; the credit and the unlock share one
+  transaction, as with a typed code.
+- **Opening a report**: the owner opens `/audits/{id}` without the token; any
+  other visitor still needs the token (a wrong one is a 404).
+- **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
+  session cookie `rigor_session`, 256-bit, `HttpOnly`, `SameSite=Lax`,
+  `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
+  form (double-submit cookie `rigor_csrf` before sign-in, the session's token
+  after); 10 failed sign-ins per hour per address and per e-mail, 5 sign-ups
+  per hour per address; a password change or reset signs out the other
+  sessions; `next` only returns to `/audits/` or `/cuenta` paths.
+- **No e-mail service yet**. Nothing sends e-mail and addresses are not
+  confirmed. A customer who forgets the password writes to the owner
+  (WhatsApp link on `/olvide`); after checking the request comes from the
+  account's address, the owner creates a one-time reset link (24 hours) in
+  `/panel` or with `quant-trade audit account-reset EMAIL`. To add e-mail
+  confirmation and reset by e-mail later, the owner needs a transactional
+  mail provider (for example Resend, Postmark or Amazon SES), a verified
+  sending domain, and its API key as a Railway variable; the hooks are listed
+  in `accounts.EMAIL_HOOKS`.
+- **Deletion**: the customer deletes the account from `/cuenta` (password
+  required), optionally with all its reports; the owner does it with
+  `quant-trade audit account-delete EMAIL [--with-reports] --yes`. Deleting an
+  audit (`audit delete ID --yes`) also removes it from its account.
+- **Storage**: five new tables (`accounts`, `account_sessions`,
+  `account_audits`, `account_codes`, `account_resets`), created on start; no
+  column is added to an existing table.
+
 ### Public verification page and badge
 
 The owner of an audit (whoever holds its token) can publish it. The page at

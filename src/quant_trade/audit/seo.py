@@ -46,7 +46,15 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
 )
 
 #: Paths crawlers are asked to skip: report URLs carry the owner's token.
-DISALLOWED_PATHS: tuple[str, ...] = ("/audits/", "/webhooks/", "/health")
+DISALLOWED_PATHS: tuple[str, ...] = (
+    "/audits/",
+    "/webhooks/",
+    "/health",
+    "/cuenta",
+    "/account",
+    "/restablecer",
+    "/reset",
+)
 
 
 @dataclass(frozen=True)

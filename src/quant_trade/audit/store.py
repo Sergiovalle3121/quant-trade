@@ -124,6 +124,48 @@ class IssuedFile:
     public_id: str | None
 
 
+@dataclass(frozen=True)
+class AccountRecord:
+    """A customer account as the service reads it: never the password hash."""
+
+    id: str
+    email: str
+    locale: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class AccountAudit:
+    """One report on an account's list."""
+
+    audit_id: str
+    created_at: str
+    linked_at: str
+    overall_class: str
+    paid: bool
+    paid_at: str | None
+    #: ``card``, ``code`` or ``""`` (not paid).
+    paid_with: str
+    purged: bool
+    published: bool
+    description: str
+
+
+@dataclass(frozen=True)
+class AccountCode:
+    """An access code on an account: its record plus when it was added."""
+
+    code: AccessCodeRecord
+    linked_at: str
+
+    def usable(self, now: str) -> bool:
+        return (
+            not self.code.disabled
+            and self.code.credits_left > 0
+            and (self.code.expires_at is None or self.code.expires_at > now)
+        )
+
+
 class _RedeemRace(RuntimeError):
     """Raised inside a transaction to roll back a credit spent for nothing."""
 
@@ -227,6 +269,53 @@ class Store:
             sa.Column("audit_id", sa.String(64), nullable=False, index=True),
             sa.Column("kind", sa.String(16), nullable=False),
             sa.Column("issued_at", sa.String(40), nullable=False),
+        )
+        # Customer accounts (``audit/accounts.py``). New tables only, so an
+        # existing database gains them on start with no column migration.
+        self.accounts = sa.Table(
+            "accounts",
+            self.metadata,
+            sa.Column("id", sa.String(32), primary_key=True),
+            sa.Column("email", sa.String(254), nullable=False, unique=True),
+            sa.Column("password_hash", sa.String(255), nullable=False),
+            sa.Column("locale", sa.String(8), nullable=False, default="es"),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        #: Only the SHA-256 of a session cookie is kept.
+        self.account_sessions = sa.Table(
+            "account_sessions",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("csrf", sa.String(64), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("expires_at", sa.String(40), nullable=False),
+        )
+        #: One account per audit: the report a customer uploaded or saved.
+        self.account_audits = sa.Table(
+            "account_audits",
+            self.metadata,
+            sa.Column("audit_id", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("linked_at", sa.String(40), nullable=False),
+        )
+        #: One account per access code: its credits show on that account.
+        self.account_codes = sa.Table(
+            "account_codes",
+            self.metadata,
+            sa.Column("code_id", sa.String(32), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("linked_at", sa.String(40), nullable=False),
+        )
+        #: One-time password reset links the owner hands out; hash only.
+        self.account_resets = sa.Table(
+            "account_resets",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("expires_at", sa.String(40), nullable=False),
+            sa.Column("used_at", sa.String(40)),
         )
         self.metadata.create_all(self.engine)
 
@@ -753,8 +842,406 @@ class Store:
             )
             conn.execute(self.audit_files.delete().where(self.audit_files.c.audit_id == audit_id))
             conn.execute(self.issued_files.delete().where(self.issued_files.c.audit_id == audit_id))
+            conn.execute(
+                self.account_audits.delete().where(self.account_audits.c.audit_id == audit_id)
+            )
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
         return bool(deleted.rowcount)
+
+    # -- accounts ----------------------------------------------------------
+    def create_account(
+        self, *, email: str, password_hash: str, locale: str, at: datetime
+    ) -> AccountRecord | None:
+        """A new account, or ``None`` when that e-mail already has one."""
+        sa = self._sa
+        account_id = secrets.token_hex(8)
+        try:
+            with self.engine.begin() as conn:
+                taken = conn.execute(
+                    sa.select(self.accounts.c.id).where(self.accounts.c.email == email)
+                ).first()
+                if taken is not None:
+                    return None
+                conn.execute(
+                    self.accounts.insert().values(
+                        id=account_id,
+                        email=email,
+                        password_hash=password_hash,
+                        locale=locale,
+                        created_at=_iso(at),
+                    )
+                )
+        except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same e-mail
+            return None
+        return AccountRecord(id=account_id, email=email, locale=locale, created_at=_iso(at))
+
+    def _account(self, condition: Any) -> tuple[AccountRecord, str] | None:
+        with self.engine.connect() as conn:
+            row = conn.execute(self._sa.select(self.accounts).where(condition)).mappings().first()
+        if row is None:
+            return None
+        record = AccountRecord(
+            id=row["id"], email=row["email"], locale=row["locale"], created_at=row["created_at"]
+        )
+        return record, str(row["password_hash"])
+
+    def account_with_hash(self, email: str) -> tuple[AccountRecord, str] | None:
+        """The account for ``email`` and its password hash, for sign-in only."""
+        if not _usable_key(email):
+            return None
+        return self._account(self.accounts.c.email == email)
+
+    def get_account(self, account_id: str) -> AccountRecord | None:
+        if not _usable_key(account_id):
+            return None
+        found = self._account(self.accounts.c.id == account_id)
+        return found[0] if found else None
+
+    def password_hash(self, account_id: str) -> str | None:
+        found = self._account(self.accounts.c.id == account_id)
+        return found[1] if found else None
+
+    def find_account(self, email: str) -> AccountRecord | None:
+        found = self.account_with_hash(email)
+        return found[0] if found else None
+
+    def set_password(self, account_id: str, password_hash: str) -> bool:
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                self.accounts.update()
+                .where(self.accounts.c.id == account_id)
+                .values(password_hash=password_hash)
+            )
+        return bool(result.rowcount)
+
+    def count_accounts(self) -> int:
+        sa = self._sa
+        with self.engine.connect() as conn:
+            value = conn.execute(sa.select(sa.func.count()).select_from(self.accounts)).scalar()
+        return int(value or 0)
+
+    def delete_account(self, account_id: str, *, with_reports: bool = False) -> list[str]:
+        """Remove an account, its sessions, reset links and links to codes.
+
+        With ``with_reports`` its reports are deleted too (as ``delete_audit``);
+        otherwise they stay reachable by their private link and follow the
+        normal retention. Returns the ids of the reports deleted.
+        """
+        sa = self._sa
+        with self.engine.connect() as conn:
+            audit_ids = [
+                str(row[0])
+                for row in conn.execute(
+                    sa.select(self.account_audits.c.audit_id).where(
+                        self.account_audits.c.account_id == account_id
+                    )
+                ).all()
+            ]
+        deleted = [a for a in audit_ids if self.delete_audit(a)] if with_reports else []
+        with self.engine.begin() as conn:
+            for table in (
+                self.account_sessions,
+                self.account_resets,
+                self.account_codes,
+                self.account_audits,
+            ):
+                conn.execute(table.delete().where(table.c.account_id == account_id))
+            conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
+        return deleted
+
+    # -- account sessions ------------------------------------------------
+    def create_session(
+        self, account_id: str, *, token_sha256: str, csrf: str, at: datetime, days: int
+    ) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.account_sessions.insert().values(
+                    token_sha256=token_sha256,
+                    account_id=account_id,
+                    csrf=csrf,
+                    created_at=_iso(at),
+                    expires_at=_iso(at + timedelta(days=days)),
+                )
+            )
+
+    def session_account(self, token_sha256: str, now: datetime) -> tuple[AccountRecord, str] | None:
+        """The signed-in account and the session's CSRF token, if it is still valid."""
+        sa = self._sa
+        table = self.account_sessions
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(table.c.account_id, table.c.csrf)
+                .where(table.c.token_sha256 == token_sha256)
+                .where(table.c.expires_at > _iso(now))
+            ).first()
+        if row is None:
+            return None
+        account = self.get_account(str(row[0]))
+        return (account, str(row[1])) if account is not None else None
+
+    def delete_session(self, token_sha256: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.account_sessions.delete().where(
+                    self.account_sessions.c.token_sha256 == token_sha256
+                )
+            )
+
+    def delete_sessions(self, account_id: str, *, keep: str = "") -> None:
+        """Sign out everywhere, except the session ``keep`` (its hash)."""
+        table = self.account_sessions
+        with self.engine.begin() as conn:
+            conn.execute(
+                table.delete()
+                .where(table.c.account_id == account_id)
+                .where(table.c.token_sha256 != keep)
+            )
+
+    def purge_sessions(self, now: datetime) -> int:
+        """Drop expired sessions and reset links; how many rows went."""
+        with self.engine.begin() as conn:
+            gone = conn.execute(
+                self.account_sessions.delete().where(
+                    self.account_sessions.c.expires_at <= _iso(now)
+                )
+            ).rowcount
+            gone += conn.execute(
+                self.account_resets.delete().where(self.account_resets.c.expires_at <= _iso(now))
+            ).rowcount
+        return int(gone or 0)
+
+    # -- password reset links --------------------------------------------
+    def create_reset(self, account_id: str, *, token_sha256: str, at: datetime, hours: int) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.account_resets.insert().values(
+                    token_sha256=token_sha256,
+                    account_id=account_id,
+                    created_at=_iso(at),
+                    expires_at=_iso(at + timedelta(hours=hours)),
+                    used_at=None,
+                )
+            )
+
+    def reset_account(self, token_sha256: str, now: datetime) -> str | None:
+        """The account a valid, unused reset link belongs to (it stays unused)."""
+        table = self.account_resets
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.account_id)
+                .where(table.c.token_sha256 == token_sha256)
+                .where(table.c.used_at.is_(None))
+                .where(table.c.expires_at > _iso(now))
+            ).first()
+        return str(row[0]) if row else None
+
+    def use_reset(self, token_sha256: str, now: datetime) -> str | None:
+        """Spend a reset link once; its account id, or ``None``."""
+        table = self.account_resets
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.update()
+                .where(table.c.token_sha256 == token_sha256)
+                .where(table.c.used_at.is_(None))
+                .where(table.c.expires_at > _iso(now))
+                .values(used_at=_iso(now))
+            )
+            if not result.rowcount:
+                return None
+            row = conn.execute(
+                self._sa.select(table.c.account_id).where(table.c.token_sha256 == token_sha256)
+            ).first()
+        return str(row[0]) if row else None
+
+    # -- what an account holds -------------------------------------------
+    def link_audit(self, account_id: str, audit_id: str, *, at: datetime) -> str:
+        """Put a report on an account: ``linked``, ``already`` or ``other``."""
+        return self._link(self.account_audits, "audit_id", audit_id, account_id, at)
+
+    def link_code(self, account_id: str, code_id: str, *, at: datetime) -> str:
+        """Put an access code on an account: ``linked``, ``already`` or ``other``."""
+        return self._link(self.account_codes, "code_id", code_id, account_id, at)
+
+    def _link(self, table: Any, key: str, value: str, account_id: str, at: datetime) -> str:
+        sa = self._sa
+        column = table.c[key]
+        try:
+            with self.engine.begin() as conn:
+                owner = conn.execute(sa.select(table.c.account_id).where(column == value)).first()
+                if owner is not None:
+                    return "already" if owner[0] == account_id else "other"
+                conn.execute(
+                    table.insert().values(
+                        **{key: value, "account_id": account_id, "linked_at": _iso(at)}
+                    )
+                )
+        except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same row
+            return "other"
+        return "linked"
+
+    def account_for_audit(self, audit_id: str) -> str | None:
+        if not _usable_key(audit_id):
+            return None
+        table = self.account_audits
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.account_id).where(table.c.audit_id == audit_id)
+            ).first()
+        return str(row[0]) if row else None
+
+    def code_id(self, code: str) -> str | None:
+        record = self.get_access_code(code)
+        return record.id if record else None
+
+    def account_audits_list(self, account_id: str) -> list[AccountAudit]:
+        """The account's reports, newest first."""
+        sa = self._sa
+        a, link = self.audits, self.account_audits
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(
+                    a.c.id,
+                    a.c.created_at,
+                    link.c.linked_at,
+                    a.c.overall_class,
+                    a.c.paid,
+                    a.c.paid_at,
+                    a.c.stripe_session_id,
+                    a.c.purged_at,
+                    a.c.declared_json,
+                    self.publications.c.public_id,
+                )
+                .select_from(
+                    link.join(a, a.c.id == link.c.audit_id).outerjoin(
+                        self.publications, self.publications.c.audit_id == a.c.id
+                    )
+                )
+                .where(link.c.account_id == account_id)
+                .order_by(a.c.created_at.desc(), a.c.id)
+            ).all()
+        out = []
+        for row in rows:
+            reference = str(row[6] or "")
+            paid_with = ""
+            if row[4]:
+                paid_with = "code" if reference.startswith(CODE_REFERENCE_PREFIX) else "card"
+            description = ""
+            if row[8]:
+                try:
+                    description = str(json.loads(row[8]).get("description") or "")
+                except (ValueError, AttributeError):
+                    description = ""
+            out.append(
+                AccountAudit(
+                    audit_id=str(row[0]),
+                    created_at=str(row[1]),
+                    linked_at=str(row[2]),
+                    overall_class=str(row[3]),
+                    paid=bool(row[4]),
+                    paid_at=row[5],
+                    paid_with=paid_with,
+                    purged=bool(row[7]),
+                    published=row[9] is not None,
+                    description=" ".join(description.split())[:120],
+                )
+            )
+        return out
+
+    def account_codes_list(self, account_id: str) -> list[AccountCode]:
+        """The account's access codes, oldest first."""
+        sa = self._sa
+        c, link = self.access_codes, self.account_codes
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    sa.select(c, link.c.linked_at)
+                    .select_from(link.join(c, c.c.id == link.c.code_id))
+                    .where(link.c.account_id == account_id)
+                    .order_by(link.c.linked_at, c.c.id)
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            AccountCode(
+                code=AccessCodeRecord(
+                    id=row["id"],
+                    note=row["note"],
+                    credits_total=int(row["credits_total"]),
+                    credits_used=int(row["credits_used"]),
+                    created_at=row["created_at"],
+                    expires_at=row["expires_at"],
+                    disabled=bool(row["disabled"]),
+                ),
+                linked_at=row["linked_at"],
+            )
+            for row in rows
+        ]
+
+    def account_credits(self, account_id: str, now: datetime) -> int:
+        """Audits the account's usable codes can still unlock."""
+        stamp = _iso(now)
+        return sum(
+            item.code.credits_left
+            for item in self.account_codes_list(account_id)
+            if item.usable(stamp)
+        )
+
+    def redeem_with_account(self, audit_id: str, account_id: str, *, at: datetime) -> bool:
+        """Unlock an unpaid audit with one credit from the account's codes.
+
+        The code that expires first is spent first. The credit and the
+        unlock share one transaction, as in :meth:`redeem_for_audit`.
+        """
+        if not _usable_key(audit_id):
+            return False
+        sa = self._sa
+        c, link = self.access_codes, self.account_codes
+        now = _iso(at)
+        try:
+            with self.engine.begin() as conn:
+                unpaid = conn.execute(
+                    sa.select(self.audits.c.id)
+                    .where(self.audits.c.id == audit_id)
+                    .where(self.audits.c.paid.is_(False))
+                ).first()
+                if unpaid is None:
+                    return False
+                candidates = conn.execute(
+                    sa.select(c.c.id, c.c.expires_at)
+                    .select_from(link.join(c, c.c.id == link.c.code_id))
+                    .where(link.c.account_id == account_id)
+                    .order_by(c.c.created_at, c.c.id)
+                ).all()
+                # Codes that expire go first, soonest first; then the rest.
+                ordered = sorted(candidates, key=lambda r: (r[1] is None, r[1] or ""))
+                for code_id, _ in ordered:
+                    spent = conn.execute(
+                        c.update()
+                        .where(c.c.id == code_id)
+                        .where(c.c.credits_used < c.c.credits_total)
+                        .where(c.c.disabled.is_(False))
+                        .where((c.c.expires_at.is_(None)) | (c.c.expires_at > now))
+                        .values(credits_used=c.c.credits_used + 1)
+                    )
+                    if not spent.rowcount:
+                        continue
+                    result = conn.execute(
+                        self.audits.update()
+                        .where(self.audits.c.id == audit_id)
+                        .where(self.audits.c.paid.is_(False))
+                        .values(
+                            paid=True,
+                            paid_at=now,
+                            stripe_session_id=CODE_REFERENCE_PREFIX + str(code_id),
+                        )
+                    )
+                    if not result.rowcount:
+                        raise _RedeemRace()
+                    return True
+                return False
+        except _RedeemRace:  # pragma: no cover - lost a race; the credit rolled back
+            return False
 
     # -- retention ---------------------------------------------------------
     def purge_expired(self, now: datetime, *, retention_days: int, dry_run: bool = False) -> int:
@@ -881,6 +1368,9 @@ def make_store(url: str) -> Store:
 
 __all__ = [
     "CODE_REFERENCE_PREFIX",
+    "AccountAudit",
+    "AccountCode",
+    "AccountRecord",
     "REQUIRE_WEB",
     "AccessCodeRecord",
     "AuditRecord",

@@ -525,6 +525,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_pricing": "Precios",
         "nav_guides": "Guías",
         "nav_faq": "Preguntas",
+        "nav_account": "Mi cuenta",
         "nav_compare": "Comparar",
         "nav_menu": "Menú",
         "cta": "Auditar mi backtest",
@@ -704,6 +705,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_pricing": "Pricing",
         "nav_guides": "Guides",
         "nav_faq": "FAQ",
+        "nav_account": "My account",
         "nav_compare": "Compare",
         "nav_menu": "Menu",
         "cta": "Audit my backtest",
@@ -940,6 +942,7 @@ def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
     ui = _UI[locale]
     home = _home(locale)
     sample = "/ejemplo" if locale == "es" else "/sample"
+    account = "/account" if locale == "en" else "/cuenta"
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
         f"<a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a>"
@@ -964,13 +967,15 @@ def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
             if switch_href
             else ""
         )
+        + f"<a href='{account}'>{_e(ui['nav_account'])}</a>"
         + f"<a class='btn btn-primary' href='{home}#subir'>{_e(ui['cta'])}</a></nav></details>"
     )
     return (
         f"<header class='nav{' nav-solid' if solid else ''}'><div class='wrap nav-in'>"
         + logo(home)
         + f"<nav class='nav-links' aria-label='{_e(BRAND)}'>{links}</nav>"
-        + f"<div class='nav-end'>{switch}<a class='btn btn-sm' href='{home}#subir'>"
+        + f"<div class='nav-end'>{switch}<a class='lang' href='{account}'>"
+        f"{_e(ui['nav_account'])}</a><a class='btn btn-sm' href='{home}#subir'>"
         f"{_e(ui['cta_short'])}</a>{menu}</div></div></header>"
     )
 
