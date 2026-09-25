@@ -32,7 +32,11 @@ applies. Trials and cost may be left blank on the web form: blank trials
 means "not declared" (1 is assumed and tagged NOT_MEASURED), blank cost means
 no extra cost beyond what the uploaded report already lists (there is no
 hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
-at least 30 return observations.
+at least 30 return observations. Platform reports and the MT5 optimisation export
+may be 10 MB (about 11,000 optimisation passes at some 900 bytes each).
+A forward export whose Forward Result cell is blank or not a number on some
+passes is still read as a forward export: those passes are left out of the
+forward review, and the plateau check never reads its Profit column.
 
 A platform report dropped in the equity field by mistake (an `.htm`,
 `.html` or `.xlsx` name, or HTML content, UTF-16 included) is read as the

@@ -298,8 +298,10 @@ PDF_CACHE_SIZE = 16
 #: How many upload fields ``POST /audits`` takes.
 UPLOAD_FIELDS = 7
 #: The fields that may carry a platform report, and how much larger than
-#: ``max_upload_bytes`` they may be.
-REPORT_FIELDS = frozenset({"equity", "report", "live"})
+#: ``max_upload_bytes`` they may be. The MT5 optimisation XML is one: about
+#: 900 bytes a pass, so 5 MB stopped at some 5,500 passes, fewer than a
+#: common genetic run.
+REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
 REPORT_SIZE_FACTOR = 2
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
