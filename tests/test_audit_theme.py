@@ -774,3 +774,17 @@ def test_locked_preview_lines_keep_their_lock_on_the_first_line_and_buttons_fit_
     assert ".paybox.redeem .inline-form .btn{flex:1 1 100%}" in STYLE
     # The "also reads" line under the platform names keeps a quiet underline.
     assert ".platforms .platforms-also a:hover{color:var(--text)" in STYLE
+
+
+def test_account_screens_read_as_cards_on_a_phone_and_deleting_looks_like_it() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    # Sign-up and sign-in forms sit in a white card beside the tinted list of benefits.
+    assert ".acct-form{border:1px solid var(--border)" in ACCOUNT_CSS
+    assert ".acct-perks{background:var(--surface-2)}" in ACCOUNT_CSS
+    # On a phone each report is a card: class, date and "Open" on one row.
+    assert ".acct-reports tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto" in (
+        ACCOUNT_CSS.replace("\n", "")
+    )
+    # Deleting the account is set apart in red.
+    assert ".acct-danger h3{color:#b42318}" in ACCOUNT_CSS

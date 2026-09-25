@@ -325,7 +325,14 @@ ACCOUNT_CSS = """
 .acct-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:36px;
 align-items:start}
 .acct-card{border:1px solid var(--border);border-radius:18px;padding:24px;
-background:var(--surface-2)}
+background:#fff}
+.acct-perks{background:var(--surface-2)}
+.acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
+box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.acct-form form>p:last-child{margin-bottom:0}
+.acct-danger{border-color:rgba(180,35,24,.28)}
+.acct-danger h3{color:#b42318}
+.acct-danger .btn{color:#b42318;border-color:rgba(180,35,24,.4)}
 .acct-card h2{margin-top:0}
 .acct-list{list-style:none;padding:0;margin:0;display:grid;gap:12px}
 .acct-list li{display:flex;gap:10px;align-items:flex-start}
@@ -335,7 +342,7 @@ background:var(--surface-2)}
 margin-bottom:8px}
 .acct-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 28px}
 .acct-kpi{border:1px solid var(--border);border-radius:16px;padding:16px 18px;
-background:var(--surface-2)}
+background:#fff}
 .acct-kpi b{display:block;font-size:1.9rem;line-height:1.1}
 .acct-kpi span{color:var(--text-2);font-size:.86rem}
 .acct-table{width:100%;border-collapse:collapse;font-size:.92rem;margin:8px 0 24px}
@@ -355,7 +362,21 @@ border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:14px 
 font-size:.92rem;background:var(--surface-2)}
 .acct-box form{margin:0}
 .acct-box .btn{margin:0}
-@media (max-width:760px){.acct-grid{grid-template-columns:1fr}.acct-kpis{grid-template-columns:1fr}}
+@media (max-width:760px){.acct-grid{grid-template-columns:1fr}.acct-kpis{gap:8px}
+.acct-kpi{padding:12px}.acct-kpi b{font-size:1.5rem}.acct-kpi span{display:block;font-size:.76rem;
+line-height:1.35}.acct-form{padding:20px}}
+@media (max-width:620px){.acct-reports thead{display:none}
+.paper table.acct-reports{border:0;background:none;box-shadow:none;overflow:visible}
+.acct-reports,.acct-reports tbody{display:block}
+.acct-reports tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px 12px;
+align-items:center;padding:14px 16px;margin:0 0 8px;border:1px solid var(--border);
+border-radius:14px;background:#fff}
+.acct-reports td{padding:0;border:0}
+.acct-reports td:nth-child(2){grid-row:1;grid-column:1}
+.acct-reports td:nth-child(1){grid-row:1;grid-column:2;font-variant-numeric:tabular-nums}
+.acct-reports td:nth-child(5){grid-row:1;grid-column:3}
+.acct-reports td:nth-child(3),.acct-reports td:nth-child(4){grid-column:1/-1}
+.acct-reports td:nth-child(4){color:var(--text-2);font-size:.88rem}}
 """
 
 
@@ -396,7 +417,7 @@ def _benefits(copy: dict[str, str]) -> str:
     items = "".join(
         f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in copy["benefits"].split("|")
     )
-    return f"<div class='acct-card'><ul class='acct-list'>{items}</ul></div>"
+    return f"<div class='acct-card acct-perks'><ul class='acct-list'>{items}</ul></div>"
 
 
 def _email_field(copy: dict[str, str], email: str) -> str:
@@ -439,7 +460,7 @@ def signup_page(
         "</button></form>" + f"<p class='acct-alt'>{_e(copy['have_account'])} "
         f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"
     )
-    body = f"<div class='acct-grid'><div>{form}</div>{_benefits(copy)}</div>"
+    body = f"<div class='acct-grid'><div class='acct-form'>{form}</div>{_benefits(copy)}</div>"
     return _shell(
         locale,
         copy["signup_title"],
@@ -478,7 +499,7 @@ def signin_page(
         "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])} "
         f"<a href='{_e(signup)}'>{_e(copy['signup_link'])}</a></p>"
     )
-    body = f"<div class='acct-grid'><div>{form}</div>{_benefits(copy)}</div>"
+    body = f"<div class='acct-grid'><div class='acct-form'>{form}</div>{_benefits(copy)}</div>"
     return _shell(
         locale,
         copy["signin_title"],
@@ -595,8 +616,8 @@ def _reports_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAu
             f"<td>{opener}</td></tr>"
         )
     return (
-        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}<th></th></tr>"
-        f"</thead><tbody>{''.join(rows)}</tbody></table></div>"
+        f"<div class='acct-scroll'><table class='acct-table acct-reports'><thead><tr>{head}"
+        f"<th></th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -754,7 +775,8 @@ def account_page(
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_password'])}</button>"
         "</form>"
-        f"<form class='acct-card' method='post' action='{path('account', locale)}/borrar'>"
+        "<form class='acct-card acct-danger' method='post' "
+        f"action='{path('account', locale)}/borrar'>"
         f"<h3>{_e(copy['delete_title'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
         + _hidden("csrf", csrf)
         + _field(
