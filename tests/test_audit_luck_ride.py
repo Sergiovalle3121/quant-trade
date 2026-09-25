@@ -168,4 +168,4 @@ def test_without_a_count_the_report_shows_what_each_search_would_need() -> None:
     section = section[: section.index("</section>")]
     assert "Los archivos no dicen cuántas configuraciones se probaron" in section
     assert "Supera a la suerte" not in section and "No supera a la suerte" not in section
-    assert "<td>1,000</td>" in section and "¿Alcanza este historial?" in section
+    assert ">1,000</td>" in section and "¿Alcanza este historial?" in section

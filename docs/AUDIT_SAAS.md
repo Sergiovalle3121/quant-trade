@@ -1902,6 +1902,8 @@ Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, t
 
 Redesign pass 51 styles the PDF link while the PDF is made ("Generando tu PDF… (unos segundos)"): the button keeps its full colour, shows a small spinning ring like the upload loader, and keeps a progress cursor; on a phone the report's PDF button spans the width so the longer label fits on one line.
 
+Redesign pass 52 checks the two new report sections on screen, on a phone and in the PDF. The "history needed" table in "¿Cuánto queda al descontar la suerte?" (`table.luck`) turns into one card per row on a phone, each figure under its column name, and its yes/no answer is green or red. In the PDF a block of figures may now split across pages (orphans and widows 1), so a heading such as "Cómo se vivió este historial" no longer sits alone above half a blank page; subsection headings stay with what follows.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
