@@ -535,6 +535,11 @@ and report wire them in during the integration step):
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
+  The report's own findings add questions too: one instrument carrying the
+  result (`one_carries`, `mostly_one`), losers held longer, re-entering fast
+  or doing worse after losses, a recent average per trade under half the
+  earlier one, and a cost dimension that is WEAK or FAIL (the costs question
+  then shows even when the file lists fees).
   For an account history the backtest questions (modelling, trials, held-out
   period, assumed costs, "is there a live account") give way to two for an
   investor: whether other accounts of the same strategy were closed or
@@ -724,6 +729,11 @@ year of exit (trades, net result, hit rate).
 | Code | WARN | FAIL |
 |---|---|---|
 | `EDGE_FADING` | the earlier trades average a profit, the recent ones zero or a loss, and the recent average sits 2 or more standard errors below the earlier one | — |
+
+Without the flag, a recent average per trade under half the earlier one
+(`decay.WEAKER_SHARE`, still above zero or within chance) shows as "Más
+débil" / "Weaker" instead of "Se mantiene", with the two averages and the
+change. Display and seller question only; no flag and no class change.
 
 Limitations: the thirds are cut by time, so a history whose pace changed
 has periods of different sizes; trades are treated as independent, which

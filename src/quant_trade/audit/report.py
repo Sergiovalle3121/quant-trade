@@ -22,6 +22,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
 from quant_trade.audit.account import is_account_history
+from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
@@ -436,6 +437,12 @@ LABELS: dict[str, dict[str, str]] = {
             "que el azar difícilmente explica. Lo verás también en las banderas rojas."
         ),
         "recent_badge_held": "Se mantiene",
+        "recent_badge_weaker": "Más débil",
+        "recent_weaker": (
+            "La media por operación bajó de {early} a {late} ({change}) en el último tercio. "
+            "Sigue sobre cero y la caída cabe en lo que el azar explica, pero conviene "
+            "vigilarla."
+        ),
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
         "fund": "Lo que revisaría quien invierte en un fondo",
@@ -1118,6 +1125,12 @@ LABELS: dict[str, dict[str, str]] = {
             "hardly explains. You will also see it in the red flags."
         ),
         "recent_badge_held": "Holds",
+        "recent_badge_weaker": "Weaker",
+        "recent_weaker": (
+            "The average per trade fell from {early} to {late} ({change}) in the last third. "
+            "It stays above zero and the drop is within what chance explains, but it is "
+            "worth watching."
+        ),
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
         "fund": "What a fund investor would check",
@@ -3575,7 +3588,19 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
             f"{_e(localize(reason, locale))}</span></p>"
         )
     out = f"<p class='muted'>{_e(labels['recent_intro'])}</p>"
-    if recent.get("clean"):
+    early_mean = _ev_value(recent["early"].get("mean"))
+    late_mean = _ev_value(recent["recent"].get("mean"))
+    if is_weaker(recent) and early_mean is not None and late_mean is not None:
+        text = labels["recent_weaker"].format(
+            early=_signed_amount(early_mean),
+            late=_signed_amount(late_mean),
+            change=f"{late_mean / early_mean - 1:+.0%}",
+        )
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['recent_badge_weaker'])}</span> {_e(text)}</p>"
+        )
+    elif recent.get("clean"):
         out += (
             f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
             f"{_e(labels['recent_badge_held'])}</span> {_e(labels['recent_held'])}</p>"
