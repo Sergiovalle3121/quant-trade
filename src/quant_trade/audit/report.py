@@ -73,6 +73,9 @@ DISCLAIMER = {
     ),
 }
 
+#: The full sample report, linked from a locked preview.
+SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample"}
+
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
@@ -630,6 +633,7 @@ LABELS: dict[str, dict[str, str]] = {
             "El veredicto, las gráficas y las explicaciones son gratis. El detalle numérico de "
             "estas secciones se entrega en el informe completo"
         ),
+        "sample_full": "Ver cómo es un informe completo (ejemplo con datos sintéticos)",
         "trade_stats": "Estadísticas de las operaciones",
         "long": "Largos",
         "short": "Cortos",
@@ -1252,6 +1256,7 @@ LABELS: dict[str, dict[str, str]] = {
             "The verdict, charts and explanations are free. The numeric detail of these "
             "sections comes with the full report"
         ),
+        "sample_full": "See what a full report looks like (sample built from synthetic data)",
         "trade_stats": "Trade statistics",
         "long": "Long",
         "short": "Short",
@@ -4263,12 +4268,16 @@ def render_html(
         (labels["red_flags"], flags_html),
     ]
     if locked:
+        # The sample opens in a new tab: the report's link is the buyer's only way back.
+        sample_href = SAMPLE_PATHS.get(locale, SAMPLE_PATHS["es"])
         detail_html = (
             f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
             + "".join(
                 f"<li>{_e(title)}</li>" for title, body in detail if not _only_unmeasured(body)
             )
-            + f"</ul>{paybox}</div>"
+            + "</ul>"
+            f"<p class='lock-sample'><a href='{sample_href}' target='_blank' rel='noopener'>"
+            f"{_e(labels['sample_full'])}</a></p>{paybox}</div>"
         )
     else:
         detail_html = "".join(
