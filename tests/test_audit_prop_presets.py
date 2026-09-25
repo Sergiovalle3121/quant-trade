@@ -59,3 +59,18 @@ def test_invalid_rules_are_refused() -> None:
     ):
         with pytest.raises(ValueError):
             ChallengeRules(**{**base, **change})
+
+
+def test_upload_form_shows_when_the_rules_were_read() -> None:
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.pages import _plain_date, landing
+    from quant_trade.audit.prop_presets import AS_OF
+
+    for locale in ("es", "en"):
+        html = landing(locale=locale)
+        assert _plain_date(AS_OF, locale) in html
+    assert _plain_date("2026-09-25", "es") == "25 sep 2026"
+    assert _plain_date("2026-09-25", "en") == "Sep 25, 2026"
+    for rules in PRESETS.values():
+        for note in rules.notes:
+            assert find_claims(note) == []

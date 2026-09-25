@@ -23,7 +23,7 @@ from quant_trade.audit.guides import (
     guides_index_url,
 )
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
-from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS, preset_label
+from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, SOURCE_NAMES, STATUS_TEXT
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
@@ -124,6 +124,8 @@ _COPY: dict[str, dict[str, Any]] = {
         "equity_help": "Columnas: timestamp y equity (o return). Hasta 5 MB.",
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
+        "challenge_help": "Reglas leídas en la web oficial de cada firma el {as_of}. "
+        "El informe cita la fuente; confirma las reglas con la firma antes de pagar su reto.",
         "trades": "Operaciones cerradas (CSV, opcional)",
         "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
         "benchmark": "Benchmark (CSV, opcional)",
@@ -320,6 +322,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "equity_help": "Columns: timestamp and equity (or return). Up to 5 MB.",
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
+        "challenge_help": "Rules read on each firm's official site on {as_of}. "
+        "The report cites the source; confirm the rules with the firm before paying for its "
+        "challenge.",
         "trades": "Closed trades (CSV, optional)",
         "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
         "benchmark": "Benchmark (CSV, optional)",
@@ -1416,7 +1421,11 @@ def _upload_form(
         + "<div class='form-grid'>"
         + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
         + _drop("equity", copy["equity"], ".csv,text/csv", _e(copy["equity_help"]), locale)
-        + _field(copy["challenge"], f"<select name='challenge'>{_preset_options(locale)}</select>")
+        + _field(
+            copy["challenge"],
+            f"<select name='challenge'>{_preset_options(locale)}</select>",
+            copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
+        )
         + _field(
             copy["locale"],
             f"<select name='locale'><option value='es'{selected['es']}>Español</option>"
@@ -1555,6 +1564,18 @@ _MONTHS = {
     "es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"),
     "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
 }
+
+
+def _plain_date(stamp: str, locale: str) -> str:
+    """An ISO date as ``25 sep 2026`` or ``Sep 25, 2026``; anything else as it came."""
+    try:
+        when = datetime.fromisoformat(stamp)
+    except ValueError:
+        return stamp
+    month = _MONTHS[locale][when.month - 1]
+    if locale == "es":
+        return f"{when.day} {month} {when.year}"
+    return f"{month} {when.day}, {when.year}"
 
 
 def _utc_time(stamp: str, locale: str) -> str:

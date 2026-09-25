@@ -258,7 +258,7 @@ Challenge presets (`quant-trade audit presets` after integration), each a
 transcription of the official page on its `as_of` date with its
 `source_url`; rules the simulator cannot model are in `notes`:
 
-| Key | Target | Daily loss | Max loss | Min days | Source (read 2026-09-24) |
+| Key | Target | Daily loss | Max loss | Min days | Source (re-read 2026-09-25) |
 |---|---|---|---|---|---|
 | `generic-2step-phase1` (default) | 10 % | 5 % of initial | 10 % static | 4 | this plan |
 | `ftmo-2step-phase1` / `-phase2` | 10 % / 5 % | 5 % of initial | 10 % static | 4 | ftmo.com/en/trading-objectives |
@@ -270,6 +270,12 @@ transcription of the official page on its `as_of` date with its
 | `the5ers-hyper-growth` | 10 % | pause only, not simulated | 6 % static | 0 | the5ers.com/hyper-growth |
 | `the5ers-bootcamp-step` | 6 % | none | 5 % static | 0 | the5ers.com/bootcamp |
 | `topstep-50k/100k/150k-combine` | 6 % | optional, not simulated | USD 2,000 / 3,000 / 4,500 trailing EOD, locks at start | 2 | help.topstep.com (maximum loss limit) |
+
+Re-check on 2026-09-25: every target, loss limit and minimum above still
+matches the official pages. The5ers' Hyper Growth now sits under a "Growth"
+page whose table lists 3 minimum profitable days while its text says there is
+no minimum; the preset keeps none and says so in its notes. The upload form
+shows the date the rules were read, and each report cites the source page.
 
 Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
 

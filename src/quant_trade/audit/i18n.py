@@ -677,6 +677,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("No minimum days; unlimited time.", "Sin mínimo de días; tiempo ilimitado."),
     (
+        "The rules page table asks for 3 days that close in gain, while its text says there "
+        "is no minimum days requirement; the simulator uses none (optimistic if the table "
+        "applies).",
+        "La tabla de la página de reglas pide 3 días que cierren en ganancia, pero su texto dice "
+        "que no hay mínimo de días; el simulador no aplica ninguno (optimista si rige la tabla).",
+    ),
+    ("Unlimited time.", "Tiempo ilimitado."),
+    (
         "No daily limit during the evaluation steps; static loss stated on The5ers' blog.",
         "Sin límite diario en las fases de evaluación; la pérdida fija la indica el blog "
         "de The5ers.",
