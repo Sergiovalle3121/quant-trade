@@ -29,9 +29,12 @@ from typing import Any
 import pandas as pd
 
 from quant_trade.audit.importers import (
+    FXBLUE_CSV,
+    MQL5_SIGNAL_CSV,
     MT4_STATEMENT_HTML,
     MT5_HISTORY_HTML,
     MT5_HISTORY_XLSX,
+    MYFXBOOK_CSV,
     _lead_num,
 )
 from quant_trade.audit.redflags import RedFlag
@@ -39,7 +42,15 @@ from quant_trade.audit.schema import ParsedTrades, declared, measured, not_measu
 
 #: Formats that are account histories rather than backtests.
 ACCOUNT_FORMATS: frozenset[str] = frozenset(
-    {MT5_HISTORY_HTML, MT5_HISTORY_XLSX, MT4_STATEMENT_HTML}
+    {
+        MT5_HISTORY_HTML,
+        MT5_HISTORY_XLSX,
+        MT4_STATEMENT_HTML,
+        # Account-tracking exports: Myfxbook, an MQL5.com signal, FX Blue.
+        MYFXBOOK_CSV,
+        MQL5_SIGNAL_CSV,
+        FXBLUE_CSV,
+    }
 )
 
 #: The percentage gain overstates the money when it is at least this large ...

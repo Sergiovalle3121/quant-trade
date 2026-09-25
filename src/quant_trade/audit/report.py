@@ -14,7 +14,9 @@ report that fails the guard is a bug in this module, not a report.
 from __future__ import annotations
 
 import html
+import math
 import re
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -1171,6 +1173,9 @@ SOURCE_NAMES: dict[str, str] = {
     "quantconnect_trades_csv": "QuantConnect (CSV)",
     "backtestingpy_csv": "backtesting.py (CSV)",
     "vectorbt_csv": "vectorbt (CSV)",
+    "myfxbook_csv": "Myfxbook (CSV)",
+    "mql5_signal_csv": "MQL5 signal (CSV)",
+    "fxblue_csv": "FX Blue (CSV)",
 }
 
 
@@ -1469,8 +1474,10 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
         tone = "bad" if breakeven < 3 * reference else "good"
         label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
         pips = _ev_value(costs.get("break_even_pips"))
-        shown = f"{breakeven:,.2f}" + (f" · {pips:,.1f} pips" if pips is not None else "")
-        out.append((label, shown, tone))
+        if pips is not None:
+            # The pips go under the figure, so the tile keeps one short number.
+            label = f"{labels['kpi_breakeven']} ({labels['bps_side']}; {pips:,.1f} pips)"
+        out.append((label, f"{breakeven:,.2f}", tone))
     for block, scenario, label, percent in (
         (stress.get("trades") or {}, "best_5_trades", "kpi_stress", False),
         (stress.get("returns") or {}, "best_5_periods", "kpi_stress_curve", True),
@@ -1629,6 +1636,19 @@ def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> s
     return html_text
 
 
+def _range_fact(
+    items: list[dict[str, Any]], joiner: str, label: str, fmt: Callable[[float], str]
+) -> str:
+    """A fact card for a range of estimates, with one evidence tag for the whole range."""
+    values = [item.get("value") for item in items]
+    evidence = {str(item.get("evidence", "NOT_MEASURED")) for item in items}
+    tag = evidence.pop() if len(evidence) == 1 else "NOT_MEASURED"
+    shown = joiner.join(
+        fmt(float(v)) if isinstance(v, (int, float)) and math.isfinite(v) else "—" for v in values
+    )
+    return f"<div class='fact'><b>{_e(shown)}</b><p>{_e(label)} {_badge(tag)}</p></div>"
+
+
 def _value_cell(item: dict[str, Any], *, percent: bool) -> str:
     value = item.get("value")
     shown = _fmt(value, key="p50" if percent else "")
@@ -1686,7 +1706,10 @@ def _open_loss_note(
     if abs(platform_dd) < limit:
         return ""
     text = labels["challenge_open_loss"].format(dd=f"{abs(platform_dd):.1%}", limit=f"{limit:.0%}")
-    return f"<p><span class='badge FAIL'>{_e(labels['open_loss_badge'])}</span> {_e(text)}</p>"
+    return (
+        f"<p class='live-verdict lv-FAIL'><span class='badge FAIL'>"
+        f"{_e(labels['open_loss_badge'])}</span> {_e(text)}</p>"
+    )
 
 
 def _challenge_html(
@@ -1732,11 +1755,15 @@ def _challenge_html(
         ci = challenge["pass_probability_ci95"]
         days = challenge["days_to_target"]
         html_text += (
-            f"<p>{_e(labels['ci95'])}: {_value_cell(ci['low'], percent=True)} – "
-            f"{_value_cell(ci['high'], percent=True)}</p>"
-            f"<p>{_e(labels['days_to_target'])}: "
-            + " / ".join(_value_cell(days[q], percent=False) for q in ("p25", "p50", "p75"))
-            + "</p>"
+            "<div class='facts'>"
+            + _range_fact([ci["low"], ci["high"]], " – ", labels["ci95"], lambda v: f"{v:.1%}")
+            + _range_fact(
+                [days[q] for q in ("p25", "p50", "p75")],
+                " / ",
+                labels["days_to_target"],
+                lambda v: f"{v:.0f}",
+            )
+            + "</div>"
         )
     notes = rules.get("notes") or []
     if notes:

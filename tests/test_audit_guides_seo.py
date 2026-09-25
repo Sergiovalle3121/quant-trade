@@ -85,6 +85,9 @@ def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
         "quantconnect",
         "backtesting-py",
         "vectorbt",
+        "myfxbook",
+        "mql5-signal",
+        "fxblue",
     }
     for guide in GUIDES:
         assert set(guide.text) == {"es", "en"}

@@ -57,6 +57,21 @@ wrote them ("Net profit", "Trade", "Profit Column"). A figure written with a
 decimal comma (`1 234,56`, `1.234,56`) is read as 1234.56; `1,234` stays a
 thousands separator. The importers were checked against 23 real public
 MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
+
+Account histories from tracking sites are read too, so an investor can
+review a trader from the export alone: Myfxbook's history CSV (`Profit` is
+net, so the gross adds commission and swap back; `Deposit`/`Withdrawal`
+rows are cash flows; the "Open Trades" section is left out of the trades
+and its summed Profit is kept as the DECLARED floating result), the history
+or positions CSV of an MQL5.com signal (`;`, repeated `Time`/`Price`
+columns, `Balance` rows are cash flows, cancelled pending orders skipped)
+and FX Blue's orders CSV (`sep=,` first line, `Closed position` rows are
+trades, `Deposit`/`Withdrawal` rows are flows; a file holding several
+accounts is read for the one with the most closed trades, with a warning).
+All three count as account histories, so they get the "El dinero real de la
+cuenta" review. Checked against 15 real public exports; see
+`docs/research/audit_iteration4/tracking_exports_check.md`.
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating
@@ -972,6 +987,12 @@ and a copy button for the badge code. Every page works without it. `/static/`
 serves only the files listed in `theme.STATIC_FILES`. Printing always gets a
 light, static page. The landing's report illustration, including its three
 figures, is labelled as synthetic data.
+
+The prop-firm simulator shows its 95 % range and its days to target as two
+fact cards with one evidence tag each. When the platform's open-trade drawdown
+already passes the challenge's total loss limit, that warning is a red-edged
+callout above the table. The break-even cost tile shows one number (basis points
+per side) and puts the pips in its label, so the figure does not wrap.
 
 ## Security
 

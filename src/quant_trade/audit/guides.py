@@ -210,6 +210,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Pide que el historial se imprima el día que lo recibes: uno impreso hace "
                     "meses no muestra lo que pasó después.",
                     "El informe lee el archivo tal como llega; no lo comprueba con el bróker.",
+                    "Si el proveedor solo publica su cuenta en Myfxbook, FX Blue o una señal de "
+                    "MQL5, sirve el historial en CSV que exportan esos sitios.",
                 ),
             ),
             "en": GuideText(
@@ -242,6 +244,8 @@ GUIDES: tuple[Guide, ...] = (
                     "ago does not show what happened since.",
                     "The report reads the file as it arrives; it does not check it with the "
                     "broker.",
+                    "If the provider only publishes the account on Myfxbook, FX Blue or an MQL5 "
+                    "signal, the CSV history those sites export works too.",
                 ),
             ),
         },
@@ -631,6 +635,185 @@ GUIDES: tuple[Guide, ...] = (
                     "For every variant to count, declare the number of trials or upload the "
                     "variants matrix.",
                     _BALANCE_EN,
+                    _FLOATING_EN,
+                ),
+            ),
+        },
+    ),
+    Guide(
+        slug="myfxbook",
+        platform="Myfxbook",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo exportar el historial de una cuenta de Myfxbook",
+                summary=(
+                    "Descarga en CSV el historial de una cuenta de Myfxbook y súbelo para ver "
+                    "sus operaciones, depósitos y retiros con las mismas pruebas que un backtest."
+                ),
+                file=(
+                    "Un .csv con las columnas Open Date, Close Date, Symbol, Action, Units/Lots, "
+                    "Open Price, Close Price, Commission, Swap, Pips y Profit."
+                ),
+                steps=(
+                    "Abre la cuenta en Myfxbook y ve a la pestaña del historial de operaciones.",
+                    "Usa la opción de exportar el historial y elige CSV.",
+                    "Si la cuenta no es tuya, pide ese CSV a su dueño: Myfxbook deja exportar "
+                    "al titular de la cuenta.",
+                ),
+                upload=(
+                    "En «Informe de tu plataforma» para revisar la cuenta sola, o en «Estado de "
+                    "cuenta real o demo» junto al backtest del robot."
+                ),
+                tips=(
+                    "Los depósitos y retiros del archivo se leen como movimientos de dinero: el "
+                    "informe separa lo que hizo la operativa de lo que se ingresó o retiró.",
+                    "Las operaciones que siguen abiertas al final del archivo no se cuentan.",
+                    "El archivo no dice la zona horaria: las horas se leen tal cual.",
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to export a Myfxbook account's history",
+                summary=(
+                    "Download a Myfxbook account's history as CSV and upload it to see its "
+                    "trades, deposits and withdrawals under the same tests as a backtest."
+                ),
+                file=(
+                    "A .csv with the columns Open Date, Close Date, Symbol, Action, Units/Lots, "
+                    "Open Price, Close Price, Commission, Swap, Pips and Profit."
+                ),
+                steps=(
+                    "Open the account on Myfxbook and go to its trading history tab.",
+                    "Use the option to export the history and pick CSV.",
+                    "If the account is not yours, ask its owner for that CSV: Myfxbook lets the "
+                    "account holder export it.",
+                ),
+                upload=(
+                    "In 'Your platform report' to review the account on its own, or in 'Live or "
+                    "demo account statement' next to the robot's backtest."
+                ),
+                tips=(
+                    "The file's deposits and withdrawals are read as money movements: the "
+                    "report separates what the trading did from what was paid in or out.",
+                    "Trades still open at the end of the file are not counted.",
+                    "The file states no time zone: times are read as they are.",
+                    _FLOATING_EN,
+                ),
+            ),
+        },
+    ),
+    Guide(
+        slug="mql5-signal",
+        platform="MQL5 Signals",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo exportar el historial de una señal de MQL5",
+                summary=(
+                    "Descarga en CSV el historial de una señal de MQL5.com y súbelo para revisar "
+                    "la cuenta antes de copiarla."
+                ),
+                file=(
+                    "Un .csv separado por punto y coma con las columnas Time, Type, Volume, "
+                    "Symbol, Price, Time, Price, Commission, Swap y Profit."
+                ),
+                steps=(
+                    "Abre la página de la señal en mql5.com e inicia sesión.",
+                    "En la pestaña del historial de operaciones, usa la opción de exportar a CSV.",
+                ),
+                upload=(
+                    "En «Informe de tu plataforma» para revisar la señal sola, o en «Estado de "
+                    "cuenta real o demo» junto al backtest del robot."
+                ),
+                tips=(
+                    "Las filas Balance (depósitos, retiros y ajustes) se leen como movimientos "
+                    "de dinero, no como operaciones.",
+                    "Las órdenes pendientes canceladas no se cuentan.",
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to export an MQL5 signal's history",
+                summary=(
+                    "Download an MQL5.com signal's history as CSV and upload it to review the "
+                    "account before copying it."
+                ),
+                file=(
+                    "A semicolon-separated .csv with the columns Time, Type, Volume, Symbol, "
+                    "Price, Time, Price, Commission, Swap and Profit."
+                ),
+                steps=(
+                    "Open the signal's page on mql5.com and log in.",
+                    "In its trading history tab, use the option to export to CSV.",
+                ),
+                upload=(
+                    "In 'Your platform report' to review the signal on its own, or in 'Live or "
+                    "demo account statement' next to the robot's backtest."
+                ),
+                tips=(
+                    "Balance rows (deposits, withdrawals and adjustments) are read as money "
+                    "movements, not as trades.",
+                    "Cancelled pending orders are not counted.",
+                    _FLOATING_EN,
+                ),
+            ),
+        },
+    ),
+    Guide(
+        slug="fxblue",
+        platform="FX Blue",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo exportar las operaciones de una cuenta de FX Blue",
+                summary=(
+                    "Descarga en CSV las órdenes de una cuenta de FX Blue y súbelas para revisar "
+                    "sus operaciones y sus depósitos."
+                ),
+                file=(
+                    "Un .csv con las columnas Type, Ticket, Symbol, Lots, Buy/sell, Open price, "
+                    "Close price, Open time, Close time, Profit, Swap, Commission y Net profit."
+                ),
+                steps=(
+                    "Abre el estado de la cuenta en FX Blue.",
+                    "Usa la opción de exportar las órdenes a CSV.",
+                ),
+                upload=(
+                    "En «Informe de tu plataforma» para revisar la cuenta sola, o en «Estado de "
+                    "cuenta real o demo» junto al backtest del robot."
+                ),
+                tips=(
+                    "Se leen las filas Closed position; las posiciones abiertas y las órdenes "
+                    "pendientes no se cuentan.",
+                    "Si el archivo trae varias cuentas, se lee la que tiene más operaciones "
+                    "cerradas y el informe lo avisa. Exporta una cuenta por archivo.",
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to export an FX Blue account's trades",
+                summary=(
+                    "Download an FX Blue account's orders as CSV and upload them to review its "
+                    "trades and deposits."
+                ),
+                file=(
+                    "A .csv with the columns Type, Ticket, Symbol, Lots, Buy/sell, Open price, "
+                    "Close price, Open time, Close time, Profit, Swap, Commission and Net profit."
+                ),
+                steps=(
+                    "Open the account's statement on FX Blue.",
+                    "Use the option to export the orders to CSV.",
+                ),
+                upload=(
+                    "In 'Your platform report' to review the account on its own, or in 'Live or "
+                    "demo account statement' next to the robot's backtest."
+                ),
+                tips=(
+                    "Closed position rows are read; open positions and pending orders are not "
+                    "counted.",
+                    "If the file holds several accounts, the one with the most closed trades is "
+                    "read and the report says so. Export one account per file.",
                     _FLOATING_EN,
                 ),
             ),
