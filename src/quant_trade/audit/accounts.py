@@ -43,10 +43,12 @@ MAX_EMAIL_CHARS = 254
 SESSION_DAYS = 30
 RESET_HOURS = 24
 #: Failed sign-ins per hour for one (address, e-mail) pair; the per-address
-#: and per-e-mail ceilings are higher so nobody can lock another person out.
+#: and per-e-mail ceilings are higher so one stranger cannot lock the owner
+#: out. The per-e-mail ceiling also slows guessing spread over many addresses:
+#: past it, even the right password waits for the hour to roll over.
 MAX_FAILED_SIGNINS_PER_HOUR = 10
 MAX_FAILED_SIGNINS_PER_IP = 50
-MAX_FAILED_SIGNINS_PER_EMAIL = 200
+MAX_FAILED_SIGNINS_PER_EMAIL = 50
 MAX_SIGNUPS_PER_HOUR = 5
 MAX_ACCOUNT_ACTIONS_PER_HOUR = 30
 
@@ -176,6 +178,7 @@ __all__ = [
     "MAX_FAILED_SIGNINS_PER_EMAIL",
     "MAX_FAILED_SIGNINS_PER_HOUR",
     "MAX_FAILED_SIGNINS_PER_IP",
+    "MAX_ACCOUNT_ACTIONS_PER_HOUR",
     "MAX_SIGNUPS_PER_HOUR",
     "MIN_PASSWORD_CHARS",
     "RESET_HOURS",
