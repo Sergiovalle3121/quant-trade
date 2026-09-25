@@ -312,7 +312,10 @@ list-style:none;color:var(--text-3);font-size:.84rem}
 animation-delay:calc(var(--i,0) * 90ms + 60ms)}
 .page-hero{position:relative;overflow:hidden;isolation:isolate;padding:clamp(56px,8vw,104px) 0
 clamp(48px,6vw,80px);border-bottom:1px solid var(--border)}
-.page-hero .aurora{top:-48vw;opacity:.8}
+.page-hero .aurora{top:-34vw;opacity:1}
+.page-hero::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;z-index:-1;
+background:linear-gradient(90deg,transparent,rgba(255,255,255,.55) 50%,transparent);
+box-shadow:0 0 28px 2px rgba(160,180,255,.22)}
 .page-hero h1{font-weight:640;font-size:clamp(2.6rem,5.6vw,4.6rem);letter-spacing:-.048em;
 line-height:1;margin:16px 0 18px;max-width:14em}
 .page-hero .lead{margin:0}
@@ -657,7 +660,7 @@ REPORT = """
 .toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;
 margin-bottom:34px}
 .toolbar-end{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.print-btn{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 15px;
+.print-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 15px;
 border-radius:999px;border:0;background:#f4f4f6;color:#000;font:560 .8rem var(--sans);cursor:pointer;
 transition:opacity .2s}
 .print-btn:hover{opacity:.86}
@@ -735,8 +738,8 @@ background:radial-gradient(90% 120% at 50% -20%,rgba(255,255,255,.12),transparen
 --text:#f4f4f6;--text-2:#a3a3aa;--text-3:#707077;--border:rgba(255,255,255,.12);
 --border-2:rgba(255,255,255,.2);--field:rgba(255,255,255,.05);--surface-2:#17171a;--btn-bg:#f4f4f6;
 --btn-fg:#000;--accent:#8fb0ff;--ok:#34c759;color-scheme:dark}
-.lockbox>p:first-child{font-size:clamp(1.6rem,3.2vw,2.4rem);font-weight:620;letter-spacing:-.04em;
-line-height:1.12;margin:0 0 24px;color:#fff}
+.lockbox>p:first-child{font-size:clamp(1.3rem,2.3vw,1.8rem);font-weight:600;letter-spacing:-.03em;max-width:30em;
+line-height:1.2;margin:0 0 28px;color:#fff}
 .lockbox ul{list-style:none;padding:0;margin:0 0 28px;display:grid;
 grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px}
 @media (max-width:620px){.lockbox ul{grid-template-columns:minmax(0,1fr)}}

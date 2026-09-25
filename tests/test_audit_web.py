@@ -28,6 +28,7 @@ from quant_trade.audit.web import (  # noqa: E402
     MESSAGES,
     client_ip,
     create_app,
+    looks_like_platform_report,
     message,
     sign_stripe_payload,
     verify_stripe_signature,
@@ -365,6 +366,41 @@ def test_a_platform_report_alone_is_audited_and_stored(tmp_path: Path) -> None:
     assert record.equity_csv is None
     assert set(record.files) == {"report.html", "optimization.xml"}
     assert record.digests["report.html"] == body["inputs"]["digests"]["report.html"]
+
+
+def test_a_report_dropped_in_the_equity_field_is_read_as_the_report(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    # No .html name: the content alone (UTF-16, as MetaTrader saves it) tells.
+    utf16 = synthetic_mt5_report(days=120)
+    assert utf16.startswith(b"\xff\xfe")
+    files = {"equity": ("export", utf16, "application/octet-stream")}
+    response = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
+    assert response.status_code == 303, response.text
+    audit_id, token = _id_and_token(response.headers["location"])
+    body = client.get(f"/audits/{audit_id}.json?token={token}").json()
+    assert body["inputs"]["source_format"] == "mt5_tester_html"
+    assert looks_like_platform_report("r.xlsx", b"PK\x03\x04")
+    assert not looks_like_platform_report("e.csv", csv_bytes(positive_drift(50)))
+
+
+def test_a_malformed_csv_is_explained_in_spanish_without_parser_text(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    bad = b"timestamp,equity,x\n2024-01-01,1,2\n2024-01-02,1,2\n2024-01-03,1,2,3,4\n"
+    files = {"equity": ("e.csv", bad, "text/csv")}
+    response = client.post("/audits", files=files, data={"consent": "on"})
+    assert response.status_code == 400
+    assert "mismo número de columnas" in response.text
+    assert "Expected" not in response.text
+
+
+def test_an_unknown_address_is_a_missing_page_not_a_missing_audit(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    page = client.get("/no-existe")
+    assert page.status_code == 404
+    assert "Página no encontrada" in page.text and "Esta página no existe" in page.text
+    assert "No se pudo auditar" not in page.text
+    assert "Page not found" in client.get("/no-existe?lang=en").text
+    assert "No encontramos esa auditoría" in client.get("/audits/nothere?token=x").text
 
 
 def test_report_uploads_are_purged_with_their_audit(tmp_path: Path) -> None:

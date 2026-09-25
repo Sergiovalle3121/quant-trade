@@ -33,6 +33,12 @@ no extra cost beyond what the uploaded report already lists (there is no
 hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
 at least 30 return observations.
 
+A platform report dropped in the equity field by mistake (an `.htm`,
+`.html` or `.xlsx` name, or HTML content, UTF-16 included) is read as the
+report instead of failing as a malformed CSV. A CSV the parser cannot read
+is explained in the form's language (header row, same number of columns),
+without the parser's English message.
+
 ### Importers and their limits
 
 `audit/importers.py` detects the format by content (standard library only)
@@ -82,7 +88,11 @@ The report embeds four SVG figures without JavaScript (`audit/charts.py`):
 equity, drawdown, the resampled scenario fan and the monthly return map,
 each with its evidence tag. "What it means for you" gives two plain
 sentences per dimension. The "Print / save PDF" button uses the print
-stylesheet, which hides the buttons and the forms.
+stylesheet, which hides the buttons and the forms. Axis labels always
+differ from each other: a narrow range (an account that moved a few
+dollars) is written in full with the decimals it needs, never "10k, 10k".
+Red-flag severities and the platform's declared fields are shown in the
+report's language (Grave / Aviso; Bróker, Beneficio neto total…).
 
 ### Executive summary
 

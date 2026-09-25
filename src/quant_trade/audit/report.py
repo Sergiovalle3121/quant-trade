@@ -596,6 +596,93 @@ def _badge(cls: str) -> str:
     return f'<span class="badge {_e(cls)}">{_e(cls)}</span>'
 
 
+#: Red-flag severities as a reader says them; the class keeps the colour.
+SEVERITY_TEXT: dict[str, dict[str, str]] = {
+    "es": {"FAIL": "Grave", "WARN": "Aviso", "INFO": "Nota"},
+    "en": {"FAIL": "Serious", "WARN": "Warning", "INFO": "Note"},
+}
+
+
+def _severity_badge(severity: str, locale: str) -> str:
+    text = SEVERITY_TEXT.get(locale, SEVERITY_TEXT["en"]).get(severity, severity)
+    return f'<span class="badge {_e(severity)}">{_e(text)}</span>'
+
+
+#: The platform's own summary fields, named as the customer knows them.
+PLATFORM_LABELS: dict[str, dict[str, str]] = {
+    "es": {
+        "strategy": "Estrategia",
+        "symbol": "Símbolo",
+        "period": "Periodo",
+        "broker": "Bróker",
+        "server": "Servidor",
+        "account_type": "Tipo de cuenta",
+        "margin_mode": "Modo de margen",
+        "leverage": "Apalancamiento",
+        "history_quality": "Calidad del historial",
+        "report_date": "Fecha del informe",
+        "start": "Inicio",
+        "end": "Fin",
+        "inputs": "Parámetros",
+        "input_names": "Nombres de los parámetros",
+        "variants": "Variantes",
+        "declared_total_net_profit": "Beneficio neto total",
+        "declared_total_trades": "Operaciones totales",
+        "declared_total_deals": "Transacciones totales",
+        "declared_balance_drawdown_maximal": "Drawdown máximo del balance",
+        "declared_equity_drawdown_maximal": "Drawdown máximo de la equity",
+        "declared_equity_drawdown_relative": "Drawdown relativo de la equity",
+        "declared_maximal_drawdown": "Drawdown máximo",
+        "declared_relative_drawdown": "Drawdown relativo",
+        "declared_sharpe_ratio": "Sharpe",
+        "declared_profit_factor": "Profit factor",
+        "declared_balance": "Balance",
+        "declared_equity": "Equity",
+        "declared_final_equity": "Equity final",
+        "declared_closed_trade_pnl": "Resultado de operaciones cerradas",
+        "declared_floating_pnl": "Resultado flotante",
+    },
+    "en": {
+        "strategy": "Strategy",
+        "symbol": "Symbol",
+        "period": "Period",
+        "broker": "Broker",
+        "server": "Server",
+        "account_type": "Account type",
+        "margin_mode": "Margin mode",
+        "leverage": "Leverage",
+        "history_quality": "History quality",
+        "report_date": "Report date",
+        "start": "Start",
+        "end": "End",
+        "inputs": "Inputs",
+        "input_names": "Input names",
+        "variants": "Variants",
+        "declared_total_net_profit": "Total net profit",
+        "declared_total_trades": "Total trades",
+        "declared_total_deals": "Total deals",
+        "declared_balance_drawdown_maximal": "Balance drawdown maximal",
+        "declared_equity_drawdown_maximal": "Equity drawdown maximal",
+        "declared_equity_drawdown_relative": "Equity drawdown relative",
+        "declared_maximal_drawdown": "Maximal drawdown",
+        "declared_relative_drawdown": "Relative drawdown",
+        "declared_sharpe_ratio": "Sharpe ratio",
+        "declared_profit_factor": "Profit factor",
+        "declared_balance": "Balance",
+        "declared_equity": "Equity",
+        "declared_final_equity": "Final equity",
+        "declared_closed_trade_pnl": "Closed trade P/L",
+        "declared_floating_pnl": "Floating P/L",
+    },
+}
+
+
+def platform_label(key: str, locale: str) -> str:
+    """A platform field's name; an unknown key is shown as plain words."""
+    names = PLATFORM_LABELS.get(locale, PLATFORM_LABELS["en"])
+    return names.get(key) or key.replace("_", " ").capitalize()
+
+
 def _is_evidence(value: Any) -> bool:
     return isinstance(value, dict) and "evidence" in value and "value" in value
 
@@ -1031,7 +1118,8 @@ def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str,
     return (
         "<ul class='flag-list'>"
         + "".join(
-            f"<li>{_badge(flag['severity'])} {_e(flag_title(flag['code'], locale))} "
+            f"<li>{_severity_badge(flag['severity'], locale)} "
+            f"{_e(flag_title(flag['code'], locale))} "
             f"<code>{_e(flag['code'])}</code></li>"
             for flag in flags
         )
@@ -1183,7 +1271,8 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         out += (
             f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
             + "".join(
-                f"<tr><td>{_e(key)}</td><td>{_e(value)}</td></tr>"
+                f"<tr><td>{_e(platform_label(key, _locale_of(labels)))}</td>"
+                f"<td>{_e(value)}</td></tr>"
                 for key, value in metadata.items()
             )
             + "</table>"
@@ -1493,7 +1582,7 @@ def render_html(
         f"<table><tr><th>{_e(labels['code'])}</th><th>{_e(labels['severity'])}</th>"
         f"<th>{_e(labels['detail'])}</th></tr>"
         + "".join(
-            f"<tr><td>{_e(flag['code'])}</td><td>{_badge(flag['severity'])}</td>"
+            f"<tr><td>{_e(flag['code'])}</td><td>{_severity_badge(flag['severity'], locale)}</td>"
             f"<td>{_e(localize(flag['detail'], locale))}</td></tr>"
             for flag in data["red_flags"]
         )
