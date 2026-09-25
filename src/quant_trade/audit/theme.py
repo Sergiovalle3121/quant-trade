@@ -749,6 +749,7 @@ ul.mtags,ul.chips,ol.ladder{padding:0!important;margin-left:0!important}.mtags l
 @media (max-width:620px){.rung{grid-template-columns:40px 1fr;gap:14px;padding:14px 16px;align-items:start}.rung-cls{width:40px;height:40px}.rung-you{grid-column:2;justify-self:start}}
 @media print{.ladder{display:block;break-inside:avoid}.rung-cls,.rung-you{border:1px solid currentColor}.rung{margin:0 0 8px;break-inside:avoid;box-shadow:none}.rung{display:flex;align-items:center}.rung-cls{display:block;flex:none;width:34px;height:34px;line-height:32px;text-align:center;margin-right:16px}.rung p{flex:1;margin-right:14px}.rung-you{flex:none}}
 a.print-btn{text-decoration:none}
+[aria-busy=true]{cursor:progress;opacity:.8}
 .report-hero .verdict+p{margin-top:28px}
 .print-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2}
 @media (max-width:620px){.meta-line .meta-x{display:none}.meta-line span{font-size:.66rem}}

@@ -249,6 +249,8 @@ LABELS: dict[str, dict[str, str]] = {
             "que produce el error de muestreo."
         ),
         "pdf_long": "Descargar el informe en PDF",
+        "pdf_busy": "Generando tu PDF… (unos segundos)",
+        "pdf_wait": "El PDF tarda unos segundos en generarse.",
         "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
@@ -981,6 +983,8 @@ LABELS: dict[str, dict[str, str]] = {
             "and the one sampling error produces."
         ),
         "pdf_long": "Download the report as PDF",
+        "pdf_busy": "Preparing your PDF… (a few seconds)",
+        "pdf_wait": "The PDF takes a few seconds to prepare.",
         "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
         "pdf_check_link": "How they check",
         "switch": "Español",
@@ -4809,7 +4813,10 @@ def render_html(
             f"<a class='print-btn' href='#unlock'>{icon('lock')}{_e(labels['unlock_nav'])}</a>"
         )
     elif pdf_url and not locked:
-        print_html = f"<a class='print-btn' href='{_e(pdf_url)}' download>{_e(labels['pdf'])}</a>"
+        print_html = (
+            f"<a class='print-btn' href='{_e(pdf_url)}' download "
+            f"data-busy='{_e(labels['pdf_busy'])}'>{_e(labels['pdf'])}</a>"
+        )
     else:
         print_html = (
             "<button type='button' class='print-btn' "
@@ -4864,7 +4871,9 @@ def render_html(
         + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
-            f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
+            f"href='{_e(pdf_url)}' download data-busy='{_e(labels['pdf_busy'])}'>"
+            f"{_e(labels['pdf_long'])}</a>"
+            f"<noscript> <span class='muted'>{_e(labels['pdf_wait'])}</span></noscript></p>"
             f"<p class='muted pdf-check rise no-print' style='--i:4'>{_e(labels['pdf_check'])} "
             f"<a href='{'/check' if locale == 'en' else '/comprobar'}'>"
             f"{_e(labels['pdf_check_link'])}</a></p>"
