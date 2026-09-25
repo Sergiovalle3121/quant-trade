@@ -1342,9 +1342,9 @@ GUIDES: tuple[Guide, ...] = (
                     "Statement), Charles Schwab (Transactions ou Realized Gain/Loss), "
                     "Fidelity, E*TRADE, Webull, tastytrade, eToro (posições fechadas), XTB "
                     "(histórico de posições fechadas do xStation 5), DEGIRO (Transações, em "
-                    "qualquer idioma), Trading 212 (histórico), cTrader, Sierra Chart (Trade "
-                    "Activity Log), Binance, Kraken, Coinbase e KuCoin (histórico de ordens "
-                    "executadas).",
+                    "qualquer idioma), Trading 212 (histórico), cTrader (History), Rithmic "
+                    "(Completed Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, "
+                    "Coinbase e KuCoin (histórico de ordens executadas).",
                     "Os custos da DEGIRO vêm em euros e são descontados como estão, também em "
                     "ações cotadas em outra moeda; o resultado da Trading 212 vem na moeda da "
                     "sua conta e é usado assim.",
