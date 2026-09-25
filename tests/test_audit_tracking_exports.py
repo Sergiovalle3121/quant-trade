@@ -12,6 +12,7 @@ import html
 import pytest
 
 from quant_trade.audit.account import ACCOUNT_FORMATS
+from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import (
     FXBLUE_CSV,
     MQL5_SIGNAL_CSV,
@@ -20,6 +21,7 @@ from quant_trade.audit.importers import (
     detect_format,
     import_report,
 )
+from quant_trade.audit.schema import parse_equity_csv
 
 MYFXBOOK_HEAD = (
     "Tags,Ticket,Open Date,Close Date,Symbol,Action,Units/Lots,SL,TP,Open Price,Close Price,"
@@ -319,3 +321,67 @@ def test_a_backtest_keeps_the_optimisation_wording() -> None:
         account = meaning(OUT_OF_SAMPLE, "NOT_MEASURED", locale, account=True)
         assert account == MEANING[locale][key + ".account"]
         assert find_claims(account) == []
+
+
+def _flow_row(ticket: int, moment: str, kind: str, amount: float) -> str:
+    return (
+        f",{ticket},{moment},,,{kind},0.010,0,0,0,0,0,0,0.0,{amount:.2f},0,{kind},0,"
+        "00:00:00:00" + TAIL
+    )
+
+
+def _win_row(ticket: int, day: int, profit: float) -> str:
+    moment = f"03/{day:02d}/2024"
+    return (
+        f",{ticket},{moment} 10:00,{moment} 12:00,EURUSD,Buy,0.10,0,0,1.10000,1.10200,"
+        f"0,0,{profit},{profit},1,,7,00:02:00:00" + TAIL
+    )
+
+
+def _emptied_and_refilled(left: float, refill_day: int) -> bytes:
+    """1,000 deposited, +10 on each of 5 days, all but ``left`` withdrawn on the
+    5th evening (the 17th), 1,000 paid in again on ``refill_day`` and +10 a day after it."""
+    rows = [MYFXBOOK_HEAD, _flow_row(1, "03/12/2024 09:00", "Deposit", 1000.0)]
+    rows += [_win_row(10 + day, day, 10.0) for day in range(13, 18)]
+    rows.append(_flow_row(2, "03/17/2024 20:00", "Withdrawal", -(1050.0 - left)))
+    rows.append(_flow_row(3, f"03/{refill_day:02d}/2024 09:00", "Deposit", 1000.0))
+    rows += [_win_row(20 + day, day, 10.0) for day in range(refill_day, refill_day + 5)]
+    return ("\n".join(rows) + "\n").encode("utf-8")
+
+
+@pytest.mark.parametrize("left", [1.0, 0.01])
+def test_a_refilled_account_is_not_read_as_a_gain_on_what_was_left(left: float) -> None:
+    # Money paid in before the day's trading counts from that moment: +10 on
+    # a refilled 1,000 is +1 %, not +10 on the 1 left the evening before.
+    report = import_report(_emptied_and_refilled(left, refill_day=18), "statement.csv")
+    returns = parse_equity_csv(report.equity_csv).returns
+    assert returns.max() < 0.011
+    assert returns.min() > -0.001
+
+
+def test_an_account_emptied_by_a_withdrawal_and_refilled_later_is_read() -> None:
+    report = import_report(_emptied_and_refilled(0.0, refill_day=24), "statement.csv")
+    returns = parse_equity_csv(report.equity_csv).returns
+    assert returns.max() < 0.011
+    # The empty days in between neither gain nor lose.
+    assert (returns.abs() < 1e-12).sum() >= 4
+
+
+def test_a_trade_closed_on_the_cents_a_withdrawal_left_is_measured_on_the_balance_before() -> None:
+    # 1,000; +10; 1,009.99 withdrawn, leaving 0.01; +20 closes; 1,000 paid in again.
+    rows = [
+        MYFXBOOK_HEAD,
+        _flow_row(1, "03/12/2024 09:00", "Deposit", 1000.0),
+        _win_row(10, 13, 10.0),
+        _flow_row(2, "03/14/2024 20:00", "Withdrawal", -1009.99),
+        _win_row(11, 15, 20.0),
+        _flow_row(3, "03/18/2024 09:00", "Deposit", 1000.0),
+        _win_row(12, 18, 10.0),
+    ]
+    report = import_report(("\n".join(rows) + "\n").encode("utf-8"), "statement.csv")
+    returns = parse_equity_csv(report.equity_csv).returns
+    # +20 on the 1,010 it was opened on, not on the 0.01 left.
+    assert returns.max() == pytest.approx(20.0 / 1010.0, rel=1e-3)
+    note = [w for w in report.warnings if "balance a withdrawal left" in w]
+    assert note and "2024-03-15" in note[0]
+    assert untranslated({"inputs": {"parse_warnings": report.warnings}}) == []
