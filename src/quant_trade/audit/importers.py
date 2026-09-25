@@ -3190,8 +3190,20 @@ def _balance_curve(
             "historial hasta ese día para auditarlo",
         )
 
+    # The balance just before the last withdrawal, until money moves again: a
+    # trade that closes on the little a withdrawal left was opened on it.
+    anchor = 0.0
+    anchored: list[date] = []
+
     def growth(start: float, end: float, day: date) -> float:
         """What trading did to the balance between two moments with no money moved."""
+        if anchor > start and abs(end - start) > max(start, 0.0):
+            # More than the whole remainder won or lost: measured against the
+            # balance the position was really opened on.
+            if anchor + end - start <= 0:
+                raise wiped(day)
+            anchored.append(day)
+            return (anchor + end - start) / anchor
         if start <= 0:
             # Emptied by a withdrawal: fine while nothing is traded.
             if abs(end - start) < 0.005:
@@ -3209,6 +3221,7 @@ def _balance_curve(
             for pre, post in cuts.get(daily[pointer][0], []):
                 factor *= growth(segment, pre, day)
                 segment = post
+                anchor = pre if post < pre else 0.0
             level = daily[pointer][1]
             pointer += 1
         factor *= growth(segment, level, day)
@@ -3217,6 +3230,12 @@ def _balance_curve(
             rows.append((day, index))
         else:
             rows.append((day, level))
+    if anchored:
+        warnings.append(
+            f"{len(anchored)} day(s) with a trade result larger than the balance a withdrawal "
+            f"left (first on {anchored[0].isoformat()}) were measured on the balance before "
+            "that withdrawal"
+        )
     if adjusted:
         warnings.append(
             "deposits or withdrawals were removed: the curve is a flow-adjusted index "

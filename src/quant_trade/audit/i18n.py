@@ -272,6 +272,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "el archivo trae {n} cuentas; solo se leyó la que tiene más operaciones cerradas ({m})",
     ),
     (
+        "{n} day(s) with a trade result larger than the balance a withdrawal left (first on "
+        "{date}) were measured on the balance before that withdrawal",
+        "{n} día(s) con un resultado mayor que el saldo que dejó un retiro (el primero, "
+        "{date}) se midieron sobre el saldo previo a ese retiro",
+    ),
+    (
         "{n} cash flow(s) after the last trade ignored",
         "se ignoraron {n} movimiento(s) de dinero posteriores a la última operación",
     ),
@@ -1560,6 +1566,13 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} open trade(s) excluded": (
         "{n} open trade excluded",
         "se excluyó {n} operación abierta",
+    ),
+    "{n} day(s) with a trade result larger than the balance a withdrawal left (first on "
+    "{date}) were measured on the balance before that withdrawal": (
+        "{n} day with a trade result larger than the balance a withdrawal left (first on "
+        "{date}) was measured on the balance before that withdrawal",
+        "{n} día con un resultado mayor que el saldo que dejó un retiro (el primero, {date}) "
+        "se midió sobre el saldo previo a ese retiro",
     ),
     "{n} cash flow(s) after the last trade ignored": (
         "{n} cash flow after the last trade ignored",

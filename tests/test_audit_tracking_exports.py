@@ -12,6 +12,7 @@ import html
 import pytest
 
 from quant_trade.audit.account import ACCOUNT_FORMATS
+from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import (
     FXBLUE_CSV,
     MQL5_SIGNAL_CSV,
@@ -364,3 +365,23 @@ def test_an_account_emptied_by_a_withdrawal_and_refilled_later_is_read() -> None
     assert returns.max() < 0.011
     # The empty days in between neither gain nor lose.
     assert (returns.abs() < 1e-12).sum() >= 4
+
+
+def test_a_trade_closed_on_the_cents_a_withdrawal_left_is_measured_on_the_balance_before() -> None:
+    # 1,000; +10; 1,009.99 withdrawn, leaving 0.01; +20 closes; 1,000 paid in again.
+    rows = [
+        MYFXBOOK_HEAD,
+        _flow_row(1, "03/12/2024 09:00", "Deposit", 1000.0),
+        _win_row(10, 13, 10.0),
+        _flow_row(2, "03/14/2024 20:00", "Withdrawal", -1009.99),
+        _win_row(11, 15, 20.0),
+        _flow_row(3, "03/18/2024 09:00", "Deposit", 1000.0),
+        _win_row(12, 18, 10.0),
+    ]
+    report = import_report(("\n".join(rows) + "\n").encode("utf-8"), "statement.csv")
+    returns = parse_equity_csv(report.equity_csv).returns
+    # +20 on the 1,010 it was opened on, not on the 0.01 left.
+    assert returns.max() == pytest.approx(20.0 / 1010.0, rel=1e-3)
+    note = [w for w in report.warnings if "balance a withdrawal left" in w]
+    assert note and "2024-03-15" in note[0]
+    assert untranslated({"inputs": {"parse_warnings": report.warnings}}) == []
