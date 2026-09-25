@@ -72,6 +72,7 @@ from quant_trade.audit.schema import (
     DeclaredMetadata,
     ParseError,
     build_inputs,
+    live_digest_name,
     report_digest_name,
 )
 from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
@@ -298,6 +299,7 @@ UPLOAD_NAMES: dict[str, dict[str, str]] = {
     "variants": {"es": "de variantes", "en": "variants"},
     "report": {"es": "del informe", "en": "report"},
     "optimization": {"es": "de optimización", "en": "optimisation"},
+    "live": {"es": "de la cuenta real", "en": "live statement"},
 }
 
 
@@ -926,6 +928,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         uploads: dict[str, bytes | None],
         report_name: str | None,
         access_code: str | None,
+        live_name: str | None = None,
     ) -> tuple[str, str, bool]:
         """The CPU- and IO-bound part of an upload; runs in the thread pool."""
         now = datetime.now(UTC)
@@ -935,6 +938,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             extra_files[report_name] = uploads["report"]
         if uploads["optimization"]:
             extra_files["optimization.xml"] = uploads["optimization"]
+        live_bytes = uploads.get("live")
+        if live_bytes and live_name:
+            extra_files[live_name] = live_bytes
         token = secrets.token_urlsafe(32)
         # Stored without any checkout link: the token must never be persisted
         # in clear, so the page is re-rendered per request with the caller's.
@@ -970,6 +976,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         equity: Annotated[UploadFile | None, File()] = None,
         report: Annotated[UploadFile | None, File()] = None,
         optimization: Annotated[UploadFile | None, File()] = None,
+        live: Annotated[UploadFile | None, File()] = None,
         trades: Annotated[UploadFile | None, File()] = None,
         benchmark: Annotated[UploadFile | None, File()] = None,
         variants: Annotated[UploadFile | None, File()] = None,
@@ -1002,6 +1009,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 "equity": await _read_limited(equity, what="equity"),
                 "report": await _read_limited(report, what="report"),
                 "optimization": await _read_limited(optimization, what="optimization"),
+                "live": await _read_limited(live, what="live"),
                 "trades": await _read_limited(trades, what="trades"),
                 "benchmark": await _read_limited(benchmark, what="benchmark"),
                 "variants": await _read_limited(variants, what="variants"),
@@ -1044,6 +1052,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             uploads["report"], uploads["equity"] = uploads["equity"], None
             report_filename = equity_name
         report_name = report_digest_name(report_filename) if uploads["report"] else None
+        live_filename = live.filename if live is not None and uploads["live"] else None
+        live_name = live_digest_name(live_filename) if uploads["live"] else None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
@@ -1060,6 +1070,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     report_bytes=uploads["report"],
                     report_filename=report_filename,
                     optimization_bytes=uploads["optimization"],
+                    live_bytes=uploads["live"],
+                    live_filename=live_filename,
                 )
             except ParseError as exc:
                 return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
@@ -1071,7 +1083,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 logger.exception("upload could not be parsed")
                 return _html_error(request, 400, message("invalid_upload", loc), loc)
             try:
-                return _run_and_store(inputs, ip, uploads, report_name, code or None)
+                return _run_and_store(
+                    inputs, ip, uploads, report_name, code or None, live_name=live_name
+                )
             except Exception:
                 logger.exception("audit failed")
                 return _html_error(request, 500, message("server_error", loc), loc)

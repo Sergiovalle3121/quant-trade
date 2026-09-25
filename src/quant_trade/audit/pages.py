@@ -116,6 +116,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "lista de operaciones de TradingView (CSV o XLSX), o el CSV de operaciones de "
             "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 5 MB."
         ),
+        "live": "Estado de cuenta real o demo (opcional)",
+        "live_help": (
+            "El historial de la cuenta donde corre el robot (MetaTrader, TradingView u otro de "
+            "los formatos de arriba). Te decimos si se comporta como el backtest."
+        ),
         "optimization": "Exportación de optimización de MT5 (XML, opcional)",
         "optimization_help": (
             "Cuenta las configuraciones que probaste: el Sharpe deflactado usa ese número real."
@@ -313,6 +318,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "XLSX MetaTrader 5 exports), a "
             "TradingView list of trades (CSV or XLSX), or the trades CSV of NinjaTrader, "
             "QuantConnect, backtesting.py or vectorbt. Up to 5 MB."
+        ),
+        "live": "Live or demo account statement (optional)",
+        "live_help": (
+            "The history of the account running the robot (MetaTrader, TradingView or any "
+            "format above). We tell you whether it behaves like the backtest."
         ),
         "optimization": "MT5 optimisation export (XML, optional)",
         "optimization_help": (
@@ -1422,6 +1432,7 @@ def _upload_form(
         )
         + "<div class='form-grid'>"
         + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
+        + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
         + _drop("equity", copy["equity"], ".csv,text/csv", _e(copy["equity_help"]), locale)
         + _field(
             copy["challenge"],

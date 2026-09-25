@@ -205,6 +205,9 @@ def test_locked_report_puts_card_payment_first_with_the_pack_and_keeps_codes(
         assert pay in page and pack in page and alt in page
         assert page.index(pay) < page.index("name='code'")
         assert "name='plan' value='pack'" in page
+        # Both buttons share one height; the card button and the secure note carry icons.
+        assert "class='btn btn-ghost btn-lg' type='submit' name='plan' value='pack'" in page
+        assert "class='muted pay-secure'><svg" in page and "class='paybox pay-alt'" in page
         assert find_claims(page) == []
     landing = client.get("/").text
     assert "procesado por Stripe" in landing and find_claims(landing) == []

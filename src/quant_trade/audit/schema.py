@@ -632,12 +632,22 @@ class AuditInputs:
     report_variants: int | None = None
     #: Deposits and withdrawals an imported account history lists.
     cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
+    #: Closed trades of a live (or demo) account statement, compared with the
+    #: backtest (``audit/live.py``); never mixed into the backtest's figures.
+    live_trades: ParsedTrades | None = None
+    live_symbols: list[str] | None = None
+    live_format: str | None = None
 
 
-def report_digest_name(filename: str | None) -> str:
+def report_digest_name(filename: str | None, stem: str = "report") -> str:
     """``report.<ext>`` with the upload's extension when it is a known one."""
     ext = (filename or "").rsplit(".", 1)[-1].lower() if filename and "." in filename else ""
-    return f"report.{ext if ext in REPORT_EXTENSIONS else 'bin'}"
+    return f"{stem}.{ext if ext in REPORT_EXTENSIONS else 'bin'}"
+
+
+def live_digest_name(filename: str | None) -> str:
+    """``live.<ext>``: the stored name of a live account statement."""
+    return report_digest_name(filename, "live")
 
 
 def build_inputs(
@@ -650,6 +660,8 @@ def build_inputs(
     report_bytes: bytes | None = None,
     report_filename: str | None = None,
     optimization_bytes: bytes | None = None,
+    live_bytes: bytes | None = None,
+    live_filename: str | None = None,
 ) -> AuditInputs:
     """Parse and hash every upload.
 
@@ -657,7 +669,9 @@ def build_inputs(
     no equity file is uploaded, the closed-trade balance curve. An MT5
     optimisation export (``optimization_bytes``) supplies the number of
     configurations tried, which the deflated Sharpe uses as a MEASURED trial
-    count when it exceeds the declared one.
+    count when it exceeds the declared one. A live account statement
+    (``live_bytes``, any format a report can have) is read for its closed
+    trades only and compared with the backtest; it changes no other figure.
     """
     # Imported here: the importers build on this module's types.
     from quant_trade.audit.importers import import_report, parse_optimization
@@ -729,6 +743,13 @@ def build_inputs(
         warnings.extend(f"optimization: {w}" for w in summary.warnings)
         extra["optimization_passes"] = summary.passes
         extra["optimization_parameters"] = list(summary.parameters)
+    if live_bytes:
+        live = import_report(live_bytes, live_filename)
+        digests[live_digest_name(live_filename)] = sha256_of_bytes(live_bytes)
+        warnings.extend(f"live: {w}" for w in live.warnings)
+        extra["live_trades"] = live.trades
+        extra["live_symbols"] = list(live.symbols) or None
+        extra["live_format"] = live.source_format
     ppy, label = infer_frequency(equity.frame["timestamp"])
     return AuditInputs(
         equity=equity,
@@ -804,6 +825,9 @@ class AuditResult(BaseModel):
     stress: dict[str, Any] | None = None
     #: Trades by entry weekday and time of day (``audit/timing.py``).
     timing: dict[str, Any] | None = None
+    #: A live account statement against the backtest (``audit/live.py``);
+    #: ``None`` when no statement was uploaded.
+    live: dict[str, Any] | None = None
     risk: dict[str, Any] | None = None
     challenge: dict[str, Any] | None = None
     #: Deposits, withdrawals and open positions of an account history

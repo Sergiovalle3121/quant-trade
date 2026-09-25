@@ -29,6 +29,7 @@ _PREFIXES: dict[str, str] = {
     "trades": "operaciones",
     "benchmark": "benchmark",
     "optimization": "optimización",
+    "live": "cuenta real",
 }
 
 #: Labels the importers put in front of a totals mismatch (``_compare``).
@@ -478,6 +479,26 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("the curve is too short or not positive", "la curva es muy corta o no es positiva"),
     ("fewer than two closed trades", "menos de dos operaciones cerradas"),
     ("fewer than {n} closed trades", "menos de {n} operaciones cerradas"),
+    ("the backtest has no closed trades", "el backtest no tiene operaciones cerradas"),
+    (
+        "the backtest has fewer than {n} closed trades",
+        "el backtest tiene menos de {n} operaciones cerradas",
+    ),
+    (
+        "the live statement has fewer than {n} closed trades",
+        "la cuenta real tiene menos de {n} operaciones cerradas",
+    ),
+    (
+        "Backtest trades resampled with replacement, as many as the live statement holds; "
+        "costs itemised per trade subtracted on both sides. Streaks are not preserved.",
+        "Operaciones del backtest tomadas al azar con reemplazo, tantas como tiene la cuenta "
+        "real; los costes detallados por operación se restan en ambos lados. No conserva las "
+        "rachas.",
+    ),
+    (
+        "{s} resampled histories of {n} backtest trades, seed {seed}",
+        "{s} historias remuestreadas de {n} operaciones del backtest, semilla {seed}",
+    ),
     (
         "Entry times as the file states them (platform or server time); "
         "net result before itemised fees.",
