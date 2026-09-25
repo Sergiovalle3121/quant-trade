@@ -210,6 +210,12 @@ Limits, each written into the report as a reading warning:
   a 1e308 profit overflowed every later sum and the report page failed.
   The capital section is not measured when its reference fall is not a
   finite number.
+- A date more than a day after the upload (`FUTURE_SLACK`, for time
+  zones) is refused in the equity, report, trades, benchmark and live files
+  (`future_dates`, ES and EN): a record in 2150 is a damaged file. A monthly
+  series may hold this month (dated by its last day), and a fund table's
+  months that have not happened yet are dropped when they are blank, a
+  dash or 0; a future month that moves the account is still refused.
 - NUL characters are dropped when a report is decoded (`decode_text`) and
   from the stored report page: PostgreSQL refuses text holding one, so a
   stray NUL in a robot's name failed the upload with a server error. A
