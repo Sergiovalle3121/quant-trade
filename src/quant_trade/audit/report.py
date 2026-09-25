@@ -479,7 +479,7 @@ LABELS: dict[str, dict[str, str]] = {
             "de lo más decisivo a lo menos. Una clase mejor significa que los archivos "
             "responden más preguntas, no que la estrategia vaya a funcionar."
         ),
-        "plan_class": "Con esta dimensión en PASS y las demás igual, la clase sería",
+        "plan_class": "Si esta dimensión pasara y las demás quedaran igual, la clase sería",
         "plan_none": "Todas las dimensiones pasan: no queda ningún paso abierto.",
         "plan_locked": "pasos concretos, con las cifras de tu archivo, en el informe completo",
         "kpis": "Resumen ejecutivo",
@@ -917,7 +917,7 @@ LABELS: dict[str, dict[str, str]] = {
             "first. A better class means the files answer more questions, not that the "
             "strategy will work."
         ),
-        "plan_class": "With this dimension at PASS and the rest unchanged, the class would be",
+        "plan_class": "If this dimension passed and the rest stayed the same, the class would be",
         "plan_none": "Every dimension passes: no step is left open.",
         "plan_locked": "concrete steps, with your file's figures, in the full report",
         "kpis": "Executive summary",
@@ -1325,6 +1325,13 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "declared_final_equity": "Equity final",
         "declared_closed_trade_pnl": "Resultado de operaciones cerradas",
         "declared_floating_pnl": "Resultado flotante",
+        "initial_deposit": "Depósito inicial",
+        "model": "Modelado",
+        "modelling_quality": "Calidad del modelado",
+        "mismatched_chart_errors": "Errores de gráficos no coincidentes",
+        "parameters": "Valores de los parámetros",
+        "spread": "Spread",
+        "closing_deals": "Transacciones de cierre",
     },
     "en": {
         "strategy": "Strategy",
@@ -1358,6 +1365,13 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "declared_final_equity": "Final equity",
         "declared_closed_trade_pnl": "Closed trade P/L",
         "declared_floating_pnl": "Floating P/L",
+        "initial_deposit": "Initial deposit",
+        "model": "Modelling",
+        "modelling_quality": "Modelling quality",
+        "mismatched_chart_errors": "Mismatched chart errors",
+        "parameters": "Parameter values",
+        "spread": "Spread",
+        "closing_deals": "Closing deals",
     },
 }
 
