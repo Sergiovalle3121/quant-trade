@@ -1722,6 +1722,28 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
     )
 
 
+_TOC_LABEL = {"es": "En esta página", "en": "On this page"}
+
+
+def _doc(sections: list[tuple[str, str]], locale: str, *, lead: str = "", aside: str = "") -> str:
+    """A long-form page: the article plus a sticky index of its sections.
+
+    ``sections`` are (heading, body html) pairs; each heading gets an anchor
+    the index links to. The index is hidden on narrow screens.
+    """
+    article = lead + "".join(
+        f"<h2 id='s{i}'>{_e(heading)}</h2>{body}" for i, (heading, body) in enumerate(sections, 1)
+    )
+    toc = "".join(
+        f"<li><a href='#s{i}'>{_e(heading)}</a></li>" for i, (heading, _) in enumerate(sections, 1)
+    )
+    return (
+        f"<div class='doc'><article class='prose'>{article}</article>"
+        f"<aside class='toc' aria-label='{_e(_TOC_LABEL[locale])}'><div class='toc-in'>"
+        f"<b>{_e(_TOC_LABEL[locale])}</b><ol data-toc>{toc}</ol>{aside}</div></aside></div>"
+    )
+
+
 def legal_page(
     text: LegalText, *, locale: str = "es", kind: str = "terms", base_url: str = ""
 ) -> str:
@@ -1734,19 +1756,20 @@ def legal_page(
     description = f"{text.title} · {copy['title']}. {DISCLAIMER[locale]}"
     meta = _public_meta(text.title, description, locale, path, base_url)
     warning = f"<div class='error'>{_e(text.warning)}</div>" if text.warning else ""
-    sections = "".join(
-        f"<h2>{_e(heading)}</h2>" + "".join(f"<p>{_e(line)}</p>" for line in lines)
+    sections = [
+        (heading, "".join(f"<p>{_e(line)}</p>" for line in lines))
         for heading, lines in text.sections
-    )
+    ]
     crumbs = (
         f"<a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a><span>/</span>"
         f"<a href='?lang={other}'>{_other_name(locale)}</a>"
     )
     body = (
         _page_hero(ui["legal_eyebrow"], text.title, crumbs=crumbs)
-        + f"<div class='paper page-main'><div class='wrap'><article class='prose'>{warning}"
-        f"{sections}<p class='muted'>{_e(copy['legal_updated'])}: {_e(text.updated)}</p>"
-        "</article></div></div>"
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(sections, locale, lead=warning)
+        + f"<p class='muted doc-foot'>{_e(copy['legal_updated'])}: {_e(text.updated)}</p>"
+        "</div></div>"
     )
     return _page(
         text.title, locale, body, meta_html=meta, switch_href=f"?lang={other}", solid_nav=True
@@ -1856,12 +1879,19 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     )
     body = (
         _page_hero(ui["guides_eyebrow"], text.title, text.summary, crumbs)
-        + "<div class='paper page-main'><div class='wrap'><article class='prose'>"
-        f"<h2>{_e(words['file'])}</h2><p>{_e(text.file)}</p>"
-        f"<h2>{_e(words['steps'])}</h2><ol class='list-steps steps-guide'>{steps}</ol>"
-        f"<h2>{_e(words['upload'])}</h2><p>{_e(text.upload)}</p>"
-        f"<h2>{_e(words['tips'])}</h2><ul class='checks'>{tips}</ul></article>"
-        f"<div class='back-row'><a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>"
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            [
+                (words["file"], f"<p>{_e(text.file)}</p>"),
+                (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
+                (words["upload"], f"<p>{_e(text.upload)}</p>"),
+                (words["tips"], f"<ul class='checks'>{tips}</ul>"),
+            ],
+            locale,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + f"<div class='back-row'><a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>"
         f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a></div></div></div>"
     )
     return _page(

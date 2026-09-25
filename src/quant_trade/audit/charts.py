@@ -304,6 +304,13 @@ def _distinct_labels(values: Sequence[float], fmt: Any) -> list[str]:
     decimals, so an axis never shows the same label twice.
     """
     labels = [fmt(v) for v in values]
+    if (
+        fmt is _fmt_number
+        and 1e4 <= max(abs(v) for v in values) < 1e6
+        and all(v % 1000 == 0 for v in values)
+    ):
+        # One unit per axis: 8k, 10k, 12k rather than 8,000, 10k, 12k.
+        labels = [f"{v / 1e3:g}k" if v else "0" for v in values]
     if len(set(labels)) == len(set(values)):
         return labels
     scale = 100.0 if fmt is _fmt_percent else 1.0

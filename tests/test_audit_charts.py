@@ -235,3 +235,8 @@ def test_a_narrow_range_never_repeats_an_axis_label() -> None:
         assert len(labels) >= 3
         assert len(set(labels)) == len(labels), labels
     assert "10k" not in charts.equity_chart(times, equity, locale="es")
+
+
+def test_an_axis_uses_one_unit_for_every_label() -> None:
+    labels = charts._distinct_labels([8000.0, 10000.0, 12000.0], charts._fmt_number)
+    assert labels == ["8k", "10k", "12k"]
