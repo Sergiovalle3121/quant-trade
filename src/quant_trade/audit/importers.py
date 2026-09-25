@@ -3030,7 +3030,7 @@ def _parse_myfxbook(header: list[str], rows: list[list[str]]) -> _Draft:
         kept.append(row)
     open_times = _parse_times([_cells(row, columns, "open date") for row in kept])
     close_times = _parse_times([_cells(row, columns, "close date") for row in kept])
-    itemised = {name for name in ("commission", "swap") if name in columns}
+    itemised: set[str] = {name for name in ("commission", "swap") if name in columns}
     draft.itemised = itemised
     cash: list[_Cash] = []
     for position, row in enumerate(kept):
