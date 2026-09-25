@@ -441,10 +441,10 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     if dsr is not None:
         parts.append(
             f"DSR {_fmt(dsr, 3)} con {trials:.0f} {'intento' if trials == 1 else 'intentos'}; "
-            "el umbral es 0.95."
+            "supera con 0.95 o más, y por debajo de 0.5 no supera."
             if es
             else f"DSR {_fmt(dsr, 3)} at {trials:.0f} {'trial' if trials == 1 else 'trials'}; "
-            "the bar is 0.95."
+            "it passes at 0.95 or more and fails below 0.5."
         )
     if half is not None:
         parts.append(
@@ -460,21 +460,41 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             else f"PBO {_fmt(pbo, 2)}: the best in-sample configuration tends to land below "
             "the median out of sample."
         )
-    actions = (
-        [
+    counted = (mult.get("trials_used") or {}).get("evidence") == "MEASURED"
+    if not counted:
+        upload = (
             "Sube el XML de la optimización de MT5 o la matriz de variantes: el número de "
-            "intentos pasa a ser medido y se calcula el PBO.",
-            "Menos parámetros y rangos más cortos reducen el número de intentos.",
-            "Valida la configuración elegida en un tramo que no se usó al optimizar.",
-        ]
-        if es
-        else [
-            "Upload the MT5 optimisation XML or the variants matrix: the trial count becomes "
-            "measured and the PBO is computed.",
-            "Fewer parameters and narrower ranges mean fewer trials.",
-            "Validate the chosen configuration on a stretch not used while optimising.",
-        ]
-    )
+            "intentos pasa a ser medido y se calcula el PBO."
+            if es
+            else "Upload the MT5 optimisation XML or the variants matrix: the trial count "
+            "becomes measured and the PBO is computed."
+        )
+    elif pbo is None:
+        # The optimisation export gave the count; only the variants' own histories
+        # give the PBO.
+        upload = (
+            "El número de intentos ya sale de tus archivos; la matriz de variantes (el "
+            "resultado de cada configuración a lo largo del tiempo) añadiría el PBO."
+            if es
+            else "The trial count already comes from your files; the variants matrix (each "
+            "configuration's results over time) would add the PBO."
+        )
+    else:
+        upload = ""
+    actions = [
+        *([upload] if upload else []),
+        *(
+            [
+                "Menos parámetros y rangos más cortos reducen el número de intentos.",
+                "Valida la configuración elegida en un tramo que no se usó al optimizar.",
+            ]
+            if es
+            else [
+                "Fewer parameters and narrower ranges mean fewer trials.",
+                "Validate the chosen configuration on a stretch not used while optimising.",
+            ]
+        ),
+    ]
     return " ".join(parts), actions
 
 
@@ -639,25 +659,29 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
     parts = []
     if oos is not None:
         parts.append(
-            f"Sharpe fuera de muestra {_fmt(oos)}; hace falta 0.5 o más."
+            f"Sharpe fuera de muestra {_fmt(oos)}; hace falta 0.5 o más "
+            f"({'cumple' if oos >= 0.5 else 'no cumple'})."
             if es
-            else f"Out-of-sample Sharpe {_fmt(oos)}; 0.5 or more is needed."
+            else f"Out-of-sample Sharpe {_fmt(oos)}; 0.5 or more is needed "
+            f"({'met' if oos >= 0.5 else 'not met'})."
         )
     if gap is not None:
         parts.append(
-            f"Diferencia dentro/fuera {_fmt(gap)}; el máximo es 1.0."
+            f"Diferencia dentro/fuera {_fmt(gap)}; el máximo es 1.0 "
+            f"({'cumple' if gap <= 1.0 else 'no cumple'})."
             if es
-            else f"In/out gap {_fmt(gap)}; the maximum is 1.0."
+            else f"In/out gap {_fmt(gap)}; the maximum is 1.0 "
+            f"({'met' if gap <= 1.0 else 'not met'})."
         )
     actions = (
         [
-            "Una caída fuerte fuera de muestra es la huella típica del sobreajuste: menos "
-            "parámetros y una nueva validación en datos no vistos.",
+            "Una caída fuerte fuera de muestra aparece a menudo cuando se ajustaron demasiados "
+            "parámetros: menos parámetros y una nueva validación en datos no vistos.",
         ]
         if es
         else [
-            "A sharp drop out of sample is the usual mark of overfitting: fewer parameters "
-            "and a fresh validation on unseen data.",
+            "A sharp drop out of sample often appears when too many parameters were tuned: "
+            "fewer parameters and a fresh validation on unseen data.",
         ]
     )
     return " ".join(parts), actions

@@ -286,8 +286,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "test_data_intro": (
             "El encabezado del informe dice cómo se simularon los precios, qué parte del "
-            "historial tuvo el probador y qué fechas se probaron. Es la parte que más se retoca "
-            "al vender un robot, así que aquí la comparamos con sus propias operaciones."
+            "historial tuvo el probador y qué fechas se probaron. Conviene verificarlo, así que "
+            "aquí lo comparamos con sus propias operaciones."
         ),
         "test_data_clean": (
             "El modelado, la calidad de datos y las fechas declaradas no levantan ninguna bandera."
@@ -349,6 +349,38 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Se mantiene",
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
+        "fund": "Lo que revisaría quien invierte en un fondo",
+        "fund_intro": (
+            "Las cifras de una ficha de fondo y dos pruebas que usan los analistas de fondos: "
+            "si las rentabilidades mensuales están suavizadas y si faltan meses con una pérdida "
+            "pequeña. No cambia la clase: son preguntas para hacer."
+        ),
+        "fund_year": "Año",
+        "fund_months": "Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic",
+        "fund_cagr": "Rentabilidad anual compuesta",
+        "fund_vol": "Volatilidad anual",
+        "fund_vol_u": "Volatilidad anual sin suavizar (antes: {vol})",
+        "fund_positive": "Meses en positivo ({n} meses)",
+        "fund_worst": "Peor mes (mejor: {best})",
+        "fund_dd": "Caída máxima",
+        "fund_under": "Meses seguidos por debajo de un máximo anterior",
+        "fund_under_open": "Meses seguidos por debajo de un máximo anterior (aún sin recuperar)",
+        "fund_losing": "Meses seguidos en pérdida, como máximo",
+        "fund_smoothed": (
+            "Cada mes se parece demasiado al anterior (autocorrelación de {rho}). Suele pasar "
+            "con activos poco líquidos o valorados con retraso, y hace que la volatilidad "
+            "parezca menor: sin ese suavizado sería {vol_u} al año en vez de {vol}. Pregunta "
+            "cómo y cada cuánto se valoran las posiciones."
+        ),
+        "fund_few_small_losses": (
+            "Hay muchos meses con una ganancia pequeña y muy pocos con una pérdida pequeña "
+            "({gains} frente a {losses}), menos de lo que hacen esperar los meses vecinos. "
+            "Los estudios sobre fondos relacionan ese patrón con valoraciones que evitan cerrar "
+            "un mes en negativo. Pregunta quién calcula el valor liquidativo y si lo revisa "
+            "un tercero."
+        ),
+        "fund_clean": "Ni suavizado ni falta de meses con pérdida pequeña.",
+        "fund_badge_clean": "Sin patrones",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
@@ -440,6 +472,9 @@ LABELS: dict[str, dict[str, str]] = {
             "resultado así suele indicar que los dos archivos no son de la misma "
             "configuración, tamaño o cuenta: pregúntalo."
         ),
+        "hero_live": "Cuenta real: {badge}.",
+        "hero_live_money": "Resultado de operar: {result} sobre {deposits} depositados.",
+        "hero_live_link": "Ver la comparación con el backtest",
         "live_badge_CONSISTENT": "Coherente",
         "live_badge_EDGE": "En el borde",
         "live_badge_INCONSISTENT": "No coherente",
@@ -480,7 +515,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "live_pair_found": "Operaciones reales encontradas en el backtest",
         "live_pair_of": "{matched} de {total} ({share})",
-        "live_pair_missing": "Operaciones del backtest sin su operación real",
+        "live_pair_missing": "Operaciones del backtest que la cuenta real no hizo",
         "live_pair_entry": "Diferencia mediana de precio al entrar",
         "live_pair_exit": "Diferencia mediana de precio al salir",
         "live_pair_gap": "Diferencia de resultado en las emparejadas",
@@ -839,8 +874,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "test_data_intro": (
             "The report header says how prices were simulated, how much of the history the "
-            "tester had and which dates were tested. It is the part most often retouched when "
-            "a robot is sold, so here it is checked against its own trades."
+            "tester had and which dates were tested. It is worth verifying, so here it is "
+            "checked against its own trades."
         ),
         "test_data_clean": ("The modelling mode, data quality and stated dates raise no flag."),
         "test_data_scope": (
@@ -898,6 +933,37 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Holds",
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
+        "fund": "What a fund investor would check",
+        "fund_intro": (
+            "A fund factsheet's figures and two tests fund analysts use: whether the monthly "
+            "returns are smoothed and whether months with a small loss are missing. It does "
+            "not change the class: these are questions to ask."
+        ),
+        "fund_year": "Year",
+        "fund_months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
+        "fund_cagr": "Compound annual return",
+        "fund_vol": "Annual volatility",
+        "fund_vol_u": "Annual volatility unsmoothed (before: {vol})",
+        "fund_positive": "Positive months ({n} months)",
+        "fund_worst": "Worst month (best: {best})",
+        "fund_dd": "Deepest fall",
+        "fund_under": "Months in a row below a previous high",
+        "fund_under_open": "Months in a row below a previous high (not yet recovered)",
+        "fund_losing": "Losing months in a row, at most",
+        "fund_smoothed": (
+            "Each month looks too much like the one before (autocorrelation of {rho}). That "
+            "is typical of illiquid or late-priced holdings, and it makes volatility look "
+            "lower: unsmoothed it would be {vol_u} a year instead of {vol}. Ask how and how "
+            "often the positions are valued."
+        ),
+        "fund_few_small_losses": (
+            "There are many months with a small gain and very few with a small loss ({gains} "
+            "against {losses}), fewer than the neighbouring months lead you to expect. Studies "
+            "of funds link that pattern to valuations that avoid closing a month negative. Ask "
+            "who calculates the net asset value and whether a third party checks it."
+        ),
+        "fund_clean": "No smoothing and no shortage of months with a small loss.",
+        "fund_badge_clean": "No pattern",
         "instruments": "Does it work on each instrument?",
         "ins_intro": (
             "When a robot or a signal trades several markets, the total can come from one of "
@@ -983,6 +1049,9 @@ LABELS: dict[str, dict[str, str]] = {
             "this usually means the two files do not share the same configuration, size or "
             "account: ask."
         ),
+        "hero_live": "Live account: {badge}.",
+        "hero_live_money": "Trading result: {result} on {deposits} deposited.",
+        "hero_live_link": "See the comparison with the backtest",
         "live_badge_CONSISTENT": "Consistent",
         "live_badge_EDGE": "At the edge",
         "live_badge_INCONSISTENT": "Not consistent",
@@ -1023,7 +1092,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "live_pair_found": "Live trades found in the backtest",
         "live_pair_of": "{matched} of {total} ({share})",
-        "live_pair_missing": "Backtest trades without their live trade",
+        "live_pair_missing": "Backtest trades the live account did not take",
         "live_pair_entry": "Median price difference at entry",
         "live_pair_exit": "Median price difference at exit",
         "live_pair_gap": "Result difference on the paired trades",
@@ -1615,6 +1684,20 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "parameters": "Valores de los parámetros",
         "spread": "Spread",
         "closing_deals": "Transacciones de cierre",
+        "column_symbol": "Columna leída como símbolo",
+        "column_side": "Columna leída como lado",
+        "column_quantity": "Columna leída como cantidad",
+        "column_entry_time": "Columna leída como hora de entrada",
+        "column_exit_time": "Columna leída como hora de salida",
+        "column_entry_price": "Columna leída como precio de entrada",
+        "column_exit_price": "Columna leída como precio de salida",
+        "column_time": "Columna leída como hora de ejecución",
+        "column_price": "Columna leída como precio de ejecución",
+        "column_profit": "Columna leída como resultado",
+        "column_commission": "Columnas leídas como comisión",
+        "column_swap": "Columna leída como swap",
+        "column_multiplier": "Columna leída como multiplicador",
+        "column_account": "Columna leída como cuenta",
     },
     "en": {
         "strategy": "Strategy",
@@ -1655,6 +1738,20 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "parameters": "Parameter values",
         "spread": "Spread",
         "closing_deals": "Closing deals",
+        "column_symbol": "Column read as symbol",
+        "column_side": "Column read as side",
+        "column_quantity": "Column read as quantity",
+        "column_entry_time": "Column read as entry time",
+        "column_exit_time": "Column read as exit time",
+        "column_entry_price": "Column read as entry price",
+        "column_exit_price": "Column read as exit price",
+        "column_time": "Column read as fill time",
+        "column_price": "Column read as fill price",
+        "column_profit": "Column read as result",
+        "column_commission": "Columns read as commission",
+        "column_swap": "Column read as swap",
+        "column_multiplier": "Column read as multiplier",
+        "column_account": "Column read as account",
     },
 }
 
@@ -1691,6 +1788,8 @@ SOURCE_NAMES: dict[str, str] = {
     "myfxbook_csv": "Myfxbook (CSV)",
     "mql5_signal_csv": "MQL5 signal (CSV)",
     "fxblue_csv": "FX Blue (CSV)",
+    "universal_trades_csv": "CSV / Excel (trades)",
+    "universal_fills_csv": "CSV / Excel (fills)",
 }
 
 
@@ -2664,7 +2763,16 @@ def _pairing_html(pairing: dict[str, Any] | None, locale: str, labels: dict[str,
         (labels["live_pair_found"], f"{_e(found)} {_badge('MEASURED')}"),
         (
             labels["live_pair_missing"],
-            f"{pairing['missing_live']['value']:,} {_badge('MEASURED')}",
+            _e(
+                labels["live_pair_of"].format(
+                    matched=pairing["missing_live"]["value"],
+                    total=pairing["backtest_trades"]["value"],
+                    share=f"{pairing['missing_live']['value'] / backtest_total:.0%}",
+                )
+            )
+            + f" {_badge('MEASURED')}"
+            if (backtest_total := pairing["backtest_trades"]["value"])
+            else f"{pairing['missing_live']['value']:,} {_badge('MEASURED')}",
         ),
         (
             labels["live_pair_entry"],
@@ -3339,6 +3447,116 @@ def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[s
     return out
 
 
+def _fund_pct(value: float, places: int = 1) -> str:
+    """A monthly or annual return as a signed percentage, never ``-0.0%``."""
+    text = f"{value * 100:+.{places}f}%"
+    return text[1:] if float(text[:-1]) == 0 else text
+
+
+def _fund_calendar(years: list[dict[str, Any]], labels: dict[str, str]) -> str:
+    head = "".join(f"<th>{_e(name)}</th>" for name in labels["fund_months"].split(","))
+    rows = []
+    for year in years:
+        months = {int(k): v for k, v in (year.get("months") or {}).items()}
+        cells = []
+        for month in range(1, 13):
+            cell = months.get(month)
+            if cell is None or cell.get("value") is None:
+                cells.append("<td class='empty'></td>")
+                continue
+            value = float(cell["value"])
+            cells.append(f"<td class='{'neg' if value < 0 else 'pos'}'>{_fund_pct(value)}</td>")
+        total = float(year["total"]["value"])
+        rows.append(
+            f"<tr><th scope='row'>{int(year['key'])}</th>{''.join(cells)}"
+            f"<td class='tot {'neg' if total < 0 else 'pos'}'>{_fund_pct(total)}</td></tr>"
+        )
+    return (
+        "<div class='fund-cal-wrap'><table class='fund-cal'>"
+        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}<th>{_e(labels['fund_year'])}</th>"
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """A monthly track record read the way a fund investor reads it."""
+    if not fund or fund.get("status") != "MEASURED":
+        return ""
+    findings = list(fund.get("findings") or [])
+    vol = f"{float(fund['volatility']['value']):.1%}"
+    vol_u = (fund.get("volatility_unsmoothed") or {}).get("value")
+    out = f"<p class='muted'>{_e(labels['fund_intro'])}</p>"
+    if findings:
+        texts = {
+            "smoothed": labels["fund_smoothed"].format(
+                rho=f"{float(fund['autocorrelation']['value']):.2f}",
+                vol_u=f"{float(vol_u):.1%}" if vol_u is not None else vol,
+                vol=vol,
+            ),
+            "few_small_losses": labels["fund_few_small_losses"].format(
+                gains=int(fund["small_gains"]["value"]),
+                losses=int(fund["small_losses"]["value"]),
+            ),
+        }
+        items = "".join(_behaviour_ask(texts[code]) for code in findings)
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>{items}</ul></div>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['fund_badge_clean'])}</span> {_e(labels['fund_clean'])}</p>"
+        )
+
+    def tile(value: str, text: str, evidence: str, *, neg: bool = False) -> str:
+        return (
+            f"<div class='fact{' neg' if neg else ''}'><b>{_e(value)}</b>"
+            f"<p>{_e(text)} {_badge(evidence)}</p></div>"
+        )
+
+    cagr = float(fund["cagr"]["value"])
+    recovered = bool(fund["recovered"]["value"])
+    facts = [
+        tile(_fund_pct(cagr), labels["fund_cagr"], fund["cagr"]["evidence"], neg=cagr < 0),
+        (
+            tile(
+                f"{float(vol_u):.1%}",
+                labels["fund_vol_u"].format(vol=vol),
+                fund["volatility_unsmoothed"]["evidence"],
+                neg="smoothed" in findings,
+            )
+            if vol_u is not None
+            else tile(vol, labels["fund_vol"], fund["volatility"]["evidence"])
+        ),
+        tile(
+            f"{float(fund['positive_share']['value']):.0%}",
+            labels["fund_positive"].format(n=int(fund["months"]["value"])),
+            fund["positive_share"]["evidence"],
+        ),
+        tile(
+            _fund_pct(float(fund["worst_month"]["value"])),
+            labels["fund_worst"].format(best=_fund_pct(float(fund["best_month"]["value"]))),
+            fund["worst_month"]["evidence"],
+        ),
+        tile(
+            _fund_pct(float(fund["max_drawdown"]["value"])),
+            labels["fund_dd"],
+            fund["max_drawdown"]["evidence"],
+        ),
+        tile(
+            str(int(fund["longest_under_water"]["value"])),
+            labels["fund_under" if recovered else "fund_under_open"],
+            fund["longest_under_water"]["evidence"],
+            neg=not recovered,
+        ),
+    ]
+    out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    out += _fund_calendar(fund.get("years") or [], labels)
+    out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
+    return out
+
+
 #: What each class requires, in the words of ``verdict.overall_class``.
 CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
     "es": (
@@ -3843,6 +4061,11 @@ def render_html(
             else []
         ),
         *(
+            [(labels["fund"], _fund_html(data.get("fund"), locale, labels))]
+            if (data.get("fund") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
             [(labels["instruments"], _instruments_html(data.get("instruments"), locale, labels))]
             if (data.get("instruments") or {}).get("status") == "MEASURED"
             else []
@@ -3966,6 +4189,9 @@ def render_html(
         f"{_e(engine['package_version'])}</span>"
         f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
+    live_anchor = next(
+        (f"r-d{i}" for i, (title, _) in enumerate(detail, 1) if title == labels["live"]), ""
+    )
     hero = (
         "<section class='report-hero'>"
         + aurora()
@@ -3981,6 +4207,7 @@ def render_html(
         + class_ring(str(verdict["overall"]), size="lg")
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         + _verdict_html(str(verdict["summary"]))
+        + ("" if locked else _hero_live(data, labels, live_anchor))
         + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
@@ -4085,6 +4312,30 @@ def render_html(
         + "<main id='main' class='paper report-main'><div class='wrap wrap-mid'>"
         + "".join(sections)
         + "</div></main></body></html>"
+    )
+
+
+def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str:
+    """One line under the verdict when a live account was uploaded: the class
+    grades the backtest, and a buyer must not have to scroll to learn how the
+    real account compares with it and what it made or lost."""
+    live = data.get("live") or {}
+    if live.get("status") != "MEASURED":
+        return ""
+    outcome = str(live["outcome"])
+    text = labels["hero_live"].format(badge=labels[f"live_badge_{outcome}"])
+    account = data.get("account") or {}
+    result = (account.get("trading_result") or {}).get("value")
+    deposits = ((account.get("deposits") or {}).get("total") or {}).get("value")
+    money = ""
+    if account.get("status") == "MEASURED" and result is not None and deposits:
+        money = " " + labels["hero_live_money"].format(
+            result=_signed_amount(float(result)), deposits=f"{float(deposits):,.2f}"
+        )
+    link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_live_link'])}</a>" if anchor else ""
+    tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
+    return (
+        f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
     )
 
 

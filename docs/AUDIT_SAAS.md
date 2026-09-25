@@ -100,6 +100,35 @@ All three count as account histories, so they get the "El dinero real de la
 cuenta" review. Checked against 15 real public exports; see
 `docs/research/audit_iteration4/tracking_exports_check.md`.
 
+Any other platform (`audit/universal.py`, guide `/guias/csv-universal`,
+`/guides/universal-csv`): a CSV or Excel table that no importer above claims
+is read by its column names, in English, Spanish, Portuguese, French, German
+and Italian (`universal.SYNONYMS`, normalised without accents, brackets or
+punctuation, the most specific name first: `Side` before `Type`, `Executed`
+before `Amount`). Up to 15 title lines above the header are skipped. Two
+shapes are read:
+
+- one closed trade per row (`universal_trades_csv`): entry and exit time,
+  quantity, entry and exit price are required; side, profit, commission (all
+  fee columns added up), swap, symbol and account are optional;
+- one fill per row (`universal_fills_csv`): time, quantity and price are
+  required; fills are paired first in, first out per account and symbol,
+  and positions still open at the end are left out with a warning.
+
+Each assumption is a reading warning: a profit column that the price moves
+explain better once commission is added back is read as net; with no side
+column the side comes from the quantity's sign (or the profit's); with no
+profit column the result is price move x quantity x the `Multiplier` column
+(1 without one); fees charged in another coin than the price (`0.0002 BNB`
+on `BTCUSDT`) are left out of the costs. Unix times in seconds or
+milliseconds are read. The report lists which column was read as what
+(`column_*` keys under the platform's fields). A table that names some of
+the columns but not enough gets `universal_columns_missing`, which names
+the missing ones and the columns found. `import_report(..., columns=...)`
+takes the customer's own role-to-column mapping. An equity curve
+(`timestamp,equity`) is not a trade list and still gets `unknown_format`.
+Tests use synthetic rows (`tests/test_audit_universal_import.py`).
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating
@@ -300,6 +329,15 @@ the pair drawn from its own random stream, so no result changes), and holds
 each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
 variety to show. The class stays C.
+
+When a live account is uploaded, one line under the verdict gives its
+comparison badge (Coherente, En el borde, No coherente, Revisar) and the
+account's trading result against the money deposited, linked to the
+comparison section: the class grades the backtest, and a buyer should not
+have to scroll to learn the real account lost money. Locked reports keep it
+back. The "Plan para subir de clase" says on which side of each threshold a
+number falls, and no longer asks for the optimisation export when the trial
+count already comes from the files.
 
 The `/ejemplo` report carries a synthetic live account, a Myfxbook CSV
 export built in `audit/sample.py` (0.1 lots, a fifth of the backtest's
@@ -650,6 +688,44 @@ No red flag and no class change: each finding is a question to ask the
 seller. Limitations: trades are ordered by entry time and overlapping trades
 give no pause to measure; the tests treat trades as independent; daily files
 measure hold times in whole days.
+
+### Fund track records (`audit/factsheet.py`, `audit/fund.py`)
+
+For investors and allocators judging a fund, a managed account or any
+monthly track record. Besides a dated NAV or return series, the equity file
+may be a factsheet's year-by-month table: a year column (values 1900-2199),
+twelve month columns (headers in English, Spanish, Portuguese, French,
+German or Italian, or 1 to 12) and an optional year-total column (`YTD`,
+`Total`, `Año`...). Cells may carry `%`, a decimal comma, parentheses for a
+loss or a Unicode minus; blanks before the first or after the last month
+are skipped. Values are percentages when any cell has `%` or the median
+absolute value is over 0.2, else fractions, and the warning says which. A
+year whose stated total matches neither its months compounded nor summed
+(beyond 0.15 points) is listed in a warning: an edited month usually leaves
+its year total behind.
+
+For a file with 13 or fewer periods a year and at least 24 monthly returns,
+the section "Lo que revisaría quien invierte en un fondo" shows, MEASURED:
+the calendar table with each year compounded, the compound annual return,
+the annual volatility, the share of positive months, the worst and best
+month, the deepest fall and the longest run of months below a previous high
+(marked when not yet recovered). Two findings, as questions:
+
+- `smoothed`: first-order autocorrelation of the monthly returns of 0.2 or
+  more and above 1.96/sqrt(n) (Getmansky, Lo and Makarov, 2004); the
+  volatility is then also shown unsmoothed, from
+  `(r_t - rho r_{t-1}) / (1 - rho)` (Geltner, 1993);
+- `few_small_losses`: months in [-sd/2, 0) against the average of the two
+  neighbouring bins, (0, sd/2] and [-sd, -sd/2), with at least 10 months in
+  those two, and a one-sided Poisson p-value below 0.01 (the discontinuity
+  at zero of Bollen and Pool, 2009). Bins of a quarter deviation, or a
+  normal reference, made honest US market windows (2000-2024) fire; at half
+  a deviation no 5, 10 or 20-year window of the US market since 1927 does.
+
+No red flag and no class change. Limitations: a short record has few
+months per bin; smoothing can also come from a genuinely
+trending strategy; a factsheet may round or restate months; returns are
+taken as the file states them, usually after the fund's fees.
 
 ### Does it work on each instrument (`audit/instruments.py`)
 
@@ -1426,6 +1502,12 @@ Redesign pass 40 styles "How it behaves after losing": each finding reads as
 what the trades show (bold) and, on its own line with a speech mark, the
 question to put to the seller (`report._behaviour_ask`, `.beh-asks`), in the
 screen and in the PDF.
+
+Redesign pass 41 gives "Does it work on each instrument?" the same finding
+layout as the behaviour section (finding in bold, then the question) and lays a
+section's single headline figure out as a row beside its sentence on screens
+(`.facts>.fact:only-child`), so a lone figure no longer fills a full-width
+tile. Print keeps the tile.
 
 ## Security
 
