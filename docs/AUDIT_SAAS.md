@@ -284,6 +284,11 @@ edge and a losing stretch. It carries a 500 top-up after that stretch
 (DEPOSIT_DURING_DRAWDOWN), a 300 withdrawal and an open position with a
 35.00 floating loss, so "El dinero real de la cuenta" shows every part. It
 comes out "En el borde"; the dates overlap, and the report says so.
+The sample backtest also starts with 60 business days from a random stream
+of their own (from October 2022), so its trades span more than two years
+and "¿Sigue funcionando en el periodo reciente?" is measured: the average
+per trade falls from +15.24 to +3.97 in the last third, a drop within
+chance (-1.0 standard errors) that reads "Se mantiene".
 
 ### Plan to reach a better class
 
@@ -476,7 +481,8 @@ card (risk, account, plateau, timing, capital and its trade pace) shows its
 MEASURED / DECLARED / NOT_MEASURED tag beside the number.
 Percentages in the metrics, yearly and rolling tables that are smaller than
 0.01 % keep two significant digits (-0.000012 % on a history in tiny units),
-never -0.00 %.
+never -0.00 %. Money amounts in the trade statistics and the other tables
+keep four significant digits under 1 (0.004123, -0.00312), never -0.00.
 The stress table and its tiles follow the same rule (0.0 %, 0.00), and contract
 sizes in the reading warnings print as plain numbers (5,000,000, never 5e+06).
 Cost reasons carry thousands separators, and the class plan says in plain Spanish

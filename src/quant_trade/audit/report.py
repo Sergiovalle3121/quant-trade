@@ -1383,6 +1383,15 @@ def _table_pct(value: float) -> str:
     return f"{text}%"
 
 
+def _table_money(value: float) -> str:
+    """A money or price amount with two decimals, or four significant digits
+    when it is under one (``0.0042`` on a history in tiny units); never a
+    signed zero."""
+    if not math.isfinite(value):
+        return f"{value:,.2f}"
+    return _signed_amount(value).removeprefix("+")
+
+
 def _fmt(value: Any, *, key: str = "") -> str:
     if value is None:
         return "—"
@@ -1396,7 +1405,7 @@ def _fmt(value: Any, *, key: str = "") -> str:
         if key in PERCENT_KEYS:
             return _table_pct(value)
         if key in MONEY_KEYS:
-            return f"{value:,.2f}"
+            return _table_money(value)
         if key in RATIO_KEYS:
             return f"{value:,.2f}"
         if value.is_integer() and abs(value) < 1e15:
