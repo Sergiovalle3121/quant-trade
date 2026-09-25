@@ -644,3 +644,48 @@ def test_the_landing_says_the_preview_needs_no_card_and_an_account_is_optional(
     en = client.get("/en").text
     assert "account optional" in en and "no account needed" not in en
     assert "No card for the preview" in en
+
+
+def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    ids = [_audit_id(_upload(client).headers["location"]) for _ in range(3)]
+    # Only full reports can be compared: with one unlocked the picker is hidden.
+    store.mark_paid(ids[0], stripe_session_id="cs_a", at=NOW)  # type: ignore[attr-defined]
+    page = client.get("/cuenta").text
+    assert "/cuenta/comparar" not in page
+    store.mark_paid(ids[1], stripe_session_id="cs_b", at=NOW)  # type: ignore[attr-defined]
+    page = client.get("/cuenta").text
+    assert "action='/cuenta/comparar'" in page
+    assert f"value='{ids[0]}'" in page and f"value='{ids[1]}'" in page
+    assert f"value='{ids[2]}'" not in page  # still a preview
+
+    shown = client.get(f"/cuenta/comparar?id={ids[0]}&id={ids[1]}")
+    assert shown.status_code == 200
+    assert f"/audits/{ids[0]}?lang=es" in shown.text and "token=" not in shown.text
+    assert "Dos informes de tu cuenta" in shown.text and "Pega los enlaces" not in shown.text
+    assert f"/account/comparar?id={ids[0]}&amp;id={ids[1]}" in shown.text or (
+        f"/account/comparar?id={ids[0]}&id={ids[1]}" in shown.text
+    )
+    assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
+    assert client.get(f"/account/comparar?id={ids[0]}&id={ids[1]}").status_code == 200
+
+    def refused(query: str, prefix: str = "/cuenta") -> bool:
+        answer = client.get(f"{prefix}/comparar?{query}", follow_redirects=False)
+        return answer.status_code == 303 and "error=compare_pick" in answer.headers["location"]
+
+    assert refused(f"id={ids[0]}")  # one report
+    assert refused(f"id={ids[0]}&id={ids[0]}")  # the same report twice
+    assert refused(f"id={ids[0]}&id={ids[2]}")  # a locked preview
+    assert refused(f"id={ids[0]}&id={ids[1]}&id={ids[2]}")  # three
+    assert refused(f"id={ids[0]}&id=nope", "/account")
+
+    # Someone else's reports never compare, even with the right ids.
+    other, _, _ = _client(tmp_path)
+    _signup(other, "otro@example.com")
+    answer = other.get(f"/cuenta/comparar?id={ids[0]}&id={ids[1]}", follow_redirects=False)
+    assert "error=compare_pick" in answer.headers["location"]
+    # Signed out, it asks to sign in.
+    anon, _, _ = _client(tmp_path)
+    answer = anon.get(f"/cuenta/comparar?id={ids[0]}&id={ids[1]}", follow_redirects=False)
+    assert answer.headers["location"].startswith("/entrar")

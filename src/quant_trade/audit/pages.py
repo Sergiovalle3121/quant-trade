@@ -2267,16 +2267,16 @@ def legal_page(
     )
 
 
-def compare_page(content: str, *, locale: str = "es") -> str:
+def compare_page(content: str, *, locale: str = "es", lead: str = "", switch_href: str = "") -> str:
     """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
     from quant_trade.audit.compare import COMPARE_CSS, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
     other = "en" if locale == "es" else "es"
-    other_path = "/compare" if other == "en" else "/comparar"
+    other_path = switch_href or ("/compare" if other == "en" else "/comparar")
     body = (
-        _page_hero(copy["eyebrow"], copy["title"], copy["lead"])
+        _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
