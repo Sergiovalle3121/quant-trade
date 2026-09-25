@@ -122,3 +122,13 @@ def test_named_platforms_match_the_universal_guide_and_show_on_the_pages(tmp_pat
         page = client.get(path).text.lower()
         assert "tradovate" in page
         assert "probado" not in page and "tested on" not in page
+
+
+def test_robot_buyers_land_on_the_form_with_the_extra_files_open(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path, lang in (("/para/compradores-de-robots", "es"), ("/for/robot-buyers", "en")):
+        assert f"href='/?lang={lang}&amp;extras=1#subir'" in client.get(path).text
+    for path in ("/para/retos-prop-firm", "/for/investors-managers-funds"):
+        assert "extras=1" not in client.get(path).text
+    assert "<details class='adv extras' open>" in client.get("/?lang=es&extras=1").text
+    assert "<details class='adv extras'>" in client.get("/").text
