@@ -138,8 +138,9 @@ def test_one_trade_carrying_the_result_fails() -> None:
     assert _codes(_with_best(60.0))["PROFIT_CONCENTRATION"] == "WARN"
     assert "PROFIT_CONCENTRATION" not in _codes(_with_best(5.0))
     assert "PROFIT_CONCENTRATION" not in _codes(_with_best(1e9, n=9))
-    # Under 20 trades it only warns; from 20 on a lone trade fails.
-    assert _codes(_with_best(1e9, n=12))["PROFIT_CONCENTRATION"] == "WARN"
+    # Under 20 trades a lone trade fails only when it is nearly everything.
+    assert _codes(_with_best(1000.0, n=10))["PROFIT_CONCENTRATION"] == "FAIL"
+    assert _codes(_with_best(12.0, n=12))["PROFIT_CONCENTRATION"] == "WARN"
     assert _codes(_with_best(1000.0, n=29, each=0.1))["PROFIT_CONCENTRATION"] == "FAIL"
 
 
