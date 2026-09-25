@@ -364,6 +364,13 @@ def _factsheet_grid(raw: pd.DataFrame) -> Any:
     return monthly_grid(raw)
 
 
+def _is_trade_list(raw: pd.DataFrame) -> bool:
+    # Imported here: ``universal`` pulls in the importers, which import this module.
+    from quant_trade.audit.universal import looks_like_trades
+
+    return looks_like_trades([str(name) for name in raw.columns])
+
+
 def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     """Parse an equity-curve or return-series CSV into the canonical frame.
 
@@ -385,6 +392,16 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         )
         warnings.extend(grid.warnings)
         ts_col = "timestamp"
+    if ts_col is None and what == "equity" and _is_trade_list(raw):
+        raise ParseError(
+            "the equity curve file looks like a list of trades, not a curve: upload it "
+            'in the "Your platform report" box',
+            message_es=(
+                "El archivo de la curva de equity parece una lista de operaciones, no una "
+                "curva: súbelo en la casilla «Informe de tu plataforma»."
+            ),
+            code="trade_list_as_curve",
+        )
     if ts_col is None:
         raise ParseError(
             f"the {what} file needs a timestamp column (one of: {', '.join(TIMESTAMP_ALIASES)})",

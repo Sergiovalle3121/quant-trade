@@ -560,6 +560,8 @@ class _Draft:
     #: True when the parser priced every trip with a known money-per-point
     #: value, so the size ``_assemble`` finds is not an inference to report.
     sized: bool = False
+    #: Positions the parser saw opened and never closed (fill lists).
+    open_positions: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -3213,6 +3215,14 @@ def _size_text(size: float) -> str:
 
 
 def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
+    if not draft.trips and draft.open_positions:
+        raise ReportFormatError(
+            "no_closed_trades",
+            f"the {draft.source_format} file has no closed trades: "
+            f"{draft.open_positions} position(s) opened and never closed in the file",
+            f"el archivo ({draft.source_format}) no contiene operaciones cerradas: "
+            f"{draft.open_positions} posición(es) se abrieron y no se cerraron en el archivo",
+        )
     if not draft.trips:
         raise ReportFormatError(
             "no_closed_trades",
@@ -3244,9 +3254,11 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     drifting = _drifting_symbols(trips, sizes) if draft.itemised else set()
     if drifting:
         warnings.append(f"{CONVERSION_DRIFT_WARNING}: {', '.join(sorted(drifting))}")
+    backwards = 0
     for trip in trips:
         if trip.exit_time < trip.entry_time:
             invalid += 1  # a trade cannot close before it opens: a damaged row
+            backwards += 1
             continue
         quantity = trip.volume * sizes[trip.symbol]
         if trip.symbol in drifting:
@@ -3270,6 +3282,14 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         client_pnl.append(trip.gross)
         trade_fees.append(-(trip.commission + trip.swap + trip.fee))
         trade_symbols.append(trip.symbol)
+    if not trades and backwards == len(trips):
+        raise ReportFormatError(
+            "exits_before_entries",
+            "every trade closes before it opens: check that the entry and exit time "
+            "columns are not swapped",
+            "todas las operaciones cierran antes de abrir: revisa que las columnas de hora "
+            "de entrada y de salida no estén intercambiadas",
+        )
     if not trades:
         raise ReportFormatError(
             "no_closed_trades",

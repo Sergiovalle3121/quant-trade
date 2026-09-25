@@ -132,6 +132,12 @@ report file), and `app.js` suggests the file's own header names in a
 datalist when a CSV is picked (nothing is uploaded until the form is sent).
 A named column missing from the header is listed in the error. An equity curve
 (`timestamp,equity`) is not a trade list and still gets `unknown_format`.
+Refusals say what is wrong: a trade list put in the equity-curve box gets
+`trade_list_as_curve` (upload it as the platform report), a file where every
+exit comes before its entry gets `exits_before_entries` (the time columns may
+be swapped), and a fill list that never closes a position gets
+`no_closed_trades` with the number of positions left open
+(`tests/test_audit_import_messages.py`).
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
 Platform exports the universal reader is checked against
