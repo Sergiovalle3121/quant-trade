@@ -3523,6 +3523,7 @@ _OPTIMIZATION_STANDARD = {
     "custom",
     "equity dd %",
     "trades",
+    "symbol",
 }
 
 
@@ -3530,6 +3531,124 @@ _OPTIMIZATION_STANDARD = {
 _OPTIMIZATION_TITLE = re.compile(
     r"^(?P<expert>.+?)\s+(?P<symbol>[^\s,]+),(?P<timeframe>[A-Z]{1,2}\d{0,2})\b"
 )
+#: The optimisation table's standard columns as a terminal in another language
+#: names them (MetaTrader 5 help and a Spanish export seen in the wild), read
+#: under the English names the rest of the audit uses. Words in brackets, such
+#: as "(Profit Factor)" after the Spanish name, are ignored.
+_OPTIMIZATION_ALIASES: dict[str, tuple[str, ...]] = {
+    "Pass": (
+        "pass",
+        "paso",
+        "pase",
+        "pasada",
+        "проход",
+        "passagem",
+        "passe",
+        "durchlaufnr.",
+        "durchlauf",
+        "递进",
+        "パス",
+    ),
+    "Result": ("result", "resultado", "результат", "ergebnis", "résultat", "结果", "結果"),
+    "Profit": ("profit", "beneficio", "прибыль", "lucro", "gewinn", "利润", "利益"),
+    "Trades": (
+        "trades",
+        "total trades",
+        "total de operaciones",
+        "total de trades",
+        "всего трейдов",
+        "трейды",
+        "anzahl trades",
+        "trades total",
+        "交易总数",
+        "取引数",
+    ),
+    "Profit Factor": (
+        "profit factor",
+        "factor de rentabilidad",
+        "factor de beneficio",
+        "прибыльность",
+        "rentabilidade",
+        "profitfaktor",
+        "facteur de profit",
+        "盈利因子",
+        "プロフィットファクター",
+    ),
+    "Expected Payoff": (
+        "expected payoff",
+        "beneficio esperado",
+        "матожидание выигрыша",
+        "retorno esperado",
+        "erwartetes ergebnis",
+        "rendement attendu",
+        "预期回报",
+        "期待利得",
+    ),
+    "Recovery Factor": (
+        "recovery factor",
+        "factor de recuperación",
+        "фактор восстановления",
+        "fator de recuperação",
+        "erholungsfaktor",
+        "facteur de recouvrement",
+        "恢复因子",
+        "回復率",
+    ),
+    "Sharpe Ratio": (
+        "sharpe ratio",
+        "ratio de sharpe",
+        "коэффициент шарпа",
+        "índice de sharpe",
+        "ratio de sharpe",
+        "夏普比率",
+        "シャープレシオ",
+    ),
+    "Symbol": ("symbol", "símbolo", "символ"),
+    "Equity DD %": (
+        "equity dd %",
+        "drawdown",
+        "reducción %",
+        "reducción",
+        "просадка",
+        "просадка %",
+        "rückgang",
+        "chute",
+        "回撤",
+        "ドローダウン",
+    ),
+}
+_OPTIMIZATION_NAMES = {
+    alias: english for english, aliases in _OPTIMIZATION_ALIASES.items() for alias in aliases
+}
+#: Words that mark the forward and the back criterion in a translated forward export.
+_FORWARD_WORDS = ("forward", "форвард", "vorwärts", "前向", "フォワード")
+_BACK_WORDS = ("back", "бэк", "回测", "バック")
+
+
+def _optimization_name(name: str) -> str:
+    """The English name of a standard optimisation column; other names unchanged."""
+    key = re.sub(r"\s*\([^)]*\)", "", name).strip().lower()
+    return _OPTIMIZATION_NAMES.get(key, name.strip())
+
+
+def _optimization_header(names: list[str]) -> list[str]:
+    """A translated header under English names, the forward pair included.
+
+    A forward export reads Pass, Forward Result, Back Result, Profit. In
+    another language the two result columns are named only when their own
+    words say which period each one is; otherwise they stay as written and
+    the forward review asks for an English export.
+    """
+    out = [_optimization_name(name) for name in names]
+    if len(out) > 3 and out[0] == "Pass" and out[3] == "Profit" and "Result" not in out[1:3]:
+        first, second = (name.lower() for name in names[1:3])
+        if any(word in first for word in _FORWARD_WORDS) and any(
+            word in second for word in _BACK_WORDS
+        ):
+            out[1], out[2] = "Forward Result", "Back Result"
+    return out
+
+
 #: Passes kept for the parameter-stability check.
 MAX_OPTIMIZATION_ROWS = 50_000
 #: Columns read per row of an optimisation export; cells placed past it are ignored.
@@ -3590,7 +3709,7 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
         if rows:
             break
     header_at = next(
-        (i for i, row in enumerate(rows) if row and row[0].strip().lower() == "pass"), None
+        (i for i, row in enumerate(rows) if row and _optimization_name(row[0]) == "Pass"), None
     )
     if header_at is None:
         raise ReportFormatError(
@@ -3599,10 +3718,15 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
             "el archivo de optimización no tiene la fila de encabezado 'Pass'",
         )
     header = rows[header_at]
-    names = [name.strip() for name in header]
+    names = _optimization_header(header)
     lowered = [name.lower() for name in names]
     if "trades" in lowered:
-        parameters = [name for name in names[lowered.index("trades") + 1 :] if name]
+        # A translated export may list more metrics after Trades; they are not inputs.
+        parameters = [
+            name
+            for name in names[lowered.index("trades") + 1 :]
+            if name and name.lower() not in _OPTIMIZATION_STANDARD
+        ]
     else:
         parameters = [name for name in names if name and name.lower() not in _OPTIMIZATION_STANDARD]
     passes: set[str] = set()
