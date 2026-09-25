@@ -75,6 +75,11 @@ BALANCE_BEFORE_NOTE = "earlier deposits and withdrawals plus trades closed befor
 FLOATING_NOTE = "the platform's own summary at the time of the statement"
 
 
+def is_account_history(data: dict[str, Any]) -> bool:
+    """True when a stored audit result was run on an account history."""
+    return str((data.get("inputs") or {}).get("source_format")) in ACCOUNT_FORMATS
+
+
 def _drawdown_on(frame: pd.DataFrame, moment: datetime) -> float | None:
     """Flow-adjusted drawdown on the last curve point before ``moment``."""
     stamps = pd.to_datetime(frame["timestamp"], utc=True)
@@ -234,4 +239,5 @@ __all__ = [
     "INFLATED_MIN_GAIN",
     "TOP_UP_DRAWDOWN",
     "account_review",
+    "is_account_history",
 ]

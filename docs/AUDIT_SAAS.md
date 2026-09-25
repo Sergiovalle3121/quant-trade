@@ -368,7 +368,10 @@ and report wire them in during the integration step):
   investor: whether other accounts of the same strategy were closed or
   restarted, and asking for the backtest of the same robot to compare trade
   by trade. The class sentence then says "account history" instead of
-  "backtest" (C and D).
+  "backtest" (C and D). The out-of-sample explanation and plan step no longer
+  ask an investor for "the date the optimisation ends": they ask the provider
+  since when the robot has run with unchanged settings (declared as the
+  out-of-sample start) and for the matching backtest.
 
 Challenge presets (`quant-trade audit presets` after integration), each a
 transcription of the official page on its `as_of` date with its
