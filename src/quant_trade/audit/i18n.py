@@ -721,6 +721,35 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("average net result per trade", "resultado neto medio por operación"),
     (
+        "needs at least {n} winning and {m} losing trades",
+        "hacen falta al menos {n} operaciones ganadoras y {m} perdedoras",
+    ),
+    (
+        "closed trades by entry and exit time; net result after the fees the file itemises",
+        "operaciones cerradas por hora de entrada y de cierre; resultado neto tras los costes "
+        "que detalla el archivo",
+    ),
+    ("median hours a winning trade stays open", "horas medianas que sigue abierta una ganadora"),
+    ("median hours a losing trade stays open", "horas medianas que sigue abierta una perdedora"),
+    (
+        "median losing hold over median winning hold",
+        "duración mediana de las perdedoras entre la de las ganadoras",
+    ),
+    (
+        "share of trades after a loss opened within 15 minutes of it",
+        "parte de las operaciones tras una pérdida abiertas en menos de 15 minutos",
+    ),
+    (
+        "share of trades after a win opened within 15 minutes of it",
+        "parte de las operaciones tras una ganancia abiertas en menos de 15 minutos",
+    ),
+    ("share of trades with a net profit", "parte de las operaciones con resultado neto positivo"),
+    (
+        "share with a net profit among trades that follow {n} losses in a row",
+        "parte con resultado neto positivo entre las operaciones que siguen a {n} pérdidas "
+        "seguidas",
+    ),
+    (
         "distance of the recent average from the earlier one, in standard errors",
         "distancia de la media reciente respecto de la anterior, en errores estándar",
     ),
