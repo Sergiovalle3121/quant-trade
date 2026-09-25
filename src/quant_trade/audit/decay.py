@@ -48,6 +48,20 @@ DROP_Z = 2.0
 NOTE = "closed trades by exit date; net result after the fees the file itemises"
 
 
+def signed_amount(value: float) -> str:
+    """A signed money or price amount with two decimals, or four significant
+    digits when it is small (``+0.00027``); never a signed zero."""
+    if not math.isfinite(value) or value == 0:
+        return "0.00"
+    digits = 2 if abs(value) >= 1 else min(10, max(2, 3 - math.floor(math.log10(abs(value)))))
+    text = f"{value:+,.{digits}f}"
+    if digits > 2:
+        text = text.rstrip("0")
+        if len(text.partition(".")[2]) < 2:
+            text = f"{float(text):+,.2f}"
+    return "0.00" if float(text.replace(",", "")) == 0 else text
+
+
 def _period(pnl: Sequence[float]) -> dict[str, Any]:
     wins = sum(1 for value in pnl if value > 0)
     return {
@@ -139,8 +153,8 @@ def recent_review(
                 "EDGE_FADING",
                 "WARN",
                 f"the {len(recent)} trades since {cut.date().isoformat()} (the last third of "
-                f"the history) average {recent_mean:+,.2f} per trade, against "
-                f"{early_mean:+,.2f} for the {len(early)} earlier ones; the drop is "
+                f"the history) average {signed_amount(recent_mean)} per trade, against "
+                f"{signed_amount(early_mean)} for the {len(early)} earlier ones; the drop is "
                 f"{abs(z):.1f} standard errors",
                 z,
             )
@@ -149,4 +163,11 @@ def recent_review(
     return review, flags
 
 
-__all__ = ["DROP_Z", "MIN_EACH", "MIN_SPAN_DAYS", "MIN_TRADES", "recent_review"]
+__all__ = [
+    "DROP_Z",
+    "MIN_EACH",
+    "MIN_SPAN_DAYS",
+    "MIN_TRADES",
+    "recent_review",
+    "signed_amount",
+]

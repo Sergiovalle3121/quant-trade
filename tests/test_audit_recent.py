@@ -155,3 +155,10 @@ def test_small_amounts_keep_their_digits_and_never_show_a_signed_zero() -> None:
     review, _ = recent_review(_trades(results))
     html = _recent_html(review, "es", LABELS["es"])
     assert "-0.00<" not in html and "+0.00<" not in html
+
+
+def test_the_flag_quotes_small_averages_with_their_digits() -> None:
+    results = [v / 1000 for v in _noise(80, 5.0, seed=2) + _noise(40, -3.0, seed=3)]
+    _, flags = recent_review(_trades(results))
+    assert [flag.code for flag in flags] == ["EDGE_FADING"]
+    assert "-0.00 " not in flags[0].detail and "+0.00 " not in flags[0].detail
