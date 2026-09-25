@@ -1047,6 +1047,11 @@ Every buy box on a locked report, whether card payments are on or not, ends
 with four checks listing what the payment unlocks: every figure, the PDF, the
 public verification page and the refund when the report misreads the file.
 
+"Qué capital necesita y a qué tamaño" shows one card per loss limit (10, 20, 30
+and 50 %): the capital needed at the backtest's size, then the size fraction on
+the file's balance. The cards sit two to a row on phones, four on desktop and in
+the PDF.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

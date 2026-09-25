@@ -2289,26 +2289,22 @@ def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str,
         if balance
         else labels["capital_scale_plain"]
     )
-    rows = "".join(
-        f"<tr><td>{float(row['limit']):.0%}</td>"
-        f"<td class='val'>{_fmt(row['capital']['value'], key='capital')}</td>"
-        f"<td class='val'>"
-        + (
-            _e(sizing_scale_text(float(row["size_share"]["value"])))
-            if row["size_share"]["value"] is not None
-            else "—"
-        )
-        + "</td></tr>"
+
+    def size_text(row: dict[str, Any]) -> str:
+        share = row["size_share"]["value"]
+        return sizing_scale_text(float(share)) if share is not None else "—"
+
+    # One card per loss limit: a reader compares four numbers, not a table.
+    tiles = "".join(
+        "<li class='cap'>"
+        f"<span class='cap-lim'>{_e(labels['capital_limit'])} "
+        f"<b>{float(row['limit']):.0%}</b></span>"
+        f"<b class='cap-money'>{_fmt(row['capital']['value'], key='capital')}</b>"
+        f"<span class='cap-sub'>{_e(labels['capital_needed'])}</span>"
+        f"<span class='cap-size'><b>{_e(size_text(row))}</b> {_e(scale_head)}</span></li>"
         for row in capital["rows"]
     )
-    out += (
-        "<table class='metrics'><thead><tr>"
-        f"<th>{_e(labels['capital_limit'])}</th>"
-        f"<th class='val'>{_e(labels['capital_needed'])}</th>"
-        f"<th class='val'>{_e(scale_head)}</th>"
-        f"</tr></thead><tbody>{rows}</tbody></table>"
-        f"<p class='muted'>{_e(labels['capital_scale_help'])}</p>"
-    )
+    out += f"<ol class='caps'>{tiles}</ol><p class='muted'>{_e(labels['capital_scale_help'])}</p>"
     return out + _assumptions(capital.get("assumptions"), locale, labels)
 
 
