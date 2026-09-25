@@ -142,7 +142,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "Curva de equity o serie de retornos (CSV o Excel; obligatoria si no subes un informe)"
         ),
         "equity_help": (
-            "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. Hasta 5 MB."
+            "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. También la "
+            "tabla de rentabilidades mensuales de un fondo (un año por fila, un mes por "
+            "columna). Hasta 5 MB."
         ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
@@ -257,7 +259,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "¿Sirve para acciones, cripto, futuros o un fondo?",
                 "Sí. Rigor no depende del mercado: mide el historial que subes. Para una cartera "
                 "de acciones o cripto, o para un fondo o un gestor, sube su curva de equity o su "
-                "serie de retornos (diaria, semanal o mensual) en CSV o Excel. Los informes de "
+                "serie de retornos (diaria, semanal o mensual) en CSV o Excel; de un fondo sirve "
+                "también la tabla de rentabilidades mensuales de su ficha. Los informes de "
                 "TradingView, NinjaTrader, QuantConnect, backtesting.py y vectorbt sirven para "
                 "cualquier activo.",
             ),
@@ -373,7 +376,8 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "equity": "Equity curve or return series (CSV or Excel; required without a report)",
         "equity_help": (
-            "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Up to 5 MB."
+            "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Also a "
+            "fund's monthly returns table (a year per row, a month per column). Up to 5 MB."
         ),
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
@@ -487,7 +491,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "Does it work for stocks, crypto, futures or a fund?",
                 "Yes. Rigor does not depend on the market: it measures the history you upload. "
                 "For a stock or crypto portfolio, or for a fund or a manager, upload its equity "
-                "curve or return series (daily, weekly or monthly) as CSV or Excel. TradingView, "
+                "curve or return series (daily, weekly or monthly) as CSV or Excel; for a fund, "
+                "the monthly returns table from its factsheet works too. TradingView, "
                 "NinjaTrader, QuantConnect, backtesting.py and vectorbt reports work for any "
                 "asset.",
             ),
@@ -1269,7 +1274,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "Operas acciones, futuros, forex o cripto",
                 "No sabes si tu ventaja es real o si la encontraste a fuerza de probar.",
                 "la lista de operaciones de TradingView o NinjaTrader, el CSV de QuantConnect, "
-                "backtesting.py o vectorbt, o tu curva de equity.",
+                "backtesting.py o vectorbt, el historial en CSV o Excel de cualquier bróker, "
+                "exchange o diario, o tu curva de equity.",
                 "significación, Sharpe deflactado, costes, si sigue funcionando en el periodo "
                 "reciente y qué capital pide.",
                 "tradingview",
@@ -1289,9 +1295,10 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "El porcentaje que te enseñan puede venir de depósitos, de pocos meses buenos o "
                 "de un backtest.",
                 "el historial de su cuenta (MetaTrader, Myfxbook, FX Blue o señal de MQL5) o su "
-                "serie de retornos mensuales en CSV.",
+                "tabla de rentabilidades mensuales en CSV o Excel.",
                 "el resultado separado de depósitos y retiros, si la cuenta se parece a su "
-                "backtest y si el historial es evidencia o suerte.",
+                "backtest, si el historial es evidencia o suerte y, con 24 meses o más, su "
+                "calendario año por mes y su caída más profunda.",
                 "cuenta-proveedor",
             ),
         ],
@@ -1323,7 +1330,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "You trade stocks, futures, forex or crypto",
                 "You do not know whether your edge is real or you found it by trying enough.",
                 "the TradingView or NinjaTrader list of trades, the QuantConnect, backtesting.py "
-                "or vectorbt CSV, or your equity curve.",
+                "or vectorbt CSV, the CSV or Excel history of any broker, exchange or journal, "
+                "or your equity curve.",
                 "significance, deflated Sharpe, costs, whether it still works in the recent "
                 "period and how much capital it needs.",
                 "tradingview",
@@ -1343,9 +1351,10 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "The percentage you are shown may come from deposits, a few good months or a "
                 "backtest.",
                 "their account history (MetaTrader, Myfxbook, FX Blue or an MQL5 signal) or "
-                "their monthly return series as CSV.",
+                "their monthly returns table as CSV or Excel.",
                 "the result kept apart from deposits and withdrawals, whether the account looks "
-                "like its backtest and whether the history is evidence or luck.",
+                "like its backtest, whether the history is evidence or luck and, with 24 "
+                "months or more, its year-by-month calendar and deepest fall.",
                 "cuenta-proveedor",
             ),
         ],

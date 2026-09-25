@@ -75,3 +75,24 @@ def test_texts_name_only_existing_guides_and_both_languages_match() -> None:
         for text in (es, en):
             for _item, guide in text.uploads:
                 assert guide == "" or guide in GUIDES_BY_SLUG
+
+
+def test_fund_page_and_upload_help_mention_the_factsheet_table(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path, words in (
+        ("/para/inversores-gestores-fondos", ("tabla de rentabilidades mensuales", "24 meses")),
+        ("/for/investors-managers-funds", ("monthly returns table", "24 months")),
+    ):
+        page = client.get(path).text
+        for word in words:
+            assert word in page
+    assert "tabla de rentabilidades mensuales de un fondo" in client.get("/").text
+    assert "monthly returns table (a year per row" in client.get("/en").text
+
+
+def test_trader_pages_link_the_universal_csv_guide(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    assert "/guias/csv-universal" in client.get("/para/traders-acciones-futuros-cripto").text
+    assert "/guides/universal-csv" in client.get("/for/stock-futures-crypto-traders").text
+    assert "cualquier bróker, exchange o diario" in client.get("/").text
+    assert "any broker, exchange or journal" in client.get("/en").text

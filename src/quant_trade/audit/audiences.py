@@ -285,6 +285,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Las operaciones de QuantConnect.", "quantconnect"),
                     ("Las operaciones de backtesting.py o vectorbt.", "backtesting-py"),
                     (
+                        "De cualquier otro bróker, exchange o diario, su historial de "
+                        "operaciones en CSV o Excel: las columnas se reconocen por su nombre.",
+                        "csv-universal",
+                    ),
+                    (
                         "O tu curva de equity o serie de retornos en CSV o Excel (diaria, "
                         "semanal o mensual), de cualquier mercado.",
                         "",
@@ -356,6 +361,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("The NinjaTrader 8 trades CSV.", "ninjatrader"),
                     ("The QuantConnect trades.", "quantconnect"),
                     ("The backtesting.py or vectorbt trades.", "backtesting-py"),
+                    (
+                        "From any other broker, exchange or journal, its trade history as CSV "
+                        "or Excel: the columns are recognised by their names.",
+                        "csv-universal",
+                    ),
                     (
                         "Or your equity curve or return series as CSV or Excel (daily, weekly or "
                         "monthly), from any market.",
@@ -432,6 +442,10 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Tu informe de MetaTrader 5 o 4.", "mt5"),
                     ("Tu lista de operaciones de TradingView.", "tradingview"),
                     ("Tu CSV de NinjaTrader 8 (futuros).", "ninjatrader"),
+                    (
+                        "O el historial de operaciones de tu plataforma en CSV o Excel.",
+                        "csv-universal",
+                    ),
                     ("Y en el formulario eliges el reto que quieres simular.", ""),
                 ),
                 checks=(
@@ -499,6 +513,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Your MetaTrader 5 or 4 report.", "mt5"),
                     ("Your TradingView list of trades.", "tradingview"),
                     ("Your NinjaTrader 8 CSV (futures).", "ninjatrader"),
+                    ("Or your platform's trade history as CSV or Excel.", "csv-universal"),
                     ("Then pick the challenge to simulate on the form.", ""),
                 ),
                 checks=(
@@ -579,6 +594,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "columnas de fecha y retorno.",
                         "",
                     ),
+                    (
+                        "O la tabla de rentabilidades mensuales de su ficha (factsheet), tal "
+                        "cual: una fila por año y una columna por mes, en CSV o Excel.",
+                        "",
+                    ),
                     ("Si lo tiene, su backtest, para compararlo con la cuenta.", "mt5"),
                 ),
                 checks=(
@@ -605,6 +625,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "El último tercio del historial frente al resto.",
                     ),
                     (
+                        "Lo que revisaría quien invierte en un fondo",
+                        "Con 24 meses o más: calendario año por mes, rentabilidad anual "
+                        "compuesta, volatilidad, peor mes, caída más profunda, tiempo en "
+                        "recuperarse y dos pruebas de retornos suavizados.",
+                    ),
+                    (
                         "Preguntas para el gestor",
                         "Qué pedirle, a partir de lo que su archivo no responde.",
                     ),
@@ -616,9 +642,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "¿Y si solo tengo sus retornos mensuales?",
-                        "Súbelos como serie de retornos en CSV o Excel. Con retornos "
-                        "mensuales, un historial corto tiene pocos datos, y el informe lo "
-                        "dice en lugar de disimularlo.",
+                        "Súbelos como serie de retornos en CSV o Excel, o sube la tabla de "
+                        "su ficha tal cual (año por fila, meses en columnas, en español, "
+                        "inglés u otro idioma, o del 1 al 12). Si el total de un año no "
+                        "cuadra con sus meses, el informe lo avisa. Con retornos mensuales, "
+                        "un historial corto tiene pocos datos, y el informe lo dice en lugar "
+                        "de disimularlo.",
                     ),
                     (
                         "¿Cómo le pido el historial?",
@@ -652,6 +681,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "with date and return columns.",
                         "",
                     ),
+                    (
+                        "Or the monthly returns table from their factsheet, as it is: one row "
+                        "per year and one column per month, as CSV or Excel.",
+                        "",
+                    ),
                     ("If they have one, their backtest, to compare with the account.", "mt5"),
                 ),
                 checks=(
@@ -678,6 +712,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "The last third of the history against the rest.",
                     ),
                     (
+                        "What someone investing in a fund would check",
+                        "With 24 months or more: a year-by-month calendar, compound annual "
+                        "return, volatility, worst month, deepest fall, time to recover and "
+                        "two checks for smoothed returns.",
+                    ),
+                    (
                         "Questions for the manager",
                         "What to ask them, based on what their file does not answer.",
                     ),
@@ -690,7 +730,10 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "What if I only have their monthly returns?",
-                        "Upload them as a return series in CSV or Excel. With monthly returns a "
+                        "Upload them as a return series in CSV or Excel, or upload their "
+                        "factsheet table as it is (a row per year, months as columns, in "
+                        "English, Spanish or another language, or 1 to 12). If a year's total "
+                        "does not match its months, the report says so. With monthly returns a "
                         "short history holds few data points, and the report says so instead "
                         "of hiding it.",
                     ),
