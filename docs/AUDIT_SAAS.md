@@ -879,6 +879,22 @@ flatters a fund whose figures are before fees. It never feeds the benchmark
 dimension (that reads only the uploaded benchmark file, as before), so the
 class does not move.
 
+Through the known crises (`audit/crises.py`). A fixed list of calendar
+windows, each the peak-to-trough months of a fall on the public record: the
+dot-com bust (2000-09 to 2002-09), the 2008 financial crisis (2007-11 to
+2009-02), the euro debt crisis (2011-05 to 2011-09), China and the oil fall
+(2015-06 to 2016-02), late 2018 (2018-10 to 2018-12), the covid crash
+(2020-02 to 2020-03), inflation and rates in 2022 (2022-01 to 2022-09) and
+the 2022 crypto winter (2021-11 to 2022-12). Equity windows follow US
+equities, the crypto one bitcoin; they are fixed in advance and never fitted
+to the file, and only dates are bundled, no market data. For each window the
+record covers in full, MEASURED: the fund's compounded return and, when a
+benchmark is present, the benchmark's. With 24 months or more, the worst and
+best 12-month return and the share of rolling 12-month periods that ended
+positive. One finding, as a question: `fell_more_in_crises` when, over at
+least two windows with a benchmark, the fund did worse in two thirds or more
+of them. No red flag and no class change.
+
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are
