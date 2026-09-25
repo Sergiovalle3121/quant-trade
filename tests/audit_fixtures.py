@@ -127,16 +127,21 @@ def _mt5_money(value: float) -> str:
 
 
 def synthetic_mt5_report(
-    days: int = 400, *, edge_pips: float = 1.5, seed: int = 17, lots: float = 0.5
+    days: int = 400,
+    *,
+    edge_pips: float = 1.5,
+    seed: int = 17,
+    lots: float = 0.5,
+    start: str = "2023-01-02",
 ) -> bytes:
     """An MT5 Strategy Tester HTML report (UTF-16 LE with BOM, like the
     terminal writes it) with one EURUSD round trip per business day."""
     rng = np.random.default_rng(seed)
-    dates = pd.bdate_range("2023-01-02", periods=days)
+    dates = pd.bdate_range(start, periods=days)
     balance = 10_000.0
     price = 1.1
     rows = [
-        "<tr><td>2023.01.02 00:00:00</td><td>1</td><td></td><td>balance</td><td></td><td></td>"
+        f"<tr><td>{dates[0]:%Y.%m.%d} 00:00:00</td><td>1</td><td></td><td>balance</td><td></td><td></td>"
         "<td></td><td></td><td>0.00</td><td>0.00</td><td>10 000.00</td><td>10 000.00</td>"
         "<td></td></tr>"
     ]
