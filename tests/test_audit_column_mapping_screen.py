@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import mapping  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.i18n import untranslated  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -173,3 +174,124 @@ def test_a_stored_choice_is_kept_to_known_fields_and_real_columns() -> None:
     )
     assert kept == {"profit": "Neto"}
     assert mapping.loads("not json") == {} and mapping.loads("[1]") == {}
+
+
+def _results(kind: str = "profit") -> bytes:
+    """A list with a date and one figure per row, as a spreadsheet keeps it."""
+    lines = ["Fecha cierre;Resultado neto;Nota" if kind == "profit" else "Día;Saldo;Nota"]
+    level = 10_000.0
+    for day in range(1, 61):
+        month, date = 1 + (day - 1) // 28, 1 + (day - 1) % 28
+        move = 30.5 if day % 3 else -41.25
+        level += move
+        figure = move if kind == "profit" else level
+        lines.append(f"{date:02d}/{month:02d}/2025;{figure:.2f}".replace(".", ",") + ";x")
+    return ("\n".join(lines) + "\n").encode()
+
+
+def test_a_date_and_each_result_are_enough(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    files = {"report": ("pnl.csv", _results(), "text/csv")}
+    asked = client.post("/audits", files=files, data={"consent": "on"})
+    assert asked.status_code == 422
+    assert "name='col_date'" in asked.text and "name='col_balance'" in asked.text
+    chosen = {"col_date": "Fecha cierre", "col_profit": "Resultado neto"}
+    posted = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on", "initial_balance": "10000", **chosen},
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303, posted.text[:400]
+    # A trade's closing date in the "exit" menu reads the same way.
+    exit_named = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on", "col_exit_time": "Fecha cierre", "col_profit": "Resultado neto"},
+        follow_redirects=False,
+    )
+    assert exit_named.status_code == 303, exit_named.text[:400]
+
+
+def test_the_curve_from_results_starts_at_the_balance_and_says_what_it_lacks() -> None:
+    columns = {"date": "Fecha cierre", "profit": "Resultado neto"}
+    curve, notes = mapping.curve_from_columns(_results(), columns, initial_balance=None)
+    lines = curve.decode().splitlines()
+    assert lines[0] == "timestamp,equity"
+    assert lines[1] == "2024-12-31 00:00:00,10000.0"
+    assert lines[2] == "2025-01-01 00:00:00,10030.5"
+    assert len(lines) == 62
+    assert notes[0] == mapping.MAPPED_PROFIT_WARNING
+    assert "does not state a starting balance" in notes[1]
+    for note in notes:
+        assert find_claims(note) == []
+    assert untranslated({"inputs": {"parse_warnings": notes}}) == []
+
+
+def test_a_date_and_the_balance_are_enough(tmp_path: Path) -> None:
+    columns = {"date": "Día", "balance": "Saldo"}
+    curve, notes = mapping.curve_from_columns(_results("balance"), columns, initial_balance=None)
+    assert curve.decode().splitlines()[1] == "2025-01-01 00:00:00,10030.5"
+    assert notes == [mapping.MAPPED_BALANCE_WARNING]
+    client = _client(tmp_path)
+    files = {"report": ("saldo.csv", _results("balance"), "text/csv")}
+    posted = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on", "col_date": "Día", "col_balance": "Saldo"},
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303, posted.text[:400]
+
+
+def test_an_incomplete_choice_names_what_is_missing_on_the_page(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    files = {"report": ("diario.csv", _journal(), "text/csv")}
+    answer = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on", "col_entry_time": "Abierto", "col_exit_time": "Cerrado"},
+    )
+    assert answer.status_code == 422
+    text = answer.text
+    assert "Para leerlo como una fila por operación aún falta:" in text
+    assert "Cantidad, Precio de entrada, Precio de salida" in text
+    assert "Indica sus columnas" not in text and "Name its columns" not in text
+    assert find_claims(text) == []
+    english = mapping.missing_fields({"date": "Fecha cierre"}, "en")
+    assert english == "To read it as date and result, still missing: Trade result."
+
+
+def test_too_few_readable_rows_are_offered_again(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    files = {"report": ("pnl.csv", _results(), "text/csv")}
+    answer = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on", "col_date": "Nota", "col_profit": "Resultado neto"},
+    )
+    assert answer.status_code == 422
+    assert "menos de dos filas con fecha y cifra legibles" in answer.text
+
+
+def test_a_very_wide_header_gets_the_plain_refusal_quickly(tmp_path: Path) -> None:
+    import time
+
+    wide = ",".join(f"c{i}" for i in range(200_000))
+    data = (wide + "\n" + ",".join("1" for _ in range(200_000)) + "\n").encode()
+    assert mapping.read_table(data) is None
+    client = _client(tmp_path)
+    started = time.monotonic()
+    answer = client.post(
+        "/audits", files={"report": ("wide.csv", data, "text/csv")}, data={"consent": "on"}
+    )
+    assert answer.status_code == 400
+    assert time.monotonic() - started < 10
+
+
+def test_the_preview_shows_at_most_the_menu_width() -> None:
+    header = [f"col{i}" for i in range(mapping.MAX_COLUMNS + 20)]
+    table = mapping.Table(header, [["x"] * len(header)])
+    page = mapping.mapping_page(table, "problema")
+    assert page.count("<th>") == mapping.MAX_COLUMNS
+    assert "y 20 columnas más, que no se muestran" in page

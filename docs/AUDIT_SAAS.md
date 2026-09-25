@@ -2088,3 +2088,24 @@ with the same header that the importers do not recognise is read with that
 choice. A recognised format is never overridden. A saved choice that no
 longer reads the file brings the mapping page back, preselected.
 `Store.delete_account` deletes the account's column maps.
+
+Two columns are enough on their own. A date (the page's "Fecha" menu, or the
+exit or fill time) with each trade's result becomes an equity curve: the
+results are chained from the declared starting balance (else
+`DEFAULT_INITIAL_BALANCE`, with the importers' own warning), from the day
+before the first result. A date with the balance or equity column is read as
+the curve itself. Either way the file's own SHA-256 is the recorded digest,
+and a warning says the trade-level checks cannot be measured (`MAPPED_PROFIT_WARNING`
+and `MAPPED_BALANCE_WARNING`, with Spanish rules). Rows without a readable date
+or figure are counted in a warning, and fewer than two readable rows bring
+the page back (`mapped_curve_unreadable`). A choice that still lacks fields
+is answered on the page itself, naming the missing fields for the way the
+choice points to (one row per trade, per fill, date and result, or date and
+balance).
+
+A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched
+for roles and gets the plain refusal, so a 200,000-column file is turned down
+in about a second instead of rendering a multi-megabyte page. The preview
+shows at most 80 columns (`MAX_COLUMNS`) with a count of the rest. The
+access code the customer typed travels as a hidden field of this page only;
+the page is `no-store` and goes only to the person who typed it.

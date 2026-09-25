@@ -17,6 +17,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from quant_trade.audit import importers as imp
 from quant_trade.audit import universal
@@ -31,12 +32,34 @@ MAPPABLE_CODES = frozenset(
         "universal_column_unreadable",
         "universal_unknown_column",
         "universal_column_twice",
+        "mapped_curve_unreadable",
     }
 )
 #: Rows of the file shown under its header, so each column's content is visible.
 SAMPLE_ROWS = 3
-#: Columns offered in each menu; wider tables are trade lists no one maps by hand.
+#: Columns offered in each menu and shown in the preview.
 MAX_COLUMNS = 80
+#: A header wider than this gets the plain refusal: no one names columns by
+#: hand in such a table, and rendering it would cost the server for nothing.
+MAX_HEADER = universal.WIDEST_HEADER
+#: Two fields that are enough on their own: a date with each trade's result
+#: (``profit``), or a date with the account's balance or equity.
+CURVE_ROLES: tuple[str, ...] = ("date", "balance")
+#: Every field the mapping page can post.
+FORM_ROLES: tuple[str, ...] = (*universal.ROLES, *CURVE_ROLES)
+#: Columns that can stand for the date of a result or balance row.
+_DATE_ROLES: tuple[str, ...] = ("date", "exit_time", "time")
+
+MAPPED_PROFIT_WARNING = (
+    "the curve was built from each trade's date and result only; without prices, "
+    "quantities or entry times, holding times, entry timing and trade-level checks "
+    "cannot be measured"
+)
+MAPPED_BALANCE_WARNING = (
+    "the curve was read from the balance column you named; the file lists no trades, so "
+    "trade-level checks cannot be measured"
+)
+MAPPED_DROPPED_WARNING = "{n} row(s) without a readable date or amount were left out"
 #: The form fields the mapping page carries over from the first upload.
 CARRIED_FIELDS: tuple[str, ...] = (
     "locale",
@@ -90,6 +113,27 @@ COPY: dict[str, dict[str, str]] = {
             "Tu archivo: no es el informe de una plataforma que reconozcamos, pero sí una "
             "tabla. Indica qué es cada columna y lo auditamos."
         ),
+        "curve_group": "Si solo tienes fecha y resultado, o fecha y saldo",
+        "curve_help": (
+            "Basta con la fecha y el «Resultado de la operación» de arriba, o con la fecha y "
+            "el saldo: Rigor arma la curva con eso."
+        ),
+        "role_date": "Fecha",
+        "role_balance": "Saldo o equity de la cuenta",
+        "more_columns": "y {n} columnas más, que no se muestran",
+        "missing": "Para leerlo como {what} aún falta: {fields}.",
+        "also": (
+            "También basta con una fecha y el resultado de cada operación, o con una fecha y "
+            "el saldo."
+        ),
+        "what_trade": "una fila por operación",
+        "what_fill": "una fila por ejecución",
+        "what_profit": "fecha y resultado",
+        "what_balance": "fecha y saldo",
+        "few_rows": (
+            "Tu archivo: con esas columnas quedan menos de dos filas con fecha y cifra "
+            "legibles. Revisa que la fecha y la cifra sean las columnas correctas."
+        ),
     },
     "en": {
         "eyebrow": "Your file",
@@ -127,6 +171,24 @@ COPY: dict[str, dict[str, str]] = {
             "Your file: it is not the report of a platform we recognise, but it is a table. "
             "Say what each column is and we audit it."
         ),
+        "curve_group": "If you only have a date and a result, or a date and a balance",
+        "curve_help": (
+            "A date with the 'Trade result' above is enough, or a date with the balance: "
+            "Rigor builds the curve from that."
+        ),
+        "role_date": "Date",
+        "role_balance": "Account balance or equity",
+        "more_columns": "and {n} more columns, not shown",
+        "missing": "To read it as {what}, still missing: {fields}.",
+        "also": "A date with each trade's result, or a date with the balance, is enough too.",
+        "what_trade": "one row per trade",
+        "what_fill": "one row per fill",
+        "what_profit": "date and result",
+        "what_balance": "date and balance",
+        "few_rows": (
+            "Your file: with those columns fewer than two rows have a readable date and "
+            "figure. Check that the date and the figure are the right columns."
+        ),
     },
 }
 
@@ -162,25 +224,35 @@ def _header_at(rows: Sequence[Sequence[str]]) -> int | None:
     return None
 
 
-def _table(rows: list[list[str]]) -> Table | None:
+@dataclass(frozen=True)
+class _Body:
+    """A table's header and every row under it, with how its numbers read."""
+
+    header: list[str]
+    rows: list[list[str]]
+    serial: bool
+    decimal: str
+
+
+def _body(rows: list[list[str]], *, serial: bool, decimal: str) -> _Body | None:
     rows = [row for row in rows if any(cell.strip() for cell in row)]
     at = _header_at(rows)
-    if at is None or at + 1 >= len(rows):
+    if at is None or at + 1 >= len(rows) or len(rows[at]) > MAX_HEADER:
         return None
     header = [cell.strip() for cell in rows[at]]
-    samples = [
-        [cell.strip() for cell in row[: len(header)]] for row in rows[at + 1 : at + 1 + SAMPLE_ROWS]
-    ]
-    return Table(header, samples)
+    body = [[cell.strip() for cell in row[: len(header)]] for row in rows[at + 1 :]]
+    return _Body(header, body, serial, decimal)
 
 
-def read_table(data: bytes) -> Table | None:
-    """The header and first rows of a CSV or Excel list, or ``None`` when the
-    file is not a table (an HTML report, a PDF, a damaged workbook)."""
+def _read_body(data: bytes) -> _Body | None:
     try:
         if imp._is_zip(data):
             for sheet in imp.read_xlsx(data).values():
-                found = _table([[imp._as_text(cell) for cell in row] for row in sheet])
+                found = _body(
+                    [[imp._as_text(cell) for cell in row] for row in sheet],
+                    serial=True,
+                    decimal=".",
+                )
                 if found is not None:
                     return found
             return None
@@ -188,10 +260,24 @@ def read_table(data: bytes) -> Table | None:
         lowered = text.lstrip()[:4000].lower()
         if "<html" in lowered or "<table" in lowered or text.lstrip().startswith("<"):
             return None
-        header, rows, _ = imp._read_delimited(text)
+        # A 200,000-column header is not a table anyone names by hand.
+        top = text[:4_000_000].splitlines()[: imp.UNIVERSAL_HEADER_SCAN + 1]
+        if any(line.count(mark) > MAX_HEADER * 4 for line in top for mark in ",;\t|"):
+            return None
+        header, rows, delimiter = imp._read_delimited(text)
     except (imp.ReportFormatError, ValueError):
         return None
-    return _table([header, *rows])
+    return _body([header, *rows], serial=False, decimal="," if delimiter == ";" else ".")
+
+
+def read_table(data: bytes) -> Table | None:
+    """The header and first rows of a CSV or Excel list, or ``None`` when the
+    file is not a table (an HTML report, a PDF, a damaged workbook) or its
+    header is wider than ``MAX_HEADER`` columns."""
+    body = _read_body(data)
+    if body is None:
+        return None
+    return Table(body.header, body.rows[:SAMPLE_ROWS])
 
 
 def header_signature(header: Sequence[str]) -> str:
@@ -208,7 +294,7 @@ def usable_mapping(columns: Mapping[str, str], table: Table) -> dict[str, str]:
     return {
         role: name
         for role, name in columns.items()
-        if role in universal.ROLES and isinstance(name, str) and name in names
+        if role in FORM_ROLES and isinstance(name, str) and name in names
     }
 
 
@@ -233,6 +319,147 @@ def guessed(table: Table) -> dict[str, str]:
         for role, index in universal.guess_columns(table.header).items()
         if role in universal.ROLES and table.header[index].strip()
     }
+
+
+def _date_role(columns: Mapping[str, str]) -> str | None:
+    return next((role for role in _DATE_ROLES if columns.get(role)), None)
+
+
+def curve_kind(columns: Mapping[str, str]) -> str | None:
+    """``balance`` or ``profit`` when the mapping names a date with a balance,
+    or a date with each trade's result and not a full trade or fill list;
+    else ``None`` (the universal reader takes the mapping)."""
+    if _date_role(columns) is None:
+        return None
+    if columns.get("balance"):
+        return "balance"
+    full = all(columns.get(role) for role in universal.TRADE_ROLES) or all(
+        columns.get(role) for role in universal.FILL_ROLES
+    )
+    if columns.get("profit") and not full:
+        return "profit"
+    return None
+
+
+def _figures(values: list[str], decimal: str) -> list[float | None]:
+    read = [universal._amount(value, decimal) for value in values]
+    other = "." if decimal == "," else ","
+    swapped = [universal._amount(value, other) for value in values]
+    # A comma-decimal column in a comma-free export, or the reverse.
+    if sum(x is not None for x in swapped) > sum(x is not None for x in read):
+        return swapped
+    return read
+
+
+def curve_from_columns(
+    data: bytes,
+    columns: Mapping[str, str],
+    *,
+    initial_balance: float | None,
+    locale: str = "es",
+) -> tuple[bytes, list[str]]:
+    """An equity CSV (``timestamp,equity``) from a date column and either the
+    balance or each trade's result, with the warnings that go with it.
+
+    Results are chained from ``initial_balance`` (the declared one, else
+    ``DEFAULT_INITIAL_BALANCE`` with the importers' own warning), one day
+    before the first result, so the first trade counts as a return.
+    """
+    kind = curve_kind(columns)
+    body = _read_body(data)
+    date_role = _date_role(columns)
+    if kind is None or body is None or date_role is None:
+        raise imp.ReportFormatError("mapped_curve_unreadable", _few_rows("en"), _few_rows("es"))
+    names = [cell.strip() for cell in body.header]
+    try:
+        date_at = names.index(columns[date_role])
+        value_at = names.index(columns[kind])
+    except ValueError as exc:
+        raise imp.ReportFormatError(
+            "mapped_curve_unreadable", _few_rows("en"), _few_rows("es")
+        ) from exc
+
+    def cell(row: list[str], at: int) -> str:
+        return row[at] if at < len(row) else ""
+
+    times = universal._times(
+        [cell(row, date_at) for row in body.rows],
+        body.serial,
+        zone=universal.header_zone(names[date_at]),
+    ).values
+    figures = _figures([cell(row, value_at) for row in body.rows], body.decimal)
+    points = sorted(
+        (
+            (when.astimezone(UTC).replace(tzinfo=None) if when.tzinfo else when, figure)
+            for when, figure in zip(times, figures, strict=True)
+            if when is not None and figure is not None
+        ),
+        key=lambda point: point[0],
+    )
+    dropped = len(body.rows) - len(points)
+    if len(points) < 2:
+        raise imp.ReportFormatError("mapped_curve_unreadable", _few_rows("en"), _few_rows("es"))
+    warnings: list[str] = []
+    curve: dict[datetime, float] = {}
+    if kind == "balance":
+        warnings.append(MAPPED_BALANCE_WARNING)
+        for when, figure in points:
+            curve[when] = figure
+    else:
+        warnings.append(MAPPED_PROFIT_WARNING)
+        start = initial_balance
+        if start is None or start <= 0:
+            start = imp.DEFAULT_INITIAL_BALANCE
+            warnings.append(
+                f"the file does not state a starting balance; {start:,.0f} was assumed, "
+                "which scales every return and drawdown"
+            )
+        first = points[0][0]
+        curve[datetime(first.year, first.month, first.day) - timedelta(days=1)] = start
+        level = start
+        for when, figure in points:
+            level += figure
+            curve[when] = level
+    if dropped:
+        warnings.append(MAPPED_DROPPED_WARNING.format(n=dropped))
+    lines = ["timestamp,equity"]
+    lines.extend(f"{when.isoformat(sep=' ')},{value!r}" for when, value in curve.items())
+    return ("\n".join(lines) + "\n").encode(), warnings
+
+
+def _few_rows(locale: str) -> str:
+    return COPY[locale]["few_rows"]
+
+
+def missing_fields(columns: Mapping[str, str], locale: str = "es") -> str:
+    """Which fields the customer's choice still lacks, for the closest way
+    to read the file, and that a date with a result or balance is enough."""
+    locale = "en" if locale == "en" else "es"
+    words = COPY[locale]
+    labels: Mapping[str, str] = {
+        **_COPY[locale]["map_roles"],
+        "date": words["role_date"],
+        "balance": words["role_balance"],
+    }
+    has_date = _date_role(columns) is not None
+    ways = (
+        ("trade", universal.TRADE_ROLES),
+        ("fill", universal.FILL_ROLES),
+        ("profit", ("date", "profit")),
+        ("balance", ("date", "balance")),
+    )
+
+    def lacking(roles: Sequence[str]) -> list[str]:
+        return [role for role in roles if not (has_date if role == "date" else columns.get(role))]
+
+    def named(roles: Sequence[str]) -> int:
+        return sum(1 for role in roles if columns.get(role))
+
+    # The way the customer's own choice points to, then the one closest to done.
+    what, roles = min(ways, key=lambda way: (-named(way[1]), len(lacking(way[1]))))
+    fields = ", ".join(labels[role] for role in lacking(roles))
+    text = words["missing"].format(what=words[f"what_{what}"], fields=fields)
+    return text if what in ("profit", "balance") else f"{text} {words['also']}"
 
 
 def _example(table: Table, name: str) -> str:
@@ -261,21 +488,22 @@ def _select(role: str, label: str, table: Table, chosen: str, words: Mapping[str
 
 
 def _preview(table: Table, words: Mapping[str, str]) -> str:
-    head = "".join(
-        f"<th>{_e(imp._clip(name, 40) or words['unnamed'])}</th>" for name in table.header
-    )
+    shown = table.header[:MAX_COLUMNS]
+    head = "".join(f"<th>{_e(imp._clip(name, 40) or words['unnamed'])}</th>" for name in shown)
     body = "".join(
         "<tr>"
         + "".join(
             f"<td>{_e(imp._clip(row[i], 40) if i < len(row) else '')}</td>"
-            for i in range(len(table.header))
+            for i in range(len(shown))
         )
         + "</tr>"
         for row in table.samples
     )
+    hidden = len(table.header) - len(shown)
+    more = f"<p class='help'>{_e(words['more_columns'].format(n=hidden))}</p>" if hidden > 0 else ""
     return (
         f"<div class='tscroll'><table style='white-space:nowrap'><thead><tr>{head}</tr></thead>"
-        f"<tbody>{body}</tbody></table></div>"
+        f"<tbody>{body}</tbody></table></div>{more}"
     )
 
 
@@ -304,6 +532,16 @@ def mapping_page(
         + "".join(_select(role, labels[role], table, picked.get(role, ""), words) for role in roles)
         + "</div></fieldset>"
         for title, roles in form_copy["map_groups"]
+    )
+    curve_labels = {"date": words["role_date"], "balance": words["role_balance"]}
+    groups += (
+        f"<fieldset class='map-group'><legend>{_e(words['curve_group'])}</legend>"
+        f"<p class='help'>{_e(words['curve_help'])}</p><div class='form-grid'>"
+        + "".join(
+            _select(role, curve_labels[role], table, picked.get(role, ""), words)
+            for role in CURVE_ROLES
+        )
+        + "</div></fieldset>"
     )
     hidden = "".join(
         f"<input type='hidden' name='{name}' value='{_e(value)}'>"

@@ -626,8 +626,15 @@ def _role_of(name: str) -> tuple[str, int] | None:
     return None
 
 
+#: A header wider than this is no trade list: it is not searched for roles,
+#: so a file of 200,000 columns costs nothing to turn down.
+WIDEST_HEADER = 500
+
+
 def _ranked(header: Sequence[str]) -> dict[str, list[tuple[int, int]]]:
     found: dict[str, list[tuple[int, int]]] = {}
+    if len(header) > WIDEST_HEADER:
+        return found
     for position, name in enumerate(header):
         match = _role_of(str(name))
         if match is not None:

@@ -184,6 +184,24 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "se dejaron fuera {n} fila(s) más con hora ilegible",
     ),
     (
+        "the curve was built from each trade's date and result only; without prices, "
+        "quantities or entry times, holding times, entry timing and trade-level checks "
+        "cannot be measured",
+        "la curva se armó solo con la fecha y el resultado de cada operación; sin precios, "
+        "cantidades ni horas de entrada no se pueden medir la duración de las operaciones, "
+        "el momento de entrada ni las comprobaciones por operación",
+    ),
+    (
+        "the curve was read from the balance column you named; the file lists no trades, so "
+        "trade-level checks cannot be measured",
+        "la curva se leyó de la columna de saldo que indicaste; el archivo no lista "
+        "operaciones, así que no se pueden medir las comprobaciones por operación",
+    ),
+    (
+        "{n} row(s) without a readable date or amount were left out",
+        "se dejaron fuera {n} fila(s) sin fecha o cifra legible",
+    ),
+    (
         "{n} repeated row(s) (the same position listed twice) counted once",
         "{n} fila(s) repetida(s) (la misma posición listada dos veces) se contaron una sola vez",
     ),
@@ -1532,6 +1550,10 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} trade(s) closed by the tester at the end of the test": (
         "{n} trade closed by the tester at the end of the test",
         "el probador cerró {n} operación al final de la prueba",
+    ),
+    "{n} row(s) without a readable date or amount were left out": (
+        "{n} row without a readable date or amount was left out",
+        "se dejó fuera {n} fila sin fecha o cifra legible",
     ),
     "{n} more row(s) with an unreadable time were left out": (
         "{n} more row with an unreadable time was left out",
