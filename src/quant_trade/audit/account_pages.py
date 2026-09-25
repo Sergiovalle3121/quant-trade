@@ -108,6 +108,8 @@ COPY: dict[str, dict[str, str]] = {
         "compare_help": "Marca dos informes completos y compáralos lado a lado, sin pegar enlaces.",
         "compare_pick": "Elige exactamente dos informes completos de tu lista para compararlos.",
         "compare_back": "Volver a mis informes",
+        "compare_mine": "¿Son informes de tu cuenta? Compáralos desde tu lista, sin pegar enlaces.",
+        "compare_mine_button": "Elegir en mis informes",
         "compare_lead": (
             "Dos informes de tu cuenta. Sirve para ver qué cambió entre dos versiones de una "
             "estrategia o entre dos robots."
@@ -318,6 +320,8 @@ COPY: dict[str, dict[str, str]] = {
         "compare_help": "Tick two full reports and compare them side by side, no links to paste.",
         "compare_pick": "Pick exactly two full reports from your list to compare them.",
         "compare_back": "Back to my reports",
+        "compare_mine": "Are they reports on your account? Compare them from your list, no links.",
+        "compare_mine_button": "Pick from my reports",
         "compare_lead": (
             "Two reports from your account. Use it to see what changed between two versions "
             "of a strategy or between two robots."
@@ -702,6 +706,18 @@ def forgot_page(*, locale: str, contact_url: str) -> str:
     )
 
 
+def compare_mine_note(locale: str) -> str:
+    """Above the paste-links form, for a signed-in visitor: their own list is quicker."""
+    locale = _locale(locale)
+    copy = COPY[locale]
+    return (
+        "<div class='cmp-mine'><p>"
+        f"{_e(copy['compare_mine'])} <a class='btn btn-dark btn-sm' "
+        f"href='{path('account', locale)}#informes'>{_e(copy['compare_mine_button'])}</a>"
+        "</p></div>"
+    )
+
+
 def gate_page(*, locale: str, reason: str, limit: int) -> str:
     """Why an upload did not run: no account, a bad code, or the month's free previews used.
 
@@ -992,7 +1008,7 @@ def account_page(
         f"<span>{_e(copy['paid_reports'])}</span></div></div>"
     )
     reports = (
-        f"<section class='acct-sec'><h2>{_e(copy['reports_title'])}</h2>"
+        f"<section class='acct-sec' id='informes'><h2>{_e(copy['reports_title'])}</h2>"
         + _reports_table(copy, locale, audits, free_mode=free_mode)
         + "</section>"
     )
