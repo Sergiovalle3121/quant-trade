@@ -195,3 +195,22 @@ def test_a_fund_without_a_benchmark_has_no_block() -> None:
         }
     )
     assert "benchmark" not in fund_review(frame, 12.0)
+
+
+def test_a_lone_index_column_is_never_taken_as_a_benchmark() -> None:
+    from quant_trade.audit.schema import ParseError
+
+    # As before this change: "index" alone is not a curve alias, so the file
+    # is refused for its missing value column, never half-read as a benchmark.
+    for column in ("index", "Indice", "referencia"):
+        data = f"date,{column}\n2020-01-31,100\n2020-02-29,103\n2020-03-31,99\n".encode()
+        with pytest.raises(ParseError) as caught:
+            parse_equity_csv(data)
+        assert caught.value.code == "missing_value"
+    # Beside a named curve, the curve stays the curve.
+    series = parse_equity_csv(
+        b"date,nav,index\n2020-01-31,100,50\n2020-02-29,103,52\n2020-03-31,99,49\n"
+    )
+    assert series.source == "equity" and series.frame["equity"].iloc[-1] == 99
+    assert series.benchmark is not None
+    assert series.benchmark["ret"].to_numpy() == pytest.approx([0.04, 49 / 52 - 1])
