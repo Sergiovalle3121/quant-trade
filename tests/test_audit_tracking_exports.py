@@ -186,3 +186,100 @@ def test_an_uploaded_tracking_export_gets_the_account_money_review(locale: str) 
     for warning in data["inputs"]["parse_warnings"]:
         if locale == "es":
             assert localize(warning, "es") != warning, warning
+
+
+def _myfxbook_without_fee_columns() -> bytes:
+    # The short layout of a real export: no Commission or Swap column.
+    rows = ["Open Date,Close date,Symbol,Action,Lots,SL,TP,Open Price,Close Price,Pips,Profit"]
+    for day in range(1, 29):
+        win = day % 3 != 0
+        close = "2,001.50" if win else "1,999.20"
+        profit = "15.00" if win else "-8.00"
+        rows.append(
+            f"03.{day:02d}.2024 10:00,03.{day:02d}.2024 10:05,XAUUSD,Buy,0.10,0,0,"
+            f'"2,000.00","{close}",0,{profit}'
+        )
+    return ("\n".join(rows) + "\n").encode("utf-8")
+
+
+def test_an_account_history_is_not_charged_as_a_zero_cost_backtest() -> None:
+    """Real fills already carry the spread: the reference is slippage only."""
+    from quant_trade.audit.costs import REAL_FILLS_NOTE, REFERENCE_BPS_OVER_REPORTED_FEES
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.i18n import localize
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    data = _myfxbook_without_fee_columns()
+    report = import_report(data, "statement.csv")
+    assert report.source_format == MYFXBOOK_CSV
+    assert not report.trades.reports_fees
+    inputs = build_inputs(
+        None, DeclaredMetadata(), report_bytes=data, report_filename="statement.csv"
+    )
+    result = run_audit(inputs, bootstrap_samples=50, risk_samples=50, challenge_samples=50)
+    out = result.model_dump() if hasattr(result, "model_dump") else result.to_dict()
+    reference = out["costs"]["reference_bps"]
+    assert reference["value"] == REFERENCE_BPS_OVER_REPORTED_FEES
+    assert reference["note"] == REAL_FILLS_NOTE
+    assert localize(REAL_FILLS_NOTE, "es") != REAL_FILLS_NOTE
+    assert "ZERO_DECLARED_COSTS" not in {flag["code"] for flag in out["red_flags"]}
+    costs = next(d for d in out["verdict"]["dimensions"] if d["name"] == "costs")
+    assert costs["inputs"]["reference_bps_per_side"]["note"] == REAL_FILLS_NOTE
+
+
+def test_a_backtest_without_costs_keeps_the_ten_bps_reference() -> None:
+    from quant_trade.audit.costs import REFERENCE_BPS_WHEN_ZERO, reference_bps, reference_note
+
+    assert reference_bps(0.0) == (REFERENCE_BPS_WHEN_ZERO, True)
+    assert reference_bps(0.0, real_fills=True) == (0.5, True)
+    assert reference_bps(2.0, real_fills=True) == (2.0, False)
+    assert reference_note(True, False) == "assumed: client declared zero cost"
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_account_history_is_called_one_and_gets_investor_questions(locale: str) -> None:
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    data = _myfxbook_without_fee_columns()
+    inputs = build_inputs(
+        None, DeclaredMetadata(), report_bytes=data, report_filename="statement.csv"
+    )
+    result = run_audit(inputs, bootstrap_samples=50, risk_samples=50, challenge_samples=50)
+    out = result.model_dump() if hasattr(result, "model_dump") else result.to_dict()
+    codes = [question["code"] for question in out["vendor_questions"]]
+    assert codes[:2] == ["other_accounts", "backtest_match"]
+    assert not {"live_record", "modelling", "trials", "out_of_sample", "costs"} & set(codes)
+    page = render_html(result, watermark=False, locale=locale)
+    if out["verdict"]["overall"] in ("C", "D"):
+        assert ("historial de cuenta" if locale == "es" else "account history") in page
+        assert "el backtest no supera" not in page and "the backtest does not" not in page
+    assert find_claims(page) == []
+
+
+def test_account_class_texts_pass_the_guard() -> None:
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.verdict import _TEXT
+
+    for texts in _TEXT.values():
+        for key in ("C.account", "D.account"):
+            assert "account" in key and find_claims(texts[key]) == []
+
+
+def test_backtest_questions_are_unchanged() -> None:
+    from quant_trade.audit.analytics import vendor_questions
+
+    codes = [
+        q["code"]
+        for q in vendor_questions(
+            [],
+            has_trades=True,
+            trials_measured=False,
+            has_out_of_sample=False,
+            has_costs=False,
+            balance_only=False,
+        )
+    ]
+    assert codes == ["live_record", "modelling", "trials", "out_of_sample", "costs"]

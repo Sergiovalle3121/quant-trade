@@ -121,6 +121,7 @@ def scan(
     trades: ParsedTrades | None = None,
     recomputed_pnl: list[float] | None = None,
     variants_columns: int = 0,
+    real_fills: bool = False,
 ) -> list[RedFlag]:
     flags: list[RedFlag] = []
     frame = series.frame
@@ -273,8 +274,13 @@ def scan(
                 )
 
     # A report that itemises commission and fees has measured costs even
-    # when the client declares none.
-    if declared.cost_bps_per_side == 0 and not (trades is not None and trades.reports_fees):
+    # when the client declares none, and so has an account history: its
+    # prices are the broker's real fills.
+    if (
+        declared.cost_bps_per_side == 0
+        and not real_fills
+        and not (trades is not None and trades.reports_fees)
+    ):
         flags.append(
             RedFlag(
                 "ZERO_DECLARED_COSTS",

@@ -363,6 +363,12 @@ and report wire them in during the integration step):
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
+  For an account history the backtest questions (modelling, trials, held-out
+  period, assumed costs, "is there a live account") give way to two for an
+  investor: whether other accounts of the same strategy were closed or
+  restarted, and asking for the backtest of the same robot to compare trade
+  by trade. The class sentence then says "account history" instead of
+  "backtest" (C and D).
 
 Challenge presets (`quant-trade audit presets` after integration), each a
 transcription of the official page on its `as_of` date with its
@@ -515,6 +521,14 @@ supplied". It is not a prediction.
   break-even is the extra cost per side on top of the reported fees, and
   `ZERO_DECLARED_COSTS` is not raised because the costs were measured. A
   cost the client declares is charged on top of the reported fees.
+- An account history (MT5/MT4 account statement, Myfxbook, MQL5 signal or
+  FX Blue export) gets the same 0.5 bps per side slippage reference even when
+  it itemises no fee: its prices are the broker's real fills, so the spread is
+  already in each result. `ZERO_DECLARED_COSTS` is not raised for it. Before
+  this, a Myfxbook export without Commission and Swap columns (a real XAUUSD
+  scalping account, 773 trades) was charged 10 bps per side, about USD 4.80
+  an ounce of gold per side, and failed the cost dimension on a cost it had
+  already paid.
 - CSCV needs the variants matrix; without it the PBO is NOT_MEASURED and
   multiplicity relies on the DSR alone.
 - The bootstrap is per period and does not annualise; its block size is

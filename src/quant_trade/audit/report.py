@@ -21,6 +21,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
+from quant_trade.audit.account import ACCOUNT_FORMATS
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
@@ -1787,6 +1788,7 @@ def _summary_in(data: dict[str, Any], locale: str) -> str:
         locale="en" if locale == "en" else "es",
         trials=int(trials.get("value") or 1),
         trials_evidence=str(trials.get("evidence") or "DECLARED"),
+        account=str((data.get("inputs") or {}).get("source_format")) in ACCOUNT_FORMATS,
     )
 
 

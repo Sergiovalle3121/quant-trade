@@ -565,15 +565,21 @@ def _cscv(variants: np.ndarray | None) -> tuple[dict[str, Any], float | None]:
     }, float(evidence.pbo)
 
 
+def _real_fills(inputs: AuditInputs) -> bool:
+    """True when the upload is an account history, whose prices are real fills."""
+    return inputs.source_format in account_lib.ACCOUNT_FORMATS
+
+
 def _costs(
     inputs: AuditInputs,
 ) -> tuple[dict[str, Any], list[cost_lib.RecostRow] | None, float | None, bool, list[float] | None]:
     if inputs.trades is None:
         return {"status": "NOT_MEASURED", "reason": "no trades uploaded"}, None, None, False, None
     fees_reported = inputs.trades.reports_fees
+    real_fills = _real_fills(inputs)
     charged = inputs.trades.fees if fees_reported else None
     ref, assumed = cost_lib.reference_bps(
-        inputs.declared.cost_bps_per_side, fees_reported=fees_reported
+        inputs.declared.cost_bps_per_side, fees_reported=fees_reported, real_fills=real_fills
     )
     rows = cost_lib.recost_trades(
         inputs.trades.trades, inputs.trades.sides, ref, reported_costs=charged
@@ -582,7 +588,7 @@ def _costs(
     gross = cost_lib.gross_pnls(inputs.trades.trades, inputs.trades.sides)
     section = {
         "status": "MEASURED",
-        "reference_bps": declared(ref, cost_lib.reference_note(assumed, fees_reported)),
+        "reference_bps": declared(ref, cost_lib.reference_note(assumed, fees_reported, real_fills)),
         "reported_costs_in_rows": fees_reported,
         "rows": [
             {
@@ -799,6 +805,7 @@ def run_audit(
         trades=inputs.trades,
         recomputed_pnl=gross,
         variants_columns=measured_trials,
+        real_fills=_real_fills(inputs),
     )
     if inputs.trades is not None:
         flags.extend(
@@ -887,6 +894,7 @@ def run_audit(
             reference_bps=reference,
             reference_is_assumption=assumed,
             fees_reported=inputs.trades is not None and inputs.trades.reports_fees,
+            real_fills=_real_fills(inputs),
             thresholds=thresholds,
         ),
         verdict.assess_out_of_sample(
@@ -911,6 +919,7 @@ def run_audit(
         trials=trials_used,
         trials_evidence=trials_evidence,
         thresholds=thresholds,
+        account=_real_fills(inputs),
     )
     mintrl = significance.get("min_track_record_length", {})
     mintrl_value = mintrl.get("value") if mintrl.get("evidence") == MEASURED else None
@@ -921,6 +930,7 @@ def run_audit(
         has_out_of_sample=holdout["status"] == "MEASURED",
         has_costs=inputs.declared.cost_bps_per_side > 0 or bool(inputs.reported_fees),
         balance_only=inputs.balance_only,
+        account_history=_real_fills(inputs),
         min_track_record_months=(
             float(mintrl_value) / ppy * 12.0 if mintrl_value is not None and ppy > 0 else None
         ),
