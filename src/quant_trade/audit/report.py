@@ -611,6 +611,7 @@ LABELS: dict[str, dict[str, str]] = {
             "sin operaciones cuenta como plano. Las fechas son fijas: no se ajustan al archivo."
         ),
         "crises_subject": "Estrategia",
+        "crises_no_trades": "sin operaciones cerradas en la ventana",
         "crises_worse": (
             "En {worse} de {n} crisis cayó más que su índice. Pregunta al vendedor qué la "
             "protege cuando el mercado cae."
@@ -1417,6 +1418,7 @@ LABELS: dict[str, dict[str, str]] = {
             "with no trades counts as flat. The dates are fixed: they are not fitted to the file."
         ),
         "crises_subject": "Strategy",
+        "crises_no_trades": "no trades closed in the window",
         "crises_worse": (
             "In {worse} of {n} crises it fell more than its benchmark. Ask the seller what "
             "protects it when markets fall."
@@ -4402,7 +4404,12 @@ def _crises_html(
         body = "".join(
             f"<tr><td>{_e(labels['fund_stress_' + row['key']])}<br>"
             f"<small class='muted'>{_e(row['first'])} – {_e(row['last'])}</small></td>"
-            + cell(row["fund"], subject)
+            + (
+                f"<td class='val muted' data-l='{_e(subject)}'>"
+                f"{_e(labels['crises_no_trades'])}</td>"
+                if row.get("no_trades")
+                else cell(row["fund"], subject)
+            )
             + (cell(row.get("benchmark"), labels["fund_stress_index"]) if with_index else "")
             + "</tr>"
             for row in rows

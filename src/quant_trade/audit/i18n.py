@@ -812,6 +812,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("the curve is shorter than two months", "la curva dura menos de dos meses"),
     (
+        "the curve never moves 0.1 % from its start",
+        "la curva nunca se aleja un 0.1 % de su inicio",
+    ),
+    (
         "fixed calendar windows of widely recorded market falls; the curve's month-end "
         "returns compounded over each window it covers in full",
         "periodos fijos de caídas de mercado de fecha pública; las rentabilidades de fin de "

@@ -210,3 +210,36 @@ def test_a_curve_starting_in_the_first_week_counts_that_month() -> None:
     assert [row["key"] for row in covered["windows"]] == ["covid"]
     late = curve_crises(_frame(pd.bdate_range("2020-02-12", "2021-06-30", tz="UTC")))
     assert late["status"] == "NOT_MEASURED"
+
+
+def test_a_flat_curve_shows_no_section() -> None:
+    from quant_trade.audit.crises import curve_crises
+
+    stamps = pd.bdate_range("2021-06-01", "2023-06-30", tz="UTC")
+    wiggle = 10_000 + 0.1 * np.sin(np.arange(len(stamps)))
+    review = curve_crises(pd.DataFrame({"timestamp": stamps, "equity": wiggle}))
+    assert review == {
+        "status": "NOT_MEASURED",
+        "reason": "the curve never moves 0.1 % from its start",
+    }
+
+
+def test_a_window_with_no_closed_trades_says_so(locale: str = "es") -> None:
+    from quant_trade.audit.crises import curve_crises
+    from quant_trade.audit.report import _crises_html
+
+    # Trades every month except through the 2008 window.
+    closes = [
+        stamp
+        for stamp in pd.date_range("2006-01-15", "2012-12-15", freq="MS", tz="UTC")
+        if not pd.Timestamp("2007-11-01", tz="UTC") <= stamp <= pd.Timestamp("2009-02-28", tz="UTC")
+    ]
+    closes = [pd.Timestamp("2006-01-02", tz="UTC"), *[c + pd.Timedelta(days=14) for c in closes]]
+    equity = 10_000 * np.cumprod(np.r_[1.0, np.full(len(closes) - 1, 1.004)])
+    frame = pd.DataFrame({"timestamp": closes, "equity": equity})
+    review = curve_crises(frame, from_trades=True)
+    gfc = next(row for row in review["windows"] if row["key"] == "gfc")
+    euro = next(row for row in review["windows"] if row["key"] == "euro")
+    assert gfc.get("no_trades") is True and "no_trades" not in euro
+    html = _crises_html(review, LABELS[locale])
+    assert LABELS[locale]["crises_no_trades"] in html
