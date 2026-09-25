@@ -880,9 +880,31 @@ SPANISH_MT5 = (
     ("Total Trades:", "Total de Trades:"),
     ("Total Deals:", "Total de transacciones:"),
 )
+#: The labels a real Spanish MetaTrader 5 terminal prints (public reports,
+#: docs/research/audit_iteration4/mt_languages_check.md), which differ from the help.
+SPANISH_MT5_TERMINAL = (
+    ("Initial Deposit:", "Depósito inicial:"),
+    ("Total Net Profit:", "Beneficio Neto:"),
+    ("Total Trades:", "Total de operaciones ejecutadas:"),
+    ("Total Deals:", "Total de transacciones:"),
+)
 
 
-@pytest.mark.parametrize("labels", [RUSSIAN_MT5, SPANISH_MT5], ids=["ru", "es"])
+#: The labels of real Italian MetaTrader 5 tester reports (same document).
+ITALIAN_MT5 = (
+    ("Initial Deposit:", "Deposito Iniziale:"),
+    ("Currency:", "Valuta:"),
+    ("Total Net Profit:", "Profitto Totale Netto:"),
+    ("Total Trades:", "Numero di Operazioni di Trading Totali:"),
+    ("Total Deals:", "Affari Totali:"),
+)
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [RUSSIAN_MT5, SPANISH_MT5, SPANISH_MT5_TERMINAL, ITALIAN_MT5],
+    ids=["ru", "es", "es-terminal", "it"],
+)
 def test_mt5_summary_labels_in_other_languages(labels: tuple[tuple[str, str], ...]) -> None:
     report = import_report(utf16(_mt5_tester_variant(*labels)))
     assert report.source_format == MT5_TESTER_HTML
@@ -1156,3 +1178,65 @@ def test_tradingview_rounded_small_pnl_is_not_another_contract_size() -> None:
         bootstrap_samples=20,
     )
     assert "TRADE_PNL_MISMATCH" not in {flag["code"] for flag in result.red_flags}
+
+
+def test_spanish_terminal_labels_map_to_the_english_names() -> None:
+    from quant_trade.audit.importers import _MT5_LABEL_ALIASES
+
+    real = {
+        "Expert": "Experto",
+        "Company": "Corredor",
+        "Total Trades": "Total de operaciones ejecutadas",
+        "Balance Drawdown Maximal": "Reducción máxima del balance",
+        "Equity Drawdown Maximal": "Reducción máxima de la equidad",
+        "Equity Drawdown Relative": "Reducción relativa de la equidad",
+        "Profit Factor": "Factor de Beneficio",
+    }
+    for english, spanish in real.items():
+        assert spanish.lower() in {alias.lower() for alias in _MT5_LABEL_ALIASES[english]}
+
+
+def _with_decimal_commas(html: bytes) -> bytes:
+    """The fixture as a terminal set to Spanish or Portuguese could print it.
+
+    Every figure's decimal point becomes a comma (``10 000,00``, ``0,2 / 0,2``);
+    dates such as ``2024.01.02`` keep their dots. No public report written
+    this way was found, so this synthetic case guards the reader.
+    """
+    text = html.decode("utf-8")
+    text = re.sub(r"(?<=[>\s(/])(-?\d[\d ]*)\.(\d+)(?=[<%)\s/])", r"\1,\2", text)
+    assert "10 000,00" in text and "2024.01.02" in text
+    return text.encode("utf-8")
+
+
+def test_mt5_report_with_decimal_commas_reads_the_same() -> None:
+    from quant_trade.audit.report import _lead_number
+
+    plain = import_report(fixture("mt5_tester.html"))
+    commas = import_report(_with_decimal_commas(fixture("mt5_tester.html")))
+    assert gross(commas) == gross(plain) == [25.0, -10.0, 57.5, 20.0, -20.0]
+    assert commas.initial_balance == plain.initial_balance == 10_000.0
+    assert [t.quantity for t in commas.trades.trades] == [t.quantity for t in plain.trades.trades]
+    assert [t.entry_price for t in commas.trades.trades] == [
+        t.entry_price for t in plain.trades.trades
+    ]
+    assert commas.fees == plain.fees
+    assert _lead_number(commas.metadata["declared_total_net_profit"]) == 63.05
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("1 234,56", 1234.56),
+        ("1.234,56", 1234.56),
+        ("1,234.56", 1234.56),
+        ("1,234", 1234.0),
+        ("-12,5", -12.5),
+        ("(1 234,56)", -1234.56),
+        ("12,345,678", 12_345_678.0),
+    ],
+)
+def test_numbers_with_a_decimal_comma(text: str, expected: float) -> None:
+    from quant_trade.audit.importers import _num
+
+    assert _num(text) == expected

@@ -48,9 +48,11 @@ statements (build 600+ with a Taxes column, older 13-column ones, and the
 numbered layout with a comment column), TradingView "List of trades" CSV and
 XLSX, and the trade exports of NinjaTrader, QuantConnect, backtesting.py and
 vectorbt. MetaTrader 5 summary labels are also read in Russian (from a real
-report), in Spanish (names from the Spanish MetaTrader 5 help, not yet seen
-in a real file) and as build 1940 wrote them ("Net profit", "Trade",
-"Profit Column"). The importers were checked against 23 real public
+report), in Spanish and Italian (checked against 8 real public reports; see
+`docs/research/audit_iteration4/mt_languages_check.md`) and as build 1940
+wrote them ("Net profit", "Trade", "Profit Column"). A figure written with a
+decimal comma (`1 234,56`, `1.234,56`) is read as 1234.56; `1,234` stays a
+thousands separator. The importers were checked against 23 real public
 MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
 Limits, each written into the report as a reading warning:
 
