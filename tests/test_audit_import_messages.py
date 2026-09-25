@@ -139,3 +139,48 @@ def test_zero_price_fills_say_so() -> None:
     with pytest.raises(ReportFormatError) as info:
         import_report(data, "fills.csv")
     assert "precio y volumen positivos" in info.value.message_es
+
+
+def test_two_exports_pasted_together_count_each_position_once() -> None:
+    from test_audit_platform_catalog import XTB_HEADER, XTB_ROWS
+
+    lines = [",".join(str(cell) for cell in row) for row in XTB_ROWS]
+    data = "\n".join([XTB_HEADER, *lines, *lines]) + "\n"
+    report = import_report(data.encode(), "xtb.csv", initial_balance=25_000)
+    assert len(report.symbols) == 3
+    assert "3 repeated row(s) (the same position listed twice) counted once" in report.warnings
+
+
+def test_partial_closes_sharing_a_position_id_are_all_kept() -> None:
+    from test_audit_platform_catalog import XTB_HEADER, XTB_ROWS
+
+    first = [str(cell) for cell in XTB_ROWS[0]]
+    second = list(first)
+    second[6], second[7], second[18] = "15/03/2026 16:00:00", "211", "110.0"
+    data = "\n".join([XTB_HEADER, ",".join(first), ",".join(second)]) + "\n"
+    report = import_report(data.encode(), "xtb.csv", initial_balance=25_000)
+    assert len(report.symbols) == 2
+    assert not any("repeated" in warning for warning in report.warnings)
+
+
+def test_identical_fills_without_an_id_are_real_and_kept() -> None:
+    data = (
+        b"Time,Symbol,Side,Quantity,Price\n"
+        b"2026-01-02 10:00,AAPL,Buy,10,190\n"
+        b"2026-01-02 10:00,AAPL,Buy,10,190\n"
+        b"2026-01-03 10:00,AAPL,Sell,20,191\n"
+    )
+    report = import_report(data, "fills.csv", initial_balance=25_000)
+    assert sum(t.quantity for t in report.trades.trades) == 20
+    assert not any("repeated" in warning for warning in report.warnings)
+
+
+def test_a_named_format_drops_repeated_rows_too() -> None:
+    from test_audit_importers import fixture
+
+    text = fixture("ninjatrader.csv").decode()
+    header, *rows = text.splitlines()
+    once = import_report(text.encode(), "ninjatrader.csv")
+    twice = import_report("\n".join([header, *rows, *rows]).encode(), "ninjatrader.csv")
+    assert len(twice.trades.trades) == len(once.trades.trades)
+    assert any("counted once" in warning for warning in twice.warnings)

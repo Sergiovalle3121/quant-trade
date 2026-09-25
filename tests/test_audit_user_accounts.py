@@ -712,3 +712,40 @@ def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path:
     anon, _, _ = _client(tmp_path)
     answer = anon.get(f"/cuenta/comparar?id={ids[0]}&id={ids[1]}", follow_redirects=False)
     assert answer.headers["location"].startswith("/entrar")
+
+
+def test_my_reports_link_the_pdf_and_public_page_of_each_report(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    full, preview = (_audit_id(_upload(client).headers["location"]) for _ in range(2))
+    store.mark_paid(full, stripe_session_id="cs_a", at=NOW)  # type: ignore[attr-defined]
+    page = client.get("/cuenta").text
+    assert f"/audits/{full}/pdf?lang=es" in page
+    assert f"/audits/{preview}/pdf" not in page  # a preview has no PDF
+    assert "/v/" not in page
+    published = client.post(f"/audits/{full}/publish", follow_redirects=False)
+    public_path = published.headers["location"].split("?")[0]
+    assert public_path.startswith("/v/")
+    page = client.get("/account").text
+    assert f"{public_path}?lang=en" in page and "Public page" in page
+    # The owner's session opens the PDF without the token.
+    assert client.get(f"/audits/{preview}/pdf").status_code == 402
+
+
+def test_without_credits_my_account_shows_prices_and_a_ready_message_first(
+    tmp_path: Path,
+) -> None:
+    client, _, settings = _client(tmp_path)
+    _signup(client)
+    _upload(client)
+    page = client.get("/cuenta").text
+    single = settings.price_usd_cents // 100
+    pack = settings.pack_price_usd_cents // 100
+    assert f"Un informe completo: USD {single}." in page
+    assert f"Paquete de 3 créditos: USD {pack}." in page
+    assert "wa.me/000?text=" in page
+    # With no credits, buying comes before the list of reports.
+    assert page.index("¿Necesitas créditos?") < page.index("Tus informes")
+    en = client.get("/account").text
+    assert f"Pack of 3 credits: USD {pack}." in en
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))

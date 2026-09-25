@@ -854,6 +854,42 @@ def without_totals(rows: list[list[str]]) -> list[list[str]]:
     return [row for row in rows if normalise(first(row)) not in TOTAL_WORDS]
 
 
+#: Column names that identify a position, order, fill or deal: a table with one
+#: never lists the same row twice on purpose.
+ID_COLUMNS = frozenset(
+    {
+        "position", "positionid", "ticket", "ticketid", "order", "orderid", "orderno",
+        "ordernumber", "id", "tradeid", "trade", "tradeno", "deal", "dealid", "transactionid",
+        "execid", "executionid", "fillid", "orden", "operacion", "idoperacion", "tradenumber",
+        "ticketnumber", "positionnumber", "dealnumber",
+    }
+)  # fmt: skip
+
+REPEATED_ROWS_WARNING = "{n} repeated row(s) (the same position listed twice) counted once"
+
+
+def drop_repeated_rows(header: Sequence[str], rows: list[list[str]]) -> tuple[list[list[str]], int]:
+    """The rows with exact repeats removed, and how many were removed.
+
+    Only when the table has an id column (Position, Ticket, Order, ID...):
+    there a row repeated in every column is the same position listed twice
+    (two exports pasted together), while rows that share an id but differ
+    (partial closes) are all kept. Without an id, two identical fills can be
+    real, so nothing is removed.
+    """
+    if not any(normalise(str(name)) in ID_COLUMNS for name in header):
+        return rows, 0
+    seen: set[tuple[str, ...]] = set()
+    kept: list[list[str]] = []
+    for row in rows:
+        key = tuple(cell.strip() for cell in row)
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(row)
+    return kept, len(rows) - len(kept)
+
+
 def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
     """Sierra Chart's Trade Activity Log mixes order events with fills; keep
     the fills when an activity column says which is which."""
@@ -1096,7 +1132,10 @@ def parse(
         for account in accounts:
             closed[account] = closed.get(account, 0) + 1
         rows = imp._busiest_account(rows, accounts, closed, draft.warnings)
-    rows = only_fills(header, without_totals(rows))
+    rows, repeated = drop_repeated_rows(header, without_totals(rows))
+    if repeated:
+        draft.warnings.append(REPEATED_ROWS_WARNING.format(n=repeated))
+    rows = only_fills(header, rows)
     if mapping.shape == UNIVERSAL_TRADES_CSV:
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:

@@ -37,7 +37,9 @@ from quant_trade.audit import forward as forward_lib
 from quant_trade.audit import fund as fund_lib
 from quant_trade.audit import instruments as instruments_lib
 from quant_trade.audit import live as live_lib
+from quant_trade.audit import luck as luck_lib
 from quant_trade.audit import plateau as plateau_lib
+from quant_trade.audit import ride as ride_lib
 from quant_trade.audit import sizing as sizing_lib
 from quant_trade.audit import stress as stress_lib
 from quant_trade.audit import testdata as testdata_lib
@@ -887,6 +889,19 @@ def run_audit(
         trials_evidence=trials_evidence,
         trials_source=trials_source,
     )
+    luck = luck_lib.luck_review(
+        moments,
+        trials=trials_used,
+        trials_source=trials_source,
+        sharpe_variance=(
+            float(multiplicity["sharpe_variance_used"]["value"])
+            if multiplicity["status"] == "MEASURED"
+            else None
+        ),
+        periods_per_year=ppy,
+        span_years=(frame["timestamp"].iloc[-1] - frame["timestamp"].iloc[0]).days / 365.25,
+    )
+    ride = ride_lib.ride_review(frame)
     bootstrap = _bootstrap(returns, samples=bootstrap_samples, seed=seed)
     subperiods = _subperiods(frame)
     rolling = _rolling(frame, ppy)
@@ -1212,6 +1227,8 @@ def run_audit(
         instruments=instruments,
         fund=fund,
         crises=crises,
+        luck=luck,
+        ride=ride,
         vendor_questions=questions,
     )
 

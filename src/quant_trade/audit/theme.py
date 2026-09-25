@@ -751,6 +751,16 @@ ul.mtags,ul.chips,ol.ladder{padding:0!important;margin-left:0!important}.mtags l
 @media print{.ladder{display:block;break-inside:avoid}.rung-cls,.rung-you{border:1px solid currentColor}.rung{margin:0 0 8px;break-inside:avoid;box-shadow:none}.rung{display:flex;align-items:center}.rung-cls{display:block;flex:none;width:34px;height:34px;line-height:32px;text-align:center;margin-right:16px}.rung p{flex:1;margin-right:14px}.rung-you{flex:none}}
 a.print-btn{text-decoration:none}
 [aria-busy=true]{cursor:progress;opacity:.8}
+/* The PDF link while the PDF is made: the upload loader in small, full colour, clicks ignored by app.js. */
+a[data-busy][aria-busy=true]{opacity:1;pointer-events:auto;cursor:progress;white-space:normal;height:auto;
+min-height:var(--h,34px)}
+a[data-busy][aria-busy=true]::before{content:'';flex:none;width:14px;height:14px;margin-right:10px;border-radius:50%;
+background:conic-gradient(from 0deg,transparent 0 25%,currentColor);
+-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 calc(100% - 1.5px));
+mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 calc(100% - 1.5px));
+animation:spin .9s linear infinite}
+.print-btn[aria-busy=true]::before{margin-right:2px}
+@media screen and (max-width:620px){a.btn[data-busy]{width:100%;padding-left:16px;padding-right:16px;text-align:center}.print-btn[aria-busy=true]{border-radius:14px;line-height:1.25;padding:6px 14px}}
 .report-hero .verdict+p{margin-top:28px}
 .print-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2}
 @media (max-width:620px){.meta-line .meta-x{display:none}.meta-line span{font-size:.66rem}}

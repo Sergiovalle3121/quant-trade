@@ -169,6 +169,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("{n} position(s) never closed; excluded", "{n} posición(es) nunca se cerraron; quedan fuera"),
     (
+        "{n} repeated row(s) (the same position listed twice) counted once",
+        "{n} fila(s) repetida(s) (la misma posición listada dos veces) se contaron una sola vez",
+    ),
+    (
         "{n} credit row(s) excluded: broker credit is not the trader's balance",
         "se excluyeron {n} fila(s) de crédito: el crédito del bróker no es balance del trader",
     ),
@@ -1357,6 +1361,64 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Source for the target and consistency rule: {url}",
         "Fuente del objetivo y de la regla de consistencia: {url}",
     ),
+    # audit/luck.py
+    (
+        "the curve never falls below a previous high",
+        "la curva nunca cae por debajo de un máximo previo",
+    ),
+    (
+        "the Sharpe ratio is zero or negative; there is no gain to discount",
+        "el Sharpe es cero o negativo; no hay ganancia que descontar",
+    ),
+    ("too short a history to discount", "historial demasiado corto para descontar"),
+    ("annualised Sharpe of the uploaded history", "Sharpe anualizado del historial aportado"),
+    (
+        "best annualised Sharpe {n} trials with no skill would show",
+        "mejor Sharpe anualizado que mostrarían {n} intentos sin habilidad",
+    ),
+    ("first to last date of the uploaded history", "de la primera a la última fecha del historial"),
+    (
+        "years of history at which the luck of {n} trials falls below this Sharpe",
+        "años de historial con los que la suerte de {n} intentos queda por debajo de este Sharpe",
+    ),
+    (
+        "one-sided p-value of the Sharpe, one test, with the spread of the deflated Sharpe",
+        "valor p unilateral del Sharpe, una sola prueba, con la dispersión del Sharpe deflactado",
+    ),
+    ("p-value x {n} (Bonferroni)", "valor p x {n} (Bonferroni)"),
+    (
+        "annualised Sharpe after discounting {n} trials",
+        "Sharpe anualizado después de descontar {n} intentos",
+    ),
+    ("share of the Sharpe the haircut removes", "parte del Sharpe que quita el descuento"),
+    (
+        "E[max Sharpe] of unskilled trials (Bailey & Lopez de Prado); minimum backtest "
+        "length (Bailey, Borwein, Lopez de Prado & Zhu); Bonferroni haircut (Harvey & Liu)",
+        "E[Sharpe máximo] de intentos sin habilidad (Bailey y López de Prado); longitud "
+        "mínima del backtest (Bailey, Borwein, López de Prado y Zhu); descuento de "
+        "Bonferroni (Harvey y Liu)",
+    ),
+    # audit/ride.py
+    ("fewer than twenty points on the curve", "menos de veinte puntos en la curva"),
+    ("the curve reaches zero or below", "la curva llega a cero o por debajo"),
+    (
+        "calendar days from a high until it is regained",
+        "días naturales desde un máximo hasta recuperarlo",
+    ),
+    ("deepest fall from a previous high", "mayor caída desde un máximo previo"),
+    ("high to low", "del máximo al mínimo"),
+    ("low to high", "del mínimo al máximo anterior"),
+    (
+        "not regained by the last date of the file",
+        "no se recupera antes de la última fecha del archivo",
+    ),
+    ("from each day's last point", "con el último punto de cada día"),
+    ("the curve has no point on most days", "la curva no tiene puntos en la mayoría de los días"),
+    ("fewer than three calendar months", "menos de tres meses naturales"),
+    (
+        "calendar days from the uploaded equity curve; months from each month's last point",
+        "días naturales de la curva de equity aportada; meses con el último punto de cada mes",
+    ),
 )
 
 #: The same sentences when their count ``{n}`` is 1: English template ->
@@ -1401,6 +1463,10 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} trade(s) closed by the tester at the end of the test": (
         "{n} trade closed by the tester at the end of the test",
         "el probador cerró {n} operación al final de la prueba",
+    ),
+    "{n} repeated row(s) (the same position listed twice) counted once": (
+        "{n} repeated row (the same position listed twice) counted once",
+        "{n} fila repetida (la misma posición listada dos veces) se contó una sola vez",
     ),
     "{n} position(s) opened in the report were not closed; excluded": (
         "{n} position opened in the report was not closed; excluded",
