@@ -133,3 +133,34 @@ def test_a_chosen_report_turns_the_drop_zone_into_a_ready_state() -> None:
 def test_guide_steps_wrap_long_code_lines_on_phones() -> None:
     # A step like pf.trades.records_readable.to_csv(...) must not widen the page.
     assert "grid-template-columns:minmax(0,1fr)}\n.list-steps li{overflow-wrap:anywhere}" in STYLE
+
+
+def test_methodology_page_uses_cards_badges_and_chips() -> None:
+    from quant_trade.audit.pages import method_page
+
+    for locale in ("es", "en"):
+        page = method_page(locale=locale)
+        assert page.count("<div class='mdim'>") == 6
+        assert page.count("<li class='rung'") == 4
+        assert "<span class='badge MEASURED'>MEASURED</span>" in page
+        assert "<ul class='chips'>" in page and "checks nots" in page
+        assert find_claims(page) == []
+
+
+def test_every_footer_and_the_landing_link_the_methodology(tmp_path: Path) -> None:
+    from quant_trade.audit.pages import INVESTOR_COPY
+
+    client = _client(tmp_path)
+    for path, target in (
+        ("/", "/metodologia"),
+        ("/en", "/methodology"),
+        ("/guias", "/metodologia"),
+    ):
+        page = client.get(path).text
+        foot = page.split("<footer", 1)[1]
+        assert f"href='{target}'" in foot
+    for locale, path in (("es", "/"), ("en", "/en")):
+        page = client.get(path).text
+        assert "class='investor'" in page and INVESTOR_COPY[locale]["title"] in page
+        assert "/cuenta-proveedor'" in page
+        assert find_claims(page) == []

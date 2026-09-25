@@ -23,6 +23,8 @@ from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
 from quant_trade.audit.legal import legal_links_html
+from quant_trade.audit.method import COPY as METHOD_COPY
+from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
@@ -1167,7 +1169,7 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
     if not rows:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
-        "<table class='metrics'><colgroup><col class='c-k'><col class='c-v'>"
+        "<table class='metrics ev'><colgroup><col class='c-k'><col class='c-v'>"
         "<col class='c-e'><col></colgroup>"
         f"<thead><tr><th>{_e(labels['metric'])}</th><th class='val'>{_e(labels['value'])}</th>"
         f"<th>{_e(labels['evidence'])}</th><th>{_e(labels['note'])}</th></tr></thead><tbody>"
@@ -2014,11 +2016,11 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
         if found:
             locale = _locale_of(labels)
             out += (
-                "<ul>"
+                "<ul class='flag-list acct-flags'>"
                 + "".join(
-                    f"<li>{_severity_badge(flag['severity'], locale)} "
-                    f"{_e(flag_title(flag['code'], locale))}: "
-                    f"{_e(localize(flag['detail'], locale))}</li>"
+                    f"<li>{_severity_badge(flag['severity'], locale)}"
+                    f"<div><b>{_e(flag_title(flag['code'], locale))}</b>"
+                    f"<p>{_e(localize(flag['detail'], locale))}</p></div></li>"
                     for flag in found
                 )
                 + "</ul>"
@@ -2688,6 +2690,8 @@ def render_html(
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>"
         f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>"
         + (legal_links_html(locale) if legal_links else "")
+        + f"<p class='muted no-print'><a href='{_e(method_url(locale))}'>"
+        f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a></p>"
         + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
