@@ -6,11 +6,13 @@ market: the buyer pays for a portfolio and gets one bet. This module groups
 the closed trades by the instrument the file names and reports, for each,
 the count, the net result after the fees the file itemises and the hit rate.
 
-Two findings, only when the total is a gain and at least two instruments
+Three findings, only when the total is a gain and at least two instruments
 carry enough trades to read:
 
 * ``one_carries``: without the best instrument, the others together net
   zero or a loss;
+* ``mostly_one``: otherwise, the best instrument still brings two thirds
+  or more of the net result;
 * ``most_lose``: more than half of those instruments net zero or a loss.
 
 The section raises no red flag and never changes the class: a finding is a
@@ -32,6 +34,8 @@ MIN_TRADES = 30
 MIN_EACH = 10
 #: Rows shown before the rest are grouped with the small ones.
 MAX_ROWS = 12
+#: Share of the net result from the best instrument that makes it "most of it".
+CONCENTRATED = 2 / 3
 #: The key of the row that groups small instruments.
 OTHER = "__other__"
 
@@ -101,6 +105,8 @@ def instrument_review(
         review["best"] = {"key": best, "share": measured(net_of[best] / total)}
         if total - net_of[best] <= 0:
             review["findings"].append("one_carries")
+        elif net_of[best] / total >= CONCENTRATED:
+            review["findings"].append("mostly_one")
         losing = sum(1 for name in readable if net_of[name] <= 0)
         review["losing"] = measured(losing)
         if losing * 2 > len(readable):

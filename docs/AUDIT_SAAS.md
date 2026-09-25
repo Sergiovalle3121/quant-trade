@@ -650,6 +650,8 @@ at least two instruments have 10 trades:
 
 - `one_carries`: without the instrument with the best net result, all the
   others together net zero or a loss;
+- `mostly_one`: otherwise, the best instrument still brings two thirds or
+  more of the net result (the section never calls that spread out);
 - `most_lose`: more than half of those instruments net zero or a loss.
 
 No red flag and no class change: each finding is a question to ask.

@@ -140,3 +140,23 @@ def test_a_csv_without_instruments_shows_no_section() -> None:
     html, _ = render(result, watermark=False)
     assert LABELS["es"]["instruments"] not in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_most_of_the_result_from_one_instrument_is_not_called_spread_out() -> None:
+    trades, symbols = _book({"XAUUSD": [20.0] * 20, "EURUSD": [12.0, -10.0] * 10})
+    review = instrument_review(trades, symbols)
+    assert review["findings"] == ["mostly_one"] and review["best"]["share"]["value"] > 0.9
+    html = _instruments_html(review, "es", LABELS["es"])
+    assert "Repartido" not in html and "Casi todo el resultado viene de XAUUSD (95%)" in html
+    english = _instruments_html(review, "en", LABELS["en"])
+    assert "Almost all of the result comes from XAUUSD" in english
+    assert_report_clean(html + english)
+
+
+def test_a_share_above_the_total_says_the_others_subtract() -> None:
+    trades, symbols = _book(
+        {"XAUUSD": [50.0] * 15, "EURUSD": [-5.0, 2.0] * 10, "GBPUSD": [12.0, -10.0] * 10}
+    )
+    review = instrument_review(trades, symbols)
+    html = _instruments_html(review, "es", LABELS["es"])
+    assert "Más que el resultado neto viene de XAUUSD: los demás juntos restan" in html

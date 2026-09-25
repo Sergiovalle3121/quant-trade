@@ -357,6 +357,10 @@ LABELS: dict[str, dict[str, str]] = {
             "Un solo instrumento sostiene el resultado: sin {best}, los demás juntos quedan en "
             "cero o en pérdida. Pregunta por qué se operan los demás."
         ),
+        "ins_mostly_one": (
+            "Casi todo el resultado viene de {best} ({share}). Pregunta qué aportan los demás."
+        ),
+        "ins_best_over": "Más que el resultado neto viene de {best}: los demás juntos restan",
         "ins_most_lose": (
             "La mayoría de los instrumentos terminan en cero o en pérdida ({losing} de "
             "{readable}). Pregunta si la estrategia se ajustó a unos pocos mercados."
@@ -898,6 +902,10 @@ LABELS: dict[str, dict[str, str]] = {
             "One instrument carries the result: without {best}, the others together net zero "
             "or a loss. Ask why the others are traded."
         ),
+        "ins_mostly_one": (
+            "Almost all of the result comes from {best} ({share}). Ask what the others add."
+        ),
+        "ins_best_over": "More than the net result comes from {best}: the others together subtract",
         "ins_most_lose": (
             "Most instruments end at zero or a loss ({losing} of {readable}). Ask whether the "
             "strategy was fitted to a few markets."
@@ -3272,6 +3280,9 @@ def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[s
     if findings:
         texts = {
             "one_carries": labels["ins_one_carries"].format(best=best),
+            "mostly_one": labels["ins_mostly_one"].format(
+                best=best, share=f"{float(review['best']['share']['value']):.0%}"
+            ),
             "most_lose": labels["ins_most_lose"].format(
                 losing=int((review.get("losing") or {}).get("value", 0)),
                 readable=int(review["readable"]["value"]),
@@ -3289,10 +3300,10 @@ def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[s
         )
     if review.get("best"):
         share = float(review["best"]["share"]["value"])
-        tone = " neg" if "one_carries" in findings else ""
+        tone = " neg" if {"one_carries", "mostly_one"} & set(findings) else ""
         out += (
             f"<div class='facts'><div class='fact{tone}'><b>{share:.0%}</b>"
-            f"<p>{_e(labels['ins_best'].format(best=best))} "
+            f"<p>{_e(labels['ins_best_over' if share > 1 else 'ins_best'].format(best=best))} "
             f"{_badge(review['best']['share']['evidence'])}</p></div></div>"
         )
 
