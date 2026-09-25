@@ -280,6 +280,28 @@ Every leaf value in the JSON carries an evidence tag:
 | Red flags | fourteen data-quality checks, each with a FAIL or WARN severity | `audit/redflags.py` |
 | Seal | the dataset digest and, with a declared out-of-sample start, a `HoldoutSeal` | `research/holdout_seal.py` |
 
+Three details a buyer reading a real MetaTrader report asked about:
+
+- One Sharpe: the headline, the executive summary, the significance
+  section and the `IMPLAUSIBLE_SHARPE` flag all use the same annualised
+  Sharpe (sample standard deviation, the audit's periods per year). The
+  platform's own Sharpe is shown apart, as DECLARED, and can differ (MT5
+  computes it another way).
+- Drawdown with open trades: a report rebuilt from closed trades cannot see
+  open losses. When the file prints the platform's equity drawdown (MT5
+  "Equity Drawdown Maximal/Relative", in any language the importer reads),
+  the deepest percentage is `performance.platform_equity_drawdown`
+  (DECLARED). The executive summary shows it next to the measured drawdown
+  when it is at least half a point deeper. The prop-firm section adds a line
+  when it is at or beyond the preset's total loss limit: the closed-trade
+  simulation cannot see those losses. Neither changes the class.
+- Costs in pips: when every trade is on one six-letter pair of USD, EUR,
+  GBP, JPY, CHF, AUD, NZD or CAD (a broker suffix is ignored), the break-even
+  and reference costs are also given in pips per side at the median entry
+  price (`costs.break_even_pips`, `costs.reference_pips`, `costs.pip_symbol`;
+  a pip is 0.01 on yen pairs, else 0.0001). Metals, indices and mixed
+  symbols stay in basis points only.
+
 ### The variance policy behind the deflated Sharpe
 
 DSR needs the variance of Sharpe estimates across the trials that were run.

@@ -323,9 +323,11 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     parts = []
     if dsr is not None:
         parts.append(
-            f"DSR {_fmt(dsr, 3)} con {trials:.0f} intento(s); el umbral es 0.95."
+            f"DSR {_fmt(dsr, 3)} con {trials:.0f} {'intento' if trials == 1 else 'intentos'}; "
+            "el umbral es 0.95."
             if es
-            else f"DSR {_fmt(dsr, 3)} at {trials:.0f} trial(s); the bar is 0.95."
+            else f"DSR {_fmt(dsr, 3)} at {trials:.0f} {'trial' if trials == 1 else 'trials'}; "
+            "the bar is 0.95."
         )
     if half is not None:
         parts.append(
@@ -380,6 +382,9 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     breakeven = _number(_value(costs.get("break_even_bps")))
     reference = _number(_value(costs.get("reference_bps"))) or 0.0
     needed = reference * 3.0
+    pips = _number(_value(costs.get("break_even_pips")))
+    reference_pips = _number(_value(costs.get("reference_pips")))
+    pair = str(costs.get("pip_symbol") or "")
     if breakeven is None or breakeven <= 0:
         finding = (
             "Incluso sin coste extra, el neto de las operaciones no queda por encima de cero "
@@ -398,17 +403,38 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
             f"pass this dimension it has to stay above zero at 3x the reference "
             f"({_fmt(needed)} bps per side)."
         )
+        if pips is not None and reference_pips is not None and pair:
+            finding += (
+                f" En {pair}: {_fmt(pips)} pips por lado; el mínimo para pasar son "
+                f"{_fmt(reference_pips * 3.0)} pips."
+                if es
+                else f" On {pair}: {_fmt(pips)} pips per side; passing needs "
+                f"{_fmt(reference_pips * 3.0)} pips."
+            )
+    broker = (
+        (
+            f"Compara ese margen con el spread y el deslizamiento reales de tu bróker en {pair}."
+            if es
+            else f"Compare that margin with your broker's real spread and slippage on {pair}."
+        )
+        if pips is not None and pair
+        else (
+            "Compara ese margen con el spread y el deslizamiento reales de tu bróker: en "
+            "EURUSD a 1.10, 1 pb por lado son unos 1.1 pips."
+            if es
+            else "Compare that margin with your broker's real spread and slippage: on EURUSD "
+            "at 1.10, 1 bp per side is about 1.1 pips."
+        )
+    )
     actions = (
         [
-            "Compara ese margen con el spread y el deslizamiento reales de tu bróker: en "
-            "EURUSD a 1.10, 1 pb por lado son unos 1.1 pips.",
+            broker,
             "Declara el coste real por lado al subir: se suma a lo que el informe ya detalla.",
             "Menos operaciones o un recorrido mayor por operación hacen que el coste pese menos.",
         ]
         if es
         else [
-            "Compare that margin with your broker's real spread and slippage: on EURUSD at "
-            "1.10, 1 bp per side is about 1.1 pips.",
+            broker,
             "Declare the real cost per side when uploading: it is added to what the report "
             "already itemises.",
             "Fewer trades or a larger move per trade make costs weigh less.",

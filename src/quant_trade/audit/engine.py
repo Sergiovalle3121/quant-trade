@@ -19,6 +19,7 @@ tags, and the refusal to compute anything the upload cannot support.
 from __future__ import annotations
 
 import math
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -109,6 +110,10 @@ def sharpe_sampling_variance(sharpe: float, skew: float, kurtosis: float, n: int
     return max(term, 0.0) / (n - 1)
 
 
+def _trials_text(trials: int) -> str:
+    return "1 trial" if trials == 1 else f"{trials} trials"
+
+
 def _annualised_sharpe(returns: pd.Series, ppy: float) -> float:
     return redflags.annualised_sharpe(returns, ppy)
 
@@ -117,8 +122,44 @@ def _annualised_sharpe(returns: pd.Series, ppy: float) -> float:
 MIN_CAGR_DAYS = 365
 
 
-def _performance(frame: pd.DataFrame, trades: list[Any]) -> dict[str, Any]:
+#: Currencies whose six-letter pairs are quoted in pips (0.0001, or 0.01 against the yen).
+FX_CURRENCIES = frozenset({"USD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD"})
+
+
+def fx_pair(symbols: list[str] | None, metadata: dict[str, str]) -> str | None:
+    """The one currency pair every trade is on (``GBPUSD`` for ``GBPUSD.m``), else ``None``."""
+    names = [name for name in (symbols or []) if name] or [metadata.get("symbol", "")]
+    cleaned = {"".join(ch for ch in name.upper() if ch.isalnum())[:6] for name in names}
+    if len(cleaned) != 1:
+        return None
+    pair = cleaned.pop()
+    if len(pair) == 6 and pair[:3] in FX_CURRENCIES and pair[3:] in FX_CURRENCIES:
+        return pair
+    return None
+
+
+def platform_equity_drawdown(metadata: dict[str, str]) -> float | None:
+    """Deepest drawdown % the platform prints with open trades counted, as a fraction."""
+    found = []
+    for key in ("declared_equity_drawdown_maximal", "declared_equity_drawdown_relative"):
+        match = re.search(r"(\d+(?:[.,]\d+)?)\s*%", metadata.get(key, ""))
+        if match:
+            found.append(float(match.group(1).replace(",", ".")) / 100.0)
+    deepest = max(found, default=0.0)
+    return deepest if 0.0 < deepest < 1.0 else None
+
+
+def _performance(
+    frame: pd.DataFrame,
+    trades: list[Any],
+    returns: pd.Series,
+    ppy: float,
+    metadata: dict[str, str],
+) -> dict[str, Any]:
     metrics = calculate_performance(frame[["timestamp", "equity"]], trades)
+    # The same Sharpe as the significance section and the red flags (sample
+    # standard deviation), so the report never prints two different values.
+    metrics["sharpe"] = _annualised_sharpe(returns, ppy)
     keys = (
         "total_return",
         "cagr",
@@ -130,6 +171,11 @@ def _performance(frame: pd.DataFrame, trades: list[Any]) -> dict[str, Any]:
         "trade_count",
     )
     out = {key: measured(metrics[key]) for key in keys}
+    platform_dd = platform_equity_drawdown(metadata)
+    if platform_dd is not None:
+        out["platform_equity_drawdown"] = declared(
+            -platform_dd, "deepest drawdown the platform prints with open trades counted"
+        )
     span_days = (frame["timestamp"].iloc[-1] - frame["timestamp"].iloc[0]).days
     if span_days < MIN_CAGR_DAYS:
         # Compounding five good weeks into a year prints a four-digit
@@ -283,10 +329,10 @@ def _multiplicity(
         "floor": measured(floor, "sampling variance of the Sharpe estimator"),
         "observed_across_variants": observed_evidence,
         "dsr_at_declared": measured(
-            dsr(declared_trials), f"PSR against E[max Sharpe] of {declared_trials} trial(s)"
+            dsr(declared_trials), f"PSR against E[max Sharpe] of {_trials_text(declared_trials)}"
         ),
         "dsr_at_trials_used": measured(
-            dsr(trials), f"PSR against E[max Sharpe] of {trials} trial(s), {trials_source}"
+            dsr(trials), f"PSR against E[max Sharpe] of {_trials_text(trials)}, {trials_source}"
         ),
         "sensitivity": sensitivity,
         "trials_to_half": (
@@ -563,6 +609,15 @@ def _costs(
             measured(be / ref) if be is not None and ref > 0 else not_measured("undefined")
         ),
     }
+    pair = fx_pair(inputs.trade_symbols, inputs.report_metadata or {})
+    prices = [t.entry_price for t in inputs.trades.trades if t.entry_price > 0]
+    if pair is not None and be is not None and prices:
+        price = float(np.median(prices))
+        pip = 0.01 if pair.endswith("JPY") else 0.0001
+        where = f"per side on {pair} at {price:.5g}, the median entry price"
+        section["break_even_pips"] = measured(be / 10_000 * price / pip, where)
+        section["reference_pips"] = declared(ref / 10_000 * price / pip, where)
+        section["pip_symbol"] = pair
     if inputs.reported_fees:
         section["reported_fees"] = {
             name: measured(value, "signed total the report itemises; negative is a cost")
@@ -717,7 +772,7 @@ def run_audit(
     trades = inputs.trades.trades if inputs.trades is not None else []
     trials_used, trials_evidence, trials_source = trial_count(inputs)
 
-    performance = _performance(frame, trades)
+    performance = _performance(frame, trades, returns, ppy, inputs.report_metadata or {})
     significance, moments = _significance(returns)
     multiplicity = _multiplicity(
         moments,
