@@ -118,6 +118,7 @@ LABELS: dict[str, dict[str, str]] = {
         "cost": "Coste",
         "net": "Neto",
         "win_rate": "Aciertos",
+        "win_rate_gross": "Aciertos antes de comisiones",
         "trades": "Operaciones",
         "in_sample": "En muestra",
         "out_of_sample": "Fuera de muestra",
@@ -761,6 +762,7 @@ LABELS: dict[str, dict[str, str]] = {
         "cost": "Cost",
         "net": "Net",
         "win_rate": "Win rate",
+        "win_rate_gross": "Win rate before fees",
         "trades": "Trades",
         "in_sample": "In sample",
         "out_of_sample": "Out of sample",
@@ -1397,6 +1399,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "sortino": "Sortino",
         "max_drawdown": "Drawdown máximo",
         "win_rate": "Aciertos",
+        "win_rate_gross": "Aciertos antes de comisiones",
         "trade_count": "Operaciones",
         "gross_profit": "Beneficio bruto de las ganadoras",
         "gross_loss": "Pérdida bruta de las perdedoras",
@@ -1485,6 +1488,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "volatility": "Annual volatility",
         "max_drawdown": "Maximum drawdown",
         "win_rate": "Win rate",
+        "win_rate_gross": "Win rate before fees",
         "trade_count": "Trades",
         "gross_profit": "Gross profit of winners",
         "gross_loss": "Gross loss of losers",
@@ -1611,6 +1615,7 @@ PERCENT_KEYS = {
     "volatility",
     "max_drawdown",
     "win_rate",
+    "win_rate_gross",
     "excess_return",
     "strategy_total_return",
     "benchmark_total_return",
@@ -4249,7 +4254,19 @@ def render_html(
             ),
         ),
         (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
-        (labels["performance"], _evidence_rows(data["performance"], labels, skip=set())),
+        (
+            labels["performance"],
+            _evidence_rows(
+                data["performance"],
+                labels,
+                # The trade table carries the one win rate (after itemised fees).
+                skip=(
+                    {"win_rate", "trade_count"}
+                    if (data.get("trade_stats") or {}).get("status") == "MEASURED"
+                    else set()
+                ),
+            ),
+        ),
         (
             labels["significance"],
             _status_line(data["significance"], labels)
