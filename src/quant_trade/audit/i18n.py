@@ -169,6 +169,21 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("{n} position(s) never closed; excluded", "{n} posición(es) nunca se cerraron; quedan fuera"),
     (
+        "{symbol}: a fill with an unreadable time ({time}) was left out; the trade it opened or "
+        "closed is missing from the results",
+        "{symbol}: se dejó fuera una ejecución con hora ilegible ({time}); la operación que "
+        "abrió o cerró falta en los resultados",
+    ),
+    (
+        "{symbol}: a trade with an unreadable time ({time}) was left out; it is missing from the "
+        "results",
+        "{symbol}: se dejó fuera una operación con hora ilegible ({time}); falta en los resultados",
+    ),
+    (
+        "{n} more row(s) with an unreadable time were left out",
+        "se dejaron fuera {n} fila(s) más con hora ilegible",
+    ),
+    (
         "{n} repeated row(s) (the same position listed twice) counted once",
         "{n} fila(s) repetida(s) (la misma posición listada dos veces) se contaron una sola vez",
     ),
@@ -1402,6 +1417,27 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "mínima del backtest (Bailey, Borwein, López de Prado y Zhu); descuento de "
         "Bonferroni (Harvey y Liu)",
     ),
+    # audit/streaks.py
+    (
+        "too many trades to count the streak exactly",
+        "demasiadas operaciones para contar la racha con exactitud",
+    ),
+    ("needs both losing and other trades", "necesita operaciones perdedoras y no perdedoras"),
+    (
+        "median longest losing run when trades lose as often as these, in random order",
+        "mediana de la racha perdedora más larga con el mismo porcentaje de perdedoras, "
+        "en orden al azar",
+    ),
+    (
+        "longest losing run chance reaches once in twenty, at the same loss rate",
+        "racha perdedora que el azar alcanza 1 de cada 20 veces, con el mismo porcentaje "
+        "de perdedoras",
+    ),
+    (
+        "chance of a losing run at least this long, at the same loss rate",
+        "probabilidad de una racha perdedora al menos así de larga, con el mismo "
+        "porcentaje de perdedoras",
+    ),
     # audit/ride.py
     ("fewer than twenty points on the curve", "menos de veinte puntos en la curva"),
     ("the curve reaches zero or below", "la curva llega a cero o por debajo"),
@@ -1467,6 +1503,10 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} trade(s) closed by the tester at the end of the test": (
         "{n} trade closed by the tester at the end of the test",
         "el probador cerró {n} operación al final de la prueba",
+    ),
+    "{n} more row(s) with an unreadable time were left out": (
+        "{n} more row with an unreadable time was left out",
+        "se dejó fuera {n} fila más con hora ilegible",
     ),
     "{n} repeated row(s) (the same position listed twice) counted once": (
         "{n} repeated row (the same position listed twice) counted once",
