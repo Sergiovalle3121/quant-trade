@@ -1017,7 +1017,9 @@ def run_audit(
     crises = (
         None
         if fund.get("status") == "MEASURED"
-        else crises_lib.curve_crises(inputs.equity.frame, bench_months)
+        else crises_lib.curve_crises(
+            inputs.equity.frame, bench_months, from_trades=inputs.balance_only
+        )
     )
     instruments = (
         instruments_lib.instrument_review(

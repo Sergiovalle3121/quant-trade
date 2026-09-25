@@ -113,7 +113,7 @@ def _daily_csv(first: str, last: str, seed: int = 5) -> bytes:
     return ("timestamp,equity\n" + "\n".join(rows) + "\n").encode()
 
 
-def test_curve_months_carry_quiet_months_and_drop_a_partial_last_month() -> None:
+def test_curve_months_fill_quiet_trade_months_and_drop_partial_edges() -> None:
     frame = pd.DataFrame(
         {
             "timestamp": pd.to_datetime(
@@ -122,10 +122,13 @@ def test_curve_months_carry_quiet_months_and_drop_a_partial_last_month() -> None
             "equity": [100.0, 110.0, 99.0, 120.0],
         }
     )
-    months = curve_months(frame)
-    # February had no point: flat. April ends on the 10th: left out.
-    assert list(months.round(6)) == [0.0, -0.1]
-    assert [stamp.month for stamp in months.index] == [2, 3]
+    # Trades: February closed nothing, so flat. January starts in its first
+    # week, so it counts. April ends on the 10th: left out.
+    months = curve_months(frame, from_trades=True)
+    assert list(months.round(6)) == [0.1, 0.0, -0.1]
+    assert [stamp.month for stamp in months.index] == [1, 2, 3]
+    # An uploaded curve with no February point: February and March are unknown.
+    assert list(curve_months(frame).round(6)) == [0.1]
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])
@@ -178,3 +181,32 @@ def test_a_curve_under_two_months_says_so() -> None:
     stamps = pd.bdate_range("2006-01-02", "2012-12-31", tz="UTC")
     frame = pd.DataFrame({"timestamp": stamps, "equity": np.linspace(100, 200, len(stamps))})
     assert curve_crises(frame)["note"] == CURVE_NOTE
+
+
+def _frame(stamps: pd.DatetimeIndex, seed: int = 1) -> pd.DataFrame:
+    steps = np.random.default_rng(seed).normal(0.0003, 0.01, len(stamps))
+    return pd.DataFrame({"timestamp": stamps, "equity": 10_000 * np.cumprod(1 + steps)})
+
+
+def test_a_hole_in_an_uploaded_curve_never_covers_a_crisis() -> None:
+    from quant_trade.audit.crises import curve_crises
+
+    # Nothing from November 2007 to May 2009: the 2008 window was never seen.
+    stamps = pd.bdate_range("2005-01-03", "2007-10-31", tz="UTC").append(
+        pd.bdate_range("2009-06-01", "2012-12-31", tz="UTC")
+    )
+    review = curve_crises(_frame(stamps))
+    assert [row["key"] for row in review["windows"]] == ["euro"]
+    # A curve rebuilt from trades closed nothing in the quiet months: flat.
+    rebuilt = curve_crises(_frame(stamps), from_trades=True)
+    gfc = next(row for row in rebuilt["windows"] if row["key"] == "gfc")
+    assert gfc["fund"]["value"] == 0.0
+
+
+def test_a_curve_starting_in_the_first_week_counts_that_month() -> None:
+    from quant_trade.audit.crises import curve_crises
+
+    covered = curve_crises(_frame(pd.bdate_range("2020-02-03", "2021-06-30", tz="UTC")))
+    assert [row["key"] for row in covered["windows"]] == ["covid"]
+    late = curve_crises(_frame(pd.bdate_range("2020-02-12", "2021-06-30", tz="UTC")))
+    assert late["status"] == "NOT_MEASURED"
