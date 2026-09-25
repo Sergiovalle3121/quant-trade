@@ -1823,6 +1823,8 @@ Redesign pass 49 checks the upload form after #230 (report first, extras in a cl
 
 Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, two reports picked from "My reports"). On a phone the dimension and figure tables now use tighter cells and smaller badges, so a "Fails" badge in the second report no longer spills past the card. It also checks the fund benchmark block and the plain lines under the headline figures on /ejemplo; both read well and needed nothing.
 
+Redesign pass 51 styles the PDF link while the PDF is made ("Generando tu PDF… (unos segundos)"): the button keeps its full colour, shows a small spinning ring like the upload loader, and keeps a progress cursor; on a phone the report's PDF button spans the width so the longer label fits on one line.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
