@@ -496,6 +496,18 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "rachas.",
     ),
     (
+        "Paired by side, symbol and entry time within 60 minutes, as the files state the "
+        "times; price differences in basis points (0.01 %), positive when worse for the "
+        "account; result differences at the backtest trade's size.",
+        "Emparejadas por lado, símbolo y hora de entrada a menos de 60 minutos, con las horas "
+        "tal como las dan los archivos; diferencias de precio en puntos básicos (0,01 %), "
+        "positivas cuando son peores para la cuenta; diferencias de resultado al tamaño de la "
+        "operación del backtest.",
+    ),
+    ("paired live trades / live trades", "operaciones reales emparejadas / operaciones reales"),
+    ("fewer than {n} paired trades", "menos de {n} operaciones emparejadas"),
+    ("no live trades on the shared dates", "no hay operaciones reales en las fechas comunes"),
+    (
         "{s} resampled histories of {n} backtest trades, seed {seed}",
         "{s} historias remuestreadas de {n} operaciones del backtest, semilla {seed}",
     ),
