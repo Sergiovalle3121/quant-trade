@@ -1442,6 +1442,11 @@ section's single headline figure out as a row beside its sentence on screens
 (`.facts>.fact:only-child`), so a lone figure no longer fills a full-width
 tile. Print keeps the tile.
 
+Redesign pass 42 sets the live-account line under the verdict (`.verdict-live`)
+apart with a hairline and a dot in the outcome's tone (green holds, amber on the
+edge, red does not hold), keeps its link muted, and prints it black at the
+verdict's size in the PDF.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
