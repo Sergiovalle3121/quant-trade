@@ -191,6 +191,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "invalid_email": {
         "es": "Esa dirección de correo no parece válida.",
         "en": "That e-mail address does not look valid.",
+        "pt": "Esse endereço de e-mail não parece válido.",
     },
     "page_missing": {
         "es": "Esta página no existe. Revisa la dirección o vuelve al inicio.",
@@ -1094,7 +1095,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         error: str | None = None,
         extras: int = 0,
     ) -> str:
-        locale = _locale(lang)
+        return _landing(request, _locale(lang), joined=joined, error=error, extras=extras)
+
+    def _landing(
+        request: Request, locale: str, *, joined: int = 0, error: str | None = None, extras: int = 0
+    ) -> str:
         # Only known codes are shown, so the query string cannot inject text.
         shown = message("invalid_email", locale) if error == "email" else None
         return landing(
@@ -1118,18 +1123,28 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """A short address to share with English-speaking traders."""
         return index(request, lang="en")
 
+    @app.get("/pt", response_class=HTMLResponse)
+    def index_pt(
+        request: Request, joined: int = 0, error: str | None = None, extras: int = 0
+    ) -> str:
+        """The landing in Portuguese; the pages it links to that are not
+        translated yet (report, account, sample, terms) open in English."""
+        return _landing(request, "pt", joined=joined, error=error, extras=extras)
+
     @app.post("/waitlist")
     def waitlist(
         request: Request, email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es"
     ) -> Response:
-        locale = _locale(lang)
+        # The Portuguese landing comes back to itself; its error page is in English.
+        home = "/pt?" if lang == "pt" else f"/?lang={_locale(lang)}&"
+        locale = "en" if lang == "pt" else _locale(lang)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         if waitlist_attempts.hit(ip, datetime.now(UTC)) >= WAITLIST_PER_HOUR_PER_IP:
             return _html_error(request, 429, message("rate_limited", locale), locale)
         if not _valid_email(email):
-            return RedirectResponse(f"/?lang={locale}&error=email", status_code=303)
+            return RedirectResponse(f"{home}error=email", status_code=303)
         db.add_waitlist(email, at=datetime.now(UTC))
-        return RedirectResponse(f"/?lang={locale}&joined=1#news", status_code=303)
+        return RedirectResponse(f"{home}joined=1#news", status_code=303)
 
     # -- customer accounts -------------------------------------------------
     secure_cookies = cfg.base_url.startswith("https://")
@@ -2742,8 +2757,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _guide(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         guide = GUIDES_BY_PATH[path_locale].get(slug)
         if guide is None:
-            # A guide's slug in the other language moves to this language's own.
-            other = GUIDES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            # A guide's slug in another language moves to this language's own.
+            other = next(
+                (
+                    found
+                    for lang, guides in GUIDES_BY_PATH.items()
+                    if lang != path_locale and (found := guides.get(slug)) is not None
+                ),
+                None,
+            )
             if other is None:
                 raise _not_found()
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
@@ -2752,7 +2774,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _audience(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         page = AUDIENCES_BY_PATH[path_locale].get(slug)
         if page is None:
-            other = AUDIENCES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            # A page's slug in another language moves to this language's own.
+            other = next(
+                (
+                    found
+                    for lang, pages in AUDIENCES_BY_PATH.items()
+                    if lang != path_locale and (found := pages.get(slug)) is not None
+                ),
+                None,
+            )
             if other is None:
                 raise _not_found()
             return RedirectResponse(audience_url(other.slug, path_locale), status_code=301)
@@ -2774,6 +2804,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/for/{slug}", response_class=HTMLResponse)
     def audience_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _audience(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/pt/guias", response_class=HTMLResponse)
+    def guides_pt(request: Request) -> str:
+        return guides_index_page(locale="pt", base_url=_site_url(request))
+
+    @app.get("/pt/guias/{slug}", response_class=HTMLResponse)
+    def guide_pt(request: Request, slug: str) -> Response:
+        return _guide(request, slug, "pt", "pt")
+
+    @app.get("/pt/para/{slug}", response_class=HTMLResponse)
+    def audience_pt(request: Request, slug: str) -> Response:
+        return _audience(request, slug, "pt", "pt")
 
     @app.get("/guias/{slug}", response_class=HTMLResponse)
     def guide_es(request: Request, slug: str, lang: str | None = None) -> Response:

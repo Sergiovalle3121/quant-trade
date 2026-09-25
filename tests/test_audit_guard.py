@@ -79,3 +79,45 @@ def test_client_text_is_reported_not_refused() -> None:
     }
     assert all(finding["reason"].startswith("client_description") for finding in findings)
     assert scan_client_text("   ") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "esta estratégia é lucrativa",
+        "um robô rentável",
+        "lucro garantido todo mês",
+        "retornos assegurados",
+        "operar sem risco",
+        "um sistema livre de risco",
+        "fique rico com isto",
+        "dinheiro fácil",
+        "o robô gera dinheiro enquanto você dorme",
+        "você vai ganhar 20%",
+        "você vai passar no desafio",
+        "garantimos resultados",
+        "estratégia aprovada",
+        "passará na avaliação",
+        "resultados verificados pela nossa equipe",
+        "robô certificado",
+    ],
+)
+def test_portuguese_claims_are_found(text: str) -> None:
+    assert find_claims(text)
+    with pytest.raises(AuditReportError):
+        assert_report_clean("parágrafo limpo", text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a rentabilidade anualizada observada foi de 12%",
+        "não garante resultados futuros",
+        "dados não verificados com a corretora",
+        "um resultado passado não é garantido",
+        "o Sharpe é estatisticamente distinguível de zero",
+        "as operações perdem dinheiro líquido ao custo de referência",
+    ],
+)
+def test_neutral_portuguese_passes(text: str) -> None:
+    assert find_claims(text) == []

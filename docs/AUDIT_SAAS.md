@@ -14,6 +14,23 @@ title and badge. A new name must pass the
 guard in both languages and must not suggest verification, certification,
 approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
+## Portuguese pages (`audit/portuguese.py`, `/pt`)
+
+The landing, its prices and its questions exist in Portuguese (Brazil and
+Portugal) at `/pt`, and every case page at `/pt/para/<slug>` with its own
+Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
+`/pt/para/` moves there), and every export guide at `/pt/guias` and
+`/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
+fields). The language switch on these pages offers the other two languages.
+Pages not translated yet (the report and its PDF, the account screens, the
+sample, the comparison and check pages, the methodology, the terms and the
+privacy policy) open in English from a Portuguese page, never in Spanish, and
+the report language on the Portuguese upload form starts on English with a line
+saying so. The profit-claim guard reads Portuguese too
+(`guard.PORTUGUESE_CLAIM_PATTERNS`: lucrativo, rentável, garantido, sem risco,
+"vai ganhar", aprovado…, with "não", "nem" and "sem" as negations), and
+`tests/test_audit_portuguese.py` runs it over the page and opens every link on it.
+
 ## What the client uploads
 
 | File | Required | Columns (aliases accepted, case-insensitive) |
