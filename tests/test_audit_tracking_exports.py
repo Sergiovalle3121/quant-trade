@@ -7,6 +7,8 @@ here is synthetic and only copies their shape.
 
 from __future__ import annotations
 
+import html
+
 import pytest
 
 from quant_trade.audit.account import ACCOUNT_FORMATS
@@ -283,3 +285,37 @@ def test_backtest_questions_are_unchanged() -> None:
         )
     ]
     assert codes == ["live_record", "modelling", "trials", "out_of_sample", "costs"]
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_account_is_not_asked_for_an_optimisation_date(locale: str) -> None:
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.plan import ACCOUNT_TITLES, improvement_plan
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+    from quant_trade.audit.verdict import MEANING, OUT_OF_SAMPLE
+
+    data = _myfxbook_without_fee_columns()
+    inputs = build_inputs(
+        None, DeclaredMetadata(), report_bytes=data, report_filename="statement.csv"
+    )
+    result = run_audit(inputs, bootstrap_samples=50, risk_samples=50, challenge_samples=50)
+    out = result.model_dump(mode="json")
+    step = next(s for s in improvement_plan(out, locale) if s.dimension == OUT_OF_SAMPLE)
+    assert step.title == ACCOUNT_TITLES[locale][OUT_OF_SAMPLE]
+    assert "optimi" not in (step.finding + " ".join(step.actions)).lower()
+    page = render_html(result, watermark=False, locale=locale)
+    assert html.escape(MEANING[locale][f"{OUT_OF_SAMPLE}.NOT_MEASURED.account"]) in page
+    assert html.escape(MEANING[locale][f"{OUT_OF_SAMPLE}.NOT_MEASURED"]) not in page
+
+
+def test_a_backtest_keeps_the_optimisation_wording() -> None:
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.verdict import MEANING, OUT_OF_SAMPLE, meaning
+
+    key = f"{OUT_OF_SAMPLE}.NOT_MEASURED"
+    for locale in ("es", "en"):
+        assert meaning(OUT_OF_SAMPLE, "NOT_MEASURED", locale) == MEANING[locale][key]
+        account = meaning(OUT_OF_SAMPLE, "NOT_MEASURED", locale, account=True)
+        assert account == MEANING[locale][key + ".account"]
+        assert find_claims(account) == []
