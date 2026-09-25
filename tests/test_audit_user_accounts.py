@@ -732,8 +732,10 @@ def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path:
     store.mark_paid(ids[1], stripe_session_id="cs_b", at=NOW)  # type: ignore[attr-defined]
     page = client.get("/cuenta").text
     assert "action='/cuenta/comparar'" in page
-    assert f"value='{ids[0]}'" in page and f"value='{ids[1]}'" in page
-    assert f"value='{ids[2]}'" not in page  # still a preview
+    # The strategy filing form lists every report; only the compare picker counts.
+    picker = page.split("action='/cuenta/comparar'", 1)[1].split("</form>", 1)[0]
+    assert f"value='{ids[0]}'" in picker and f"value='{ids[1]}'" in picker
+    assert f"value='{ids[2]}'" not in picker  # still a preview
 
     shown = client.get(f"/cuenta/comparar?id={ids[0]}&id={ids[1]}")
     assert shown.status_code == 200
