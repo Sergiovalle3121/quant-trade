@@ -341,6 +341,16 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
             "or wider ranges, and pick settings that also work in the forward period."
         ),
     },
+    "EDGE_FADING": {
+        "es": (
+            "Las operaciones recientes dejan de sumar: pregunta qué cambió (mercado, bróker, "
+            "ajustes) y juzga el sistema por su último tramo, no por el total."
+        ),
+        "en": (
+            "The recent trades stop adding up: ask what changed (market, broker, settings) and "
+            "judge the system on its last stretch, not on the total."
+        ),
+    },
     "REPORT_HEADER_MISMATCH": {
         "es": (
             "Pide el archivo original que exporta MetaTrader, no una captura, y vuelve a "

@@ -313,6 +313,27 @@ LABELS: dict[str, dict[str, str]] = {
         "account_before": "Balance antes",
         "account_drawdown": "Drawdown entonces",
         "account_scope": ("Leído del archivo tal como lo subiste; nada se comprobó con el bróker."),
+        "recent": "¿Sigue funcionando en el periodo reciente?",
+        "recent_intro": (
+            "Un historial largo puede verse bien en total aunque su último tramo ya no sume. "
+            "Partimos el tiempo del historial en tres tramos iguales y comparamos el último con "
+            "los dos anteriores, operación por operación."
+        ),
+        "recent_early": "Media por operación antes del {date}",
+        "recent_late": "Media por operación desde el {date}",
+        "recent_net": "Resultado neto desde el {date} ({n} operaciones)",
+        "recent_z": "Distancia entre ambas medias, en errores estándar",
+        "recent_held": (
+            "El último tercio del historial no muestra una caída a pérdidas que el azar no "
+            "explique."
+        ),
+        "recent_faded": (
+            "El último tercio del historial promedia cero o pérdidas por operación, una caída "
+            "que el azar difícilmente explica. Lo verás también en las banderas rojas."
+        ),
+        "recent_badge_held": "Se mantiene",
+        "recent_badge_faded": "Se apaga",
+        "recent_year": "Año de cierre",
         "timing": "Cuándo gana y cuándo pierde",
         "timing_intro": (
             "Tus operaciones agrupadas por el día y la hora de entrada. Si casi todo el "
@@ -776,6 +797,26 @@ LABELS: dict[str, dict[str, str]] = {
         "account_before": "Balance before",
         "account_drawdown": "Drawdown then",
         "account_scope": "Read from the file as uploaded; nothing was checked with the broker.",
+        "recent": "Does it still work in the recent period?",
+        "recent_intro": (
+            "A long history can look good in total while its last stretch no longer adds up. "
+            "We cut the history's time in three equal stretches and compare the last one with "
+            "the two before it, trade by trade."
+        ),
+        "recent_early": "Average per trade before {date}",
+        "recent_late": "Average per trade since {date}",
+        "recent_net": "Net result since {date} ({n} trades)",
+        "recent_z": "Distance between the two averages, in standard errors",
+        "recent_held": (
+            "The last third of the history shows no drop into losses beyond what chance explains."
+        ),
+        "recent_faded": (
+            "The last third of the history averages zero or a loss per trade, a drop chance "
+            "hardly explains. You will also see it in the red flags."
+        ),
+        "recent_badge_held": "Holds",
+        "recent_badge_faded": "Fades",
+        "recent_year": "Exit year",
         "timing": "When it wins and when it loses",
         "timing_intro": (
             "Your trades grouped by entry day and time. If nearly all the result comes from "
@@ -2500,7 +2541,7 @@ def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict
         return (
             f"<td class='val tbar {side}' data-l='{_e(labels['timing_net'])}'>"
             "<span class='tbar-track' aria-hidden='true'>"
-            f"<span style='--w:{width:.0f}%'></span></span><b>{net:+,.2f}</b></td>"
+            f"<span style='--w:{width:.0f}%'></span></span><b>{_signed_amount(net)}</b></td>"
         )
 
     body = "".join(
@@ -2916,6 +2957,89 @@ def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, s
     if timing.get("blocks"):
         out += _timing_table(timing["blocks"], labels["timing_block"], _block_name, labels)
     out += f"<p class='muted'>{_e(localize(timing.get('note', ''), locale))}</p>"
+    return out
+
+
+_MONTHS_SHORT = {
+    "es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"),
+    "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+}
+
+
+def _date_text(iso: str, locale: str) -> str:
+    """``2024-01-05`` as ``5 ene 2024`` or ``5 Jan 2024``."""
+    year, month, day = (int(part) for part in iso[:10].split("-"))
+    months = _MONTHS_SHORT.get(locale, _MONTHS_SHORT["es"])
+    return f"{day} {months[month - 1]} {year}"
+
+
+def _signed_amount(value: float) -> str:
+    """A signed money or price amount with two decimals, or four significant
+    digits when it is small (``+0.00027``); never a signed zero."""
+    if not math.isfinite(value) or value == 0:
+        return "0.00"
+    digits = 2 if abs(value) >= 1 else min(10, max(2, 3 - math.floor(math.log10(abs(value)))))
+    text = f"{value:+,.{digits}f}"
+    if digits > 2:
+        text = text.rstrip("0")
+        if len(text.partition(".")[2]) < 2:
+            text = f"{float(text):+,.2f}"
+    return "0.00" if float(text.replace(",", "")) == 0 else text
+
+
+def _signed_z(value: float) -> str:
+    text = f"{value:+.1f}"
+    return "0.0" if text in ("+0.0", "-0.0") else text
+
+
+def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """The last third of the history against the two before it."""
+    if not recent or recent.get("status") != "MEASURED":
+        reason = (recent or {}).get("reason", "")
+        return (
+            f"<p>{_badge('NOT_MEASURED')} <span class='muted'>"
+            f"{_e(localize(reason, locale))}</span></p>"
+        )
+    out = f"<p class='muted'>{_e(labels['recent_intro'])}</p>"
+    if recent.get("clean"):
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['recent_badge_held'])}</span> {_e(labels['recent_held'])}</p>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['recent_badge_faded'])}</span> {_e(labels['recent_faded'])}</p>"
+        )
+    date = _date_text(recent["recent_from"], locale)
+    tone = " neg" if recent.get("clean") is False else ""
+    late = recent["recent"]
+    cells = [
+        ("", recent["early"]["mean"], labels["recent_early"].format(date=date), "money"),
+        (tone, late["mean"], labels["recent_late"].format(date=date), "money"),
+        (
+            tone,
+            late["net"],
+            labels["recent_net"].format(date=date, n=f"{int(late['trades']['value']):,}"),
+            "money",
+        ),
+    ]
+    if recent.get("drop_z"):
+        cells.append((tone, recent["drop_z"], labels["recent_z"], "z"))
+    facts = "".join(
+        f"<div class='fact{cls}'><b>"
+        + (
+            _signed_amount(float(item["value"]))
+            if kind == "money"
+            else _signed_z(float(item["value"]))
+        )
+        + f"</b><p>{_e(text)} {_badge(item['evidence'])}</p></div>"
+        for cls, item, text, kind in cells
+    )
+    grid = " pairs" if len(cells) % 2 == 0 else ""
+    out += f"<div class='facts{grid}'>{facts}</div>"
+    out += _timing_table(recent["years"], labels["recent_year"], str, labels)
+    out += f"<p class='muted'>{_e(localize(recent.get('note', ''), locale))}</p>"
     return out
 
 
@@ -3410,6 +3534,11 @@ def render_html(
         ),
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
         (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
+        *(
+            [(labels["recent"], _recent_html(data.get("recent"), locale, labels))]
+            if (data.get("recent") or {}).get("status") == "MEASURED"
+            else []
+        ),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels, hidden)),
         *(
