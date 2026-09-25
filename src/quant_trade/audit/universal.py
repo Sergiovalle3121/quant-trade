@@ -404,6 +404,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "quantity #",
         "no. of shares",
         "exec qty",
+        "qty filled",
         "filled amount",
         "quantity",
         "qty",
@@ -490,6 +491,15 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "realized profit",
         "realized p/l",
         "net usd",
+        "net eur",
+        "net gbp",
+        "net aud",
+        "net cad",
+        "net chf",
+        "net jpy",
+        "net nzd",
+        "net sgd",
+        "net hkd",
         "net profit usd",
         "closed p&l",
         "gain/loss ($)",
@@ -960,6 +970,29 @@ _ZONES = {
 }  # fmt: skip
 _COMPACT = re.compile(r"^(\d{4})(\d{2})(\d{2})(?:[;,T ]+(\d{2}):?(\d{2}):?(\d{2})?)?$")
 _SHORT_YEAR = re.compile(r"^(\d{1,2})([/.\-])(\d{1,2})\2(\d{2})(?=\s|$)")
+#: ``07 Aug 2026`` (cTrader statements) and ``02-Jan-2025`` (Saxo), English or Spanish.
+_MONTH_NAME = re.compile(r"^(\d{1,2})[ \-]([A-Za-z]{3,10})\.?[ \-](\d{4})(?=[\sT]|$)")
+_MONTHS = {
+    name: number
+    for number, names in enumerate(
+        (
+            ("jan", "january", "ene", "enero"),
+            ("feb", "february", "febrero"),
+            ("mar", "march", "marzo"),
+            ("apr", "april", "abr", "abril"),
+            ("may", "mayo"),
+            ("jun", "june", "junio"),
+            ("jul", "july", "julio"),
+            ("aug", "august", "ago", "agosto"),
+            ("sep", "sept", "september", "septiembre", "set", "setiembre"),
+            ("oct", "october", "octubre"),
+            ("nov", "november", "noviembre"),
+            ("dec", "december", "dic", "diciembre"),
+        ),
+        start=1,
+    )
+    for name in names
+}
 _TAIL_OFFSET = re.compile(r"\s*(?:(?:UTC|GMT)?([+-])(\d{1,2}):?(\d{2})?)$")
 _CLOCK = re.compile(r"^\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?(\s*[AaPp][Mm])?$")
 _ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
@@ -995,6 +1028,11 @@ def _clean_time(text: str) -> tuple[str, int | None]:
             sign = 1 if tail.group(1) == "+" else -1
             offset = sign * (int(tail.group(2)) * 60 + int(tail.group(3) or 0))
             value = value[: tail.start()]
+    named = _MONTH_NAME.match(value)
+    if named and named.group(2).lower() in _MONTHS:
+        month = _MONTHS[named.group(2).lower()]
+        day = int(named.group(1))
+        value = f"{named.group(3)}-{month:02d}-{day:02d}{value[named.end() :]}"
     short = _SHORT_YEAR.match(value)
     if short:
         value = f"{short.group(1)}/{short.group(3)}/20{short.group(4)}{value[short.end() :]}"
@@ -1044,6 +1082,10 @@ def header_zone(name: str) -> int | None:
     clock uses (outside -12 to +14 hours)."""
     found = _HEADER_ZONE.search(name)
     if found is None:
+        # Rithmic writes the zone as a word: "Update Time (EDT)".
+        word = re.search(r"\(([A-Za-z]{2,4})\)", name)
+        if word and word.group(1).upper() in _ZONES:
+            return _ZONES[word.group(1).upper()] * 60
         return None
     sign, digits, minutes = found.groups()
     if sign is None:
