@@ -179,3 +179,12 @@ def test_retail_investors_have_their_own_page(
     landing = client.get("/" if locale == "es" else "/en").text
     assert landing.count("class='card spot audience'") == 4
     assert f"href='{path}'" in landing
+
+
+def test_prop_page_names_the_firm_fit_check(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    es = client.get("/para/retos-prop-firm").text
+    en = client.get("/for/prop-firm-challenges").text
+    assert "¿Con qué firma encaja tu historial?" in es and "mejor día" in es
+    assert "Which firm does your history fit?" in en and "best-day" in en
+    assert find_claims(es) == [] and find_claims(en) == []
