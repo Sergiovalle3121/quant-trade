@@ -26,6 +26,10 @@ REFERENCE_BPS_WHEN_ZERO = 10.0
 #: what is left is slippage, assumed at 0.5 bps per side (about half a pip on
 #: EURUSD at 1.10; 10 bps would be 11 pips) and labelled an assumption.
 REFERENCE_BPS_OVER_REPORTED_FEES = 0.5
+#: The same 0.5 bps is used for an account history (a real or demo account
+#: exported from the platform, Myfxbook, an MQL5 signal or FX Blue) even when
+#: it itemises no fee: its fills are the broker's, so the spread and any
+#: commission folded into the price are already in each result.
 DEFAULT_MULTIPLIERS: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0)
 
 
@@ -44,21 +48,32 @@ class RecostRow:
         return asdict(self)
 
 
-def reference_bps(declared_bps: float, *, fees_reported: bool = False) -> tuple[float, bool]:
+def reference_bps(
+    declared_bps: float, *, fees_reported: bool = False, real_fills: bool = False
+) -> tuple[float, bool]:
     """The per-side cost the sensitivity is anchored on, and whether it is
     the client's figure (``False``) or the zero-cost assumption (``True``).
 
     With ``fees_reported`` the reference is charged on top of the costs the
-    report already itemises, so the assumption is slippage only."""
+    report already itemises, so the assumption is slippage only; the same
+    holds with ``real_fills``, an account history whose prices are real."""
     if declared_bps > 0:
         return float(declared_bps), False
-    if fees_reported:
+    if fees_reported or real_fills:
         return REFERENCE_BPS_OVER_REPORTED_FEES, True
     return REFERENCE_BPS_WHEN_ZERO, True
 
 
-def reference_note(assumed: bool, fees_reported: bool) -> str:
+REAL_FILLS_NOTE = (
+    "assumed slippage: an account history's prices are the broker's fills, so the spread "
+    "is already in each result; charged on top"
+)
+
+
+def reference_note(assumed: bool, fees_reported: bool, real_fills: bool = False) -> str:
     """Where the reference cost comes from, in the audit's own words."""
+    if assumed and real_fills and not fees_reported:
+        return REAL_FILLS_NOTE
     if assumed and fees_reported:
         return (
             "assumed slippage: the client declared zero cost; charged on top of the fees "
@@ -153,6 +168,7 @@ def break_even_bps(
 
 __all__ = [
     "DEFAULT_MULTIPLIERS",
+    "REAL_FILLS_NOTE",
     "REFERENCE_BPS_OVER_REPORTED_FEES",
     "REFERENCE_BPS_WHEN_ZERO",
     "RecostRow",
