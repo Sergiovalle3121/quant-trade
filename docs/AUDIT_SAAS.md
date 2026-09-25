@@ -136,8 +136,11 @@ Refusals say what is wrong: a trade list put in the equity-curve box gets
 `trade_list_as_curve` (upload it as the platform report), a file where every
 exit comes before its entry gets `exits_before_entries` (the time columns may
 be swapped), and a fill list that never closes a position gets
-`no_closed_trades` with the number of positions left open
-(`tests/test_audit_import_messages.py`).
+`no_closed_trades` with the number of positions left open (a fill list in
+the curve box gets `trade_list_as_curve` too). A column the customer mapped
+that holds no numbers (or no dates, for a time) gets
+`universal_column_unreadable`, naming the column and its role. Format codes
+never appear in customer text (`tests/test_audit_import_messages.py`).
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
 Platform exports the universal reader is checked against

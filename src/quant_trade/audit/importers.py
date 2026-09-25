@@ -2750,9 +2750,7 @@ def _parse_ninjatrader_executions(
             draft.invalid_rows += 1
             continue
         fee = abs(_num(_cells(row, columns, "commission"), decimal=decimal) or 0.0)
-        account = _cells(row, columns, "account display name") or _cells(
-            row, columns, "account"
-        )
+        account = _cells(row, columns, "account display name") or _cells(row, columns, "account")
         fills.append((moment, position, account, instrument, sign * abs(quantity), price, fee))
     unknown = sorted({_futures_root(fill[3]) for fill in fills} - set(FUTURES_POINT_VALUE_USD))
     if unknown:
@@ -2803,9 +2801,7 @@ def _parse_ninjatrader_executions(
     )
     kept = {row[0] for row in chosen}
     draft.trips = [trip for account in kept for trip in trips[account]]
-    still_open = sum(
-        1 for (account, _), lots in open_lots.items() if account in kept and lots
-    )
+    still_open = sum(1 for (account, _), lots in open_lots.items() if account in kept and lots)
     if still_open:
         draft.warnings.append(
             f"{still_open} position(s) still open at the end of the report; excluded "
@@ -3222,18 +3218,27 @@ def _finite_trip(trip: _Trip, notional: float) -> bool:
 
 def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     if not draft.trips and draft.open_positions:
+        count = draft.open_positions
         raise ReportFormatError(
             "no_closed_trades",
-            f"the {draft.source_format} file has no closed trades: "
-            f"{draft.open_positions} position(s) opened and never closed in the file",
-            f"el archivo ({draft.source_format}) no contiene operaciones cerradas: "
-            f"{draft.open_positions} posición(es) se abrieron y no se cerraron en el archivo",
+            "the file has no closed trades: "
+            + (
+                "1 position opened and never closed in the file"
+                if count == 1
+                else f"{count} positions opened and never closed in the file"
+            ),
+            "el archivo no contiene operaciones cerradas: "
+            + (
+                "1 posición se abrió y no se cerró en el archivo"
+                if count == 1
+                else f"{count} posiciones se abrieron y no se cerraron en el archivo"
+            ),
         )
     if not draft.trips:
         raise ReportFormatError(
             "no_closed_trades",
-            f"the {draft.source_format} file has no closed trades",
-            f"el archivo ({draft.source_format}) no contiene operaciones cerradas",
+            "the file has no closed trades",
+            "el archivo no contiene operaciones cerradas",
         )
     if len(draft.trips) > MAX_TRADES:
         raise ReportFormatError(
