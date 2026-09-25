@@ -520,6 +520,15 @@ half a point deeper than the closed-trade one (a real MT5 GBPUSD report:
 40.5 % against 29.0 %), and a plain note when the curve is a closed-trade
 balance. For an account history the sizes read as "the size the account
 used" instead of the backtest's.
+When `GRID_AVERAGING` or `HIDDEN_FLOATING_DRAWDOWN` fires, closed trades
+understate the fall (a grid closes its baskets in profit and hides the open
+losses: a real MQL5 grid signal showed a closed-trade fall of 112 on a 5,000
+balance, which read as 3.8x the size at a 10 % limit). The figures are then
+held back as NOT_MEASURED unless a fall that includes open trades is
+available as a floor: the platform's open-trade drawdown, or an uploaded
+equity curve (not rebuilt from closed trades) that starts within 10 % of the
+stated balance, whose deepest fall in money is shown as `fall_curve`
+(MEASURED). The reason tells the client what to upload.
 
 ### What data the test ran on (`audit/testdata.py`)
 

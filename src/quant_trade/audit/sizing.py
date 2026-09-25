@@ -63,15 +63,20 @@ RESAMPLED_NOTE = (
 )
 HISTORY_NOTE = "deepest fall in money of the closed trades in their own order"
 REFERENCE_NOTE = (
-    "the largest of the resampled 95th percentile, the history's own fall and the "
-    "platform's drawdown with open trades"
+    "the largest of the resampled 95th percentile, the history's own fall and any "
+    "drawdown with open trades from the platform or the equity curve"
 )
 PLATFORM_NOTE = "the platform's maximal drawdown in money, open trades included"
+CURVE_NOTE = "deepest fall in money of the uploaded equity curve, open trades included"
+HIDDEN_LOSSES = (
+    "the trades overlap as a grid or with hidden open losses, so closed trades understate "
+    "the real fall; upload an equity curve that includes open trades or the platform report "
+    "with its equity drawdown"
+)
 CAPITAL_NOTE = "reference fall / loss limit, at the backtest's sizes"
 SCALE_NOTE = "loss limit x starting balance / reference fall"
 TINY_FALL_REASON = (
-    "the trades show almost no fall to size against: under half a percent of the "
-    "starting balance"
+    "the trades show almost no fall to size against: under half a percent of the starting balance"
 )
 ASSUMPTIONS: dict[str, list[str]] = {
     "es": [
@@ -108,10 +113,23 @@ def capital_review(
     fees: Sequence[float] | None,
     starting_balance: float | None,
     platform_fall: float | None = None,
+    curve_fall: float | None = None,
+    hidden_open_losses: bool = False,
     samples: int = 2000,
     seed: int = 0,
 ) -> dict[str, Any]:
-    """Capital and size for each loss limit, from the closed trades."""
+    """Capital and size for each loss limit, from the closed trades.
+
+    ``platform_fall`` and ``curve_fall`` are falls in money that include open
+    trades; either is a floor for the reference fall. With
+    ``hidden_open_losses`` (a grid, or positions overlapping on a curve rebuilt
+    from closed trades) and neither floor, the figures are held back: a grid
+    closes its baskets in profit and the closed trades hide its real fall.
+    """
+    platform = platform_fall if platform_fall is not None and platform_fall > 0 else None
+    curve = curve_fall if curve_fall is not None and curve_fall > 0 else None
+    if hidden_open_losses and platform is None and curve is None:
+        return {"status": "NOT_MEASURED", "reason": HIDDEN_LOSSES}
     if len(trades) < MIN_TRADES:
         return {
             "status": "NOT_MEASURED",
@@ -137,8 +155,7 @@ def capital_review(
     falls = _deepest_fall(drawn)
     history = float(_deepest_fall(pnl))
     resampled = float(np.percentile(falls, QUANTILE))
-    platform = platform_fall if platform_fall is not None and platform_fall > 0 else None
-    reference = max(resampled, history, platform or 0.0)
+    reference = max(resampled, history, platform or 0.0, curve or 0.0)
     if reference <= 0:
         return {"status": "NOT_MEASURED", "reason": "the trades show no fall to size against"}
 
@@ -173,6 +190,11 @@ def capital_review(
             declared(platform, PLATFORM_NOTE)
             if platform is not None
             else not_measured("the file does not print the platform's drawdown in money")
+        ),
+        "fall_curve": (
+            measured(curve, CURVE_NOTE)
+            if curve is not None
+            else not_measured("no equity curve with open trades in money")
         ),
         "short_history": span_days < FULL_YEAR_DAYS,
         "span_days": measured(round(span_days), "days from the first entry to the last exit"),

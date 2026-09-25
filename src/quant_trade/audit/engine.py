@@ -672,6 +672,27 @@ def _platform_fall(metadata: dict[str, str]) -> float | None:
     return None
 
 
+#: Flags that say the closed trades hide open losses (a grid closes baskets in profit).
+HIDDEN_LOSS_FLAGS = frozenset({"GRID_AVERAGING", "HIDDEN_FLOATING_DRAWDOWN"})
+#: An uploaded curve is read as money when it starts this close to the starting balance.
+CURVE_MONEY_TOLERANCE = 0.10
+
+
+def _curve_fall(inputs: AuditInputs) -> float | None:
+    """Deepest fall in money of an uploaded equity curve that includes open trades.
+
+    Only a curve the client uploaded (not one rebuilt from closed trades) and
+    only when it starts at the stated balance, so an index curve is not read
+    as money."""
+    balance = inputs.initial_balance or inputs.declared.initial_balance
+    equity = inputs.equity.frame["equity"].to_numpy(dtype=float)
+    if inputs.balance_only or not balance or len(equity) < 2:
+        return None
+    if abs(equity[0] / balance - 1) > CURVE_MONEY_TOLERANCE:
+        return None
+    return float(np.max(np.maximum.accumulate(equity) - equity))
+
+
 def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[str, Any]:
     risk = analytics.drawdown_risk(returns, periods_per_year=ppy, samples=samples, seed=seed)
     status = "MEASURED" if risk.get("method") else "NOT_MEASURED"
@@ -873,6 +894,8 @@ def run_audit(
             fees=inputs.trades.fees,
             starting_balance=inputs.initial_balance or inputs.declared.initial_balance,
             platform_fall=_platform_fall(inputs.report_metadata),
+            curve_fall=_curve_fall(inputs),
+            hidden_open_losses=bool(HIDDEN_LOSS_FLAGS & {flag.code for flag in flags}),
             samples=risk_samples,
             seed=seed,
         )

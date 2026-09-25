@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pandas as pd
 import pytest
 from audit_fixtures import csv_bytes, positive_drift, trades_following
 
@@ -115,3 +116,66 @@ def test_under_a_year_is_marked_and_under_ninety_days_is_held_back() -> None:
     short = _trades([10.0, -5.0] * 20, every_days=2.0)
     review = capital_review(short, fees=None, starting_balance=1.0)
     assert review["status"] == "NOT_MEASURED" and "90 days" in review["reason"]
+
+
+def test_hidden_open_losses_hold_the_figures_back() -> None:
+    trades = _trades(PROFITS)
+    held = capital_review(trades, fees=None, starting_balance=10_000.0, hidden_open_losses=True)
+    assert held["status"] == "NOT_MEASURED"
+    assert "closed trades understate the real fall" in held["reason"]
+    floored = capital_review(
+        trades,
+        fees=None,
+        starting_balance=10_000.0,
+        platform_fall=5_000.0,
+        hidden_open_losses=True,
+    )
+    assert floored["status"] == "MEASURED"
+    assert floored["fall_reference"]["value"] == pytest.approx(5_000.0)
+    by_curve = capital_review(
+        trades, fees=None, starting_balance=10_000.0, curve_fall=4_000.0, hidden_open_losses=True
+    )
+    assert by_curve["fall_curve"]["evidence"] == "MEASURED"
+    assert by_curve["fall_reference"]["value"] == pytest.approx(4_000.0)
+
+
+def _grid_trades(curve: pd.DataFrame) -> pd.DataFrame:
+    """Baskets of five buys, each lower than the last, closed together in profit."""
+    stamps = pd.to_datetime(curve["timestamp"], utc=True)
+    rows = []
+    for start in range(0, len(curve) - 12, 12):
+        for level in range(5):
+            rows.append(
+                {
+                    "entry_time": stamps.iloc[start + level],
+                    "exit_time": stamps.iloc[start + 10],
+                    "quantity": 1.0,
+                    "entry_price": 100.0 - level,
+                    "exit_price": 101.0,
+                    "side": "long",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+@pytest.mark.parametrize("scale", [1.0, 1 / 10_000])
+def test_grid_is_sized_on_a_money_curve_and_held_back_on_an_index(scale: float) -> None:
+    curve = positive_drift(400)
+    curve["equity"] = curve["equity"] * scale
+    inputs = build_inputs(
+        csv_bytes(curve),
+        DeclaredMetadata(initial_balance=10_000.0),
+        trades_bytes=csv_bytes(_grid_trades(curve)),
+    )
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300)
+    assert "GRID_AVERAGING" in {flag["code"] for flag in result.red_flags}
+    capital = result.capital
+    assert capital is not None
+    if scale == 1.0:
+        assert capital["status"] == "MEASURED"
+        assert capital["fall_curve"]["evidence"] == "MEASURED"
+        assert capital["fall_reference"]["value"] >= capital["fall_curve"]["value"]
+    else:
+        assert capital["status"] == "NOT_MEASURED"
+        assert "open losses" in capital["reason"]
+    assert untranslated(result.model_dump(mode="json")) == []
