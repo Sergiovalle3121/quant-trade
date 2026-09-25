@@ -1787,8 +1787,16 @@ TRUST_COPY: dict[str, dict[str, Any]] = {
 }
 
 
-def _trust(locale: str, *, retention_days: int, operator: tuple[str, str], contact_url: str) -> str:
-    """Why trust Rigor, each point with the page that proves it."""
+def _trust(
+    locale: str,
+    *,
+    retention_days: int,
+    operator: tuple[str, str],
+    contact_url: str,
+    free_mode: bool = False,
+) -> str:
+    """Why trust Rigor, each point with the page that proves it (in free mode
+    nothing is sold, so the refund point is left out)."""
     words = TRUST_COPY[locale]
     linked = link_locale(locale)
     hrefs = {
@@ -1804,7 +1812,9 @@ def _trust(locale: str, *, retention_days: int, operator: tuple[str, str], conta
         f"<p>{_e(text.format(retention=retention_days))}</p>"
         + (f"<p><a href='{_e(hrefs[target])}'>{_e(label)}</a></p>" if target else "")
         + "</div>"
-        for i, (name, title, text, label, target) in enumerate(words["items"])
+        for i, (name, title, text, label, target) in enumerate(
+            item for item in words["items"] if not (free_mode and item[4] == "terms")
+        )
     )
     name, address = operator
     who = (
@@ -2295,7 +2305,13 @@ def landing(
         + _evidence(locale, copy)
         + _how_html(copy, locale)
         + _differences(locale)
-        + _trust(locale, retention_days=retention_days, operator=operator, contact_url=contact_url)
+        + _trust(
+            locale,
+            retention_days=retention_days,
+            operator=operator,
+            contact_url=contact_url,
+            free_mode=free_mode,
+        )
         + _prices_html(
             copy,
             locale,
