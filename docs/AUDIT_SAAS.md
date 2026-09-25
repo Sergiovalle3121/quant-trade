@@ -1331,6 +1331,15 @@ footer names the tagline and the legal pages once instead of twice. The preview'
 red flags use the same cards as the full report, the gravest first, without the
 detail that the payment unlocks.
 
+Redesign pass 39 styles the report check (`/comprobar`, `/check`): the file
+goes into the same drop zone as the upload, the button spans the card, "How
+it works" reads as three icon steps, and the answer is a tinted card with a
+mark (green check when the bytes match, amber caution when Rigor has no
+record, since an unmatched file may simply predate the recording). The page
+is linked from every footer's Product column, from a note on the public /v
+page ("Were you sent this report's PDF or JSON?") and from a line under the
+report's PDF download.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

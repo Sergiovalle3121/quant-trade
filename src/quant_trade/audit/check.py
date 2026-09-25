@@ -16,6 +16,7 @@ import html
 from typing import Any
 
 from quant_trade.audit.store import IssuedFile
+from quant_trade.audit.theme import icon
 
 #: The largest file the page reads; a report PDF is far smaller.
 MAX_CHECK_BYTES = 20 * 1024 * 1024
@@ -39,6 +40,8 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "file": "Informe que te enviaron (PDF o JSON)",
         "submit": "Comprobar",
+        "drop_title": "Arrastra aquí el informe",
+        "drop_sub": "o haz clic para elegirlo · hasta 20 MB",
         "found_title": "Este archivo no se editó",
         "found": (
             "Es idéntico, byte a byte, al {kind} que Rigor generó el {date} para un informe "
@@ -88,6 +91,8 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "file": "Report you were sent (PDF or JSON)",
         "submit": "Check",
+        "drop_title": "Drop the report here",
+        "drop_sub": "or click to choose it · up to 20 MB",
         "found_title": "This file was not edited",
         "found": (
             "It is identical, byte for byte, to the {kind} Rigor produced on {date} for a "
@@ -131,19 +136,41 @@ COPY: dict[str, dict[str, Any]] = {
 }
 
 CHECK_CSS = (
-    ".chk-grid{display:grid;gap:28px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);"
+    ".chk-grid{display:grid;gap:clamp(28px,5vw,72px);"
+    "grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start}"
+    "@media (max-width:759px){.chk-grid{grid-template-columns:minmax(0,1fr)}}"
+    ".chk-form .field{margin:0}"
+    ".chk-form .btn{width:100%;justify-content:center;margin-top:20px}"
+    ".chk-form .error{margin:0 0 18px}"
+    ".chk-aside h2{font-size:1.25rem;letter-spacing:-.02em;margin:0 0 20px}"
+    ".chk-steps{list-style:none;margin:0;padding:0;display:grid;gap:20px}"
+    ".chk-steps li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:14px;"
     "align-items:start}"
-    "@media (max-width:759px){.chk-grid{grid-template-columns:1fr}}"
-    ".chk-form{display:grid;gap:16px}"
-    ".chk-form input[type=file]{width:100%;max-width:100%}"
-    ".chk-aside ol{margin:0;padding-left:1.2em;display:grid;gap:10px}"
-    ".chk-aside li b{display:block}"
-    ".chk-result{border:1px solid var(--border);border-radius:16px;padding:18px 20px;"
-    "margin:0 0 18px;overflow-wrap:anywhere}"
-    ".chk-result.ok{border-color:var(--pass,#1a7f4b)}"
-    ".chk-result.bad{border-color:var(--fail,#b42318)}"
-    ".chk-result h2{margin:0 0 8px}"
-    ".chk-result code{font-size:.8rem;word-break:break-all}"
+    ".chk-steps .icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;"
+    "border:1px solid var(--border-2);background:var(--surface)}"
+    ".chk-steps .icon svg{width:18px;height:18px}"
+    ".chk-steps b{display:block;font-weight:600;letter-spacing:-.01em;margin:1px 0 2px}"
+    ".chk-steps span{color:var(--text-2);font-size:.92rem;line-height:1.55}"
+    ".chk-note{margin:24px 0 0;padding-top:18px;border-top:1px solid var(--border);"
+    "color:var(--text-3);font-size:.86rem;line-height:1.55}"
+    ".chk-result{--tone:var(--ok);display:grid;grid-template-columns:48px minmax(0,1fr);"
+    "gap:18px;padding:clamp(20px,3vw,30px);margin:0 0 clamp(28px,4vw,44px);"
+    "border-radius:var(--r-xl,22px);overflow-wrap:anywhere;"
+    "border:1px solid color-mix(in srgb,var(--tone) 45%,transparent);"
+    "background:color-mix(in srgb,var(--tone) 7%,var(--surface))}"
+    ".chk-result.bad{--tone:var(--warn)}"
+    ".chk-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;"
+    "color:var(--tone);background:color-mix(in srgb,var(--tone) 14%,transparent)}"
+    ".chk-mark svg{width:24px;height:24px}"
+    ".chk-result h2{margin:4px 0 6px;font-size:clamp(1.3rem,2.4vw,1.6rem);letter-spacing:-.03em}"
+    ".chk-result .chk-text{margin:0;font-size:1.02rem;line-height:1.55}"
+    ".chk-result .btn{margin-top:16px}"
+    ".chk-scope{margin:16px 0 0;color:var(--text-2);font-size:.88rem;line-height:1.55}"
+    ".chk-hash{margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;"
+    "font-size:.78rem;color:var(--text-3)}"
+    ".chk-hash code{font:500 .74rem var(--mono);word-break:break-all;color:var(--text-2)}"
+    "@media (max-width:620px){.chk-result{grid-template-columns:minmax(0,1fr);gap:12px}"
+    ".chk-mark{width:40px;height:40px}}"
 )
 
 
@@ -172,20 +199,29 @@ def check_form(locale: str, *, error: str = "") -> str:
     locale = _locale(locale)
     copy = COPY[locale]
     error_html = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
+    formats = "".join(f"<span>{kind}</span>" for kind in ("PDF", "JSON"))
     form = (
-        f"<form class='chk-form' method='post' action='{check_path(locale)}' "
+        f"<form class='panel chk-form' method='post' action='{check_path(locale)}' "
         f"enctype='multipart/form-data'>{error_html}"
         f"<input type='hidden' name='lang' value='{locale}'>"
         f"<div class='field'><label for='report'>{_e(copy['file'])}</label>"
+        f"<div class='drop drop-main'><div class='icon'>{icon('upload')}</div>"
+        f"<div class='drop-title'>{_e(copy['drop_title'])}</div>"
+        f"<div class='drop-sub'>{_e(copy['drop_sub'])}</div>"
+        f"<div class='formats'>{formats}</div><div class='drop-file' aria-live='polite'></div>"
         "<input id='report' type='file' name='report' required "
-        "accept='.pdf,.json,application/pdf,application/json'></div>"
-        f"<div><button class='btn btn-primary' type='submit'>{_e(copy['submit'])}</button></div>"
+        "accept='.pdf,.json,application/pdf,application/json'></div></div>"
+        f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['submit'])}</button>"
         "</form>"
     )
-    steps = "".join(f"<li><b>{_e(k)}</b><span>{_e(v)}</span></li>" for k, v in copy["shows"])
+    steps = "".join(
+        f"<li><div class='icon'>{icon(mark)}</div><div><b>{_e(k)}</b><span>{_e(v)}</span></div>"
+        "</li>"
+        for mark, (k, v) in zip(("hash", "database", "lock"), copy["shows"], strict=True)
+    )
     aside = (
-        f"<aside class='chk-aside'><h2>{_e(copy['shows_title'])}</h2><ol>{steps}</ol>"
-        f"<p>{_e(copy['note'])}</p></aside>"
+        f"<aside class='chk-aside'><h2>{_e(copy['shows_title'])}</h2>"
+        f"<ol class='chk-steps'>{steps}</ol><p class='chk-note'>{_e(copy['note'])}</p></aside>"
     )
     return f"<div class='chk-grid'>{form}{aside}</div>"
 
@@ -194,12 +230,11 @@ def check_result(found: IssuedFile | None, digest: str, locale: str) -> str:
     """What the page says about one file, then the form again."""
     locale = _locale(locale)
     copy = COPY[locale]
+    link = ""
     if found is None:
-        box = (
-            f"<div class='chk-result bad' role='status'><h2>{_e(copy['missing_title'])}</h2>"
-            f"<p>{_e(copy['missing'])}</p>"
-        )
+        tone, mark, title, text = "bad", "alert", copy["missing_title"], copy["missing"]
     else:
+        tone, mark, title = "ok", "check", copy["found_title"]
         kind = copy["kinds"].get(found.kind, found.kind)
         date = _date(found.issued_at, locale)
         if found.audit_id == SAMPLE_AUDIT_ID:
@@ -208,16 +243,17 @@ def check_result(found: IssuedFile | None, digest: str, locale: str) -> str:
             text = copy["found"].format(kind=kind, date=date, cls=found.overall_class)
         else:
             text = copy["found_no_class"].format(kind=kind, date=date)
-        box = (
-            f"<div class='chk-result ok' role='status'><h2>{_e(copy['found_title'])}</h2>"
-            f"<p>{_e(text)}</p>"
-        )
         if found.public_id:
             href = f"/v/{_e(found.public_id)}?lang={locale}"
-            box += f"<p><a href='{href}'>{_e(copy['public'])}</a></p>"
-    box += (
-        f"<p class='muted'>{_e(copy['scope'])}</p>"
-        f"<p class='muted'>SHA-256 <code>{_e(digest)}</code></p></div>"
+            link = (
+                f"<a class='btn btn-ghost btn-sm' href='{href}'>{_e(copy['public'])}"
+                f"{icon('arrow')}</a>"
+            )
+    box = (
+        f"<div class='chk-result {tone}' role='status'><div class='chk-mark'>{icon(mark)}</div>"
+        f"<div><h2>{_e(title)}</h2><p class='chk-text'>{_e(text)}</p>{link}"
+        f"<p class='chk-scope'>{_e(copy['scope'])}</p>"
+        f"<p class='chk-hash'><span>SHA-256</span><code>{_e(digest)}</code></p></div></div>"
     )
     return box + check_form(locale)
 
