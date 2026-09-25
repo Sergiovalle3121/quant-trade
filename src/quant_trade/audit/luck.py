@@ -32,7 +32,7 @@ import math
 from typing import Any
 
 from quant_trade.audit.schema import measured
-from quant_trade.metrics.statistics import _phi, _phi_inv, expected_max_sharpe
+from quant_trade.metrics.statistics import _phi_inv, expected_max_sharpe
 
 #: Below this many configurations there is no search to discount.
 MIN_TRIALS = 2
@@ -108,9 +108,16 @@ def luck_review(
     # Harvey & Liu with the same Sharpe spread as the deflated Sharpe, so a
     # Sharpe left after the haircut always clears the luck above it.
     se = math.sqrt(sharpe_variance)
-    p_value = 1.0 - _phi(sr / se)
+    # The upper tail through erfc, so a very steady history keeps a tiny
+    # p-value instead of rounding it to zero (which has no inverse).
+    p_value = 0.5 * math.erfc(sr / se / math.sqrt(2.0))
     p_adjusted = min(1.0, p_value * trials)
-    haircut_sr = max(0.0, _phi_inv(1.0 - p_adjusted) * se) if p_adjusted < 0.5 else 0.0
+    if p_adjusted >= 0.5:
+        haircut_sr = 0.0
+    elif p_adjusted <= 0.0:
+        haircut_sr = sr  # too far out for any search size to explain
+    else:
+        haircut_sr = min(sr, max(0.0, -_phi_inv(p_adjusted) * se))
     if observed <= luck:
         haircut_sr = 0.0
     after = haircut_sr * scale
