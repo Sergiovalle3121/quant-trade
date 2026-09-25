@@ -99,6 +99,11 @@ Limits, each written into the report as a reading warning:
   else 10,000 with a warning.
 - A CSV line longer than 32 KB (`MAX_CSV_LINE_BYTES`) is refused: no real
   export has one, and pandas takes minutes on a 5 MB line of fields.
+- An optimisation export whose title names another robot, symbol or
+  timeframe than the MT5 tester report, or whose optimised inputs share no
+  name with the report's inputs, is refused (`optimization_mismatch`): its
+  passes would count as the report's trials and its neighbours would judge
+  another strategy. A broker suffix (`EURUSD.m`) still matches.
 - An optimisation export cell placed past column 4,096 by `ss:Index`
   (`MAX_OPTIMIZATION_COLUMNS`) ends its row: a 200-byte crafted index
   would otherwise pad one row with hundreds of millions of empty cells.

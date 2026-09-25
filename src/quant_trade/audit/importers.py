@@ -184,6 +184,11 @@ class OptimizationSummary:
     #: Numeric cells of each pass (parameters and result columns), for the
     #: parameter-stability check; at most ``MAX_OPTIMIZATION_ROWS`` rows.
     table: list[dict[str, float]] = field(default_factory=list)
+    #: What the export's title names ("MyEA EURUSD,H1 2024.01.01-2024.06.30"),
+    #: so the upload can be checked against the report; None when not stated.
+    expert: str | None = None
+    symbol: str | None = None
+    timeframe: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -3496,6 +3501,10 @@ _OPTIMIZATION_STANDARD = {
 }
 
 
+#: "MyEA EURUSD,H1 2024.01.01-2024.06.30", as MetaTrader titles the export.
+_OPTIMIZATION_TITLE = re.compile(
+    r"^(?P<expert>.+?)\s+(?P<symbol>[^\s,]+),(?P<timeframe>[A-Z]{1,2}\d{0,2})\b"
+)
 #: Passes kept for the parameter-stability check.
 MAX_OPTIMIZATION_ROWS = 50_000
 #: Columns read per row of an optimisation export; cells placed past it are ignored.
@@ -3521,6 +3530,10 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
         )
     body = re.sub(r"^\s*<\?xml[^>]*\?>", "", text)
     root = _xml(body.encode("utf-8"))
+    title = next(
+        ((node.text or "").strip() for node in root.iter() if _local(node.tag) == "Title"), ""
+    )
+    named = _OPTIMIZATION_TITLE.match(title)
     rows: list[list[str]] = []
     for sheet in root.iter():
         if _local(sheet.tag) != "Worksheet":
@@ -3604,7 +3617,46 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
         parameters=parameters,
         warnings=warnings,
         table=table,
+        expert=named.group("expert") if named else None,
+        symbol=named.group("symbol") if named else None,
+        timeframe=named.group("timeframe") if named else None,
     )
+
+
+def _plain(name: str) -> str:
+    """``Experts\\Folder\\MyEA.ex5`` and ``myea`` alike: ``MYEA``."""
+    base = re.split(r"[\\/]", name.strip())[-1]
+    base = re.sub(r"\.(ex5|mq5|ex4|mq4)$", "", base, flags=re.IGNORECASE)
+    return "".join(ch for ch in base.upper() if ch.isalnum())
+
+
+def optimization_mismatch(
+    summary: OptimizationSummary, report: dict[str, str]
+) -> tuple[str, str, str] | None:
+    """``(what, in the export, in the report)`` when the export is not the report's robot.
+
+    Only what both files state is compared: the robot's name, the symbol
+    (a broker suffix such as ``EURUSD.m`` still matches), the timeframe and
+    the input names. A file that states less is given the benefit of the doubt.
+    """
+    expert, reported = summary.expert, report.get("strategy")
+    if expert and reported and _plain(expert) != _plain(reported):
+        return "robot", expert, reported
+    symbol, reported = summary.symbol, report.get("symbol")
+    if symbol and reported:
+        a, b = _plain(symbol), _plain(reported)
+        if not (a.startswith(b) or b.startswith(a)):
+            return "symbol", symbol, reported
+    timeframe = summary.timeframe
+    reported = (report.get("period") or "").split(" ")[0]
+    if timeframe and reported and timeframe.upper() != reported.upper():
+        return "timeframe", timeframe, reported
+    listed = report.get("input_names") or ""
+    names = {_plain(name) for name in listed.split(",") if name.strip()}
+    tried = {_plain(name) for name in summary.parameters}
+    if names and tried and not names & tried:
+        return "inputs", ", ".join(summary.parameters[:4]), listed
+    return None
 
 
 __all__ = [
@@ -3623,6 +3675,7 @@ __all__ = [
     "NINJATRADER_CSV",
     "QUANTCONNECT_TRADES_CSV",
     "REPORT_FORMATS",
+    "optimization_mismatch",
     "TRADINGVIEW_CSV",
     "TRADINGVIEW_XLSX",
     "VECTORBT_CSV",
