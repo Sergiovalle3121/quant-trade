@@ -78,6 +78,7 @@ def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
     assert slugs == {
         "mt5",
         "mt5-optimization",
+        "cuenta-proveedor",
         "mt4",
         "tradingview",
         "ninjatrader",

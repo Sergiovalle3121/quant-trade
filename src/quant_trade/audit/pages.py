@@ -23,9 +23,17 @@ from quant_trade.audit.guides import (
     guides_index_url,
 )
 from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
+from quant_trade.audit.method import COPY as METHOD_COPY
+from quant_trade.audit.method import REFERENCES, dimension_rows, method_url
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.redflags import FLAG_TITLES
-from quant_trade.audit.report import DIMENSION_TITLES, DISCLAIMER, SOURCE_NAMES, STATUS_TEXT
+from quant_trade.audit.report import (
+    CLASS_LADDER,
+    DIMENSION_TITLES,
+    DISCLAIMER,
+    SOURCE_NAMES,
+    STATUS_TEXT,
+)
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.theme import (
@@ -622,6 +630,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulador de reto de prop firm",
             "Riesgo remuestreado a un año",
             "Preguntas para el vendedor del robot",
+            "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -796,6 +805,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Prop-firm challenge simulator",
             "Resampled one-year risk",
             "Questions to ask the robot's vendor",
+            "The real money behind an account's %: deposits, top-ups and open losses",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",
@@ -1857,6 +1867,60 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     return _page(title, locale, body, switch_href=f"/?lang={other}", solid_nav=True)
 
 
+def method_page(*, locale: str = "es", base_url: str = "") -> str:
+    """The public methodology: tests, thresholds, labels, limits and sources."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words: dict[str, Any] = METHOD_COPY[locale]
+    other = "en" if locale == "es" else "es"
+    title = f"{words['title']} · {copy['title']}"
+    meta = _public_meta(title, words["summary"], locale, method_url(locale), base_url)
+
+    def bullets(items: list[str]) -> str:
+        return (
+            "<ul class='checks'>"
+            + "".join(f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in items)
+            + "</ul>"
+        )
+
+    dims_table = "".join(
+        f"<h3>{_e(question)}</h3><p>{_e(measure)}</p>"
+        f"<p><b>{_e(words['col_pass'])}:</b> {_e(rule)}</p>"
+        for question, measure, rule in dimension_rows(locale)
+    )
+    ladder = "".join(
+        f"<li><b>{_e(cls)}</b> · {_e(text)}</li>" for cls, text in CLASS_LADDER[locale]
+    )
+    evidence = "".join(f"<li><b>{_e(tag)}</b> · {_e(text)}</li>" for tag, text in words["evidence"])
+    flags = ", ".join(titles.get(locale, titles["en"]) for titles in FLAG_TITLES.values())
+    refs = "".join(f"<li>{_e(ref)}</li>" for ref in REFERENCES)
+    crumbs = (
+        f"<a href='/?lang={_e(locale)}'>{_e(GUIDES_COPY[locale]['back'])}</a><span>/</span>"
+        f"<a href='{_e(method_url(other))}' hreflang='{other}'>{_other_name(locale)}</a>"
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["summary"], crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            [
+                (words["independence_title"], bullets(words["independence"])),
+                (words["dims_title"], dims_table),
+                (words["ladder_title"], f"<ul>{ladder}</ul>"),
+                (words["evidence_title"], f"<ul>{evidence}</ul>"),
+                (words["flags_title"], f"<p>{_e(flags)}.</p>"),
+                (words["repro_title"], bullets(words["repro"])),
+                (words["limits_title"], bullets(words["limits"])),
+                (words["refs_title"], f"<ol>{refs}</ol>"),
+            ],
+            locale,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            f"{_e(GUIDES_COPY[locale]['form'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, switch_href=method_url(other), solid_nav=True)
+
+
 def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     """The list of export guides."""
     locale = _locale(locale)
@@ -1952,6 +2016,7 @@ __all__ = [
     "guides_index_page",
     "landing",
     "legal_page",
+    "method_page",
     "sample_meta",
     "verification_page",
 ]

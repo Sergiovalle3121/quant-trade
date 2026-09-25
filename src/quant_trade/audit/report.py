@@ -161,6 +161,34 @@ LABELS: dict[str, dict[str, str]] = {
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
         "unlock_nav": "Desbloquear",
+        "account": "El dinero real de la cuenta",
+        "account_intro": (
+            "El porcentaje de ganancia que muestran los sitios de historiales quita los "
+            "depósitos y los retiros. Aquí lo ponemos junto al dinero que la cuenta ganó o "
+            "perdió operando, los depósitos hechos en plena pérdida y las posiciones que "
+            "seguían abiertas al imprimir el historial."
+        ),
+        "account_backtest": (
+            "Esta revisión es para historiales de cuentas reales o demo de MetaTrader 4 o 5. "
+            "Tu archivo es un backtest."
+        ),
+        "account_gain": "Ganancia en %, como la muestran los sitios de historiales.",
+        "account_money": "Resultado de operar, en dinero, sobre {deposited} depositados.",
+        "account_floating": "Pérdida abierta sobre el balance al imprimir el historial.",
+        "account_clean": (
+            "No vimos depósitos en plena pérdida, ni una pérdida abierta grande, ni un "
+            "porcentaje que se aparte del dinero."
+        ),
+        "account_live": (
+            "Revisión del historial que subiste como cuenta real. Sus banderas se muestran "
+            "aquí y no cambian la clase del backtest."
+        ),
+        "account_deposits": "Depósitos después de empezar a operar, de mayor a menor",
+        "account_date": "Fecha",
+        "account_amount": "Importe",
+        "account_before": "Balance antes",
+        "account_drawdown": "Drawdown entonces",
+        "account_scope": ("Leído del archivo tal como lo subiste; nada se comprobó con el bróker."),
         "timing": "Cuándo gana y cuándo pierde",
         "timing_intro": (
             "Tus operaciones agrupadas por el día y la hora de entrada. Si casi todo el "
@@ -472,6 +500,33 @@ LABELS: dict[str, dict[str, str]] = {
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
         "unlock_nav": "Unlock",
+        "account": "The account's real money",
+        "account_intro": (
+            "The percentage gain track-record sites show takes deposits and withdrawals out. "
+            "Here it sits next to the money the account made or lost by trading, deposits "
+            "made in a deep drawdown, and positions still open when the history was printed."
+        ),
+        "account_backtest": (
+            "This review is for real or demo account histories from MetaTrader 4 or 5. "
+            "Your file is a backtest."
+        ),
+        "account_gain": "Percentage gain, as track-record sites show it.",
+        "account_money": "Trading result, in money, on {deposited} deposited.",
+        "account_floating": "Open loss over the balance when the history was printed.",
+        "account_clean": (
+            "We saw no deposit in a deep drawdown, no large open loss and no percentage that "
+            "departs from the money."
+        ),
+        "account_live": (
+            "Review of the history you uploaded as the live account. Its flags are shown "
+            "here and do not change the backtest's class."
+        ),
+        "account_deposits": "Deposits after trading began, largest first",
+        "account_date": "Date",
+        "account_amount": "Amount",
+        "account_before": "Balance before",
+        "account_drawdown": "Drawdown then",
+        "account_scope": "Read from the file as uploaded; nothing was checked with the broker.",
         "timing": "When it wins and when it loses",
         "timing_intro": (
             "Your trades grouped by entry day and time. If nearly all the result comes from "
@@ -745,6 +800,18 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "average_loss": "Pérdida media",
         "payoff_ratio": "Ratio ganancia/pérdida media",
         "largest_win_share": "Peso de la mayor ganadora",
+        "deposits_count": "Depósitos",
+        "deposits_total": "Dinero depositado",
+        "withdrawals_count": "Retiros",
+        "withdrawals_total": "Dinero retirado",
+        "later_deposits": "Depósitos después de empezar a operar",
+        "trading_result": "Resultado de operar, en dinero",
+        "percent_gain": "Ganancia en %",
+        "result_on_deposits": "Resultado sobre lo depositado",
+        "withdrawn_share": "Parte retirada de lo depositado",
+        "top_ups": "Depósitos en plena pérdida",
+        "floating_pnl": "Resultado flotante al imprimir",
+        "floating_share": "Flotante sobre el balance",
         "max_consecutive_wins": "Máximo de ganadoras seguidas",
         "max_consecutive_losses": "Máximo de perdedoras seguidas",
         "mean_holding_hours": "Horas medias por operación",
@@ -797,6 +864,18 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "average_loss": "Average loss",
         "payoff_ratio": "Average win / average loss",
         "largest_win_share": "Share of the largest win",
+        "deposits_count": "Deposits",
+        "deposits_total": "Money deposited",
+        "withdrawals_count": "Withdrawals",
+        "withdrawals_total": "Money withdrawn",
+        "later_deposits": "Deposits after trading began",
+        "trading_result": "Trading result, in money",
+        "percent_gain": "Percentage gain",
+        "result_on_deposits": "Result on the money deposited",
+        "withdrawn_share": "Share of deposits withdrawn",
+        "top_ups": "Deposits in a deep drawdown",
+        "floating_pnl": "Floating result when printed",
+        "floating_share": "Floating result / balance",
         "max_consecutive_wins": "Most consecutive wins",
         "max_consecutive_losses": "Most consecutive losses",
         "mean_holding_hours": "Mean hours per trade",
@@ -849,6 +928,12 @@ MONEY_KEYS = {
     "average_loss",
     "commission",
     "swap",
+    "deposits_total",
+    "withdrawals_total",
+    "trading_result",
+    "floating_pnl",
+    "amount",
+    "balance_before",
 }
 #: Ratios a trader reads at two decimals (a profit factor of 1.25, not 1.2453).
 RATIO_KEYS = {
@@ -888,6 +973,11 @@ PERCENT_KEYS = {
     "largest_win_share",
     "dsr_at_declared",
     "dsr_at_trials_used",
+    "percent_gain",
+    "result_on_deposits",
+    "withdrawn_share",
+    "floating_share",
+    "drawdown",
 }
 
 
@@ -1968,6 +2058,91 @@ def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict
     )
 
 
+def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """Deposits, withdrawals and open positions of an account history."""
+    if not account or account.get("status") != "MEASURED":
+        return (
+            f"<p>{_badge('NOT_MEASURED')} <span class='muted'>"
+            f"{_e(labels['account_backtest'])}</span></p>"
+        )
+    out = f"<p class='muted'>{_e(labels['account_intro'])}</p>"
+    if account.get("source") == "live":
+        out += f"<p>{_e(labels['account_live'])}</p>"
+        found = account.get("flags") or []
+        if found:
+            locale = _locale_of(labels)
+            out += (
+                "<ul>"
+                + "".join(
+                    f"<li>{_severity_badge(flag['severity'], locale)} "
+                    f"{_e(flag_title(flag['code'], locale))}: "
+                    f"{_e(localize(flag['detail'], locale))}</li>"
+                    for flag in found
+                )
+                + "</ul>"
+            )
+    facts = []
+    gain = account["percent_gain"]["value"]
+    if gain is not None:
+        facts.append(
+            f"<div class='fact'><b>{gain:.0%}</b><p>{_e(labels['account_gain'])}</p></div>"
+        )
+    money = account["trading_result"]["value"]
+    deposited = _fmt(float(account["deposits"]["total"]["value"]), key="deposits_total")
+    facts.append(
+        f"<div class='fact'><b>{_fmt(float(money), key='trading_result')}</b>"
+        f"<p>{_e(labels['account_money'].format(deposited=deposited))}</p></div>"
+    )
+    floating = account["floating_share"]["value"]
+    if floating is not None and floating < 0:
+        facts.append(
+            f"<div class='fact'><b>{-floating:.0%}</b><p>{_e(labels['account_floating'])}</p></div>"
+        )
+    out += f"<div class='facts'>{''.join(facts)}</div>"
+    flat = {
+        "deposits_count": account["deposits"]["count"],
+        "deposits_total": account["deposits"]["total"],
+        "withdrawals_count": account["withdrawals"]["count"],
+        "withdrawals_total": account["withdrawals"]["total"],
+        **{
+            key: account[key]
+            for key in (
+                "trading_result",
+                "percent_gain",
+                "result_on_deposits",
+                "withdrawn_share",
+                "later_deposits",
+                "top_ups",
+                "floating_pnl",
+                "floating_share",
+            )
+        },
+    }
+    out += _evidence_rows(flat, labels, skip=set())
+    listed = account.get("deposit_list") or []
+    if listed:
+        rows = "".join(
+            f"<tr><td>{_e(str(item['time'])[:10])}</td>"
+            f"<td class='val'>{_fmt(float(item['amount']['value']), key='amount')}</td>"
+            f"<td class='val'>{_fmt(item['balance_before']['value'], key='balance_before')}</td>"
+            f"<td class='val'>{_fmt(item['drawdown']['value'], key='drawdown')}</td></tr>"
+            for item in listed
+        )
+        out += (
+            f"<h3>{_e(labels['account_deposits'])}</h3>"
+            "<table class='metrics'><thead><tr>"
+            f"<th>{_e(labels['account_date'])}</th>"
+            f"<th class='val'>{_e(labels['account_amount'])}</th>"
+            f"<th class='val'>{_e(labels['account_before'])}</th>"
+            f"<th class='val'>{_e(labels['account_drawdown'])}</th>"
+            f"</tr></thead><tbody>{rows}</tbody></table>"
+        )
+    if account.get("clean"):
+        out += f"<p>{_e(labels['account_clean'])}</p>"
+    out += f"<p class='muted'>{_e(labels['account_scope'])}</p>"
+    return out
+
+
 def _timing_fact(share: float, sentence: str) -> str:
     return f"<div class='fact'><b>{share:.0%}</b><p>{_e(sentence)}</p></div>"
 
@@ -2439,6 +2614,11 @@ def render_html(
         *(
             [(labels["live"], _live_html(data.get("live"), locale, labels))]
             if data.get("live")
+            else []
+        ),
+        *(
+            [(labels["account"], _account_html(data.get("account"), labels))]
+            if (data.get("account") or {}).get("status") == "MEASURED"
             else []
         ),
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
