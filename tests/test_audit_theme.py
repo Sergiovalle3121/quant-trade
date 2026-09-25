@@ -817,3 +817,11 @@ def test_an_or_rule_separates_the_report_from_the_curve(tmp_path: Path, locale: 
     rule = f"<div class='or-rule' aria-hidden='true'><span>{word}</span></div>"
     assert page.index("name='report'") < page.index(rule) < page.index("name='equity'")
     assert ".or-rule::before,.or-rule::after{content:''" in STYLE
+
+
+def test_the_side_by_side_tables_fit_a_phone() -> None:
+    from quant_trade.audit.compare import COMPARE_CSS
+
+    # The two report columns keep their badges inside the card at 390 px.
+    assert "@media screen and (max-width:620px){.cmp th,.cmp td{padding:10px 8px}" in COMPARE_CSS
+    assert ".cmp .badge{white-space:nowrap;font-size:.62rem" in COMPARE_CSS

@@ -1784,6 +1784,8 @@ Redesign pass 48 styles the account screens from #205. On sign-up and sign-in, t
 
 Redesign pass 49 checks the upload form after #230 (report first, extras in a closed "Add more files" box) and the pricing line about the optional account; both needed nothing on a phone or desktop. It adds a quiet "or" rule between the platform report and the equity curve, so it reads that one of the two is enough.
 
+Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, two reports picked from "My reports"). On a phone the dimension and figure tables now use tighter cells and smaller badges, so a "Fails" badge in the second report no longer spills past the card. It also checks the fund benchmark block and the plain lines under the headline figures on /ejemplo; both read well and needed nothing.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

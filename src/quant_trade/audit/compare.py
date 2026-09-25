@@ -134,6 +134,11 @@ COMPARE_CSS = (
     "letter-spacing:.08em}.cmp-card p{margin:4px 0 0;font-size:.86rem;color:var(--text-2)}"
     "@media (max-width:620px){.cmp-head{grid-template-columns:minmax(0,1fr)}}"
     ".cmp td.diff{font-weight:600}"
+    # On a phone the two report columns keep their badges inside the card.
+    "@media screen and (max-width:620px){.cmp th,.cmp td{padding:10px 8px}"
+    ".cmp th:first-child,.cmp td:first-child{padding-left:12px;width:42%}"
+    ".cmp .badge{white-space:nowrap;font-size:.62rem;padding:2px 6px;letter-spacing:0}"
+    ".cmp-card{padding:14px;gap:12px}}"
 )
 
 
