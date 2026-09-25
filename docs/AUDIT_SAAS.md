@@ -811,6 +811,19 @@ that open losses do not show. Hidden on fund records, whose own section
 already shows months and time under water. The depth itself is not repeated:
 the summary tiles show it.
 
+### Losing streaks next to chance (`audit/streaks.py`)
+
+The trade statistics put the longest losing run next to the one chance
+gives at the same share of losing trades: the exact distribution of the
+longest run for independent trades (Feller's recurrence), with its median,
+the run reached one time in twenty, and the chance of a run at least as long
+as the observed one. Below 5 % the page adds a plain line that the losses
+came closer together than chance explains, which usually points to losses
+that depend on the kind of market or to positions open at the same time.
+Needs 20 closed trades with losing and other trades, at most 100,000.
+Informational: no flag, no class change. Real-file check (40 files): classes
+and every other figure unchanged; 7 files show the line.
+
 ### How it behaves after losing (`audit/behaviour.py`)
 
 What traders pay a trading journal to tell them, and what a buyer of a robot

@@ -38,6 +38,7 @@ from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
+from quant_trade.audit.streaks import CLUSTERED
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -880,6 +881,16 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "sample_full": "Ver cómo es un informe completo (ejemplo con datos sintéticos)",
         "trade_stats": "Estadísticas de las operaciones",
+        "streak_line": (
+            "Con el mismo porcentaje de perdedoras y en orden al azar, lo normal es una "
+            "racha máxima de {chance} perdedoras seguidas, y 1 de cada 20 historiales "
+            "llega a {rare}. Este historial tuvo {observed}."
+        ),
+        "streak_clustered": (
+            "Las perdedoras llegaron más juntas de lo que el azar explica: una racha así "
+            "sale en menos de 1 de cada 20 órdenes al azar. Suele indicar pérdidas que "
+            "dependen del tipo de mercado o posiciones abiertas a la vez."
+        ),
         "long": "Largos",
         "short": "Cortos",
         "risk": "Riesgo remuestreado a un año",
@@ -1670,6 +1681,16 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "sample_full": "See what a full report looks like (sample built from synthetic data)",
         "trade_stats": "Trade statistics",
+        "streak_line": (
+            "At the same share of losing trades and in random order, the longest losing "
+            "run is typically {chance} in a row, and 1 history in 20 reaches {rare}. "
+            "This history had {observed}."
+        ),
+        "streak_clustered": (
+            "The losses came closer together than chance explains: a run like this shows "
+            "up in fewer than 1 in 20 random orders. It usually points to losses that "
+            "depend on the kind of market, or to positions open at the same time."
+        ),
         "long": "Long",
         "short": "Short",
         "risk": "Resampled one-year risk",
@@ -1862,6 +1883,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "tester_spread": "Spread del probador",
         "max_consecutive_wins": "Máximo de ganadoras seguidas",
         "max_consecutive_losses": "Máximo de perdedoras seguidas",
+        "losing_run_chance": "Racha máxima normal por azar",
+        "losing_run_rare": "Racha máxima por azar, 1 de cada 20",
+        "losing_run_odds": "Probabilidad de una racha así por azar",
         "mean_holding_hours": "Horas medias por operación",
         "median_holding_hours": "Horas medianas por operación",
         "sqn": "SQN",
@@ -1951,6 +1975,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "tester_spread": "Tester spread",
         "max_consecutive_wins": "Most consecutive wins",
         "max_consecutive_losses": "Most consecutive losses",
+        "losing_run_chance": "Typical longest losing run by chance",
+        "losing_run_rare": "Longest losing run by chance, 1 in 20",
+        "losing_run_odds": "Chance of a run this long",
         "mean_holding_hours": "Mean hours per trade",
         "median_holding_hours": "Median hours per trade",
         "trades_per_month": "Trades per month",
@@ -2058,6 +2085,7 @@ PERCENT_KEYS = {
     "p99",
     "point_estimate",
     "largest_win_share",
+    "losing_run_odds",
     "dsr_at_declared",
     "dsr_at_trials_used",
     "percent_gain",
@@ -2841,12 +2869,35 @@ def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str,
     )
 
 
+def _streak_html(stats: dict[str, Any], labels: dict[str, str]) -> str:
+    """The longest losing run next to the one chance gives at the same loss rate."""
+    chance, rare, odds, observed = (
+        stats.get(key) or {}
+        for key in (
+            "losing_run_chance",
+            "losing_run_rare",
+            "losing_run_odds",
+            "max_consecutive_losses",
+        )
+    )
+    if not all(item.get("evidence") == "MEASURED" for item in (chance, rare, odds, observed)):
+        return ""
+    line = labels["streak_line"].format(
+        chance=chance["value"], rare=rare["value"], observed=observed["value"]
+    )
+    out = f"<p>{_e(line)} {_badge('MEASURED')}</p>"
+    if float(odds["value"]) < CLUSTERED:
+        out += f"<p class='live-verdict lv-WEAK'>{_e(labels['streak_clustered'])}</p>"
+    return out
+
+
 def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> str:
     if not stats:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     html_text = _status_line(stats, labels)
     if stats.get("status") != "MEASURED":
         return html_text
+    html_text += _streak_html(stats, labels)
     html_text += _evidence_rows(stats, labels, skip={"long", "short"})
     for side in ("long", "short"):
         if isinstance(stats.get(side), dict):
