@@ -159,3 +159,17 @@ def test_spanish_reports_carry_no_internal_keys() -> None:
         "samples=",
     ):
         assert key not in page.split("<script")[0].replace("id='", ""), key
+
+
+def test_summaries_name_flags_instead_of_codes() -> None:
+    from quant_trade.audit.redflags import flag_title
+
+    inputs = build_inputs(csv_bytes(positive_drift(300)), DeclaredMetadata(locale="en"))
+    result = run_audit(inputs, now=NOW, audit_id="f1", bootstrap_samples=50)
+    codes = [flag["code"] for flag in result.red_flags]
+    assert "ZERO_DECLARED_COSTS" in codes
+    summary = result.verdict.summary
+    assert "ZERO_DECLARED_COSTS" not in summary
+    assert flag_title("ZERO_DECLARED_COSTS", "en") in summary
+    page = render_html(result, watermark=False)
+    assert "0 chars" not in page and "No strategy description was written." in page

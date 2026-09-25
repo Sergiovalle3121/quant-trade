@@ -474,6 +474,7 @@ _UI: dict[str, dict[str, Any]] = {
         "skip": "Saltar al contenido",
         "nav_how": "Cómo funciona",
         "nav_sample": "Ejemplo",
+        "footer_sample_pdf": "Ejemplo en PDF",
         "nav_pricing": "Precios",
         "nav_guides": "Guías",
         "nav_faq": "Preguntas",
@@ -648,6 +649,7 @@ _UI: dict[str, dict[str, Any]] = {
         "skip": "Skip to content",
         "nav_how": "How it works",
         "nav_sample": "Sample",
+        "footer_sample_pdf": "Sample as PDF",
         "nav_pricing": "Pricing",
         "nav_guides": "Guides",
         "nav_faq": "FAQ",
@@ -981,6 +983,7 @@ def _footer(locale: str) -> str:
     product = (
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
         f"<li><a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a></li>"
+        f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
         f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"

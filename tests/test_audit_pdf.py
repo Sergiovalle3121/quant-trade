@@ -112,3 +112,9 @@ def test_the_sample_report_downloads_as_pdf(tmp_path: Path) -> None:
         assert response.status_code == 200
         assert response.content.startswith(b"%PDF")
         assert response.headers["content-disposition"].startswith("attachment")
+
+
+def test_the_footer_links_the_sample_pdf(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    assert "href='/ejemplo.pdf'" in client.get("/").text
+    assert "href='/sample.pdf'" in client.get("/en").text

@@ -14,6 +14,7 @@ report that fails the guard is a bug in this module, not a report.
 from __future__ import annotations
 
 import html
+import re
 from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -107,6 +108,8 @@ LABELS: dict[str, dict[str, str]] = {
         "detail": "Detalle",
         "warnings": "Avisos de lectura",
         "client_text": "Descripción del cliente",
+        "client_text_none": "No se escribió una descripción de la estrategia.",
+        "chars": "{n} caracteres",
         "client_text_note": (
             "La descripción no se reproduce en este informe; consta en el JSON. Expresiones de "
             "promesa de resultados detectadas en ella"
@@ -135,6 +138,20 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_code": "¿No tienes código? Pídelo aquí",
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
+        "reading": "Lectura de tu archivo",
+        "reading_intro": (
+            "Antes de analizar nada, volvimos a contar tus operaciones fila por fila y lo "
+            "comparamos con el resumen que imprime tu plataforma."
+        ),
+        "reading_platform": "Tu plataforma",
+        "reading_rows": "Leído de las filas",
+        "reading_ok": "Coincide",
+        "reading_bad": "No coincide",
+        "reading_all_ok": "Todo coincide: el análisis parte de los mismos números que ves tú.",
+        "reading_some_bad": (
+            "Algo no coincide. Revisa los avisos de lectura más abajo y, si crees que leímos "
+            "mal tu archivo, escríbenos con el identificador del informe."
+        ),
         "boot_line": "Bootstrap estacionario por bloques, remuestreos:",
         "boot_block": "bloque",
         "point": "Estimación",
@@ -280,6 +297,8 @@ LABELS: dict[str, dict[str, str]] = {
         "detail": "Detail",
         "warnings": "Parse warnings",
         "client_text": "Client description",
+        "client_text_none": "No strategy description was written.",
+        "chars": "{n} characters",
         "client_text_note": (
             "The description is not reproduced here; it is in the JSON. Result-promise "
             "expressions detected in it"
@@ -308,6 +327,20 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_code": "No code yet? Ask for one here",
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
+        "reading": "How your file was read",
+        "reading_intro": (
+            "Before analysing anything, we re-counted your trades row by row and compared "
+            "them with the summary your platform prints."
+        ),
+        "reading_platform": "Your platform",
+        "reading_rows": "Read from the rows",
+        "reading_ok": "Matches",
+        "reading_bad": "Does not match",
+        "reading_all_ok": "Everything matches: the analysis starts from the same numbers you see.",
+        "reading_some_bad": (
+            "Something does not match. Check the reading notes further down and, if you think "
+            "your file was misread, write to us with the report id."
+        ),
         "boot_line": "Stationary block bootstrap, resamples:",
         "boot_block": "block",
         "point": "Estimate",
@@ -522,6 +555,11 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dsr_at_trials_used": "DSR at the trials used",
         "trials_to_half": "Trials that bring DSR to 0.5",
         "trials_used": "Trials used",
+        "trials": "Trials",
+        "observations": "Observations",
+        "sharpe": "Sharpe",
+        "sortino": "Sortino",
+        "sqn": "SQN",
         "skewness": "Skewness",
         "kurtosis": "Kurtosis",
         "floor": "Sampling-error floor",
@@ -1315,6 +1353,63 @@ def _short_time(stamp: str) -> str:
     return f"{stamp[:10]} {stamp[11:16]} UTC" if len(stamp) >= 16 else stamp
 
 
+#: Totals a platform prints that the audit re-counts from the file's rows:
+#: ``(metadata key, trade-stats key, tolerance, is a count)``. The profit
+#: factor is left out: platforms count commission and swap in it differently.
+READING_CHECKS: tuple[tuple[str, str, float, bool], ...] = (
+    ("declared_total_trades", "trade_count", 0.5, True),
+    ("declared_total_net_profit", "net_pnl", 0.011, False),
+)
+
+
+def _lead_number(text: object) -> float | None:
+    """The first number in a platform figure such as ``'1 279.20 (38.80%)'``."""
+    match = re.match(r"\s*(-?[\d\s]+(?:\.\d+)?)", str(text or ""))
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace(" ", "").replace("\u00a0", ""))
+    except ValueError:
+        return None
+
+
+def _reading_rows(data: dict[str, Any]) -> list[tuple[str, float, float, bool]]:
+    """``(label key, platform value, value read from the rows, matches)``."""
+    meta = (data.get("inputs") or {}).get("report_metadata") or {}
+    stats = data.get("trade_stats") or {}
+    rows = []
+    for meta_key, stat_key, tolerance, _count in READING_CHECKS:
+        declared = _lead_number(meta.get(meta_key))
+        measured = _ev_value(stats.get(stat_key))
+        if declared is None or measured is None:
+            continue
+        rows.append((stat_key, declared, measured, abs(declared - measured) <= tolerance))
+    return rows
+
+
+def _reading_html(data: dict[str, Any], labels: dict[str, str]) -> str:
+    """Did the audit read the file the way the platform did? Shown before
+    payment too: these are the customer's own totals, re-counted."""
+    rows = _reading_rows(data)
+    if not rows:
+        return ""
+    body = "".join(
+        f"<tr><td>{_e(_key_label(key, labels))}</td>"
+        f"<td>{_e(f'{declared:,.0f}' if key == 'trade_count' else f'{declared:,.2f}')}</td>"
+        f"<td>{_e(f'{measured:,.0f}' if key == 'trade_count' else f'{measured:,.2f}')}</td>"
+        f"<td><span class='badge {'PASS' if ok else 'FAIL'}'>"
+        f"{_e(labels['reading_ok'] if ok else labels['reading_bad'])}</span></td></tr>"
+        for key, declared, measured, ok in rows
+    )
+    all_ok = all(ok for *_, ok in rows)
+    return (
+        f"<p class='muted'>{_e(labels['reading_intro'])}</p>"
+        f"<table><tr><th></th><th>{_e(labels['reading_platform'])}</th>"
+        f"<th>{_e(labels['reading_rows'])}</th><th></th></tr>{body}</table>"
+        f"<p class='muted'>{_e(labels['reading_all_ok' if all_ok else 'reading_some_bad'])}</p>"
+    )
+
+
 def _only_unmeasured(body: str) -> bool:
     """True when a section has nothing but NOT_MEASURED marks to show."""
     return "badge NOT_MEASURED" in body and not any(
@@ -1455,11 +1550,15 @@ def render_html(
     declared_html = _evidence_rows(data["declared"], labels, skip=set())
     description = data["declared"].get("description", "")
     findings = data.get("client_text_findings", [])
-    declared_html += (
-        f"<p class='muted'>{_e(labels['client_text'])}: {len(description)} chars, sha256 "
-        f"<code>{_e(sha256_of_text(description))}</code>. {_e(labels['client_text_note'])}: "
-        f"{len(findings)}.</p>"
-    )
+    if description:
+        declared_html += (
+            f"<p class='muted'>{_e(labels['client_text'])}: "
+            f"{_e(labels['chars'].format(n=len(description)))}, sha256 "
+            f"<code>{_e(sha256_of_text(description))}</code>. {_e(labels['client_text_note'])}: "
+            f"{len(findings)}.</p>"
+        )
+    else:
+        declared_html += f"<p class='muted'>{_e(labels['client_text_none'])}</p>"
 
     sens = data["multiplicity"].get("sensitivity", [])
     sens_html = ""
@@ -1771,7 +1870,9 @@ def render_html(
         + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
+    reading_html = _reading_html(data, labels)
     sections = [
+        section(labels["reading"], reading_html, "r-reading") if reading_html else "",
         section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
         section(labels["meaning"], _meaning_html(verdict, locale), "r-meaning"),
         section(labels["charts"], _charts_html(data, locale), "r-charts"),

@@ -272,6 +272,15 @@ optimisation export, variants in a vectorbt report); the latter is tagged
 MEASURED. `TRIALS_BELOW_VARIANTS` warns when the declaration is lower; it
 stays silent when the customer left trials blank, since nothing was declared.
 
+File reading check ("Lectura de tu archivo"): when the uploaded report
+prints its own totals (MT5 Tester: Total Trades, Total Net Profit), the report
+opens with a table comparing them to what the audit re-counted from the rows
+(`report.READING_CHECKS`: trades exactly, net result to the cent) and says
+"Coincide" or "No coincide". It is shown before payment too: these are the
+customer's own totals. The profit factor is left out because platforms treat
+commission and swap in it differently. A mismatch points to the reading notes
+and to the refund promise's contact route.
+
 PDF download: an unlocked report (paid, or any report in free mode) offers
 "Descargar el informe en PDF" at `/audits/{id}/pdf?token=…`, a locked one
 answers 402. `audit/pdf.py` lays out the same report page with WeasyPrint
