@@ -25,6 +25,7 @@ import hmac
 import ipaddress
 import json
 import logging
+import os
 import re
 import secrets
 import threading
@@ -285,6 +286,9 @@ UPLOAD_ATTEMPTS_PER_UPLOAD = 3
 WAITLIST_PER_HOUR_PER_IP = 5
 #: Room for the form fields and multipart boundaries on top of the files.
 FORM_OVERHEAD_BYTES = 1 << 20
+#: How long a PDF download waits for a free render slot before the busy
+#: page: two customers (or one double click) must not get an error.
+PDF_WAIT_SECONDS = 25.0
 #: How many upload fields ``POST /audits`` takes.
 UPLOAD_FIELDS = 6
 
@@ -442,6 +446,30 @@ class BodyTooLarge(Exception):
     """The request body passed the service's limit while it was being read."""
 
 
+class HeadAsGetMiddleware:
+    """Answer ``HEAD`` like ``GET`` with the body left out.
+
+    Link-preview bots (WhatsApp, Slack, Facebook) and uptime monitors often
+    probe a page with ``HEAD`` first; FastAPI routes answer only ``GET``, so
+    they got a 405 and could drop the preview.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http" or scope.get("method") != "HEAD":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_headers_only(message: Any) -> None:
+            if message.get("type") == "http.response.body":
+                message = {**message, "body": b""}
+            await send(message)
+
+        await self.app({**scope, "method": "GET"}, receive, send_headers_only)
+
+
 class BodyLimitMiddleware:
     """Refuse a request body over ``limit`` bytes before anything spools it.
 
@@ -593,6 +621,17 @@ def _client_ip(request: Any, trusted_proxy_hops: int) -> str:
     )
 
 
+_COMMIT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def deployed_version(environ: Any = None) -> str:
+    """The short commit this process runs, from ``RAILWAY_GIT_COMMIT_SHA``
+    (set by Railway on every deploy), or ``unknown`` off Railway."""
+    env = os.environ if environ is None else environ
+    sha = str(env.get("RAILWAY_GIT_COMMIT_SHA", "")).strip().lower()
+    return sha[:7] if _COMMIT_SHA.match(sha) else "unknown"
+
+
 def _wants_json(request: Any) -> bool:
     return "application/json" in request.headers.get("accept", "")
 
@@ -712,6 +751,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return _secure(response, path=scope.get("path", ""))
 
     app.add_middleware(BodyLimitMiddleware, limit=body_limit, reject=_too_large_response)
+    app.add_middleware(HeadAsGetMiddleware)
 
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
@@ -807,6 +847,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "database": cfg.database_kind,
             "legal_configured": cfg.legal_configured,
             "auto_purge": cfg.auto_purge,
+            "version": deployed_version(),
         }
 
     @app.get(PANEL_PATH, response_class=HTMLResponse)
@@ -1169,7 +1210,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale=locale,
         )
         try:
-            content = pdf_lib.report_pdf(page, audit_id=record.id, locale=locale)
+            content = pdf_lib.report_pdf(
+                page, audit_id=record.id, locale=locale, wait_seconds=PDF_WAIT_SECONDS
+            )
         except pdf_lib.PdfBusy:
             return _html_error(request, 503, message("pdf_busy", locale), locale)
         except pdf_lib.PdfUnavailable:
@@ -1387,7 +1430,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 try:
                     sample_pdfs[locale] = pdf_lib.report_pdf(
-                        page, audit_id="ejemplo" if locale == "es" else "sample", locale=locale
+                        page,
+                        audit_id="ejemplo" if locale == "es" else "sample",
+                        locale=locale,
+                        wait_seconds=PDF_WAIT_SECONDS,
                     )
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(

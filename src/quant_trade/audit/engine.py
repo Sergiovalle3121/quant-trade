@@ -582,10 +582,10 @@ def _safe_text(text: str) -> str:
 def _trade_stats(inputs: AuditInputs) -> dict[str, Any]:
     if inputs.trades is None:
         return {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    # A net credit (swap paid to the account) counts too, so the net result
+    # matches the platform's; the stress tests keep only costs (stricter).
     fees = -sum(value for value in inputs.reported_fees.values())
-    stats = analytics.trade_statistics(
-        inputs.trades.trades, inputs.trades.sides, fees_total=max(fees, 0.0)
-    )
+    stats = analytics.trade_statistics(inputs.trades.trades, inputs.trades.sides, fees_total=fees)
     return {"status": "MEASURED", **stats}
 
 

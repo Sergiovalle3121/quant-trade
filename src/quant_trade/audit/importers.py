@@ -107,6 +107,12 @@ DEFAULT_INITIAL_BALANCE = 10_000.0
 #: A workbook may not inflate past this many bytes, nor hold more members.
 MAX_XLSX_UNCOMPRESSED_BYTES = 40_000_000
 MAX_XLSX_MEMBERS = 500
+#: Cells past this column are ignored (platform exports use a few dozen),
+#: and a sheet may not spread past this many cells once its rows are laid
+#: out: a single cell at column ZZZZZZ would otherwise ask for a row of
+#: hundreds of millions of empty cells.
+MAX_XLSX_COLUMNS = 256
+MAX_XLSX_CELLS = 5_000_000
 
 FLOATING_DRAWDOWN_WARNING = (
     "the balance curve is built from closed trades only; it does not show floating "
@@ -202,7 +208,8 @@ def _looks_utf16(data: bytes) -> str | None:
 
 
 def decode_text(data: bytes) -> str:
-    """Decode by BOM, then strict UTF-8, then BOM-less UTF-16, then cp1252."""
+    """Decode by BOM, then BOM-less UTF-16, then strict UTF-8, then cp1251
+    when Russian report words appear, then cp1252."""
     if data.startswith(b"\xef\xbb\xbf"):
         return data[3:].decode("utf-8", errors="replace")
     if data.startswith(b"\xff\xfe"):
@@ -216,10 +223,27 @@ def decode_text(data: bytes) -> str:
         return data.decode("utf-8")
     except UnicodeDecodeError:
         pass
+    if _looks_cp1251(data):
+        return data.decode("cp1251", errors="replace")
     try:
         return data.decode("cp1252")
     except UnicodeDecodeError:
         return data.decode("latin-1")
+
+
+#: Words a Russian MetaTrader report prints in its summary. A terminal set
+#: to Russian writes the MT4 tester report in cp1251 without declaring it, and
+#: read as cp1252 those words become unreadable symbols.
+_CYRILLIC_MARKERS = ("Символ", "Период", "Начальный депозит", "Всего сделок", "Прибыль")
+
+
+def _looks_cp1251(data: bytes) -> bool:
+    """Whether BOM-less, non-UTF-8 bytes are Cyrillic text in cp1251."""
+    try:
+        text = data.decode("cp1251")
+    except UnicodeDecodeError:
+        return False
+    return any(marker in text for marker in _CYRILLIC_MARKERS)
 
 
 _NUMBER_NOISE = re.compile(r"[\s  $€£¥%]")
@@ -700,8 +724,12 @@ _MT4_TYPES = {
     "buy stop",
     "sell stop",
     "delete",
+    "swap close",
+    "swap open",
 }
-_MT4_CLOSES = {"close", "t/p", "s/l", "close at stop", "close by"}
+#: "swap close" / "swap open": some brokers close every position at rollover
+#: and reopen it under a new ticket; MetaTrader counts the close as a trade.
+_MT4_CLOSES = {"close", "t/p", "s/l", "close at stop", "close by", "swap close"}
 
 
 def _is_mt4_tester_row(texts: list[str]) -> bool:
@@ -1128,37 +1156,79 @@ def _period_dates(value: str) -> tuple[str, str] | None:
 #: Summary labels by the English name the parsers use. Older builds and other
 #: terminal languages print other words for the same figure: the Russian
 #: names come from a real Russian report, the Spanish ones from the Spanish
-#: MetaTrader 5 help ("Informe de simulación") and from real Spanish and
-#: Italian tester reports (docs/research/audit_iteration4/mt_languages_check.md), matched
-#: without case.
+#: MetaTrader 5 help ("Informe de simulación") and from real Spanish,
+#: Italian, Portuguese, Chinese and Czech reports
+#: (docs/research/audit_iteration4/mt_languages_check.md), matched without case.
 _MT5_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
-    "Expert": ("Советник", "Asesor", "Asesor Experto", "Experto"),
-    "Symbol": ("Символ", "Símbolo", "Simbolo"),
-    "Period": ("Период", "Período", "Periodo", "Periodo"),
-    "Company": ("Broker", "Брокер", "Компания", "Compañía", "Empresa", "Corredor", "Società"),
-    "Currency": ("Валюта", "Divisa", "Moneda", "Valuta"),
-    "Initial Deposit": ("Начальный депозит", "Depósito inicial", "Deposito Iniziale"),
-    "Leverage": ("Плечо", "Apalancamiento", "Leva"),
-    "History Quality": ("Качество истории", "Calidad del historial", "Qualità dello Storico"),
-    "Total Net Profit": ("Net profit", "Чистая прибыль", "Beneficio Neto", "Profitto Totale Netto"),
+    "Expert": ("Советник", "Asesor", "Asesor Experto", "Experto", "Expert Advisor (Robô)", "专家"),
+    "Symbol": ("Символ", "Símbolo", "Simbolo", "Ativo", "交易品种"),
+    "Period": ("Период", "Período", "Periodo", "Periodo", "期间"),
+    "Company": (
+        "Broker",
+        "Брокер",
+        "Компания",
+        "Compañía",
+        "Empresa",
+        "Corredor",
+        "Società",
+        "公司",
+        "交易商",
+        "Firma",
+    ),
+    "Currency": ("Валюта", "Divisa", "Moneda", "Valuta", "Moeda", "货币"),
+    "Initial Deposit": ("Начальный депозит", "Depósito inicial", "Deposito Iniziale", "初始入金"),
+    "Leverage": ("Плечо", "Apalancamiento", "Leva", "Alavancagem", "杠杆"),
+    "History Quality": (
+        "Качество истории",
+        "Calidad del historial",
+        "Qualità dello Storico",
+        "Qualidade do histórico",
+        "质量历史",
+    ),
+    "Total Net Profit": (
+        "Net profit",
+        "Чистая прибыль",
+        "Beneficio Neto",
+        "Profitto Totale Netto",
+        "Lucro Líquido Total",
+        "总净盈利",
+        "總淨盈利",
+        "Čistý zisk celkem",
+    ),
     "Total Trades": (
         "Всего трейдов",
         "Total de Trades",
         "Total de operaciones ejecutadas",
         "Numero di Operazioni di Trading Totali",
+        "Total de Negociações",
+        "交易总计",
+        "交易總計",
+        "Všechny transakce",
     ),
-    "Total Deals": ("Всего сделок", "Total de transacciones", "Affari Totali"),
+    "Total Deals": (
+        "Всего сделок",
+        "Total de transacciones",
+        "Affari Totali",
+        "Ofertas Total",
+        "总成交",
+    ),
     "Balance Drawdown Maximal": (
         "Максимальная просадка по балансу",
         "Reducción Máxima del Saldo",
         "Reducción máxima del balance",
         "Bilancio Drawdown Massimo",
+        "Rebaixamento Máximo do Saldo",
+        "最大结余亏损",
+        "最大本日餘額虧損",
+        "Maximální ztráta na zůstatku od lokálního maxima",
     ),
     "Equity Drawdown Maximal": (
         "Максимальная просадка по средствам",
         "Reducción máxima del capital",
         "Reducción máxima de la equidad",
         "Equità Drawdown Massima",
+        "Rebaixamento Máximo do Capital Líquido",
+        "最大净值亏损",
     ),
     "Equity Drawdown Relative": (
         "Relative equity drawdown",
@@ -1166,19 +1236,31 @@ _MT5_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
         "Reducción relativa del capital",
         "Reducción relativa de la equidad",
         "Equità Drawdown Relativa",
+        "Rebaixamento Relativo do Capital Líquido",
+        "相对净值亏损",
     ),
     "Sharpe Ratio": (
         "Коэффициент Шарпа",
         "Ratio de Sharpe",
         "El Ratio de Sharpe",
         "Indice di Sharpe",
+        "Índice de Sharpe",
+        "夏普比率",
+        "Sharpeho poměr",
     ),
     "Profit Factor": (
         "Прибыльность",
         "Factor de Rentabilidad",
         "Factor de Beneficio",
         "Fattore di Profitto",
+        "Fator de Lucro",
+        "盈利因子",
+        "Ukazatel zisku",
     ),
+    "Account": ("Cuenta", "Conta", "Conto", "Счет", "帳戶", "账户", "Účet"),
+    "Date": ("Fecha", "Data", "Дата", "日期", "Datum"),
+    "Equity": ("權益數", "Majetek"),
+    "Floating P/L": ("浮動 P/L", "Pohyblivý P/L"),
 }
 
 
@@ -1380,6 +1462,11 @@ def _parse_mt5_history(reader: _TableReader) -> _Draft:
                 f"the Deals table charges {fee_total:,.2f} in fees that the Positions table "
                 "does not itemise per trade; they are in the balance curve only"
             )
+        # MetaTrader counts every closing deal as a trade, so a position
+        # closed in two parts is one row here and two in "Total Trades".
+        closing = sum(1 for deal in trade_deals if deal.direction in {"out", "out_by"})
+        if closing:
+            draft.metadata["closing_deals"] = str(closing)
         open_positions = _count_opened_not_closed(trade_deals, positions)
         if open_positions:
             draft.warnings.append(
@@ -1400,6 +1487,11 @@ def _parse_mt5_history(reader: _TableReader) -> _Draft:
     inside = re.search(r"\(([^)]*)\)", account)
     if inside is not None:
         parts = [part.strip() for part in inside.group(1).split(",")]
+        # Newer terminals put the leverage after the currency: (USD, 1:500, ...).
+        leverage = [part for part in parts if re.fullmatch(r"1:\d+", part)]
+        if leverage:
+            draft.metadata["leverage"] = leverage[0]
+            parts = [part for part in parts if part not in leverage]
         if parts and re.fullmatch(r"[A-Z]{3,4}", parts[0]):
             draft.currency = parts[0]
         if len(parts) >= 2:
@@ -1455,13 +1547,42 @@ _MT4_LABELS = {
 }
 
 
+#: The same summary labels as terminals set to other languages print them,
+#: from real public reports (docs/research/audit_iteration4/mt_languages_check.md).
+_MT4_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
+    "Symbol": ("Символ", "Ativo"),
+    "Period": ("Период", "Período"),
+    "Model": ("Модель", "Modelo"),
+    "Parameters": ("Параметры", "Parâmetros"),
+    "Modelling quality": ("Качество моделирования", "Qualidade do modelamento"),
+    "Mismatched charts errors": (
+        "Ошибки рассогласования графиков",
+        "Erros de gráficos incompatíveis",
+    ),
+    "Spread": ("Спред",),
+    "Initial deposit": ("Начальный депозит", "Depósito Inicial"),
+    "Total net profit": ("Чистая прибыль", "Lucro líquido total"),
+    "Total trades": ("Всего сделок", "Total de negociações"),
+    "Maximal drawdown": ("Максимальная просадка", "Rebaixamento Máximo"),
+    "Relative drawdown": ("Относительная просадка", "Rebaixamento Relativo"),
+    "Profit factor": ("Прибыльность", "Fator de lucro"),
+}
+_MT4_ENGLISH = {
+    alias.lower(): english
+    for english, aliases in _MT4_LABEL_ALIASES.items()
+    for alias in (english, *aliases)
+}
+
+
 def _mt4_pairs(rows: list[_Row]) -> dict[str, str]:
+    """Summary label → value, under the English label whatever the language."""
     found: dict[str, str] = {}
     for row in rows:
         texts = row.texts
         for index in range(len(texts) - 1):
-            if texts[index] in _MT4_LABELS:
-                found.setdefault(texts[index], texts[index + 1])
+            english = _MT4_ENGLISH.get(texts[index].strip().lower())
+            if english is not None:
+                found.setdefault(english, texts[index + 1])
     return found
 
 
@@ -1482,6 +1603,11 @@ def _parse_mt4_tester(reader: _TableReader) -> _Draft:
     unpaired = 0
     linked = 0
     forced = 0
+    # Sides of positions closed at rollover, reopened in order by "swap open".
+    rolled: list[str] = []
+    # Tickets a partial close left open: MT4 moves the rest to a new ticket,
+    # printed as a "buy"/"sell" row at the close's time and the entry price.
+    partial: list[tuple[_Mt4Ticket, datetime]] = []
     for row in reader.rows:
         texts = row.texts
         if not _is_mt4_tester_row(texts):
@@ -1496,9 +1622,29 @@ def _parse_mt4_tester(reader: _TableReader) -> _Draft:
             continue
         if kind in {"buy", "sell"}:
             if order not in tickets:
-                tickets[order] = _Mt4Ticket(
-                    "long" if kind == "buy" else "short", size, price, moment
+                side = "long" if kind == "buy" else "short"
+                rest = next(
+                    (
+                        old
+                        for old, at in partial
+                        if at == moment
+                        and old.side == side
+                        and abs(old.volume - size) <= _EPS
+                        and abs(old.price - price) <= _EPS * max(1.0, abs(price))
+                    ),
+                    None,
                 )
+                if rest is not None:
+                    tickets[order] = _Mt4Ticket(side, size, rest.price, rest.time)
+                    rest.volume = 0.0
+                else:
+                    tickets[order] = _Mt4Ticket(side, size, price, moment)
+            continue
+        if kind == "swap open":
+            if rolled and order not in tickets:
+                tickets[order] = _Mt4Ticket(rolled.pop(0), size, price, moment)
+            else:
+                draft.invalid_rows += 1
             continue
         if kind not in _MT4_CLOSES:
             continue
@@ -1522,6 +1668,10 @@ def _parse_mt4_tester(reader: _TableReader) -> _Draft:
                 continue
         take = min(size, ticket.volume)
         ticket.volume -= take
+        if ticket.volume > _EPS:
+            partial.append((ticket, moment))
+        if kind == "swap close":
+            rolled.append(ticket.side)
         draft.trips.append(
             _Trip(
                 symbol=_mt4_symbol(pairs.get("Symbol", "")),
@@ -1771,9 +1921,12 @@ def _local(tag: str) -> str:
 
 
 def _column_index(reference: str) -> int:
-    letters = re.match(r"[A-Z]+", reference.upper())
+    letters = re.match(r"[A-Z]+", reference[:8].upper())
     if letters is None:
         return -1
+    if len(letters.group(0)) > 3:
+        # Past XFD, Excel's last column: never a real cell.
+        return 26**4
     index = 0
     for char in letters.group(0):
         index = index * 26 + (ord(char) - 64)
@@ -1866,6 +2019,7 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
 
 def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]]:
     rows: list[list[Any]] = []
+    cells = 0
     for row in sheet.iter():
         if _local(row.tag) != "row":
             continue
@@ -1877,6 +2031,8 @@ def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]
             reference = cell.get("r")
             index = _column_index(reference) if reference else next_index
             next_index = index + 1
+            if not 0 <= index < MAX_XLSX_COLUMNS:
+                continue
             kind = cell.get("t", "n")
             raw = next((child.text for child in cell if _local(child.tag) == "v"), None)
             value: Any
@@ -1894,6 +2050,9 @@ def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]
             values[index] = value
         if values:
             width = max(values) + 1
+            cells += width
+            if cells > MAX_XLSX_CELLS:
+                raise _xlsx_too_big()
             rows.append([values.get(i) for i in range(width)])
         else:
             rows.append([])
@@ -2858,30 +3017,37 @@ def detect_format(data: bytes, filename: str | None = None) -> str | None:
 
     ``filename`` is only a tie-breaker; the content decides.
     """
+    return _detect(data)[0]
+
+
+def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
+    """The format of ``data`` and, for an HTML report, its parsed tables, so
+    the import reads a large report once instead of twice."""
     if not data:
-        return None
+        return None, None
     if _is_zip(data):
         try:
             sheets = read_xlsx(data)
         except ParseError:
-            return None
+            return None, None
         if any(rows and _is_tradingview_header(rows[0]) for rows in sheets.values()):
-            return TRADINGVIEW_XLSX
+            return TRADINGVIEW_XLSX, None
         workbook = _mt5_workbook(sheets)
-        return workbook[0] if workbook is not None else None
+        return (workbook[0] if workbook is not None else None), None
     text = decode_text(data)
     stripped = text.lstrip()
     if stripped.startswith("<?xml") or stripped[:200].lower().startswith("<workbook"):
         if _is_optimization_xml(text):
-            return MT5_OPTIMIZATION_XML
-        return None
+            return MT5_OPTIMIZATION_XML, None
+        return None, None
     lowered = stripped[:4000].lower()
     if "<html" in lowered or "<table" in lowered or "<!doctype html" in lowered:
-        return _html_format(_read_html(text))
+        reader = _read_html(text)
+        return _html_format(reader), reader
     header, _, _ = _read_delimited(text)
     if header:
-        return _table_format(header)
-    return None
+        return _table_format(header), None
+    return None, None
 
 
 def import_report(
@@ -2911,7 +3077,7 @@ def import_report(
         )
         workbook_draft.source_format = workbook_format
         return _assemble(workbook_draft, initial_balance)
-    source_format = detect_format(data, filename)
+    source_format, html_reader = _detect(data)
     if source_format == MT5_OPTIMIZATION_XML:
         raise ReportFormatError(
             "optimization_file",
@@ -2930,7 +3096,7 @@ def import_report(
         )
     draft: _Draft
     if source_format in {MT5_TESTER_HTML, MT5_HISTORY_HTML, MT4_TESTER_HTML, MT4_STATEMENT_HTML}:
-        reader = _read_html(decode_text(data))
+        reader = html_reader if html_reader is not None else _read_html(decode_text(data))
         parser = {
             MT5_TESTER_HTML: _parse_mt5_tester,
             MT5_HISTORY_HTML: _parse_mt5_history,

@@ -29,9 +29,12 @@ def test_too_few_observations_fail_and_warn() -> None:
 
 
 def test_non_positive_equity() -> None:
-    frame = positive_drift(200)
-    frame.loc[50, "equity"] = 0.0
-    assert _codes(frame)["NON_POSITIVE_EQUITY"] == "FAIL"
+    # An upload with such a row is refused before the audit
+    # (``equity_not_positive``); the flag still guards a series built directly.
+    series = parse_equity_csv(csv_bytes(positive_drift(200)))
+    series.frame.loc[50, "equity"] = 0.0
+    flags = redflags.scan(series, periods_per_year=252.0, declared=DECLARED)
+    assert {flag.code: flag.severity for flag in flags}["NON_POSITIVE_EQUITY"] == "FAIL"
 
 
 def test_duplicates_and_order() -> None:

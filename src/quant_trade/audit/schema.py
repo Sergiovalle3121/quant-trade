@@ -372,6 +372,8 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         elif values.abs().median() > 0.5:
             values = values / 100.0
             warnings.append("returns look like percentages (median |r| > 0.5); divided by 100")
+    # "inf" and "1e400" read as numbers but are not values an account can hold.
+    values = values.where(np.isfinite(values.astype(float)))
     frame = pd.DataFrame({"timestamp": timestamps, "value": values})
     unparseable = int(frame.isna().any(axis=1).sum())
     frame = frame.dropna()
@@ -386,6 +388,32 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
             f"the {what} file has fewer than two usable rows",
             message_es=f"El archivo {_file_es(what)} tiene menos de dos filas utilizables.",
             code="too_few_rows",
+        )
+
+    values = frame["value"].astype(float)
+    bad = values <= 0 if source == "equity" else values <= -1
+    if bool(bad.any()):
+        when = frame.loc[bad.idxmax(), "timestamp"].strftime("%Y-%m-%d")
+        if source == "equity":
+            raise ParseError(
+                f"the {what} file reaches zero or a negative value on {when}; the audit needs "
+                "the account balance (for example 10000 growing to 12500), not a cumulative "
+                "profit that starts at 0",
+                message_es=(
+                    f"El archivo {_file_es(what)} llega a cero o a un valor negativo el {when}; "
+                    "la auditoría necesita el saldo de la cuenta (por ejemplo 10000 que sube a "
+                    "12500), no la ganancia acumulada que empieza en 0."
+                ),
+                code="equity_not_positive",
+            )
+        raise ParseError(
+            f"the {what} file has a return of -100 % or worse on {when}, which would leave "
+            "the account at zero or below",
+            message_es=(
+                f"El archivo {_file_es(what)} tiene un retorno de -100 % o peor el {when}, "
+                "lo que dejaría la cuenta en cero o menos."
+            ),
+            code="return_below_total_loss",
         )
 
     if source == "equity":

@@ -176,7 +176,7 @@ def test_drawdown_risk_hand_checked_constant_loss() -> None:
 
 def test_drawdown_risk_caps_resampled_cells() -> None:
     returns = _daily_returns(200)
-    risk = analytics.drawdown_risk(returns, periods_per_year=100_000, samples=5000, seed=0)
+    risk = analytics.drawdown_risk(returns, periods_per_year=9_000, samples=5000, seed=0)
     assert risk["method"]["samples"] < 5000
     assert risk["method"]["samples_requested"] == 5000
 
