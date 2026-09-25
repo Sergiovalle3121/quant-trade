@@ -1261,3 +1261,13 @@ def test_contract_sizes_never_read_in_scientific_notation(size: float, shown: st
     from quant_trade.audit.importers import _size_text
 
     assert _size_text(size) == shown
+
+
+def test_mt5_symbols_keep_the_file_s_case() -> None:
+    # A broker suffix like ".m" is shown as the file writes it, not uppercased.
+    deals = [
+        ("2024.01.02 09:00:00", "EURUSD.m", "buy", "in", 0.1, 1.1000, 0.0),
+        ("2024.01.02 10:00:00", "EURUSD.m", "sell", "out", 0.1, 1.1010, 10.0),
+    ]
+    report = import_report(_mt5_deals_report(deals))
+    assert report.symbols == ["EURUSD.m"]

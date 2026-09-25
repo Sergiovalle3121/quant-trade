@@ -693,6 +693,9 @@ Instrument names come from the file, so a name the profit-claim guard
 refuses (here and in the live comparison's new-symbols note) is shown as
 withheld promotional wording, like report metadata, instead of stopping the
 audit with an error page.
+Names keep the file's own case (a broker suffix like `EURUSD.m` is not
+uppercased); trades are grouped regardless of case, and a row shows the
+name as the file first writes it.
 
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
