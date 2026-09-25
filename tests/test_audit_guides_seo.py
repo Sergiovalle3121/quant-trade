@@ -143,11 +143,13 @@ def test_upload_form_and_landing_link_the_guides(tmp_path: Path) -> None:
 
 def test_error_pages_link_the_guides(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    files = {"report": ("x.csv", b"a,b\n1,2\n", "text/csv")}
-    response = client.post("/audits", files=files, data={"trials": "1", "consent": "on"})
-    assert response.status_code == 400
-    assert f"href='{guides_index_url('es')}'" in response.text
-    assert _meta(response.text, "robots") == "noindex, nofollow"
+    # An unknown table gets the column-naming page; an unreadable file, a refusal.
+    for content, status in ((b"a,b\n1,2\n", 422), (b"\x00\x01garbage", 400)):
+        files = {"report": ("x.csv", content, "text/csv")}
+        response = client.post("/audits", files=files, data={"trials": "1", "consent": "on"})
+        assert response.status_code == status
+        assert f"href='{guides_index_url('es')}'" in response.text
+        assert _meta(response.text, "robots") == "noindex, nofollow"
 
 
 def test_public_pages_have_title_description_canonical_and_open_graph(tmp_path: Path) -> None:

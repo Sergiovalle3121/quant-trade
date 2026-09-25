@@ -2062,3 +2062,29 @@ the audit's other hashes and go with `audit delete ID --yes`. A PDF printed
 again, a screenshot or any re-save never matches.
 
 A fifth audience page, for signal copiers (`/para/copiar-senales`, `/for/signal-copiers`), names the risks a copy-trading percentage hides and points each at a live check: martingale sizing, grid averaging, no sign of a stop loss, many small wins with large losses, many positions open at once, hidden floating drawdown, positions still open at the end, and gains inflated by deposits. It asks for the account's exported history, because a screenshot cannot be audited. The landing keeps its four cards and links the fifth page in a line under them, so `AUDIENCE_PAGES` keeps the four card pages first.
+
+### Naming the columns of a file no importer knows (`audit/mapping.py`)
+
+Some uploads are tables that no importer recognises: `unknown_format`,
+`universal_columns_missing`, a column the customer named that is unreadable
+or missing, or one column chosen twice. For these, the upload now answers
+with HTTP 422 and a page instead of a refusal. The page shows the file's
+header and its first three rows, as read. Each field gets a menu listing the
+file's columns with an example value, preselected with the reader's guess or
+the customer's earlier choice. The page also carries the first upload's form
+fields (starting balance, trials, costs, code, consent), and asks for the same
+file again, because the service keeps no file before auditing it. A JSON
+client gets `{"error", "code", "columns"}`. An HTML report or anything else
+that is not a table keeps the plain error.
+
+Nothing is spent on the mapping step. It is not an audit, so the free first
+report, the month's previews and credits are untouched, which the
+`test_audit_column_mapping_screen.py` tests check.
+
+When a mapped upload succeeds for a signed-in customer, the choice is saved
+in `column_maps`. That table keeps only the account id, the SHA-256 of the
+header's normalised names and the column names. The next upload of a file
+with the same header that the importers do not recognise is read with that
+choice. A recognised format is never overridden. A saved choice that no
+longer reads the file brings the mapping page back, preselected.
+`Store.delete_account` deletes the account's column maps.

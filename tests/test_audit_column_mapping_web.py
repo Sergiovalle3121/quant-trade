@@ -62,7 +62,7 @@ def test_a_journal_nobody_knows_is_audited_with_the_customers_mapping(tmp_path: 
     client = _client(tmp_path)
     files = {"report": ("mi_diario.csv", _own_journal(), "text/csv")}
     refused = client.post("/audits", files=files, data={"consent": "on"})
-    assert refused.status_code == 400
+    assert refused.status_code == 422
     posted = client.post(
         "/audits",
         files=files,
@@ -84,7 +84,7 @@ def test_a_mapped_column_missing_from_the_file_is_named(tmp_path: Path) -> None:
         files=files,
         data={"consent": "on", **MAPPING, "col_profit": "Perdí"},
     )
-    assert answer.status_code == 400
+    assert answer.status_code == 422
     assert "Perdí" in answer.text
 
 
@@ -100,7 +100,7 @@ def test_one_column_chosen_for_two_fields_is_refused_naming_both(tmp_path: Path)
         refused = client.post(
             "/audits", files=files, data={"consent": "on", "locale": locale, **twice}
         )
-        assert refused.status_code == 400
+        assert refused.status_code == 422
         assert words in refused.text
 
 

@@ -38,7 +38,7 @@ from urllib.parse import quote
 
 from pydantic import ValidationError
 
-from quant_trade.audit import account_pages, payments, universal
+from quant_trade.audit import account_pages, mapping, payments, universal
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
@@ -1825,24 +1825,70 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
         }
 
+        # A signed-in customer's column choice is remembered per header.
+        signed_in = _session(request)
+        mapper = signed_in[0].id if signed_in is not None else ""
+        carried = {
+            "locale": loc,
+            "consent": consent,
+            "trials": trials,
+            "cost_bps": cost_bps,
+            "oos_start": oos_start,
+            "description": description,
+            "benchmark_applicable": benchmark_applicable,
+            "challenge": challenge,
+            "initial_balance": initial_balance,
+            "access_code": access_code,
+            "net_of_fees": net_of_fees,
+        }
+
+        def build(columns: dict[str, str] | None) -> Any:
+            return build_inputs(
+                uploads["equity"],
+                declared,
+                trades_bytes=uploads["trades"],
+                benchmark_bytes=uploads["benchmark"],
+                variants_bytes=uploads["variants"],
+                report_bytes=uploads["report"],
+                report_filename=report_filename,
+                optimization_bytes=uploads["optimization"],
+                live_bytes=uploads["live"],
+                live_filename=live_filename,
+                report_columns=columns if uploads["report"] else None,
+            )
+
         def parse_and_audit() -> tuple[str, str, bool] | Response:
             """Parse, audit and store; runs in the thread pool under a slot."""
             try:
-                inputs = build_inputs(
-                    uploads["equity"],
-                    declared,
-                    trades_bytes=uploads["trades"],
-                    benchmark_bytes=uploads["benchmark"],
-                    variants_bytes=uploads["variants"],
-                    report_bytes=uploads["report"],
-                    report_filename=report_filename,
-                    optimization_bytes=uploads["optimization"],
-                    live_bytes=uploads["live"],
-                    live_filename=live_filename,
-                    report_columns=report_columns if uploads["report"] else None,
-                )
+                inputs = build(report_columns or None)
             except ParseError as exc:
-                return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
+                table = (
+                    mapping.read_table(uploads["report"])
+                    if uploads["report"] and exc.code in mapping.MAPPABLE_CODES
+                    else None
+                )
+                if table is None:
+                    return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
+                # The columns this account chose before for the same header.
+                saved = (
+                    mapping.usable_mapping(
+                        mapping.loads(
+                            db.column_map(mapper, mapping.header_signature(table.header))
+                        ),
+                        table,
+                    )
+                    if mapper and not report_columns
+                    else {}
+                )
+                if saved:
+                    try:
+                        inputs = build(saved)
+                    except Exception:
+                        # A saved choice that no longer reads the file is offered again.
+                        logger.info("a saved column mapping did not read the file")
+                        return _mapping_answer(request, table, exc, loc, carried, saved)
+                else:
+                    return _mapping_answer(request, table, exc, loc, carried, report_columns)
             except ValueError:
                 return _html_error(request, 400, message("invalid_upload", loc), loc)
             except Exception:
@@ -1869,6 +1915,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not isinstance(outcome, tuple):
             return outcome
         audit_id, token, paid = outcome
+        if mapper and report_columns and uploads["report"]:
+            table = mapping.read_table(uploads["report"])
+            chosen = mapping.usable_mapping(report_columns, table) if table else {}
+            if table is not None and chosen:
+                db.save_column_map(
+                    mapper, mapping.header_signature(table.header), mapping.dumps(chosen), at=now
+                )
         credit_used = False
         welcomed = False
         if gate_account is not None and not paid and welcome:
@@ -1916,6 +1969,28 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # A random id for this browser: one free full report per browser.
             _cookie(answer, acct.DEVICE_COOKIE, new_device, max_age=acct.DEVICE_DAYS * 86400)
         return answer
+
+    def _mapping_answer(
+        request: Request,
+        table: mapping.Table,
+        exc: ParseError,
+        locale: str,
+        carried: dict[str, str],
+        chosen: dict[str, str],
+    ) -> Response:
+        """A file whose columns were not recognised: its columns and first
+        rows, to name them. Nothing is spent: no preview, no free report."""
+        text = (
+            mapping.COPY[locale]["unknown"]
+            if exc.code == "unknown_format"
+            else _sentence(exc.localized(locale))
+        )
+        if _wants_json(request):
+            return JSONResponse(
+                {"error": text, "code": exc.code, "columns": table.names}, status_code=422
+            )
+        page = mapping.mapping_page(table, text, locale=locale, carried=carried, chosen=chosen)
+        return HTMLResponse(page, status_code=422)
 
     def _gate(request: Request, locale: str, reason: str, status: int) -> Response:
         """The answer to an upload the free tier does not cover."""
