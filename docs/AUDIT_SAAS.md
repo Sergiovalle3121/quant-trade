@@ -725,6 +725,9 @@ to D scale with no class singled out, and the three evidence labels). The
 `AUDIT_BASE_URL` is set; private report pages never get one. Regenerate the
 images with `python tools/make_og_images.py` after changing the headline.
 
+Once a report is chosen, the upload zone turns green, swaps its arrow for a
+check, hides the platform list and shows the file name and size as a pill.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and
