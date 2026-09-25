@@ -269,15 +269,28 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
     section = FUND
     entries: list[tuple[str, Any]] = []
     left_out = 0
+    seen: set[int] = set()
+    # A label-only row that switches the block, and the block it left: an
+    # empty "Benchmark" row under a fund year looks the same as a heading.
+    reopened: str | None = None
     for row in table:
         text = text_of(row)
         if not has_month(row):
-            if text and len(text) <= MAX_MARKER:
-                section = _role(text, section)
+            if text and len(text) <= MAX_MARKER and _role(text, section) != section:
+                reopened, section = section, _role(text, section)
             continue
         if text and DIFFERENCE.search(text):
             left_out += 1
             continue
+        year = next((y for i in others if (y := _year(row[i])) is not None), None)
+        if reopened is not None:
+            # A block repeats years already listed, in either order; a new
+            # year means the label row was an empty data row, not a heading.
+            if not text and year is not None and year not in seen:
+                section = reopened
+            reopened = None
+        if year is not None:
+            seen.add(year)
         entries.append((_role(text, section) if text else section, row))
     if not entries:
         return None

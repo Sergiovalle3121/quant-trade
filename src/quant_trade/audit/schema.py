@@ -451,7 +451,7 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
             raw,
             timestamps,
             source,
-            divided=source == "returns" and bool(values_divided(warnings)),
+            fund=values,
             skip={ts_col, value_col},
             warnings=warnings,
         )
@@ -544,13 +544,24 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     )
 
 
-def values_divided(warnings: list[str]) -> bool:
-    """Whether the returns column was read as percentages (see the warnings above)."""
-    return any("divided by 100" in w for w in warnings)
-
-
 #: A column that carries a benchmark beside the fund's own values.
 BENCHMARK_COLUMN = re.compile(r"^(benchmark|bench|bmk|index|indice|índice|referencia)(_\S*)?$")
+
+
+#: A benchmark period above this return (1,000 %) is not an index's.
+MAX_BENCHMARK_RETURN = 10.0
+
+
+def _nearer_scale(values: pd.Series, fund: pd.Series) -> pd.Series:
+    """Bare returns as they are, or divided by 100: whichever puts their
+    median size nearer the fund's (compared as a ratio)."""
+    own = float(values.abs().median())
+    target = float(fund.abs().median())
+    if not (own > 0 and target > 0) or not (np.isfinite(own) and np.isfinite(target)):
+        return values
+    as_is = abs(math.log(own / target))
+    divided = abs(math.log(own / 100.0 / target))
+    return values / 100.0 if divided < as_is else values
 
 
 def _benchmark_column(
@@ -558,12 +569,17 @@ def _benchmark_column(
     timestamps: pd.Series,
     source: str,
     *,
-    divided: bool,
+    fund: pd.Series,
     skip: set[str | None],
     warnings: list[str],
 ) -> pd.DataFrame | None:
-    """A benchmark column's returns (``timestamp``, ``ret``), read like the
-    fund's own column: returns beside returns, levels beside levels."""
+    """A benchmark column's returns (``timestamp``, ``ret``).
+
+    Levels beside levels, returns beside returns; a ``%`` in the column's
+    own cells marks returns in percent, even beside a curve of levels. Bare
+    returns take the scale (as is, or divided by 100) that puts their median
+    size nearer the fund's own returns, so each column's scale rests on its
+    own evidence."""
     column = next(
         (str(c) for c in raw.columns if str(c) not in skip and BENCHMARK_COLUMN.match(str(c))),
         None,
@@ -575,17 +591,21 @@ def _benchmark_column(
     counter = numbers.to_numpy()
     if len(counter) and np.array_equal(counter, np.arange(counter[0], counter[0] + len(counter))):
         return None  # a row number, not a benchmark
-    if source == "returns" and (percent or divided):
+    as_returns = source == "returns" or percent
+    if percent:
         values = values / 100.0
+    elif as_returns:
+        values = _nearer_scale(values, fund)
     frame = pd.DataFrame({"timestamp": timestamps, "value": values})
     frame = frame[np.isfinite(frame["value"].astype(float))].dropna()
     frame = frame.sort_values("timestamp", kind="stable").drop_duplicates("timestamp", keep="last")
-    if source == "equity":
+    if as_returns:
+        valid = bool(((frame["value"] > -1) & (frame["value"] <= MAX_BENCHMARK_RETURN)).all())
+        ret = frame["value"].astype(float)
+    else:
         valid = bool((frame["value"] > 0).all())
         ret = frame["value"].astype(float).pct_change()
-    else:
-        valid = bool((frame["value"] > -1).all())
-        ret = frame["value"].astype(float)
+        valid = valid and bool((ret.dropna() <= MAX_BENCHMARK_RETURN).all())
     if len(frame) < 2 or not valid:
         warnings.append(f"the benchmark column {column!r} could not be read; left out")
         return None

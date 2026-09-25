@@ -818,13 +818,19 @@ fund's, so the equity file may carry it:
 - a dated file: a column named `benchmark`, `bench`, `bmk`, `index`,
   `indice`, `índice` or `referencia` (optionally with a suffix, e.g.
   `benchmark_return`), read like the fund's own column (returns beside
-  returns, levels beside levels, the same percent scaling). A column of
+  returns, levels beside levels). A `%` in the column's own cells means
+  percent returns, even beside a curve of levels; bare returns take the
+  scale (as is or divided by 100) whose median size is nearer the fund's.
+  A period above 1,000 % leaves the column out. A column of
   row numbers (0, 1, 2...) is not a benchmark.
 - a factsheet table: rows whose label names the benchmark ("Benchmark",
   "Index", "Índice", or an index family such as MSCI, S&P, FTSE, STOXX,
   Russell, Nasdaq, IBEX, DAX, Bloomberg, HFRI, IPC...) in a label column, in
   a row under the fund's year with no year of its own, or in a block opened
-  by a short heading row naming the benchmark. A label naming the fund
+  by a short heading row naming the benchmark. A heading opens a block only
+  when the next unlabelled row repeats a year already listed (a block
+  repeats the years, in either order); a new year there means the label row
+  was an empty benchmark row, so the fund's rows go on as the fund's. A label naming the fund
   ("Fund", "Fondo", "Portfolio", "Cartera", "Strategy"...) wins, so "Acme
   Index Fund" stays the fund. Rows of differences ("Excess", "Relative",
   "Difference", "Alpha", "+/-", "Diferencia"...) are left out and counted in
