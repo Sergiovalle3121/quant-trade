@@ -324,7 +324,9 @@ def _distinct_labels(values: Sequence[float], fmt: Any) -> list[str]:
 
 
 def _fmt_signed_percent(value: float) -> str:
-    return f"{value * 100:+.1f}%"
+    """A signed share at one decimal; a month that rounds to zero reads 0.0%."""
+    shown = f"{value * 100:+,.1f}%"
+    return "0.0%" if shown in {"+0.0%", "-0.0%"} else shown
 
 
 class _Frame:

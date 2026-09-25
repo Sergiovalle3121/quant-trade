@@ -240,3 +240,11 @@ def test_a_narrow_range_never_repeats_an_axis_label() -> None:
 def test_an_axis_uses_one_unit_for_every_label() -> None:
     labels = charts._distinct_labels([8000.0, 10000.0, 12000.0], charts._fmt_number)
     assert labels == ["8k", "10k", "12k"]
+
+
+@pytest.mark.parametrize(
+    ("value", "shown"),
+    [(-0.0004, "0.0%"), (0.0004, "0.0%"), (-0.012, "-1.2%"), (12.5, "+1,250.0%")],
+)
+def test_monthly_cells_never_print_a_signed_zero(value: float, shown: str) -> None:
+    assert charts._fmt_signed_percent(value) == shown
