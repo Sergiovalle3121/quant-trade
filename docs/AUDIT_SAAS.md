@@ -423,6 +423,9 @@ come out optimistic. On any balance-only file the summary tiles read "Maximum
 drawdown (closed trades only)", and a fall under 0.05 % prints as 0.0 %, never -0.0 %.
 A clean account review vouches for "no large open loss" only when the file states
 the floating result; otherwise it asks for the equity curve with floating results.
+A file that already loses before any extra cost shows its break-even tile as 0
+with "already negative before any extra cost", never a negative cost, and large
+percentages carry thousands separators (+191,136.0 %).
 
 Trades against an uploaded equity curve (`redflags.scan_trades_against_equity`;
 skipped when the curve was rebuilt from the same report):
