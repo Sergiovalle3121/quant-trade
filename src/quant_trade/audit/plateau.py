@@ -43,7 +43,13 @@ KEEP_SHARE = 0.5
 PROFITABLE_SHARE = 0.5
 MAX_LISTED = 12
 
-METRICS: tuple[str, ...] = ("Profit", "Result")
+#: Only the export's Profit column is a profit. "Result" is the optimisation
+#: criterion (by default the final balance), so it is never used as one.
+METRICS: tuple[str, ...] = ("Profit",)
+NO_PROFIT = (
+    "the export has no Profit column; its Result column is the optimisation criterion "
+    "(by default the final balance), not a profit"
+)
 NOTE = "from the rows of the optimisation export"
 
 
@@ -82,6 +88,8 @@ def parameter_stability(
         return {"status": "NOT_MEASURED", "reason": "no optimisation file uploaded"}, []
     metric = _metric(table)
     varied = [name for name in parameters if len({row.get(name) for row in table} - {None}) >= 2]
+    if metric is None and len(table) >= MIN_PASSES:
+        return {"status": "NOT_MEASURED", "reason": NO_PROFIT}, []
     if metric is None or not varied or len(table) < MIN_PASSES:
         return {
             "status": "NOT_MEASURED",

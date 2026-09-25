@@ -538,6 +538,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("no optimisation file uploaded", "no se subió archivo de optimización"),
     (
+        "the export has no Profit column; its Result column is the optimisation criterion "
+        "(by default the final balance), not a profit",
+        "la exportación no tiene columna Profit; su columna Result es el criterio de "
+        "optimización (por defecto el balance final), no un beneficio",
+    ),
+    (
         "needs at least {n} passes with a profit column and a parameter that varies",
         "necesita al menos {n} pasadas con columna de beneficio y un parámetro que varíe",
     ),

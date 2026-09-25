@@ -464,8 +464,9 @@ none of it.
 ### Lone peak or plateau (`audit/plateau.py`)
 
 For buyers of an optimised robot. Needs the MT5 optimisation export (at
-least 10 passes with a Profit or Result column and a parameter that
-varies). The importer keeps each pass's numeric cells
+least 10 passes with a Profit column and a parameter that varies). The
+Result column is never read as a profit: it is the optimisation criterion,
+by default the final balance, so an export without Profit is NOT_MEASURED. The importer keeps each pass's numeric cells
 (`OptimizationSummary.table`) and the tester report's inputs as
 `input_values`. The chosen pass is the one matching those inputs, or else
 the most profitable pass (the section says which). Its neighbours are the
