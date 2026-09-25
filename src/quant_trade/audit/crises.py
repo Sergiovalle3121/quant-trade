@@ -59,6 +59,10 @@ NOTE = (
     "fixed calendar windows of widely recorded market falls; the fund's months "
     "compounded over each window it covers in full"
 )
+CURVE_NOTE = (
+    "fixed calendar windows of widely recorded market falls; the curve's month-end "
+    "returns compounded over each window it covers in full"
+)
 
 
 def _by_month(series: pd.Series) -> pd.Series:
@@ -133,9 +137,12 @@ def curve_crises(frame: pd.DataFrame, benchmark: pd.Series | None = None) -> dic
     """The crisis windows for a backtest or trade history's equity curve;
     NOT_MEASURED when the curve covers none of them in full."""
     months = curve_months(frame)
-    if months.empty or (months <= -1.0).any():
+    if months.empty:
+        return {"status": "NOT_MEASURED", "reason": "the curve is shorter than two months"}
+    if (months <= -1.0).any():
         return {"status": "NOT_MEASURED", "reason": "the curve has no usable month-end levels"}
     review = crisis_review(months, benchmark)
+    review["note"] = CURVE_NOTE
     if not review["windows"]:
         return {
             "status": "NOT_MEASURED",

@@ -806,6 +806,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the curve covers none of the dated market falls in full",
         "la curva no cubre completa ninguna de las caídas de mercado con fecha",
     ),
+    ("the curve is shorter than two months", "la curva dura menos de dos meses"),
+    (
+        "fixed calendar windows of widely recorded market falls; the curve's month-end "
+        "returns compounded over each window it covers in full",
+        "periodos fijos de caídas de mercado de fecha pública; las rentabilidades de fin de "
+        "mes de la curva compuestas en cada periodo que cubre completo",
+    ),
     (
         "the curve has no usable month-end levels",
         "la curva no tiene saldos de fin de mes utilizables",

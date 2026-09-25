@@ -519,9 +519,9 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_stress": "¿Cómo le fue en las crisis conocidas?",
         "crises": "¿Cómo le fue en las crisis conocidas?",
         "crises_intro": (
-            "Rentabilidad de la curva en cada caída de mercado de fecha pública que cubre "
-            "completa, de máximo a mínimo, con los saldos de fin de mes. Las fechas son fijas: "
-            "no se ajustan al archivo."
+            "Rentabilidad de la curva, con sus saldos de fin de mes, en cada caída de mercado "
+            "de fecha pública que cubre completa (del máximo al mínimo del mercado). Un mes "
+            "sin operaciones cuenta como plano. Las fechas son fijas: no se ajustan al archivo."
         ),
         "crises_subject": "Estrategia",
         "crises_worse": (
@@ -530,7 +530,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_stress_intro": (
             "Rentabilidad del fondo en cada caída de mercado de fecha pública que su historial "
-            "cubre completa, de máximo a mínimo. Las fechas son fijas: no se ajustan al archivo."
+            "cubre completa (del máximo al mínimo del mercado). Las fechas son fijas: no se "
+            "ajustan al archivo."
         ),
         "fund_stress_none": (
             "El historial no cubre completa ninguna de las caídas de la lista (puntocom, 2008, "
@@ -1250,9 +1251,9 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_stress": "How did it do in the known crises?",
         "crises": "How did it do in the known crises?",
         "crises_intro": (
-            "The curve's return through each market fall on the public record that it covers "
-            "in full, peak to trough, from month-end balances. The dates are fixed: they are "
-            "not fitted to the file."
+            "The curve's return, from its month-end balances, through each market fall on the "
+            "public record that it covers in full (the market's peak to its trough). A month "
+            "with no trades counts as flat. The dates are fixed: they are not fitted to the file."
         ),
         "crises_subject": "Strategy",
         "crises_worse": (
@@ -1261,7 +1262,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_stress_intro": (
             "The fund's return through each market fall on the public record that its history "
-            "covers in full, peak to trough. The dates are fixed: they are not fitted to the file."
+            "covers in full (the market's peak to its trough). The dates are fixed: they are not "
+            "fitted to the file."
         ),
         "fund_stress_none": (
             "The history does not cover any fall on the list in full (dot-com, 2008, euro 2011, "

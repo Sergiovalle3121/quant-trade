@@ -163,3 +163,18 @@ def test_a_fund_record_keeps_the_crises_in_its_own_section() -> None:
     assert result.crises is None
     html, _ = render(result, watermark=False)
     assert html.count(LABELS["es"]["fund_stress"]) == 1
+
+
+def test_a_curve_under_two_months_says_so() -> None:
+    from quant_trade.audit.crises import CURVE_NOTE, curve_crises
+
+    short = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2020-03-02", "2020-03-20"], utc=True),
+            "equity": [100.0, 101.0],
+        }
+    )
+    assert curve_crises(short)["reason"] == "the curve is shorter than two months"
+    stamps = pd.bdate_range("2006-01-02", "2012-12-31", tz="UTC")
+    frame = pd.DataFrame({"timestamp": stamps, "equity": np.linspace(100, 200, len(stamps))})
+    assert curve_crises(frame)["note"] == CURVE_NOTE
