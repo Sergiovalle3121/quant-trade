@@ -297,8 +297,15 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "You are responsible for your password. If you forget it, we send you a "
                     "one-time link after checking that you write from the account's e-mail. "
                     "You can delete the account at any time from its page.",
-                    "An access code saved on an account still belongs to the code's holder: "
-                    "its credits are used from that account or by typing the code.",
+                    *(
+                        (
+                            "An access code saved on an account still belongs to the code's "
+                            "holder: its credits are used from that account or by typing the "
+                            "code.",
+                        )
+                        if ctx.access_codes
+                        else ()
+                    ),
                 ),
             ),
             (
@@ -401,8 +408,15 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Eres responsable de tu contraseña. Si la olvidas, te enviamos un enlace de un "
                 "solo uso después de comprobar que nos escribes desde el correo de la cuenta. "
                 "Puedes borrar la cuenta cuando quieras desde su página.",
-                "Un código de acceso guardado en una cuenta sigue siendo del titular del "
-                "código: sus créditos se usan desde esa cuenta o escribiendo el código.",
+                *(
+                    (
+                        "Un código de acceso guardado en una cuenta sigue siendo del titular "
+                        "del código: sus créditos se usan desde esa cuenta o escribiendo el "
+                        "código.",
+                    )
+                    if ctx.access_codes
+                    else ()
+                ),
             ),
         ),
         (

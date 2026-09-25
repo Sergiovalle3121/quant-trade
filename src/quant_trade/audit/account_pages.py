@@ -339,7 +339,9 @@ border-bottom:1px solid var(--border);vertical-align:middle}
 font-weight:700;border:2px solid currentColor}
 .acct-tag{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:999px;
 border:1px solid var(--border);margin:2px 4px 2px 0;color:var(--text-2)}
-.acct-sec{margin-top:36px}
+.acct-sec{margin-top:40px}
+.acct-sec h2{margin:0 0 10px}
+.acct-card h3{margin:0 0 14px}
 .acct-box{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;
 border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:14px 0;
 font-size:.92rem;background:var(--surface-2)}
