@@ -278,8 +278,9 @@ GUIDES: tuple[Guide, ...] = (
                     "su informe HTML (ver la guía de MetaTrader 5).",
                 ),
                 upload=(
-                    "En el campo «Exportación de optimización de MT5», junto con el informe "
-                    "HTML de la configuración elegida en «Informe de tu plataforma»."
+                    "En el campo «Exportación de optimización de MT5» (dentro de «Añadir más "
+                    "archivos»), junto con el informe HTML de la configuración elegida en «Informe "
+                    "de tu plataforma»."
                 ),
                 tips=(
                     "Cada fila es un intento. El Sharpe deflactado se calcula con ese número "
@@ -308,8 +309,8 @@ GUIDES: tuple[Guide, ...] = (
                     "(see the MetaTrader 5 guide).",
                 ),
                 upload=(
-                    "In the field 'MT5 optimisation export', together with the chosen "
-                    "configuration's HTML report in 'Your platform report'."
+                    "In the field 'MT5 optimisation export' (under 'Add more files'), together "
+                    "with the chosen configuration's HTML report in 'Your platform report'."
                 ),
                 tips=(
                     "Each row is a trial. The deflated Sharpe uses that real number, reported "
@@ -676,7 +677,8 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload=(
                     "En «Informe de tu plataforma» para revisar la cuenta sola, o en «Estado de "
-                    "cuenta real o demo» junto al backtest del robot."
+                    "cuenta real o demo» (dentro de «Añadir más archivos») junto al backtest del "
+                    "robot."
                 ),
                 tips=(
                     "Los depósitos y retiros del archivo se leen como movimientos de dinero: el "
@@ -704,7 +706,8 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload=(
                     "In 'Your platform report' to review the account on its own, or in 'Live or "
-                    "demo account statement' next to the robot's backtest."
+                    "demo account statement' (under 'Add more files') next to the robot's "
+                    "backtest."
                 ),
                 tips=(
                     "The file's deposits and withdrawals are read as money movements: the "
@@ -737,7 +740,8 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload=(
                     "En «Informe de tu plataforma» para revisar la señal sola, o en «Estado de "
-                    "cuenta real o demo» junto al backtest del robot."
+                    "cuenta real o demo» (dentro de «Añadir más archivos») junto al backtest del "
+                    "robot."
                 ),
                 tips=(
                     "Las filas Balance (depósitos, retiros y ajustes) se leen como movimientos "
@@ -762,7 +766,8 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload=(
                     "In 'Your platform report' to review the signal on its own, or in 'Live or "
-                    "demo account statement' next to the robot's backtest."
+                    "demo account statement' (under 'Add more files') next to the robot's "
+                    "backtest."
                 ),
                 tips=(
                     "Balance rows (deposits, withdrawals and adjustments) are read as money "
@@ -794,7 +799,8 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload=(
                     "En «Informe de tu plataforma» para revisar la cuenta sola, o en «Estado de "
-                    "cuenta real o demo» junto al backtest del robot."
+                    "cuenta real o demo» (dentro de «Añadir más archivos») junto al backtest del "
+                    "robot."
                 ),
                 tips=(
                     "Se leen las filas Closed position; las posiciones abiertas y las órdenes "
@@ -820,7 +826,8 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload=(
                     "In 'Your platform report' to review the account on its own, or in 'Live or "
-                    "demo account statement' next to the robot's backtest."
+                    "demo account statement' (under 'Add more files') next to the robot's "
+                    "backtest."
                 ),
                 tips=(
                     "Closed position rows are read; open positions and pending orders are not "

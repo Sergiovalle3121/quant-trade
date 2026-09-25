@@ -286,6 +286,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "Si el informe lee mal tu archivo (operaciones, saldo o fechas que no coinciden con "
             "tu plataforma) y no podemos corregirlo, te devolvemos el importe de ese informe."
         ),
+        "account_note": (
+            "Cuenta gratis opcional: guarda tus informes y tus créditos en un solo lugar. "
+            "La vista previa no la necesita."
+        ),
+        "account_link": "Crear cuenta",
         "faq_title": "Preguntas frecuentes",
         "faq": [
             (
@@ -551,6 +556,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "If the report misreads your file (trades, balance or dates that do not match your "
             "platform) and we cannot fix it, we refund that report."
         ),
+        "account_note": (
+            "Optional free account: keep your reports and credits in one place. The preview "
+            "does not need one."
+        ),
+        "account_link": "Create an account",
         "faq_title": "Frequently asked questions",
         "faq": [
             (
@@ -800,6 +810,8 @@ _UI: dict[str, dict[str, Any]] = {
         "drop_sub": "o haz clic para elegirlo · hasta 10 MB",
         "drop_small": "Arrastra o haz clic",
         "no_report": "¿No tienes informe? Sube tu curva de equity",
+        "extras": "Añadir más archivos",
+        "extras_note": "Opcional: XML de optimización, cuenta real o demo, reto de prop firm",
         "advanced": "Opciones avanzadas",
         "advanced_note": "Todo tiene un valor por defecto",
         "busy_title": "Auditando tu archivo",
@@ -986,6 +998,8 @@ _UI: dict[str, dict[str, Any]] = {
         "drop_sub": "or click to choose it · up to 10 MB",
         "drop_small": "Drop or click",
         "no_report": "No report? Upload your equity curve",
+        "extras": "Add more files",
+        "extras_note": "Optional: optimisation XML, live or demo account, prop-firm challenge",
         "advanced": "Advanced options",
         "advanced_note": "Everything has a default",
         "busy_title": "Auditing your file",
@@ -1679,6 +1693,9 @@ def _prices_html(
             + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta_full'])}</a></div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
+            + f"<p class='muted account-note' data-reveal>{_e(copy['account_note'])} "
+            f"<a href='{'/signup' if locale == 'en' else '/registro'}'>"
+            f"{_e(copy['account_link'])}</a></p>"
             + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
             f"{_e(METHOD_COPY[locale]['title'])}{icon('arrow')}</a></p>"
         )
@@ -1747,6 +1764,7 @@ def _upload_form(
     err: str,
     access_codes: bool,
     retention_days: int,
+    extras_open: bool = False,
 ) -> str:
     ui = _UI[locale]
     selected = {"es": "", "en": ""}
@@ -1854,9 +1872,6 @@ def _upload_form(
             main=True,
         )
         + mapping
-        + "<div class='form-grid'>"
-        + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
-        + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
         + _drop(
             "equity",
             copy["equity"],
@@ -1864,11 +1879,22 @@ def _upload_form(
             _e(copy["equity_help"]),
             locale,
         )
+        # The one-file case stays short; the second files and the challenge open on demand.
+        + f"<details class='adv extras'{' open' if extras_open else ''}><summary><span>"
+        f"{_e(ui['extras'])} <small>· {_e(ui['extras_note'])}</small></span>"
+        "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
+        "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
+        "<div class='form-grid'>"
+        + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
+        + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
+        + "</div>"
         + _field(
             copy["challenge"],
             f"<select name='challenge'>{_preset_options(locale)}</select>",
             copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
         )
+        + "</div></details>"
+        + "<div class='form-grid'>"
         + _field(
             copy["locale"],
             f"<select name='locale'><option value='es'{selected['es']}>Español</option>"
@@ -1939,6 +1965,7 @@ def landing(
     retention_days: int = 30,
     base_url: str = "",
     pack_price_usd: float = 0.0,
+    extras_open: bool = False,
 ) -> str:
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -1977,6 +2004,7 @@ def landing(
             err=err,
             access_codes=access_codes,
             retention_days=retention_days,
+            extras_open=extras_open,
         )
         + _faq_html(copy, locale, retention_days=retention_days)
         + _final_cta(copy, locale, sample, joined=joined)
@@ -2609,9 +2637,11 @@ def audience_page(
         for page in AUDIENCE_PAGES
         if page.slug != audience.slug
     )
+    # Robot buyers land on the form with the live-account box already open.
+    start = f"/?lang={locale}" + ("&extras=1" if audience.open_extras else "") + "#subir"
     buttons = (
         "<div class='hero-cta'>"
-        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(words['start'])}"
+        f"<a class='btn btn-dark' href='{_e(start)}'>{_e(words['start'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
         "</div>"
@@ -2636,7 +2666,7 @@ def audience_page(
             ],
             locale,
             lead=buttons,
-            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(start)}'>"
             f"{_e(words['start'])}<span class='go'>{icon('arrow')}</span></a>",
         )
         + "</div></div>"
