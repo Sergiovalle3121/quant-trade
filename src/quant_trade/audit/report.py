@@ -2633,7 +2633,7 @@ def _forward_html(forward: dict[str, Any] | None, labels: dict[str, str]) -> str
                 f"<b>{float(item['value']):.0%}</b>"
                 f"<p>{_e(label)} {_badge(item['evidence'])}</p></div>"
             )
-    out += f"<div class='facts'>{''.join(facts)}</div>"
+    # The answer first, then the four figures behind it as a two-by-two grid.
     if forward.get("clean"):
         out += (
             f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
@@ -2644,7 +2644,8 @@ def _forward_html(forward: dict[str, Any] | None, labels: dict[str, str]) -> str
             f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
             f"{_e(labels['forward_badge_lost'])}</span> {_e(labels['forward_lost'])}</p>"
         )
-    return out
+    grid = " pairs" if len(facts) % 2 == 0 else ""
+    return out + f"<div class='facts{grid}'>{''.join(facts)}</div>"
 
 
 def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str:

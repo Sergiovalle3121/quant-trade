@@ -172,3 +172,12 @@ def test_section_renders_clean_with_the_tester_report(locale: str) -> None:
     title = "¿Aguanta en el periodo forward?" if locale == "es" else "Does it hold in the forward"
     assert title in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_forward_section_answers_first_then_a_two_by_two_grid() -> None:
+    from quant_trade.audit.report import LABELS, _forward_html
+
+    for forward in (_review(_lost)[0], _review(_held)[0]):
+        html = _forward_html(forward, LABELS["es"])
+        assert html.index("live-verdict") < html.index("<div class='facts pairs'>")
+        assert html.count("<div class='fact'>") + html.count("<div class='fact neg'>") == 4
