@@ -89,6 +89,16 @@ class AuditRecord:
 
 
 @dataclass(frozen=True)
+class RefusedPayment:
+    """A live card payment Stripe charged that unlocked nothing: ids only."""
+
+    session_id: str
+    audit_id: str
+    reason: str
+    created_at: str
+
+
+@dataclass(frozen=True)
 class AccessCodeRecord:
     """An access code as the owner may see it: never the code itself."""
 
@@ -280,6 +290,18 @@ class Store:
             sa.Column("audit_id", sa.String(64), nullable=False, index=True),
             sa.Column("kind", sa.String(16), nullable=False),
             sa.Column("issued_at", sa.String(40), nullable=False),
+        )
+        #: Live card payments that were charged but unlocked nothing (wrong
+        #: amount, another link, an unknown audit), so the owner can refund or
+        #: unlock them from /panel. Ids and a reason only, never an amount, an
+        #: email or card data; rows go with the retention purge.
+        self.refused_payments = sa.Table(
+            "refused_payments",
+            self.metadata,
+            sa.Column("session_id", sa.String(255), primary_key=True),
+            sa.Column("audit_id", sa.String(80), nullable=False),
+            sa.Column("reason", sa.String(80), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
         # Customer accounts (``audit/accounts.py``). New tables only, so an
         # existing database gains them on start with no column migration.
@@ -621,6 +643,55 @@ class Store:
             expires_at=row["expires_at"],
             disabled=bool(row["disabled"]),
         )
+
+    # -- refused card payments ------------------------------------------------
+    def record_refused_payment(
+        self, *, session_id: str, audit_id: str, reason: str, at: datetime
+    ) -> bool:
+        """Keep a charged payment that unlocked nothing, once per session."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                table = self.refused_payments
+                exists = conn.execute(
+                    sa.select(table.c.session_id).where(table.c.session_id == session_id)
+                ).first()
+                if exists is not None:
+                    return False
+                conn.execute(
+                    table.insert().values(
+                        session_id=session_id[:255],
+                        audit_id=audit_id[:80],
+                        reason=reason[:80],
+                        created_at=_iso(at),
+                    )
+                )
+                return True
+        except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same insert
+            return False
+
+    def list_refused_payments(self, limit: int = 50) -> list[RefusedPayment]:
+        """The newest refused payments first."""
+        table = self.refused_payments
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    self._sa.select(table)
+                    .order_by(table.c.created_at.desc(), table.c.session_id)
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            RefusedPayment(
+                session_id=row["session_id"],
+                audit_id=row["audit_id"],
+                reason=row["reason"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     def list_access_codes(self) -> list[AccessCodeRecord]:
         with self.engine.connect() as conn:
@@ -1313,6 +1384,9 @@ class Store:
             )
             if dry_run:
                 return count
+            conn.execute(
+                self.refused_payments.delete().where(self.refused_payments.c.created_at < cutoff)
+            )
             # The upload IP only serves the hourly limit: past the retention
             # window it goes for every audit, paid ones included.
             conn.execute(

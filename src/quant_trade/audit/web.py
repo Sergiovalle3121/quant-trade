@@ -1034,6 +1034,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             panel_page(
                 key=key,
                 codes=db.list_access_codes(),
+                refused=db.list_refused_payments(),
                 new_code=new_code,
                 flash=flash,
                 error=error,
