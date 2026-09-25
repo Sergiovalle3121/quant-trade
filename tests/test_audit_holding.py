@@ -12,7 +12,7 @@ from audit_fixtures import business_days, csv_bytes, trades_following
 from quant_trade.audit import market as market_lib
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
-from quant_trade.audit.holding import MIN_DAYS, versus_holding
+from quant_trade.audit.holding import MIN_DAYS, sharpe_gap_se, versus_holding
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.market import BY_KEY, MarketData, asset_of, dominant_asset, parse_fred_csv
 from quant_trade.audit.market import _download as real_download
@@ -106,9 +106,12 @@ def test_a_leveraged_copy_of_the_market_rides_it() -> None:
     moves = np.r_[0.0, closes.pct_change().dropna().to_numpy()]
     out = versus_holding(_curve(2 * moves, closes.index), closes, BY_KEY["nasdaq100"])
     assert out["status"] == "MEASURED"
-    assert out["correlation"]["value"] == pytest.approx(1.0)
-    assert out["beta"]["value"] == pytest.approx(2.0)
-    assert out["strategy_sharpe"]["value"] == pytest.approx(out["market_sharpe"]["value"])
+    assert out["correlation"]["value"] == pytest.approx(1.0, abs=0.01)
+    assert out["beta"]["value"] == pytest.approx(2.0, rel=0.05)
+    assert out["strategy_sharpe_shared_days"]["value"] == pytest.approx(
+        out["market_sharpe"]["value"]
+    )
+    assert "strategy_sharpe" not in out
     assert out["market_return"]["value"] == pytest.approx(closes.iloc[-1] / closes.iloc[0] - 1)
     assert out["findings"] == ["rides_the_market"]
 
@@ -119,8 +122,70 @@ def test_an_independent_strategy_with_more_per_unit_of_risk_does_not() -> None:
     out = versus_holding(_curve(own, closes.index), closes, BY_KEY["sp500"])
     assert out["status"] == "MEASURED"
     assert abs(out["correlation"]["value"]) < 0.3
-    assert out["strategy_sharpe"]["value"] > out["market_sharpe"]["value"]
+    assert out["strategy_sharpe_shared_days"]["value"] > out["market_sharpe"]["value"]
     assert out["findings"] == []
+
+
+def _calendar_market(days: pd.DatetimeIndex, seed: int) -> pd.Series:
+    rng = np.random.default_rng(seed)
+    return pd.Series(100 * np.cumprod(1 + rng.normal(0.0005, 0.012, len(days))), index=days)
+
+
+def test_a_seven_day_strategy_is_read_on_the_markets_trading_days() -> None:
+    """Weekend moves roll into Monday instead of pairing with Friday's close."""
+    every_day = pd.date_range("2022-01-03", periods=560, freq="D")
+    closes = _calendar_market(pd.bdate_range(every_day[0], every_day[-1]), seed=4)
+    along = closes.reindex(every_day).ffill().to_numpy()
+    weekend = np.random.default_rng(5).normal(0, 0.012, len(every_day))
+    moves = 1.5 * np.r_[0.0, along[1:] / along[:-1] - 1] + np.where(
+        every_day.dayofweek >= 5, weekend, 0.0
+    )
+    out = versus_holding(_curve(moves, every_day), closes, BY_KEY["sp500"])
+    assert out["status"] == "MEASURED"
+    assert out["days"]["value"] == len(closes) - 1
+    assert out["correlation"]["value"] > 0.7
+    # A weekday strategy beside bitcoin's seven-day calendar stays on its own days.
+    btc = _calendar_market(every_day, seed=6)
+    weekdays = pd.bdate_range(every_day[0], every_day[-1])
+    own = np.random.default_rng(7).normal(0.001, 0.01, len(weekdays))
+    out = versus_holding(_curve(own, weekdays), btc, BY_KEY["bitcoin"])
+    assert out["days"]["value"] == len(weekdays) - 1
+
+
+def test_a_day_of_offset_between_the_closes_does_not_hide_the_link() -> None:
+    """Broker time read as UTC: the strategy's day is one market day late."""
+    closes = _market(600, seed=11)
+    moves = np.r_[0.0, closes.pct_change().dropna().to_numpy()]
+    late = closes.index[1:].append(pd.DatetimeIndex([closes.index[-1] + pd.offsets.BDay()]))
+    out = versus_holding(_curve(1.5 * moves, late), closes, BY_KEY["nasdaq100"])
+    daily = np.corrcoef(1.5 * moves[2:], moves[1:-1])[0, 1]
+    assert abs(daily) < 0.3  # what the daily returns, paired a day apart, would have read
+    assert out["correlation"]["value"] > 0.7
+    assert out["findings"] == ["rides_the_market"]
+
+
+def test_a_small_sharpe_gap_is_no_clear_edge_and_a_large_one_is() -> None:
+    closes = _market(1260, seed=21)
+    moves = np.r_[0.0, closes.pct_change().dropna().to_numpy()]
+    rng = np.random.default_rng(22)
+    small = moves + rng.normal(0.0003, 0.004, len(moves))
+    out = versus_holding(_curve(small, closes.index), closes, BY_KEY["sp500"])
+    gap = out["strategy_sharpe_shared_days"]["value"] - out["market_sharpe"]["value"]
+    assert gap > 0.1  # the old rule would have let it pass
+    assert out["sharpe_gap_in_se"]["value"] < 2
+    assert out["findings"] == ["rides_the_market"]
+    large = moves + rng.normal(0.0025, 0.004, len(moves))
+    out = versus_holding(_curve(large, closes.index), closes, BY_KEY["sp500"])
+    assert out["correlation"]["value"] >= 0.7
+    assert out["sharpe_gap_in_se"]["value"] >= 2
+    assert out["findings"] == []
+
+
+def test_the_gap_standard_error_matches_the_textbook_formula() -> None:
+    # Two identical ratios, correlation 0.9, 250 periods: sqrt((0.2 + 0.5·s²·(2 - 2·0.81)) / 250).
+    assert sharpe_gap_se(0.1, 0.1, 0.9, 250) == pytest.approx(
+        np.sqrt((0.2 + 0.5 * 0.01 * (2 - 2 * 0.81)) / 250)
+    )
 
 
 def test_too_few_shared_days_is_not_measured() -> None:
@@ -165,7 +230,8 @@ def test_the_report_shows_the_market_beside_the_strategy(locale: str) -> None:
     labels = LABELS[locale]
     assert labels["holding"] in html and "Nasdaq 100" in html
     assert "href='https://fred.stlouisfed.org/series/NASDAQ100'" in html
-    assert labels["holding_rides"].format(label="Nasdaq 100").split("?")[0] in html
+    assert labels["holding_rides"].split("({gap}")[0].format(label="Nasdaq 100") in html
+    assert labels["holding_sharpe"].format(days=int(result.holding["days"]["value"])) in html
     assert untranslated(result.model_dump(mode="json")) == []
     for key, text in labels.items():
         if key.startswith("holding"):

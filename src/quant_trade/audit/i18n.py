@@ -895,11 +895,18 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "la curva nunca se aleja un 0.1 % de su inicio",
     ),
     (
-        "the strategy's daily closes against the market's public closes (FRED) on the same "
-        "days; Sharpe ratios without subtracting a cash rate, annualised by the days observed",
-        "los cierres diarios de la estrategia frente a los cierres públicos del mercado (FRED) "
-        "en los mismos días; Sharpe sin restar la tasa del efectivo, anualizado según los días "
-        "observados",
+        "the strategy's closes against the market's public closes (FRED) on the days both are "
+        "seen (the sparser of the two calendars); Sharpe ratios on those days without "
+        "subtracting a cash rate, annualised by the days observed; correlation and beta on "
+        "Friday-to-Friday weekly returns",
+        "los cierres de la estrategia frente a los cierres públicos del mercado (FRED) en los "
+        "días en que se ven los dos (el calendario con menos días); Sharpe en esos días sin "
+        "restar la tasa del efectivo, anualizado según los días observados; correlación y beta "
+        "con rentabilidades semanales de viernes a viernes",
+    ),
+    (
+        "fewer than 12 weeks shared with the market's public closes",
+        "menos de 12 semanas en común con los cierres públicos del mercado",
     ),
     ("no overlapping days", "ningún día en común"),
     (

@@ -676,14 +676,17 @@ LABELS: dict[str, dict[str, str]] = {
         "holding_market": "Mantener el {label}",
         "holding_return": "Rentabilidad en el periodo",
         "holding_drawdown": "Peor caída",
-        "holding_sharpe": "Sharpe (rentabilidad por unidad de riesgo)",
+        "holding_sharpe": "Sharpe en los mismos {days} días (rentabilidad por unidad de riesgo)",
         "holding_together": (
-            "Correlación diaria con el {label}: {corr}. Por cada 1 % que se movió el mercado, "
-            "la estrategia se movió en promedio {beta} %."
+            "Correlación semanal (de viernes a viernes) con el {label}: {corr}. Por cada 1 % "
+            "que se movió el mercado en una semana, la estrategia se movió en promedio {beta} %. "
+            "Se usan semanas porque la hora de cierre del archivo y la del mercado pueden no "
+            "coincidir."
         ),
         "holding_rides": (
-            "Se mueve casi al mismo paso que el {label} y no paga más por unidad de riesgo "
-            "que mantenerlo. ¿Qué agrega frente a comprar el mercado y esperar?"
+            "Se mueve casi al mismo paso que el {label} y no muestra una ventaja clara sobre "
+            "mantenerlo: la diferencia de Sharpe ({gap}) queda dentro del ruido de {weeks} "
+            "semanas (error típico {se}). ¿Qué agrega frente a comprar el mercado y esperar?"
         ),
         "holding_closed_only": (
             "El archivo solo trae el balance al cerrar operaciones: los días con posiciones "
@@ -1606,14 +1609,16 @@ LABELS: dict[str, dict[str, str]] = {
         "holding_market": "Holding the {label}",
         "holding_return": "Return over the period",
         "holding_drawdown": "Worst fall",
-        "holding_sharpe": "Sharpe (return per unit of risk)",
+        "holding_sharpe": "Sharpe on the same {days} days (return per unit of risk)",
         "holding_together": (
-            "Daily correlation with the {label}: {corr}. For each 1 % the market moved, the "
-            "strategy moved {beta} % on average."
+            "Weekly correlation (Friday to Friday) with the {label}: {corr}. For each 1 % the "
+            "market moved in a week, the strategy moved {beta} % on average. Weeks are used "
+            "because the file's closing time and the market's may not match."
         ),
         "holding_rides": (
-            "It moves almost in step with the {label} and pays no more per unit of risk than "
-            "holding it. What does it add over buying the market and waiting?"
+            "It moves almost in step with the {label} and shows no clear edge over holding "
+            "it: the Sharpe gap ({gap}) is within the noise of {weeks} weeks (standard error "
+            "{se}). What does it add over buying the market and waiting?"
         ),
         "holding_closed_only": (
             "The file only has the balance at each close: days with open positions are not "
@@ -4837,17 +4842,27 @@ def _holding_html(
         )
         return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
     out = ""
+    days = int(holding["days"]["value"])
     if "rides_the_market" in (holding.get("findings") or []):
+        gap = float(holding["strategy_sharpe_shared_days"]["value"]) - float(
+            holding["market_sharpe"]["value"]
+        )
+        rides = labels["holding_rides"].format(
+            label=label,
+            gap=f"{gap:+.2f}",
+            weeks=int(holding["weeks"]["value"]),
+            se=f"{float(holding['sharpe_gap_se']['value']):.2f}",
+        )
         out += (
             f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
             f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>"
-            f"{_behaviour_ask(labels['holding_rides'].format(label=label))}</ul></div>"
+            f"{_behaviour_ask(rides)}</ul></div>"
         )
     intro = labels["holding_intro"].format(
         label=label,
         first=holding.get("first", ""),
         last=holding.get("last", ""),
-        days=int(holding["days"]["value"]),
+        days=days,
     )
     out += f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
     strategy_head = labels["holding_strategy"]
@@ -4856,10 +4871,13 @@ def _holding_html(
     def row(name: str, key: str, text: Callable[[float], str]) -> str:
         cells = ""
         for side, head in (("strategy", strategy_head), ("market", market_head)):
-            value = float(holding[f"{side}_{key}"]["value"])
+            field = f"{side}_{key}"
+            if field == "strategy_sharpe":
+                field = "strategy_sharpe_shared_days"
+            value = float(holding[field]["value"])
             neg = " neg" if value < 0 and key != "sharpe" else ""
             cells += f"<td class='val{neg}' data-l='{_e(head)}'>{_e(text(value))}</td>"
-        return f"<tr><td>{_e(labels[name])}</td>{cells}</tr>"
+        return f"<tr><td>{_e(labels[name].format(days=days))}</td>{cells}</tr>"
 
     body = (
         row("holding_return", "return", _fund_pct)

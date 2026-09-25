@@ -1127,15 +1127,27 @@ When at least two thirds of a file's trades are on the S&P 500, the Nasdaq 100
 or bitcoin (by symbol name: `US500`, `SPX500`, `ES` futures; `US100`,
 `USTEC`, `NAS100`, `NQ` futures; `BTCUSD`, `BTCUSDT`, `XBTUSD`; broker
 suffixes dropped), or a tester report names one of them, the report puts the
-strategy's daily closes beside the market's public closes from FRED
+strategy's closes beside the market's public closes from FRED
 (`SP500`, `NASDAQ100`, `CBBTCUSD`) on the same days: return, worst fall and
-Sharpe ratio for both, plus correlation and beta of the daily returns. It
-needs 60 shared days (`MIN_DAYS`) spanning 90 calendar days
-(`MIN_SPAN_DAYS`); a market close more than 5 days before a strategy day is
-not paired (`MAX_GAP_DAYS`). One finding, as a question, no red flag and no
-class change: `rides_the_market` when the correlation is 0.7 or more
-(`CLOSE_MOVE`) and the strategy's Sharpe is less than 0.1 (`SHARPE_EDGE`)
-above holding's. Sharpe is used because it does not change with position
+Sharpe ratio for both, plus correlation and beta. The two are paired on the
+sparser calendar, taking the other side's last level on or before each day:
+a strategy that also moves on weekends is read on the market's trading days
+(weekend moves roll into Monday), a weekday strategy beside bitcoin on its
+own days. The strategy's Sharpe here is on those shared days only
+(`strategy_sharpe_shared_days`, labelled "on the same N days"), not the
+headline Sharpe. Correlation and beta use Friday-to-Friday weekly returns,
+because a file's day ends at its last stamp (often broker time read as UTC)
+while FRED closes at the market's close, and that offset pulls daily figures
+toward zero. It needs 60 shared days (`MIN_DAYS`) spanning 90 calendar days
+(`MIN_SPAN_DAYS`) and 12 weekly returns (`MIN_WEEKS`); a market close more
+than 5 days before a strategy day is not paired (`MAX_GAP_DAYS`). One
+finding, as a question, no red flag and no class change: `rides_the_market`
+when the weekly correlation is 0.7 or more (`CLOSE_MOVE`) and the strategy's
+Sharpe is not at least 2 standard errors (`EDGE_SE`) above holding's, the
+standard error of the difference of two correlated Sharpe ratios (Jobson and
+Korkie with Memmel's correction) on the weekly returns (`sharpe_gap_se`,
+`sharpe_gap_in_se`). A gap inside the noise reads as "no clear edge", never
+as "worse". Sharpe is used because it does not change with position
 size, so a leveraged copy of the index scores the same as the index. Neither
 Sharpe subtracts a cash rate. On a balance-only file a line says the
 strategy's correlation and worst fall read short. The closes are read at
