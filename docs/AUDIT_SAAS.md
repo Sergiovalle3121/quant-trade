@@ -2226,7 +2226,11 @@ A list with no header row whose first row holds a date (an exported P&L list
 often has none) is shown with numbered columns (`Col. 1`, `Col. 2`...), in
 the report and in the curve field, and read with a date and a result or a
 balance chosen among them; a row with a date in it is never taken for the
-header. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
+header. A semicolon file whose first lines all hold the same number of `;`
+is split on `;` with comma decimals, so a European export with its header
+stripped gets the page too. When the only other column is a number, it is
+preselected: as the result when a sample is negative (with the "parece una
+lista de resultados" line), else as the balance. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
 column in the report field too. When the file has no price column and either a balance column or
 fewer than two date columns, the date-and-balance-or-result group comes first
 and alone is preselected (a `Volumen` column is not guessed as a trade's

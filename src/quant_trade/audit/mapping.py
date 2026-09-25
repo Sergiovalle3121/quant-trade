@@ -13,6 +13,7 @@ mapping holds only column names and a hash of the header.
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import re
@@ -297,10 +298,25 @@ def _read_body(data: bytes) -> _Body | None:
         top = text[:4_000_000].splitlines()[: imp.UNIVERSAL_HEADER_SCAN + 1]
         if any(line.count(mark) > MAX_HEADER * 4 for line in top for mark in ",;\t|"):
             return None
+        semicolons = _semicolon_rows(text)
+        if semicolons is not None:
+            return _body(semicolons, serial=False, decimal=",")
         header, rows, delimiter = imp._read_delimited(text)
     except (imp.ReportFormatError, ValueError):
         return None
     return _body([header, *rows], serial=False, decimal="," if delimiter == ";" else ".")
+
+
+def _semicolon_rows(text: str) -> list[list[str]] | None:
+    """The rows of a semicolon file whose decimals are commas (the usual
+    European export), which a comma count would otherwise split at each
+    decimal: every one of the first lines holds the same number of ``;``."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    top = lines[: imp.UNIVERSAL_HEADER_SCAN + 5]
+    counts = {line.count(";") for line in top}
+    if len(top) < 2 or len(counts) != 1 or counts == {0}:
+        return None
+    return [row for row in csv.reader(lines, delimiter=";")]
 
 
 def read_table(data: bytes) -> Table | None:
@@ -465,6 +481,35 @@ def looks_like_results(data: bytes) -> bool:
     return changes >= 3 and changes >= 0.05 * len(figures)
 
 
+def _negative(row: Sequence[str], table: Table, name: str) -> bool:
+    at = [cell.strip() for cell in table.header].index(name)
+    cell = row[at].strip() if at < len(row) else ""
+    return cell.startswith("-") or (cell.startswith("(") and cell.endswith(")"))
+
+
+def preselected(table: Table) -> tuple[dict[str, str], bool]:
+    """The page's own guess of each field, and whether the file reads as a
+    list of results or balances (no prices), whose two-field path goes first."""
+    guess = guessed(table)
+    curve_guess = results_guess(table, with_result=False)
+    # With no price column the file is a list of results or balances: the
+    # two-field path comes first and alone is preselected (a "Volumen" column
+    # is not offered as a trade's quantity).
+    dates = sum(1 for name in table.names if _is_date(_example(table, name)))
+    simple = not any(role in guess for role in ("price", "entry_price", "exit_price")) and (
+        "balance" in curve_guess or dates < 2
+    )
+    if simple:
+        picked = dict(curve_guess)
+        if "balance" not in picked and "profit" in guess:
+            picked["profit"] = guess["profit"]
+    else:
+        picked = dict(guess)
+        for role, name in curve_guess.items():
+            picked.setdefault(role, name)
+    return picked, simple
+
+
 def results_guess(table: Table, *, with_result: bool = True) -> dict[str, str]:
     """For a list of results: its first date column, and the first other
     column whose sample is a number, preselected as the date and the result."""
@@ -475,10 +520,19 @@ def results_guess(table: Table, *, with_result: bool = True) -> dict[str, str]:
     )
     balance = ""
     if not with_result:
-        figure = ""
         balance = next(
             (name for name in table.names if universal.normalise(name) in _BALANCE_NAMES), ""
         )
+        numbers = [
+            name
+            for name in table.names
+            if name != date and _is_number(_example(table, name) or "x")
+        ]
+        if balance or len(numbers) != 1:
+            figure = ""
+        elif not any(_negative(row, table, numbers[0]) for row in table.samples):
+            # One unnamed column of numbers that never goes below zero: a balance.
+            balance, figure = numbers[0], ""
     pairs = (("date", date), ("profit", figure), ("balance", balance))
     return {role: name for role, name in pairs if name}
 
@@ -668,23 +722,7 @@ def mapping_page(
     words = COPY[locale]
     form_copy = _COPY[locale]
     labels: Mapping[str, str] = form_copy["map_roles"]
-    guess = guessed(table)
-    curve_guess = results_guess(table, with_result=False)
-    # With no price column the file is a list of results or balances: the
-    # two-field path comes first and alone is preselected (a "Volumen" column
-    # is not offered as a trade's quantity).
-    dates = sum(1 for name in table.names if _is_date(_example(table, name)))
-    simple = not any(role in guess for role in ("price", "entry_price", "exit_price")) and (
-        "balance" in curve_guess or dates < 2
-    )
-    if simple:
-        picked = dict(curve_guess)
-        if "balance" not in picked and "profit" in guess:
-            picked["profit"] = guess["profit"]
-    else:
-        picked = dict(guess)
-        for role, name in curve_guess.items():
-            picked.setdefault(role, name)
+    picked, simple = preselected(table)
     picked.update(usable_mapping(chosen or {}, table))
     trade_groups = "".join(
         f"<fieldset class='map-group'><legend>{_e(title)}</legend><div class='form-grid'>"

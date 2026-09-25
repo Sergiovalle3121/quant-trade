@@ -457,3 +457,34 @@ def test_a_sheet_without_prices_puts_the_two_field_path_first() -> None:
     assert trades is not None
     listed = mapping.mapping_page(trades, "problema")
     assert listed.index("Una fila por operación") < listed.index("Si solo tienes fecha")
+
+
+def _european(kind: str) -> bytes:
+    """A headerless semicolon export with comma decimals."""
+    rows = []
+    for day in range(3, 32):
+        value = (-1) ** day * day * 3.52 if kind == "results" else 1000 + day * 3.52
+        rows.append(f"{day:02d}/01/2022;{value:.2f}".replace(".", ","))
+    return ("\n".join(rows) + "\n").encode()
+
+
+@pytest.mark.parametrize("field", ["report", "equity"])
+def test_a_headerless_european_export_preselects_its_only_number(
+    tmp_path: Path, field: str
+) -> None:
+    client = _client(tmp_path)
+    for kind, role in (("results", "profit"), ("balance", "balance")):
+        answer = client.post(
+            "/audits", files={field: ("x.csv", _european(kind), "text/csv")}, data={"consent": "on"}
+        )
+        assert answer.status_code == 422, (kind, answer.text[:300])
+        menu = rf"name='col_{role}'>(?:(?!</select>).)*?value='Col. 2' selected"
+        assert re.search(menu, answer.text)
+        assert ("parece una lista de resultados" in answer.text) == (kind == "results")
+    posted = client.post(
+        "/audits",
+        files={field: ("x.csv", _european("results"), "text/csv")},
+        data={"consent": "on", "col_date": "Col. 1", "col_profit": "Col. 2"},
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303, posted.text[:400]
