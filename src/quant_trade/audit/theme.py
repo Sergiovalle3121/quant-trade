@@ -628,6 +628,9 @@ box-shadow:0 1px 0 rgba(255,255,255,.06) inset,var(--shadow)}
 .panel-note{display:flex;gap:10px;align-items:center;font-size:.86rem;color:var(--text-2);
 margin:0 0 22px}
 .panel-note svg{width:16px;height:16px;color:var(--ok);flex:none}
+.signin-first{margin:0 0 18px;padding:16px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2,rgba(0,0,0,.03))}
+.signin-first p{margin:0 0 12px;font-size:.93rem;line-height:1.5}
+.signin-first .inline-form{display:flex;flex-wrap:wrap;gap:10px}
 .submit-row{margin-top:24px}
 .inline-form{display:flex;flex-wrap:wrap;gap:10px}
 .inline-form input{flex:1 1 220px}
