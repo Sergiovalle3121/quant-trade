@@ -277,6 +277,49 @@ def test_etoro_closed_positions() -> None:
     assert [round(t.pnl, 2) for t in report.trades.trades] == [50.0, -20.0]
 
 
+XTB_HEADER = (
+    "Position,Symbol,Type,Volume,Open time,Open price,Close time,Close price,Open origin,"
+    "Close origin,Purchase value,Sale value,SL,TP,Margin,Commission,Swap,Rollover,Gross P/L,"
+    "Comment"
+)
+XTB_ROWS = [
+    ["101", "AAPL.US", "BUY", 10, "02/03/2026 15:30:00", 200, "04/03/2026 16:00:00", 210,
+     "xStation5", "xStation5", 2000, 2100, 0, 0, 0, -1.0, 0, 0, 100.0, ""],
+    ["102", "EURUSD", "SELL", 0.1, "13/03/2026 08:00:00", 1.09, "13/03/2026 12:00:00", 1.088,
+     "xStation5", "xStation5", 10900, 10880, 0, 0, 0, 0, -0.5, -0.25, 20.0, ""],
+    ["103", "AAPL.US", "BUY", 5, "16/03/2026 15:30:00", 212, "17/03/2026 16:00:00", 208,
+     "xStation5", "xStation5", 1060, 1040, 0, 0, 0, -1.0, 0, 0, -20.0, ""],
+]  # fmt: skip
+
+
+def test_xtb_closed_positions_csv_skips_the_total_row() -> None:
+    lines = [XTB_HEADER] + [",".join(str(cell) for cell in row) for row in XTB_ROWS]
+    lines.append("Total,,,,,,,,,,,,,,,-2,-0.5,-0.25,100,")
+    report = _read(["Name,Demo", "Currency,USD", "", *lines], "account_123_closed.csv")
+    assert report.source_format == UNIVERSAL_TRADES_CSV
+    assert report.trades.sides == ["long", "short", "long"]
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [100.0, 20.0, -20.0]
+    # Commission and both financing columns (Swap and Rollover) are costs.
+    assert _net(report) == [99.0, 19.25, -21.0]
+    assert report.metadata["column_commission"] == "Commission, Rollover"
+    assert not any("dropped" in warning for warning in report.warnings)
+    assert report.symbols == ["AAPL.US", "EURUSD", "AAPL.US"]
+
+
+def test_xtb_xlsx_with_account_rows_and_an_empty_first_column() -> None:
+    from test_audit_importers import xlsx
+
+    top: list[list[object]] = [[None, "Name and surname", "Demo"], [None, "Account", "123"]]
+    top += [[None]] * 10
+    sheet = [*top, [None, *XTB_HEADER.split(",")], *[[None, *row] for row in XTB_ROWS]]
+    sheet.append([None, "Total", *[None] * 14, -2, -0.5, -0.25, 100])
+    data = xlsx({"CLOSED POSITION HISTORY": sheet, "CASH OPERATION HISTORY": [["ID"]]})
+    report = import_report(data, "account_123_xStation5.xlsx", initial_balance=25_000)
+    assert report.source_format == UNIVERSAL_TRADES_CSV
+    assert _net(report) == [99.0, 19.25, -21.0]
+    assert report.trades.trades[0].entry_time == datetime(2026, 3, 2, 15, 30, tzinfo=UTC)
+
+
 def test_ctrader_history() -> None:
     header = (
         "ID,Symbol,Opening Direction,Opening Time (UTC+0),Closing Time (UTC+0),Entry price,"
