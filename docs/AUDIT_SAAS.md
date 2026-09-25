@@ -1307,6 +1307,18 @@ A payment or code that worked shows a green "done" notice instead of the blue
 informational one. The optimisation XML refusal also states its limit in MB and
 splits into the problem and "What to do".
 
+Redesign pass 37, the full report on a phone. Metric cards put the MEASURED,
+DECLARED or NOT_MEASURED badge on the label's line, so a card without a note is one
+line. "Reasons per dimension" becomes one card per dimension. "When it wins and
+when it loses" stays a compact four-column table instead of eleven tall cards. An
+empty red-flag list reads "No red flags in the audited files." with a check
+instead of a bare "none". The out-of-sample keys `sharpe_annualised` and `gap`
+have readable names, reason and note text starts with a capital, and the fan
+chart legend no longer overlaps. The sample report on a phone is about 3,000 px
+shorter; print is unchanged. The recent-period section (#179) was checked in both
+cases (holds and fades) on a phone, a desktop and the PDF. It reuses the polished
+verdict callout, fact pairs and year table; its closing note now starts with a capital.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

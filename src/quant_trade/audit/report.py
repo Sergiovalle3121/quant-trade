@@ -100,6 +100,7 @@ LABELS: dict[str, dict[str, str]] = {
         "evidence": "Evidencia",
         "note": "Nota",
         "none": "ninguna",
+        "flags_none": "Sin banderas rojas en los archivos auditados.",
         "trials": "intentos",
         "expected_max": "Sharpe máximo esperado sin habilidad",
         "dsr": "Sharpe deflactado (DSR)",
@@ -592,6 +593,7 @@ LABELS: dict[str, dict[str, str]] = {
         "evidence": "Evidence",
         "note": "Note",
         "none": "none",
+        "flags_none": "No red flags in the audited files.",
         "trials": "trials",
         "expected_max": "Expected max Sharpe without skill",
         "dsr": "Deflated Sharpe (DSR)",
@@ -1086,6 +1088,8 @@ STATUS_TEXT: dict[str, dict[str, str]] = {
 #: Reader-facing names of the numeric keys; the key itself when absent.
 KEY_LABELS: dict[str, dict[str, str]] = {
     "es": {
+        "sharpe_annualised": "Sharpe anualizado",
+        "gap": "Diferencia de Sharpe (dentro menos fuera)",
         "seal_id": "Identificador del sello",
         "selection_start": "Inicio de la selección",
         "selection_end": "Fin de la selección",
@@ -1174,6 +1178,8 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dataset_digest": "Huella del conjunto de datos",
     },
     "en": {
+        "sharpe_annualised": "Annualised Sharpe",
+        "gap": "Sharpe gap (in minus out of sample)",
         "seal_id": "Seal id",
         "selection_start": "Selection start",
         "selection_end": "Selection end",
@@ -1679,8 +1685,9 @@ def _reasons_html(verdict: dict[str, Any], locale: str, labels: dict[str, str]) 
             f"<td>{_status_badge(d['status'], locale)}</td><td>{_e('; '.join(reasons))}</td></tr>"
         )
     return (
-        f"<table><tr><th>{_e(labels['dimension'])}</th><th>{_e(labels['status'])}</th>"
-        f"<th>{_e(labels['reasons'])}</th></tr>{''.join(rows)}</table>"
+        f"<table class='reasons'><tr><th>{_e(labels['dimension'])}</th>"
+        f"<th>{_e(labels['status'])}</th><th>{_e(labels['reasons'])}</th></tr>"
+        f"{''.join(rows)}</table>"
         f"<p class='muted'>{_e(labels['thresholds'])}: "
         + _e(
             " · ".join(
@@ -2017,9 +2024,14 @@ def _stress_html(stress: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
+def _no_flags_html(labels: dict[str, str]) -> str:
+    """An empty red-flag list as a calm line, not a bare "none"."""
+    return f"<p class='no-flags'>{icon('check')}<span>{_e(labels['flags_none'])}</span></p>"
+
+
 def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str, str]) -> str:
     if not flags:
-        return f"<p class='muted'>{_e(labels['none'])}</p>"
+        return _no_flags_html(labels)
     return (
         "<ul class='flag-list'>"
         + "".join(
@@ -3039,7 +3051,7 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
     grid = " pairs" if len(cells) % 2 == 0 else ""
     out += f"<div class='facts{grid}'>{facts}</div>"
     out += _timing_table(recent["years"], labels["recent_year"], str, labels)
-    out += f"<p class='muted'>{_e(localize(recent.get('note', ''), locale))}</p>"
+    out += f"<p class='muted'>{_e(_sentence(localize(recent.get('note', ''), locale)))}</p>"
     return out
 
 
@@ -3457,7 +3469,7 @@ def render_html(
         )
         + "</ul>"
         if data["red_flags"]
-        else f"<p class='muted'>{_e(labels['none'])}</p>"
+        else _no_flags_html(labels)
     )
 
     seal = data["seal"]
