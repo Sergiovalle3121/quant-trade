@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import io
 import math
+import re
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -205,6 +206,10 @@ class IngestedSeries:
     unparseable_rows: int
     non_monotonic: bool
     warnings: list[str] = field(default_factory=list)
+    #: A benchmark the same file carries (``timestamp``, ``ret``): a column
+    #: beside the returns, or a factsheet's benchmark rows. Read only by the
+    #: fund section; it never feeds the benchmark dimension.
+    benchmark: pd.DataFrame | None = None
 
     @property
     def observations(self) -> int:
@@ -382,7 +387,9 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     warnings: list[str] = []
     ts_col = _pick(raw, TIMESTAMP_ALIASES)
     grid = _factsheet_grid(raw) if ts_col is None else None
+    companion: pd.DataFrame | None = None
     if grid is not None:
+        companion = grid.benchmark
         # A factsheet's year-by-month table becomes a dated return series.
         raw = pd.DataFrame(
             {
@@ -440,6 +447,15 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         elif values.abs().median() > 0.5:
             values = values / 100.0
             warnings.append("returns look like percentages (median |r| > 0.5); divided by 100")
+    if grid is None:
+        companion = _benchmark_column(
+            raw,
+            timestamps,
+            source,
+            divided=source == "returns" and bool(values_divided(warnings)),
+            skip={ts_col, value_col},
+            warnings=warnings,
+        )
     # "inf" and "1e400" read as numbers but are not values an account can hold.
     values = values.where(np.isfinite(values.astype(float)))
     frame = pd.DataFrame({"timestamp": timestamps, "value": values})
@@ -525,6 +541,58 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         unparseable_rows=unparseable,
         non_monotonic=non_monotonic,
         warnings=warnings,
+        benchmark=companion,
+    )
+
+
+def values_divided(warnings: list[str]) -> bool:
+    """Whether the returns column was read as percentages (see the warnings above)."""
+    return any("divided by 100" in w for w in warnings)
+
+
+#: A column that carries a benchmark beside the fund's own values.
+BENCHMARK_COLUMN = re.compile(r"^(benchmark|bench|bmk|index|indice|índice|referencia)(_\S*)?$")
+
+
+def _benchmark_column(
+    raw: pd.DataFrame,
+    timestamps: pd.Series,
+    source: str,
+    *,
+    divided: bool,
+    skip: set[str | None],
+    warnings: list[str],
+) -> pd.DataFrame | None:
+    """A benchmark column's returns (``timestamp``, ``ret``), read like the
+    fund's own column: returns beside returns, levels beside levels."""
+    column = next(
+        (str(c) for c in raw.columns if str(c) not in skip and BENCHMARK_COLUMN.match(str(c))),
+        None,
+    )
+    if column is None:
+        return None
+    values, percent = _to_numeric(raw[column])
+    numbers = values.dropna()
+    counter = numbers.to_numpy()
+    if len(counter) and np.array_equal(counter, np.arange(counter[0], counter[0] + len(counter))):
+        return None  # a row number, not a benchmark
+    if source == "returns" and (percent or divided):
+        values = values / 100.0
+    frame = pd.DataFrame({"timestamp": timestamps, "value": values})
+    frame = frame[np.isfinite(frame["value"].astype(float))].dropna()
+    frame = frame.sort_values("timestamp", kind="stable").drop_duplicates("timestamp", keep="last")
+    if source == "equity":
+        valid = bool((frame["value"] > 0).all())
+        ret = frame["value"].astype(float).pct_change()
+    else:
+        valid = bool((frame["value"] > -1).all())
+        ret = frame["value"].astype(float)
+    if len(frame) < 2 or not valid:
+        warnings.append(f"the benchmark column {column!r} could not be read; left out")
+        return None
+    warnings.append(f"benchmark column {column!r} read: the fund section compares the fund with it")
+    return (
+        pd.DataFrame({"timestamp": frame["timestamp"], "ret": ret}).dropna().reset_index(drop=True)
     )
 
 

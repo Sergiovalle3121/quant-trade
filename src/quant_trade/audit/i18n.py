@@ -851,6 +851,53 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "{count} mes(es) ilegibles fuera de la tabla: {cells}",
     ),
     (
+        "benchmark rows read from the table: the fund section compares the fund with them",
+        "filas del índice de referencia leídas de la tabla: la sección de fondos compara el "
+        "fondo con ellas",
+    ),
+    (
+        "{n} row(s) of differences between the fund and its benchmark left out",
+        "{n} fila(s) de diferencias entre el fondo y su índice de referencia fuera del análisis",
+    ),
+    (
+        "benchmark column {column} read: the fund section compares the fund with it",
+        "columna de índice de referencia {column} leída: la sección de fondos compara el fondo "
+        "con ella",
+    ),
+    (
+        "the benchmark column {column} could not be read; left out",
+        "la columna de índice de referencia {column} no se pudo leer; queda fuera",
+    ),
+    (
+        "the benchmark's returns as supplied; Rigor did not check them against the index",
+        "rentabilidades del índice de referencia tal como se aportaron; Rigor no las comprobó "
+        "con el índice",
+    ),
+    (
+        "needs at least {n} months shared with the benchmark",
+        "necesita al menos {n} meses en común con el índice de referencia",
+    ),
+    (
+        "the benchmark's monthly returns do not vary",
+        "las rentabilidades mensuales del índice de referencia no varían",
+    ),
+    (
+        "needs at least {n} months with the benchmark up",
+        "necesita al menos {n} meses con el índice de referencia al alza",
+    ),
+    (
+        "needs at least {n} months with the benchmark down",
+        "necesita al menos {n} meses con el índice de referencia a la baja",
+    ),
+    (
+        "fund's compound annual return minus the benchmark's",
+        "rentabilidad anual compuesta del fondo menos la del índice de referencia",
+    ),
+    (
+        "annualised standard deviation of the monthly differences",
+        "desviación típica anualizada de las diferencias mensuales",
+    ),
+    (
         "the stated year total does not match its months for {years}",
         "el total anual indicado no cuadra con sus meses en {years}",
     ),
@@ -1295,6 +1342,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
 #: (English singular, Spanish singular). The result JSON keeps the ``(s)``
 #: form; a page shows the singular for one item and the plural otherwise.
 _SINGULAR: dict[str, tuple[str, str]] = {
+    "{n} row(s) of differences between the fund and its benchmark left out": (
+        "{n} row of differences between the fund and its benchmark left out",
+        "{n} fila de diferencias entre el fondo y su índice de referencia fuera del análisis",
+    ),
     "{n} future period(s) with no change dropped (they have not happened yet)": (
         "{n} future period with no change dropped (it has not happened yet)",
         "se descartó {n} periodo futuro sin cambio (todavía no ha ocurrido)",

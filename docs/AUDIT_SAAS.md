@@ -813,6 +813,45 @@ DECLARED and says Rigor did not measure costs, and the report is titled
 warning and costs are checked as usual. The observation thresholds do not
 change, and the costs dimension stays NOT_MEASURED.
 
+Against its benchmark. Factsheets print the benchmark's months next to the
+fund's, so the equity file may carry it:
+
+- a dated file: a column named `benchmark`, `bench`, `bmk`, `index`,
+  `indice`, `índice` or `referencia` (optionally with a suffix, e.g.
+  `benchmark_return`), read like the fund's own column (returns beside
+  returns, levels beside levels, the same percent scaling). A column of
+  row numbers (0, 1, 2...) is not a benchmark.
+- a factsheet table: rows whose label names the benchmark ("Benchmark",
+  "Index", "Índice", or an index family such as MSCI, S&P, FTSE, STOXX,
+  Russell, Nasdaq, IBEX, DAX, Bloomberg, HFRI, IPC...) in a label column, in
+  a row under the fund's year with no year of its own, or in a block opened
+  by a short heading row naming the benchmark. A label naming the fund
+  ("Fund", "Fondo", "Portfolio", "Cartera", "Strategy"...) wins, so "Acme
+  Index Fund" stays the fund. Rows of differences ("Excess", "Relative",
+  "Difference", "Alpha", "+/-", "Diferencia"...) are left out and counted in
+  a warning. A year repeated within the fund's rows, or within the
+  benchmark's, is still refused.
+
+An uploaded benchmark file is used instead when there is one. Over the
+months both share (at least 24), MEASURED: each one's compound annual
+return and the difference, the share of months the fund beat the
+benchmark, the annual tracking error and information ratio, beta and
+correlation, and up and down capture (Morningstar's definition: geometric
+mean monthly return in the benchmark's up, or down, months over the
+benchmark's; each needs 6 such months). Findings, as questions:
+
+- `trails`: the fund's compound annual return is below the benchmark's;
+- `index_like`: correlation 0.95 or more and tracking error under 3 % a
+  year, the closet-indexing pattern (Cremers and Petajisto, 2009);
+- `worse_both_ways`: up capture under 100 % and down capture over 100 %.
+
+No index data is bundled: the benchmark is the customer's, as supplied, and
+the note says Rigor did not check it against the index. When the fund's
+figures are not declared net of fees, the section says the comparison
+flatters a fund whose figures are before fees. It never feeds the benchmark
+dimension (that reads only the uploaded benchmark file, as before), so the
+class does not move.
+
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are
