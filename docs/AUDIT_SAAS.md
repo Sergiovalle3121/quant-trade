@@ -869,6 +869,11 @@ On a locked preview each executive-summary tile shows a lock and a grey
 placeholder bar (a slow shimmer, off under reduced motion) where the figure
 will be; no stand-in number is ever drawn.
 
+"Backtest frente a cuenta real" opens with its verdict as a callout edged in
+the verdict's colour, shows the two shares of resampled histories as
+big-figure cards, and below 900px turns its table into one card per row, each
+value named by its column.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and
