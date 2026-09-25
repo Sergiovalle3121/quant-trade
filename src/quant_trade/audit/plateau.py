@@ -32,7 +32,7 @@ import statistics
 from collections.abc import Sequence
 from typing import Any
 
-from quant_trade.audit.forward import UNNAMED_FORWARD, unnamed_forward
+from quant_trade.audit.forward import UNNAMED_FORWARD, is_forward, unnamed_forward
 from quant_trade.audit.redflags import RedFlag
 from quant_trade.audit.schema import measured, not_measured
 
@@ -91,7 +91,7 @@ def parameter_stability(
     """Neighbours of the chosen pass in an MT5 optimisation export."""
     if not table:
         return {"status": "NOT_MEASURED", "reason": "no optimisation file uploaded"}, []
-    if all("Forward Result" in row and "Back Result" in row for row in table):
+    if is_forward(table):
         return {"status": "NOT_MEASURED", "reason": FORWARD_EXPORT}, []
     if unnamed_forward(table):
         return {"status": "NOT_MEASURED", "reason": UNNAMED_FORWARD}, []

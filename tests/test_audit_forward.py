@@ -6,15 +6,19 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.forward import UNNAMED_FORWARD, forward_review, is_forward, unnamed_forward
-from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import parse_optimization
 from quant_trade.audit.plateau import parameter_stability
 from quant_trade.audit.report import render
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+from quant_trade.audit.settings import AuditSettings
+from quant_trade.audit.store import make_store
+from quant_trade.audit.web import create_app
 
 FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
 FAST = [4, 8, 12, 16, 20]
@@ -172,6 +176,71 @@ def test_section_renders_clean_with_the_tester_report(locale: str) -> None:
     title = "¿Aguanta en el periodo forward?" if locale == "es" else "Does it hold in the forward"
     assert title in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize("cell", ["", "-", "n/a"])
+def test_a_pass_without_a_forward_result_keeps_the_export_a_forward_one(cell: str) -> None:
+    # One blank forward cell used to make the whole file a plain export, so
+    # the plateau check read the forward period's Profit as the backtest's.
+    first = f'<Data ss:Type="Number">{10_000 + _lost(FAST[0], SLOW[0])}</Data>'
+    export = _export(_lost).decode()
+    assert first in export
+    summary = parse_optimization(
+        export.replace(first, f'<Data ss:Type="String">{cell}</Data>', 1).encode()
+    )
+    assert "Forward Result" not in summary.table[0]
+    assert is_forward(summary.table)
+    review, flags = forward_review(summary.table, summary.parameters, report_inputs="FastMA=12")
+    assert review["status"] == "MEASURED" and review["passes"]["value"] == 24
+    assert [flag.code for flag in flags] == ["FORWARD_NOT_HELD"]
+    plateau, plateau_flags = parameter_stability(
+        summary.table, summary.parameters, report_inputs=None
+    )
+    assert plateau["status"] == "NOT_MEASURED" and plateau_flags == []
+    assert "forward export" in plateau["reason"]
+
+
+def test_unnamed_forward_columns_are_found_past_a_blank_first_row() -> None:
+    header = ["Pass", "Columna 1", "Columna 2", *HEADER[3:]]
+    table = [dict(values) for values in parse_optimization(_export(_lost, header)).table]
+    del table[0]["Columna 1"]
+    assert unnamed_forward(table)
+
+
+def test_the_optimisation_export_may_be_as_large_as_a_report(tmp_path: Path) -> None:
+    # About 900 bytes a pass: a 5 MB cap refused common genetic runs.
+    export = _export(_lost)
+    settings = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db",
+        bootstrap_samples=100,
+        max_upload_bytes=len(export) * 2 // 3,
+    )
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    files = {
+        "report": ("ReportTester.html", (FIXTURES / "mt5_tester.html").read_bytes(), "text/html"),
+        "optimization": ("ReportOptimizer.xml", export, "text/xml"),
+    }
+    response = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
+    assert response.status_code == 303
+
+
+@pytest.mark.parametrize(("lang", "hint"), [("es", "genético"), ("en", "genetic")])
+def test_an_optimisation_over_the_limit_says_what_to_do(
+    tmp_path: Path, lang: str, hint: str
+) -> None:
+    export = _export(_lost)
+    settings = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db", max_upload_bytes=len(export) // 3
+    )
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    files = {
+        "report": ("ReportTester.html", (FIXTURES / "mt5_tester.html").read_bytes(), "text/html"),
+        "optimization": ("ReportOptimizer.xml", export, "text/xml"),
+    }
+    response = client.post("/audits", files=files, data={"consent": "on", "locale": lang})
+    assert response.status_code == 413
+    assert hint in response.text
+    assert find_claims(response.text) == []
 
 
 def test_forward_section_answers_first_then_a_two_by_two_grid() -> None:

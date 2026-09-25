@@ -32,7 +32,14 @@ applies. Trials and cost may be left blank on the web form: blank trials
 means "not declared" (1 is assumed and tagged NOT_MEASURED), blank cost means
 no extra cost beyond what the uploaded report already lists (there is no
 hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
-at least 30 return observations.
+at least 30 return observations. Platform reports and the MT5 optimisation export
+may be 10 MB (about 11,000 optimisation passes at some 900 bytes each).
+A larger optimisation export is refused with what to do instead: optimise
+again with the genetic algorithm or narrower ranges, or upload the report alone
+and type the pass count in "Configurations tried" (then DECLARED).
+A forward export whose Forward Result cell is blank or not a number on some
+passes is still read as a forward export: those passes are left out of the
+forward review, and the plateau check never reads its Profit column.
 
 A platform report dropped in the equity field by mistake (an `.htm`,
 `.html` or `.xlsx` name, or HTML content, UTF-16 included) is read as the
@@ -665,8 +672,10 @@ answers 402. `audit/pdf.py` lays out the same report page with WeasyPrint
 (needs Pango: `Dockerfile.web` installs it) and serves only the site's own
 fonts and `data:` URIs to the renderer; every other URL is refused, so a
 PDF never reaches the network. At most `MAX_CONCURRENT_PDFS = 2` render at
-once; a download waits up to `PDF_WAIT_SECONDS = 25` for a free slot (a
-double click or a second customer waits its turn), then a busy or missing
+once; a download waits up to `PDF_WAIT_SECONDS = 60` for a free slot (ten
+customers downloading at once all get their PDF), and the last
+`PDF_CACHE_SIZE = 16` finished PDFs are kept in memory so a double click
+does not render twice; then a busy or missing
 renderer answers 503 with a hint to use print. `HEAD` is answered like
 `GET` without the body, so link-preview bots and uptime checks do not get
 a 405.

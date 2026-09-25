@@ -30,6 +30,7 @@ import re
 import secrets
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -113,6 +114,20 @@ MESSAGES: dict[str, dict[str, str]] = {
     "too_large": {
         "es": "El archivo {what} supera el límite de {limit} bytes.",
         "en": "The {what} file exceeds {limit} bytes.",
+    },
+    "optimization_too_large": {
+        "es": (
+            "El XML de optimización supera el límite de {limit} bytes (unas {passes} pasadas). "
+            "Vuelve a optimizar con el algoritmo genético o con rangos de parámetros más "
+            "cortos y exporta de nuevo. También puedes subir el informe sin el XML y "
+            "escribir el número de pasadas en «Configuraciones probadas»."
+        ),
+        "en": (
+            "The optimisation XML exceeds {limit} bytes (about {passes} passes). Optimise "
+            "again with the genetic algorithm or narrower parameter ranges and export it "
+            "again. You can also upload the report without the XML and type the number of "
+            'passes in "Configurations tried".'
+        ),
     },
     "equity_required": {
         "es": (
@@ -288,13 +303,21 @@ WAITLIST_PER_HOUR_PER_IP = 5
 #: Room for the form fields and multipart boundaries on top of the files.
 FORM_OVERHEAD_BYTES = 1 << 20
 #: How long a PDF download waits for a free render slot before the busy
-#: page: two customers (or one double click) must not get an error.
-PDF_WAIT_SECONDS = 25.0
+#: page: ten customers downloading at once (a render takes 4-8 s, two run at
+#: a time) all get their PDF instead of an error.
+PDF_WAIT_SECONDS = 60.0
+#: Finished PDFs kept in memory, so a double click or a second download of
+#: the same report does not render again.
+PDF_CACHE_SIZE = 16
 #: How many upload fields ``POST /audits`` takes.
 UPLOAD_FIELDS = 7
 #: The fields that may carry a platform report, and how much larger than
-#: ``max_upload_bytes`` they may be.
-REPORT_FIELDS = frozenset({"equity", "report", "live"})
+#: ``max_upload_bytes`` they may be. The MT5 optimisation XML is one: about
+#: 900 bytes a pass, so 5 MB stopped at some 5,500 passes, fewer than a
+#: common genetic run.
+REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
+#: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
+OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
@@ -1080,12 +1103,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 "variants": await _read_limited(variants, what="variants"),
             }
         except UploadTooLarge as exc:
-            text = message(
-                "too_large",
-                loc,
-                what=UPLOAD_NAMES[exc.what][loc],
-                limit=f"{_field_limit(exc.what):,}",
-            )
+            limit = _field_limit(exc.what)
+            if exc.what == "optimization":
+                count = limit // OPTIMIZATION_PASS_BYTES
+                passes = f"{round(count, -3) if count >= 1_000 else count:,}"
+                text = message("optimization_too_large", loc, limit=f"{limit:,}", passes=passes)
+            else:
+                text = message(
+                    "too_large", loc, what=UPLOAD_NAMES[exc.what][loc], limit=f"{limit:,}"
+                )
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:
             return _html_error(request, 400, message("equity_required", loc), loc)
@@ -1216,6 +1242,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return html_text
 
+    pdf_cache: OrderedDict[tuple[str, str, bool], bytes] = OrderedDict()
+    pdf_cache_lock = threading.Lock()
+
     @app.get("/audits/{audit_id}/pdf")
     def audit_pdf(
         request: Request, audit_id: str, token: str | None = None, lang: str | None = None
@@ -1224,22 +1253,32 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         locale = _view_locale(record, lang)
         if not record.paid and not cfg.free_mode:
             raise HTTPException(status_code=402, detail="payment_required")
-        result = AuditResult.model_validate_json(record.result_json)
-        page, _ = render(
-            result,
-            watermark=not record.paid,
-            free_mode=cfg.free_mode,
-            legal_links=True,
-            locale=locale,
-        )
-        try:
-            content = pdf_lib.report_pdf(
-                page, audit_id=record.id, locale=locale, wait_seconds=PDF_WAIT_SECONDS
+        key = (record.id, locale, bool(record.paid))
+        with pdf_cache_lock:
+            content = pdf_cache.get(key)
+            if content is not None:
+                pdf_cache.move_to_end(key)
+        if content is None:
+            result = AuditResult.model_validate_json(record.result_json)
+            page, _ = render(
+                result,
+                watermark=not record.paid,
+                free_mode=cfg.free_mode,
+                legal_links=True,
+                locale=locale,
             )
-        except pdf_lib.PdfBusy:
-            return _html_error(request, 503, message("pdf_busy", locale), locale)
-        except pdf_lib.PdfUnavailable:
-            return _html_error(request, 503, message("pdf_unavailable", locale), locale)
+            try:
+                content = pdf_lib.report_pdf(
+                    page, audit_id=record.id, locale=locale, wait_seconds=PDF_WAIT_SECONDS
+                )
+            except pdf_lib.PdfBusy:
+                return _html_error(request, 503, message("pdf_busy", locale), locale)
+            except pdf_lib.PdfUnavailable:
+                return _html_error(request, 503, message("pdf_unavailable", locale), locale)
+            with pdf_cache_lock:
+                pdf_cache[key] = content
+                while len(pdf_cache) > PDF_CACHE_SIZE:
+                    pdf_cache.popitem(last=False)
         return Response(
             content=content,
             media_type="application/pdf",
