@@ -1354,11 +1354,21 @@ def test_common_passwords_are_refused_offline() -> None:
         "1qaz2wsx3edc",
         "trader12345",
         "20240521198801",
+        "P@ssw0rd2024",
+        "p4ssw0rd!2025",
+        "1q2w3e4r5t6y",
+        "zaq12wsxcde3",
     ):
         assert common_password(weak), weak
         assert password_problem(weak) == "password_common", weak
     assert password_problem("anapaula1990", email="anapaula@example.com") == "password_common"
-    for fine in (PASSWORD, "long safe phrase", "correct horse battery", "MiPerroSeLlamaTobi"):
+    for fine in (
+        PASSWORD,
+        "long safe phrase",
+        "correct horse battery",
+        "MiPerroSeLlamaTobi",
+        "Tr0mb0n-azul-83",
+    ):
         assert not common_password(fine), fine
 
 
