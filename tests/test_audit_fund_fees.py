@@ -27,6 +27,7 @@ def test_a_fee_comes_off_every_month() -> None:
     assert [row["rate"] for row in fees["rows"]] == list(FEE_RATES)
     gross = 1.01**12 - 1
     assert fees["gross_cagr"]["value"] == pytest.approx(gross)
+    assert fees["gross_growth"]["value"] == pytest.approx(1.01**60 - 1)
     for row in fees["rows"]:
         assert row["cagr"]["value"] == pytest.approx((1 + gross) / (1 + row["rate"]) - 1)
     assert "break_even" not in fees
@@ -71,8 +72,11 @@ def test_the_fund_section_shows_the_fee_table(locale: str) -> None:
     assert_report_clean(html)
     labels = LABELS[locale]
     assert labels["fund_fees"].replace("'", "&#x27;") in html
+    assert "20 %" in labels["fund_fees_management"]
+    assert labels["fund_fees_management"].split(".")[0] in html
     assert untranslated(result.model_dump(mode="json")) == []
-    for key in ("fund_fees", "fund_fees_intro", "fund_fees_break_even", "fund_fees_behind"):
+    keys = ("fund_fees", "fund_fees_intro", "fund_fees_management")
+    for key in (*keys, "fund_fees_break_even", "fund_fees_behind"):
         assert find_claims(labels[key]) == [], key
 
 

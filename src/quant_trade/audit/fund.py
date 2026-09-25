@@ -307,6 +307,7 @@ def fee_drag(series: pd.Series, comparison: dict[str, Any] | None = None) -> dic
         "status": "MEASURED",
         "note": FEE_NOTE,
         "gross_cagr": measured(float(np.prod(1.0 + r) ** (1.0 / years) - 1.0)),
+        "gross_growth": measured(float(np.prod(1.0 + r) - 1.0)),
         "rows": rows,
     }
     if comparison and comparison.get("status") == "MEASURED":

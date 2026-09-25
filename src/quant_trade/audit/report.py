@@ -595,6 +595,10 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_fees_cagr": "Rentabilidad anual",
         "fund_fees_growth": "Crecimiento total",
         "fund_fees_none": "Sin comisión",
+        "fund_fees_management": (
+            "Solo comisión de gestión. Muchos fondos cobran además una comisión de éxito, a "
+            "menudo el 20 % de las ganancias, así que el 2.5 % no es el peor caso."
+        ),
         "fund_fees_break_even": (
             "Con una comisión de {rate} al año o más, el fondo habría quedado igual o por "
             "debajo de su índice en los meses en común."
@@ -1468,6 +1472,10 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_fees_cagr": "Yearly return",
         "fund_fees_growth": "Total growth",
         "fund_fees_none": "No fee",
+        "fund_fees_management": (
+            "Management fees only. Many funds also take a performance fee, often 20 % of "
+            "gains, so the 2.5 % row is not the worst case."
+        ),
         "fund_fees_break_even": (
             "At a fee of {rate} a year or more, the fund would have ended level with or below "
             "its benchmark over the months they share."
@@ -4687,10 +4695,12 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
     """The record under common yearly fees, when it was not declared net."""
     if not fees or fees.get("status") != "MEASURED":
         return ""
+    gross_growth = fees.get("gross_growth")
+    gross = _fund_pct(float(gross_growth["value"])) if gross_growth else "—"
     first = (
         f"<tr><td>{_e(labels['fund_fees_none'])}</td>"
         f"<td class='val'>{_e(_fund_pct(float(fees['gross_cagr']['value'])))}</td>"
-        "<td class='val'>—</td></tr>"
+        f"<td class='val'>{_e(gross)}</td></tr>"
     )
     body = first + "".join(
         f"<tr><td>{float(row['rate']) * 100:.1f} %</td>"
@@ -4705,6 +4715,7 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
         f"<th class='val'>{_e(labels['fund_fees_cagr'])}</th>"
         f"<th class='val'>{_e(labels['fund_fees_growth'])}</th></tr></thead>"
         f"<tbody>{body}</tbody></table>"
+        f"<p class='muted'>{_e(labels['fund_fees_management'])}</p>"
     )
     break_even = fees.get("break_even")
     if break_even:
