@@ -106,3 +106,23 @@ def test_the_report_shows_the_firm_table(locale: str) -> None:
     assert untranslated(result.model_dump(mode="json")) == []
     for key in ("ff_title", "ff_intro", "ff_clean", "best_day_line"):
         assert find_claims(labels[key]) == [], key
+
+
+def test_one_huge_day_carries_every_pass_past_the_best_day_rule() -> None:
+    # Flat drift and a single +50 % day: any pass rests on that day.
+    daily = np.r_[np.full(100, 0.0001), 0.5, np.full(100, 0.0001)]
+    fit = firm_fit(daily, samples=300, seed=1)
+    assert fit["status"] == "MEASURED"
+    for row in fit["firms"]:
+        assert 0.0 <= row["pass"]["value"] <= 1.0
+        if "pass_within_best_day" in row:
+            assert row["pass_within_best_day"]["value"] == 0.0
+    result = simulate_challenge(daily, PRESETS["ftmo-1step"], samples=300, seed=1)
+    if result["probability"]["pass"]["value"] > 0:
+        assert result["best_day"]["breach_share_of_passes"]["value"] == 1.0
+
+
+@pytest.mark.parametrize("daily", [np.zeros(200), np.full(5, 0.01)], ids=["flat", "short"])
+def test_flat_or_short_histories_give_no_table_and_no_best_day(daily: np.ndarray) -> None:
+    assert firm_fit(daily, samples=100)["status"] == "NOT_MEASURED"
+    assert "best_day" not in simulate_challenge(daily, PRESETS["ftmo-1step"], samples=100)

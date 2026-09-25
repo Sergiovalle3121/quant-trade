@@ -444,6 +444,12 @@ BEST_DAY_NOTE = (
 )
 
 
+BEST_DAY_BREACH_NOTE = (
+    "share of the resampled passes whose best day breaks the firm's best-day rule, "
+    "checked at the pass on daily closes"
+)
+
+
 def _best_day_at_pass(
     rules: ChallengeRules,
     passed: np.ndarray,
@@ -465,7 +471,7 @@ def _best_day_at_pass(
         "pass_within": measured(clean / samples, BEST_DAY_NOTE),
     }
     if passes:
-        out["breach_share_of_passes"] = measured((passes - clean) / passes, BEST_DAY_NOTE)
+        out["breach_share_of_passes"] = measured((passes - clean) / passes, BEST_DAY_BREACH_NOTE)
     return out
 
 

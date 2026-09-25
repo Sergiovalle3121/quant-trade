@@ -816,6 +816,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "es el producto de la de cada fase",
     ),
     (
+        "share of the resampled passes whose best day breaks the firm's best-day rule, "
+        "checked at the pass on daily closes",
+        "proporción de los pases remuestreados cuyo mejor día rompe la regla del mejor día "
+        "de la firma, comprobada al pasar con cierres diarios",
+    ),
+    (
         "share of all resampled paths that reach the target with the best day inside the "
         "firm's best-day rule; the rule is checked at the pass, on daily closes",
         "proporción de todos los recorridos remuestreados que llegan al objetivo con el mejor "
