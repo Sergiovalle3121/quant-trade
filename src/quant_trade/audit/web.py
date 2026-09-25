@@ -113,6 +113,8 @@ PAID_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_suc
 #: The page languages; Spanish is the default everywhere.
 LOCALES = ("es", "en")
 _EMAIL_MAX = 254
+#: Control characters, dropped from the column names a customer types.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
 #: Every message the service itself shows, in both locales. Parse errors
 #: carry their own Spanish text (``ParseError.localized``).
@@ -1059,7 +1061,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/", response_class=HTMLResponse)
     def index(
-        request: Request, lang: str | None = None, joined: int = 0, error: str | None = None
+        request: Request,
+        lang: str | None = None,
+        joined: int = 0,
+        error: str | None = None,
+        extras: int = 0,
     ) -> str:
         locale = _locale(lang)
         # Only known codes are shown, so the query string cannot inject text.
@@ -1076,6 +1082,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention_days=cfg.retention_days,
             base_url=_site_url(request),
             pack_price_usd=cfg.pack_price_usd,
+            extras_open=bool(extras),
         )
 
     @app.get("/en", response_class=HTMLResponse)
@@ -1744,10 +1751,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
         # "Name its columns": the customer's mapping for a platform no importer knows.
         form = await request.form()
+        # Control characters (a NUL) cannot be in a decoded header; dropped
+        # so a pasted name still matches and never reaches a page.
         report_columns = {
-            role: str(form.get(f"col_{role}") or "").strip()[:100]
+            role: _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()[:200]
             for role in universal.ROLES
-            if str(form.get(f"col_{role}") or "").strip()
+            if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
         }
 
         def parse_and_audit() -> tuple[str, str, bool] | Response:

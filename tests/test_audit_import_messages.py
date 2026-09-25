@@ -67,6 +67,55 @@ def test_fills_that_never_close_count_the_open_positions() -> None:
     with pytest.raises(ReportFormatError) as info:
         import_report(data, "fills.csv")
     assert info.value.code == "no_closed_trades"
-    assert "2 position(s) opened and never closed" in str(info.value)
-    assert "2 posición(es) se abrieron y no se cerraron" in info.value.message_es
+    assert "2 positions opened and never closed" in str(info.value)
+    assert "2 posiciones se abrieron y no se cerraron" in info.value.message_es
+    assert "universal" not in str(info.value) + info.value.message_es
+    _clean(info.value)
+
+
+def test_one_position_never_closed_is_singular() -> None:
+    data = b"Time,Symbol,Side,Quantity,Price\n2026-01-02 10:00,AAPL,Buy,10,190\n"
+    with pytest.raises(ReportFormatError) as info:
+        import_report(data, "fills.csv")
+    assert "1 position opened and never closed" in str(info.value)
+    assert "1 posición se abrió y no se cerró" in info.value.message_es
+
+
+def test_fill_list_in_the_curve_box_is_sent_to_the_report_box() -> None:
+    data = (
+        b"Time,Symbol,Side,Quantity,Price\n"
+        b"2026-01-02 10:00,AAPL,Buy,10,190\n"
+        b"2026-01-03 10:00,AAPL,Sell,10,191\n"
+    )
+    with pytest.raises(ParseError) as info:
+        parse_equity_csv(data, what="equity")
+    assert info.value.code == "trade_list_as_curve"
+
+
+@pytest.mark.parametrize(
+    ("role", "english", "spanish"),
+    [
+        ("quantity", "as quantity holds no numbers", "como cantidad no tiene números"),
+        ("entry_time", "as entry time holds no dates", "como hora de entrada no tiene fechas"),
+    ],
+)
+def test_a_text_column_mapped_to_a_number_or_time_is_named(
+    role: str, english: str, spanish: str
+) -> None:
+    columns = {
+        "entry_time": "Open Time",
+        "exit_time": "Close Time",
+        "quantity": "Qty",
+        "entry_price": "Entry Price",
+        "exit_price": "Exit Price",
+    }
+    columns[role] = "Notiz"
+    data = (TRADES_HEADER.rstrip("\n") + ",Notiz\n").encode() + b"".join(
+        line + b",hello\n" for line in _trades(5).splitlines()[1:]
+    )
+    with pytest.raises(ReportFormatError) as info:
+        import_report(data, "trades.csv", columns=columns)
+    assert info.value.code == "universal_column_unreadable"
+    assert f'"Notiz" you chose {english}' in str(info.value)
+    assert f"«Notiz» que elegiste {spanish}" in info.value.message_es
     _clean(info.value)

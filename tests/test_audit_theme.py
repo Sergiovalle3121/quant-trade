@@ -286,8 +286,14 @@ def test_deposit_rows_are_cards_on_phones_and_facts_share_a_printed_row(tmp_path
 
 def test_upload_form_leaves_no_lone_field_on_desktop() -> None:
     page = landing(locale="es", free_mode=False, price_usd=29, access_codes=True)
-    grid = page.split("<div class='form-grid'>", 1)[1].split("<details", 1)[0]
-    assert "name='access_code'" in grid and "name='optimization'" in grid
+    form = page.split("id='subir'", 1)[1].split("</form>", 1)[0]
+    grids = [
+        re.split(r"<details|<label class='check'>|<label for='f-challenge'", part)[0]
+        for part in form.split("<div class='form-grid'>")[1:]
+    ]
+    # The extra files pair up inside "Añadir más archivos"; language and code pair below.
+    assert any("name='optimization'" in g and "name='live'" in g for g in grids)
+    assert any("name='locale'" in g and "name='access_code'" in g for g in grids)
     assert ".form-grid>:last-child:nth-child(odd){grid-column:1/-1}" in STYLE
 
 
