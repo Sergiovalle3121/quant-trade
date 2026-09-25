@@ -186,6 +186,22 @@ LABELS: dict[str, dict[str, str]] = {
             "1x es el tamaño de lote del backtest; 0.50x es la mitad. Por encima de 1x la "
             "caída en dinero crece en la misma proporción."
         ),
+        # The same labels when the file is a real or demo account history.
+        "capital_fall_account": "Caída de referencia en dinero, al tamaño que usó la cuenta.",
+        "capital_needed_account": "Capital necesario al tamaño que usó la cuenta",
+        "capital_scale_help_account": (
+            "1x es el tamaño de lote que usó la cuenta; 0.50x es la mitad. Por encima de 1x "
+            "la caída en dinero crece en la misma proporción."
+        ),
+        "capital_open_loss": (
+            "Tu plataforma imprime un drawdown de {platform} con las operaciones abiertas, "
+            "frente a {closed} con las cerradas. Esta sección solo ve las operaciones "
+            "cerradas: con las pérdidas abiertas hace falta más capital que el de la tabla."
+        ),
+        "capital_closed_only": (
+            "Solo cuenta operaciones cerradas: las pérdidas de las posiciones mientras seguían "
+            "abiertas no entran, así que el capital necesario puede ser mayor."
+        ),
         "test_data_intro": (
             "El encabezado del informe dice cómo se simularon los precios, qué parte del "
             "historial tuvo el probador y qué fechas se probaron. Es la parte que más se retoca "
@@ -558,6 +574,21 @@ LABELS: dict[str, dict[str, str]] = {
         "capital_scale_help": (
             "1x is the backtest's lot size; 0.50x is half of it. Above 1x the fall in money "
             "grows in the same proportion."
+        ),
+        "capital_fall_account": "Reference fall in money, at the size the account used.",
+        "capital_needed_account": "Capital needed at the size the account used",
+        "capital_scale_help_account": (
+            "1x is the lot size the account used; 0.50x is half of it. Above 1x the fall in "
+            "money grows in the same proportion."
+        ),
+        "capital_open_loss": (
+            "Your platform prints a {platform} drawdown with open trades, against {closed} "
+            "with closed trades. This section sees closed trades only: with the open losses "
+            "it takes more capital than the table shows."
+        ),
+        "capital_closed_only": (
+            "It counts closed trades only: losses of positions while they were still open are "
+            "not included, so the capital needed may be larger."
         ),
         "test_data_intro": (
             "The report header says how prices were simulated, how much of the history the "
@@ -2262,10 +2293,26 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     return out
 
 
-def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
-    """Capital and size for each loss limit."""
+def _capital_html(
+    capital: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    *,
+    account: bool = False,
+    closed_dd: float | None = None,
+    platform_dd: float | None = None,
+    closed_only: bool = False,
+) -> str:
+    """Capital and size for each loss limit.
+
+    ``account`` words the sizes as the account's own; ``platform_dd`` (deeper
+    than ``closed_dd``) or ``closed_only`` say that open losses are left out."""
     if not capital or capital.get("status") != "MEASURED":
         return ""
+
+    def label(key: str) -> str:
+        return labels.get(f"{key}_account", labels[key]) if account else labels[key]
+
     samples = int((capital.get("method") or {}).get("samples") or 0)
     out = f"<p class='muted'>{_e(labels['capital_intro'].format(samples=samples))}</p>"
     reference = float(capital["fall_reference"]["value"])
@@ -2273,7 +2320,7 @@ def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str,
     out += (
         "<div class='facts'>"
         f"<div class='fact'><b>{_fmt(reference, key='fall_reference')}</b>"
-        f"<p>{_e(labels['capital_fall'])}</p></div>"
+        f"<p>{_e(label('capital_fall'))}</p></div>"
         f"<div class='fact'><b>{_fmt(history, key='fall_history')}</b>"
         f"<p>{_e(labels['capital_history'])}</p></div></div>"
     )
@@ -2300,11 +2347,21 @@ def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str,
         f"<span class='cap-lim'>{_e(labels['capital_limit'])} "
         f"<b>{float(row['limit']):.0%}</b></span>"
         f"<b class='cap-money'>{_fmt(row['capital']['value'], key='capital')}</b>"
-        f"<span class='cap-sub'>{_e(labels['capital_needed'])}</span>"
+        f"<span class='cap-sub'>{_e(label('capital_needed'))}</span>"
         f"<span class='cap-size'><b>{_e(size_text(row))}</b> {_e(scale_head)}</span></li>"
         for row in capital["rows"]
     )
-    out += f"<ol class='caps'>{tiles}</ol><p class='muted'>{_e(labels['capital_scale_help'])}</p>"
+    out += f"<ol class='caps'>{tiles}</ol><p class='muted'>{_e(label('capital_scale_help'))}</p>"
+    if platform_dd is not None and closed_dd is not None and platform_dd < closed_dd - 0.005:
+        text = labels["capital_open_loss"].format(
+            platform=f"{abs(platform_dd):.1%}", closed=f"{abs(closed_dd):.1%}"
+        )
+        out += (
+            f"<p class='live-verdict lv-FAIL'><span class='badge FAIL'>"
+            f"{_e(labels['open_loss_badge'])}</span> {_e(text)}</p>"
+        )
+    elif closed_only:
+        out += f"<p class='muted'>{_e(labels['capital_closed_only'])}</p>"
     return out + _assumptions(capital.get("assumptions"), locale, labels)
 
 
@@ -2839,7 +2896,22 @@ def render_html(
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
         *(
-            [(labels["capital"], _capital_html(data.get("capital"), locale, labels))]
+            [
+                (
+                    labels["capital"],
+                    _capital_html(
+                        data.get("capital"),
+                        locale,
+                        labels,
+                        account=is_account_history(data),
+                        closed_dd=_ev_value((data.get("performance") or {}).get("max_drawdown")),
+                        platform_dd=_ev_value(
+                            (data.get("performance") or {}).get("platform_equity_drawdown")
+                        ),
+                        closed_only=bool((data.get("inputs") or {}).get("balance_only")),
+                    ),
+                )
+            ]
             if (data.get("capital") or {}).get("status") == "MEASURED"
             else []
         ),
