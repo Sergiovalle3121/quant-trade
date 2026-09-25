@@ -1953,6 +1953,8 @@ Redesign pass 52 checks the two new report sections on screen, on a phone and in
 
 Redesign pass 53 checks the screens that landed after pass 51 on a phone first. The line naming the 20 recognised platforms under the landing's platform row is no longer one long underlined link: the names stay in a lighter grey, the link ends in an arrow and underlines on hover. "¿Cómo le fue en las crisis conocidas?" (`table.timing.crises`) now spans the card on a phone, wraps the crisis name, shows losses in red and wraps "sin operaciones cerradas en la ventana" instead of running off the screen. /para/copiar-senales and the longer verdict on /ejemplo read well and needed nothing.
 
+Redesign pass 54 walks the free tier's path on a phone first: upload without an account, sign up, first full report, locked preview, "Mi cuenta". The "create your account" screen puts its two buttons in a card, full width on a phone. On a report saved to the account, the tick beside "Guardado en tu cuenta" is icon sized; before, it filled the box. In "Mi cuenta" the free first report comes first while it is unused, in a green tile across the row on a phone, followed by the month's previews and the credits; the tiles sit two across on a phone and in one row on a desktop. On the price cards a long note under the price (the free card's) drops below it whole instead of splitting beside it.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
