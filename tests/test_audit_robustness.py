@@ -610,3 +610,80 @@ def test_the_matching_optimization_file_and_a_broker_suffix_are_accepted() -> No
             optimization_bytes=text.encode(),
         )
         assert inputs.optimization_passes
+
+
+def _nul_client(tmp_path: Path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    settings = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/a.db",
+        bootstrap_samples=100,
+        free_mode=False,
+        access_codes=True,
+        admin_key="k" * 40,
+    )
+    store = make_store(settings.database_url)
+    return TestClient(create_app(settings, store)), store
+
+
+def test_a_nul_byte_in_a_report_never_reaches_the_database(tmp_path: Path) -> None:
+    # PostgreSQL refuses text holding a NUL: a stray one in the robot's name
+    # failed the whole upload with a server error.
+    from quant_trade.audit.importers import decode_text
+
+    report = (_FIXTURES / "mt5_tester.html").read_bytes().replace(b"FixtureEA", b"Fix\x00tureEA")
+    assert "\x00" not in decode_text(report)
+    client, store = _nul_client(tmp_path)
+    response = client.post(
+        "/audits",
+        data={"consent": "on"},
+        files={"report": ("report.html", report, "text/html")},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    audit_id = response.headers["location"].split("/")[2].split("?")[0]
+    record = store.get_audit(audit_id)
+    assert record is not None and record.report_html
+    assert "\x00" not in record.report_html and "FixtureEA" in record.report_html
+
+
+@pytest.mark.parametrize("email", ["a\x00@b.co", "a@b.co\r\nBcc: c@d.co", "a b@c.co"])
+def test_a_waitlist_address_with_control_characters_is_refused(
+    tmp_path: Path, email: str
+) -> None:
+    client, store = _nul_client(tmp_path)
+    response = client.post("/waitlist", data={"email": email}, follow_redirects=False)
+    assert response.status_code == 303 and "error=email" in response.headers["location"]
+    assert store.waitlist_emails() == []
+
+
+def test_a_panel_note_with_a_nul_creates_no_code(tmp_path: Path) -> None:
+    client, store = _nul_client(tmp_path)
+    page = client.post(
+        "/panel", data={"key": "k" * 40, "action": "create", "credits": "1", "note": "a\x00b"}
+    )
+    assert page.status_code == 200
+    assert store.list_access_codes() == []
+
+
+def test_an_id_holding_a_nul_is_not_found_without_asking_the_database(tmp_path: Path) -> None:
+    # "/v/%00" was a server error on PostgreSQL, which refuses text holding a NUL.
+    client, store = _nul_client(tmp_path)
+    for path in ("/v/%00", "/v/%00/badge.svg", "/audits/%00?token=a", "/audits/%00/pdf?token=a"):
+        assert client.get(path).status_code == 404
+    store.engine = None  # any query would now fail
+    at = datetime(2026, 1, 1, tzinfo=UTC)
+    assert store.get_audit("a\x00") is None
+    assert store.get_publication("a\x00") is None
+    assert store.publication_for_audit("a\x00") is None
+    assert store.publication_view("a\x00") is None
+    assert store.mark_paid("a\x00", stripe_session_id="s", at=at) is False
+    assert store.redeem_for_audit("a\x00", "AUD-2222-2222-2222", at=at) is False
+    assert store.disable_access_code("a\x00") is False
+    assert store.unpublish("a\x00") is False
+    assert store.delete_audit("a\x00") is False
