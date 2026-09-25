@@ -42,6 +42,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit.crises import crisis_review
 from quant_trade.audit.schema import measured, not_measured
 
 #: Periods per year at or below which a file counts as a monthly track record.
@@ -269,6 +270,7 @@ def fund_review(
             review["findings"].append("few_small_losses")
     if benchmark is not None:
         review["benchmark"] = compare_with_benchmark(series, benchmark, benchmark_source)
+    review["crises"] = crisis_review(series, benchmark)
     return review
 
 

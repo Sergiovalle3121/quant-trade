@@ -514,6 +514,34 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_bench_badge_clean": "Por delante",
         "fund_bench_nm": "Comparación con el índice:",
+        "fund_stress": "¿Cómo le fue en las crisis conocidas?",
+        "fund_stress_intro": (
+            "Rentabilidad del fondo en cada caída de mercado de fecha pública que su historial "
+            "cubre completa, de máximo a mínimo. Las fechas son fijas: no se ajustan al archivo."
+        ),
+        "fund_stress_none": (
+            "El historial no cubre completa ninguna de las caídas de la lista (puntocom, 2008, "
+            "euro 2011, 2015-16, final de 2018, covid, 2022)."
+        ),
+        "fund_stress_head": "Crisis",
+        "fund_stress_fund": "Fondo",
+        "fund_stress_index": "Índice",
+        "fund_stress_12m": (
+            "Peores 12 meses seguidos: {worst}; mejores: {best}. Terminaron en positivo el "
+            "{share} de los periodos de 12 meses."
+        ),
+        "fund_stress_worse": (
+            "En {worse} de {n} crisis cayó más que su índice. Pregunta qué protege la cartera "
+            "cuando el mercado cae."
+        ),
+        "fund_stress_dotcom": "Estallido de las puntocom",
+        "fund_stress_gfc": "Crisis financiera de 2008",
+        "fund_stress_euro": "Crisis de deuda del euro",
+        "fund_stress_china_oil": "China y caída del petróleo",
+        "fund_stress_late_2018": "Final de 2018",
+        "fund_stress_covid": "Caída por el covid",
+        "fund_stress_rates_2022": "Inflación y tipos, 2022",
+        "fund_stress_crypto_2022": "Invierno cripto 2022",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
@@ -1206,6 +1234,34 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_bench_badge_clean": "Ahead",
         "fund_bench_nm": "Comparison with the benchmark:",
+        "fund_stress": "How did it do in the known crises?",
+        "fund_stress_intro": (
+            "The fund's return through each market fall on the public record that its history "
+            "covers in full, peak to trough. The dates are fixed: they are not fitted to the file."
+        ),
+        "fund_stress_none": (
+            "The history does not cover any fall on the list in full (dot-com, 2008, euro 2011, "
+            "2015-16, late 2018, covid, 2022)."
+        ),
+        "fund_stress_head": "Crisis",
+        "fund_stress_fund": "Fund",
+        "fund_stress_index": "Index",
+        "fund_stress_12m": (
+            "Worst 12 months in a row: {worst}; best: {best}. {share} of the 12-month periods "
+            "ended positive."
+        ),
+        "fund_stress_worse": (
+            "In {worse} of {n} crises it fell more than its benchmark. Ask what protects the "
+            "portfolio when markets fall."
+        ),
+        "fund_stress_dotcom": "Dot-com bust",
+        "fund_stress_gfc": "2008 financial crisis",
+        "fund_stress_euro": "Euro debt crisis",
+        "fund_stress_china_oil": "China and the oil fall",
+        "fund_stress_late_2018": "Late 2018",
+        "fund_stress_covid": "Covid crash",
+        "fund_stress_rates_2022": "Inflation and rates, 2022",
+        "fund_stress_crypto_2022": "Crypto winter 2022",
         "instruments": "Does it work on each instrument?",
         "ins_intro": (
             "When a robot or a signal trades several markets, the total can come from one of "
@@ -3925,12 +3981,71 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
     out += _fund_benchmark_html(fund, locale, labels)
+    out += _fund_crises_html(fund, labels)
     if fund.get("net_of_fees"):
         out += (
             f"<p class='muted'>{_badge(fund['net_of_fees']['evidence'])} "
             f"{_e(labels['fund_net'])}</p>"
         )
     out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
+    return out
+
+
+def _fund_crises_html(fund: dict[str, Any], labels: dict[str, str]) -> str:
+    """The fund through the dated market falls its history covers."""
+    stress = fund.get("crises")
+    if not stress or stress.get("status") != "MEASURED":
+        return ""
+    out = f"<h3>{_e(labels['fund_stress'])}</h3>"
+    rows = stress.get("windows") or []
+    with_index = any("benchmark" in row for row in rows)
+    if "fell_more_in_crises" in (stress.get("findings") or []):
+        text = labels["fund_stress_worse"].format(
+            worse=int(stress["worse_than_benchmark"]["value"]), n=int(stress["compared"]["value"])
+        )
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>"
+            f"{_behaviour_ask(text)}</ul></div>"
+        )
+    if rows:
+        out += f"<p class='muted'>{_e(labels['fund_stress_intro'])} {_badge('MEASURED')}</p>"
+
+        def cell(item: dict[str, Any] | None, label: str) -> str:
+            if not item:
+                return f"<td class='val' data-l='{_e(label)}'>—</td>"
+            value = float(item["value"])
+            side = " neg" if value < 0 else ""
+            return f"<td class='val{side}' data-l='{_e(label)}'>{_e(_fund_pct(value))}</td>"
+
+        body = "".join(
+            f"<tr><td>{_e(labels['fund_stress_' + row['key']])}<br>"
+            f"<small class='muted'>{_e(row['first'])} – {_e(row['last'])}</small></td>"
+            + cell(row["fund"], labels["fund_stress_fund"])
+            + (cell(row.get("benchmark"), labels["fund_stress_index"]) if with_index else "")
+            + "</tr>"
+            for row in rows
+        )
+        head = (
+            f"<th>{_e(labels['fund_stress_head'])}</th>"
+            f"<th class='val'>{_e(labels['fund_stress_fund'])}</th>"
+            + (f"<th class='val'>{_e(labels['fund_stress_index'])}</th>" if with_index else "")
+        )
+        out += f"<table class='timing'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    else:
+        out += f"<p class='muted'>{_e(labels['fund_stress_none'])}</p>"
+    if stress.get("worst_12m"):
+        out += (
+            "<p class='muted'>"
+            + _e(
+                labels["fund_stress_12m"].format(
+                    worst=_fund_pct(float(stress["worst_12m"]["value"])),
+                    best=_fund_pct(float(stress["best_12m"]["value"])),
+                    share=f"{float(stress['positive_12m']['value']):.0%}",
+                )
+            )
+            + f" {_badge('MEASURED')}</p>"
+        )
     return out
 
 

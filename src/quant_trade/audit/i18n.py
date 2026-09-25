@@ -898,6 +898,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "desviación típica anualizada de las diferencias mensuales",
     ),
     (
+        "fixed calendar windows of widely recorded market falls; the fund's months "
+        "compounded over each window it covers in full",
+        "periodos fijos de caídas de mercado de fecha pública; los meses del fondo compuestos "
+        "en cada periodo que cubre completo",
+    ),
+    (
         "the stated year total does not match its months for {years}",
         "el total anual indicado no cuadra con sus meses en {years}",
     ),
