@@ -698,6 +698,18 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
         "es": "Pérdida abierta que el balance no muestra",
         "en": "Open loss the balance does not show",
     },
+    "COARSE_TICK_MODEL": {
+        "es": "Backtest con un modelado de precios grueso",
+        "en": "Backtest run on a coarse price model",
+    },
+    "TEST_DATA_QUALITY_LOW": {
+        "es": "Historial de precios incompleto en la prueba",
+        "en": "Incomplete price history in the test",
+    },
+    "REPORT_HEADER_MISMATCH": {
+        "es": "El encabezado del informe no cuadra",
+        "en": "The report header does not add up",
+    },
 }
 
 

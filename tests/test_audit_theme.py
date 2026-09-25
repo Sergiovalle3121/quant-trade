@@ -162,7 +162,9 @@ def test_every_footer_and_the_landing_link_the_methodology(tmp_path: Path) -> No
     for locale, path in (("es", "/"), ("en", "/en")):
         page = client.get(path).text
         assert "class='investor'" in page and INVESTOR_COPY[locale]["title"] in page
-        assert "/cuenta-proveedor'" in page
+        assert (
+            "/guias/cuenta-proveedor'" if locale == "es" else "/guides/provider-account'"
+        ) in page
         assert find_claims(page) == []
 
 

@@ -430,6 +430,30 @@ the floating result is the platform's figure at print time, not a history
 of floating losses; a history printed after the open losers close shows
 none of it.
 
+### What data the test ran on (`audit/testdata.py`)
+
+For buyers of a robot. Only for MetaTrader tester reports (MT4 HTML, MT5
+HTML/XLSX); account histories skip the section. The report header states the
+modelling mode (MT4 "Model"; MT5 "real ticks" in History Quality), the data
+quality (MT4 "Modelling quality", MT5 "History Quality"), MT4's mismatched
+chart errors and spread, and the requested dates: all shown as DECLARED. The
+audit counts, as MEASURED, the trades that open or close outside those dates
+(one day of slack each side). Model names are recognised in English,
+Russian, Portuguese and Spanish; an unknown one stays NOT_MEASURED.
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `COARSE_TICK_MODEL` | MT4 "Control points" or "Open prices only" | — |
+| `TEST_DATA_QUALITY_LOW` | data quality below 90 % (not raised for a coarse model, which prints a low figure by design) | below 50 % |
+| `REPORT_HEADER_MISMATCH` | MT4 prints more than 90 % modelling quality with a coarse model, or trades fall outside the stated dates | — |
+
+The vendor questions add "modelling" and, for a header mismatch, a request
+for the original, unedited MetaTrader file. Limitations: the header is read
+as uploaded, so an edit that stays consistent with itself and with the
+trades is not caught; "Open prices only" is a sound choice for robots that
+trade only at the bar's open, which the warning's hint says; the MT5 report
+prints no modelling mode apart from "real ticks".
+
 Trials: the deflated Sharpe uses the larger of the declared trials and what
 the files prove (columns of the variants matrix, passes of an MT5
 optimisation export, variants in a vectorbt report); the latter is tagged

@@ -166,6 +166,19 @@ LABELS: dict[str, dict[str, str]] = {
         "unlock_jump": "Desbloquear el informe completo",
         "unlock_nav": "Desbloquear",
         "account": "El dinero real de la cuenta",
+        "test_data": "Con qué datos se hizo la prueba",
+        "test_data_intro": (
+            "El encabezado del informe dice cómo se simularon los precios, qué parte del "
+            "historial tuvo el probador y qué fechas se probaron. Es la parte que más se retoca "
+            "al vender un robot, así que aquí la comparamos con sus propias operaciones."
+        ),
+        "test_data_clean": (
+            "El modelado, la calidad de datos y las fechas declaradas no levantan ninguna bandera."
+        ),
+        "test_data_scope": (
+            "Leído del encabezado tal como lo subiste: si alguien lo editó, solo lo detectamos "
+            "cuando no cuadra consigo mismo o con las operaciones."
+        ),
         "account_intro": (
             "El porcentaje de ganancia que muestran los sitios de historiales quita los "
             "depósitos y los retiros. Aquí lo ponemos junto al dinero que la cuenta ganó o "
@@ -505,6 +518,17 @@ LABELS: dict[str, dict[str, str]] = {
         "unlock_jump": "Unlock the full report",
         "unlock_nav": "Unlock",
         "account": "The account's real money",
+        "test_data": "What data the test ran on",
+        "test_data_intro": (
+            "The report header says how prices were simulated, how much of the history the "
+            "tester had and which dates were tested. It is the part most often retouched when "
+            "a robot is sold, so here it is checked against its own trades."
+        ),
+        "test_data_clean": ("The modelling mode, data quality and stated dates raise no flag."),
+        "test_data_scope": (
+            "Read from the header as uploaded: an edit is caught only when the header does not "
+            "fit itself or the trades."
+        ),
         "account_intro": (
             "The percentage gain track-record sites show takes deposits and withdrawals out. "
             "Here it sits next to the money the account made or lost by trading, deposits "
@@ -816,6 +840,13 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "top_ups": "Depósitos en plena pérdida",
         "floating_pnl": "Resultado flotante al imprimir",
         "floating_share": "Flotante sobre el balance",
+        "tick_model": "Modelado de precios",
+        "data_quality": "Calidad de datos",
+        "tested_from": "Prueba desde",
+        "tested_to": "Prueba hasta",
+        "trades_outside_window": "Operaciones fuera de esas fechas",
+        "mismatched_chart_errors": "Errores de gráficos no coincidentes",
+        "tester_spread": "Spread del probador",
         "max_consecutive_wins": "Máximo de ganadoras seguidas",
         "max_consecutive_losses": "Máximo de perdedoras seguidas",
         "mean_holding_hours": "Horas medias por operación",
@@ -880,6 +911,13 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "top_ups": "Deposits in a deep drawdown",
         "floating_pnl": "Floating result when printed",
         "floating_share": "Floating result / balance",
+        "tick_model": "Price modelling",
+        "data_quality": "Data quality",
+        "tested_from": "Tested from",
+        "tested_to": "Tested to",
+        "trades_outside_window": "Trades outside those dates",
+        "mismatched_chart_errors": "Mismatched chart errors",
+        "tester_spread": "Tester spread",
         "max_consecutive_wins": "Most consecutive wins",
         "max_consecutive_losses": "Most consecutive losses",
         "mean_holding_hours": "Mean hours per trade",
@@ -949,6 +987,7 @@ RATIO_KEYS = {
 }
 
 PERCENT_KEYS = {
+    "data_quality",
     "platform_equity_drawdown",
     "total_return",
     "cagr",
@@ -2172,6 +2211,40 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     return out
 
 
+#: The tester's modelling modes as a reader says them.
+TICK_MODEL_TEXT: dict[str, dict[str, str]] = {
+    "es": {
+        "every tick": "Cada tick",
+        "control points": "Puntos de control",
+        "open prices only": "Solo precios de apertura",
+        "real ticks": "Ticks reales",
+    },
+    "en": {
+        "every tick": "Every tick",
+        "control points": "Control points",
+        "open prices only": "Open prices only",
+        "real ticks": "Real ticks",
+    },
+}
+
+
+def _test_data_html(review: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """Tick model, data quality and test window of a tester report."""
+    if not review or review.get("status") != "MEASURED":
+        return ""
+    locale = _locale_of(labels)
+    rows = {key: dict(value) for key, value in review.items() if _is_evidence(value)}
+    model = rows.get("tick_model")
+    if model and isinstance(model.get("value"), str):
+        model["value"] = TICK_MODEL_TEXT[locale].get(model["value"], model["value"])
+    out = f"<p class='muted'>{_e(labels['test_data_intro'])}</p>"
+    out += _evidence_rows(rows, labels, skip=set())
+    if review.get("clean"):
+        out += f"<p>{_e(labels['test_data_clean'])}</p>"
+    out += f"<p class='muted'>{_e(labels['test_data_scope'])}</p>"
+    return out
+
+
 def _timing_fact(share: float, sentence: str) -> str:
     return f"<div class='fact'><b>{share:.0%}</b><p>{_e(sentence)}</p></div>"
 
@@ -2648,6 +2721,11 @@ def render_html(
         *(
             [(labels["account"], _account_html(data.get("account"), labels))]
             if (data.get("account") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
+            [(labels["test_data"], _test_data_html(data.get("test_data"), labels))]
+            if (data.get("test_data") or {}).get("status") == "MEASURED"
             else []
         ),
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
