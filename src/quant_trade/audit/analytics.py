@@ -440,6 +440,43 @@ def _day_limit(rules: ChallengeRules, max_days: int) -> int:
     return max(1, min(int(max_days), business))
 
 
+BEST_DAY_NOTE = (
+    "share of all resampled paths that reach the target with the best day inside the "
+    "firm's best-day rule; the rule is checked at the pass, on daily closes"
+)
+
+
+BEST_DAY_BREACH_NOTE = (
+    "share of the resampled passes whose best day breaks the firm's best-day rule, "
+    "checked at the pass on daily closes"
+)
+
+
+def _best_day_at_pass(
+    rules: ChallengeRules,
+    passed: np.ndarray,
+    best_day: np.ndarray,
+    positive: np.ndarray,
+    samples: int,
+) -> dict[str, Any]:
+    """How many passes keep the best day inside the firm's best-day rule."""
+    limit = float(rules.best_day_limit or 0.0)
+    if rules.best_day_basis == "profit_target":
+        within = best_day <= limit * rules.profit_target + 1e-12
+    else:
+        within = best_day <= limit * positive + 1e-12
+    clean = int((passed & within).sum())
+    passes = int(passed.sum())
+    out: dict[str, Any] = {
+        "limit": limit,
+        "basis": rules.best_day_basis,
+        "pass_within": measured(clean / samples, BEST_DAY_NOTE),
+    }
+    if passes:
+        out["breach_share_of_passes"] = measured((passes - clean) / passes, BEST_DAY_BREACH_NOTE)
+    return out
+
+
 def simulate_challenge(
     daily_returns: pd.Series | np.ndarray | Sequence[float],
     rules: ChallengeRules,
@@ -495,6 +532,9 @@ def simulate_challenge(
     balance = np.ones(samples)
     peak = np.ones(samples)
     traded = np.zeros(samples, dtype=np.int64)
+    # Best day and summed positive days, in units of the initial balance.
+    best_day = np.zeros(samples)
+    positive = np.zeros(samples)
     # 0 running, 1 pass, 2 daily, 3 total
     state = np.zeros(samples, dtype=np.int8)
     day_done = np.full(samples, -1, dtype=np.int64)
@@ -506,6 +546,9 @@ def simulate_challenge(
         ret = paths[:, day]
         balance = np.where(running, start * (1.0 + ret), balance)
         traded = traded + (running & (ret != 0.0))
+        gain = np.where(running, balance - start, 0.0)
+        best_day = np.maximum(best_day, gain)
+        positive = positive + np.maximum(gain, 0.0)
 
         if rules.max_daily_loss is not None:
             if rules.daily_loss_basis == "initial_balance":
@@ -547,6 +590,8 @@ def simulate_challenge(
         "low": measured(low, ci_note),
         "high": measured(high, ci_note),
     }
+    if rules.best_day_limit is not None:
+        base["best_day"] = _best_day_at_pass(rules, state == 1, best_day, positive, samples)
     days = day_done[state == 1]
     if len(days):
         base["days_to_target"] = {

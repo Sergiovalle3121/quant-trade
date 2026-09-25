@@ -33,6 +33,7 @@ from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import crises as crises_lib
 from quant_trade.audit import decay as decay_lib
+from quant_trade.audit import firmfit as firmfit_lib
 from quant_trade.audit import forward as forward_lib
 from quant_trade.audit import fund as fund_lib
 from quant_trade.audit import instruments as instruments_lib
@@ -787,6 +788,10 @@ def _challenge(inputs: AuditInputs, *, samples: int, seed: int) -> dict[str, Any
     out: dict[str, Any] = {"status": status, "preset": key, "selected_by": selected_by, **result}
     if status == "NOT_MEASURED":
         out["reason"] = result["probability"]["pass"]["note"]
+    else:
+        out["firm_fit"] = firmfit_lib.firm_fit(
+            daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed
+        )
     return out
 
 
