@@ -3927,7 +3927,13 @@ def import_report(
         }[source_format]
         draft = parser(reader)
     else:
+        from quant_trade.audit import universal
+
         header, rows, delimiter = _read_delimited(decode_text(data))
+        repeated = 0
+        if source_format not in {UNIVERSAL_TRADES_CSV, UNIVERSAL_FILLS_CSV}:
+            # The universal reader finds its own header first and drops repeats itself.
+            rows, repeated = universal.drop_repeated_rows(header, rows)
         if source_format == TRADINGVIEW_CSV:
             draft = _parse_tradingview(header, [list(row) for row in rows], TRADINGVIEW_CSV,
                                        serial_dates=False)  # fmt: skip
@@ -3946,13 +3952,13 @@ def import_report(
         elif source_format == FXBLUE_CSV:
             draft = _parse_fxblue(header, rows)
         elif source_format in {UNIVERSAL_TRADES_CSV, UNIVERSAL_FILLS_CSV}:
-            from quant_trade.audit import universal
-
             found = _universal_table(header, rows)
             assert found is not None  # _detect found it
             draft = universal.parse(found[0], found[1], delimiter)
         else:
             draft = _parse_vectorbt(header, rows)
+        if repeated:
+            draft.warnings.append(universal.REPEATED_ROWS_WARNING.format(n=repeated))
     return _assemble(draft, initial_balance)
 
 
