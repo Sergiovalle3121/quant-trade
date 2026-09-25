@@ -414,9 +414,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("fewer than two closed trades", "menos de dos operaciones cerradas"),
     ("fewer than {n} closed trades", "menos de {n} operaciones cerradas"),
     (
-        "entry times as the file states them (platform or server time); net before itemised fees",
-        "horas de entrada tal como las da el archivo (hora de la plataforma o del servidor); "
-        "resultado neto antes de los costes que detalla el informe",
+        "Entry times as the file states them (platform or server time); "
+        "net result before itemised fees.",
+        "Horas de entrada tal como las da el archivo (hora de la plataforma o del servidor); "
+        "resultado neto antes de los costes que detalla el informe.",
     ),
     (
         "average net result per trade, account currency",

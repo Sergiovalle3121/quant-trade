@@ -27,7 +27,10 @@ MIN_TRADES = 20
 #: Width of a time-of-day block, in hours.
 BLOCK_HOURS = 4
 
-NOTE = "entry times as the file states them (platform or server time); net before itemised fees"
+NOTE = (
+    "Entry times as the file states them (platform or server time); "
+    "net result before itemised fees."
+)
 
 
 def _group(keys: list[int], pnl: list[float]) -> list[dict[str, Any]]:

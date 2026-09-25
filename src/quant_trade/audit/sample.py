@@ -36,6 +36,9 @@ def synthetic_mt5_report(
     """An MT5 tester HTML report (UTF-16 LE with BOM, as the terminal writes
     it) with one EURUSD round trip per business day. Synthetic by design."""
     rng = np.random.default_rng(seed)
+    # Entry hours come from their own stream so the trades' results stay the
+    # same; they spread the entries over the day like an intraday strategy.
+    hours = np.random.default_rng(seed + 1).choice([2, 5, 9, 11, 14, 16, 19], size=days)
     dates = pd.bdate_range("2023-01-02", periods=days)
     balance = 10_000.0
     price = 1.1
@@ -45,7 +48,7 @@ def synthetic_mt5_report(
         "<td></td></tr>"
     ]
     deal = 2
-    for day in dates:
+    for day, hour in zip(dates, hours, strict=True):
         side = "buy" if rng.random() < 0.5 else "sell"
         sign = 1.0 if side == "buy" else -1.0
         entry = round(price, 5)
@@ -56,14 +59,15 @@ def synthetic_mt5_report(
         stamp = day.strftime("%Y.%m.%d")
         balance -= 3.5
         rows.append(
-            f"<tr><td>{stamp} 09:00:00</td><td>{deal}</td><td>EURUSD</td><td>{side}</td>"
+            f"<tr><td>{stamp} {hour:02d}:00:00</td><td>{deal}</td><td>EURUSD</td><td>{side}</td>"
             f"<td>in</td><td>{lots}</td><td>{entry:.5f}</td><td>{deal}</td><td>-3.50</td>"
             f"<td>0.00</td><td>0.00</td><td>{_money(balance)}</td><td></td></tr>"
         )
         balance += profit - 3.5
         close = "sell" if side == "buy" else "buy"
         rows.append(
-            f"<tr><td>{stamp} 17:00:00</td><td>{deal + 1}</td><td>EURUSD</td><td>{close}</td>"
+            f"<tr><td>{stamp} {hour + 3:02d}:30:00</td><td>{deal + 1}</td><td>EURUSD</td>"
+            f"<td>{close}</td>"
             f"<td>out</td><td>{lots}</td><td>{exit_price:.5f}</td><td>{deal + 1}</td>"
             f"<td>-3.50</td><td>0.00</td><td>{profit:.2f}</td><td>{_money(balance)}</td>"
             "<td></td></tr>"
