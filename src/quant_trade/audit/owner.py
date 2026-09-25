@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 
 if TYPE_CHECKING:
-    from quant_trade.audit.store import AccessCodeRecord
+    from quant_trade.audit.store import AccessCodeRecord, RefusedPayment
 
 PANEL_PATH = "/panel"
 MAX_CREDITS = 100
@@ -51,6 +51,10 @@ TEXT: dict[str, str] = {
     "off": "desactivado",
     "never": "nunca",
     "cols": "Id|Nota|Usados|Total|Creado|Caduca|Estado|",
+    "refused_title": "Pagos con tarjeta que no abrieron un informe",
+    "refused_lead": "Stripe cobró estos pagos, pero Rigor no abrió ningún informe. Búscalo "
+    "en Stripe por el id de sesión y reembolsa, o crea un código para el cliente.",
+    "refused_cols": "Fecha|Sesión de Stripe|Informe|Motivo",
     "reset_title": "Restablecer la contraseña de un cliente",
     "reset_lead": (
         "Crea un enlace de un solo uso (caduca en 24 horas) para un cliente que olvidó su "
@@ -61,6 +65,18 @@ TEXT: dict[str, str] = {
     "reset_link": "Enlace creado. Cópialo y envíalo ahora: no se puede volver a mostrar.",
     "reset_unknown": "No hay ninguna cuenta con ese correo.",
     "accounts": "Cuentas de clientes",
+}
+
+#: The panel is in Spanish; ``payments.refusal`` reasons are logged in English.
+REFUSAL_REASONS: dict[str, str] = {
+    "no Checkout session or no audit id": "sin sesión de Stripe o sin informe",
+    "test payment for an audit not listed for testing": "pago de prueba",
+    "unknown audit": "el informe no existe",
+    "unknown plan": "plan desconocido",
+    "no Rigor marker": "no es un enlace de Rigor (falta app=rigor)",
+    "not USD": "no se cobró en dólares",
+    "no amount": "sin monto",
+    "below the plan price": "pagó menos que el precio",
 }
 
 
@@ -123,10 +139,31 @@ def _codes_table(key: str, codes: Sequence[AccessCodeRecord]) -> str:
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
 
 
+def _refused_table(refused: Sequence[RefusedPayment]) -> str:
+    if not refused:
+        return ""
+    head = "".join(f"<th>{_e(col)}</th>" for col in TEXT["refused_cols"].split("|"))
+    rows = []
+    for payment in refused:
+        cells = (
+            payment.created_at[:16].replace("T", " "),
+            payment.session_id,
+            payment.audit_id,
+            REFUSAL_REASONS.get(payment.reason, payment.reason),
+        )
+        rows.append("<tr>" + "".join(f"<td>{_e(c)}</td>" for c in cells) + "</tr>")
+    return (
+        f"<h2 style='margin-top:32px'>{_e(TEXT['refused_title'])}</h2>"
+        f"<div class='error'>{_e(TEXT['refused_lead'])}</div>"
+        f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
 def panel_page(
     *,
     key: str,
     codes: Sequence[AccessCodeRecord],
+    refused: Sequence[RefusedPayment] = (),
     new_code: str = "",
     flash: str = "",
     error: str = "",
@@ -181,7 +218,7 @@ def panel_page(
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(TEXT['reset_create'])}</button></form>"
     )
-    return _shell(err + shown + notice + create + listing + reset)
+    return _shell(err + shown + notice + _refused_table(refused) + create + listing + reset)
 
 
 __all__ = [
@@ -190,6 +227,7 @@ __all__ = [
     "MAX_FAILED_LOGINS_PER_HOUR",
     "MAX_NOTE_CHARS",
     "PANEL_PATH",
+    "REFUSAL_REASONS",
     "TEXT",
     "login_page",
     "panel_page",

@@ -1034,6 +1034,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             panel_page(
                 key=key,
                 codes=db.list_access_codes(),
+                refused=db.list_refused_payments(),
                 new_code=new_code,
                 flash=flash,
                 error=error,
@@ -1176,7 +1177,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
     signin_flashes = ("signed_out", "deleted", "reset_done")
     account_flashes = ("welcome", "code_linked", "password_changed")
-    account_errors = ("code_already", "code_other", "code_unknown", "wrong", "csrf", "too_many")
+    account_errors = (
+        "code_already",
+        "code_other",
+        "code_unknown",
+        "wrong",
+        "csrf",
+        "too_many",
+        "compare_pick",
+    )
 
     def _signup_get(path_locale: str) -> Callable[..., Response]:
         def handler(request: Request, lang: str | None = None, next: str = "") -> Response:
@@ -1365,8 +1374,59 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     access_codes=cfg.access_codes_enabled,
                     card_payments=cfg.stripe_enabled,
                     contact_url=cfg.contact_url,
+                    free_mode=cfg.free_mode,
                 )
             )
+
+        return handler
+
+    def _account_compare(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            id: Annotated[list[str] | None, Query(max_length=40)] = None,
+            lang: str | None = None,
+        ) -> Response:
+            # Read-only, so a GET: nothing changes, and the reports must be on
+            # the signed-in account's own list.
+            locale = _account_locale(path_locale, lang)
+            session = _session(request)
+            base = account_pages.path("account", locale)
+            if session is None:
+                return _signin_redirect(locale, next_path=base)
+            picked = list(dict.fromkeys(id or []))
+            mine = {item.audit_id: item for item in db.account_audits_list(session[0].id)}
+            ready = {
+                audit_id
+                for audit_id, item in mine.items()
+                if account_pages.comparable(item, free_mode=cfg.free_mode)
+            }
+            if len(picked) != 2 or not ready.issuperset(picked):
+                return RedirectResponse(f"{base}?error=compare_pick", status_code=303)
+            results = []
+            for audit_id in picked:
+                record = db.get_audit(audit_id)
+                if record is None or record.purged_at or not record.result_json:
+                    return RedirectResponse(f"{base}?error=compare_pick", status_code=303)
+                result = AuditResult.model_validate_json(record.result_json)
+                results.append(result.model_dump(mode="json"))
+            body = comparison_body(
+                results[0],
+                results[1],
+                href_a=account_pages.report_href(picked[0], locale),
+                href_b=account_pages.report_href(picked[1], locale),
+                locale=locale,
+            )
+            copy = account_pages.COPY[locale]
+            body += f"<p><a class='btn btn-ghost' href='{base}'>{copy['compare_back']}</a></p>"
+            other = account_pages.path("account", "en" if locale == "es" else "es")
+            query = "&".join(f"id={audit_id}" for audit_id in picked)
+            page = compare_page(
+                body,
+                locale=locale,
+                lead=copy["compare_lead"],
+                switch_href=f"{other}/comparar?{query}",
+            )
+            return HTMLResponse(guard_page(page))
 
         return handler
 
@@ -1523,6 +1583,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(paths["signout"], _signout_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"], _account_get(path_locale), **html_get)
         app.add_api_route(paths["account"] + "/codigo", _code_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["account"] + "/comparar", _account_compare(path_locale), **html_get)
         app.add_api_route(
             paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]
         )

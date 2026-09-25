@@ -398,3 +398,34 @@ def test_new_grid_warnings_are_translated() -> None:
         "as percentages (the file shows no % sign: check one month against the factsheet)",
     ):
         assert spanish(text) is not None
+
+
+def test_an_excel_total_column_formatted_apart_from_its_months() -> None:
+    import io
+    import re
+    import zipfile
+
+    from test_audit_importers import xlsx
+
+    r = _returns(24, seed=11)
+    rows: list[list[object]] = [["Year", *MONTHS_EN, "YTD"]]
+    for i in range(2):
+        months = [float(v) for v in r[12 * i : 12 * i + 12]]
+        rows.append([2020 + i, *months, float(np.prod([1 + v for v in months]) - 1)])
+    source = zipfile.ZipFile(io.BytesIO(xlsx({"Returns": rows})))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as archive:
+        for info in source.infolist():
+            body = source.read(info.filename)
+            if info.filename.startswith("xl/worksheets/"):
+                # The months show as percentages; the YTD column (N) stays General.
+                body = re.sub(rb'<c r="([B-M]\d+)">', rb'<c r="\1" s="1">', body)
+            archive.writestr(info.filename, body)
+        archive.writestr(
+            "xl/styles.xml",
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            '<cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="10"/></cellXfs></styleSheet>',
+        )
+    series = parse_equity_csv(out.getvalue())
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r)
+    assert not any("does not match its months" in w for w in series.warnings)
