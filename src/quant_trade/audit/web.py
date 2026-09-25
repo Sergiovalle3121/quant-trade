@@ -38,7 +38,7 @@ from typing import Annotated, Any
 from pydantic import ValidationError
 
 from quant_trade.audit import check as check_lib
-from quant_trade.audit import payments
+from quant_trade.audit import payments, universal
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
@@ -944,6 +944,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "free_mode": cfg.free_mode,
             "stripe_enabled": cfg.stripe_enabled,
             "card_mode": payments.card_mode(cfg),
+            "card_via": payments.card_via(cfg),
             "access_codes": cfg.access_codes_enabled,
             "database": cfg.database_kind,
             "legal_configured": cfg.legal_configured,
@@ -1042,7 +1043,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             joined=bool(joined),
             error=shown,
             access_codes=cfg.access_codes_enabled,
-            card_payments=cfg.stripe_enabled,
+            card_payments=cfg.card_public,
             contact_url=cfg.contact_url,
             retention_days=cfg.retention_days,
             base_url=_site_url(request),
@@ -1209,6 +1210,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+        # "Name its columns": the customer's mapping for a platform no importer knows.
+        form = await request.form()
+        report_columns = {
+            role: str(form.get(f"col_{role}") or "").strip()[:100]
+            for role in universal.ROLES
+            if str(form.get(f"col_{role}") or "").strip()
+        }
 
         def parse_and_audit() -> tuple[str, str, bool] | Response:
             """Parse, audit and store; runs in the thread pool under a slot."""
@@ -1224,6 +1232,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     optimization_bytes=uploads["optimization"],
                     live_bytes=uploads["live"],
                     live_filename=live_filename,
+                    report_columns=report_columns if uploads["report"] else None,
                 )
             except ParseError as exc:
                 return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
@@ -1284,7 +1293,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         notice_ok: bool = False,
     ) -> str:
         result = AuditResult.model_validate_json(record.result_json)
-        unlockable = not record.paid and cfg.stripe_enabled
+        unlockable = not record.paid and cfg.stripe_enabled and cfg.card_for(record.id)
+        link_single, link_pack = (
+            payments.payment_link_urls(cfg, record.id, locale)
+            if not record.paid and cfg.links_enabled and cfg.card_for(record.id)
+            else ("", "")
+        )
         redeemable = not record.paid and cfg.access_codes_enabled
         publishable = record.paid or cfg.free_mode
         pack_code, pack_left = (
@@ -1299,11 +1313,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             checkout_url=f"{base}/checkout{query}" if unlockable else None,
+            pay_links=(link_single, link_pack, f"{base}{query}&pay=done") if link_single else None,
             redeem_url=f"{base}/redeem{query}" if redeemable else None,
             publish_url=f"{base}/publish{query}" if publishable else None,
             notice=notice,
             contact_url=cfg.contact_url if redeemable else None,
-            pack_price_usd=cfg.pack_price_usd if (redeemable or unlockable) else 0.0,
+            pack_price_usd=(
+                cfg.pack_price_usd if (redeemable or unlockable or link_single) else 0.0
+            ),
             pack_code=pack_code,
             pack_credits_left=pack_left,
             code_error=code_error and not record.paid,
@@ -1391,6 +1408,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if session_id and cfg.stripe_enabled:
             if not record.paid:
                 record = _confirm_card_payment(record, session_id)
+            notice = message("card_paid" if record.paid else "card_pending", locale)
+        elif pay == "done" and cfg.links_enabled:
+            # Back from a Payment Link: the webhook unlocks, this page only reports.
             notice = message("card_paid" if record.paid else "card_pending", locale)
         elif pay == "cancelled" and not record.paid:
             notice = message("card_cancelled", locale)
@@ -1682,7 +1702,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             jurisdiction=cfg.jurisdiction,
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
-            card_payments=cfg.stripe_enabled,
+            card_payments=cfg.card_public,
             access_codes=cfg.access_codes_enabled,
             pack_price_usd=cfg.pack_price_usd,
             retention_days=cfg.retention_days,
@@ -1848,7 +1868,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
     ) -> Response:
         record = _load(audit_id, token)
-        if not cfg.stripe_enabled:
+        if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
             raise HTTPException(status_code=503, detail="payments_disabled")
         locale = _view_locale(record, lang)
         if record.paid:
@@ -1864,7 +1884,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.post("/webhooks/stripe")
     async def stripe_webhook(request: Request) -> Response:
-        if not cfg.stripe_configured:
+        if not (cfg.stripe_configured or cfg.links_configured):
             raise _not_found()
         payload = await request.body()
         header = request.headers.get("stripe-signature")

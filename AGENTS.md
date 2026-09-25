@@ -72,7 +72,8 @@ Data lake code is research/backtesting only. Do not commit generated datasets, s
 - Every verdict sentence, page and report must pass the profit-claim guard in English and Spanish (`audit/guard.py`); a sentence that fails it is a bug, not a report.
 - Every reported number carries an evidence tag (`MEASURED`, `DECLARED`, `NOT_MEASURED`). Do not report a client declaration as measured.
 - Uploads, the audit database and generated reports stay git-ignored (`state/`, `outputs/`). Never commit a client file.
-- No secret has a default. Stripe keys and `DATABASE_URL` come from the environment only; free mode is forced when either Stripe secret (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) is missing, unless the owner explicitly opts into selling access codes (`AUDIT_ACCESS_CODES=true` with `AUDIT_FREE_MODE=false`).
+- No secret has a default. Stripe keys and `DATABASE_URL` come from the environment only; free mode is forced unless card payment is fully configured (`STRIPE_WEBHOOK_SECRET` plus either `STRIPE_SECRET_KEY` or `STRIPE_PAYMENT_LINK_SINGLE`), or unless the owner explicitly opts into selling access codes (`AUDIT_ACCESS_CODES=true` with `AUDIT_FREE_MODE=false`).
+- A Stripe payment with `livemode: false` unlocks only an audit listed in `AUDIT_STRIPE_TEST_AUDITS`, and test-mode card buttons show only on those audits: Stripe's public test card must never unlock a real report.
 - Web tests use `TestClient` with Stripe simulated by the HMAC helper; nothing reaches the network in tests.
 - A new red flag, threshold or dimension needs a test and a line in `docs/AUDIT_SAAS.md`.
 - Every customer page exists in Spanish (the default, URLs unchanged) and English with a language switch. A new English warning, note or red-flag detail needs its Spanish rule in `audit/i18n.py`.

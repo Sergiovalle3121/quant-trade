@@ -59,6 +59,18 @@ def stripe_keys_valid(secret_key: str, webhook_secret: str) -> bool:
     return secret_key.startswith(("sk_", "rk_")) and webhook_secret.startswith("whsec_")
 
 
+#: Stripe Payment Links live here; a test-mode link has ``/test_`` in its path.
+PAYMENT_LINK_PREFIX = "https://buy.stripe.com/"
+
+
+def payment_link_valid(url: str) -> bool:
+    return url.startswith(PAYMENT_LINK_PREFIX) and len(url) <= 300 and " " not in url
+
+
+def _ids(value: str) -> frozenset[str]:
+    return frozenset(part.strip() for part in value.split(",") if part.strip())
+
+
 def _safe_url(value: str) -> str:
     """Only an ``https://`` (or ``mailto:``) link is shown; anything else is dropped."""
     value = value.strip()
@@ -77,6 +89,13 @@ class AuditSettings:
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_id: str = ""
+    #: Payment Links (no secret key on the service): one audit, and the pack.
+    #: Paid links are confirmed only by the signed webhook.
+    stripe_link_single: str = ""
+    stripe_link_pack: str = ""
+    #: Audits that may be unlocked by a test-mode payment. Empty in normal
+    #: operation, so Stripe's public test card never unlocks a real report.
+    stripe_test_audits: frozenset[str] = frozenset()
     free_mode: bool = True
     max_upload_bytes: int = MAX_UPLOAD_BYTES
     max_uploads_per_hour_per_ip: int = DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP
@@ -128,6 +147,37 @@ class AuditSettings:
         return self.stripe_configured and not self.free_mode
 
     @property
+    def links_configured(self) -> bool:
+        """Payment Links for one audit plus the webhook secret that confirms them."""
+        return self.stripe_webhook_secret.startswith("whsec_") and payment_link_valid(
+            self.stripe_link_single
+        )
+
+    @property
+    def links_enabled(self) -> bool:
+        return self.links_configured and not self.free_mode and not self.stripe_enabled
+
+    @property
+    def card_test_mode(self) -> bool:
+        """The configured card payments are Stripe test mode (sandbox)."""
+        if self.stripe_enabled:
+            return "_live_" not in self.stripe_secret_key
+        if self.links_enabled:
+            return "/test_" in self.stripe_link_single
+        return False
+
+    @property
+    def card_public(self) -> bool:
+        """Every visitor can pay by card: live mode only."""
+        return (self.stripe_enabled or self.links_enabled) and not self.card_test_mode
+
+    def card_for(self, audit_id: str) -> bool:
+        """Card payment is offered on this audit: live mode, or a listed test audit."""
+        if not (self.stripe_enabled or self.links_enabled):
+            return False
+        return not self.card_test_mode or audit_id in self.stripe_test_audits
+
+    @property
     def access_codes_enabled(self) -> bool:
         """Codes unlock reports only in paid mode; in free mode nothing is locked."""
         return self.access_codes and not self.free_mode
@@ -154,7 +204,7 @@ class AuditSettings:
     def pack_price_usd(self) -> float:
         """The pack's price when it is on sale, else 0."""
         on_sale = (
-            self.access_codes_enabled or self.stripe_enabled
+            self.access_codes_enabled or self.stripe_enabled or self.links_enabled
         ) and 0 < self.pack_price_usd_cents < PACK_CREDITS * self.price_usd_cents
         return self.pack_price_usd_cents / 100.0 if on_sale else 0.0
 
@@ -168,7 +218,11 @@ class AuditSettings:
         stripe_secret_key = env.get("STRIPE_SECRET_KEY", "").strip()
         stripe_webhook_secret = env.get("STRIPE_WEBHOOK_SECRET", "").strip()
         stripe_price_id = env.get("STRIPE_PRICE_ID", "").strip()
-        configured = stripe_keys_valid(stripe_secret_key, stripe_webhook_secret)
+        stripe_link_single = env.get("STRIPE_PAYMENT_LINK_SINGLE", "").strip()
+        stripe_link_pack = env.get("STRIPE_PAYMENT_LINK_PACK", "").strip()
+        configured = stripe_keys_valid(stripe_secret_key, stripe_webhook_secret) or (
+            stripe_webhook_secret.startswith("whsec_") and payment_link_valid(stripe_link_single)
+        )
         requested_free = env.get("AUDIT_FREE_MODE", "true").strip().lower() in TRUE_VALUES
         access_codes = env.get("AUDIT_ACCESS_CODES", "").strip().lower() in TRUE_VALUES
         return cls(
@@ -180,6 +234,9 @@ class AuditSettings:
             stripe_secret_key=stripe_secret_key,
             stripe_webhook_secret=stripe_webhook_secret,
             stripe_price_id=stripe_price_id,
+            stripe_link_single=stripe_link_single if payment_link_valid(stripe_link_single) else "",
+            stripe_link_pack=stripe_link_pack if payment_link_valid(stripe_link_pack) else "",
+            stripe_test_audits=_ids(env.get("AUDIT_STRIPE_TEST_AUDITS", "")),
             # Free mode is forced unless Stripe is fully configured or the
             # owner opted into selling access codes.
             free_mode=requested_free or not (configured or access_codes),

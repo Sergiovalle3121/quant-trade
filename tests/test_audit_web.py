@@ -35,7 +35,7 @@ from quant_trade.audit.web import (  # noqa: E402
 )
 
 STRIPE = {
-    "stripe_secret_key": "sk_test_x",
+    "stripe_secret_key": "sk_live_x",
     "stripe_webhook_secret": "whsec_test",
     "stripe_price_id": "price_x",
 }
@@ -66,6 +66,7 @@ def test_health_and_landing_pages_pass_the_guard(tmp_path: Path) -> None:
         "free_mode": True,
         "stripe_enabled": False,
         "card_mode": "off",
+        "card_via": "off",
         "access_codes": False,
         "database": "sqlite",
         "legal_configured": False,
@@ -301,6 +302,7 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
                 "object": {
                     "id": "cs_test_1",
                     "payment_status": "paid",
+                    "livemode": True,
                     "metadata": {"audit_id": audit_id},
                 }
             },

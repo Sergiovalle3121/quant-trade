@@ -2011,6 +2011,36 @@ def _xlsx_too_big() -> ReportFormatError:
     )
 
 
+class PercentCell(float):
+    """A number from a cell formatted as a percentage: Excel stores 1.23 % as
+    0.0123. It behaves as that float; ``xlsx_as_csv`` writes it back with its
+    ``%`` so a reader sees what the sheet showed."""
+
+
+#: Excel's built-in percentage number formats (``0%`` and ``0.00%``).
+_PERCENT_FORMATS = {9, 10}
+
+
+def _percent_styles(styles: ElementTree.Element | None) -> set[int]:
+    """Cell style indices whose number format shows a percentage."""
+    if styles is None:
+        return set()
+    percent = set(_PERCENT_FORMATS)
+    for node in styles.iter():
+        if _local(node.tag) == "numFmt":
+            code = re.sub(r'"[^"]*"', "", node.get("formatCode", ""))
+            if "%" in code and (node.get("numFmtId") or "").isdigit():
+                percent.add(int(node.get("numFmtId", "0")))
+    found: set[int] = set()
+    for node in styles.iter():
+        if _local(node.tag) != "cellXfs":
+            continue
+        for index, xf in enumerate(child for child in node if _local(child.tag) == "xf"):
+            if (xf.get("numFmtId") or "").isdigit() and int(xf.get("numFmtId", "0")) in percent:
+                found.add(index)
+    return found
+
+
 def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
     """Every sheet of a workbook as rows of text or numbers (standard library only)."""
     try:
@@ -2072,6 +2102,7 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
                     shared.append(
                         "".join(node.text or "" for node in item.iter() if _local(node.tag) == "t")
                     )
+        percent = _percent_styles(load("xl/styles.xml"))
         sheets: dict[str, list[list[Any]]] = {}
         position = 0
         for node in workbook.iter():
@@ -2082,7 +2113,7 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
             target = targets.get(rel_id, f"xl/worksheets/sheet{position}.xml")
             sheet = load(target)
             if sheet is not None:
-                sheets[node.get("name", f"Sheet{position}")] = _sheet_rows(sheet, shared)
+                sheets[node.get("name", f"Sheet{position}")] = _sheet_rows(sheet, shared, percent)
         return sheets
 
 
@@ -2113,12 +2144,19 @@ def xlsx_as_csv(data: bytes, time_headers: Sequence[str]) -> bytes:
                 if i in times and isinstance(cell, float | int) and not isinstance(cell, bool)
                 else None
             )
-            cells.append(moment.isoformat() if moment is not None else _as_text(cell))
+            if moment is not None:
+                cells.append(moment.isoformat())
+            elif isinstance(cell, PercentCell):
+                cells.append(f"{float(cell) * 100:.10g}%")
+            else:
+                cells.append(_as_text(cell))
         writer.writerow(cells)
     return out.getvalue().encode("utf-8")
 
 
-def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]]:
+def _sheet_rows(
+    sheet: ElementTree.Element, shared: list[str], percent: set[int] | None = None
+) -> list[list[Any]]:
     rows: list[list[Any]] = []
     cells = 0
     for row in sheet.iter():
@@ -2147,6 +2185,9 @@ def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]
                 value = raw
             else:
                 number = _num(raw) if raw is not None else None
+                style = cell.get("s") or ""
+                if number is not None and percent and style.isdigit() and int(style) in percent:
+                    number = PercentCell(number)
                 value = number
             values[index] = value
         if values:
@@ -3648,7 +3689,8 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
                 return universal.parse(
                     texts[header_at], texts[header_at + 1 :], ",", columns, serial_dates=True
                 )
-        raise _mapped_not_found()
+        first = next((sheet for sheet in sheets.values() if sheet), [])
+        raise _mapped_not_found([[_as_text(cell) for cell in row] for row in first], columns)
     text = decode_text(data)
     lowered = text.lstrip()[:4000].lower()
     if "<html" in lowered or "<table" in lowered or text.lstrip().startswith("<?xml"):
@@ -3663,7 +3705,7 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
     table = [header, *rows]
     header_at = _mapped_header(table, columns)
     if header_at is None:
-        raise _mapped_not_found()
+        raise _mapped_not_found(table, columns)
     return universal.parse(table[header_at], table[header_at + 1 :], delimiter, columns)
 
 
@@ -3676,7 +3718,24 @@ def _mapped_header(table: list[list[str]], columns: Mapping[str, str]) -> int | 
     return None
 
 
-def _mapped_not_found() -> ReportFormatError:
+def _mapped_not_found(
+    table: list[list[str]] | None = None, columns: Mapping[str, str] | None = None
+) -> ReportFormatError:
+    """The customer named columns the header does not hold: name them."""
+    wanted = [name.strip() for name in (columns or {}).values() if name and name.strip()]
+    best: set[str] = set()
+    for row in (table or [])[:UNIVERSAL_HEADER_SCAN]:
+        cells = {cell.strip() for cell in row}
+        if len(cells & set(wanted)) > len(best & set(wanted)):
+            best = cells
+    missing = [name for name in wanted if name not in best]
+    if best and missing:
+        listed = ", ".join(_clip(name, 60) for name in missing[:5])
+        return ReportFormatError(
+            "universal_unknown_column",
+            f"these columns are not in the file's header: {listed}; check their names",
+            f"estas columnas no están en la cabecera del archivo: {listed}; revisa sus nombres",
+        )
     return ReportFormatError(
         "universal_unknown_column",
         "the columns you chose are not in the file's header; check their names",
