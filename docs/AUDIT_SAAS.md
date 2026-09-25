@@ -439,6 +439,29 @@ the floating result is the platform's figure at print time, not a history
 of floating losses; a history printed after the open losers close shows
 none of it.
 
+### Lone peak or plateau (`audit/plateau.py`)
+
+For buyers of an optimised robot. Needs the MT5 optimisation export (at
+least 10 passes with a Profit or Result column and a parameter that
+varies). The importer keeps each pass's numeric cells
+(`OptimizationSummary.table`) and the tester report's inputs as
+`input_values`. The chosen pass is the one matching those inputs, or else
+the most profitable pass (the section says which). Its neighbours are the
+passes one step away on a single parameter (the next lower or higher value
+tried), every other parameter unchanged. MEASURED from the export's rows:
+passes, share of passes with a profit, the chosen pass's top share, the
+neighbours found, the share of neighbours with a profit and the share of the
+chosen profit their median keeps.
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `ISOLATED_OPTIMUM` | at least 2 neighbours, a positive chosen profit, and fewer than half the neighbours with a profit or a median keeping under half of the chosen profit | — |
+
+Limitations: the profits are the optimiser's, not re-computed trades; a
+genetic or sparse optimisation may not have tried the neighbours (the
+section then shows them as NOT_MEASURED and raises nothing); only the MT5
+tester report's English "Inputs:" rows are matched.
+
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
 For anyone about to run or copy a strategy: "with my account, at what size

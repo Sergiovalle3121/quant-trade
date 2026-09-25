@@ -498,6 +498,28 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "las operaciones no muestran una caída con la que dimensionar",
     ),
     (
+        "{n} settings one step away keep {p} of the chosen profit at the median and {q} of "
+        "them end with a profit: the chosen settings look like a lone peak",
+        "{n} configuraciones a un paso conservan en la mediana el {p} del beneficio elegido y "
+        "el {q} de ellas gana: los parámetros elegidos parecen un pico aislado",
+    ),
+    ("from the rows of the optimisation export", "de las filas de la exportación de optimización"),
+    ("rank of the chosen pass / passes", "puesto de la pasada elegida / pasadas"),
+    (
+        "median neighbour profit / chosen profit",
+        "beneficio mediano de los vecinos / beneficio elegido",
+    ),
+    ("the chosen pass shows no profit", "la pasada elegida no tiene beneficio"),
+    (
+        "the optimisation did not try the settings one step away (genetic or sparse)",
+        "la optimización no probó las configuraciones a un paso (genética o dispersa)",
+    ),
+    ("no optimisation file uploaded", "no se subió archivo de optimización"),
+    (
+        "needs at least {n} passes with a profit column and a parameter that varies",
+        "necesita al menos {n} pasadas con columna de beneficio y un parámetro que varíe",
+    ),
+    (
         "the file is a backtest, not an account history",
         "el archivo es un backtest, no el historial de una cuenta",
     ),

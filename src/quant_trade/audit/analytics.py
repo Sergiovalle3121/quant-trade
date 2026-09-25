@@ -639,6 +639,7 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "COARSE_TICK_MODEL": "modelling",
     "TEST_DATA_QUALITY_LOW": "modelling",
     "REPORT_HEADER_MISMATCH": "original_file",
+    "ISOLATED_OPTIMUM": "out_of_sample",
     "MAD_SPIKES": "data_quality",
     "STALE_MARKS": "data_quality",
     "LARGE_GAPS": "data_quality",

@@ -712,6 +712,10 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
         "es": "Historial de precios incompleto en la prueba",
         "en": "Incomplete price history in the test",
     },
+    "ISOLATED_OPTIMUM": {
+        "es": "Parámetros en un pico aislado",
+        "en": "Settings on a lone peak",
+    },
     "REPORT_HEADER_MISMATCH": {
         "es": "El encabezado del informe no cuadra",
         "en": "The report header does not add up",

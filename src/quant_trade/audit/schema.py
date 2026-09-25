@@ -680,6 +680,8 @@ class AuditInputs:
     #: Configurations an MT5 optimisation export lists (MEASURED trials).
     optimization_passes: int | None = None
     optimization_parameters: list[str] = field(default_factory=list)
+    #: Numeric cells of each optimisation pass (``OptimizationSummary.table``).
+    optimization_table: list[dict[str, float]] = field(default_factory=list)
     #: Parameter variants a report says it holds (vectorbt), when more than one.
     report_variants: int | None = None
     #: Deposits and withdrawals an imported account history lists.
@@ -800,6 +802,7 @@ def build_inputs(
         warnings.extend(f"optimization: {w}" for w in summary.warnings)
         extra["optimization_passes"] = summary.passes
         extra["optimization_parameters"] = list(summary.parameters)
+        extra["optimization_table"] = list(summary.table)
     if live_bytes:
         try:
             live = import_report(live_bytes, live_filename)
@@ -908,6 +911,9 @@ class AuditResult(BaseModel):
     #: Capital and size for each loss limit (``audit/sizing.py``); None on
     #: older results.
     capital: dict[str, Any] | None = None
+    #: The chosen settings against their neighbours in an MT5 optimisation
+    #: export (``audit/plateau.py``); None on older results.
+    plateau: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

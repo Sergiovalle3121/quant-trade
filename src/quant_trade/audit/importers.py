@@ -181,6 +181,9 @@ class OptimizationSummary:
     passes: int
     parameters: list[str]
     warnings: list[str]
+    #: Numeric cells of each pass (parameters and result columns), for the
+    #: parameter-stability check; at most ``MAX_OPTIMIZATION_ROWS`` rows.
+    table: list[dict[str, float]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1325,6 +1328,9 @@ def _parse_mt5_tester(reader: _TableReader) -> _Draft:
     if inputs:
         meta["inputs"] = str(len(inputs))
         meta["input_names"] = _clip(", ".join(inputs), 500)
+        values = _mt5_input_values(reader.rows)
+        if values:
+            meta["input_values"] = _clip("; ".join(values), 2000)
     trades_declared = _lead_num(labels.get("Total Trades"))
     _compare(
         draft.warnings,
@@ -1384,6 +1390,26 @@ def _mt5_inputs(rows: list[_Row]) -> list[str]:
         if collecting and "=" in texts[1]:
             names.append(texts[1].split("=", 1)[0].strip())
     return names
+
+
+def _mt5_input_values(rows: list[_Row]) -> list[str]:
+    """``name=value`` of each tester input, in the report's order."""
+    pairs: list[str] = []
+    collecting = False
+    for row in rows:
+        texts = row.texts
+        if len(texts) < 2:
+            if collecting:
+                break
+            continue
+        if texts[0] == "Inputs:":
+            collecting = True
+        elif collecting and texts[0] != "":
+            break
+        if collecting and "=" in texts[1]:
+            name, value = texts[1].split("=", 1)
+            pairs.append(f"{name.strip()}={value.strip()}")
+    return pairs
 
 
 def _mt5_positions(reader: _TableReader) -> tuple[list[_Trip], int]:
@@ -3470,6 +3496,10 @@ _OPTIMIZATION_STANDARD = {
 }
 
 
+#: Passes kept for the parameter-stability check.
+MAX_OPTIMIZATION_ROWS = 50_000
+
+
 def parse_optimization(data: bytes, filename: str | None = None) -> OptimizationSummary:
     """Count the passes of a MetaTrader 5 optimisation export (SpreadsheetML XML).
 
@@ -3532,12 +3562,22 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
         parameters = [name for name in names if name and name.lower() not in _OPTIMIZATION_STANDARD]
     passes: set[str] = set()
     duplicates = 0
+    table: list[dict[str, float]] = []
     for values in rows[header_at + 1 :]:
         if not values or _num(values[0]) is None:
             continue
         if values[0] in passes:
             duplicates += 1
+            passes.add(values[0])
+            continue
         passes.add(values[0])
+        if len(table) < MAX_OPTIMIZATION_ROWS:
+            numbers = {
+                name: number
+                for name, value in zip(names, values, strict=False)
+                if name and (number := _num(value)) is not None
+            }
+            table.append(numbers)
     if not passes:
         raise ReportFormatError(
             "optimization_empty",
@@ -3556,6 +3596,7 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
         passes=len(passes),
         parameters=parameters,
         warnings=warnings,
+        table=table,
     )
 
 
