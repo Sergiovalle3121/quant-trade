@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift, synthetic_mt5_report
+from audit_fixtures import csv_bytes, positive_drift, signed_in, synthetic_mt5_report
 
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
@@ -30,7 +30,7 @@ def _client(tmp_path: Path, **overrides) -> tuple[TestClient, object]:
         **overrides,
     )
     store = make_store(settings.database_url)
-    return TestClient(create_app(settings, store)), store
+    return signed_in(TestClient(create_app(settings, store))), store
 
 
 def _upload(client: TestClient, locale: str = "es", **data) -> tuple[str, str]:

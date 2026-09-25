@@ -1497,8 +1497,39 @@ Tests: `tests/test_audit_owner_panel.py`.
 A customer can create an account with an e-mail and a password to find, in
 one place, the reports they uploaded or saved, the access codes they
 redeemed or added (with the credits left), and what they paid for. The
-account is optional: the free preview and each report's private link work
-without one, and an account never changes what a report says.
+free preview needs one (see "Free tier" below); each report's private link
+and a report paid with an access code work without one, and an account never
+changes what a report says.
+
+- **Free tier** (`accounts.FREE_PREVIEWS_PER_MONTH = 3`,
+  `FREE_PREVIEWS_PER_IP_PER_MONTH = 10`; not in free mode). An upload
+  without a working access code needs a signed-in account (401 page with
+  "Crear cuenta gratis" otherwise; `{"error": "free_tier_signin"}` for JSON).
+  Each account gets 3 free previews per calendar month (UTC), counted in
+  the `free_previews` table; free previews are also capped per network
+  address per month, across accounts. Past either limit, an account with
+  credits gets a full report and spends one credit (`acct=upload_credit`);
+  without credits the upload answers 402 with a link to buy. A code typed
+  in the form that still has credits pays the upload with no account, as
+  before. "Mi cuenta" shows the free previews left this month. The
+  address in `free_previews` is cleared by the retention purge.
+  What it does not stop: without e-mail verification, someone can open
+  several accounts with made-up addresses; the per-network cap and the
+  5 sign-ups per hour per address only slow that down. E-mail confirmation
+  (needs a mail provider) would close it.
+- **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
+  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3`; not in free mode). A signed-in
+  account's first upload comes out as a full report with PDF and a
+  publishable verification page, paid with the reference `welcome:<id>`
+  (`paid_with = "welcome"`, `acct=welcome` shows the notice). It does not
+  use a monthly preview. It is refused (the upload falls back to the
+  free-preview rules) when the account already had it, when this browser
+  already gave one (a `rigor_device` cookie holding a random id, stored as
+  its SHA-256), when the same file (SHA-256 of the upload) already got one
+  on any account, or when the network address reached the monthly cap. The
+  `welcome_reports` row outlives the account, so deleting and signing up
+  again does not repeat it. The purge clears the address; the device and
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado.
 
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
