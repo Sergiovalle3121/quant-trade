@@ -577,7 +577,15 @@ cursor:pointer}
 .drop-main .icon{width:56px;height:56px;border-radius:16px}
 .drop-main .icon svg{width:26px;height:26px}
 .drop-main .drop-title{font-size:1.1rem}
-.drop-main.has .icon{color:var(--ok)}
+.drop-main.has .icon{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);
+border-color:color-mix(in srgb,var(--ok) 40%,transparent);display:grid;place-items:center}
+.drop-main.has .icon svg{display:none}
+.drop-main.has .icon::after{content:'';width:20px;height:10px;border:2.5px solid currentColor;
+border-top:0;border-right:0;transform:translateY(-3px) rotate(-45deg)}
+.drop-main.has .formats{display:none}
+.drop-main .drop-file{display:inline-block;max-width:100%;margin-top:4px;padding:6px 14px;
+border-radius:99px;font-size:.86rem;background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.drop-main .drop-file:empty{display:none}
 .formats{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:6px}
 .formats span{font:500 .7rem var(--mono);padding:3px 8px;border-radius:6px;color:var(--text-2);
 border:1px solid var(--border)}

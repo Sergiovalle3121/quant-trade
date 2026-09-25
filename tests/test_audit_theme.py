@@ -122,3 +122,9 @@ def test_each_dimension_has_its_own_icon() -> None:
     names = list(_DIMENSION_ICONS.values())
     assert len(set(names)) == len(names)
     assert len({ICONS[name] for name in names}) == len(names)
+
+
+def test_a_chosen_report_turns_the_drop_zone_into_a_ready_state() -> None:
+    assert ".drop-main.has .icon svg{display:none}" in STYLE
+    assert ".drop-main.has .formats{display:none}" in STYLE
+    assert 'zone.classList.toggle("has"' in (STATIC_DIR / "app.js").read_text()
