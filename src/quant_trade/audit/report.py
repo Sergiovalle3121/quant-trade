@@ -49,7 +49,13 @@ from quant_trade.audit.theme import (
     icon,
     logo,
 )
-from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning, summary
+from quant_trade.audit.verdict import (
+    DEFAULT_THRESHOLDS,
+    DIMENSION_ORDER,
+    NOT_MEASURED_ES,
+    meaning,
+    summary,
+)
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
     pretty_dumps,
@@ -453,6 +459,12 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "luck_badge_beats": "Supera a la suerte",
         "luck_badge_below": "No supera a la suerte",
+        "luck_badge_narrow": "Supera a la suerte, sin margen",
+        "luck_narrow": (
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin "
+            "habilidad, pero no con el margen que pedimos: la confianza de que no sea suerte "
+            "(DSR) es del {dsr}, y para aprobar esta dimensión pedimos {need}."
+        ),
         "luck_beats": (
             "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin "
             "habilidad."
@@ -1286,6 +1298,12 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "luck_badge_beats": "Beats luck",
         "luck_badge_below": "Does not beat luck",
+        "luck_badge_narrow": "Beats luck, without margin",
+        "luck_narrow": (
+            "The Sharpe of {sharpe} beats the {luck} that {n} settings with no skill would "
+            "show, but not by the margin we ask: the confidence that it is not luck (DSR) is "
+            "{dsr}, and passing this dimension needs {need}."
+        ),
         "luck_beats": (
             "The Sharpe of {sharpe} beats the {luck} that {n} settings with no skill would show."
         ),
@@ -3998,9 +4016,19 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
-def _luck_html(luck: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+def _luck_html(
+    luck: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    multiplicity: dict[str, Any] | None = None,
+    dsr_pass: float = DEFAULT_THRESHOLDS.dsr_pass,
+) -> str:
     """The file's Sharpe next to the luck of the configurations counted, and
-    what a search of 10, 100 or 1,000 would need."""
+    what a search of 10, 100 or 1,000 would need.
+
+    Beating the luck is a DSR of at least 0.5; the multiplicity dimension
+    passes only at 0.95, so a Sharpe between the two says it beats the luck
+    without the margin the dimension asks."""
     if not luck or luck.get("status") != "MEASURED":
         return ""
     sharpe = f"{float(luck['sharpe']['value']):.2f}"
@@ -4022,12 +4050,21 @@ def _luck_html(luck: dict[str, Any] | None, locale: str, labels: dict[str, str])
         n = f"{int(luck['trials']):,}"
         chance = f"{float(luck['luck_sharpe']['value']):.2f}"
         beats = bool(luck.get("beats_luck"))
-        key = "beats" if beats else "below"
+        dsr_item = (multiplicity or {}).get("dsr_at_trials_used") or {}
+        dsr = dsr_item.get("value") if dsr_item.get("evidence") == "MEASURED" else None
+        narrow = beats and isinstance(dsr, (int, float)) and dsr < dsr_pass
+        key = "narrow" if narrow else "beats" if beats else "below"
+        tone = "PASS" if key == "beats" else "WEAK"
+        line = labels["luck_" + key].format(
+            sharpe=sharpe,
+            luck=chance,
+            n=n,
+            dsr=f"{float(dsr or 0):.0%}",
+            need=f"{dsr_pass:.0%}",
+        )
         out += (
-            f"<p class='live-verdict lv-{'PASS' if beats else 'WEAK'}'>"
-            f"<span class='badge {'PASS' if beats else 'WEAK'}'>"
-            f"{_e(labels['luck_badge_' + key])}</span> "
-            f"{_e(labels['luck_' + key].format(sharpe=sharpe, luck=chance, n=n))}</p>"
+            f"<p class='live-verdict lv-{tone}'><span class='badge {tone}'>"
+            f"{_e(labels['luck_badge_' + key])}</span> {_e(line)}</p>"
         )
         cells = [
             (chance, luck["luck_sharpe"], labels["luck_sharpe"].format(n=n, sharpe=sharpe)),
@@ -5199,7 +5236,17 @@ def render_html(
             else []
         ),
         *(
-            [(labels["luck"], _luck_html(data.get("luck"), locale, labels))]
+            [(labels["luck"], _luck_html(
+                        data.get("luck"),
+                        locale,
+                        labels,
+                        data.get("multiplicity"),
+                        float(
+                            ((data.get("verdict") or {}).get("thresholds") or {}).get(
+                                "dsr_pass", DEFAULT_THRESHOLDS.dsr_pass
+                            )
+                        ),
+                    ))]
             if (data.get("luck") or {}).get("status") == "MEASURED"
             else []
         ),

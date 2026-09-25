@@ -365,8 +365,8 @@ def test_long_key_figures_step_down_to_fit_a_phone_tile() -> None:
     data["performance"]["total_return"]["value"] = 1911.36
     page = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
     assert "<div class='kpi  long'><b>+191,136.0%</b>" in page
-    assert "<div class='kpi good long'><b>+4,529.30</b>" in page
-    assert "class='kpi  long'><b>560 · 56%" not in page
+    assert "<div class='kpi good long'><b>+15,375.41</b>" in page
+    assert "<div class='kpi '><b>1.79</b>" in page
     assert "<div class='tscroll'><table>" in page
     assert ".kpi.long b{font-size:" in KPI_CSS and ".kpi.xlong b{font-size:" in KPI_CSS
     data["performance"]["total_return"]["value"] = 100000.046
@@ -656,7 +656,7 @@ def test_the_live_account_line_sits_apart_under_the_verdict_with_its_tone(tmp_pa
     client = _client(tmp_path)
     page = client.get("/ejemplo").text
     # The sample carries a live account: one line under the verdict, toned by the outcome.
-    assert "<p class='verdict-live weak'>" in page
+    assert "<p class='verdict-live fail'>" in page
     for tone, token in (("pass", "--ok"), ("weak", "--warn"), ("fail", "--bad")):
         assert f".verdict-live.{tone}::before{{background:var({token})" in STYLE
     assert ".verdict-live{margin:20px 0 0;padding-top:16px;border-top:1px solid" in STYLE

@@ -21,8 +21,9 @@ from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 SAMPLE_SEED = 20260924
 SAMPLE_DAYS = 500
 #: Business days before the main 500, from their own random stream, so the
-#: history spans over two years and the recent-period section is measured.
-SAMPLE_LEAD_DAYS = 60
+#: history starts on 2 January 2020: it covers the covid fall and the 2022
+#: windows in full, and the recent-period section is measured.
+SAMPLE_LEAD_DAYS = 782
 SAMPLE_PASSES = 120
 #: The sample robot trades two majors (the same pip value in a USD account), so
 #: the per-instrument section has something to show; each trade's result is
