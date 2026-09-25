@@ -179,6 +179,10 @@ LABELS: dict[str, dict[str, str]] = {
             "No vimos depósitos en plena pérdida, ni una pérdida abierta grande, ni un "
             "porcentaje que se aparte del dinero."
         ),
+        "account_live": (
+            "Revisión del historial que subiste como cuenta real. Sus banderas se muestran "
+            "aquí y no cambian la clase del backtest."
+        ),
         "account_deposits": "Depósitos después de empezar a operar, de mayor a menor",
         "account_date": "Fecha",
         "account_amount": "Importe",
@@ -480,6 +484,10 @@ LABELS: dict[str, dict[str, str]] = {
         "account_clean": (
             "We saw no deposit in a deep drawdown, no large open loss and no percentage that "
             "departs from the money."
+        ),
+        "account_live": (
+            "Review of the history you uploaded as the live account. Its flags are shown "
+            "here and do not change the backtest's class."
         ),
         "account_deposits": "Deposits after trading began, largest first",
         "account_date": "Date",
@@ -1867,6 +1875,21 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
             f"{_e(labels['account_backtest'])}</span></p>"
         )
     out = f"<p class='muted'>{_e(labels['account_intro'])}</p>"
+    if account.get("source") == "live":
+        out += f"<p>{_e(labels['account_live'])}</p>"
+        found = account.get("flags") or []
+        if found:
+            locale = _locale_of(labels)
+            out += (
+                "<ul>"
+                + "".join(
+                    f"<li>{_severity_badge(flag['severity'], locale)} "
+                    f"{_e(flag_title(flag['code'], locale))}: "
+                    f"{_e(localize(flag['detail'], locale))}</li>"
+                    for flag in found
+                )
+                + "</ul>"
+            )
     facts = []
     gain = account["percent_gain"]["value"]
     if gain is not None:

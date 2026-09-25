@@ -9,6 +9,7 @@ still reads as a gain. Every test is offline and deterministic.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -22,6 +23,7 @@ from quant_trade.audit.report import render
 from quant_trade.audit.schema import DeclaredMetadata, ParsedTrades, build_inputs
 from quant_trade.core.models import Trade
 
+FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
 START = datetime(2024, 3, 4, 9, 0, tzinfo=UTC)
 
 
@@ -201,3 +203,34 @@ def test_backtest_is_not_an_account_history() -> None:
         metadata={},
     )
     assert review["status"] == "NOT_MEASURED" and flags == []
+
+
+def test_account_uploaded_as_live_is_reviewed_without_touching_the_class() -> None:
+    backtest = (FIXTURES / "mt5_tester.html").read_bytes()
+    statement = _statement(TOPPED_UP, floating=-3_000.0, balance=19_500.0)
+
+    def audit(live: bytes | None):  # type: ignore[no-untyped-def]
+        inputs = build_inputs(
+            None,
+            DeclaredMetadata(),
+            report_bytes=backtest,
+            report_filename="ReportTester.html",
+            live_bytes=live,
+            live_filename="statement.htm" if live else None,
+        )
+        return run_audit(inputs, bootstrap_samples=200)
+
+    alone, with_live = audit(None), audit(statement)
+    account = with_live.account
+    assert account is not None and account["status"] == "MEASURED"
+    assert account["source"] == "live"
+    assert {flag["code"] for flag in account["flags"]} >= {"DEPOSIT_DURING_DRAWDOWN"}
+    assert with_live.verdict.overall == alone.verdict.overall
+    assert not {flag["code"] for flag in with_live.red_flags} & {
+        "GAIN_INFLATED_BY_FLOWS",
+        "DEPOSIT_DURING_DRAWDOWN",
+        "FLOATING_LOSS_AT_END",
+    }
+    html, _ = render(with_live, watermark=False)
+    assert_report_clean(html)
+    assert "como cuenta real" in html

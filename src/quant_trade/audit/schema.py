@@ -637,6 +637,11 @@ class AuditInputs:
     live_trades: ParsedTrades | None = None
     live_symbols: list[str] | None = None
     live_format: str | None = None
+    #: Deposits, platform summary and balance curve of the live statement,
+    #: for the account review when the main upload is a backtest.
+    live_cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
+    live_metadata: dict[str, str] = field(default_factory=dict)
+    live_equity_csv: bytes | None = None
 
 
 def report_digest_name(filename: str | None, stem: str = "report") -> str:
@@ -750,6 +755,9 @@ def build_inputs(
         extra["live_trades"] = live.trades
         extra["live_symbols"] = list(live.symbols) or None
         extra["live_format"] = live.source_format
+        extra["live_cash_flows"] = list(live.cash_flows)
+        extra["live_metadata"] = dict(live.metadata)
+        extra["live_equity_csv"] = live.equity_csv
     ppy, label = infer_frequency(equity.frame["timestamp"])
     return AuditInputs(
         equity=equity,
