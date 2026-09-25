@@ -1567,6 +1567,7 @@ SOURCE_NAMES: dict[str, str] = {
     "tradingview_csv": "TradingView (CSV)",
     "tradingview_xlsx": "TradingView (Excel)",
     "ninjatrader_csv": "NinjaTrader (CSV)",
+    "ninjatrader_executions_csv": "NinjaTrader executions (CSV)",
     "quantconnect_trades_csv": "QuantConnect (CSV)",
     "backtestingpy_csv": "backtesting.py (CSV)",
     "vectorbt_csv": "vectorbt (CSV)",

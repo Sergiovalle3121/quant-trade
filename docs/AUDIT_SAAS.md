@@ -65,6 +65,20 @@ decimal comma (`1 234,56`, `1.234,56`) is read as 1234.56; `1,234` stays a
 thousands separator. The importers were checked against 23 real public
 MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
 
+NinjaTrader's Trades export is read with English or French headers ("Pos.
+marché.", "Prix d'entrée", "Longue"/"Courte") and with the `90.00 $` amount
+suffix. Its Executions export (`Instrument;Action;Quantity;Price;Time;...;E/X`,
+European decimals) has no profit per trade, so fills are paired first in,
+first out per account and instrument and priced with the contract's point
+value from `FUTURES_POINT_VALUE_USD` (CME contract specifications,
+cmegroup.com, as of 2026-09-25: ES 50, MES 5, NQ 20, MNQ 2, CL 1000, GC 100
+and the rest listed in the code); the commission of each fill is spread over
+its contracts. A contract missing from that table is refused
+(`ninjatrader_executions_symbol`) with a request for the Trades tab, and
+contracts still open at the end are left out with a warning. Layouts were
+taken from public importers of real NinjaTrader files; tests use synthetic
+rows (`tests/test_audit_ninjatrader_exports.py`).
+
 Account histories from tracking sites are read too, so an investor can
 review a trader from the export alone: Myfxbook's history CSV (`Profit` is
 net, so the gross adds commission and swap back; `Deposit`/`Withdrawal`

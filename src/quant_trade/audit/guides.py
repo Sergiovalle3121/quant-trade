@@ -460,6 +460,10 @@ GUIDES: tuple[Guide, ...] = (
                 tips=(
                     "Da igual si tu Windows usa coma o punto decimal: la auditoría detecta el "
                     "separador.",
+                    "Para una cuenta (Account Performance), la pestaña Trades es la mejor. "
+                    "También se lee la pestaña Executions de futuros de CME (ES, NQ, CL, GC y "
+                    "sus micros): cada operación se calcula con el valor por punto del contrato.",
+                    "Un terminal en francés también sirve: se leen sus nombres de columna.",
                     _BALANCE_ES,
                     _FLOATING_ES,
                 ),
@@ -480,6 +484,10 @@ GUIDES: tuple[Guide, ...] = (
                 tips=(
                     "It does not matter whether Windows uses a comma or a dot as decimal "
                     "mark: the audit detects the separator.",
+                    "For an account (Account Performance), the Trades tab is best. The "
+                    "Executions tab of CME futures (ES, NQ, CL, GC and their micros) is read "
+                    "too: each trade is priced with the contract's point value.",
+                    "A terminal set to French works as well: its column names are read.",
                     _BALANCE_EN,
                     _FLOATING_EN,
                 ),
