@@ -632,3 +632,15 @@ def test_failures_from_elsewhere_do_not_lock_the_owner_out(tmp_path: Path) -> No
     assert _signin(client, "v@example.com", ip="203.0.113.9").status_code == 429
     client.cookies.clear()
     assert _signin(client, "v@example.com", ip="198.51.100.4").status_code == 303
+
+
+def test_the_landing_says_the_preview_needs_no_card_and_an_account_is_optional(
+    tmp_path: Path,
+) -> None:
+    client, _, _ = _client(tmp_path)
+    es = client.get("/").text
+    assert "cuenta opcional" in es and "sin crear cuenta" not in es
+    assert "Vista previa sin tarjeta" in es
+    en = client.get("/en").text
+    assert "account optional" in en and "no account needed" not in en
+    assert "No card for the preview" in en
