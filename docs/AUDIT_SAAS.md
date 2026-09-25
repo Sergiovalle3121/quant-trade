@@ -778,6 +778,10 @@ first; they stay on wide screens and in the PDF.
 letter in the class colour; the report's own class is filled in and labelled
 "Tu informe". In print the four cards stay on one page.
 
+With card payment on, both unlock buttons share one height, the card button
+carries a card icon, the Stripe note a lock, and the bank-transfer alternative
+is a quiet row with a chat icon under the price card.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and
