@@ -38,7 +38,7 @@ from typing import Annotated, Any
 from pydantic import ValidationError
 
 from quant_trade.audit import check as check_lib
-from quant_trade.audit import payments
+from quant_trade.audit import payments, universal
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
@@ -1210,6 +1210,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+        # "Name its columns": the customer's mapping for a platform no importer knows.
+        form = await request.form()
+        report_columns = {
+            role: str(form.get(f"col_{role}") or "").strip()[:100]
+            for role in universal.ROLES
+            if str(form.get(f"col_{role}") or "").strip()
+        }
 
         def parse_and_audit() -> tuple[str, str, bool] | Response:
             """Parse, audit and store; runs in the thread pool under a slot."""
@@ -1225,6 +1232,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     optimization_bytes=uploads["optimization"],
                     live_bytes=uploads["live"],
                     live_filename=live_filename,
+                    report_columns=report_columns if uploads["report"] else None,
                 )
             except ParseError as exc:
                 return _html_error(request, 400, _sentence(exc.localized(loc)), loc)

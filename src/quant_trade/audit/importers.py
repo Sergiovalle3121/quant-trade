@@ -3689,7 +3689,8 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
                 return universal.parse(
                     texts[header_at], texts[header_at + 1 :], ",", columns, serial_dates=True
                 )
-        raise _mapped_not_found()
+        first = next((sheet for sheet in sheets.values() if sheet), [])
+        raise _mapped_not_found([[_as_text(cell) for cell in row] for row in first], columns)
     text = decode_text(data)
     lowered = text.lstrip()[:4000].lower()
     if "<html" in lowered or "<table" in lowered or text.lstrip().startswith("<?xml"):
@@ -3704,7 +3705,7 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
     table = [header, *rows]
     header_at = _mapped_header(table, columns)
     if header_at is None:
-        raise _mapped_not_found()
+        raise _mapped_not_found(table, columns)
     return universal.parse(table[header_at], table[header_at + 1 :], delimiter, columns)
 
 
@@ -3717,7 +3718,24 @@ def _mapped_header(table: list[list[str]], columns: Mapping[str, str]) -> int | 
     return None
 
 
-def _mapped_not_found() -> ReportFormatError:
+def _mapped_not_found(
+    table: list[list[str]] | None = None, columns: Mapping[str, str] | None = None
+) -> ReportFormatError:
+    """The customer named columns the header does not hold: name them."""
+    wanted = [name.strip() for name in (columns or {}).values() if name and name.strip()]
+    best: set[str] = set()
+    for row in (table or [])[:UNIVERSAL_HEADER_SCAN]:
+        cells = {cell.strip() for cell in row}
+        if len(cells & set(wanted)) > len(best & set(wanted)):
+            best = cells
+    missing = [name for name in wanted if name not in best]
+    if best and missing:
+        listed = ", ".join(_clip(name, 60) for name in missing[:5])
+        return ReportFormatError(
+            "universal_unknown_column",
+            f"these columns are not in the file's header: {listed}; check their names",
+            f"estas columnas no están en la cabecera del archivo: {listed}; revisa sus nombres",
+        )
     return ReportFormatError(
         "universal_unknown_column",
         "the columns you chose are not in the file's header; check their names",

@@ -125,7 +125,12 @@ milliseconds are read. The report lists which column was read as what
 (`column_*` keys under the platform's fields). A table that names some of
 the columns but not enough gets `universal_columns_missing`, which names
 the missing ones and the columns found. `import_report(..., columns=...)`
-takes the customer's own role-to-column mapping. An equity curve
+takes the customer's own role-to-column mapping; the upload form asks for
+it under "¿Tu plataforma no aparece o su archivo da error? Indica sus
+columnas" (fields `col_<role>`, 100 characters each, only used with a
+report file), and `app.js` suggests the file's own header names in a
+datalist when a CSV is picked (nothing is uploaded until the form is sent).
+A named column missing from the header is listed in the error. An equity curve
 (`timestamp,equity`) is not a trade list and still gets `unknown_format`.
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
