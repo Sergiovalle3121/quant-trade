@@ -119,3 +119,23 @@ def test_a_text_column_mapped_to_a_number_or_time_is_named(
     assert f'"Notiz" you chose {english}' in str(info.value)
     assert f"«Notiz» que elegiste {spanish}" in info.value.message_es
     _clean(info.value)
+
+
+@pytest.mark.parametrize("price", ["0", "-1.1"])
+def test_zero_or_negative_prices_say_so(price: str) -> None:
+    data = _trades(5).replace(b",1.1,", f",{price},".encode())
+    with pytest.raises(ReportFormatError) as info:
+        import_report(data, "trades.csv")
+    assert "positive prices and volume" in str(info.value)
+    assert "precio y volumen positivos" in info.value.message_es
+
+
+def test_zero_price_fills_say_so() -> None:
+    data = (
+        b"Time,Symbol,Side,Quantity,Price\n"
+        b"2026-01-02 10:00,AAPL,Buy,10,0\n"
+        b"2026-01-03 10:00,AAPL,Sell,10,0\n"
+    )
+    with pytest.raises(ReportFormatError) as info:
+        import_report(data, "fills.csv")
+    assert "precio y volumen positivos" in info.value.message_es

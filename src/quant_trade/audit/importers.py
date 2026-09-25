@@ -3234,6 +3234,12 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
                 else f"{count} posiciones se abrieron y no se cerraron en el archivo"
             ),
         )
+    if not draft.trips and draft.invalid_rows:
+        raise ReportFormatError(
+            "no_closed_trades",
+            "no closed trade has positive prices and volume",
+            "ninguna operación cerrada tiene precio y volumen positivos",
+        )
     if not draft.trips:
         raise ReportFormatError(
             "no_closed_trades",
