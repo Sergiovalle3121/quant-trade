@@ -966,6 +966,22 @@ positive. One finding, as a question: `fell_more_in_crises` when, over at
 least two windows with a benchmark, the fund did worse in two thirds or more
 of them. No red flag and no class change.
 
+The same windows apply to any dated curve that is not a fund record (a
+daily backtest, a platform report, a trade history), in their own section
+"How did it do in the known crises?". The curve is taken at month ends. On
+a curve rebuilt from a report's trades a month with no point carries the
+previous level (nothing closed); on an uploaded curve it stays missing, so a
+hole in the data never covers a window. The first month counts when the
+curve starts in its first week, the last when it reaches its final week, so
+no window is covered by a month seen in part. On a curve rebuilt from trades, a window
+with no trade closed in any of its months reads "no trades closed in the
+window" instead of 0.0 %. A curve that never moves 0.1 % from its start
+(for example a trade list in price points on a large base) is NOT_MEASURED
+and the section is left out. The benchmark
+is the uploaded file or the curve's own benchmark column. A curve that covers
+no window in full is NOT_MEASURED and the section is left out. A trade
+history with no stated starting balance inherits the assumed-balance warning.
+
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are

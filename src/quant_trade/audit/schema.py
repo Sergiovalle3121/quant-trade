@@ -1178,6 +1178,9 @@ class AuditResult(BaseModel):
     instruments: dict[str, Any] | None = None
     #: Calendar table and fund-investor checks of a monthly track record (``audit/fund.py``).
     fund: dict[str, Any] | None = None
+    #: A dated curve through fixed market-fall windows (``audit/crises.py``),
+    #: when the fund section does not already show them.
+    crises: dict[str, Any] | None = None
     #: The Sharpe next to the luck of the configurations tried (``audit/luck.py``).
     luck: dict[str, Any] | None = None
     #: Time under water, worst day and month, monthly hit rate (``audit/ride.py``).
