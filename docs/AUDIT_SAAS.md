@@ -179,7 +179,11 @@ are subtracted as they are even on shares quoted in another currency),
 Trading 212 history (`Market buy`/`Limit sell` in `Action`; deposit and
 dividend rows have no price and are dropped; `Result` is in the account
 currency, so the contract size inferred from it absorbs the exchange rate),
-KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader, Binance
+KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader History
+(`07 Aug 2026 21:50:45.162` dates, a `Net AUD`/`Net EUR`/… result in the
+account currency), Rithmic Completed Orders (`B`/`S`, `Qty Filled`,
+`Avg Fill Price`, `Update Time (EDT)`: a zone abbreviation in brackets in the
+column name applies like an offset), Binance
 (with `Fee Coin`), Kraken, Coinbase and Sierra Chart's Trade Activity Log (only
 `Fills` rows). A zone stated in a time column's name (`Filled Time(UTC+02:00)`,
 `Transaction Time(UTC+10)`, `Date(UTC)`) applies to every cell that carries
@@ -195,7 +199,8 @@ not numbers. A side named by the position (`Open Long`, `Close Long`,
 it) is that trade's direction on a closed-trade row; on a fill, closing a long
 sells and closing a short buys. `Fees Paid` and `Exec Fee` are costs. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
-abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
+abbreviation (`EST`, `CET`) or offset after a day/month date, and a month
+name in English or Spanish (`07 Aug 2026`, `02-Jan-2026`, `15 ene 2026`). Day/month
 order that no day past 12 settles is taken from a year-first column of the
 same rows (Tradovate's `Trade Date`) or another day/month column of the file;
 otherwise the `ambiguous_dates` error stands. A file listed newest first

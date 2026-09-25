@@ -874,8 +874,9 @@ GUIDES: tuple[Guide, ...] = (
                     "Statement), Charles Schwab (Transactions o Realized Gain/Loss), Fidelity, "
                     "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), XTB (xStation 5, "
                     "historial de posiciones cerradas), DEGIRO (Transacciones, en cualquier "
-                    "idioma), Trading 212 (historial), cTrader, Sierra Chart (Trade Activity "
-                    "Log), Binance, Kraken, Coinbase y KuCoin (historial de ejecuciones).",
+                    "idioma), Trading 212 (historial), cTrader (History), Rithmic (Completed "
+                    "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase y "
+                    "KuCoin (historial de ejecuciones).",
                     "Los costes de DEGIRO vienen en euros y se restan tal cual, también en "
                     "acciones que cotizan en otra moneda; el resultado de Trading 212 viene en "
                     "la moneda de tu cuenta y se usa como tal.",
@@ -923,8 +924,9 @@ GUIDES: tuple[Guide, ...] = (
                     "(Account Statement), Charles Schwab (Transactions or Realized Gain/Loss), "
                     "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), XTB "
                     "(xStation 5 closed position history), DEGIRO (Transactions, in any "
-                    "language), Trading 212 (history), cTrader, Sierra Chart (Trade Activity "
-                    "Log), Binance, Kraken, Coinbase and KuCoin (filled orders history).",
+                    "language), Trading 212 (history), cTrader (History), Rithmic (Completed "
+                    "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase and "
+                    "KuCoin (filled orders history).",
                     "DEGIRO's costs come in euros and are subtracted as they are, also on "
                     "shares quoted in another currency; Trading 212's result comes in your "
                     "account currency and is used as such.",

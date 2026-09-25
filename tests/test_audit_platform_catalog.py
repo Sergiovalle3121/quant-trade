@@ -551,6 +551,44 @@ def test_ctrader_history() -> None:
     assert _net(report) == [194.0, -54.2, 94.0]
 
 
+def test_ctrader_history_with_month_names_and_the_account_currency() -> None:
+    header = (
+        "ID,Symbol,Opening Direction,Opening Time (UTC+3),Closing Time (UTC+3),Entry Price,"
+        "Closing Price,Closing Quantity,Net AUD,Balance AUD"
+    )
+    rows = [
+        "1,EURUSD,Buy,07 Aug 2026 20:00:00.000,07 Aug 2026 21:50:45.162,1.10000,1.10200,"
+        "1.00 Lots,200.00,25200.00",
+        "2,EURUSD,Sell,08 Aug 2026 09:00:00.000,08 Aug 2026 10:05:12.001,1.10300,1.10400,"
+        "1.00 Lots,-100.00,25100.00",
+        "3,GBPUSD,Buy,09 Aug 2026 13:00:00.000,09 Aug 2026 14:00:00.000,1.30000,1.30150,"
+        "0.50 Lots,75.00,25175.00",
+    ]
+    report = _read([header, *rows], "cTrader_history.csv")
+    trades = report.trades.trades
+    assert report.trades.sides == ["long", "short", "long"]
+    assert _net(report) == [200.0, -100.0, 75.0]
+    closed = trades[0].exit_time.replace(microsecond=0)
+    assert closed == datetime(2026, 8, 7, 18, 50, 45, tzinfo=UTC)
+
+
+def test_rithmic_completed_orders_with_the_zone_named_in_words() -> None:
+    lines = [
+        "Completed Orders",
+        "Account,Status,Buy/Sell,Qty Filled,Symbol,Exchange,Avg Fill Price,Order Type,"
+        "Update Time (EDT)",
+        "ACC1,Filled,B,1,ESU6,CME,5000.00,Market,2026-08-03 09:31:00",
+        "ACC1,Filled,S,1,ESU6,CME,5004.00,Market,2026-08-03 10:15:00",
+        "ACC1,Filled,S,2,ESU6,CME,5010.00,Limit,2026-08-04 09:40:00",
+        "ACC1,Filled,B,2,ESU6,CME,5006.50,Market,2026-08-04 11:02:00",
+    ]
+    report = _read(lines, "rithmic_completed_orders.csv")
+    trades = report.trades.trades
+    assert report.trades.sides == ["long", "short"]
+    assert [round(t.pnl, 2) for t in trades] == [200.0, 350.0]
+    assert trades[0].entry_time == datetime(2026, 8, 3, 13, 31, tzinfo=UTC)
+
+
 def test_binance_futures_with_realized_profit_and_fee_coin() -> None:
     header = "Date(UTC),Symbol,Side,Price,Quantity,Amount,Fee,Fee Coin,Realized Profit"
     rows = [
@@ -607,6 +645,9 @@ def test_sierra_chart_trade_activity_keeps_the_fills() -> None:
         ("1/15/26 09:30:00", datetime(2026, 1, 15, 9, 30, tzinfo=UTC)),
         ("01/15/2026 09:30:00 EST", datetime(2026, 1, 15, 14, 30, tzinfo=UTC)),
         ("15/01/2026 09:30:00 +01:00", datetime(2026, 1, 15, 8, 30, tzinfo=UTC)),
+        ("07 Aug 2026 21:50:45", datetime(2026, 8, 7, 21, 50, 45, tzinfo=UTC)),
+        ("02-Jan-2026 09:30", datetime(2026, 1, 2, 9, 30, tzinfo=UTC)),
+        ("15 ene 2026", datetime(2026, 1, 15, tzinfo=UTC)),
     ],
 )
 def test_platform_time_styles(text: str, expected: datetime) -> None:
