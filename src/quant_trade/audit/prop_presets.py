@@ -24,8 +24,12 @@ Loss rules the simulator understands:
   ``trailing_eod_lock`` - as ``trailing_eod`` but the floor stops rising
   once it reaches the initial balance.
 
-Rules the simulator cannot see (consistency or best-day rules, news
-restrictions, intraday trailing) are listed in ``notes``.
+- ``best_day_limit`` with ``best_day_basis``: the best day's gain may not
+  exceed that share of the profit target (``profit_target``) or of the
+  positive days' summed gain (``positive_days``); checked at the pass.
+
+Rules the simulator cannot see (news restrictions, intraday trailing) are
+listed in ``notes``.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from typing import Any, Literal
 
 DailyLossBasis = Literal["initial_balance", "start_of_day", "none"]
 TotalLossType = Literal["static", "trailing_eod", "trailing_eod_lock"]
+BestDayBasis = Literal["profit_target", "positive_days"]
 
 DAILY_LOSS_BASES: tuple[str, ...] = ("initial_balance", "start_of_day", "none")
 TOTAL_LOSS_TYPES: tuple[str, ...] = ("static", "trailing_eod", "trailing_eod_lock")
@@ -56,6 +61,10 @@ class ChallengeRules:
     notes: tuple[str, ...]
     source_url: str
     as_of: str
+    #: Best-day (consistency) rule: the best day's gain may not exceed this
+    #: share of the profit target or of the positive days' summed gain.
+    best_day_limit: float | None = None
+    best_day_basis: BestDayBasis | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 < self.profit_target < 1.0:
@@ -76,6 +85,10 @@ class ChallengeRules:
             raise ValueError(f"{self.key}: time_limit_days must be positive or None")
         if not self.source_url or not self.as_of:
             raise ValueError(f"{self.key}: every preset needs source_url and as_of")
+        if (self.best_day_limit is None) != (self.best_day_basis is None):
+            raise ValueError(f"{self.key}: best_day_limit and best_day_basis go together")
+        if self.best_day_limit is not None and not 0.0 < self.best_day_limit < 1.0:
+            raise ValueError(f"{self.key}: best_day_limit must be a fraction in (0, 1)")
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -116,7 +129,7 @@ _TOPSTEP_NOTES = (
     "starting balance; it is monitored in real time, which daily data cannot see.",
     "The daily loss limit is optional and not simulated.",
     "Consistency target: the best day must stay at or below 55 % of the profit target, "
-    "otherwise the target rises; not simulated.",
+    "otherwise the target rises; checked when a path reaches the target, on daily closes.",
     "No time limit stated on the pages read.",
     "Source for the target and consistency rule: "
     "https://help.topstep.com/en/articles/8284208-what-is-the-consistency-target",
@@ -139,6 +152,8 @@ def _topstep(size: str, maximum_loss: float) -> ChallengeRules:
         notes=_TOPSTEP_NOTES,
         source_url=TOPSTEP_URL,
         as_of=AS_OF,
+        best_day_limit=0.55,
+        best_day_basis="profit_target",
     )
 
 
@@ -207,11 +222,13 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
             "Maximum loss is an end-of-day trailing limit; whether it stops trailing was not "
             "stated on the page read, so the simulator lets it trail (stricter).",
             "Best Day Rule: the best day may not exceed 50 % of the positive days' profit; "
-            "not simulated.",
+            "checked when a path reaches the target, on daily closes.",
             "No minimum trading days; no time limit (" + FTMO_TIME_URL + ").",
         ),
         source_url=FTMO_URL,
         as_of=AS_OF,
+        best_day_limit=0.50,
+        best_day_basis="positive_days",
     ),
     ChallengeRules(
         key="fundednext-stellar-2step-phase1",

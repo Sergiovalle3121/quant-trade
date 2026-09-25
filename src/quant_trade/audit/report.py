@@ -926,6 +926,24 @@ LABELS: dict[str, dict[str, str]] = {
         "unfinished": "No termina a tiempo",
         "ci95": "Intervalo del 95 % de llegar al objetivo",
         "days_to_target": "Días hábiles hasta el objetivo (p25 / p50 / p75)",
+        "best_day_line": (
+            "Regla del mejor día de esta firma: en el {share} de las veces que pasa, el mejor "
+            "día queda por encima del límite. Según la firma, eso sube el objetivo o bloquea "
+            "el retiro."
+        ),
+        "ff_title": "¿Con qué firma encaja tu historial?",
+        "ff_intro": (
+            "El mismo historial, remuestreado igual, con las reglas publicadas de cada firma, "
+            "de más a menos probabilidad de pasar todas las fases del programa. Compara "
+            "reglas; no recomienda comprar ningún reto."
+        ),
+        "ff_program": "Reto",
+        "ff_pass": "Pasa",
+        "ff_clean": "Pasa dentro de la regla del mejor día",
+        "ff_risk": "Lo que más lo tumba",
+        "ff_no_rule": "sin regla",
+        "ff_phases": "{n} fases",
+        "ff_phase": "1 fase",
         "assumptions": "Supuestos",
         "source": "Fuente",
         "as_of": "leída el",
@@ -1729,6 +1747,23 @@ LABELS: dict[str, dict[str, str]] = {
         "unfinished": "Does not finish in time",
         "ci95": "95 % interval of reaching the target",
         "days_to_target": "Business days to the target (p25 / p50 / p75)",
+        "best_day_line": (
+            "This firm's best-day rule: in {share} of the passes, the best day is above the "
+            "limit. Depending on the firm, that raises the target or blocks the withdrawal."
+        ),
+        "ff_title": "Which firm's rules does your history fit?",
+        "ff_intro": (
+            "The same history, resampled the same way, under each firm's published rules, "
+            "from most to least likely to pass every phase of the program. It compares rules; "
+            "it does not recommend buying any challenge."
+        ),
+        "ff_program": "Challenge",
+        "ff_pass": "Passes",
+        "ff_clean": "Passes within the best-day rule",
+        "ff_risk": "What stops it most",
+        "ff_no_rule": "no rule",
+        "ff_phases": "{n} phases",
+        "ff_phase": "1 phase",
         "assumptions": "Assumptions",
         "source": "Source",
         "as_of": "read on",
@@ -3057,6 +3092,13 @@ def _challenge_html(
             )
             + "</div>"
         )
+        best_day = challenge.get("best_day") or {}
+        if best_day.get("breach_share_of_passes"):
+            share = float(best_day["breach_share_of_passes"]["value"])
+            html_text += (
+                f"<p>{_e(labels['best_day_line'].format(share=f'{share:.0%}'))} "
+                f"{_badge('MEASURED')}</p>"
+            )
     notes = rules.get("notes") or []
     if notes:
         html_text += (
@@ -3064,7 +3106,42 @@ def _challenge_html(
             + "".join(f"<li>{_e(localize(n, locale))}</li>" for n in notes)
             + "</ul>"
         )
-    return html_text + _assumptions(challenge.get("assumptions"), locale, labels)
+    html_text += _assumptions(challenge.get("assumptions"), locale, labels)
+    return html_text + _firm_fit_html(challenge.get("firm_fit"), locale, labels)
+
+
+def _phases(count: int, labels: dict[str, str]) -> str:
+    return labels["ff_phase"] if count == 1 else labels["ff_phases"].format(n=count)
+
+
+def _firm_fit_html(fit: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """Every published challenge on the same resampled history, best odds first."""
+    if not fit or fit.get("status") != "MEASURED" or not fit.get("firms"):
+        return ""
+
+    def pct(item: dict[str, Any] | None, label: str) -> str:
+        if not item:
+            return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
+        return f"<td class='val' data-l='{_e(label)}'>{float(item['value']):.0%}</td>"
+
+    body = "".join(
+        "<tr><td>"
+        + _e(f"{row['firm']} · {row['program']}")
+        + f"<br><small class='muted'>{_e(_phases(row['phases'], labels))}</small>"
+        + "</td>"
+        + pct(row["pass"], labels["ff_pass"])
+        + pct(row.get("pass_within_best_day"), labels["ff_clean"])
+        + f"<td data-l='{_e(labels['ff_risk'])}'>{_e(labels[row['main_risk']])}</td></tr>"
+        for row in fit["firms"]
+    )
+    return (
+        f"<h3>{_e(labels['ff_title'])}</h3>"
+        f"<p class='muted'>{_e(labels['ff_intro'])} {_badge('MEASURED')}</p>"
+        f"<table class='timing'><thead><tr><th>{_e(labels['ff_program'])}</th>"
+        f"<th class='val'>{_e(labels['ff_pass'])}</th>"
+        f"<th class='val'>{_e(labels['ff_clean'])}</th>"
+        f"<th>{_e(labels['ff_risk'])}</th></tr></thead><tbody>{body}</tbody></table>"
+    )
 
 
 def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[str, str]) -> str:
