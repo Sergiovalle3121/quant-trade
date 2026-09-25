@@ -227,7 +227,10 @@ def test_an_upload_with_a_code_is_born_paid(tmp_path: Path) -> None:
     assert "/redeem?token=" in preview.text
     assert find_claims(preview.text) == []
     # A client without a working code is told where to buy one, and the price.
-    assert "¿No tienes código? Pídelo aquí (USD 49)" in preview.text
+    buy = preview.text.split("<div class='paybox buy'>", 1)[1].split("</div></div>", 1)[0]
+    assert "<b>USD 49</b>" in buy and "¿No tienes código? Pídelo aquí" in buy
+    # The way to buy comes before the field for a code already bought.
+    assert preview.text.index("paybox buy") < preview.text.index("id='redeem-code'")
     assert "href='https://wa.me/000?text=" in preview.text
     assert client.get("/health").json()["access_codes"] is True
     # Tables scroll inside the page on a phone instead of widening it.

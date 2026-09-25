@@ -713,6 +713,11 @@ On phones the landing's long statement drops to body-like size, and the
 class range ("A a D", "A to D") is joined with non-breaking spaces so it never
 splits across lines.
 
+In code-sale mode the locked report's unlock box leads with a price card: the
+single price in large type, the pack of 3 under it, and the WhatsApp button
+(prefilled with the report id). The field for a code already bought comes
+after it, with a secondary button.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and

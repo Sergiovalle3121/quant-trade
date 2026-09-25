@@ -27,7 +27,7 @@ from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
-from quant_trade.audit.theme import SCRIPT_TAG, STYLE, aurora, class_ring, grid_bg, logo
+from quant_trade.audit.theme import SCRIPT_TAG, STYLE, aurora, class_ring, grid_bg, icon, logo
 from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning, summary
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
@@ -1706,9 +1706,17 @@ def render_html(
         verdict = {**verdict, "summary": _summary_in(data, locale)}
 
     paybox = ""
+    price = f"USD {price_usd:,.0f}" if price_usd else ""
+    pack = labels["pack"].format(price=pack_price_usd) if pack_price_usd else ""
+    price_html = (
+        f"<div class='buy-price'><b>{_e(price)}</b>"
+        + (f"<span>{_e(pack)}</span>" if pack else "")
+        + "</div>"
+        if price
+        else ""
+    )
     if locked and checkout_url:
         # Card payment is the main way to pay; the pack is the second button.
-        price = f" (USD {price_usd:,.0f})" if price_usd else ""
         pack_button = (
             "<button class='btn btn-ghost' type='submit' name='plan' value='pack'>"
             f"{_e(labels['pay_pack'].format(price=pack_price_usd))}</button>"
@@ -1716,39 +1724,42 @@ def render_html(
             else ""
         )
         paybox = (
-            f"<form class='paybox' method='post' action='{_e(checkout_url)}'>"
-            "<div class='inline-form'>"
+            f"<form class='paybox buy' method='post' action='{_e(checkout_url)}'>"
+            + price_html
+            + "<div><div class='inline-form'>"
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
-            f"{_e(labels['pay'])}{_e(price)}</button>{pack_button}</div>"
-            f"<p class='muted'>{_e(labels['pay_secure'])}</p></form>"
+            f"{_e(labels['pay'])}</button>{pack_button}</div>"
+            f"<p class='muted'>{_e(labels['pay_secure'])}</p></div></form>"
         )
     if locked and redeem_url:
-        paybox += (
-            f"<form class='paybox' method='post' action='{_e(redeem_url)}'>"
-            f"<label for='redeem-code'>{_e(labels['redeem'])}</label><div class='inline-form'>"
-            "<input id='redeem-code' type='text' name='code' required maxlength='40' "
-            "autocomplete='off' spellcheck='false' placeholder='AUD-XXXX-XXXX-XXXX'>"
-            f"<button class='btn btn-primary' type='submit'>{_e(labels['redeem_button'])}</button>"
-            "</div></form>"
-        )
         if contact_url:
             # Where a client without a code buys one (bank transfer, WhatsApp).
             contact_url = _prefilled(
                 contact_url, labels["code_request"].format(id=data["audit_id"])
             )
-            price = f" (USD {price_usd:,.0f})" if price_usd else ""
-            paybox += (
-                f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
-                f"target='_blank'>"
-                f"{_e(labels['buy_code_alt' if checkout_url else 'buy_code'])}{_e(price)}</a>"
-                + (
-                    f" <span class='muted'>· {_e(labels['pack'].format(price=pack_price_usd))}"
-                    "</span>"
-                    if pack_price_usd
-                    else ""
+            if checkout_url:
+                # With card payment on, WhatsApp is the alternative, not the main button.
+                paybox += (
+                    f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
+                    f"target='_blank'>{_e(labels['buy_code_alt'])}</a></p>"
                 )
-                + "</p>"
-            )
+            else:
+                paybox += (
+                    "<div class='paybox buy'>"
+                    + price_html
+                    + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
+                    f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
+                    f"{_e(labels['buy_code'])}</a></div>"
+                )
+        main_button = contact_url or checkout_url
+        paybox += (
+            f"<form class='paybox' method='post' action='{_e(redeem_url)}'>"
+            f"<label for='redeem-code'>{_e(labels['redeem'])}</label><div class='inline-form'>"
+            "<input id='redeem-code' type='text' name='code' required maxlength='40' "
+            "autocomplete='off' spellcheck='false' placeholder='AUD-XXXX-XXXX-XXXX'>"
+            f"<button class='btn {'btn-ghost' if main_button else 'btn-primary'}' type='submit'>"
+            f"{_e(labels['redeem_button'])}</button></div></form>"
+        )
     compare_html = ""
     if compare_link and not locked:
         from quant_trade.audit.compare import COPY as COMPARE_COPY
