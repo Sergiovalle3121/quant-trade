@@ -99,6 +99,9 @@ Limits, each written into the report as a reading warning:
   else 10,000 with a warning.
 - A CSV line longer than 32 KB (`MAX_CSV_LINE_BYTES`) is refused: no real
   export has one, and pandas takes minutes on a 5 MB line of fields.
+- An optimisation export cell placed past column 4,096 by `ss:Index`
+  (`MAX_OPTIMIZATION_COLUMNS`) ends its row: a 200-byte crafted index
+  would otherwise pad one row with hundreds of millions of empty cells.
 - XML (the optimisation export and every XLSX member) is refused when it
   declares a document type, in any encoding; a damaged, encrypted or
   size-lying workbook gets a plain "could not be read" message.

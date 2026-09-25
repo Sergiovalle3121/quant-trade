@@ -530,3 +530,37 @@ def test_a_size_share_above_ten_prints_as_more_than_ten() -> None:
     assert scale_text(9.96, "es") == "10.0x"
     assert scale_text(124.2, "es") == "más de 10x"
     assert scale_text(124.2, "en") == "more than 10x"
+
+
+_OPT_HEAD = (
+    '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
+    'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet '
+    'ss:Name="Tester Optimizator Results"><Table>'
+)
+
+
+def _opt_row(*values: object) -> str:
+    return "<Row>" + "".join(f"<Cell><Data>{value}</Data></Cell>" for value in values) + "</Row>"
+
+
+def test_a_crafted_optimization_cell_index_does_not_pad_millions_of_cells() -> None:
+    import time
+
+    header = _opt_row("Pass", "Result", "Profit", "Trades", "FastMA")
+    rows = "".join(_opt_row(i, 10_000 + i, i, 100, 5 + i) for i in range(12))
+    crafted = '<Row><Cell ss:Index="200000000"><Data>1</Data></Cell></Row>'
+    data = (_OPT_HEAD + header + rows + crafted + "</Table></Worksheet></Workbook>").encode()
+    started = time.perf_counter()
+    summary = importers.parse_optimization(data)
+    assert time.perf_counter() - started < 2
+    assert summary.passes == 12
+
+
+def test_the_best_pass_with_a_blank_parameter_is_not_a_crash() -> None:
+    from quant_trade.audit.plateau import parameter_stability
+
+    table = [{"Profit": float(i), "FastMA": 5.0 + i, "SlowMA": 50.0 + i % 3} for i in range(19)]
+    table.append({"Profit": 999.0, "SlowMA": 51.0})  # the best pass left FastMA blank
+    review, _ = parameter_stability(table, ["FastMA", "SlowMA"], report_inputs=None)
+    assert review["status"] == "MEASURED"
+    assert review["chosen"] == {"SlowMA": 51.0}

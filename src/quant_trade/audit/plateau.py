@@ -105,6 +105,8 @@ def parameter_stability(
     index = {_key(row, varied): row for row in table}
     neighbours: list[dict[str, Any]] = []
     for position, name in enumerate(varied):
+        if name not in chosen:
+            continue  # the chosen pass left this parameter blank: no step to take
         steps = sorted({row[name] for row in table if name in row})
         at = steps.index(chosen[name])
         for other in (at - 1, at + 1):
@@ -122,7 +124,7 @@ def parameter_stability(
         "status": "MEASURED",
         "metric": metric,
         "chosen_by": chosen_by,
-        "chosen": {name: chosen[name] for name in varied},
+        "chosen": {name: chosen[name] for name in varied if name in chosen},
         "chosen_result": measured(chosen_value, NOTE),
         "passes": measured(len(table), NOTE),
         "passes_in_profit": measured(sum(value > 0 for value in results) / len(results), NOTE),
