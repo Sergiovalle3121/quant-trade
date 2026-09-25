@@ -2623,6 +2623,11 @@ KPI_CSS = (
     ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
     ".kpi.locked b{display:flex;align-items:center;gap:10px;height:1.1em;color:var(--text-3)}"
     ".kpi.locked svg{width:.62em;height:.62em;flex:none}"
+    "a.kpi.locked{display:block;color:inherit;text-decoration:none;"
+    "transition:border-color .2s,box-shadow .2s}"
+    "a.kpi.locked:hover,a.kpi.locked:focus-visible{border-color:var(--text-3);"
+    "box-shadow:0 6px 18px rgba(0,0,0,.06)}"
+    "a.kpi.locked:hover svg{color:var(--text)}"
     ".kpi.locked i{display:block;height:.5em;width:62%;border-radius:999px;"
     "background:linear-gradient(90deg,#ececef 0%,#f6f6f8 50%,#ececef 100%);"
     "background-size:200% 100%;"
@@ -2759,8 +2764,10 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
     if not kpis:
         return ""
     tiles = "".join(
-        f"<div class='kpi locked'><b aria-hidden='true'>{icon('lock')}<i></i></b>"
-        f"<span>{_e(label)}</span></div>"
+        # A locked figure is a way in: tapping it goes to the unlock box.
+        f"<a class='kpi locked' href='#unlock' "
+        f"aria-label='{_e(label)}: {_e(labels['unlock_nav'])}'>"
+        f"<b aria-hidden='true'>{icon('lock')}<i></i></b><span>{_e(label)}</span></a>"
         if locked
         else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
         f"<span>{_e(label)}</span>{_kpi_hint(label, labels)}</div>"
