@@ -26,6 +26,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit import account as account_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import stress as stress_lib
@@ -752,6 +753,14 @@ def run_audit(
         )
         if not inputs.balance_only:
             flags.extend(redflags.scan_trades_against_equity(inputs.trades, frame))
+    account, account_flags = account_lib.account_review(
+        source_format=inputs.source_format,
+        cash_flows=inputs.cash_flows,
+        trades=inputs.trades,
+        frame=frame,
+        metadata=inputs.report_metadata,
+    )
+    flags.extend(account_flags)
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
     stress_tests = _stress(inputs, frame)
@@ -915,6 +924,7 @@ def run_audit(
         timing=timing,
         risk=risk,
         challenge=challenge,
+        account=account,
         vendor_questions=questions,
     )
 

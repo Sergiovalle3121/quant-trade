@@ -156,6 +156,9 @@ class ImportedReport:
     #: The instrument of each trade in ``trades`` (empty string when unknown),
     #: so the grid and concurrency flags never mix symbols.
     symbols: list[str] = field(default_factory=list)
+    #: Deposits (positive) and withdrawals (negative) the file lists, in time
+    #: order, including those before the first trade and after the last.
+    cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -2770,6 +2773,9 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         warnings=warnings,
         metadata=metadata,
         symbols=trade_symbols,
+        cash_flows=sorted(
+            (item.time, item.amount) for item in draft.cash or [] if item.is_flow and item.amount
+        ),
     )
 
 

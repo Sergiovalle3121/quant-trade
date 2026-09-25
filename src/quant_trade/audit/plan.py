@@ -244,6 +244,36 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
         "es": "Las operaciones no explican la curva: sube ambos archivos de la misma cuenta.",
         "en": "The trades do not explain the curve: upload both files from the same account.",
     },
+    "GAIN_INFLATED_BY_FLOWS": {
+        "es": (
+            "El porcentaje sale de quitar depósitos y retiros: juzga la cuenta también por "
+            "el dinero que ganó o perdió al operar."
+        ),
+        "en": (
+            "The percentage comes from removing deposits and withdrawals: judge the account "
+            "by the money its trading made or lost as well."
+        ),
+    },
+    "DEPOSIT_DURING_DRAWDOWN": {
+        "es": (
+            "Hubo dinero nuevo en plena pérdida: mira el drawdown sin esos depósitos y "
+            "pregunta por qué se añadieron."
+        ),
+        "en": (
+            "New money arrived in a deep loss: look at the drawdown without those deposits "
+            "and ask why they were added."
+        ),
+    },
+    "FLOATING_LOSS_AT_END": {
+        "es": (
+            "Hay posiciones abiertas con pérdida: pide un historial impreso después de que "
+            "se cierren para ver el resultado real."
+        ),
+        "en": (
+            "Positions are open at a loss: ask for a history printed after they close to see "
+            "the real result."
+        ),
+    },
 }
 
 GENERIC_FLAG_HINT = {

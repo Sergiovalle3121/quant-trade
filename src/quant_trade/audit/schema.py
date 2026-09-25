@@ -630,6 +630,8 @@ class AuditInputs:
     optimization_parameters: list[str] = field(default_factory=list)
     #: Parameter variants a report says it holds (vectorbt), when more than one.
     report_variants: int | None = None
+    #: Deposits and withdrawals an imported account history lists.
+    cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
 
 
 def report_digest_name(filename: str | None) -> str:
@@ -684,6 +686,7 @@ def build_inputs(
             "reported_fees": dict(imported.fees),
             "report_metadata": dict(imported.metadata),
             "initial_balance": imported.initial_balance,
+            "cash_flows": list(imported.cash_flows),
         }
         variants_in_report = imported.metadata.get("variants", "")
         if variants_in_report.isdigit() and int(variants_in_report) > 1:
@@ -803,6 +806,9 @@ class AuditResult(BaseModel):
     timing: dict[str, Any] | None = None
     risk: dict[str, Any] | None = None
     challenge: dict[str, Any] | None = None
+    #: Deposits, withdrawals and open positions of an account history
+    #: (``audit/account.py``); None on older results.
+    account: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

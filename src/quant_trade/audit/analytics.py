@@ -567,6 +567,16 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "Most trades win a little and a few lose a lot: what prevents a loss larger "
         "than those in the history?",
     },
+    "deposits": {
+        "es": "Pide el historial completo con cada depósito y retiro: ¿cuánto dinero se "
+        "depositó en total, cuándo, y cuánto se retiró?",
+        "en": "Ask for the full history with every deposit and withdrawal: how much money "
+        "was deposited in total, when, and how much was withdrawn?",
+    },
+    "open_positions": {
+        "es": "¿Qué posiciones siguen abiertas, desde cuándo y con qué pérdida flotante?",
+        "en": "Which positions are still open, since when, and with what floating loss?",
+    },
     "data_quality": {
         "es": "El historial tiene saltos, huecos o valores repetidos: ¿de dónde salen los datos "
         "y cómo se limpiaron?",
@@ -582,6 +592,9 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "HIDDEN_FLOATING_DRAWDOWN": "equity_curve",
     "NO_STOP_EVIDENCE": "stop_loss",
     "NEGATIVE_PAYOFF_HIGH_WINRATE": "payoff",
+    "GAIN_INFLATED_BY_FLOWS": "deposits",
+    "DEPOSIT_DURING_DRAWDOWN": "deposits",
+    "FLOATING_LOSS_AT_END": "open_positions",
     "MAD_SPIKES": "data_quality",
     "STALE_MARKS": "data_quality",
     "LARGE_GAPS": "data_quality",
