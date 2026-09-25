@@ -1117,6 +1117,9 @@ The chosen settings read as chips.
 The capital warning for a history under a year is an amber callout.
 On desktop the upload form pairs the language and access-code fields, so no field sits alone.
 
+In "El dinero real de la cuenta", a negative percent gain, a negative money result and the open loss show in red.
+Reading notes from the file importer read as a short list, not one run-on sentence.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

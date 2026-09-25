@@ -285,3 +285,12 @@ def test_upload_form_leaves_no_lone_field_on_desktop() -> None:
     grid = page.split("<div class='form-grid'>", 1)[1].split("<details", 1)[0]
     assert "name='access_code'" in grid and "name='optimization'" in grid
     assert ".form-grid>:last-child:nth-child(odd){grid-column:1/-1}" in STYLE
+
+
+def test_account_losses_read_red_and_reading_notes_are_a_list(tmp_path: Path) -> None:
+    page = _client(tmp_path).get("/ejemplo").text
+    # Percent gain, money result and open loss of the sample account are losses.
+    assert page.count("<div class='fact neg'>") >= 3
+    assert "<div class='read-notes'><p>Avisos de lectura</p><ul><li>" in page
+    assert ".read-notes{" in STYLE and "Input values" not in page
+    assert find_claims(page) == []
