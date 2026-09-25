@@ -905,6 +905,9 @@ class AuditResult(BaseModel):
     #: Tick model, data quality and test window of a MetaTrader tester
     #: report (``audit/testdata.py``); None on older results.
     test_data: dict[str, Any] | None = None
+    #: Capital and size for each loss limit (``audit/sizing.py``); None on
+    #: older results.
+    capital: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 
