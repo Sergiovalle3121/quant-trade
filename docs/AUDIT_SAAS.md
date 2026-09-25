@@ -369,6 +369,30 @@ skipped when the curve was rebuilt from the same report):
 | `TRADES_OUTSIDE_EQUITY` | > 10 % of trade exits fall outside the curve's dates (± 1 day) | — |
 | `TRADES_EQUITY_UNRELATED` | ≥ 6 months with trade exits and the monthly realised pnl correlates < 0.2 with the monthly equity change | — |
 
+### The account's real money (`audit/account.py`)
+
+For investors checking someone else's track record. Only for account
+histories (MT5 history HTML/XLSX, MT4 statement); a backtest shows the
+section as NOT_MEASURED. The importer lists every deposit and withdrawal
+(`ImportedReport.cash_flows`), and the section puts side by side: the
+time-weighted percentage gain (deposits and withdrawals taken out, as
+track-record sites compute it), the money the closed trades made after
+commission and swap, the result on the money deposited, the share withdrawn,
+each deposit made after trading began with the balance before it and the
+flow-adjusted drawdown on the day before, and the platform's own floating
+result (DECLARED). Nothing is checked with the broker.
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `GAIN_INFLATED_BY_FLOWS` | percentage gain ≥ 10 % while the trading result is ≤ 0 or below a third of the gain on the money deposited | — |
+| `DEPOSIT_DURING_DRAWDOWN` | a deposit after the first trade while the flow-adjusted drawdown is ≥ 20 % | — |
+| `FLOATING_LOSS_AT_END` | the declared floating result is a loss ≥ 10 % of the balance | ≥ 30 % |
+
+Limitations: broker credit and bonus rows of an MT5 history count as flows;
+the floating result is the platform's figure at print time, not a history
+of floating losses; a history printed after the open losers close shows
+none of it.
+
 Trials: the deflated Sharpe uses the larger of the declared trials and what
 the files prove (columns of the variants matrix, passes of an MT5
 optimisation export, variants in a vectorbt report); the latter is tagged

@@ -658,11 +658,18 @@ class AuditInputs:
     optimization_parameters: list[str] = field(default_factory=list)
     #: Parameter variants a report says it holds (vectorbt), when more than one.
     report_variants: int | None = None
+    #: Deposits and withdrawals an imported account history lists.
+    cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
     #: Closed trades of a live (or demo) account statement, compared with the
     #: backtest (``audit/live.py``); never mixed into the backtest's figures.
     live_trades: ParsedTrades | None = None
     live_symbols: list[str] | None = None
     live_format: str | None = None
+    #: Deposits, platform summary and balance curve of the live statement,
+    #: for the account review when the main upload is a backtest.
+    live_cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
+    live_metadata: dict[str, str] = field(default_factory=dict)
+    live_equity_csv: bytes | None = None
 
 
 def report_digest_name(filename: str | None, stem: str = "report") -> str:
@@ -726,6 +733,7 @@ def build_inputs(
             "reported_fees": dict(imported.fees),
             "report_metadata": dict(imported.metadata),
             "initial_balance": imported.initial_balance,
+            "cash_flows": list(imported.cash_flows),
         }
         variants_in_report = imported.metadata.get("variants", "")
         if variants_in_report.isdigit() and int(variants_in_report) > 1:
@@ -775,6 +783,9 @@ def build_inputs(
         extra["live_trades"] = live.trades
         extra["live_symbols"] = list(live.symbols) or None
         extra["live_format"] = live.source_format
+        extra["live_cash_flows"] = list(live.cash_flows)
+        extra["live_metadata"] = dict(live.metadata)
+        extra["live_equity_csv"] = live.equity_csv
     ppy, label = infer_frequency(equity.frame["timestamp"])
     return AuditInputs(
         equity=equity,
@@ -855,6 +866,9 @@ class AuditResult(BaseModel):
     live: dict[str, Any] | None = None
     risk: dict[str, Any] | None = None
     challenge: dict[str, Any] | None = None
+    #: Deposits, withdrawals and open positions of an account history
+    #: (``audit/account.py``); None on older results.
+    account: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

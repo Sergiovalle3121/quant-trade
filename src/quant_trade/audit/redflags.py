@@ -686,6 +686,18 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
         "es": "Operaciones que no se mueven con la curva",
         "en": "Trades that do not move with the curve",
     },
+    "GAIN_INFLATED_BY_FLOWS": {
+        "es": "El % de ganancia no refleja el dinero",
+        "en": "The percentage gain does not reflect the money",
+    },
+    "DEPOSIT_DURING_DRAWDOWN": {
+        "es": "Depósitos en plena pérdida",
+        "en": "Deposits in a deep drawdown",
+    },
+    "FLOATING_LOSS_AT_END": {
+        "es": "Pérdida abierta que el balance no muestra",
+        "en": "Open loss the balance does not show",
+    },
 }
 
 
