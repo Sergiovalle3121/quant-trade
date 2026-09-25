@@ -45,7 +45,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": guides_index_url("es"), "en": guides_index_url("en")},
     *({"es": guide_url(g.slug, "es"), "en": guide_url(g.slug, "en")} for g in GUIDES),
     dict(METHOD_PATH),
-    *({"es": audience_url(a.slug, "es"), "en": audience_url(a.slug, "en")} for a in AUDIENCE_PAGES),
+    *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     {"es": "/comprobar", "en": "/check"},
     {"es": "/terminos", "en": "/terms"},
     {"es": "/privacidad", "en": "/privacy"},

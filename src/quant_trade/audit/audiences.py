@@ -4,7 +4,7 @@ upload, what Rigor checks and what it does not do.
 A stranger who arrives from a search ("¿mi backtest está sobreajustado?",
 "is this prop firm challenge realistic?", "check a fund's track record")
 lands on the page written for their case instead of the generic landing.
-Each page exists in Spanish and English, is listed in the sitemap and names
+Each page exists in Spanish, English and Portuguese, is listed in the sitemap and names
 only features that are live. The test suite runs the profit-claim guard over
 every page.
 """
@@ -35,7 +35,8 @@ class AudienceText:
 
 @dataclass(frozen=True)
 class Audience:
-    #: Spanish path segment; ``slug_en`` is the English one.
+    #: Spanish path segment; ``slug_en`` and ``slug_pt`` are the English and
+    #: Portuguese ones.
     slug: str
     slug_en: str
     icon: str
@@ -43,13 +44,16 @@ class Audience:
     #: The start button opens the form's "Añadir más archivos" box (robot buyers
     #: bring the live account and the optimisation XML).
     open_extras: bool = False
+    slug_pt: str = ""
 
     def slug_for(self, locale: str) -> str:
+        if locale == "pt":
+            return self.slug_pt or self.slug
         return self.slug_en if locale == "en" else self.slug
 
 
 #: A page lives at ``<base>/<slug>`` in each language.
-AUDIENCE_BASE: dict[str, str] = {"es": "/para", "en": "/for"}
+AUDIENCE_BASE: dict[str, str] = {"es": "/para", "en": "/for", "pt": "/pt/para"}
 
 #: Export formats the universal reader recognises by their published column
 #: layout (``audit/universal.py``). Named as "recognised", never as "tried":
@@ -133,12 +137,34 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "others": "Other cases",
         "home": "Home",
     },
+    "pt": {
+        "eyebrow": "Para quem é",
+        "pains": "O problema",
+        "uploads": "O que você envia",
+        "checks": "O que o Rigor revisa",
+        "limits": "O que não faz",
+        "price": "Preço",
+        "price_text": (
+            "O seu primeiro relatório completo é grátis ao criar a sua conta. Depois, a prévia "
+            f"é grátis ({FREE_PREVIEWS_PER_MONTH} por mês) e não pede cartão: classe de A a D, "
+            "gráficos, bandeiras vermelhas e o que cada dimensão significa. O relatório "
+            "completo custa USD {price:.0f} (USD {pack:.0f} o pacote de 3). Se o relatório ler "
+            "mal o seu arquivo e não conseguirmos corrigir, devolvemos o valor."
+        ),
+        "faq": "Perguntas",
+        "start": "Começar grátis",
+        "sample": "Ver um relatório de exemplo (em inglês)",
+        "guide": "Como exportar (em inglês)",
+        "others": "Outros casos",
+        "home": "Início",
+    },
 }
 
 AUDIENCE_PAGES: tuple[Audience, ...] = (
     Audience(
         slug="compradores-de-robots",
         slug_en="robot-buyers",
+        slug_pt="compradores-de-robos",
         icon="layers",
         open_extras=True,
         text={
@@ -305,11 +331,93 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                 ),
             ),
+            "pt": AudienceText(
+                title="Antes de comprar um robô de trading, revise o backtest dele",
+                summary=(
+                    "Envie o relatório do testador do MetaTrader que o vendedor mostra e "
+                    "descubra se a curva é evidência ou o resultado de testar centenas de "
+                    "configurações."
+                ),
+                pains=(
+                    "O vendedor mostra uma curva quase reta e um fator de lucro alto, e você não "
+                    "sabe quantas configurações ele testou até encontrá-la.",
+                    "Muitos robôs ficam bonitos no testador e falham na conta real por custos, "
+                    "slippage ou dados de baixa qualidade.",
+                    "Um histórico do Myfxbook pode ser inflado com depósitos ou esconder perdas "
+                    "abertas que ainda não foram fechadas.",
+                ),
+                uploads=(
+                    (
+                        "O relatório HTML do testador do MetaTrader 5 ou 4, do jeito que o "
+                        "testador o salva.",
+                        "mt5",
+                    ),
+                    (
+                        "Se o vendedor fornecer, o XML de otimização: ele conta as configurações "
+                        "que foram testadas.",
+                        "mt5-optimization",
+                    ),
+                    (
+                        "Se houver uma conta real ou demo rodando o robô, o histórico dela no "
+                        "MetaTrader, Myfxbook, FX Blue ou sinal da MQL5.",
+                        "cuenta-proveedor",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Número de tentativas",
+                        "O Sharpe deflacionado desconta as configurações testadas; com o XML, "
+                        "esse número é medido em vez de suposto.",
+                    ),
+                    (
+                        "Pico isolado ou platô?",
+                        "Se mover um parâmetro um passo derruba o resultado, a configuração foi "
+                        "ajustada ao ruído do histórico.",
+                    ),
+                    (
+                        "Com que dados o teste foi feito",
+                        "O modelo de ticks e a qualidade do histórico do testador: um teste com "
+                        "preços de abertura não diz o mesmo que um com ticks reais.",
+                    ),
+                    (
+                        "Testes de estresse",
+                        "O resultado sem as suas melhores operações e meses, e o que acontece "
+                        "com o dobro e o triplo dos custos.",
+                    ),
+                    (
+                        "Backtest frente à conta real",
+                        "Se a conta do vendedor se comporta como milhares de histórias "
+                        "reamostradas do seu próprio backtest.",
+                    ),
+                    (
+                        "Perguntas para o vendedor",
+                        "Uma lista de perguntas concretas tiradas do que o arquivo não responde.",
+                    ),
+                ),
+                limits=(
+                    "Não confere as operações com a corretora: audita o arquivo que você envia.",
+                    "Não recomenda comprar ou não um robô, e não prevê resultados.",
+                ),
+                faq=(
+                    (
+                        "E se o vendedor não me der o relatório?",
+                        "Peça o relatório HTML do testador e, se houve otimização, o XML de "
+                        "otimização. Um vendedor que não pode mostrar nenhum dos dois já está "
+                        "dando uma resposta.",
+                    ),
+                    (
+                        "Classe A quer dizer que o robô vai funcionar?",
+                        "Não. A classe mede quantas perguntas estatísticas o arquivo responde. O "
+                        "futuro depende do mercado, dos custos reais e de como se opera.",
+                    ),
+                ),
+            ),
         },
     ),
     Audience(
         slug="traders-acciones-futuros-cripto",
         slug_en="stock-futures-crypto-traders",
+        slug_pt="traders-acoes-futuros-cripto",
         icon="chart",
         text={
             "es": AudienceText(
@@ -471,11 +579,95 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                 ),
             ),
+            "pt": AudienceText(
+                title="A sua estratégia de ações, futuros ou cripto tem uma vantagem real?",
+                summary=(
+                    "Envie a lista de operações do TradingView, NinjaTrader, QuantConnect, "
+                    "backtesting.py ou vectorbt, ou a sua curva de equity, e meça se a sua "
+                    "vantagem sobrevive ao número de tentativas, aos custos e ao período "
+                    "recente."
+                ),
+                pains=(
+                    "Você testou dezenas de variantes até uma ficar boa, e já não sabe se "
+                    "encontrou uma vantagem ou a sorte de testar tantas.",
+                    "Comissão, spread, funding e slippage comem as vantagens pequenas, sobretudo "
+                    "em cripto e em futuros pequenos.",
+                    "Uma estratégia que funcionou anos atrás pode ter parado de funcionar.",
+                ),
+                uploads=(
+                    ("A lista de operações do TradingView (CSV ou XLSX).", "tradingview"),
+                    ("O CSV de operações do NinjaTrader 8.", "ninjatrader"),
+                    ("As operações do QuantConnect.", "quantconnect"),
+                    ("As operações do backtesting.py ou do vectorbt.", "backtesting-py"),
+                    (
+                        "O histórico de operações da sua corretora ou exchange em CSV ou Excel. "
+                        "O Rigor reconhece o formato de exportação de "
+                        + PLATFORMS_PT
+                        + "; de qualquer outra corretora ou diário, as colunas são reconhecidas "
+                        "pelo nome.",
+                        "csv-universal",
+                    ),
+                    (
+                        "Ou a sua curva de equity ou série de retornos em CSV ou Excel (diária, "
+                        "semanal ou mensal), de qualquer mercado.",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Significância estatística",
+                        "Se o seu Sharpe se distingue de zero, dados o tamanho, a assimetria e a "
+                        "curtose do histórico.",
+                    ),
+                    (
+                        "Número de tentativas",
+                        "Quanto sobrevive depois de descontar as variantes que você testou.",
+                    ),
+                    (
+                        "Custos",
+                        "O que acontece com 1x, 2x e 3x o custo de operação, e o custo de "
+                        "equilíbrio.",
+                    ),
+                    (
+                        "Continua funcionando no período recente?",
+                        "O último terço do histórico frente ao resto.",
+                    ),
+                    (
+                        "Funciona em cada instrumento?",
+                        "Operações, resultado líquido e taxa de acerto por símbolo, quando o "
+                        "arquivo tem vários.",
+                    ),
+                    (
+                        "Quanto capital pede",
+                        "O capital que cada limite de perda exige, reamostrando um ano das suas "
+                        "operações.",
+                    ),
+                ),
+                limits=(
+                    "Nunca se conecta à sua corretora ou exchange: audita o arquivo que você "
+                    "envia.",
+                    "Não recomenda operar e não prevê resultados.",
+                ),
+                faq=(
+                    (
+                        "Serve para cripto?",
+                        "Sim. O Rigor não depende do mercado: mede o histórico que você envia. "
+                        "Uma exportação do TradingView ou uma curva de equity da sua carteira "
+                        "cripto serve igual a uma de ações.",
+                    ),
+                    (
+                        "E se eu só tiver uma curva de equity?",
+                        "Ela é auditada do mesmo jeito. Sem a lista de operações, os custos "
+                        "ficam NOT_MEASURED e o relatório diz qual arquivo os mediria.",
+                    ),
+                ),
+            ),
         },
     ),
     Audience(
         slug="retos-prop-firm",
         slug_en="prop-firm-challenges",
+        slug_pt="desafios-prop-firm",
         icon="target",
         text={
             "es": AudienceText(
@@ -643,11 +835,97 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                 ),
             ),
+            "pt": AudienceText(
+                title="Antes de pagar um desafio de prop firm, simule-o com o seu histórico",
+                summary=(
+                    "Envie o seu backtest ou histórico e veja com que frequência você "
+                    "tocaria o limite de perda diária ou total nos desafios da FTMO, "
+                    "FundedNext, The5ers e Topstep, reamostrando as suas próprias operações."
+                ),
+                pains=(
+                    "Você paga o desafio, uma sequência ruim toca a perda diária e você paga de "
+                    "novo.",
+                    "A sua estratégia pode ser sólida e mesmo assim não caber nas regras de "
+                    "perda diária, perda total e prazo de um desafio.",
+                    "Cada firma muda as suas regras, e compará-las não é fácil.",
+                    "Você pode cumprir o desafio e mesmo assim ter o saque retido pela regra do "
+                    "melhor dia (consistência) da firma.",
+                ),
+                uploads=(
+                    ("O seu relatório do MetaTrader 5 ou 4.", "mt5"),
+                    ("A sua lista de operações do TradingView.", "tradingview"),
+                    ("O seu CSV do NinjaTrader 8 (futuros).", "ninjatrader"),
+                    (
+                        "Ou o histórico de operações da sua plataforma em CSV ou Excel: o Rigor "
+                        "reconhece o formato do Tradovate, TopstepX e Sierra Chart, entre "
+                        "outros.",
+                        "csv-universal",
+                    ),
+                    (
+                        "Depois, no formulário, abra 'Adicionar mais arquivos' e escolha o "
+                        "desafio a simular.",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Simulador de desafios",
+                        "Reamostra o seu histórico milhares de vezes e conta com que frequência "
+                        "a perda diária ou a perda total seria tocada, ou a meta não seria "
+                        "alcançada no prazo.",
+                    ),
+                    (
+                        "Com qual firma o seu histórico combina?",
+                        "O mesmo histórico sob as regras publicadas de cada firma, da mais à "
+                        "menos provável de cumprir, e se a regra do melhor dia reteria o saque. "
+                        "Compara regras; não recomenda comprar um desafio.",
+                    ),
+                    (
+                        "Regras com fonte e data",
+                        "Cada desafio cita o site oficial da firma e a data em que as regras "
+                        "foram lidas.",
+                    ),
+                    (
+                        "Quanto capital pede e com que tamanho",
+                        "O capital que a sua estratégia exige com limites de perda de 10, 20, 30 "
+                        "e 50 %.",
+                    ),
+                    (
+                        "Risco reamostrado em um ano",
+                        "A queda provável da sua estratégia em um ano, com as suposições "
+                        "escritas ao lado.",
+                    ),
+                    (
+                        "Como se comporta quando perde",
+                        "Se você segura as operações perdedoras por mais tempo ou volta a entrar "
+                        "logo depois de uma perda.",
+                    ),
+                ),
+                limits=(
+                    "São estimativas com as suposições escritas, não uma previsão do desafio.",
+                    "Confirme sempre as regras com a firma antes de pagar o desafio.",
+                ),
+                faq=(
+                    (
+                        "Quais firmas e desafios estão incluídos?",
+                        "{presets} desafios da FTMO, FundedNext, The5ers e Topstep, mais um "
+                        "genérico de duas fases. O formulário mostra a data em que as regras "
+                        "foram lidas.",
+                    ),
+                    (
+                        "Ele me diz se vou conseguir a conta?",
+                        "Não. Diz com que frequência, repetindo o seu próprio histórico em outra "
+                        "ordem, os limites do desafio seriam tocados. Mede o risco da sua "
+                        "estratégia frente a essas regras.",
+                    ),
+                ),
+            ),
         },
     ),
     Audience(
         slug="inversores-gestores-fondos",
         slug_en="investors-managers-funds",
+        slug_pt="investidores-gestores-fundos",
         icon="eye",
         text={
             "es": AudienceText(
@@ -826,12 +1104,97 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                 ),
             ),
+            "pt": AudienceText(
+                title="Antes de investir com um gestor, um sinal ou um fundo, revise o histórico",
+                summary=(
+                    "Envie o histórico da conta ou a série de retornos para separar o "
+                    "resultado das operações dos depósitos, comparar a conta com o backtest "
+                    "e medir se o histórico é evidência ou sorte."
+                ),
+                pains=(
+                    "A porcentagem que mostram pode vir de depósitos e recargas, não das "
+                    "operações.",
+                    "Um histórico curto, ou com poucos meses muito bons, pode parecer um "
+                    "histórico sólido.",
+                    "O que o backtest mostra e o que a conta real faz nem sempre se parecem.",
+                ),
+                uploads=(
+                    (
+                        "O histórico da conta: o relatório do MetaTrader ou o CSV que o "
+                        "Myfxbook, o FX Blue ou o sinal da MQL5 exportam.",
+                        "cuenta-proveedor",
+                    ),
+                    (
+                        "Ou a série de retornos (diária, semanal ou mensal) em CSV ou Excel, com "
+                        "colunas de data e retorno.",
+                        "",
+                    ),
+                    (
+                        "Ou a tabela de rentabilidades mensais da lâmina, como está: uma linha "
+                        "por ano e uma coluna por mês, em CSV ou Excel.",
+                        "",
+                    ),
+                    ("Se houver, o backtest, para comparar com a conta.", "mt5"),
+                ),
+                checks=(
+                    (
+                        "O dinheiro real na conta",
+                        "Depósitos e saques separados do resultado das operações; um aviso "
+                        "quando a porcentagem é inflada por recargas ou há perdas ainda abertas.",
+                    ),
+                    (
+                        "Backtest frente à conta real",
+                        "A conta frente a milhares de histórias reamostradas do backtest, e "
+                        "operação por operação nas mesmas datas.",
+                    ),
+                    (
+                        "Significância estatística",
+                        "Se o histórico se destaca do acaso, dado o seu tamanho.",
+                    ),
+                    ("Testes de estresse", "O resultado sem os seus melhores meses e operações."),
+                    (
+                        "Continua funcionando no período recente?",
+                        "O último terço do histórico frente ao resto.",
+                    ),
+                    (
+                        "O que quem investe num fundo revisaria",
+                        "Com 24 meses ou mais: calendário ano por mês, retorno anual composto, "
+                        "volatilidade, pior mês, queda mais funda, tempo para se recuperar e "
+                        "duas verificações de retornos suavizados.",
+                    ),
+                    (
+                        "Perguntas para o gestor",
+                        "O que perguntar, a partir do que o arquivo dele não responde.",
+                    ),
+                ),
+                limits=(
+                    "Nunca se conecta à corretora dele nem ao seu dinheiro: audita o arquivo que "
+                    "você envia.",
+                    "Não diz se você deve investir; dá os números para decidir.",
+                ),
+                faq=(
+                    (
+                        "E se eu só tiver os retornos mensais?",
+                        "Envie-os como série de retornos em CSV ou Excel, ou envie a tabela da "
+                        "lâmina como está (uma linha por ano, meses como colunas, em português, "
+                        "inglês, espanhol ou de 1 a 12). Se o total de um ano não bater com os "
+                        "seus meses, o relatório diz isso. Com retornos mensais um histórico "
+                        "curto tem poucos dados, e o relatório diz isso em vez de esconder.",
+                    ),
+                    (
+                        "Como peço o histórico?",
+                        "O guia da conta do fornecedor explica o que pedir no MetaTrader, "
+                        "Myfxbook, FX Blue e sinais da MQL5 (em inglês).",
+                    ),
+                ),
+            ),
         },
     ),
     # Last, so the landing's four cards keep pointing at the first four pages.
     Audience(
         slug="copiar-senales",
         slug_en="signal-copiers",
+        slug_pt="copiar-sinais",
         icon="copy",
         text={
             "es": AudienceText(
@@ -890,8 +1253,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "Preguntas para el proveedor",
-                        "Qué pedirle antes de copiar, a partir de lo que su historial no "
-                        "responde.",
+                        "Qué pedirle antes de copiar, a partir de lo que su historial no responde.",
                     ),
                 ),
                 limits=(
@@ -968,8 +1330,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "Questions for the provider",
-                        "What to ask before copying, drawn from what the history does not "
-                        "answer.",
+                        "What to ask before copying, drawn from what the history does not answer.",
                     ),
                 ),
                 limits=(
@@ -991,11 +1352,91 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                 ),
             ),
+            "pt": AudienceText(
+                title="Antes de copiar um sinal, veja o risco que ele não mostra",
+                summary=(
+                    "Envie o histórico da conta que você quer copiar e veja o que a "
+                    "porcentagem dela não diz: martingale, grades, operações sem stop, "
+                    "perdas abertas e depósitos."
+                ),
+                pains=(
+                    "O sinal mostra uma taxa de acerto muito alta, e você não vê se por trás há "
+                    "martingale, uma grade ou operações sem stop.",
+                    "Uma conta pode subir suave por meses e perder quase tudo de uma vez; a "
+                    "curva de saldo não mostra as perdas abertas.",
+                    "O ganho em porcentagem pode vir de depósitos, e um print não mostra nada "
+                    "disso.",
+                ),
+                uploads=(
+                    (
+                        "O histórico da conta que você copia: o relatório do MetaTrader ou o CSV "
+                        "que o Myfxbook, o FX Blue ou o sinal da MQL5 exportam.",
+                        "cuenta-proveedor",
+                    ),
+                    (
+                        "Ou o histórico de operações da corretora em CSV ou Excel, por exemplo o "
+                        "do eToro.",
+                        "csv-universal",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Martingale e grades",
+                        "Se o tamanho cresce depois de uma perda, ou se abrem mais posições para "
+                        "fazer preço médio de uma perda.",
+                    ),
+                    (
+                        "Sem stop loss",
+                        "Se as maiores perdas são muitas vezes a perda típica, sinal de "
+                        "operações sem stop.",
+                    ),
+                    (
+                        "Muitos ganhos pequenos e perdas grandes",
+                        "Uma taxa de acerto alta com perdas que apagam muitos ganhos de uma vez.",
+                    ),
+                    (
+                        "Perdas abertas que você não vê",
+                        "Um aviso quando há muitas posições abertas ao mesmo tempo, quando a "
+                        "curva não mostra a perda flutuante delas e quando ainda há posições "
+                        "abertas no final.",
+                    ),
+                    (
+                        "O dinheiro real na conta",
+                        "Depósitos e saques separados do resultado das operações; um aviso se as "
+                        "recargas inflam a porcentagem ou se entra dinheiro num drawdown "
+                        "profundo.",
+                    ),
+                    (
+                        "Perguntas para o fornecedor",
+                        "O que perguntar antes de copiar, tirado do que o histórico não responde.",
+                    ),
+                ),
+                limits=(
+                    "Não se conecta à conta do fornecedor nem copia operações: audita o arquivo "
+                    "que você envia.",
+                    "Não diz se você deve copiar, e não prevê resultados.",
+                ),
+                faq=(
+                    (
+                        "E se o sinal só mostra prints no Telegram?",
+                        "Um print não pode ser auditado. Peça o histórico exportado da conta "
+                        "(MetaTrader, Myfxbook, FX Blue ou sinal da MQL5); um fornecedor que não "
+                        "pode dá-lo já está dando uma resposta.",
+                    ),
+                    (
+                        "Um histórico sem bandeiras vermelhas é seguro para copiar?",
+                        "Não. O relatório diz quais riscos aparecem no passado dessa conta. O "
+                        "futuro depende do mercado, do tamanho que você usa e de como você "
+                        "copia.",
+                    ),
+                ),
+            ),
         },
     ),
     Audience(
         slug="inversores-particulares",
         slug_en="retail-investors",
+        slug_pt="investidores-pessoa-fisica",
         icon="globe",
         text={
             "es": AudienceText(
@@ -1076,8 +1517,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "¿Necesita la contraseña de mi bróker?",
-                        "No. Solo el archivo que exportas tú; Rigor no se conecta a ningún "
-                        "bróker.",
+                        "No. Solo el archivo que exportas tú; Rigor no se conecta a ningún bróker.",
                     ),
                 ),
             ),
@@ -1127,8 +1567,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "What the fees weigh",
-                        "With your trades and their costs, what is left at double and triple "
-                        "fees.",
+                        "With your trades and their costs, what is left at double and triple fees.",
                     ),
                     (
                         "Your best trades and months",
@@ -1164,12 +1603,94 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                 ),
             ),
+            "pt": AudienceText(
+                title=(
+                    "Se você investe por conta própria com DEGIRO, Trading 212, IBKR ou XTB, "
+                    "revise o seu histórico"
+                ),
+                summary=(
+                    "Envie o histórico da sua corretora ou o valor da sua carteira ao longo "
+                    "do tempo e veja se o seu resultado se destaca da sorte, quanto pesam as "
+                    "taxas e como se saiu em quedas conhecidas do mercado."
+                ),
+                pains=(
+                    "A sua corretora mostra quanto a sua carteira cresceu, mas não se isso se "
+                    "destaca da sorte nem como se compara com um índice.",
+                    "Taxas e conversão de moeda comem parte do resultado e não aparecem num "
+                    "único número.",
+                    "Poucas operações ou meses muito bons podem carregar o histórico inteiro.",
+                ),
+                uploads=(
+                    (
+                        "O histórico de operações da sua corretora em CSV ou Excel: DEGIRO "
+                        "(Transações), Trading 212 (histórico), Interactive Brokers (Flex Query "
+                        "ou Activity Statement) ou XTB (histórico de posições fechadas).",
+                        "csv-universal",
+                    ),
+                    (
+                        "Ou a sua carteira ao longo do tempo: o valor ou o retorno por data "
+                        "(diário, semanal ou mensal), em CSV ou Excel.",
+                        "",
+                    ),
+                    (
+                        "Para se comparar com um índice, a série dele em CSV em 'Opções "
+                        "avançadas' (Benchmark).",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Destaca-se da sorte?",
+                        "Se o seu resultado se distingue de zero, dados o tamanho e a "
+                        "volatilidade do seu histórico.",
+                    ),
+                    (
+                        "Frente ao índice",
+                        "Se você enviar a série de um índice, o seu resultado frente a ele nas "
+                        "mesmas datas.",
+                    ),
+                    (
+                        "O que pesam as taxas",
+                        "Com as suas operações e os seus custos, o que sobra com o dobro e o "
+                        "triplo das taxas.",
+                    ),
+                    (
+                        "As suas melhores operações e meses",
+                        "O resultado sem eles, para ver se tudo se apoia em poucos.",
+                    ),
+                    (
+                        "Quedas conhecidas do mercado",
+                        "Como o seu histórico se saiu em 2008, em março de 2020 ou em 2022, "
+                        "quando as suas datas cobrem essas quedas por inteiro.",
+                    ),
+                    ("É igual no período recente?", "O último terço do histórico frente ao resto."),
+                ),
+                limits=(
+                    "Com o histórico de operações só conta o que você já vendeu: posições "
+                    "abertas e dividendos ficam de fora, e o relatório diz isso. Para ver tudo, "
+                    "envie a sua carteira ao longo do tempo.",
+                    "Não se conecta à sua corretora, não diz o que comprar e não prevê resultados.",
+                ),
+                faq=(
+                    (
+                        "Eu só compro e mantenho. Serve para mim?",
+                        "Sim, com a sua carteira ao longo do tempo (o valor ou o retorno por "
+                        "mês). Com o histórico de operações você só veria o que vendeu.",
+                    ),
+                    (
+                        "Precisa da senha da minha corretora?",
+                        "Não. Só o arquivo que você mesmo exporta; o Rigor não se conecta a "
+                        "nenhuma corretora.",
+                    ),
+                ),
+            ),
         },
     ),
 )
 
 AUDIENCES_BY_PATH: dict[str, dict[str, Audience]] = {
-    locale: {page.slug_for(locale): page for page in AUDIENCE_PAGES} for locale in ("es", "en")
+    locale: {page.slug_for(locale): page for page in AUDIENCE_PAGES}
+    for locale in ("es", "en", "pt")
 }
 
 

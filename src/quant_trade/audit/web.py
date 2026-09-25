@@ -2477,7 +2477,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _audience(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         page = AUDIENCES_BY_PATH[path_locale].get(slug)
         if page is None:
-            other = AUDIENCES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            # A page's slug in another language moves to this language's own.
+            other = next(
+                (
+                    found
+                    for lang, pages in AUDIENCES_BY_PATH.items()
+                    if lang != path_locale and (found := pages.get(slug)) is not None
+                ),
+                None,
+            )
             if other is None:
                 raise _not_found()
             return RedirectResponse(audience_url(other.slug, path_locale), status_code=301)
@@ -2499,6 +2507,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/for/{slug}", response_class=HTMLResponse)
     def audience_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _audience(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/pt/para/{slug}", response_class=HTMLResponse)
+    def audience_pt(request: Request, slug: str) -> Response:
+        return _audience(request, slug, "pt", "pt")
 
     @app.get("/guias/{slug}", response_class=HTMLResponse)
     def guide_es(request: Request, slug: str, lang: str | None = None) -> Response:

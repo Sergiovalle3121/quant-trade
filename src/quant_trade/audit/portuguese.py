@@ -566,7 +566,7 @@ AUDIENCES_PT: dict[str, Any] = {
         ),
     ],
     "guide": "Qual arquivo enviar",
-    "more": "Ver o que revisa no seu caso (em inglês)",
+    "more": "Ver o que revisa no seu caso",
     "also": "Outro caso:",
     "start": "Começar",
 }

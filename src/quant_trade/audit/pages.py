@@ -1580,11 +1580,10 @@ AUDIENCES["pt"] = AUDIENCES_PT
 
 def _audiences(locale: str) -> str:
     words = AUDIENCES[locale]
-    linked = link_locale(locale)
     cards = []
     for i, (name, title, pain, upload, get, _guide) in enumerate(words["items"]):
         page = AUDIENCE_PAGES[i]
-        link = f"<a href='{_e(audience_url(page.slug, linked))}'>{_e(words['more'])}</a>"
+        link = f"<a href='{_e(audience_url(page.slug, locale))}'>{_e(words['more'])}</a>"
         cards.append(
             f"<div class='card spot audience' data-reveal style='--i:{i % 2}'>"
             f"<div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3><p>{_e(pain)}</p>"
@@ -1595,7 +1594,7 @@ def _audiences(locale: str) -> str:
     # Pages beyond the four cards get a plain link under them.
     extra = "".join(
         f"<p class='muted audience-also'>{_e(words['also'])} "
-        f"<a href='{_e(audience_url(page.slug, linked))}'>{_e(page.text[linked].title)}</a></p>"
+        f"<a href='{_e(audience_url(page.slug, locale))}'>{_e(page.text[locale].title)}</a></p>"
         for page in AUDIENCE_PAGES[len(words["items"]) :]
     )
     return (
@@ -2376,7 +2375,7 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
     )
 
 
-_TOC_LABEL = {"es": "En esta página", "en": "On this page"}
+_TOC_LABEL = {"es": "En esta página", "en": "On this page", "pt": "Nesta página"}
 
 
 def _doc(sections: list[tuple[str, str]], locale: str, *, lead: str = "", aside: str = "") -> str:
@@ -2740,14 +2739,14 @@ def audience_page(
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
     text = audience.text[locale]
-    other = "en" if locale == "es" else "es"
+    linked = link_locale(locale)
     title = f"{text.title} · {BRAND}"
     meta = _public_meta(title, text.summary, locale, audience_url(audience.slug, locale), base_url)
-    sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
+    sample = _sample_url(linked)
     pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
     uploads = "".join(
         f"<li>{icon('file')}<span>{_e(item)}"
-        + (f" <a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>" if guide else "")
+        + (f" <a href='{_e(guide_url(guide, linked))}'>{_e(words['guide'])}</a>" if guide else "")
         + "</span></li>"
         for item, guide in text.uploads
     )
@@ -2773,7 +2772,10 @@ def audience_page(
         if page.slug != audience.slug
     )
     # Robot buyers land on the form with the live-account box already open.
-    start = f"/?lang={locale}" + ("&extras=1" if audience.open_extras else "") + "#subir"
+    if locale == "pt":
+        start = "/pt" + ("?extras=1" if audience.open_extras else "") + "#subir"
+    else:
+        start = f"/?lang={locale}" + ("&extras=1" if audience.open_extras else "") + "#subir"
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(words['start'])}"
@@ -2781,10 +2783,12 @@ def audience_page(
         f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
         "</div>"
     )
-    crumbs = (
-        f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a><span>/</span>"
-        f"<a href='{_e(audience_url(audience.slug, other))}' hreflang='{other}'>"
-        f"{_other_name(locale)}</a>"
+    alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + "".join(
+        f"<span>/</span><a href='{_e(href)}' hreflang='{lang}' lang='{lang}'>"
+        f"{_e(LANGUAGE_NAMES[lang])}</a>"
+        for lang, href in alternates.items()
+        if lang != locale
     )
     body = (
         _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
@@ -2811,7 +2815,7 @@ def audience_page(
         locale,
         body,
         meta_html=meta,
-        switch_href=audience_url(audience.slug, other),
+        alternates=alternates,
         solid_nav=True,
     )
 

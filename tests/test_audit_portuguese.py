@@ -14,6 +14,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import _COPY, _UI, landing  # noqa: E402
 from quant_trade.audit.portuguese import AUDIENCES_PT, INVESTOR_PT, link_locale  # noqa: E402
@@ -138,3 +139,49 @@ def test_search_engines_see_the_portuguese_landing(tmp_path: Path) -> None:
     assert "<link rel='canonical' href='http://testserver/pt'>" in pt
     assert "content='pt_BR'" in pt
     assert "/static/og-en.png" in pt
+
+
+@pytest.mark.parametrize("page", AUDIENCE_PAGES, ids=lambda page: page.slug)
+def test_every_case_page_exists_in_portuguese(tmp_path: Path, page) -> None:
+    client = _client(tmp_path)
+    path = audience_url(page.slug, "pt")
+    assert path.startswith("/pt/para/")
+    response = client.get(path)
+    assert response.status_code == 200
+    assert "<html lang='pt'>" in response.text
+    text = _text(response.text)
+    assert find_claims(text) == []
+    assert page.text["pt"].title in text
+    for spanish in ("Qué subes", "Qué no hace", "Empezar gratis", "Otros casos", "archivo"):
+        assert spanish not in text, spanish
+    # The other languages, the start button and every link open.
+    for lang in ("es", "en"):
+        assert f"href='{audience_url(page.slug, lang)}' hreflang='{lang}'" in response.text
+    assert "href='/pt" in response.text
+    links = {
+        href.split("#", 1)[0]
+        for href in HREF.findall(response.text)
+        if href.startswith("/") and not href.startswith("//")
+    }
+    for href in sorted(links - {""}):
+        assert client.get(href, follow_redirects=False).status_code < 400, href
+
+
+def test_a_case_page_slug_in_another_language_moves_to_the_portuguese_one(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path)
+    moved = client.get("/pt/para/retos-prop-firm", follow_redirects=False)
+    assert moved.status_code == 301
+    assert moved.headers["location"] == "/pt/para/desafios-prop-firm"
+    assert (
+        client.get("/pt/para/robot-buyers", follow_redirects=False).headers["location"]
+        == "/pt/para/compradores-de-robos"
+    )
+    assert client.get("/pt/para/nothing-here").status_code == 404
+
+
+def test_the_portuguese_landing_cards_open_the_portuguese_case_pages() -> None:
+    page = _paid("pt")
+    for case in AUDIENCE_PAGES:
+        assert f"href='{audience_url(case.slug, 'pt')}'" in page
