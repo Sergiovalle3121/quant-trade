@@ -100,6 +100,35 @@ All three count as account histories, so they get the "El dinero real de la
 cuenta" review. Checked against 15 real public exports; see
 `docs/research/audit_iteration4/tracking_exports_check.md`.
 
+Any other platform (`audit/universal.py`, guide `/guias/csv-universal`,
+`/guides/universal-csv`): a CSV or Excel table that no importer above claims
+is read by its column names, in English, Spanish, Portuguese, French, German
+and Italian (`universal.SYNONYMS`, normalised without accents, brackets or
+punctuation, the most specific name first: `Side` before `Type`, `Executed`
+before `Amount`). Up to 15 title lines above the header are skipped. Two
+shapes are read:
+
+- one closed trade per row (`universal_trades_csv`): entry and exit time,
+  quantity, entry and exit price are required; side, profit, commission (all
+  fee columns added up), swap, symbol and account are optional;
+- one fill per row (`universal_fills_csv`): time, quantity and price are
+  required; fills are paired first in, first out per account and symbol,
+  and positions still open at the end are left out with a warning.
+
+Each assumption is a reading warning: a profit column that the price moves
+explain better once commission is added back is read as net; with no side
+column the side comes from the quantity's sign (or the profit's); with no
+profit column the result is price move x quantity x the `Multiplier` column
+(1 without one); fees charged in another coin than the price (`0.0002 BNB`
+on `BTCUSDT`) are left out of the costs. Unix times in seconds or
+milliseconds are read. The report lists which column was read as what
+(`column_*` keys under the platform's fields). A table that names some of
+the columns but not enough gets `universal_columns_missing`, which names
+the missing ones and the columns found. `import_report(..., columns=...)`
+takes the customer's own role-to-column mapping. An equity curve
+(`timestamp,equity`) is not a trade list and still gets `unknown_format`.
+Tests use synthetic rows (`tests/test_audit_universal_import.py`).
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating

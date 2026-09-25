@@ -57,7 +57,7 @@ MAX_ACCOUNT_VALUE = 1e15
 MAX_PERIOD_RETURN = 1e6
 MIN_OBSERVATIONS = 30
 
-TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha")
+TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha", "observation_date")
 EQUITY_ALIASES = ("equity", "nav", "balance", "value", "portfolio_value", "close", "capital")
 RETURN_ALIASES = ("return", "returns", "ret", "pnl_pct", "daily_return", "retorno")
 
