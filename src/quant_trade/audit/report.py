@@ -22,6 +22,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
 from quant_trade.audit.account import is_account_history
+from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
@@ -1363,6 +1364,21 @@ def _e(value: Any) -> str:
 _MIDNIGHT = re.compile(r"^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.0+)?(?:Z|\+00:00)?$")
 
 
+def _table_pct(value: float) -> str:
+    """A percentage with two decimals, or two significant digits when it is
+    smaller than that (``-0.000012%`` on a history in tiny units); never a
+    signed zero."""
+    if not math.isfinite(value) or abs(value) >= 0.00005:
+        return f"{value:,.2%}"
+    if value == 0:
+        return "0.00%"
+    digits = min(10, 1 - math.floor(math.log10(abs(value * 100))))
+    text = f"{value * 100:.{digits}f}"
+    if float(text) == 0:
+        return "0.00%"
+    return f"{text}%"
+
+
 def _fmt(value: Any, *, key: str = "") -> str:
     if value is None:
         return "—"
@@ -1374,7 +1390,7 @@ def _fmt(value: Any, *, key: str = "") -> str:
         if key in COUNT_UP_KEYS and math.isfinite(value):
             return f"{math.ceil(value):,}"
         if key in PERCENT_KEYS:
-            return f"{value:,.2%}"
+            return _table_pct(value)
         if key in MONEY_KEYS:
             return f"{value:,.2f}"
         if key in RATIO_KEYS:
@@ -2985,20 +3001,6 @@ def _date_text(iso: str, locale: str) -> str:
     year, month, day = (int(part) for part in iso[:10].split("-"))
     months = _MONTHS_SHORT.get(locale, _MONTHS_SHORT["es"])
     return f"{day} {months[month - 1]} {year}"
-
-
-def _signed_amount(value: float) -> str:
-    """A signed money or price amount with two decimals, or four significant
-    digits when it is small (``+0.00027``); never a signed zero."""
-    if not math.isfinite(value) or value == 0:
-        return "0.00"
-    digits = 2 if abs(value) >= 1 else min(10, max(2, 3 - math.floor(math.log10(abs(value)))))
-    text = f"{value:+,.{digits}f}"
-    if digits > 2:
-        text = text.rstrip("0")
-        if len(text.partition(".")[2]) < 2:
-            text = f"{float(text):+,.2f}"
-    return "0.00" if float(text.replace(",", "")) == 0 else text
 
 
 def _signed_z(value: float) -> str:

@@ -474,6 +474,9 @@ and a share short of a whole (-99.7 %) never rounds to -100 %: it gets one more
 decimal, and past that it reads as a bound (>99.99 %). Every fact
 card (risk, account, plateau, timing, capital and its trade pace) shows its
 MEASURED / DECLARED / NOT_MEASURED tag beside the number.
+Percentages in the metrics, yearly and rolling tables that are smaller than
+0.01 % keep two significant digits (-0.000012 % on a history in tiny units),
+never -0.00 %.
 The stress table and its tiles follow the same rule (0.0 %, 0.00), and contract
 sizes in the reading warnings print as plain numbers (5,000,000, never 5e+06).
 Cost reasons carry thousands separators, and the class plan says in plain Spanish
