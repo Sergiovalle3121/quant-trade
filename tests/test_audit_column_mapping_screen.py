@@ -379,3 +379,25 @@ def test_a_results_sheet_in_the_curve_field_is_offered_as_results(tmp_path: Path
 )
 def test_the_decimal_mark_comes_from_the_cells(cells: list[str], default: str, mark: str) -> None:
     assert mapping._decimal_mark(cells, default) == mark
+
+
+def test_a_hand_typed_column_mixing_decimal_marks_reads_each_cell() -> None:
+    cells = ["12.34", "-5,60", "101.10", "-7,25", "3.50", "8,01"]
+    for default in (".", ","):
+        assert mapping._figures(cells, default) == [12.34, -5.6, 101.1, -7.25, 3.5, 8.01]
+    # A repeated mark is the thousands one; a lone three-digit tail follows the column.
+    assert mapping._figures(["1.234.567", "2,5"], ",") == [1234567.0, 2.5]
+    assert mapping._figures(["1.234,50", "1,234.50"], ".") == [1234.5, 1234.5]
+
+
+def test_a_curve_file_without_a_known_value_column_preselects_the_balance(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path)
+    answer = client.post(
+        "/audits",
+        files={"equity": ("saldo.csv", _results("balance"), "text/csv")},
+        data={"consent": "on"},
+    )
+    assert answer.status_code == 422
+    assert re.search(r"name='col_balance'>.*?<option value='Saldo'[^>]* selected", answer.text)

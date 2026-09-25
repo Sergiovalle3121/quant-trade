@@ -1984,14 +1984,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     exc.code == "equity_not_positive"
                     and sheet is not None
                     and mapping.looks_like_results(sheet)
-                ) or (exc.code == "missing_value" and not uploads["report"])
+                ) or (exc.code in ("missing_value", "missing_timestamp") and not uploads["report"])
                 if curve_like and lone and not report_columns:
                     results = mapping.read_table(sheet) if sheet else None
                     if results is not None:
                         guess = mapping.results_guess(
                             results, with_result=exc.code == "equity_not_positive"
                         )
-                        return _mapping_answer(request, results, exc, loc, carried, guess)
+                        # A curve file with no date in sight keeps its plain refusal.
+                        if "date" in guess or exc.code == "equity_not_positive":
+                            return _mapping_answer(request, results, exc, loc, carried, guess)
                 table = (
                     mapping.read_table(uploads["report"])
                     if uploads["report"] and exc.code in mapping.MAPPABLE_CODES
@@ -2135,7 +2137,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         elif exc.code == "equity_not_positive":
             text = mapping.COPY[locale]["results"]
-        elif exc.code == "missing_value":
+        elif exc.code in ("missing_value", "missing_timestamp"):
             text = mapping.COPY[locale]["unknown"]
         else:
             text = _sentence(exc.localized(locale))

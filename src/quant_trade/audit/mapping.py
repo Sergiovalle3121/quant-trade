@@ -351,31 +351,49 @@ def curve_kind(columns: Mapping[str, str]) -> str | None:
     return None
 
 
+def _cell_mark(text: str) -> str | None:
+    """The decimal mark one cell settles on its own, else ``None``: the later
+    of ``.`` and ``,`` when both appear; the other mark when one repeats
+    (``1.234.567``); a lone mark not followed by exactly three digits."""
+    marks = [mark for mark in ".," if mark in text]
+    if len(marks) == 2:
+        return "." if text.rfind(".") > text.rfind(",") else ","
+    if not marks:
+        return None
+    mark = marks[0]
+    if text.count(mark) > 1:
+        return "," if mark == "." else "."
+    tail = text[text.index(mark) + 1 :]
+    digits = len(tail) - len(tail.lstrip("0123456789"))
+    return None if digits == 3 else mark
+
+
 def _decimal_mark(values: Sequence[str], default: str) -> str:
-    """The column's decimal mark from its cells: the later of ``.`` and
-    ``,`` when both appear, else a lone mark not followed by three digits
-    (``12.34`` in a semicolon file is twelve, not 1,234)."""
+    """The column's decimal mark by the cells' votes (``12.34`` in a
+    semicolon file is twelve, not 1,234), else ``default``."""
     votes = {".": 0, ",": 0}
     for value in values:
-        text = value.strip()
-        marks = [(text.rfind(mark), mark) for mark in ".," if mark in text]
-        if len(marks) == 2:
-            votes[max(marks)[1]] += 1
-        elif len(marks) == 1:
-            at, mark = marks[0]
-            digits = len(text) - at - 1 - len(text[at + 1 :].lstrip("0123456789"))
-            if digits != 3:
-                votes[mark] += 1
+        mark = _cell_mark(value.strip())
+        if mark is not None:
+            votes[mark] += 1
     if votes["."] != votes[","]:
         return "." if votes["."] > votes[","] else ","
     return default
 
 
 def _figures(values: list[str], decimal: str) -> list[float | None]:
-    mark = _decimal_mark(values, decimal)
-    return [universal._amount(value, mark) for value in values]
+    """Each cell's number. A cell that settles its own mark is read with it,
+    so a hand-typed column mixing ``12.34`` and ``-5,60`` is never read a
+    hundred times too large; only ``1.234``-like cells take the column's."""
+    column = _decimal_mark(values, decimal)
+    return [universal._amount(value, _cell_mark(value.strip()) or column) for value in values]
 
 
+#: Column names (normalised) read as the account's balance when a curve file
+#: has no value column the curve reader knows.
+_BALANCE_NAMES = frozenset(
+    {"saldo", "balance", "equity", "capital", "patrimonio", "saldocuenta", "accountbalance"}
+)
 _DATE_LIKE = re.compile(r"^\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")
 
 
@@ -419,9 +437,14 @@ def results_guess(table: Table, *, with_result: bool = True) -> dict[str, str]:
         (name for name in table.names if name != date and _is_number(_example(table, name) or "x")),
         "",
     )
+    balance = ""
     if not with_result:
         figure = ""
-    return {role: name for role, name in (("date", date), ("profit", figure)) if name}
+        balance = next(
+            (name for name in table.names if universal.normalise(name) in _BALANCE_NAMES), ""
+        )
+    pairs = (("date", date), ("profit", figure), ("balance", balance))
+    return {role: name for role, name in pairs if name}
 
 
 def curve_from_columns(

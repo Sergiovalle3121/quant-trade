@@ -2133,8 +2133,12 @@ list of results: it gets this page, with its first date column and first other
 numeric column preselected as the date and the result. A balance that falls below zero
 once, or a cumulative profit that starts at 0, keeps the plain refusal
 asking for the account balance. A curve-field file
-with no value column (`missing_value`) gets the page too, with the date
-preselected. The decimal mark of a named figure column comes from its cells
+with no date or value column the curve reader knows (`missing_timestamp`,
+`missing_value`) gets the page too, with the date and a `Saldo`/`Balance`/
+`Equity` column preselected. A cell with both marks, a repeated mark or a lone
+mark not followed by three digits is read with the mark it settles; only
+`1.234`-like cells follow the column's vote, so a hand-typed column mixing
+`12.34` and `-5,60` is never read a hundred times too large. The decimal mark of a named figure column comes from its cells
 (`12.34` in a semicolon file is twelve), not from the delimiter alone.
 
 A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched
