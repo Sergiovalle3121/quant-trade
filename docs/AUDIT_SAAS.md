@@ -143,6 +143,14 @@ left out. Fees cannot be attributed per trade, so removing trades keeps
 them whole, which errs on the strict side. These rows set no threshold and
 do not change the class.
 
+### What each class requires
+
+Every report, locked or paid, and `/ejemplo` show a short table
+(`report.CLASS_LADDER`, ES and EN) with the rule `verdict.overall_class`
+applies for each class, and mark the report's own. It adds no threshold; it
+restates the existing ones so a buyer can see what a better class would take
+without implying a result.
+
 ### When it wins and when it loses
 
 `audit/timing.py` groups the closed trades by the weekday and the four-hour

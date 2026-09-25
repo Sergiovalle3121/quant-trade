@@ -182,6 +182,14 @@ LABELS: dict[str, dict[str, str]] = {
             "para tu web. Nunca muestra tus archivos, operaciones ni descripción."
         ),
         "meaning": "Qué significa para ti",
+        "ladder": "Qué pide cada clase",
+        "ladder_intro": (
+            "La clase no mide cuánto ganó el backtest, sino cuántas preguntas responden tus "
+            "archivos. Una clase mejor no significa que la estrategia vaya a funcionar."
+        ),
+        "ladder_class": "Clase",
+        "ladder_needs": "Qué hace falta",
+        "ladder_you": "Tu informe",
         "charts": "Gráficas",
         "detail_heading": "Detalle",
         "locked_intro": (
@@ -383,6 +391,14 @@ LABELS: dict[str, dict[str, str]] = {
             "for your site. It never shows your files, trades or description."
         ),
         "meaning": "What this means for you",
+        "ladder": "What each class requires",
+        "ladder_intro": (
+            "The class does not measure how much the backtest made, but how many questions "
+            "your files answer. A better class does not mean the strategy will work."
+        ),
+        "ladder_class": "Class",
+        "ladder_needs": "What it takes",
+        "ladder_you": "Your report",
         "charts": "Charts",
         "detail_heading": "Detail",
         "locked_intro": (
@@ -1545,6 +1561,60 @@ def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
+#: What each class requires, in the words of ``verdict.overall_class``.
+CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
+    "es": (
+        (
+            "A",
+            "La estadística y el número de intentos superan; costes, fuera de muestra y "
+            "benchmark superan o no aplican; los datos no tienen banderas graves ni avisos.",
+        ),
+        (
+            "B",
+            "La estadística y el número de intentos superan y nada falla, pero falta medir "
+            "o reforzar costes, fuera de muestra, benchmark o calidad de datos.",
+        ),
+        (
+            "C",
+            "Una dimensión no supera, o la estadística o el número de intentos quedan en débil.",
+        ),
+        (
+            "D",
+            "Los datos o la estadística no superan, o no superan dos dimensiones o más.",
+        ),
+    ),
+    "en": (
+        (
+            "A",
+            "Statistics and number of trials pass; costs, out-of-sample and benchmark pass "
+            "or do not apply; the data has no serious or warning flags.",
+        ),
+        (
+            "B",
+            "Statistics and number of trials pass and nothing fails, but costs, "
+            "out-of-sample, benchmark or data quality still need measuring or strengthening.",
+        ),
+        ("C", "One dimension fails, or statistics or number of trials are weak."),
+        ("D", "The data or the statistics fail, or two dimensions or more fail."),
+    ),
+}
+
+
+def _ladder_html(current: str, labels: dict[str, str]) -> str:
+    """The four classes and what each requires, with this report's marked."""
+    you = " class='you'"
+    rows = "".join(
+        f"<tr{you if cls == current else ''}><td><b>{cls}</b></td><td>{_e(text)}</td>"
+        f"<td>{_e(labels['ladder_you']) if cls == current else ''}</td></tr>"
+        for cls, text in CLASS_LADDER[_locale_of(labels)]
+    )
+    return (
+        f"<p class='muted'>{_e(labels['ladder_intro'])}</p>"
+        f"<table class='ladder'><tr><th>{_e(labels['ladder_class'])}</th>"
+        f"<th>{_e(labels['ladder_needs'])}</th><th></th></tr>{rows}</table>"
+    )
+
+
 def _only_unmeasured(body: str) -> bool:
     """True when a section has nothing but NOT_MEASURED marks to show."""
     return "badge NOT_MEASURED" in body and not any(
@@ -2013,6 +2083,7 @@ def render_html(
         section(labels["reading"], reading_html, "r-reading") if reading_html else "",
         section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
         section(labels["meaning"], _meaning_html(verdict, locale), "r-meaning"),
+        section(labels["ladder"], _ladder_html(str(verdict["overall"]), labels), "r-ladder"),
         section(labels["charts"], _charts_html(data, locale), "r-charts"),
         section(
             labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels), "r-flags"
