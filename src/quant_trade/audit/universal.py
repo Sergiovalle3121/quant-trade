@@ -652,6 +652,24 @@ def looks_like_trades(header: Sequence[str]) -> bool:
     return _shape(guess_columns(header)) is not None
 
 
+def _refuse_shared_columns(header: Sequence[str], taken: Mapping[str, int]) -> None:
+    """One column chosen for two fields (entry and exit time, say) would make
+    every trade last zero seconds or move zero points: refused, naming both."""
+    seen: dict[int, str] = {}
+    for role, index in taken.items():
+        if index in seen:
+            first, second = seen[index], role
+            name = imp._clip(str(header[index]), 60)
+            raise imp.ReportFormatError(
+                "universal_column_twice",
+                f"the column '{name}' was chosen for two fields ({_ROLE_TEXT['en'][first]} "
+                f"and {_ROLE_TEXT['en'][second]}); choose a different column for each",
+                f"la columna «{name}» se eligió para dos campos ({_ROLE_TEXT['es'][first]} "
+                f"y {_ROLE_TEXT['es'][second]}); elige una columna distinta para cada uno",
+            )
+        seen[index] = role
+
+
 def resolve(header: Sequence[str], chosen: Mapping[str, str] | None = None) -> ColumnMap:
     """The mapping for ``header``: the customer's ``chosen`` role -> column
     name first, each role not chosen guessed from the names.
@@ -676,6 +694,7 @@ def resolve(header: Sequence[str], chosen: Mapping[str, str] | None = None) -> C
                 f"la columna «{imp._clip(str(name), 60)}» no está en el archivo",
             )
         taken[role] = found_at
+    _refuse_shared_columns(header, taken)
     if taken:
         # A column the customer assigned is no longer free for a guessed role.
         columns = {role: index for role, index in columns.items() if index not in taken.values()}
@@ -707,12 +726,16 @@ _ROLE_TEXT = {
     "en": {
         "entry_time": "entry time", "exit_time": "exit time", "quantity": "quantity",
         "entry_price": "entry price", "exit_price": "exit price", "time": "time",
-        "price": "price",
+        "price": "price", "symbol": "symbol", "side": "side", "profit": "profit",
+        "commission": "commission", "swap": "swap", "multiplier": "multiplier",
+        "account": "account",
     },
     "es": {
         "entry_time": "hora de entrada", "exit_time": "hora de salida", "quantity": "cantidad",
         "entry_price": "precio de entrada", "exit_price": "precio de salida", "time": "hora",
-        "price": "precio",
+        "price": "precio", "symbol": "símbolo", "side": "lado", "profit": "resultado",
+        "commission": "comisión", "swap": "swap", "multiplier": "multiplicador",
+        "account": "cuenta",
     },
 }  # fmt: skip
 
@@ -1029,6 +1052,8 @@ def parse(
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:
         other_coin = _fills(draft, mapping, rows, decimal, serial_dates)
+    if not draft.trips and chosen:
+        _refuse_unreadable_choice(mapping, chosen, rows, decimal, serial_dates)
     if "commission" in mapping.columns or "swap" in mapping.columns:
         draft.itemised = {name for name in ("commission", "swap") if name in mapping.columns}
     if (
@@ -1039,6 +1064,50 @@ def parse(
     ):
         draft.warnings.append("every trade has zero commission and fees")
     return draft
+
+
+#: How a refusal names a role the customer mapped: (English, Spanish).
+ROLE_WORDS: dict[str, tuple[str, str]] = {
+    "quantity": ("quantity", "cantidad"),
+    "entry_time": ("entry time", "hora de entrada"),
+    "exit_time": ("exit time", "hora de salida"),
+    "time": ("fill time", "hora de la ejecución"),
+    "entry_price": ("entry price", "precio de entrada"),
+    "exit_price": ("exit price", "precio de salida"),
+    "price": ("fill price", "precio de la ejecución"),
+    "profit": ("trade result", "resultado de la operación"),
+}
+
+
+def _refuse_unreadable_choice(
+    mapping: ColumnMap,
+    chosen: Mapping[str, str],
+    rows: list[list[str]],
+    decimal: str,
+    serial: bool,
+) -> None:
+    """Name the column the customer mapped when it holds nothing readable
+    for its role (text chosen as the quantity), instead of the generic
+    "no closed trades"."""
+    for role, (word_en, word_es) in ROLE_WORDS.items():
+        if role not in chosen or role not in mapping.columns:
+            continue
+        values = [_cell(row, mapping.columns, role) for row in rows]
+        if role.endswith("time"):
+            times = _times(values, serial, rows, mapping.columns[role], mapping.date_column)
+            readable = any(moment is not None for moment in times.values)
+            kind_en, kind_es = "dates", "fechas"
+        else:
+            readable = any(_amount(value, decimal) is not None for value in values)
+            kind_en, kind_es = "numbers", "números"
+        if readable:
+            continue
+        name = imp._clip(mapping.names.get(role, chosen[role]), 60)
+        raise imp.ReportFormatError(
+            "universal_column_unreadable",
+            f'the column "{name}" you chose as {word_en} holds no {kind_en}',
+            f"la columna «{name}» que elegiste como {word_es} no tiene {kind_es}",
+        )
 
 
 @dataclass
