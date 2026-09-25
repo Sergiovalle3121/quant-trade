@@ -401,7 +401,8 @@ border-radius:14px;background:#fff}
 .acct-reports.pick td:nth-child(3){grid-row:1;grid-column:2}
 .acct-reports.pick td:nth-child(2){grid-row:1;grid-column:3}
 .acct-reports.pick td:nth-child(6){grid-row:1;grid-column:4}
-.acct-reports.pick td:nth-child(4),.acct-reports.pick td:nth-child(5){grid-row:auto;grid-column:1/-1}
+.acct-reports.pick td:nth-child(4),.acct-reports.pick td:nth-child(5){grid-row:auto;
+grid-column:1/-1}
 .acct-reports.pick td:nth-child(4){color:inherit;font-size:inherit}
 .acct-reports.pick td:nth-child(5){color:var(--text-2);font-size:.88rem}}
 """
