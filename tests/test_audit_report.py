@@ -135,3 +135,13 @@ def test_the_report_links_every_section_from_its_section_bar() -> None:
         assert ("unlock" in targets) is locked
     lead = result.verdict.summary.split(". ", 1)[0]
     assert f"<span class='verdict-lead'>{lead}.</span>" in page
+
+
+def test_metric_tables_share_columns_so_values_line_up() -> None:
+    from quant_trade.audit.sample import sample_result
+
+    page = render_html(sample_result("es", bootstrap_samples=60), watermark=False, locale="es")
+    tables = page.count("<table class='metrics'>")
+    assert tables >= 3
+    assert page.count("<col class='c-v'>") == tables
+    assert page.count("<td class='val'>") >= 3 * tables
