@@ -392,6 +392,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "closing quantity",
         "quantity #",
         "no. of shares",
+        "exec qty",
         "quantity",
         "qty",
         "size",
@@ -636,6 +637,12 @@ def guess_columns(header: Sequence[str]) -> dict[str, int]:
         if len(prices) >= 2:
             columns.setdefault("entry_price", prices[0])
             columns.setdefault("exit_price", prices[1])
+    if "symbol" not in columns:
+        # Bybit names the instrument column "Contracts" and its size "Qty".
+        for position, name in enumerate(header):
+            if normalise(str(name)) == "contracts" and position not in columns.values():
+                columns["symbol"] = position
+                break
     return columns
 
 
@@ -645,6 +652,17 @@ def _shape(columns: Mapping[str, int]) -> str | None:
     if all(role in columns for role in FILL_ROLES):
         return UNIVERSAL_FILLS_CSV
     return None
+
+
+def _close_time_only(columns: Mapping[str, int]) -> bool:
+    """Entry and exit prices with one time (Bybit's Closed P&L)."""
+    times = [role for role in ("time", "entry_time", "exit_time") if role in columns]
+    return (
+        "entry_price" in columns
+        and "exit_price" in columns
+        and "quantity" in columns
+        and len(times) == 1
+    )
 
 
 def looks_like_trades(header: Sequence[str]) -> bool:
@@ -749,6 +767,17 @@ _ROLE_TEXT = {
 
 def missing_columns(header: Sequence[str], columns: Mapping[str, int]) -> imp.ReportFormatError:
     """The error for a table that is neither a trade list nor a fill list."""
+    if _close_time_only(columns):
+        return imp.ReportFormatError(
+            "universal_close_time_only",
+            "the file gives each trade's closing time but not its opening time, so holding "
+            "times and entry timing cannot be measured: export the list of executions "
+            "(fills) instead, for example Bybit's Trade History, and upload that",
+            "el archivo da la hora de cierre de cada operación pero no la de apertura, así "
+            "que no se pueden medir la duración ni el momento de entrada: exporta la lista "
+            "de ejecuciones, por ejemplo el Historial de operaciones (Trade History) de "
+            "Bybit, y sube ese archivo",
+        )
     trade_gap = [role for role in TRADE_ROLES if role not in columns]
     fill_gap = [role for role in FILL_ROLES if role not in columns]
     gap = trade_gap if len(trade_gap) <= len(fill_gap) else fill_gap

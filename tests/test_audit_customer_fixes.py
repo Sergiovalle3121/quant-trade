@@ -241,3 +241,35 @@ def test_trial_counts_read_as_plain_singular_or_plural() -> None:
     for locale in ("es", "en"):
         text = sample_result(locale, bootstrap_samples=100).verdict.summary
         assert "(s)" not in text
+
+
+@pytest.mark.parametrize(
+    ("locale", "button", "wait", "message"),
+    [
+        ("es", "Comprar por WhatsApp", "Responde una persona", "quiero%20comprar"),
+        ("en", "Buy on WhatsApp", "A person replies", "like%20to%20buy"),
+    ],
+)
+def test_whatsapp_purchase_reads_as_a_purchase_with_steps(
+    locale: str, button: str, wait: str, message: str
+) -> None:
+    result = run_audit(
+        _inputs(DeclaredMetadata(trials=2)), now=NOW, audit_id="t9", bootstrap_samples=50
+    )
+    page = render_html(
+        result,
+        watermark=True,
+        free_mode=False,
+        redeem_url="/r",
+        contact_url="https://wa.me/5215550000000",
+        price_usd=29.0,
+        locale=locale,
+    )
+    box = page.split("id='unlock'")[1]
+    assert button in box and wait in box
+    steps = box.split("<ol class='buy-steps'>")[1].split("</ol>")[0]
+    assert steps.count("<li>") == 3
+    # The typed message names the report and its price, so the reply can quote it.
+    link = box.split("https://wa.me/5215550000000?text=")[1].split("'")[0]
+    assert message in link and "t9" in link and "USD%2029" in link
+    assert find_claims(page) == []

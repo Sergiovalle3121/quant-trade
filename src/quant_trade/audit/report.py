@@ -251,6 +251,8 @@ LABELS: dict[str, dict[str, str]] = {
             "que produce el error de muestreo."
         ),
         "pdf_long": "Descargar el informe en PDF",
+        "pdf_busy": "Generando tu PDF… (unos segundos)",
+        "pdf_wait": "El PDF tarda unos segundos en generarse.",
         "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
@@ -264,10 +266,16 @@ LABELS: dict[str, dict[str, str]] = {
             "Cópialo tal como te llegó y vuelve a canjearlo."
         ),
         "code_error_contact": "Si sigue sin funcionar, escríbenos por el botón de arriba.",
-        "buy_code": "¿No tienes código? Pídelo por WhatsApp",
+        "buy_code": "Comprar por WhatsApp",
         "buy_code_how": (
-            "Te respondemos con los datos de pago y, al confirmarse, te enviamos el código. "
-            "Lo escribes aquí abajo y el informe se abre completo."
+            "Nos escribes por WhatsApp; el mensaje ya lleva el número de este informe.|"
+            "Te respondemos con los datos para pagar.|"
+            "Al confirmarse el pago recibes un código: lo escribes aquí abajo y el informe "
+            "se abre completo."
+        ),
+        "buy_code_wait": (
+            "Responde una persona. Si escribes de noche o en fin de semana, te contestamos en "
+            "cuanto lo veamos; mientras tanto tu informe sigue en este enlace."
         ),
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
@@ -726,6 +734,10 @@ LABELS: dict[str, dict[str, str]] = {
         "engine": "versión del motor",
         "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
+        "code_request_price": (
+            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). "
+            "¿Cómo pago?"
+        ),
         "keep_link": (
             "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
             "No pedimos correo ni cuenta."
@@ -995,6 +1007,8 @@ LABELS: dict[str, dict[str, str]] = {
             "and the one sampling error produces."
         ),
         "pdf_long": "Download the report as PDF",
+        "pdf_busy": "Preparing your PDF… (a few seconds)",
+        "pdf_wait": "The PDF takes a few seconds to prepare.",
         "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
         "pdf_check_link": "How they check",
         "switch": "Español",
@@ -1008,10 +1022,16 @@ LABELS: dict[str, dict[str, str]] = {
             "or has expired. Copy it exactly as you received it and redeem it again."
         ),
         "code_error_contact": "If it still does not work, message us with the button above.",
-        "buy_code": "No code yet? Ask for one on WhatsApp",
+        "buy_code": "Buy on WhatsApp",
         "buy_code_how": (
-            "We reply with the payment details and, once it is confirmed, send you the code. "
-            "Enter it below and the full report opens."
+            "You message us on WhatsApp; the message already carries this report's number.|"
+            "We reply with the payment details.|"
+            "Once the payment is confirmed you get a code: enter it below and the full "
+            "report opens."
+        ),
+        "buy_code_wait": (
+            "A person replies. If you write at night or at the weekend, we answer as soon as "
+            "we see it; meanwhile your report stays at this link."
         ),
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
@@ -1452,6 +1472,10 @@ LABELS: dict[str, dict[str, str]] = {
         "engine": "engine version",
         "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
+        "code_request_price": (
+            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). "
+            "How do I pay?"
+        ),
         "keep_link": (
             "Save this page's link: it is the only way back to your report. "
             "We ask for no email and no account."
@@ -4389,9 +4413,12 @@ def render_html(
     if locked and redeem_url:
         if contact_url:
             # Where a client without a code buys one (bank transfer, WhatsApp).
-            contact_url = _prefilled(
-                contact_url, labels["code_request"].format(id=data["audit_id"])
+            request = (
+                labels["code_request_price"].format(id=data["audit_id"], price=price)
+                if price
+                else labels["code_request"].format(id=data["audit_id"])
             )
+            contact_url = _prefilled(contact_url, request)
             if card_on:
                 # With card payment on, WhatsApp is the alternative, not the main button.
                 paybox += (
@@ -4406,7 +4433,11 @@ def render_html(
                     + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
                     f"{_e(labels['buy_code'])}</a>"
-                    f"<p class='muted pay-secure'>{_e(labels['buy_code_how'])}</p>"
+                    "<ol class='buy-steps'>"
+                    + "".join(
+                        f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|")
+                    )
+                    + f"</ol><p class='muted pay-secure'>{_e(labels['buy_code_wait'])}</p>"
                     f"{includes_html}</div>"
                 )
         main_button = contact_url or card_on
@@ -4848,7 +4879,10 @@ def render_html(
             f"<a class='print-btn' href='#unlock'>{icon('lock')}{_e(labels['unlock_nav'])}</a>"
         )
     elif pdf_url and not locked:
-        print_html = f"<a class='print-btn' href='{_e(pdf_url)}' download>{_e(labels['pdf'])}</a>"
+        print_html = (
+            f"<a class='print-btn' href='{_e(pdf_url)}' download "
+            f"data-busy='{_e(labels['pdf_busy'])}'>{_e(labels['pdf'])}</a>"
+        )
     else:
         print_html = (
             "<button type='button' class='print-btn' "
@@ -4903,7 +4937,9 @@ def render_html(
         + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
-            f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
+            f"href='{_e(pdf_url)}' download data-busy='{_e(labels['pdf_busy'])}'>"
+            f"{_e(labels['pdf_long'])}</a>"
+            f"<noscript> <span class='muted'>{_e(labels['pdf_wait'])}</span></noscript></p>"
             f"<p class='muted pdf-check rise no-print' style='--i:4'>{_e(labels['pdf_check'])} "
             f"<a href='{'/check' if locale == 'en' else '/comprobar'}'>"
             f"{_e(labels['pdf_check_link'])}</a></p>"

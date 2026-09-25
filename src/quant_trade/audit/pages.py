@@ -231,6 +231,7 @@ _COPY: dict[str, dict[str, Any]] = {
             ),
         ),
         "map_found": "Columnas de tu archivo:",
+        "or_word": "o",
         "map_roles": {
             "entry_time": "Fecha y hora de entrada",
             "exit_time": "Fecha y hora de salida",
@@ -503,6 +504,7 @@ _COPY: dict[str, dict[str, Any]] = {
             ("Either way", ("side", "quantity", "symbol", "profit", "commission", "multiplier")),
         ),
         "map_found": "Columns in your file:",
+        "or_word": "or",
         "map_roles": {
             "entry_time": "Entry date and time",
             "exit_time": "Exit date and time",
@@ -1872,6 +1874,7 @@ def _upload_form(
             main=True,
         )
         + mapping
+        + f"<div class='or-rule' aria-hidden='true'><span>{_e(copy['or_word'])}</span></div>"
         + _drop(
             "equity",
             copy["equity"],

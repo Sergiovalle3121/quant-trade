@@ -537,3 +537,47 @@ def test_every_refusal_reason_has_a_spanish_panel_label() -> None:
     source = inspect.getsource(payments.refusal) + inspect.getsource(payments.fulfil)
     reasons = set(re.findall(r'(?:reason = |return )"([a-zA-Z ]+)"', source))
     assert reasons and reasons <= set(REFUSAL_REASONS)
+
+
+def test_the_return_page_cannot_be_looped_to_use_up_stripe_lookups(tmp_path: Path) -> None:
+    from quant_trade.audit.payments import CARD_LOOKUPS_PER_HOUR
+
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    calls: list[str] = []
+
+    def lookup(settings: AuditSettings, session_id: str) -> dict[str, Any]:
+        calls.append(session_id)
+        if session_id == "cs_good":
+            return _session(audit_id, sid="cs_good")
+        return {**_session(audit_id, sid=session_id), "payment_status": "unpaid"}
+
+    client.app.state.session_lookup = lookup
+    base = f"/audits/{audit_id}?token={token}"
+    for _ in range(5):  # the same session that did not unlock is asked once
+        client.get(f"{base}&session_id=cs_unpaid")
+    assert calls == ["cs_unpaid"]
+    for n in range(30):  # new ids stop at the hourly limit for this audit
+        client.get(f"{base}&session_id=cs_loop_{n}")
+    assert len(calls) == CARD_LOOKUPS_PER_HOUR
+    # The webhook still unlocks the report without any lookup.
+    assert _webhook(client, _session(audit_id, sid="cs_good")) == 200
+    assert "class='lockbox'" not in client.get(base).text
+    assert len(calls) == CARD_LOOKUPS_PER_HOUR
+
+
+def test_a_sale_from_another_app_is_not_listed_on_the_panel(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    other_sale = {
+        "id": "cs_other_app",
+        "payment_status": "paid",
+        "livemode": True,
+        "currency": "usd",
+        "amount_total": 5000,
+        "metadata": {},
+    }
+    assert _webhook(client, other_sale) == 200
+    marked = {**other_sale, "id": "cs_marked", "metadata": {"app": "rigor"}}
+    assert _webhook(client, marked) == 200
+    listed = [r.session_id for r in client.app.state.store.list_refused_payments()]
+    assert listed == ["cs_marked"]
