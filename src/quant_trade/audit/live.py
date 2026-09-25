@@ -17,20 +17,30 @@ than 25 % away from the backtest's), each live trade is rescaled to the
 backtest's median size; otherwise both are compared as traded. Costs the files itemise per trade are
 subtracted on both sides.
 
+Same dates, trade by trade: where the two files cover the same days, each
+live trade is paired with the backtest trade of the same side and symbol whose
+entry is nearest and at most ``MATCH_WINDOW`` away. The share of live trades
+found in the backtest says whether it is the same robot; the median price
+difference at entry and exit (basis points, positive when worse for the
+account) and the result difference of the paired trades, at the backtest
+trade's size, measure what execution cost.
+
 Limits: trades are resampled independently, so streaks and regime changes
 in the backtest are not preserved; with fewer than ``MIN_LIVE_TRADES`` live
-trades the comparison is not made.
+trades the comparison is not made. Pairing uses times as the files state
+them: two files in different server time zones pair poorly.
 """
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
 
-from quant_trade.audit.schema import ParsedTrades, measured
+from quant_trade.audit.schema import ParsedTrades, measured, not_measured
 
 #: Fewer live trades than this say nothing about consistency.
 MIN_LIVE_TRADES = 10
@@ -48,6 +58,13 @@ SIZE_BAND = (0.8, 1.25)
 #: A live trading pace this far from the backtest's is worth a line.
 PACE_BAND = (0.5, 2.0)
 
+#: A live trade pairs with a backtest trade whose entry is at most this far.
+MATCH_WINDOW = timedelta(minutes=60)
+#: Fewer paired trades than this give no execution figures.
+MIN_MATCHED = 5
+#: Below this share of live trades found in the backtest, it may not be the same robot.
+MATCH_LOW = 0.5
+
 CONSISTENT = "CONSISTENT"
 EDGE = "EDGE"
 INCONSISTENT = "INCONSISTENT"
@@ -56,6 +73,13 @@ ABOVE = "ABOVE"
 NOTE = (
     "Backtest trades resampled with replacement, as many as the live statement holds; "
     "costs itemised per trade subtracted on both sides. Streaks are not preserved."
+)
+
+
+PAIRING_NOTE = (
+    "Paired by side, symbol and entry time within 60 minutes, as the files state the "
+    "times; price differences in basis points (0.01 %), positive when worse for the "
+    "account; result differences at the backtest trade's size."
 )
 
 
@@ -100,6 +124,117 @@ def _side(pnl: np.ndarray, parsed: ParsedTrades) -> dict[str, Any]:
         "avg_loss": measured(float(losses.mean())) if losses.size else None,
         "max_fall": measured(_max_fall(pnl)),
     }
+
+
+def _symbol(value: str) -> str:
+    return "".join(ch for ch in value.upper() if ch.isalnum())
+
+
+def _same_symbol(a: str, b: str) -> bool:
+    """Symbols agree when either is unknown or one extends the other (EURUSD.m)."""
+    a, b = _symbol(a), _symbol(b)
+    return not a or not b or a.startswith(b) or b.startswith(a)
+
+
+def _at(values: Sequence[str] | None, index: int) -> str:
+    return values[index] if values and index < len(values) else ""
+
+
+def _worse_bps(side: str, reference: float, actual: float, *, entry: bool) -> float:
+    """Price difference in basis points, positive when worse for the account."""
+    worse_when_higher = (side == "long") == entry
+    diff = actual - reference if worse_when_higher else reference - actual
+    return diff / reference * 10_000.0
+
+
+def _pairing(
+    backtest: ParsedTrades,
+    live: ParsedTrades,
+    bt_pnl: np.ndarray,
+    live_pnl: np.ndarray,
+    backtest_symbols: Sequence[str] | None,
+    live_symbols: Sequence[str] | None,
+) -> dict[str, Any] | None:
+    """Live trades paired with backtest trades on the dates both files cover.
+
+    ``bt_pnl`` and ``live_pnl`` are the net results as traded (not rescaled).
+    Returns ``None`` when the files share no dates.
+    """
+    bt, lv = backtest.trades, live.trades
+    start = max(min(t.entry_time for t in bt), min(t.entry_time for t in lv))
+    end = min(max(t.entry_time for t in bt), max(t.entry_time for t in lv))
+    if start > end:
+        return None
+    window = MATCH_WINDOW
+    bt_idx = sorted(
+        (i for i, t in enumerate(bt) if start - window <= t.entry_time <= end + window),
+        key=lambda i: bt[i].entry_time,
+    )
+    live_idx = [i for i, t in enumerate(lv) if start <= t.entry_time <= end]
+    bt_in = sum(1 for i in bt_idx if start <= bt[i].entry_time <= end)
+    times = [bt[i].entry_time for i in bt_idx]
+    used: set[int] = set()
+    pairs: list[tuple[int, int]] = []
+    for j in sorted(live_idx, key=lambda k: (lv[k].entry_time, k)):
+        when = lv[j].entry_time
+        best: tuple[timedelta, int] | None = None
+        for pos in range(bisect_left(times, when - window), len(times)):
+            if times[pos] > when + window:
+                break
+            i = bt_idx[pos]
+            if i in used or backtest.sides[i] != live.sides[j]:
+                continue
+            if not _same_symbol(_at(backtest_symbols, i), _at(live_symbols, j)):
+                continue
+            gap = abs(times[pos] - when)
+            if best is None or gap < best[0]:
+                best = (gap, i)
+        if best is not None:
+            used.add(best[1])
+            pairs.append((best[1], j))
+    out: dict[str, Any] = {
+        "status": "MEASURED",
+        "note": PAIRING_NOTE,
+        "start": start.date().isoformat(),
+        "end": end.date().isoformat(),
+        "backtest_trades": measured(bt_in),
+        "live_trades": measured(len(live_idx)),
+        "matched": measured(len(pairs)),
+        "matched_share": (
+            measured(len(pairs) / len(live_idx), "paired live trades / live trades")
+            if live_idx
+            else not_measured("no live trades on the shared dates")
+        ),
+        "missing_live": measured(max(bt_in - len(pairs), 0)),
+        "low_match": bool(len(live_idx) >= MIN_MATCHED and len(pairs) / len(live_idx) < MATCH_LOW),
+    }
+    priced = [
+        (i, j)
+        for i, j in pairs
+        if bt[i].entry_price > 0 and bt[i].exit_price > 0 and lv[j].quantity > 0
+    ]
+    if len(priced) < MIN_MATCHED:
+        reason = f"fewer than {MIN_MATCHED} paired trades"
+        out["entry_bps"] = not_measured(reason)
+        out["exit_bps"] = not_measured(reason)
+        out["result_gap"] = not_measured(reason)
+        return out
+    entry = [
+        _worse_bps(live.sides[j], bt[i].entry_price, lv[j].entry_price, entry=True)
+        for i, j in priced
+    ]
+    exit_ = [
+        _worse_bps(live.sides[j], bt[i].exit_price, lv[j].exit_price, entry=False)
+        for i, j in priced
+    ]
+    gaps = [
+        float(live_pnl[j]) * bt[i].quantity / lv[j].quantity - float(bt_pnl[i]) for i, j in priced
+    ]
+    out["entry_bps"] = measured(float(np.median(entry)))
+    out["exit_bps"] = measured(float(np.median(exit_)))
+    out["result_gap"] = measured(float(np.sum(gaps)))
+    out["result_gap_per_trade"] = measured(float(np.mean(gaps)))
+    return out
 
 
 def _resample(
@@ -165,6 +300,7 @@ def compare_live(
             "reason": f"the live statement has fewer than {MIN_LIVE_TRADES} closed trades",
         }
     bt_pnl, live_pnl = _net(backtest), _net(live)
+    as_traded = live_pnl
     bt_size, live_size = _sizes(backtest), _sizes(live)
     size_ratio = float(np.median(live_size) / np.median(bt_size))
     rescaled = not (SIZE_BAND[0] <= size_ratio <= SIZE_BAND[1])
@@ -183,7 +319,15 @@ def compare_live(
     backtest_side = _side(bt_pnl, backtest)
     live_side = _side(live_pnl, live)
     pace = live_side["per_month"]["value"] / backtest_side["per_month"]["value"]
-    new_symbols = sorted(set(live_symbols or ()) - set(backtest_symbols or ()))
+    known = {_symbol(s) for s in backtest_symbols or () if _symbol(s)}
+    new_symbols = sorted(
+        {
+            s.strip()
+            for s in live_symbols or ()
+            if _symbol(s) and not any(_same_symbol(s, b) for b in known)
+        }
+    )
+    pairing = _pairing(backtest, live, bt_pnl, as_traded, backtest_symbols, live_symbols)
     return {
         "status": "MEASURED",
         "note": NOTE,
@@ -202,7 +346,8 @@ def compare_live(
         "pace_ratio": measured(pace),
         "pace_differs": not (PACE_BAND[0] <= pace <= PACE_BAND[1]),
         "overlap": live_side["start"] <= backtest_side["end"],
-        "new_symbols": new_symbols if backtest_symbols and live_symbols else [],
+        "new_symbols": new_symbols[:10] if backtest_symbols and live_symbols else [],
+        "pairing": pairing,
         "samples": samples,
         "seed": seed,
     }

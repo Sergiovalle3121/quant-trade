@@ -781,6 +781,7 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
 @media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
 .live .val{text-align:right;white-space:nowrap}.live td:first-child{font-weight:500}
+.pair .val{text-align:right}.pair td:first-child{font-weight:500;width:55%}
 @media (max-width:759px){.live td:first-child{min-width:130px}}
 .metrics .c-k{width:30%}.metrics .c-v{width:15%}.metrics .c-e{width:170px}
 .metrics td:first-child{font-weight:500}
