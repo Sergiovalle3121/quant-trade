@@ -1764,6 +1764,8 @@ Redesign pass 47 polishes the screens from the first-sales rewrite (#223). In th
 
 Redesign pass 48 styles the account screens from #205. On sign-up and sign-in, the form sits in a white card beside the tinted list of what an account gives. On "My account", the three counts are white tiles, three across even on a phone. On a phone each report is a card with its class, date and "Open" on one row and its status and description below. "Delete my account" is outlined and titled in red, so it does not read like the password card beside it. On sign-up, the words "terms of service" and "privacy policy" are themselves the links to those pages; the line used to link only a lone "›" and left privacy unlinked.
 
+Redesign pass 49 checks the upload form after #230 (report first, extras in a closed "Add more files" box) and the pricing line about the optional account; both needed nothing on a phone or desktop. It adds a quiet "or" rule between the platform report and the equity curve, so it reads that one of the two is enough.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

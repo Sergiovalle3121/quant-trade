@@ -863,6 +863,9 @@ line-height:1;font-variant-numeric:tabular-nums}
 .aud-others a{display:flex;align-items:center;justify-content:space-between;height:100%;min-height:44px;padding:14px 16px;background:#fff;border:1px solid var(--border);border-radius:14px;color:var(--text);font-weight:500;line-height:1.4;text-decoration:none;transition:border-color .2s,transform .35s var(--ease)}
 .aud-others a:hover{border-color:var(--text-3);transform:translateY(-1px)}
 .aud-others svg{flex:none;width:16px;height:16px;margin-left:12px;color:var(--text-3)}
+.or-rule{display:flex;align-items:center;margin:22px 0 14px;font:500 .86rem var(--sans);color:var(--text-3)}
+.or-rule::before,.or-rule::after{content:'';flex:1;height:1px;background:var(--border)}
+.or-rule span{padding:0 12px}
 .map-group{margin:18px 0 0;padding:0;border:0;border-top:1px solid var(--border);min-width:0}
 .map-group legend{padding:0;margin:0 0 10px;font:500 .68rem var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--text-3)}
 .map-group .form-grid{gap:0 16px}

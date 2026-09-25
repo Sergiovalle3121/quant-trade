@@ -808,3 +808,12 @@ def test_sign_up_links_the_terms_and_privacy_words_themselves(tmp_path: Path, lo
     assert ">›</a>" not in page
     text = copy["terms_agree"].format(terms=copy["terms_link"], privacy=copy["privacy_link"])
     assert find_claims(text) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_or_rule_separates_the_report_from_the_curve(tmp_path: Path, locale: str) -> None:
+    page = _client(tmp_path).get(f"/?lang={locale}").text
+    word = "o" if locale == "es" else "or"
+    rule = f"<div class='or-rule' aria-hidden='true'><span>{word}</span></div>"
+    assert page.index("name='report'") < page.index(rule) < page.index("name='equity'")
+    assert ".or-rule::before,.or-rule::after{content:''" in STYLE
