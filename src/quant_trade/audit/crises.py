@@ -47,6 +47,42 @@ WINDOWS: tuple[Window, ...] = (
     Window("rates_2022", "2022-01", "2022-09"),
     Window("crypto_2022", "2021-11", "2022-12"),
 )
+
+
+@dataclass(frozen=True)
+class MarketMove:
+    index: str
+    change: float  # month-end close before the window to the last month's close
+    source_url: str
+
+
+#: What public indices did over each window, for context beside the file's own
+#: figures. Computed once from FRED's daily closes (last close of each month),
+#: never from the upload and never used in any finding or class. The S&P 500
+#: series on FRED starts in 2016, so older windows show the Nasdaq Composite only.
+MARKET_AS_OF = "2026-09-25"
+_SP500 = "https://fred.stlouisfed.org/series/SP500"
+_NASDAQ = "https://fred.stlouisfed.org/series/NASDAQCOM"
+_BITCOIN = "https://fred.stlouisfed.org/series/CBBTCUSD"
+MARKET: dict[str, tuple[MarketMove, ...]] = {
+    "dotcom": (MarketMove("Nasdaq Composite", -0.7214, _NASDAQ),),
+    "gfc": (MarketMove("Nasdaq Composite", -0.5181, _NASDAQ),),
+    "euro": (MarketMove("Nasdaq Composite", -0.1594, _NASDAQ),),
+    "china_oil": (MarketMove("Nasdaq Composite", -0.1010, _NASDAQ),),
+    "late_2018": (
+        MarketMove("S&P 500", -0.1397, _SP500),
+        MarketMove("Nasdaq Composite", -0.1754, _NASDAQ),
+    ),
+    "covid": (
+        MarketMove("S&P 500", -0.1987, _SP500),
+        MarketMove("Nasdaq Composite", -0.1585, _NASDAQ),
+    ),
+    "rates_2022": (
+        MarketMove("S&P 500", -0.2477, _SP500),
+        MarketMove("Nasdaq Composite", -0.3240, _NASDAQ),
+    ),
+    "crypto_2022": (MarketMove("Bitcoin (Coinbase)", -0.7305, _BITCOIN),),
+}
 #: Months of rolling windows for the worst and best stretch.
 ROLLING = 12
 #: Share of covered windows in which trailing the benchmark is a finding.
@@ -175,4 +211,13 @@ def curve_crises(
     return review
 
 
-__all__ = ["WINDOWS", "Window", "crisis_review", "curve_crises", "curve_months"]
+__all__ = [
+    "MARKET",
+    "MARKET_AS_OF",
+    "WINDOWS",
+    "MarketMove",
+    "Window",
+    "crisis_review",
+    "curve_crises",
+    "curve_months",
+]
