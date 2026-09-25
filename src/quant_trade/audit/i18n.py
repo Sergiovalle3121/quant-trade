@@ -425,6 +425,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("gross profit / gross loss", "beneficio bruto / pérdida bruta"),
     (
+        "gross profit / gross loss, before commission and swap; a platform that counts "
+        "them inside each trade can show a slightly lower figure",
+        "beneficio bruto / pérdida bruta, antes de comisiones y swap; una plataforma que los "
+        "cuenta dentro de cada operación puede mostrar una cifra algo menor",
+    ),
+    (
         "no losing trades; the ratio is undefined",
         "no hay operaciones perdedoras; el ratio no está definido",
     ),

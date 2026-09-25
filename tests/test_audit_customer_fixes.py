@@ -181,3 +181,13 @@ def test_money_and_ratios_read_like_the_platform_prints_them() -> None:
     assert _fmt(-127.60869, key="average_loss") == "-127.61"
     assert _fmt(1.24531, key="profit_factor") == "1.25"
     assert _fmt(0.61017, key="win_rate") == "61.02%"
+
+
+def test_profit_factor_note_explains_a_lower_platform_figure() -> None:
+    from quant_trade.audit.analytics import PROFIT_FACTOR_NOTE
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.i18n import localize
+
+    spanish = localize(PROFIT_FACTOR_NOTE, "es")
+    assert "antes de comisiones y swap" in spanish
+    assert find_claims(PROFIT_FACTOR_NOTE) == [] and find_claims(spanish) == []
