@@ -12,7 +12,7 @@ import html
 import pytest
 
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.report import LABELS, _capital_html
+from quant_trade.audit.report import LABELS, _capital_html, _capital_shown, _fmt
 from quant_trade.audit.schema import measured
 
 CAPITAL = {
@@ -46,9 +46,7 @@ def test_a_closed_trade_balance_says_open_losses_are_left_out(locale: str) -> No
     labels = LABELS[locale]
     page = _capital_html(CAPITAL, locale, labels, closed_only=True)
     assert html.escape(labels["capital_closed_only"]) in page
-    assert html.escape(labels["capital_closed_only"]) not in _capital_html(
-        CAPITAL, locale, labels
-    )
+    assert html.escape(labels["capital_closed_only"]) not in _capital_html(CAPITAL, locale, labels)
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])
@@ -59,3 +57,24 @@ def test_an_account_history_is_sized_at_the_account_size(locale: str) -> None:
         assert html.escape(labels[f"{key}_account"]) in page
         assert html.escape(labels[key]) not in page
     assert find_claims(page) == []
+
+
+def test_a_short_file_says_why_there_are_no_capital_figures() -> None:
+    capital = {
+        "status": "NOT_MEASURED",
+        "reason": "needs trades spread over at least 90 days; a shorter history stretched "
+        "to a year gives capital figures too uncertain to act on",
+    }
+    assert _capital_shown(capital)
+    assert not _capital_shown({"status": "NOT_MEASURED", "reason": "no trades uploaded"})
+    es = _capital_html(capital, "es", LABELS["es"])
+    assert "NOT_MEASURED" in es and "al menos 90 días" in es and "3 meses o más" in es
+    en = _capital_html(capital, "en", LABELS["en"])
+    assert "at least 90 days" in en and "3 months or more" in en
+    flat = {"status": "NOT_MEASURED", "reason": "the trades show no fall to size against"}
+    assert "3 meses" not in _capital_html(flat, "es", LABELS["es"])
+
+
+def test_observation_counts_read_as_whole_numbers() -> None:
+    assert _fmt(84.69, key="min_track_record_length") == "85"
+    assert _fmt(58.69, key="observations_short_by") == "59"
