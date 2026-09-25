@@ -774,6 +774,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "share of trades after a win opened within 15 minutes of it",
         "parte de las operaciones tras una ganancia abiertas en menos de 15 minutos",
     ),
+    (
+        "share of trades with a net profit after the fees the file itemises",
+        "parte de las operaciones con resultado neto positivo, después de los costes que "
+        "detalla el archivo",
+    ),
     ("share of trades with a net profit", "parte de las operaciones con resultado neto positivo"),
     ("the file has no time of day", "el archivo no tiene hora del día"),
     ("the file is not a monthly track record", "el archivo no es un historial mensual"),
@@ -1016,9 +1021,9 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "Entry times as the file states them (platform or server time); "
-        "net result before itemised fees.",
+        "net result after the fees the file itemises per trade.",
         "Horas de entrada tal como las da el archivo (hora de la plataforma o del servidor); "
-        "resultado neto antes de los costes que detalla el informe.",
+        "resultado neto después de los costes que el archivo detalla por operación.",
     ),
     (
         "average net result per trade, account currency",

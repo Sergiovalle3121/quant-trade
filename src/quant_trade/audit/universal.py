@@ -60,7 +60,8 @@ def normalise(name: str) -> str:
     letter or a digit are dropped, so one synonym covers every spelling.
     """
     text = unicodedata.normalize("NFKD", name.strip().lstrip("﻿"))
-    text = "".join(char for char in text if not unicodedata.combining(char)).lower()
+    # casefold, not lower: German ``ß`` becomes ``ss`` (``Schließzeit``).
+    text = "".join(char for char in text if not unicodedata.combining(char)).casefold()
     text = re.sub(r"\([^)]*\)|\[[^\]]*\]", "", text)
     return re.sub(r"[^a-z0-9]", "", text)
 
@@ -148,6 +149,9 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "heure de sortie",
         "date de fermeture",
         "heure de fermeture",
+        "date de cloture",
+        "heure de cloture",
+        "cloture",
         "fermeture",
         "schliessung",
         "schliesszeit",
@@ -212,6 +216,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "preco de fechamento",
         "prix de sortie",
         "prix de fermeture",
+        "prix de cloture",
         "ausstiegspreis",
         "schlusskurs",
         "prezzo di chiusura",
@@ -498,6 +503,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "corretagem",
         "frais",
         "gebuhr",
+        "kommission",
         "gebuhren",
         "provision",
         "commissione",
@@ -1020,14 +1026,15 @@ def parse(
         rows = imp._busiest_account(rows, accounts, closed, draft.warnings)
     rows = only_fills(header, rows)
     if mapping.shape == UNIVERSAL_TRADES_CSV:
-        _trades(draft, mapping, rows, decimal, serial_dates)
+        other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:
-        _fills(draft, mapping, rows, decimal, serial_dates)
+        other_coin = _fills(draft, mapping, rows, decimal, serial_dates)
     if "commission" in mapping.columns or "swap" in mapping.columns:
         draft.itemised = {name for name in ("commission", "swap") if name in mapping.columns}
     if (
         draft.trips
         and draft.itemised
+        and not other_coin
         and all(trip.commission == 0 and trip.swap == 0 for trip in draft.trips)
     ):
         draft.warnings.append("every trade has zero commission and fees")
@@ -1050,7 +1057,9 @@ class _Row:
 
 def _trades(
     draft: imp._Draft, mapping: ColumnMap, rows: list[list[str]], decimal: str, serial: bool
-) -> None:
+) -> int:
+    """Read one closed trade per row; returns how many fees were left out
+    because they are charged in another coin."""
     columns = mapping.columns
     entry_times = _times(
         [_cell(row, columns, "entry_time") for row in rows], serial, rows, columns["entry_time"]
@@ -1165,7 +1174,7 @@ def _trades(
             )
         )
     if "profit" in columns:
-        return
+        return other_coin
     if "multiplier" in columns:
         for trip, factor in zip(draft.trips, multipliers, strict=True):
             trip.gross *= factor
@@ -1174,6 +1183,7 @@ def _trades(
         draft.sized = True
     else:
         draft.warnings.append(NO_PROFIT_WARNING)
+    return other_coin
 
 
 def _profit_is_net(items: list[tuple[str, float, float | None, float]], column_name: str) -> bool:
@@ -1261,8 +1271,9 @@ def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
 
 def _fills(
     draft: imp._Draft, mapping: ColumnMap, rows: list[list[str]], decimal: str, serial: bool
-) -> None:
-    """Pair fills first in, first out per account and symbol into round trips.
+) -> int:
+    """Pair fills first in, first out per account and symbol into round trips;
+    returns how many fees were left out because they are charged in another coin.
 
     A closing fill's own realised profit, when the file has one, is shared
     among the trips it closes by quantity; otherwise the trip's result is the
@@ -1384,6 +1395,7 @@ def _fills(
     else:
         draft.warnings.append(NO_PROFIT_WARNING)
     draft.trips = sorted((pair[0] for pair in pairs), key=lambda t: (t.exit_time, t.entry_time))
+    return other_coin
 
 
 __all__ = [

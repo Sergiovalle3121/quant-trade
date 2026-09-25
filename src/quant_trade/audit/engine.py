@@ -686,7 +686,12 @@ def _trade_stats(inputs: AuditInputs) -> dict[str, Any]:
     # A net credit (swap paid to the account) counts too, so the net result
     # matches the platform's; the stress tests keep only costs (stricter).
     fees = -sum(value for value in inputs.reported_fees.values())
-    stats = analytics.trade_statistics(inputs.trades.trades, inputs.trades.sides, fees_total=fees)
+    stats = analytics.trade_statistics(
+        inputs.trades.trades,
+        inputs.trades.sides,
+        fees_total=fees,
+        trade_fees=inputs.trades.fees,
+    )
     return {"status": "MEASURED", **stats}
 
 
@@ -978,7 +983,7 @@ def run_audit(
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
     timing = (
-        timing_lib.timing_breakdown(inputs.trades.trades)
+        timing_lib.timing_breakdown(inputs.trades.trades, inputs.trades.fees)
         if inputs.trades is not None
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
