@@ -626,8 +626,10 @@ answers 402. `audit/pdf.py` lays out the same report page with WeasyPrint
 (needs Pango: `Dockerfile.web` installs it) and serves only the site's own
 fonts and `data:` URIs to the renderer; every other URL is refused, so a
 PDF never reaches the network. At most `MAX_CONCURRENT_PDFS = 2` render at
-once; a download waits up to `PDF_WAIT_SECONDS = 25` for a free slot (a
-double click or a second customer waits its turn), then a busy or missing
+once; a download waits up to `PDF_WAIT_SECONDS = 60` for a free slot (ten
+customers downloading at once all get their PDF), and the last
+`PDF_CACHE_SIZE = 16` finished PDFs are kept in memory so a double click
+does not render twice; then a busy or missing
 renderer answers 503 with a hint to use print. `HEAD` is answered like
 `GET` without the body, so link-preview bots and uptime checks do not get
 a 405.

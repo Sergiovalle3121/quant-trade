@@ -142,3 +142,27 @@ def test_a_second_pdf_waits_for_a_free_slot() -> None:
     finally:
         for _ in range(pdf_lib.MAX_CONCURRENT_PDFS - 1):
             pdf_lib._SLOTS.release()
+
+
+def test_a_second_download_of_the_same_report_is_not_rendered_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Ten customers at once waited past the old 25 s for two render slots;
+    # a double click must not take a second slot.
+    calls: list[str] = []
+
+    def render(_page: str, *, audit_id: str, locale: str, wait_seconds: float = 0.0) -> bytes:
+        calls.append(locale)
+        assert wait_seconds >= 60
+        return b"%PDF-" + locale.encode()
+
+    monkeypatch.setattr(pdf_lib, "report_pdf", render)
+    client = _client(tmp_path)
+    audit_id, query = _upload(client).removeprefix("/audits/").split("?")
+    first = client.get(f"/audits/{audit_id}/pdf?{query}")
+    second = client.get(f"/audits/{audit_id}/pdf?{query}")
+    english = client.get(f"/audits/{audit_id}/pdf?{query}&lang=en")
+    assert first.content == second.content == b"%PDF-es"
+    assert english.content == b"%PDF-en"
+    assert calls == ["es", "en"]
+    assert client.get(f"/audits/{audit_id}/pdf?token=wrong").status_code == 404
