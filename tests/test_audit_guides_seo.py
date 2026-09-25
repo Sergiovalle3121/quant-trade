@@ -283,3 +283,22 @@ def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path)
 def test_pages_without_a_base_url_leave_the_image_out(tmp_path: Path) -> None:
     page = _client(tmp_path, base_url="").get("/").text
     assert "og:image" not in page and "content='summary'" in page
+
+
+def test_provider_guide_has_an_english_path_and_the_old_one_redirects(tmp_path: Path) -> None:
+    from quant_trade.audit.guides import guide_url
+    from quant_trade.audit.seo import PUBLIC_PAGES
+
+    assert guide_url("cuenta-proveedor", "es") == "/guias/cuenta-proveedor"
+    assert guide_url("cuenta-proveedor", "en") == "/guides/provider-account"
+    assert {"es": "/guias/cuenta-proveedor", "en": "/guides/provider-account"} in PUBLIC_PAGES
+    client = _client(tmp_path)
+    english = client.get("/guides/provider-account")
+    assert english.status_code == 200
+    assert "href='/guias/cuenta-proveedor'" in english.text
+    old = client.get("/guides/cuenta-proveedor", follow_redirects=False)
+    assert old.status_code == 301 and old.headers["location"] == "/guides/provider-account"
+    swapped = client.get("/guias/provider-account", follow_redirects=False)
+    assert swapped.status_code == 301 and swapped.headers["location"] == "/guias/cuenta-proveedor"
+    assert client.get("/guides/nope").status_code == 404
+    assert client.get("/guides/mt5").status_code == 200

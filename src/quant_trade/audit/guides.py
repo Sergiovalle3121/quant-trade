@@ -33,6 +33,11 @@ class Guide:
     #: The upload field the file goes in: ``report`` or ``optimization``.
     field: str
     text: dict[str, GuideText]
+    #: The English path segment when it differs from the Spanish ``slug``.
+    slug_en: str | None = None
+
+    def slug_for(self, locale: str) -> str:
+        return self.slug_en if locale == "en" and self.slug_en else self.slug
 
 
 #: Index and page paths per language. A guide lives at ``<index>/<slug>``.
@@ -171,6 +176,7 @@ GUIDES: tuple[Guide, ...] = (
     ),
     Guide(
         slug="cuenta-proveedor",
+        slug_en="provider-account",
         platform="Cuenta de un proveedor / Provider's account",
         field="report",
         text={
@@ -633,6 +639,10 @@ GUIDES: tuple[Guide, ...] = (
 )
 
 GUIDES_BY_SLUG: dict[str, Guide] = {guide.slug: guide for guide in GUIDES}
+#: Guides by their path segment in each language.
+GUIDES_BY_PATH: dict[str, dict[str, Guide]] = {
+    locale: {guide.slug_for(locale): guide for guide in GUIDES} for locale in ("es", "en")
+}
 
 #: Guides for the upload form's platform-report field, in display order.
 REPORT_GUIDES: tuple[Guide, ...] = tuple(guide for guide in GUIDES if guide.field == "report")
@@ -643,11 +653,14 @@ def guides_index_url(locale: str) -> str:
 
 
 def guide_url(slug: str, locale: str) -> str:
-    return f"{guides_index_url(locale)}/{slug}"
+    """The guide's path in ``locale``; ``slug`` is its Spanish slug."""
+    guide = GUIDES_BY_SLUG.get(slug)
+    return f"{guides_index_url(locale)}/{guide.slug_for(locale) if guide else slug}"
 
 
 __all__ = [
     "GUIDES",
+    "GUIDES_BY_PATH",
     "GUIDES_BY_SLUG",
     "GUIDES_COPY",
     "GUIDES_PATH",
