@@ -149,12 +149,12 @@ TRIAL_SOURCE: dict[str, dict[str, str]] = {
     "es": {
         "DECLARED": "declarado(s)",
         "MEASURED": "contado(s) en los archivos",
-        "NOT_MEASURED": "supuesto(s), sin declarar",
+        "NOT_MEASURED": "sin declarar (el caso más favorable)",
     },
     "en": {
         "DECLARED": "declared",
         "MEASURED": "counted in the files",
-        "NOT_MEASURED": "assumed, not declared",
+        "NOT_MEASURED": "not declared (the most favourable case)",
     },
 }
 
@@ -482,6 +482,19 @@ _TEXT: dict[str, dict[str, str]] = {
             "el mejor de esos intentos sin habilidad."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicidad no medida: {reason}.",
+        f"{MULTIPLICITY}.PASS.undeclared": (
+            "No se declaró cuántas configuraciones se probaron; con 1, el caso más favorable, "
+            "el resultado sigue por encima de lo que produciría un intento sin habilidad. Si "
+            "se probaron más, declararlo puede cambiar esta conclusión."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared": (
+            "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
+            "favorable, el Sharpe deflactado no llega al umbral."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared": (
+            "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
+            "favorable, el resultado no supera lo que produciría un intento sin habilidad."
+        ),
         f"{COSTS}.PASS": (
             "Neto de 3x el coste de referencia, el resultado de las operaciones sigue positivo."
         ),
@@ -542,6 +555,19 @@ _TEXT: dict[str, dict[str, str]] = {
             "of those trials would produce without skill."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicity not measured: {reason}.",
+        f"{MULTIPLICITY}.PASS.undeclared": (
+            "The number of configurations tried was not declared; with 1, the most favourable "
+            "case, the result stays above what an unskilled trial would produce. If more were "
+            "tried, declaring them may change this conclusion."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared": (
+            "The number of configurations tried was not declared, and even with 1, the most "
+            "favourable case, the deflated Sharpe misses the bar."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared": (
+            "The number of configurations tried was not declared, and even with 1, the most "
+            "favourable case, the result does not exceed what an unskilled trial would produce."
+        ),
         f"{COSTS}.PASS": "Net of 3x the reference cost, the trade ledger stays positive.",
         f"{COSTS}.WEAK": "The trades survive the reference cost but not 3x that cost.",
         f"{COSTS}.FAIL": "At the reference cost, the trades lose money net.",
@@ -795,7 +821,12 @@ def summary(
         dimension = by_name.get(name)
         if dimension is None:
             continue
-        template = text.get(f"{name}.{dimension.status}", f"{name}: {dimension.status}.")
+        key = f"{name}.{dimension.status}"
+        # Undeclared trials are computed at 1, the most favourable case; say so plainly.
+        undeclared = f"{key}.undeclared"
+        if name == MULTIPLICITY and trials_evidence == "NOT_MEASURED" and trials == 1:
+            key = undeclared if undeclared in text else key
+        template = text.get(key, f"{name}: {dimension.status}.")
         reasons = dimension.reasons_in(locale)
         lines.append(
             template.format(

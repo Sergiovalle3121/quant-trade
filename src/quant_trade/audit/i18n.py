@@ -59,6 +59,10 @@ _INITIAL_SOURCES: dict[str, str] = {
 
 #: Where the number of trials comes from (``engine._trials_used``).
 _TRIAL_SOURCES: dict[str, str] = {
+    "not declared; computed with 1, the most favourable case": (
+        "sin declarar; se calcula con 1, el caso más favorable"
+    ),
+    "not declared; 1 assumed": "sin declarar; se calcula con 1, el caso más favorable",
     "declared by the client": "declarado por el cliente",
     "passes in the MT5 optimisation export": "pasadas de la exportación de optimización de MT5",
     "columns of the uploaded variants matrix": "columnas de la matriz de variantes subida",
