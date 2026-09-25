@@ -216,11 +216,18 @@ def synthetic_mt5_optimization(passes: int = 250) -> bytes:
     ).encode("utf-8")
 
 
-def signed_in(client, email: str = "tester@example.com", password: str = "long safe phrase"):
+def signed_in(
+    client,
+    email: str = "tester@example.com",
+    password: str = "long safe phrase",
+    *,
+    welcome: bool = False,
+):
     """Sign ``client`` up (and so in): a preview in paid mode needs an account.
 
-    A service whose base URL is https sets a ``Secure`` cookie, so the client
-    then talks https too.
+    The account's free full report is spent unless ``welcome`` is true, so
+    uploads give the monthly previews. A service whose base URL is https sets
+    a ``Secure`` cookie, so the client then talks https too.
     """
     import re
 
@@ -246,4 +253,12 @@ def signed_in(client, email: str = "tester@example.com", password: str = "long s
             follow_redirects=False,
         )
     assert client.get("/cuenta", follow_redirects=False).status_code == 200, "not signed in"
+    if not welcome:
+        # Most tests need the monthly previews, not the one free full report.
+        from datetime import UTC, datetime
+
+        store = client.app.state.store
+        account = store.find_account(email)
+        assert account is not None
+        store.spend_welcome(account.id, at=datetime.now(UTC))
     return client

@@ -4,7 +4,8 @@ An account gathers what a customer already had scattered in links: the
 reports they uploaded or saved, the access codes they redeemed or added,
 and what they paid for. It never changes what a report says or how a
 report is unlocked; a report link keeps working without an account. The free
-preview needs one: :data:`FREE_PREVIEWS_PER_MONTH` a month per account.
+preview needs one: :data:`FREE_PREVIEWS_PER_MONTH` a month per account, after a
+first full report that is free once (:data:`WELCOME_FULL_REPORT`).
 
 Design choices, all standard library:
 
@@ -59,6 +60,14 @@ FREE_PREVIEWS_PER_MONTH = 3
 #: Free previews per network address per calendar month, across accounts:
 #: slows throwaway accounts without blocking a shared office or carrier.
 FREE_PREVIEWS_PER_IP_PER_MONTH = 10
+
+#: A new account's first upload comes out as a free full report, once. The
+#: same browser (``DEVICE_COOKIE``) or the same file never gets a second one
+#: on another account, and each network address gets a few a month.
+WELCOME_FULL_REPORT = True
+WELCOME_REPORTS_PER_IP_PER_MONTH = 3
+DEVICE_COOKIE = "rigor_device"
+DEVICE_DAYS = 400
 
 SESSION_COOKIE = "rigor_session"
 CSRF_COOKIE = "rigor_csrf"
@@ -188,6 +197,7 @@ def safe_next(value: str | None) -> str:
 
 __all__ = [
     "CSRF_COOKIE",
+    "DEVICE_COOKIE",
     "EMAIL_HOOKS",
     "FREE_PREVIEWS_PER_IP_PER_MONTH",
     "FREE_PREVIEWS_PER_MONTH",
@@ -200,6 +210,8 @@ __all__ = [
     "RESET_HOURS",
     "SESSION_COOKIE",
     "SESSION_DAYS",
+    "WELCOME_FULL_REPORT",
+    "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
     "hash_password",
     "hash_secret",

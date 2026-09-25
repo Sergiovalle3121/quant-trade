@@ -68,13 +68,24 @@ def _csrf(page: str) -> str:
     return match.group(1)
 
 
-def _signup(client: TestClient, email: str = "ana@example.com", password: str = PASSWORD):
+def _signup(
+    client: TestClient,
+    email: str = "ana@example.com",
+    password: str = PASSWORD,
+    *,
+    welcome: bool = False,
+):
+    """Sign up; the free full report is spent unless ``welcome`` is true."""
     csrf = _csrf(client.get("/registro").text)
-    return client.post(
+    response = client.post(
         "/registro",
         data={"email": email, "password": password, "csrf": csrf},
         follow_redirects=False,
     )
+    account = client.app.state.store.find_account(email)
+    if not welcome and account is not None:
+        client.app.state.store.spend_welcome(account.id, at=datetime.now(UTC))
+    return response
 
 
 def _signin(client: TestClient, email: str, password: str = PASSWORD, ip: str = ""):
@@ -684,14 +695,15 @@ def test_sign_ups_stop_at_the_limit_exactly(tmp_path: Path) -> None:
 def test_the_landing_says_the_free_preview_comes_with_an_account(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     es = client.get("/").text
-    assert "3 vistas previas gratis al mes con tu cuenta" in es
-    assert "Crea tu cuenta gratis: 3 vistas previas al mes, sin tarjeta." in es
-    assert "3 al mes con tu cuenta" in es
+    assert "Tu primer informe completo, gratis al crear tu cuenta" in es
+    assert "después, 3 vistas previas gratis al mes. Sin tarjeta." in es
+    assert "Primer informe completo gratis con tu cuenta" in es
+    assert "el primer informe completo y 3 al mes" in es
     assert "cuenta opcional" not in es and "cuenta es opcional" not in es
     assert "sin crear cuenta" not in es and "Cuenta gratis opcional" not in es
     en = client.get("/en").text
-    assert "3 free previews a month with your account" in en
-    assert "Create your free account: 3 previews a month, no card." in en
+    assert "Your first full report, free when you create your account" in en
+    assert "then 3 free previews a month. No card." in en
     assert "account optional" not in en and "account is optional" not in en
     assert "Optional free account" not in en
 
@@ -783,7 +795,7 @@ def test_a_preview_needs_an_account_unless_a_working_code_pays_for_it(tmp_path: 
     client, store, _ = _client(tmp_path)
     refused = _upload(client)
     assert refused.status_code == 401
-    assert "Crea tu cuenta gratis para ver tu vista previa" in refused.text
+    assert "tu primer informe completo no se paga" in refused.text
     assert "href='/registro'" in refused.text and "3 vistas previas gratis" in refused.text
     assert not find_claims(re.sub(r"<[^>]+>", " ", refused.text))
     as_json = client.post(
@@ -803,7 +815,7 @@ def test_a_preview_needs_an_account_unless_a_working_code_pays_for_it(tmp_path: 
         files={"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")},
         data={"consent": "on", "locale": "en"},
     )
-    assert "Create your free account to see your preview" in english.text
+    assert "your first full report is on us" in english.text
 
 
 def test_each_account_gets_three_free_previews_a_month_then_uses_credits(
@@ -880,3 +892,138 @@ def test_free_previews_renew_each_calendar_month_and_lose_the_address(tmp_path: 
     store.purge_expired(may + timedelta(days=40), retention_days=30)  # type: ignore[attr-defined]
     assert count(month_start(april), client_ip="1.2.3.4") == 0
     assert count(month_start(april), account_id="acc") == 1
+
+
+# -- the free first full report ----------------------------------------------------
+def _other_file() -> dict[str, tuple[str, bytes, str]]:
+    return {"equity": ("other.csv", csv_bytes(positive_drift(420, seed=7)), "text/csv")}
+
+
+def test_a_new_account_gets_its_first_full_report_free_then_previews(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, welcome=True)
+    page = client.get("/cuenta").text
+    assert "Primer informe completo gratis" in page and "Disponible" in page
+    first = _upload(client)
+    assert first.status_code == 303 and "acct=welcome" in first.headers["location"]
+    report = client.get(first.headers["location"]).text
+    assert "Tu primer informe completo es gratis por crear tu cuenta" in report
+    assert "class='lockbox'" not in report
+    assert not find_claims(re.sub(r"<[^>]+>", " ", report))
+    audit = store.get_audit(_audit_id(first.headers["location"]))  # type: ignore[attr-defined]
+    assert audit.paid and audit.stripe_session_id.startswith("welcome:")
+    # The free full report does not use one of the monthly previews.
+    page = client.get("/cuenta").text
+    assert "Usado" in page and "3 de 3" in page and "gratis, primer informe" in page
+    second = client.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, follow_redirects=False
+    )
+    assert second.status_code == 303 and "acct=" not in second.headers["location"]
+    assert "class='lockbox'" in client.get(second.headers["location"]).text
+
+
+def test_the_free_report_is_once_per_browser_and_once_per_file(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client, "first@example.com", welcome=True)
+    assert "acct=welcome" in _upload(client).headers["location"]
+    device = client.cookies.get("rigor_device")
+    assert device
+    # Another account in the same browser gets a preview, even with a new file.
+    client.cookies.clear()
+    client.cookies.set("rigor_device", device)
+    _signup(client, "second@example.com", welcome=True)
+    same_browser = client.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, follow_redirects=False
+    )
+    assert same_browser.status_code == 303
+    assert "acct=welcome" not in same_browser.headers["location"]
+    # A fresh browser with the same file gets a preview too.
+    fresh = TestClient(client.app)
+    _signup(fresh, "third@example.com", welcome=True)
+    same_file = _upload(fresh)
+    assert same_file.status_code == 303 and "acct=welcome" not in same_file.headers["location"]
+    # ...while a fresh browser with a new file still gets its free full report.
+    other = TestClient(client.app)
+    _signup(other, "fourth@example.com", welcome=True)
+    new_file = other.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, follow_redirects=False
+    )
+    assert "acct=welcome" in new_file.headers["location"]
+
+
+def test_free_reports_are_capped_per_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 1)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    ip = {"X-Forwarded-For": "203.0.113.70"}
+    _signup(client, "first@example.com", welcome=True)
+    first = client.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, headers=ip, follow_redirects=False
+    )
+    assert "acct=welcome" in first.headers["location"]
+    second = TestClient(client.app)
+    _signup(second, "second@example.com", welcome=True)
+    files = {"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")}
+    capped = second.post(
+        "/audits", files=files, data={"consent": "on"}, headers=ip, follow_redirects=False
+    )
+    assert capped.status_code == 303 and "acct=welcome" not in capped.headers["location"]
+
+
+def test_a_deleted_account_cannot_sign_up_again_for_another_free_report(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, welcome=True)
+    assert "acct=welcome" in _upload(client).headers["location"]
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    store.delete_account(account.id)  # type: ignore[attr-defined]
+    assert store.welcome_used(account.id)  # type: ignore[attr-defined]
+
+
+def test_the_free_report_address_is_cleared_by_the_purge(tmp_path: Path) -> None:
+    _, store, _ = _client(tmp_path)
+    old = datetime(2026, 1, 1, tzinfo=UTC)
+    store.spend_welcome("acc", at=old)  # type: ignore[attr-defined]
+    store.grant_welcome(  # type: ignore[attr-defined]
+        "b" * 32, "acc2", device_sha256="d", file_sha256="f", client_ip="1.2.3.4", at=old
+    )
+    since = datetime(2025, 12, 1, tzinfo=UTC)
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="", client_ip="1.2.3.4", since=since, per_ip=1
+        )
+        == ""  # grant failed: there is no such audit, so nothing was recorded
+    )
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(
+            store.welcome_reports.insert().values(  # type: ignore[attr-defined]
+                account_id="acc3",
+                audit_id="",
+                device_sha256="d",
+                file_sha256="f",
+                client_ip="1.2.3.4",
+                created_at=old.isoformat(),
+            )
+        )
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="", client_ip="1.2.3.4", since=since, per_ip=1
+        )
+        == "network"
+    )
+    store.purge_expired(NOW, retention_days=30)  # type: ignore[attr-defined]
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="", client_ip="1.2.3.4", since=since, per_ip=1
+        )
+        == ""
+    )
+    # The device and the file still count after the purge.
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="d", file_sha256="", client_ip="", since=since, per_ip=1
+        )
+        == "device"
+    )

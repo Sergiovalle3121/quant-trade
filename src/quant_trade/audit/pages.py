@@ -289,8 +289,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "tu plataforma) y no podemos corregirlo, te devolvemos el importe de ese informe."
         ),
         "account_note": (
-            f"Cuenta gratis: {_FREE} vistas previas al mes, y tus informes y créditos en un "
-            "solo lugar. La vista previa se ve con tu cuenta."
+            "Tu primer informe completo, gratis al crear tu cuenta; después, "
+            f"{_FREE} vistas previas gratis al mes, y tus informes y créditos en un solo lugar."
         ),
         "account_link": "Crear cuenta",
         "faq_title": "Preguntas frecuentes",
@@ -560,8 +560,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "platform) and we cannot fix it, we refund that report."
         ),
         "account_note": (
-            f"Free account: {_FREE} previews a month, and your reports and credits in one "
-            "place. The preview is shown with your account."
+            "Your first full report, free when you create your account; then "
+            f"{_FREE} free previews a month, and your reports and credits in one place."
         ),
         "account_link": "Create an account",
         "faq_title": "Frequently asked questions",
@@ -676,7 +676,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
             ("globe", "Informe en español o inglés"),
-            ("key", f"{_FREE} vistas previas gratis al mes con tu cuenta"),
+            ("key", "Primer informe completo gratis con tu cuenta"),
         ],
         "mock_url": "informe · clase B",
         "mock_k": "Veredicto",
@@ -777,7 +777,7 @@ _UI: dict[str, dict[str, Any]] = {
         "pricing_eyebrow": "Precios",
         "plan_free": "Vista previa",
         "plan_free_amount": "Gratis",
-        "plan_free_note": f"{_FREE} al mes con tu cuenta",
+        "plan_free_note": f"con tu cuenta: el primer informe completo y {_FREE} al mes",
         "plan_full": "Informe completo",
         "plan_full_note": "por auditoría",
         "plan_badge": "Completo",
@@ -807,7 +807,10 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "upload_points": [
             "Tu archivo nunca se publica.",
-            f"Crea tu cuenta gratis: {_FREE} vistas previas al mes, sin tarjeta.",
+            (
+                "Tu primer informe completo, gratis al crear tu cuenta; después, "
+                f"{_FREE} vistas previas gratis al mes. Sin tarjeta."
+            ),
             "Borrado automático si no desbloqueas el informe.",
         ],
         "drop_title": "Arrastra tu informe aquí",
@@ -866,7 +869,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
             ("globe", "Report in English or Spanish"),
-            ("key", f"{_FREE} free previews a month with your account"),
+            ("key", "First full report free with your account"),
         ],
         "mock_url": "report · class B",
         "mock_k": "Verdict",
@@ -966,7 +969,7 @@ _UI: dict[str, dict[str, Any]] = {
         "pricing_eyebrow": "Pricing",
         "plan_free": "Preview",
         "plan_free_amount": "Free",
-        "plan_free_note": f"{_FREE} a month with your account",
+        "plan_free_note": f"with your account: the first full report and {_FREE} a month",
         "plan_full": "Full report",
         "plan_full_note": "per audit",
         "plan_badge": "Complete",
@@ -996,7 +999,10 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "upload_points": [
             "Your file is never published.",
-            f"Create your free account: {_FREE} previews a month, no card.",
+            (
+                "Your first full report, free when you create your account; then "
+                f"{_FREE} free previews a month. No card."
+            ),
             "Deleted automatically if you do not unlock the report.",
         ],
         "drop_title": "Drop your report here",

@@ -93,8 +93,9 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "limits": "Qué no hace",
         "price": "Precio",
         "price_text": (
-            f"La vista previa es gratis con tu cuenta ({FREE_PREVIEWS_PER_MONTH} al mes) y no "
-            "pide tarjeta: clase de A a D, gráficas, "
+            "Tu primer informe completo es gratis al crear tu cuenta. Después, la vista previa "
+            f"es gratis ({FREE_PREVIEWS_PER_MONTH} al mes) y no pide tarjeta: clase de A a D, "
+            "gráficas, "
             "banderas rojas y qué significa cada dimensión. El informe completo cuesta "
             "USD {price:.0f} (USD {pack:.0f} el paquete de 3). Si el informe lee mal tu archivo "
             "y no podemos corregirlo, te devolvemos el importe."
@@ -114,8 +115,9 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "limits": "What it does not do",
         "price": "Price",
         "price_text": (
-            f"The preview is free with your account ({FREE_PREVIEWS_PER_MONTH} a month) and "
-            "needs no card: A to D class, charts, red flags "
+            "Your first full report is free when you create your account. After that the "
+            f"preview is free ({FREE_PREVIEWS_PER_MONTH} a month) and needs no card: A to D "
+            "class, charts, red flags "
             "and what each dimension means. The full report is USD {price:.0f} (USD {pack:.0f} "
             "for a pack of 3). If the report misreads your file and we cannot fix it, we refund "
             "you."

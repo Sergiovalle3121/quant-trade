@@ -37,6 +37,8 @@ CODE_GROUPS = 3
 CODE_GROUP_LENGTH = 4
 #: The reference a code-paid audit carries instead of a Stripe session.
 CODE_REFERENCE_PREFIX = "code:"
+#: The payment reference of the free first full report of a new account.
+WELCOME_REFERENCE_PREFIX = "welcome:"
 
 
 def new_access_code() -> str:
@@ -154,7 +156,7 @@ class AccountAudit:
     overall_class: str
     paid: bool
     paid_at: str | None
-    #: ``card``, ``code`` or ``""`` (not paid).
+    #: ``card``, ``code``, ``welcome`` (the free first report) or ``""`` (not paid).
     paid_with: str
     purged: bool
     published: bool
@@ -363,6 +365,20 @@ class Store:
             self.metadata,
             sa.Column("audit_id", sa.String(32), primary_key=True),
             sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
+            sa.Column("created_at", sa.String(40), nullable=False, index=True),
+        )
+        #: The one free full report each new account gets. The device (a hash
+        #: of a random browser cookie) and the file's SHA-256 stay so that the
+        #: same browser or file never gets a second one on another account;
+        #: the address is cleared by the retention purge.
+        self.welcome_reports = sa.Table(
+            "welcome_reports",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("audit_id", sa.String(32), nullable=False, default=""),
+            sa.Column("device_sha256", sa.String(64), nullable=False, default="", index=True),
+            sa.Column("file_sha256", sa.String(64), nullable=False, default="", index=True),
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
@@ -1231,6 +1247,105 @@ class Store:
             and (record.expires_at is None or record.expires_at > _iso(at))
         )
 
+    # -- the free first full report ---------------------------------------
+    def welcome_refusal(
+        self,
+        account_id: str,
+        *,
+        device_sha256: str,
+        file_sha256: str,
+        client_ip: str,
+        since: datetime,
+        per_ip: int,
+    ) -> str:
+        """Why this upload cannot be the account's free full report; ``""`` if it can."""
+        sa = self._sa
+        table = self.welcome_reports
+        with self.engine.connect() as conn:
+
+            def used(condition: Any) -> int:
+                return int(
+                    conn.execute(
+                        sa.select(sa.func.count()).select_from(table).where(condition)
+                    ).scalar()
+                    or 0
+                )
+
+            if used(table.c.account_id == account_id):
+                return "account"
+            if device_sha256 and used(table.c.device_sha256 == device_sha256):
+                return "device"
+            if file_sha256 and used(table.c.file_sha256 == file_sha256):
+                return "file"
+            if client_ip and (
+                used((table.c.client_ip == client_ip) & (table.c.created_at >= _iso(since)))
+                >= per_ip
+            ):
+                return "network"
+        return ""
+
+    def welcome_used(self, account_id: str) -> bool:
+        sa = self._sa
+        table = self.welcome_reports
+        with self.engine.connect() as conn:
+            return (
+                conn.execute(
+                    sa.select(table.c.account_id).where(table.c.account_id == account_id)
+                ).first()
+                is not None
+            )
+
+    def grant_welcome(
+        self,
+        audit_id: str,
+        account_id: str,
+        *,
+        device_sha256: str,
+        file_sha256: str,
+        client_ip: str,
+        at: datetime,
+    ) -> bool:
+        """Unlock ``audit_id`` as the account's free full report; ``False`` if already used."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.welcome_reports.insert().values(
+                        account_id=account_id,
+                        audit_id=audit_id,
+                        device_sha256=device_sha256,
+                        file_sha256=file_sha256,
+                        client_ip=client_ip[:64],
+                        created_at=_iso(at),
+                    )
+                )
+                result = conn.execute(
+                    self.audits.update()
+                    .where(self.audits.c.id == audit_id)
+                    .where(self.audits.c.paid.is_(False))
+                    .values(
+                        paid=True,
+                        paid_at=_iso(at),
+                        stripe_session_id=WELCOME_REFERENCE_PREFIX + audit_id,
+                    )
+                )
+                if not result.rowcount:
+                    raise LookupError(audit_id)
+        except (sa.exc.IntegrityError, LookupError):
+            return False
+        return True
+
+    def spend_welcome(self, account_id: str, *, at: datetime) -> None:
+        """Mark the free full report as used without a report (the owner's tool, tests)."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.welcome_reports.insert().values(account_id=account_id, created_at=_iso(at))
+                )
+        except sa.exc.IntegrityError:
+            return
+
     # -- free previews -----------------------------------------------------
     def record_free_preview(
         self, audit_id: str, account_id: str, *, client_ip: str, at: datetime
@@ -1295,7 +1410,12 @@ class Store:
             reference = str(row[6] or "")
             paid_with = ""
             if row[4]:
-                paid_with = "code" if reference.startswith(CODE_REFERENCE_PREFIX) else "card"
+                if reference.startswith(CODE_REFERENCE_PREFIX):
+                    paid_with = "code"
+                elif reference.startswith(WELCOME_REFERENCE_PREFIX):
+                    paid_with = "welcome"
+                else:
+                    paid_with = "card"
             description = ""
             if row[8]:
                 try:
@@ -1451,6 +1571,14 @@ class Store:
                 .values(client_ip="")
             )
             conn.execute(
+                self.welcome_reports.update()
+                .where(
+                    (self.welcome_reports.c.created_at < cutoff)
+                    & (self.welcome_reports.c.client_ip != "")
+                )
+                .values(client_ip="")
+            )
+            conn.execute(
                 self.free_previews.update()
                 .where(
                     (self.free_previews.c.created_at < cutoff)
@@ -1552,6 +1680,7 @@ def make_store(url: str) -> Store:
 
 __all__ = [
     "CODE_REFERENCE_PREFIX",
+    "WELCOME_REFERENCE_PREFIX",
     "AccountAudit",
     "AccountCode",
     "AccountRecord",

@@ -42,8 +42,9 @@ COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Tu cuenta",
         "signup_title": "Crea tu cuenta",
         "signup_lead": (
-            f"Tu cuenta gratis trae {FREE_PREVIEWS_PER_MONTH} vistas previas al mes y guarda "
-            "en un solo lugar tus informes, tus créditos y tus compras."
+            "Al crear tu cuenta, tu primer informe completo es gratis, con PDF. Después "
+            f"tienes {FREE_PREVIEWS_PER_MONTH} vistas previas gratis al mes, y tus informes, "
+            "créditos y compras en un solo lugar."
         ),
         "signin_title": "Entra a tu cuenta",
         "signin_lead": "Tus informes, créditos y compras te esperan aquí.",
@@ -117,6 +118,15 @@ COPY: dict[str, dict[str, str]] = {
         "status_saved": "Guardado desde un enlace",
         "paid_card": "tarjeta",
         "paid_code": "código",
+        "paid_welcome": "gratis, primer informe",
+        "welcome_kpi": "Primer informe completo gratis",
+        "welcome_available": "Disponible",
+        "welcome_used": "Usado",
+        "welcome_notice": (
+            "Tu primer informe completo es gratis por crear tu cuenta, con PDF y página de "
+            "verificación. Para tus siguientes archivos tienes {limit} vistas previas gratis al "
+            "mes; el informe completo cuesta {price} ({pack} el paquete de 3)."
+        ),
         "no_description": "Sin descripción",
         "codes_title": "Tus códigos de acceso",
         "codes_none": "Aún no hay códigos en tu cuenta.",
@@ -193,11 +203,12 @@ COPY: dict[str, dict[str, str]] = {
         "credit_used": "Crédito usado: este es el informe completo.",
         "free_left": "Vistas previas gratis este mes",
         "free_left_value": "{left} de {limit}",
-        "gate_signin_title": "Crea tu cuenta gratis para ver tu vista previa",
+        "gate_signin_title": "Crea tu cuenta gratis: tu primer informe completo no se paga",
         "gate_signin_lead": (
-            "Con una cuenta tienes {limit} vistas previas gratis cada mes: la clase de A a D, "
-            "las gráficas y las señales de alerta de tu archivo. Si ya tienes un código de "
-            "acceso, escríbelo en el formulario y no necesitas cuenta."
+            "Al crear tu cuenta, el primer archivo que subas sale como informe completo, con "
+            "PDF, sin pagar. Después tienes {limit} vistas previas gratis cada mes: la clase de "
+            "A a D, las gráficas y las señales de alerta. Si ya tienes un código de acceso, "
+            "escríbelo en el formulario y no necesitas cuenta."
         ),
         "gate_code_title": "Ese código no sirve",
         "gate_code_lead": (
@@ -228,8 +239,9 @@ COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Your account",
         "signup_title": "Create your account",
         "signup_lead": (
-            f"Your free account comes with {FREE_PREVIEWS_PER_MONTH} previews a month and "
-            "keeps your reports, credits and purchases in one place."
+            "When you create your account, your first full report is free, with the PDF. "
+            f"Then you get {FREE_PREVIEWS_PER_MONTH} free previews a month, and your reports, "
+            "credits and purchases in one place."
         ),
         "signin_title": "Sign in to your account",
         "signin_lead": "Your reports, credits and purchases are waiting here.",
@@ -304,6 +316,15 @@ COPY: dict[str, dict[str, str]] = {
         "status_saved": "Saved from a link",
         "paid_card": "card",
         "paid_code": "code",
+        "paid_welcome": "free, first report",
+        "welcome_kpi": "Free first full report",
+        "welcome_available": "Available",
+        "welcome_used": "Used",
+        "welcome_notice": (
+            "Your first full report is free for creating your account, with the PDF and the "
+            "verification page. For your next files you have {limit} free previews a month; "
+            "the full report costs {price} ({pack} for a pack of 3)."
+        ),
         "no_description": "No description",
         "codes_title": "Your access codes",
         "codes_none": "No codes on your account yet.",
@@ -376,11 +397,12 @@ COPY: dict[str, dict[str, str]] = {
         "credit_used": "Credit used: this is the full report.",
         "free_left": "Free previews this month",
         "free_left_value": "{left} of {limit}",
-        "gate_signin_title": "Create your free account to see your preview",
+        "gate_signin_title": "Create your free account: your first full report is on us",
         "gate_signin_lead": (
-            "An account gives you {limit} free previews every month: the A to D class, the "
-            "charts and the red flags of your file. If you already have an access code, type "
-            "it in the form and you need no account."
+            "When you create your account, the first file you upload comes out as a full "
+            "report, with the PDF, at no cost. Then you get {limit} free previews every month: "
+            "the A to D class, the charts and the red flags. If you already have an access "
+            "code, type it in the form and you need no account."
         ),
         "gate_code_title": "That code does not work",
         "gate_code_lead": (
@@ -743,7 +765,7 @@ def _reports_table(
         if item.purged:
             tags.append(copy["status_purged"])
         elif item.paid:
-            method = copy["paid_card"] if item.paid_with == "card" else copy["paid_code"]
+            method = copy.get(f"paid_{item.paid_with}", copy["paid_code"])
             tags.append(f"{copy['status_full']} · {method}")
         else:
             tags.append(copy["status_preview"])
@@ -845,7 +867,7 @@ def _purchases_table(copy: dict[str, str], locale: str, audits: Sequence[Account
     head = "".join(f"<th>{_e(copy[k])}</th>" for k in ("col_paid", "col_method", "col_class"))
     rows = [
         f"<tr><td>{_e(_date(a.paid_at))}</td>"
-        f"<td>{_e(copy['paid_card'] if a.paid_with == 'card' else copy['paid_code'])}</td>"
+        f"<td>{_e(copy.get(f'paid_{a.paid_with}', copy['paid_code']))}</td>"
         f"<td>{_class_badge(a.overall_class)}</td><td>"
         + (
             ""
@@ -880,6 +902,7 @@ def account_page(
     pack_price_cents: int = 0,
     free_left: int = 0,
     free_limit: int = 0,
+    welcome: str = "",
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -905,6 +928,12 @@ def account_page(
             f"<div class='acct-kpi'><b>{_e(free_value)}</b>"
             f"<span>{_e(copy['free_left'])}</span></div>"
             if free_limit
+            else ""
+        )
+        + (
+            f"<div class='acct-kpi'><b>{_e(copy['welcome_' + welcome])}</b>"
+            f"<span>{_e(copy['welcome_kpi'])}</span></div>"
+            if welcome in ("available", "used")
             else ""
         )
         + f"<div class='acct-kpi'><b>{len(audits)}</b><span>{_e(copy['reports'])}</span></div>"

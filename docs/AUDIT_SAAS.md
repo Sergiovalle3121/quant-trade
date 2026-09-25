@@ -1434,6 +1434,19 @@ changes what a report says.
   several accounts with made-up addresses; the per-network cap and the
   5 sign-ups per hour per address only slow that down. E-mail confirmation
   (needs a mail provider) would close it.
+- **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
+  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3`; not in free mode). A signed-in
+  account's first upload comes out as a full report with PDF and a
+  publishable verification page, paid with the reference `welcome:<id>`
+  (`paid_with = "welcome"`, `acct=welcome` shows the notice). It does not
+  use a monthly preview. It is refused (the upload falls back to the
+  free-preview rules) when the account already had it, when this browser
+  already gave one (a `rigor_device` cookie holding a random id, stored as
+  its SHA-256), when the same file (SHA-256 of the upload) already got one
+  on any account, or when the network address reached the monthly cap. The
+  `welcome_reports` row outlives the account, so deleting and signing up
+  again does not repeat it. The purge clears the address; the device and
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado.
 
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`

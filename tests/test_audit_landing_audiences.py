@@ -90,8 +90,8 @@ def test_second_files_and_challenge_sit_in_a_closed_extras_box() -> None:
 
 def test_pricing_offers_the_free_account_that_the_preview_needs() -> None:
     for locale, words, href in (
-        ("es", "Cuenta gratis: 3 vistas previas al mes", "/registro"),
-        ("en", "Free account: 3 previews a month", "/signup"),
+        ("es", "gratis al crear tu cuenta; después, 3 vistas previas", "/registro"),
+        ("en", "free when you create your account; then 3 free previews", "/signup"),
     ):
         page = _paid_landing(locale, card_payments=False)
         note = page.split("class='muted account-note'", 1)[1].split("</p>", 1)[0]
