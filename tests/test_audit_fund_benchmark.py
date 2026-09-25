@@ -214,3 +214,88 @@ def test_a_lone_index_column_is_never_taken_as_a_benchmark() -> None:
     assert series.source == "equity" and series.frame["equity"].iloc[-1] == 99
     assert series.benchmark is not None
     assert series.benchmark["ret"].to_numpy() == pytest.approx([0.04, 49 / 52 - 1])
+
+
+# --- Regressions from the bug hunt's retest of #218 --------------------------
+
+
+@pytest.mark.parametrize("empty", ["", "n/a", "-"])
+@pytest.mark.parametrize("newest_first", [False, True])
+def test_an_empty_benchmark_row_is_not_a_block_heading(empty: str, newest_first: bool) -> None:
+    fund, index = _pair(60)
+    years = list(range(5))
+    if newest_first:
+        years.reverse()
+    lines = [",".join(["Year", *MONTHS])]
+    for y in years:
+        lines.append(",".join([str(2019 + y), *_cells(fund[12 * y : 12 * y + 12])]))
+        if y == years[0]:
+            lines.append(",".join(["Benchmark", *_cells(index[12 * y : 12 * y + 12])]))
+        else:
+            lines.append(",".join(["Benchmark", *[empty] * 12]))
+    series = parse_equity_csv(("\n".join(lines) + "\n").encode())
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(fund, abs=5e-5)
+    assert series.benchmark is not None and len(series.benchmark) == 12
+
+
+@pytest.mark.parametrize("newest_first", [False, True])
+def test_a_benchmark_block_repeats_the_years_in_either_order(newest_first: bool) -> None:
+    fund, index = _pair(36)
+    years = [2, 1, 0] if newest_first else [0, 1, 2]
+    lines = [",".join(["Year", *MONTHS])]
+    lines += [",".join([str(2019 + y), *_cells(fund[12 * y : 12 * y + 12])]) for y in years]
+    lines.append(",".join(["Benchmark", *[""] * 12]))
+    lines += [",".join([str(2019 + y), *_cells(index[12 * y : 12 * y + 12])]) for y in years]
+    series = parse_equity_csv(("\n".join(lines) + "\n").encode())
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(fund, abs=5e-5)
+    assert series.benchmark is not None
+    assert series.benchmark["ret"].to_numpy() == pytest.approx(index, abs=5e-5)
+
+
+def _dated_text(fund: list[str], bench: list[str], head: str = "return") -> bytes:
+    stamps = pd.date_range("2019-01-31", periods=len(fund), freq="ME")
+    lines = [f"date,{head},benchmark"] + [
+        f"{t.date()},{f},{b}" for t, f, b in zip(stamps, fund, bench, strict=True)
+    ]
+    return ("\n".join(lines) + "\n").encode()
+
+
+def test_each_column_scale_rests_on_its_own_evidence() -> None:
+    fund, index = _pair(36)
+    # The fund in "0.70%", the benchmark in bare fractions.
+    series = parse_equity_csv(
+        _dated_text([f"{v * 100:.4f}%" for v in fund], [f"{v:.6f}" for v in index])
+    )
+    assert series.benchmark is not None
+    assert series.benchmark["ret"].to_numpy() == pytest.approx(index, abs=1e-6)
+    # The fund in bare fractions, the benchmark in bare percentages.
+    series = parse_equity_csv(
+        _dated_text([f"{v:.6f}" for v in fund], [f"{v * 100:.4f}" for v in index])
+    )
+    assert series.benchmark is not None
+    assert series.benchmark["ret"].to_numpy() == pytest.approx(index, abs=1e-6)
+    review = compare_with_benchmark(
+        series.frame.set_index("timestamp")["ret"].dropna(),
+        series.benchmark.set_index("timestamp")["ret"],
+        "file",
+    )
+    assert 0.5 < review["beta"]["value"] < 1.2
+
+
+def test_a_percent_benchmark_beside_a_curve_of_levels_is_returns() -> None:
+    fund, index = _pair(36)
+    levels = 100 * np.cumprod(1 + fund)
+    series = parse_equity_csv(
+        _dated_text([f"{v:.4f}" for v in levels], [f"{v * 100:.4f}%" for v in index], head="nav")
+    )
+    assert series.benchmark is not None
+    assert series.benchmark["ret"].to_numpy() == pytest.approx(index, abs=1e-6)
+
+
+def test_an_impossible_benchmark_month_leaves_the_column_out() -> None:
+    fund, index = _pair(36)
+    bench = [f"{v:.6f}" for v in index]
+    bench[5] = "1000000"
+    series = parse_equity_csv(_dated_text([f"{v:.6f}" for v in fund], bench))
+    assert series.benchmark is None
+    assert any("could not be read; left out" in w for w in series.warnings)

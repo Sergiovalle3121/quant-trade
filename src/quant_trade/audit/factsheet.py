@@ -199,8 +199,14 @@ def _no_grid(message: str, message_es: str, code: str) -> Exception:
     return ParseError(message, message_es=message_es, code=code)
 
 
-def _matches(cells: list[tuple[int, int, float]], totals: dict[int, float], scale: float) -> int:
-    """Years whose stated total matches their months read at ``scale``."""
+def _matches(
+    cells: list[tuple[int, int, float]],
+    totals: dict[int, float],
+    scale: float,
+    total_scale: float | None = None,
+) -> int:
+    """Years whose stated total (read at ``total_scale``, by default the
+    months' own) matches their months read at ``scale``."""
     hits = 0
     for year, stated in totals.items():
         months_of_year = [v / scale for y, _, v in cells if y == year]
@@ -208,7 +214,7 @@ def _matches(cells: list[tuple[int, int, float]], totals: dict[int, float], scal
             continue
         compounded = math.prod(1.0 + r for r in months_of_year) - 1.0
         summed = sum(months_of_year)
-        target = stated / scale
+        target = stated / (total_scale or scale)
         if min(abs(target - compounded), abs(target - summed)) <= TOTAL_TOLERANCE:
             hits += 1
     return hits
@@ -263,15 +269,28 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
     section = FUND
     entries: list[tuple[str, Any]] = []
     left_out = 0
+    seen: set[int] = set()
+    # A label-only row that switches the block, and the block it left: an
+    # empty "Benchmark" row under a fund year looks the same as a heading.
+    reopened: str | None = None
     for row in table:
         text = text_of(row)
         if not has_month(row):
-            if text and len(text) <= MAX_MARKER:
-                section = _role(text, section)
+            if text and len(text) <= MAX_MARKER and _role(text, section) != section:
+                reopened, section = section, _role(text, section)
             continue
         if text and DIFFERENCE.search(text):
             left_out += 1
             continue
+        year = next((y for i in others if (y := _year(row[i])) is not None), None)
+        if reopened is not None:
+            # A block repeats years already listed, in either order; a new
+            # year means the label row was an empty data row, not a heading.
+            if not text and year is not None and year not in seen:
+                section = reopened
+            reopened = None
+        if year is not None:
+            seen.add(year)
         entries.append((_role(text, section) if text else section, row))
     if not entries:
         return None
@@ -328,6 +347,7 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
     totals: dict[int, float] = {}
     unreadable: list[str] = []
     any_percent = False
+    total_percent = False
     for year, row in zip(years, rows, strict=True):
         for i, month in month_of.items():
             value, percent = _number(row[i])
@@ -338,7 +358,7 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
                 unreadable.append(f"{year}-{month:02d}")
         if total_col is not None:
             value, percent = _number(row[total_col])
-            any_percent |= percent
+            total_percent |= percent
             if value is not None and math.isfinite(value):
                 totals[year] = value
     bench_cells: list[tuple[int, int, float]] = []
@@ -355,7 +375,7 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
 
     # The scale: a % sign settles it; otherwise the year totals, when the
     # file states them; otherwise percentages, as factsheets publish.
-    if any_percent:
+    if any_percent or total_percent:
         scale, how = 100.0, "values taken as percentages"
     elif totals and (
         (as_fraction := _compounding_error(cells, totals, 1.0))
@@ -397,8 +417,18 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
         grid.warnings.append(
             f"{left_out} row(s) of differences between the fund and its benchmark left out"
         )
+    # A total column may be formatted apart from the months (Excel months as
+    # 1.23 % beside a General 0.07 total): its own % settles its scale, else
+    # the reading its years match best.
+    if total_percent:
+        total_scale = 100.0
+    elif any_percent and _matches(cells, totals, scale, 1.0) > _matches(cells, totals, scale):
+        total_scale = 1.0
+    else:
+        total_scale = scale
     for year, stated in sorted(totals.items()):
-        if _matches(cells, {year: stated}, scale) == 0 and any(y == year for y, _, _ in cells):
+        has_months = any(y == year for y, _, _ in cells)
+        if has_months and _matches(cells, {year: stated}, scale, total_scale) == 0:
             grid.mismatched_years.append(year)
     if grid.mismatched_years:
         grid.warnings.append(

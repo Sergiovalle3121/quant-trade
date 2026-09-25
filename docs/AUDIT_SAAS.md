@@ -794,7 +794,9 @@ months, compounded, miss the stated totals by less than half the other's
 miss wins (summing cannot tell the two apart). Without totals, or when
 neither reading clearly wins, the grid is read as percentages, as
 factsheets publish, and the warning asks the customer to check one month
-against the factsheet. A money-market fund's `0.03` is therefore 0.03 %,
+against the factsheet. The total column's own scale is settled apart (its
+`%`, else the reading its years match best), so Excel months shown as
+1.23 % beside a General 0.07 total read as one. A money-market fund's `0.03` is therefore 0.03 %,
 not 3 % (the old median rule read it as a fraction, a 100x misread). A
 year whose stated total matches neither its months compounded nor summed
 (beyond 0.15 points) is listed in a warning: an edited month usually leaves
@@ -835,13 +837,19 @@ fund's, so the equity file may carry it:
 - a dated file: a column named `benchmark`, `bench`, `bmk`, `index`,
   `indice`, `índice` or `referencia` (optionally with a suffix, e.g.
   `benchmark_return`), read like the fund's own column (returns beside
-  returns, levels beside levels, the same percent scaling). A column of
+  returns, levels beside levels). A `%` in the column's own cells means
+  percent returns, even beside a curve of levels; bare returns take the
+  scale (as is or divided by 100) whose median size is nearer the fund's.
+  A period above 1,000 % leaves the column out. A column of
   row numbers (0, 1, 2...) is not a benchmark.
 - a factsheet table: rows whose label names the benchmark ("Benchmark",
   "Index", "Índice", or an index family such as MSCI, S&P, FTSE, STOXX,
   Russell, Nasdaq, IBEX, DAX, Bloomberg, HFRI, IPC...) in a label column, in
   a row under the fund's year with no year of its own, or in a block opened
-  by a short heading row naming the benchmark. A label naming the fund
+  by a short heading row naming the benchmark. A heading opens a block only
+  when the next unlabelled row repeats a year already listed (a block
+  repeats the years, in either order); a new year there means the label row
+  was an empty benchmark row, so the fund's rows go on as the fund's. A label naming the fund
   ("Fund", "Fondo", "Portfolio", "Cartera", "Strategy"...) wins, so "Acme
   Index Fund" stays the fund. Rows of differences ("Excess", "Relative",
   "Difference", "Alpha", "+/-", "Diferencia"...) are left out and counted in
@@ -1320,7 +1328,11 @@ not lock a report again; disable a pack code from `/panel` if needed.
 A paid session that does not unlock (wrong amount, currency or marker, an
 unlisted test audit, an unknown audit) is logged as a warning with the
 session id, the audit id and the reason, never an amount or an email, so a
-charged buyer who stays locked can be found and refunded or unlocked.
+charged buyer who stays locked can be found and refunded or unlocked. Live
+ones are also listed on `/panel` ("Pagos con tarjeta que no abrieron un
+informe": date, Stripe session id, audit id, reason), and the retention purge
+deletes those rows; test-mode ones stay in the log only, since anyone can pay a
+test link with Stripe's public card.
 
 ### Selling with access codes
 
@@ -1376,6 +1388,11 @@ without one, and an account never changes what a report says.
   1 crédito de tu cuenta" when their codes have credits left. The code that
   expires first is spent first; the credit and the unlock share one
   transaction, as with a typed code.
+- **Comparing**: with two or more full reports, "Mis informes" lets the
+  customer tick two and open `/cuenta/comparar` (`/account/comparar`), the
+  same side-by-side view as `/comparar` without pasting private links. It is
+  a read-only GET; both reports must be on the signed-in account's list, not
+  purged and unlocked (or free mode); anything else goes back to the list.
 - **Opening a report**: the owner opens `/audits/{id}` without the token; any
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
