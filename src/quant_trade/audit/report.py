@@ -2510,7 +2510,7 @@ def _capital_html(
         # The hint answers "too few trades" or "too short"; not "no fall to size".
         short = str(capital.get("reason", "")).startswith("needs ")
         hint = f"<p class='muted'>{_e(labels['capital_missing'])}</p>" if short else ""
-        return _status_line(capital, labels) + hint
+        return f"<div class='live-verdict held'>{_status_line(capital, labels)}{hint}</div>"
 
     def label(key: str) -> str:
         return labels.get(f"{key}_account", labels[key]) if account else labels[key]

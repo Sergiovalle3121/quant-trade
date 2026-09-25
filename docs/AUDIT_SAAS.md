@@ -1121,6 +1121,7 @@ On desktop the upload form pairs the language and access-code fields, so no fiel
 
 In "El dinero real de la cuenta", a negative percent gain, a negative money result and the open loss show in red.
 Reading notes from the file importer read as a short list, not one run-on sentence.
+A capital section held back for a short history reads as a grey card with the reason and what to upload.
 
 ## Security
 
