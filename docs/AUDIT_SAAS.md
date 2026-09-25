@@ -727,7 +727,13 @@ An account emptied by a withdrawal and refilled later is read; trading on a
 zero or negative balance is refused as before. A trade that closes on what a
 withdrawal left, for more than that whole remainder, was opened on the balance
 before the withdrawal and is measured on it; the file-reading notes name the
-first such day.
+first such day. The account section then adds a "Para preguntar" line with
+that date and the number of such days: the account was traded almost empty,
+a percentage on almost nothing explodes, and the buyer should ask why almost
+everything was withdrawn and trading went on with what was left (`account.near_empty`,
+MEASURED; the reader writes the count to the report metadata, which the
+report never lists as the platform's own figures). Informational: no flag,
+no class change. Real-file check (40 files): one signal export shows it.
 
 | Code | WARN | FAIL |
 |---|---|---|
