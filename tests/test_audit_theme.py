@@ -931,4 +931,6 @@ def test_an_unknown_share_card_falls_back_to_the_site_card() -> None:
     assert og_image_name("class-C", "en") == "og-class-C-en.png"
     assert og_image_name("class-Z", "es") == "og-es.png"
     assert og_image_name("../secret", "es") == "og-es.png"
+    # Portuguese has no cards yet: a Brazilian link previews the English one, not Spanish.
+    assert og_image_name("sample", "pt") == "og-sample-en.png"
     assert set(OG_IMAGES) <= set(STATIC_FILES)

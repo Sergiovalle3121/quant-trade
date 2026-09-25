@@ -88,8 +88,10 @@ OG_KINDS: tuple[str, ...] = (
 
 
 def og_image_name(kind: str, locale: str) -> str:
-    """The file under ``static/`` of the share card ``kind`` in ``locale``."""
+    """The file under ``static/`` of the share card ``kind`` in ``locale``. A language
+    with no cards of its own (Portuguese, for now) gets the English ones."""
     kind = kind if kind in OG_KINDS else ""
+    locale = locale if locale in LOCALES else "en"
     return f"og-{kind}-{locale}.png" if kind else f"og-{locale}.png"
 
 
@@ -127,7 +129,7 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
     base = base_url.rstrip("/")
     if base:
         # Messaging apps need an absolute URL to show a picture with the link.
-        image = f"{base}/static/{og_image_name(meta.image, locale)}"
+        image = f"{base}/static/{og_image_name(meta.image, meta.locale)}"
         tags += [
             f"<meta property='og:image' content='{_e(image)}'>",
             "<meta property='og:image:type' content='image/png'>",
