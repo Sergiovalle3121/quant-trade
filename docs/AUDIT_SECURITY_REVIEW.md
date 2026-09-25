@@ -105,8 +105,11 @@ Every change below has an offline, deterministic test in
 - Pre-launch sweep of the account surface (bug hunt, local): nothing high.
   Fixed after it: the per-e-mail ceiling blocked even the right password, so
   a few addresses could lock an owner out every hour; now it only stops an
-  address past 2 failures on that e-mail. POST `/audits` checks Origin or
-  Referer as a second layer (the domain is on the Public Suffix List). The
+  address past 2 failures on that e-mail. POST `/audits` checks
+  `Sec-Fetch-Site`, else Origin or Referer, as a second layer (the domain is on
+  the Public Suffix List); `Origin: null` is no signal, because our own
+  no-referrer pages send it (a first version refused it and blocked every
+  real upload; caught in Chromium before merge). The
   sign-in, sign-up and panel counters moved to the database (`attempts`,
   hashed keys), so deploys no longer reset them. Parked: sign-up's 409
   confirms an e-mail exists (needs e-mail verification); scrypt N=2^14.

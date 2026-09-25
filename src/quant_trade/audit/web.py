@@ -1705,18 +1705,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return result.audit_id, token, paid
 
     def _cross_site(request: Request) -> bool:
-        """True when a browser says the upload was posted from another site.
+        """True when the browser says the upload was posted from another site.
 
-        A second layer beside the SameSite cookie (the service's domain may
-        sit on the Public Suffix List): the Origin, else the Referer, must be
-        this service. A request with neither (a script, curl) is let through;
-        it carries no cookie a browser would add for someone else.
+        A second layer beside the SameSite cookie (the service's domain sits
+        on the Public Suffix List). ``Sec-Fetch-Site`` decides when present
+        (every current browser sends it, whatever the referrer policy):
+        only ``same-origin`` and ``none`` pass; ``same-site`` is refused too,
+        since other apps on the same parent domain would count as same site.
+        Without it, the Origin (else the Referer) must be this service. Our
+        pages send ``Referrer-Policy: no-referrer``, so a genuine form post
+        carries ``Origin: null``: that, like no header at all (a script,
+        curl), is no signal and goes through.
         """
+        fetch_site = request.headers.get("sec-fetch-site", "").strip().lower()
+        if fetch_site:
+            return fetch_site not in ("same-origin", "none")
         source = request.headers.get("origin") or request.headers.get("referer") or ""
-        if not source:
+        if not source or source == "null":
             return False
-        if source == "null":
-            return True
         host = urlsplit(source).netloc.lower()
         allowed = {request.headers.get("host", "").lower()}
         if cfg.base_url:

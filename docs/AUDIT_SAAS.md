@@ -1646,9 +1646,13 @@ changes what a report says.
   `attempts` table (keys hashed, rows older than the hour deleted), so a
   deploy does not reset them. A password change or reset signs out the other
   sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
-  `/` and `/en` (with an anchor). POST `/audits` answers 403 when the
-  browser's Origin (else Referer) names another site, a second layer beside
-  the `SameSite=Lax` cookie; a request with neither header goes through.
+  `/` and `/en` (with an anchor). POST `/audits` answers 403 to a browser
+  post from another site, a second layer beside the `SameSite=Lax` cookie:
+  `Sec-Fetch-Site` decides when present (only `same-origin` and `none` pass;
+  `same-site` is refused, as other apps on the parent domain count as same
+  site); without it, the Origin (else Referer) must be this service. Our
+  pages send `Referrer-Policy: no-referrer`, so a real form post carries
+  `Origin: null`; that, like no header at all (scripts), is no signal.
 - **No e-mail service yet**. Nothing sends e-mail and addresses are not
   confirmed. A customer who forgets the password writes to the owner
   (WhatsApp link on `/olvide`); after checking the request comes from the

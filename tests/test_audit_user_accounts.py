@@ -1306,23 +1306,32 @@ def test_sign_in_limits_survive_a_restart(tmp_path: Path, monkeypatch: pytest.Mo
 def test_an_upload_posted_from_another_site_is_refused(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     files = {"equity": ("e.csv", csv_bytes(positive_drift(300)), "text/csv")}
+
+    def post(headers: dict[str, str]) -> int:
+        return client.post(
+            "/audits", files=files, data={"consent": "on"}, headers=headers, follow_redirects=False
+        ).status_code
+
     for header in (
+        {"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"},
+        # Another app under the same parent domain counts as same-site.
+        {"Sec-Fetch-Site": "same-site", "Origin": "https://evil.up.railway.app"},
+        # An attacker page with its own no-referrer policy: the fetch header still tells.
+        {"Sec-Fetch-Site": "cross-site", "Origin": "null"},
+        # An old browser without Sec-Fetch-Site: Origin, else Referer, decides.
         {"Origin": "https://evil.up.railway.app"},
-        {"Origin": "null"},
         {"Referer": "https://evil.example/page"},
     ):
-        answer = client.post(
-            "/audits", files=files, data={"consent": "on"}, headers=header, follow_redirects=False
-        )
-        assert answer.status_code == 403, header
-        assert "no viene del formulario de este sitio" in answer.text
-    # The site's own form (same Origin) and scripts with no Origin still reach the gate.
-    same = client.post(
-        "/audits",
-        files=files,
-        data={"consent": "on"},
-        headers={"Origin": "http://testserver"},
-        follow_redirects=False,
+        assert post(header) == 403, header
+    refused = client.post(
+        "/audits", files=files, data={"consent": "on"}, headers={"Sec-Fetch-Site": "cross-site"}
     )
-    assert same.status_code == 401
-    assert client.post("/audits", files=files, data={"consent": "on"}).status_code == 401
+    assert "no viene del formulario de este sitio" in refused.text
+    # What a real browser sends from our own form (our pages say no-referrer):
+    # Origin null, no Referer, Sec-Fetch-Site same-origin. It reaches the gate.
+    assert post({"Sec-Fetch-Site": "same-origin", "Origin": "null"}) == 401
+    assert post({"Sec-Fetch-Site": "none"}) == 401
+    # An old browser from our own page, and a script with no headers, go through too.
+    assert post({"Origin": "null"}) == 401
+    assert post({"Origin": "http://testserver"}) == 401
+    assert post({}) == 401
