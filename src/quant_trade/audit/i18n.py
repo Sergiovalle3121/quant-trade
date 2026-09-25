@@ -473,6 +473,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "cualquier drawdown con operaciones abiertas de la plataforma o de la curva de equity",
     ),
     (
+        "the closed trades end with a net loss, so no size is given for them: at any size the "
+        "history loses",
+        "las operaciones cerradas terminan con pérdida neta, así que no se da un tamaño para "
+        "ellas: a cualquier tamaño el historial pierde",
+    ),
+    (
         "deepest fall in money of the uploaded equity curve, open trades included",
         "mayor caída en dinero de la curva de equity subida, con operaciones abiertas",
     ),
@@ -612,6 +618,16 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "the largest adverse excursion is {m}x the average loss; no sign of a fixed stop",
         "la mayor excursión adversa es {m}x la pérdida media; no hay señal de un stop fijo",
+    ),
+    (
+        "the best trade makes {share} of the total of the winning trades ({n} trades)",
+        "la mejor operación aporta el {share} del total de las operaciones ganadoras "
+        "({n} operaciones)",
+    ),
+    (
+        "the best 5 trades make {share} of the total of the winning trades ({n} trades)",
+        "las 5 mejores operaciones aportan el {share} del total de las operaciones ganadoras "
+        "({n} operaciones)",
     ),
     (
         "the largest loss is {m}x the average loss; no sign of a fixed stop",

@@ -357,6 +357,14 @@ CONCURRENT_WARN = 5
 HIGH_WINRATE = 0.85
 HIGH_WINRATE_LOSS_MULTIPLE = 3.0
 HIGH_WINRATE_MIN_TRADES = 20
+#: Trades needed before the share of the gains carried by the best trades is judged.
+CONCENTRATION_MIN_TRADES = 30
+#: The best trade carrying this share of all winning trades' total fails the data ...
+CONCENTRATION_FAIL_SHARE = 0.50
+#: ... and this share, or the best five carrying CONCENTRATION_TOP_SHARE, is a warning.
+CONCENTRATION_WARN_SHARE = 0.33
+CONCENTRATION_TOP = 5
+CONCENTRATION_TOP_SHARE = 0.80
 #: Largest loss (or adverse excursion) over the mean loss.
 NO_STOP_LOSS_MULTIPLE = 8.0
 NO_STOP_MIN_LOSSES = 10
@@ -563,7 +571,46 @@ def scan_trade_patterns(
                     worst / typical,
                 )
             )
+    flags.extend(_concentration(pnl, trades.fees))
     return flags
+
+
+def _concentration(pnl: list[float], fees: list[float] | None) -> list[RedFlag]:
+    """The share of the winning trades' total carried by the best trade or best five.
+
+    Measured on the gains, not the net result, so a thin net over many noisy
+    trades is not mistaken for concentration. A history whose gains rest on
+    one trade says nothing about the rest of the system, and one outsized
+    trade is also what a data error looks like. Fees stay with every trade."""
+    n = len(pnl)
+    costs = fees if fees is not None and len(fees) == n else [0.0] * n
+    net = [value - cost for value, cost in zip(pnl, costs, strict=True)]
+    wins = sorted((value for value in net if value > 0), reverse=True)
+    gains = float(sum(wins))
+    if n < CONCENTRATION_MIN_TRADES or sum(net) <= 0 or gains <= 0:
+        return []
+    share = wins[0] / gains
+    top_share = sum(wins[:CONCENTRATION_TOP]) / gains
+    if share >= CONCENTRATION_WARN_SHARE:
+        return [
+            RedFlag(
+                "PROFIT_CONCENTRATION",
+                "FAIL" if share >= CONCENTRATION_FAIL_SHARE else "WARN",
+                f"the best trade makes {share:.0%} of the total of the winning trades ({n} trades)",
+                share,
+            )
+        ]
+    if top_share >= CONCENTRATION_TOP_SHARE:
+        return [
+            RedFlag(
+                "PROFIT_CONCENTRATION",
+                "WARN",
+                f"the best {CONCENTRATION_TOP} trades make {top_share:.0%} of the total of the "
+                f"winning trades ({n} trades)",
+                top_share,
+            )
+        ]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -684,6 +731,10 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
         "en": "Many small wins and large losses",
     },
     "NO_STOP_EVIDENCE": {"es": "Sin señal de stop de pérdida", "en": "No sign of a stop loss"},
+    "PROFIT_CONCENTRATION": {
+        "es": "Resultado concentrado en pocas operaciones",
+        "en": "Result carried by a few trades",
+    },
     "TRADES_OUTSIDE_EQUITY": {
         "es": "Operaciones fuera de las fechas de la curva",
         "en": "Trades outside the curve's dates",

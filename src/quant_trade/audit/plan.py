@@ -243,6 +243,17 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
         "es": "La mayor pérdida es muy superior a la media: revisa si el stop de pérdida existe.",
         "en": "The largest loss far exceeds the average: check whether a stop loss exists.",
     },
+    "PROFIT_CONCENTRATION": {
+        "es": (
+            "Revisa la mejor operación en el archivo (fecha, tamaño, precio) y pide más "
+            "historial: con el resultado en una sola operación, el resto del sistema no está "
+            "medido."
+        ),
+        "en": (
+            "Check the best trade in the file (date, size, price) and ask for more history: "
+            "with the result in one trade, the rest of the system is not measured."
+        ),
+    },
     "TRADES_OUTSIDE_EQUITY": {
         "es": "Sube la curva y las operaciones de la misma cuenta y el mismo periodo.",
         "en": "Upload the curve and the trades of the same account and period.",

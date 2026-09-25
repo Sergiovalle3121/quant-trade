@@ -66,6 +66,10 @@ REFERENCE_NOTE = (
     "the largest of the resampled 95th percentile, the history's own fall and any "
     "drawdown with open trades from the platform or the equity curve"
 )
+NET_LOSS = (
+    "the closed trades end with a net loss, so no size is given for them: at any size the "
+    "history loses"
+)
 PLATFORM_NOTE = "the platform's maximal drawdown in money, open trades included"
 CURVE_NOTE = "deepest fall in money of the uploaded equity curve, open trades included"
 HIDDEN_LOSSES = (
@@ -138,6 +142,8 @@ def capital_review(
     ordered = sorted(range(len(trades)), key=lambda i: trades[i].exit_time)
     costs = list(fees) if fees is not None else [0.0] * len(trades)
     pnl = np.array([trades[i].pnl - costs[i] for i in ordered], dtype=float)
+    if float(pnl.sum()) <= 0:
+        return {"status": "NOT_MEASURED", "reason": NET_LOSS}
     first = min(trade.entry_time for trade in trades)
     last = max(trade.exit_time for trade in trades)
     span_days = (last - first).total_seconds() / 86_400

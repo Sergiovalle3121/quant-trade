@@ -425,6 +425,15 @@ Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
 | `HIDDEN_FLOATING_DRAWDOWN` | a balance-only curve while positions overlapped | — |
 | `NEGATIVE_PAYOFF_HIGH_WINRATE` | ≥ 20 trades, win rate > 85 % and average loss ≥ 3x average win | — |
 | `NO_STOP_EVIDENCE` | ≥ 10 losses and the largest loss (or adverse excursion) ≥ 8x the average loss | — |
+| `PROFIT_CONCENTRATION` | ≥ 30 trades with a net gain after fees, and the best trade ≥ 33 % of the winning trades' total, or the best 5 ≥ 80 % | the best trade ≥ 50 % of the winning trades' total |
+
+`PROFIT_CONCENTRATION` is measured on the winning trades' total, not the net
+result, so a thin net over many noisy trades is not mistaken for concentration
+(on simulated normal trades it never fails; on very heavy-tailed ones with 30
+trades it fails about 5 % of the time). A history whose gains rest on one trade
+says nothing about the rest of the system, and one outsized trade is what a data
+error looks like, so it fails the data dimension (class D). Found by the bug hunt:
+an MQL5-signal file with one trade of 1e9 on a 10,000 deposit was class B.
 
 When `HIDDEN_FLOATING_DRAWDOWN` fires, the resampled risk, the prop simulator
 (and the capital section, when it still shows figures)
@@ -545,7 +554,11 @@ held back as NOT_MEASURED unless a fall that includes open trades is
 available as a floor: the platform's open-trade drawdown, or an uploaded
 equity curve (not rebuilt from closed trades) that starts within 10 % of the
 stated balance, whose deepest fall in money is shown as `fall_curve`
-(MEASURED). The reason tells the client what to upload.
+(MEASURED), and only when that curve covers the trades from the first entry to
+the last exit (one day of slack), so a curve of the first few days cannot stand
+in for the whole history. The reason tells the client what to upload. A history
+whose closed trades end with a net loss after fees gets no capital figures
+(NOT_MEASURED): a size at which a losing history may be run is not given.
 
 ### What data the test ran on (`audit/testdata.py`)
 
