@@ -2208,7 +2208,7 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
             f"</tr></thead><tbody>{rows}</tbody></table>"
         )
     if account.get("clean"):
-        out += f"<p>{_e(labels['account_clean'])}</p>"
+        out += f"<p class='live-verdict lv-PASS'>{_e(labels['account_clean'])}</p>"
     out += f"<p class='muted'>{_e(labels['account_scope'])}</p>"
     return out
 
@@ -2242,7 +2242,7 @@ def _test_data_html(review: dict[str, Any] | None, labels: dict[str, str]) -> st
     out = f"<p class='muted'>{_e(labels['test_data_intro'])}</p>"
     out += _evidence_rows(rows, labels, skip=set())
     if review.get("clean"):
-        out += f"<p>{_e(labels['test_data_clean'])}</p>"
+        out += f"<p class='live-verdict lv-PASS'>{_e(labels['test_data_clean'])}</p>"
     out += f"<p class='muted'>{_e(labels['test_data_scope'])}</p>"
     return out
 

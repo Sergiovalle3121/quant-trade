@@ -1637,14 +1637,15 @@ def _evidence_value(item: Any) -> str:
     return "-" if item is None else str(item)
 
 
-def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "") -> str:
+def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "") -> str:
     return (
         "<section class='page-hero'>"
         + aurora()
         + grid_bg()
         + "<div class='wrap'>"
         + (f"<div class='crumbs rise' style='--i:0'>{crumbs}</div>" if crumbs else "")
-        + f"<div class='eyebrow rise' style='--i:1;margin-top:18px'><span class='dot'></span>"
+        + f"<div class='eyebrow rise' style='--i:1;margin-top:18px'>"
+        f"<span class='dot{' ' + dot if dot else ''}'></span>"
         f"{_e(eyebrow)}</div><h1 class='rise' style='--i:2'>{_e(title)}</h1>"
         + (f"<p class='lead rise' style='--i:3'>{_e(lead)}</p>" if lead else "")
         + "</div></section>"
@@ -1917,6 +1918,32 @@ _ERROR_TITLES = {
 }
 
 
+#: Where an importer's message starts listing the formats it reads.
+_EXPECTED_MARKERS = ("Se espera:", "Expected:")
+
+
+def _error_card(message: str) -> str:
+    """The error as a card: the upload field, the problem, then what is expected."""
+    field, rest = "", message.strip()
+    head, sep, tail = rest.partition(": ")
+    # "Estado de cuenta real: el archivo..." names the field; a sentence never does.
+    if sep and len(head) <= 40 and "." not in head and tail:
+        field, rest = head, tail
+    expected = ""
+    for marker in _EXPECTED_MARKERS:
+        before, found, after = rest.partition(marker)
+        if found and before.strip() and after.strip():
+            rest = before.strip()
+            expected = f"<p class='err-exp'><b>{_e(marker)}</b>{_e(after)}</p>"
+            break
+    rest = rest[:1].upper() + rest[1:]
+    return (
+        f"<div class='error-card' role='alert'><div class='err-ico'>{icon('alert')}</div><div>"
+        + (f"<p class='err-field'>{_e(field)}</p>" if field else "")
+        + f"<p class='err-msg'>{_e(rest)}</p>{expected}</div></div>"
+    )
+
+
 def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     """An error page; ``kind`` picks the title: audit, page (404) or server."""
     locale = _locale(locale)
@@ -1925,9 +1952,9 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
     body = (
-        _page_hero(ui["error_eyebrow"], title)
+        _page_hero(ui["error_eyebrow"], title, dot="bad")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
-        f"<div class='error'>{_e(message)}</div><div class='back-row'>"
+        f"{_error_card(message)}<div class='back-row'>"
         f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"
         f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
         f"{_e(GUIDES_COPY[locale]['title'])}</a>"

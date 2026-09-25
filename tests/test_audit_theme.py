@@ -212,3 +212,21 @@ def test_guides_index_lists_backtests_and_live_accounts_apart(tmp_path: Path) ->
         assert find_claims(page) == []
     # Ten or more platforms sit in two even rows on a wide screen.
     assert "gap:14px 40px;max-width:880px}" in STYLE
+
+
+def test_error_page_shows_the_field_problem_and_expected_formats_apart() -> None:
+    from quant_trade.audit.pages import error_page
+
+    page = error_page(
+        "Estado de cuenta real: el archivo no es un informe compatible. Se espera: un informe "
+        "de MetaTrader 5 o 4.",
+        locale="es",
+    )
+    card = page.split("<div class='error-card' role='alert'>", 1)[1]
+    assert "<p class='err-field'>Estado de cuenta real</p>" in card
+    assert "<p class='err-msg'>El archivo no es un informe compatible.</p>" in card
+    assert "<b>Se espera:</b>" in card and "<span class='dot bad'>" in page
+    # A plain sentence keeps its words and gets no field label.
+    plain = error_page("No encontramos esa página. Revisa el enlace.", locale="es")
+    assert "<p class='err-field'>" not in plain and "Revisa el enlace." in plain
+    assert find_claims(page) == [] and find_claims(plain) == []
