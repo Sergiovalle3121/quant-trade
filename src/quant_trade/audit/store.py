@@ -169,6 +169,16 @@ class AccountAudit:
 
 
 @dataclass(frozen=True)
+class StrategyRecord:
+    """A named strategy on an account: the reports that are its versions."""
+
+    id: str
+    name: str
+    created_at: str
+    audit_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class AccountCode:
     """An access code on an account: its record plus when it was added."""
 
@@ -406,6 +416,25 @@ class Store:
             sa.Column("claim_key", sa.String(200), primary_key=True),
             sa.Column("reservation", sa.String(64), nullable=False, index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
+        )
+        #: "Mis estrategias": an account names a strategy and files its reports
+        #: under it, each report in at most one strategy. Only reports already
+        #: on the account's list can be filed; nothing here unlocks anything.
+        self.strategies = sa.Table(
+            "strategies",
+            self.metadata,
+            sa.Column("id", sa.String(32), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("name", sa.String(80), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        self.strategy_reports = sa.Table(
+            "strategy_reports",
+            self.metadata,
+            sa.Column("audit_id", sa.String(32), primary_key=True),
+            sa.Column("strategy_id", sa.String(32), nullable=False, index=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("added_at", sa.String(40), nullable=False),
         )
         #: Failed sign-ins, sign-ups and panel keys in the last hour, so a
         #: deploy does not reset the limits. Keys are hashed (they hold an
@@ -1026,6 +1055,9 @@ class Store:
             conn.execute(
                 self.account_audits.delete().where(self.account_audits.c.audit_id == audit_id)
             )
+            conn.execute(
+                self.strategy_reports.delete().where(self.strategy_reports.c.audit_id == audit_id)
+            )
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
         return bool(deleted.rowcount)
 
@@ -1128,6 +1160,8 @@ class Store:
                 self.account_codes,
                 self.account_audits,
                 self.column_maps,
+                self.strategies,
+                self.strategy_reports,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
@@ -1413,6 +1447,133 @@ class Store:
                 )
         except sa.exc.IntegrityError:
             return
+
+    # -- strategies ("Mis estrategias") ------------------------------------
+    MAX_STRATEGIES_PER_ACCOUNT = 50
+
+    def create_strategy(self, account_id: str, name: str, *, at: datetime) -> str:
+        """A new strategy on the account; ``""`` when the name is empty or the
+        account already has :attr:`MAX_STRATEGIES_PER_ACCOUNT`."""
+        sa = self._sa
+        name = " ".join(name.split())[:80]
+        if not name:
+            return ""
+        table = self.strategies
+        with self.engine.begin() as conn:
+            count = int(
+                conn.execute(
+                    sa.select(sa.func.count())
+                    .select_from(table)
+                    .where(table.c.account_id == account_id)
+                ).scalar()
+                or 0
+            )
+            if count >= self.MAX_STRATEGIES_PER_ACCOUNT:
+                return ""
+            strategy_id = secrets.token_hex(16)
+            conn.execute(
+                table.insert().values(
+                    id=strategy_id, account_id=account_id, name=name, created_at=_iso(at)
+                )
+            )
+        return strategy_id
+
+    def list_strategies(self, account_id: str) -> list[StrategyRecord]:
+        """The account's strategies, oldest first, each with its reports oldest first."""
+        sa = self._sa
+        s, link, a = self.strategies, self.strategy_reports, self.audits
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(s.c.id, s.c.name, s.c.created_at)
+                .where(s.c.account_id == account_id)
+                .order_by(s.c.created_at, s.c.id)
+            ).all()
+            members = conn.execute(
+                sa.select(link.c.strategy_id, link.c.audit_id)
+                .select_from(link.join(a, a.c.id == link.c.audit_id))
+                .where(link.c.account_id == account_id)
+                .order_by(a.c.created_at, a.c.id)
+            ).all()
+        by_strategy: dict[str, list[str]] = {}
+        for strategy_id, audit_id in members:
+            by_strategy.setdefault(str(strategy_id), []).append(str(audit_id))
+        return [
+            StrategyRecord(
+                id=str(row[0]),
+                name=str(row[1]),
+                created_at=str(row[2]),
+                audit_ids=tuple(by_strategy.get(str(row[0]), ())),
+            )
+            for row in rows
+        ]
+
+    def get_strategy(self, account_id: str, strategy_id: str) -> StrategyRecord | None:
+        for strategy in self.list_strategies(account_id):
+            if strategy.id == strategy_id:
+                return strategy
+        return None
+
+    def file_report(
+        self, account_id: str, audit_id: str, strategy_id: str, *, at: datetime
+    ) -> bool:
+        """File a report of the account's list under one of its strategies;
+        ``strategy_id=""`` takes it out of any. ``False`` if either is not the
+        account's."""
+        sa = self._sa
+        link = self.strategy_reports
+        with self.engine.begin() as conn:
+            on_list = conn.execute(
+                sa.select(self.account_audits.c.audit_id)
+                .where(self.account_audits.c.account_id == account_id)
+                .where(self.account_audits.c.audit_id == audit_id)
+            ).first()
+            if on_list is None:
+                return False
+            if strategy_id:
+                owned = conn.execute(
+                    sa.select(self.strategies.c.id)
+                    .where(self.strategies.c.id == strategy_id)
+                    .where(self.strategies.c.account_id == account_id)
+                ).first()
+                if owned is None:
+                    return False
+            conn.execute(link.delete().where(link.c.audit_id == audit_id))
+            if strategy_id:
+                conn.execute(
+                    link.insert().values(
+                        audit_id=audit_id,
+                        strategy_id=strategy_id,
+                        account_id=account_id,
+                        added_at=_iso(at),
+                    )
+                )
+        return True
+
+    def rename_strategy(self, account_id: str, strategy_id: str, name: str) -> bool:
+        name = " ".join(name.split())[:80]
+        if not name:
+            return False
+        table = self.strategies
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.update()
+                .where((table.c.id == strategy_id) & (table.c.account_id == account_id))
+                .values(name=name)
+            )
+        return bool(result.rowcount)
+
+    def delete_strategy(self, account_id: str, strategy_id: str) -> bool:
+        """Remove a strategy; its reports stay on the account's list."""
+        table, link = self.strategies, self.strategy_reports
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.delete().where(
+                    (table.c.id == strategy_id) & (table.c.account_id == account_id)
+                )
+            )
+            if result.rowcount:
+                conn.execute(link.delete().where(link.c.strategy_id == strategy_id))
+        return bool(result.rowcount)
 
     # -- rate limits that survive a deploy ----------------------------------
     def attempt_hit(self, key: str, now: datetime, *, since: datetime) -> int:

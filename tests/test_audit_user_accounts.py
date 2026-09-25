@@ -1441,3 +1441,116 @@ def test_portuguese_visitors_get_the_account_screens_in_english(tmp_path: Path) 
     client, _, _ = _client(tmp_path)
     page = client.get("/registro?lang=pt").text
     assert "<html lang='en'" in page and "Create" in page
+
+
+# -- "Mis estrategias" -------------------------------------------------------------
+def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> None:
+    from quant_trade.audit.strategies import class_change, sharpe_change, what_changed
+
+    def result(overall: str, low: float, high: float, dims: dict[str, str]) -> dict:
+        band = {
+            "p5": {"value": low, "evidence": "MEASURED"},
+            "p95": {"value": high, "evidence": "MEASURED"},
+        }
+        return {
+            "inputs": {"periods_per_year": 252},
+            "verdict": {
+                "overall": overall,
+                "dimensions": [{"name": k, "status": v} for k, v in dims.items()],
+            },
+            "bootstrap": {"sharpe_per_period": band},
+            "performance": {"sharpe": {"value": (low + high) * 8, "evidence": "MEASURED"}},
+        }
+
+    assert class_change("C", "B") == "better" and class_change("A", "B") == "worse"
+    old = result("C", 0.02, 0.06, {"statistical_significance": "WEAK", "costs": "NOT_MEASURED"})
+    overlap = result("B", 0.05, 0.09, {"statistical_significance": "PASS", "costs": "PASS"})
+    apart = result("B", 0.07, 0.11, {"statistical_significance": "PASS"})
+    assert sharpe_change(old, overlap) == "unclear"
+    assert sharpe_change(old, apart) == "better" and sharpe_change(apart, old) == "worse"
+    daily_vs_hourly = dict(apart, inputs={"periods_per_year": 6048})
+    assert sharpe_change(old, daily_vs_hourly) == "different_frequency"
+    lines = dict(what_changed(old, overlap, "es"))
+    assert lines["Clase: C → B"] == "mejor"
+    assert any(word == "sin cambio claro" for word in lines.values())
+    # A dimension that was not measured before is not called better.
+    assert not any(k.startswith("Costes") for k in lines)
+
+
+def test_a_strategy_groups_versions_and_says_what_changed(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    ids = []
+    for seed in (1, 2, 3):
+        files = {"equity": ("e.csv", csv_bytes(positive_drift(500, seed=seed)), "text/csv")}
+        answer = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
+        ids.append(_audit_id(answer.headers["location"]))
+    for audit_id in ids[:2]:
+        store.mark_paid(audit_id, stripe_session_id=f"cs_{audit_id}", at=NOW)  # type: ignore[attr-defined]
+    page = client.get("/cuenta").text
+    assert "Mis estrategias" in page and "Guardar un informe en una estrategia" in page
+    csrf = _csrf(page)
+    first = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": ids[0], "strategy": "new", "name": "EA Oro", "csrf": csrf},
+        follow_redirects=False,
+    )
+    where = first.headers["location"]
+    assert where.startswith("/cuenta/estrategias/")
+    strategy_id = where.rsplit("/", 1)[1]
+    for audit_id in ids[1:]:
+        client.post(
+            "/cuenta/estrategias/guardar",
+            data={"audit_id": audit_id, "strategy": strategy_id, "csrf": csrf},
+            follow_redirects=False,
+        )
+    view = client.get(where).text
+    assert "EA Oro" in view and "<td>v1</td>" in view and "<td>v3</td>" in view
+    assert "Qué cambió frente a la versión 1" in view
+    assert f"/cuenta/comparar?id={ids[0]}&amp;id={ids[1]}" in view
+    # v3 is a locked preview: only its class change, no per-test detail.
+    assert "las dos versiones tienen que ser informes completos" in view
+    assert not find_claims(re.sub(r"<[^>]+>", " ", view))
+    assert "EA Oro" in client.get("/cuenta").text
+    # English page and rename.
+    assert "My strategies" in client.get("/account").text
+    assert "What changed against version 1" in client.get(f"/account/strategies/{strategy_id}").text
+    client.post(f"{where}/nombre", data={"name": "EA Oro v2", "csrf": csrf})
+    assert "EA Oro v2" in client.get(where).text
+    # Removing a version keeps the report on the list.
+    client.post(f"{where}/quitar", data={"audit_id": ids[2], "csrf": csrf})
+    assert "<td>v3</td>" not in client.get(where).text
+    # Deleting the strategy keeps every report.
+    client.post(f"{where}/borrar", data={"csrf": csrf}, follow_redirects=False)
+    assert client.get(where).status_code == 404
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert len(store.account_audits_list(account.id)) == 3  # type: ignore[attr-defined]
+
+
+def test_strategies_stay_inside_their_account(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, "one@example.com")
+    mine = _audit_id(_upload(client).headers["location"])
+    csrf = _csrf(client.get("/cuenta").text)
+    where = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": mine, "strategy": "new", "name": "Mía", "csrf": csrf},
+        follow_redirects=False,
+    ).headers["location"]
+    other = TestClient(client.app)
+    _signup(other, "two@example.com")
+    assert other.get(where).status_code == 404
+    other_csrf = _csrf(other.get("/cuenta").text)
+    # Someone else's report cannot be filed, and someone else's strategy cannot be touched.
+    bad = other.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": mine, "strategy": "new", "name": "Robo", "csrf": other_csrf},
+        follow_redirects=False,
+    )
+    assert "error=file_bad" in bad.headers["location"]
+    assert other.post(f"{where}/borrar", data={"csrf": other_csrf}).status_code == 404
+    assert client.get(where).status_code == 200
+    # Deleting the account removes its strategies.
+    account = store.find_account("one@example.com")  # type: ignore[attr-defined]
+    store.delete_account(account.id)  # type: ignore[attr-defined]
+    assert store.list_strategies(account.id) == []  # type: ignore[attr-defined]

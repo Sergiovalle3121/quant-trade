@@ -8,13 +8,14 @@ site's shell (``pages._page``) so the redesign styles them with the rest.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 from quant_trade.audit.seo import BRAND
-from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord
+from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord, StrategyRecord
 from quant_trade.audit.theme import CLASS_COLOURS, icon
 
 #: Spanish paths are the default; English paths show the same page in English.
@@ -1044,6 +1045,7 @@ def account_page(
     free_limit: int = 0,
     welcome: str = "",
     retention_days: int = 30,
+    strategies: Sequence[StrategyRecord] = (),
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -1178,6 +1180,7 @@ def account_page(
         # Without credits, how to get more comes before the list.
         + (buy if credits == 0 else "")
         + reports
+        + strategies_section(locale=locale, csrf=csrf, strategies=strategies, audits=audits)
         + codes_html
         + (buy if credits > 0 else "")
         + purchases
@@ -1270,3 +1273,207 @@ __all__ = [
     "signin_page",
     "signup_page",
 ]
+
+
+# -- "Mis estrategias" -------------------------------------------------------------
+def strategies_path(locale: str) -> str:
+    return path("account", locale) + ("/strategies" if _locale(locale) == "en" else "/estrategias")
+
+
+def strategies_section(
+    *,
+    locale: str,
+    csrf: str,
+    strategies: Sequence[StrategyRecord],
+    audits: Sequence[AccountAudit],
+) -> str:
+    """The "My strategies" block on the account page: the list and the filing form."""
+    from quant_trade.audit.strategies import COPY as SCOPY
+
+    locale = _locale(locale)
+    copy = SCOPY[locale]
+    by_id = {item.audit_id: item for item in audits}
+    base = strategies_path(locale)
+    if strategies:
+        items = []
+        for strategy in strategies:
+            count = len(strategy.audit_ids)
+            versions = copy["version_one"] if count == 1 else copy["versions"].format(n=count)
+            latest = by_id.get(strategy.audit_ids[-1]) if strategy.audit_ids else None
+            badge = _class_badge(latest.overall_class) if latest is not None else ""
+            items.append(
+                f"<li class='acct-card strat-item'>{badge}<div><b>{_e(strategy.name)}</b>"
+                f"<span class='muted'> · {_e(versions)}</span></div>"
+                f"<a class='btn btn-ghost btn-sm' href='{base}/{_e(strategy.id)}'>"
+                f"{_e(copy['open'])}</a></li>"
+            )
+        listing = f"<ul class='strat-list'>{''.join(items)}</ul>"
+    else:
+        listing = f"<p class='muted'>{_e(copy['none'])}</p>"
+    usable = [item for item in audits if not item.purged]
+    if usable:
+        report_options = "".join(
+            f"<option value='{_e(item.audit_id)}'>{_e(_date(item.created_at))} · "
+            f"{_e(item.overall_class)} · "
+            f"{_e(_safe_text(item.description)[:60] if item.description else item.audit_id[:8])}"
+            "</option>"
+            for item in usable
+        )
+        strategy_options = (
+            "".join(
+                f"<option value='{_e(strategy.id)}'>{_e(strategy.name)}</option>"
+                for strategy in strategies
+            )
+            + f"<option value='new'>{_e(copy['new_strategy'])}</option>"
+        )
+        form = (
+            f"<form class='acct-card strat-file' method='post' action='{base}/guardar'>"
+            f"<h3>{_e(copy['file_title'])}</h3>"
+            + _hidden("csrf", csrf)
+            + _field(copy["report"], f"<select name='audit_id' required>{report_options}</select>")
+            + _field(copy["strategy"], f"<select name='strategy'>{strategy_options}</select>")
+            + _field(
+                copy["new_name"],
+                "<input type='text' name='name' maxlength='80' autocomplete='off'>",
+                copy["new_name_help"],
+            )
+            + f"<button class='btn btn-dark' type='submit'>{_e(copy['file_button'])}</button>"
+            "</form>"
+        )
+    else:
+        form = f"<p class='muted'>{_e(copy['no_reports'])}</p>"
+    return (
+        f"<section class='acct-sec' id='estrategias'><h2>{_e(copy['section_title'])}</h2>"
+        f"<p class='muted'>{_e(copy['section_lead'])}</p>{listing}{form}</section>"
+    )
+
+
+def strategy_page(
+    *,
+    locale: str,
+    csrf: str,
+    strategy: StrategyRecord,
+    versions: Sequence[tuple[AccountAudit, dict[str, Any] | None]],
+    free_mode: bool = False,
+) -> str:
+    """One strategy: its versions oldest first, and what changed at each step."""
+    from quant_trade.audit.strategies import COPY as SCOPY
+    from quant_trade.audit.strategies import figures_text, headline, what_changed
+
+    locale = _locale(locale)
+    copy = SCOPY[locale]
+    base = f"{strategies_path(locale)}/{strategy.id}"
+    head = "".join(
+        f"<th>{_e(copy[k])}</th>"
+        for k in ("col_version", "col_date", "col_class", "col_sharpe", "col_dsr", "col_dd")
+    )
+    rows = []
+    blocks = []
+    previous: tuple[AccountAudit, dict[str, Any] | None] | None = None
+    for number, (item, result) in enumerate(versions, start=1):
+        full = comparable(item, free_mode=free_mode) and result is not None
+        if full and result is not None:
+            cells = "".join(f"<td>{_e(text)}</td>" for text in figures_text(headline(result)))
+        else:
+            cells = (
+                f"<td colspan='3'><span class='acct-tag'>{_e(copy['locked'])}</span> "
+                f"<a href='{_e(report_href(item.audit_id, locale))}'>{_e(copy['unlock'])}</a>"
+                "</td>"
+            )
+        remove = (
+            f"<form method='post' action='{base}/quitar'>"
+            + _hidden("csrf", csrf)
+            + _hidden("audit_id", item.audit_id)
+            + f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['remove'])}</button>"
+            "</form>"
+        )
+        rows.append(
+            f"<tr><td>v{number}</td><td>{_e(_date(item.created_at))}</td>"
+            f"<td><a href='{_e(report_href(item.audit_id, locale))}'>"
+            f"{_class_badge(item.overall_class)}</a></td>{cells}<td>{remove}</td></tr>"
+        )
+        if previous is not None:
+            prev_item, prev_result = previous
+            title = copy["changed_title"].format(n=number - 1)
+            prev_full = comparable(prev_item, free_mode=free_mode) and prev_result is not None
+            if full and prev_full and prev_result is not None and result is not None:
+                lines = what_changed(prev_result, result, locale)
+                items = "".join(
+                    f"<li><span>{_e(what)}</span> <b>{_e(word)}</b></li>" for what, word in lines
+                )
+                compare_href = (
+                    f"{path('account', locale)}/comparar?id={prev_item.audit_id}"
+                    f"&amp;id={item.audit_id}"
+                )
+                blocks.append(
+                    f"<div class='acct-card strat-change'><h3>v{number}: {_e(title)}</h3>"
+                    f"<ul>{items}</ul><p><a class='btn btn-ghost btn-sm' href='{compare_href}'>"
+                    f"{_e(copy['side_by_side'])}</a></p></div>"
+                )
+            else:
+                text = copy["changed_locked"].format(
+                    a=prev_item.overall_class, b=item.overall_class
+                )
+                blocks.append(
+                    f"<div class='acct-card strat-change'><h3>v{number}: {_e(title)}</h3>"
+                    f"<p>{_e(text)}</p></div>"
+                )
+        previous = (item, result)
+    if rows:
+        table = (
+            "<div class='acct-scroll'><table class='acct-table strat-table'>"
+            f"<thead><tr>{head}<th></th></tr></thead><tbody>{''.join(rows)}</tbody>"
+            "</table></div>"
+        )
+    else:
+        table = f"<p class='muted'>{_e(copy['empty'])}</p>"
+    manage = (
+        "<div class='acct-grid strat-manage'>"
+        f"<form class='acct-card' method='post' action='{base}/nombre'>"
+        f"<h3>{_e(copy['rename'])}</h3>"
+        + _hidden("csrf", csrf)
+        + _field(
+            copy["name_label"],
+            f"<input type='text' name='name' required maxlength='80' value='{_e(strategy.name)}'>",
+        )
+        + f"<button class='btn btn-dark' type='submit'>{_e(copy['rename_button'])}</button></form>"
+        f"<form class='acct-card acct-danger' method='post' action='{base}/borrar'>"
+        f"<h3>{_e(copy['delete'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
+        + _hidden("csrf", csrf)
+        + f"<button class='btn btn-ghost' type='submit'>{_e(copy['delete'])}</button></form>"
+        "</div>"
+    )
+    back = (
+        f"<p><a class='btn btn-ghost' href='{path('account', locale)}#estrategias'>"
+        f"{_e(copy['back'])}</a></p>"
+    )
+    body = (
+        table
+        + "".join(blocks)
+        + f"<p class='muted'>{_e(copy['note'])}</p>"
+        + manage
+        + back
+        + f"<style>{STRATEGY_CSS}</style>"
+    )
+    other = "en" if locale == "es" else "es"
+    return _shell(
+        locale,
+        strategy.name,
+        copy["page_lead"],
+        body,
+        switch=f"{strategies_path(other)}/{strategy.id}",
+    )
+
+
+STRATEGY_CSS = """
+.strat-list{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:10px}
+.strat-item{display:flex;gap:14px;align-items:center;padding:14px 18px}
+.strat-item>div{flex:1;min-width:0}
+.strat-file{max-width:560px}
+.strat-file select,.strat-file input{width:100%}
+.strat-change{margin:14px 0}
+.strat-change ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.strat-change h3{margin:0 0 10px;font-size:1rem}
+.strat-manage{margin-top:28px}
+.strat-table td form{margin:0}
+"""
