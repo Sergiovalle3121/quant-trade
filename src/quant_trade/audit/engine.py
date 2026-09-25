@@ -33,6 +33,7 @@ from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import decay as decay_lib
 from quant_trade.audit import forward as forward_lib
+from quant_trade.audit import instruments as instruments_lib
 from quant_trade.audit import live as live_lib
 from quant_trade.audit import plateau as plateau_lib
 from quant_trade.audit import sizing as sizing_lib
@@ -948,6 +949,13 @@ def run_audit(
         if inputs.trades is not None
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
+    instruments = (
+        instruments_lib.instrument_review(
+            inputs.trades.trades, inputs.trade_symbols, inputs.trades.fees
+        )
+        if inputs.trades is not None
+        else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    )
     live = (
         live_lib.compare_live(
             inputs.trades,
@@ -1125,6 +1133,7 @@ def run_audit(
         forward=forward,
         recent=recent,
         behaviour=behaviour,
+        instruments=instruments,
         vendor_questions=questions,
     )
 
