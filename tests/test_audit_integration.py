@@ -24,7 +24,7 @@ from typer.testing import CliRunner
 from quant_trade.audit import redflags
 from quant_trade.audit.engine import WITHHELD_TEXT, run_audit, trial_count
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.prop_presets import DEFAULT_PRESET
+from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET
 from quant_trade.audit.report import render, render_html
 from quant_trade.audit.schema import (
     SCHEMA_VERSION,
@@ -338,7 +338,7 @@ def test_the_full_report_has_charts_explanations_and_print(locale: str) -> None:
     assert heading in html_text
     challenge_title = "Simulador de reto" if locale == "es" else "Prop-firm challenge simulator"
     assert challenge_title in html_text
-    assert "ftmo.com" not in html_text or "2026-09-24" in html_text
+    assert "ftmo.com" not in html_text or AS_OF in html_text
     assert find_claims(html_text) == []
 
 
@@ -411,7 +411,7 @@ def test_cli_lists_presets_with_source_and_date() -> None:
     assert result.exit_code == 0, result.output
     assert DEFAULT_PRESET in result.output
     assert "ftmo-2step-phase1" in result.output
-    assert "2026-09-24" in result.output
+    assert AS_OF in result.output
 
 
 def test_mt5_commission_is_measured_not_replaced_by_the_zero_cost_assumption() -> None:

@@ -199,3 +199,31 @@ def test_every_starting_balance_source_reads_in_spanish() -> None:
     for source, spanish_source in _INITIAL_SOURCES.items():
         text = localize(f"initial balance 1,000.00 taken from {source}", "es")
         assert text == f"balance inicial 1,000.00 tomado de {spanish_source}"
+
+
+def test_undeclared_trials_read_as_the_most_favourable_case() -> None:
+    from quant_trade.audit.verdict import _TEXT, MULTIPLICITY, summary
+
+    for locale in ("es", "en"):
+        for status in ("PASS", "WEAK", "FAIL"):
+            assert f"{MULTIPLICITY}.{status}.undeclared" in _TEXT[locale]
+    result = run_audit(
+        _inputs(DeclaredMetadata(trials_declared=False)),
+        now=NOW,
+        audit_id="t9",
+        bootstrap_samples=50,
+    )
+    assert result.multiplicity["trials_used"]["evidence"] == "NOT_MEASURED"
+    for locale, phrase in (
+        ("es", "No se declaró cuántas configuraciones"),
+        ("en", "number of configurations tried was not declared"),
+    ):
+        text = summary(
+            result.verdict.dimensions,
+            result.verdict.overall,
+            locale=locale,
+            trials=1,
+            trials_evidence="NOT_MEASURED",
+        )
+        assert phrase in text and "supuesto" not in text and "assumed" not in text
+        assert find_claims(text) == []

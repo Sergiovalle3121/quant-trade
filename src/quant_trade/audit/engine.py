@@ -180,6 +180,10 @@ def _significance(returns: pd.Series) -> tuple[dict[str, Any], dict[str, float] 
     return section, {**moments, "psr": psr}
 
 
+#: The trial count when the client declares none and no file shows one.
+UNDECLARED_TRIALS = "not declared; computed with 1, the most favourable case"
+
+
 def trial_count(inputs: AuditInputs) -> tuple[int, str, str]:
     """The trial count the deflated Sharpe uses, its evidence and its source.
 
@@ -191,7 +195,7 @@ def trial_count(inputs: AuditInputs) -> tuple[int, str, str]:
     best = (
         (inputs.declared.trials, DECLARED, "declared by the client")
         if inputs.declared.trials_declared
-        else (1, NOT_MEASURED, "not declared; 1 assumed")
+        else (1, NOT_MEASURED, UNDECLARED_TRIALS)
     )
     measured_counts = [
         (inputs.optimization_passes, "passes in the MT5 optimisation export"),
@@ -877,7 +881,7 @@ def run_audit(
             "trials": (
                 declared(inputs.declared.trials)
                 if inputs.declared.trials_declared
-                else not_measured("not declared; 1 assumed")
+                else not_measured(UNDECLARED_TRIALS)
             ),
             "cost_bps_per_side": declared(inputs.declared.cost_bps_per_side),
             "oos_start": declared(_iso(oos)) if oos is not None else not_measured("not declared"),

@@ -59,6 +59,10 @@ _INITIAL_SOURCES: dict[str, str] = {
 
 #: Where the number of trials comes from (``engine._trials_used``).
 _TRIAL_SOURCES: dict[str, str] = {
+    "not declared; computed with 1, the most favourable case": (
+        "sin declarar; se calcula con 1, el caso más favorable"
+    ),
+    "not declared; 1 assumed": "sin declarar; se calcula con 1, el caso más favorable",
     "declared by the client": "declarado por el cliente",
     "passes in the MT5 optimisation export": "pasadas de la exportación de optimización de MT5",
     "columns of the uploaded variants matrix": "columnas de la matriz de variantes subida",
@@ -672,6 +676,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Stop-out fijo al 6 %: lo indica el blog de The5ers, no la página de reglas.",
     ),
     ("No minimum days; unlimited time.", "Sin mínimo de días; tiempo ilimitado."),
+    (
+        "The rules page table asks for 3 days that close in gain, while its text says there "
+        "is no minimum days requirement; the simulator uses none (optimistic if the table "
+        "applies).",
+        "La tabla de la página de reglas pide 3 días que cierren en ganancia, pero su texto dice "
+        "que no hay mínimo de días; el simulador no aplica ninguno (optimista si rige la tabla).",
+    ),
+    ("Unlimited time.", "Tiempo ilimitado."),
     (
         "No daily limit during the evaluation steps; static loss stated on The5ers' blog.",
         "Sin límite diario en las fases de evaluación; la pérdida fija la indica el blog "

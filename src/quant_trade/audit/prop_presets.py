@@ -85,7 +85,7 @@ class ChallengeRules:
 
 DEFAULT_PRESET = "generic-2step-phase1"
 
-AS_OF = "2026-09-24"
+AS_OF = "2026-09-25"
 
 FTMO_URL = "https://ftmo.com/en/trading-objectives/"
 FTMO_TIME_URL = "https://ftmo.com/en/faq/how-long-does-it-take-to-become-an-ftmo-trader/"
@@ -341,7 +341,10 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
             "The 3 % daily limit suspends trading for the day instead of ending the account; "
             "not simulated.",
             "Static stop-out at 6 %: stated on The5ers' blog, not on the rules page.",
-            "No minimum days; unlimited time.",
+            "The rules page table asks for 3 days that close in gain, while its text says there "
+            "is no minimum days requirement; the simulator uses none (optimistic if the table "
+            "applies).",
+            "Unlimited time.",
         ),
         source_url=THE5ERS_HYPER_GROWTH_URL,
         as_of=AS_OF,
