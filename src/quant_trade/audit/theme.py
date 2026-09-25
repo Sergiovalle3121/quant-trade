@@ -906,6 +906,12 @@ color:#fff;font-variant-numeric:tabular-nums}
 .paybox.buy .btn{gap:10px}.paybox.buy .btn svg{width:18px;height:18px;flex:none}
 .pay-secure{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;font-size:.85rem}
 .pay-secure svg{width:15px;height:15px;flex:none;margin-top:3px}
+.buy-incl,.lockbox .buy-incl{flex:1 1 100%;list-style:none;margin:2px 0 0;padding:16px 0 0;border-top:1px solid var(--border-2);
+display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px}
+.lockbox .buy-incl li::before{content:none}
+.lockbox .buy-incl li{padding:0;display:flex;gap:9px;align-items:flex-start;color:var(--text-2);font-size:.88rem;line-height:1.45}
+.buy-incl svg{width:15px;height:15px;flex:none;margin-top:2px;color:#4ade80}
+@media (max-width:620px){.buy-incl,.lockbox .buy-incl{grid-template-columns:minmax(0,1fr)}}
 .paybox.pay-alt{padding:14px 18px}
 .pay-alt a{display:inline-flex;align-items:center;gap:10px;color:var(--text-2);font-weight:500;text-decoration:none}
 .pay-alt a:hover{color:#fff}

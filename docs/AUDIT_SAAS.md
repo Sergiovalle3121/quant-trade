@@ -1019,6 +1019,10 @@ The card names the upload field, states the problem in one line and lists the
 expected formats under "Se espera" / "Expected". When the account review or the
 test-data review finds nothing, its closing line is a green-edged callout.
 
+Every buy box on a locked report, whether card payments are on or not, ends
+with four checks listing what the payment unlocks: every figure, the PDF, the
+public verification page and the refund when the report misreads the file.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
