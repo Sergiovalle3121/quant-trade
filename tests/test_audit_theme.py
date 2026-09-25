@@ -107,3 +107,9 @@ def test_long_pages_have_an_index_that_links_every_section(tmp_path: Path) -> No
         links = re.findall(r"<li><a href='#(s\d+)'>", page)
         assert headings and headings == links, path
         assert find_claims(page) == []
+
+
+def test_the_class_range_never_breaks_across_lines() -> None:
+    assert "A a D." in landing(locale="es")
+    assert "A to D." in landing(locale="en")
+    assert "@media (max-width:620px){.statement{" in STYLE

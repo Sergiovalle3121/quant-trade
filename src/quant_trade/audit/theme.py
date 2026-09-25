@@ -403,6 +403,7 @@ transition:color .3s}
 .platforms li:hover{color:var(--text)}
 .statement{font-size:clamp(1.6rem,3.2vw,2.6rem);font-weight:560;letter-spacing:-.034em;
 line-height:1.22;max-width:1000px;margin:0 0 clamp(56px,7vw,96px);color:var(--text)}
+@media (max-width:620px){.statement{font-size:1.28rem;line-height:1.35;letter-spacing:-.02em}}
 @supports (animation-timeline:view()){
 .js .statement{color:transparent;background:linear-gradient(180deg,var(--text) 50%,
 color-mix(in srgb,var(--text) 22%,transparent) 50%) 0 100%/100% 200% no-repeat;
