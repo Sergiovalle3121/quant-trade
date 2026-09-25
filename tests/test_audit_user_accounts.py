@@ -389,7 +389,9 @@ def test_a_card_pack_bought_from_an_account_report_lands_on_it(tmp_path: Path) -
         "id": "cs_test_1",
         "payment_status": "paid",
         "livemode": True,
-        "metadata": {"audit_id": "a2", "plan": "pack"},
+        "currency": "usd",
+        "amount_total": settings.pack_price_usd_cents,
+        "metadata": {"audit_id": "a2", "plan": "pack", "app": "rigor"},
     }
     assert fulfil(store, settings, session, at=NOW) == "a2"
     code_id = store.code_id(pack_code("whsec_x", "cs_test_1"))
