@@ -158,6 +158,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "(vacío = 0)"
         ),
         "oos_start": "Inicio del tramo fuera de muestra (opcional)",
+        "net_of_fees": (
+            "Son rentabilidades de un fondo, ya netas de sus comisiones (solo historial mensual)"
+        ),
         "benchmark_applicable": "¿Aplica un benchmark?",
         "yes": "Sí",
         "no": "No",
@@ -390,6 +393,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "(blank = 0)"
         ),
         "oos_start": "Out-of-sample start (optional)",
+        "net_of_fees": (
+            "These are a fund's returns, already net of its fees (monthly track record only)"
+        ),
         "benchmark_applicable": "Does a benchmark apply?",
         "yes": "Yes",
         "no": "No",
@@ -1691,6 +1697,8 @@ def _upload_form(
             "<input type='number' name='initial_balance' min='0' step='0.01'>",
         )
         + "</div>"
+        + "<label class='check'><input type='checkbox' name='net_of_fees' value='on'>"
+        + f"<span>{_e(copy['net_of_fees'])}</span></label>"
         + _field(
             copy["description"],
             "<textarea name='description' rows='3' maxlength='2000'></textarea>",

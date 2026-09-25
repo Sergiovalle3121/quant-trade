@@ -757,6 +757,17 @@ month, the deepest fall and the longest run of months below a previous high
   normal reference, made honest US market windows (2000-2024) fire; at half
   a deviation no 5, 10 or 20-year window of the US market since 1927 does.
 
+Net of fees (DECLARED). A fund's returns are its own figures after its
+fees, so the upload form has a box for it ("Son rentabilidades de un fondo,
+ya netas de sus comisiones"). It is honoured only for a fund track record: a
+hand-made return or NAV file (or factsheet table) at 13 or fewer periods a
+year, with no trades, platform report or live history (`engine.fund_record`).
+There it drops `ZERO_DECLARED_COSTS`, the section shows the declaration as
+DECLARED and says Rigor did not measure costs, and the report is titled
+"Auditoría de historial de fondo". Anywhere else the box is ignored with a
+warning and costs are checked as usual. The observation thresholds do not
+change, and the costs dimension stays NOT_MEASURED.
+
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are
