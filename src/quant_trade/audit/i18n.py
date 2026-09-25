@@ -169,6 +169,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("{n} position(s) never closed; excluded", "{n} posición(es) nunca se cerraron; quedan fuera"),
     (
+        "{n} repeated row(s) (the same position listed twice) counted once",
+        "{n} fila(s) repetida(s) (la misma posición listada dos veces) se contaron una sola vez",
+    ),
+    (
         "{n} credit row(s) excluded: broker credit is not the trader's balance",
         "se excluyeron {n} fila(s) de crédito: el crédito del bróker no es balance del trader",
     ),
@@ -1386,6 +1390,10 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} trade(s) closed by the tester at the end of the test": (
         "{n} trade closed by the tester at the end of the test",
         "el probador cerró {n} operación al final de la prueba",
+    ),
+    "{n} repeated row(s) (the same position listed twice) counted once": (
+        "{n} repeated row (the same position listed twice) counted once",
+        "{n} fila repetida (la misma posición listada dos veces) se contó una sola vez",
     ),
     "{n} position(s) opened in the report were not closed; excluded": (
         "{n} position opened in the report was not closed; excluded",

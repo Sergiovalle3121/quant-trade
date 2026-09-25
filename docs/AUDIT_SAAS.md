@@ -148,6 +148,12 @@ gets `universal_close_time_only`: without opening times holding time and
 entry timing cannot be measured, so it asks for the executions export (Bybit
 Trade History) instead. A `Contracts` column names the instrument when no
 symbol column exists and `Exec Qty` is the size.
+Rows repeated in every column are counted once when the table has an id
+column (Position, Ticket, Order, ID, Trade number...), as when two exports
+are pasted together (`universal.drop_repeated_rows`, for the universal reader
+and every delimited named format); the report says how many. Rows that share
+an id but differ (partial closes) are all kept, and a table without an id
+keeps identical rows, since two identical fills can be real.
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
 Platform exports the universal reader is checked against
