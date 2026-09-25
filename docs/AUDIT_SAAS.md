@@ -574,6 +574,27 @@ and report wire them in during the integration step):
   Calendar time limits become business days at 5/7. Daily data cannot see
   intraday floating drawdown, so the estimate is optimistic; fixed notes in
   Spanish and English say so, and that it is not a prediction.
+  A preset with a best-day (consistency) rule (`best_day_limit`,
+  `best_day_basis`: FTMO 1-Step, best day at most 50 % of the positive days'
+  gain; Topstep, best day at most 55 % of the profit target) is checked at
+  the pass on daily closes: `best_day.pass_within` is the share of all paths
+  that pass with the best day inside the rule, and `breach_share_of_passes`
+  the share of passes that break it. The report says it in one line: many
+  refused payouts come from this rule.
+- `firmfit.firm_fit` ("¿Con qué firma encaja tu historial?"): every
+  published preset (never the generic one) on the same resampled paths and
+  seed, 2,000 paths each, grouped by firm and program. A program's pass
+  chance is the product of its phases' (phases taken as fresh starts; The5ers
+  Bootcamp counts its preset three times), with the same product within the
+  best-day rule when a phase has one, and the weakest phase's main failure.
+  Ranked by the figure that matters for a payout (within the best-day rule
+  where the firm has one), ties by name. Figures read "≥99%" at the top.
+  When every program is at or above 99 % or at or below 1 %, the table
+  gives way to one sentence (and, for all failing, the most common reason).
+  A program where no path fails reads "Nothing in the simulations". When
+  the balance hides open losses, the table repeats that its figures are
+  optimistic. MEASURED under the simulator's assumptions; it compares rules
+  and never recommends buying a challenge. No class change.
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
