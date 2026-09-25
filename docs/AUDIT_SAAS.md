@@ -671,6 +671,10 @@ No red flag and no class change: each finding is a question to ask.
 Limitations: instruments are compared by net money at the file's own sizes,
 so a pair traded at larger size weighs more; a few instruments with few
 trades each say little on their own.
+Instrument names come from the file, so a name the profit-claim guard
+refuses (here and in the live comparison's new-symbols note) is shown as
+withheld promotional wording, like report metadata, instead of stopping the
+audit with an error page.
 
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
