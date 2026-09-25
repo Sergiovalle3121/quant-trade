@@ -25,7 +25,7 @@ from quant_trade.audit.account import is_account_history
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
-from quant_trade.audit.legal import legal_links_html
+from quant_trade.audit.legal import LINK_TEXT, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
@@ -3434,15 +3434,24 @@ def render_html(
         anchor = f" id='{_e(key)}'" if key else ""
         return f"<section class='rsec'{anchor}><h2>{_e(title)}</h2>{content}</section>"
 
+    links = [
+        f"<a class='no-print' href='{_e(method_url(locale))}'>"
+        f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a>"
+    ]
+    if legal_links:
+        links += [
+            f"<a href='{_e(legal_url(kind, locale))}'>{_e(LINK_TEXT[locale][kind])}</a>"
+            for kind in ("terms", "privacy")
+        ]
     footer = (
         "<div class='report-foot'>"
         f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>"
-        f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>"
-        + (legal_links_html(locale) if legal_links else "")
-        + f"<p class='muted no-print'><a href='{_e(method_url(locale))}'>"
-        f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a></p>"
-        + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
+        f"<p class='rf-sha'><span>{_e(labels['json_sha'])}</span>"
+        f"<code>{_e(result_sha256(result))}</code></p>"
+        "<div class='rf-bar'>"
+        f"<p class='rf-brand'><b>{_e(BRAND)}</b> · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p>"
+        f"<nav class='rf-links'>{''.join(links)}</nav></div></div>"
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     reading_html = _reading_html(data, labels)

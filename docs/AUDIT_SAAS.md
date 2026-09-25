@@ -1215,6 +1215,10 @@ Very large figures stay on the page: chart axes switch to T and then to powers o
 
 In the full report the red flags are cards, gravest first: severity badge, the flag's name in the customer's language, the detail as a sentence and the code in small type underneath (the old three-column table cut the detail off on phones). The "No medido" / "Not measured" list is one card with each check's name in bold over its reason. A not-measured section no longer adds "none" under its reason, the declared holdout seal names its rows in plain words, and a declared midnight date shows as the day (2024-06-03, not 2024-06-03T00:00:00Z). In the PDF a huge figure (95,766,086,888,191,808.00%) wraps inside its table cell instead of running off the page; label columns keep whole words.
 
+The report ends with one tidy footer: the notice card, the audit JSON fingerprint in small monospace type, then a single bar with the brand on the left and "Cómo auditamos", terms and privacy on the right (in the PDF the method link is dropped and the other two sit on one line).
+
+The landing's report mockup always settles flat and sharp: the hero clips with `overflow:clip` so the scroll-driven tilt follows the page scroll (with `overflow:hidden` the hero became its scroller and the mockup stayed tilted and soft), and the entrance fade no longer animates a blur. With reduced motion the mockup is flat from the start.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
