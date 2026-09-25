@@ -689,8 +689,11 @@ def test_guesses_spread_over_many_addresses_hit_the_per_email_ceiling(tmp_path: 
     for n in range(MAX_FAILED_SIGNINS_PER_EMAIL):
         ip = f"198.18.{n // 5}.{n % 5 + 1}"
         assert _signin(client, "w@example.com", "otra frase distinta", ip=ip).status_code == 401
-    # Past the ceiling even the right password waits, from any address.
-    assert _signin(client, "w@example.com", ip="192.0.2.77").status_code == 429
+    # Past the ceiling an address that already failed gets one more try, then waits.
+    assert _signin(client, "w@example.com", "otra frase más", ip="198.18.0.1").status_code == 401
+    assert _signin(client, "w@example.com", "otra frase más", ip="198.18.0.1").status_code == 429
+    # The owner, from an address with no failures on this e-mail, is not locked out.
+    assert _signin(client, "w@example.com", ip="192.0.2.77").status_code == 303
 
 
 def test_sign_ups_stop_at_the_limit_exactly(tmp_path: Path) -> None:
@@ -1250,3 +1253,76 @@ def test_the_public_compare_page_points_a_signed_in_visitor_to_their_list(
         assert words in page and f"href='{href}'" in page
         assert not find_claims(re.sub(r"<[^>]+>", " ", page))
     assert "id='informes'" in client.get("/cuenta").text
+
+
+# -- hardening before launch -------------------------------------------------------
+def test_a_stranger_who_knows_the_email_cannot_lock_the_owner_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "MAX_FAILED_SIGNINS_PER_EMAIL", 3)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client, "owner@example.com")
+    client.cookies.clear()
+    for n in range(4):
+        _signin(client, "owner@example.com", "wrong password here", ip=f"203.0.113.{n}")
+    # The attacker's address that already failed gets one more try past the
+    # ceiling, then is stopped...
+    assert (
+        _signin(client, "owner@example.com", "wrong again!!", ip="203.0.113.1").status_code == 401
+    )
+    blocked = _signin(client, "owner@example.com", "wrong password again", ip="203.0.113.1")
+    assert blocked.status_code == 429
+    # ...but the owner, from a network with no failures, still signs in.
+    owner = _signin(client, "owner@example.com", ip="198.51.100.9")
+    assert owner.status_code == 303
+
+
+def test_sign_in_limits_survive_a_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "MAX_FAILED_SIGNINS_PER_HOUR", 2)
+    settings = _settings(tmp_path, trusted_proxy_hops=1)
+    store = make_store(settings.database_url)
+    first = TestClient(create_app(settings, store))
+    _signup(first, "kept@example.com")
+    first.cookies.clear()
+    for _ in range(2):
+        _signin(first, "kept@example.com", "wrong password here", ip="203.0.113.7")
+    # A deploy: a new app on the same database keeps the count.
+    again = TestClient(create_app(settings, make_store(settings.database_url)))
+    assert _signin(again, "kept@example.com", ip="203.0.113.7").status_code == 429
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        keys = [
+            row[0]
+            for row in conn.execute(
+                store.attempts.select().with_only_columns(store.attempts.c.key_sha256)
+            )
+        ]  # type: ignore[attr-defined]
+    assert keys and all("@" not in key and "203.0" not in key for key in keys)
+
+
+def test_an_upload_posted_from_another_site_is_refused(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    files = {"equity": ("e.csv", csv_bytes(positive_drift(300)), "text/csv")}
+    for header in (
+        {"Origin": "https://evil.up.railway.app"},
+        {"Origin": "null"},
+        {"Referer": "https://evil.example/page"},
+    ):
+        answer = client.post(
+            "/audits", files=files, data={"consent": "on"}, headers=header, follow_redirects=False
+        )
+        assert answer.status_code == 403, header
+        assert "no viene del formulario de este sitio" in answer.text
+    # The site's own form (same Origin) and scripts with no Origin still reach the gate.
+    same = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on"},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert same.status_code == 401
+    assert client.post("/audits", files=files, data={"consent": "on"}).status_code == 401

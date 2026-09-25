@@ -34,7 +34,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from pydantic import ValidationError
 
@@ -122,6 +122,10 @@ MESSAGES: dict[str, dict[str, str]] = {
     "consent_required": {
         "es": "Tienes que aceptar las condiciones para enviar la auditoría.",
         "en": "You must accept the terms to submit the audit.",
+    },
+    "cross_site": {
+        "es": "Esta subida no viene del formulario de este sitio. Abre la página y súbela ahí.",
+        "en": "This upload does not come from this site's form. Open the page and upload there.",
     },
     "rate_limited": {
         "es": "Demasiadas auditorías desde esta dirección en la última hora; inténtalo más tarde.",
@@ -479,6 +483,25 @@ class AttemptLog:
             return len(self._log)
 
 
+class StoredAttemptLog:
+    """:class:`AttemptLog` kept in the database, so a deploy does not reset it.
+
+    Used for the limits that guard passwords (sign-in, sign-up, the owner
+    panel); ``name`` keeps each limit's keys apart.
+    """
+
+    def __init__(self, store: Any, name: str, window: timedelta = timedelta(hours=1)) -> None:
+        self.store = store
+        self.name = name
+        self.window = window
+
+    def hit(self, key: str, now: datetime) -> int:
+        return int(self.store.attempt_hit(f"{self.name}|{key}", now, since=now - self.window))
+
+    def count(self, key: str, now: datetime) -> int:
+        return int(self.store.attempt_count(f"{self.name}|{key}", since=now - self.window))
+
+
 async def _take_slot(slots: Any, wait_seconds: float) -> bool:
     """Take one of ``slots`` (an anyio ``CapacityLimiter``), waiting at most
     ``wait_seconds``; ``False`` when none came free in time."""
@@ -797,7 +820,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     upload_attempts = AttemptLog()
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
-    panel_failures = AttemptLog()
+    panel_failures = StoredAttemptLog(db, "panel")
     check_attempts = AttemptLog()
     card_lookups = AttemptLog()
     failed_card_sessions = AttemptLog()
@@ -1109,10 +1132,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     # -- customer accounts -------------------------------------------------
     secure_cookies = cfg.base_url.startswith("https://")
-    signin_failures = AttemptLog()
-    signin_email_failures = AttemptLog()
-    signin_ip_failures = AttemptLog()
-    signup_attempts = AttemptLog()
+    signin_failures = StoredAttemptLog(db, "signin")
+    signin_email_failures = StoredAttemptLog(db, "signin_email")
+    signin_ip_failures = StoredAttemptLog(db, "signin_ip")
+    signup_attempts = StoredAttemptLog(db, "signup")
     account_actions = AttemptLog()
 
     def _session(request: Request) -> tuple[Any, str, str] | None:
@@ -1305,12 +1328,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             now = datetime.now(UTC)
             # Keyed on (address, e-mail) so that failures from elsewhere never
             # lock the real owner out; the per-address and per-e-mail ceilings
-            # are higher and only slow wide guessing.
+            # are higher and only slow wide guessing. The per-e-mail ceiling
+            # stops only an address that has already failed on this e-mail
+            # (SIGNIN_TRIES_PAST_EMAIL_CEILING), so someone who knows a customer's
+            # e-mail cannot lock the customer out from another network.
             pair = f"{ip}|{clean}"
+            own_failures = signin_failures.count(pair, now)
             if (
-                signin_failures.count(pair, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
+                own_failures >= acct.MAX_FAILED_SIGNINS_PER_HOUR
                 or signin_ip_failures.count(ip, now) >= acct.MAX_FAILED_SIGNINS_PER_IP
-                or signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_EMAIL
+                or (
+                    own_failures >= acct.SIGNIN_TRIES_PAST_EMAIL_CEILING
+                    and signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_EMAIL
+                )
             ):
                 return again("too_many", 429)
             found = db.account_with_hash(clean) if acct.valid_email(clean) else None
@@ -1674,6 +1704,25 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return result.audit_id, token, paid
 
+    def _cross_site(request: Request) -> bool:
+        """True when a browser says the upload was posted from another site.
+
+        A second layer beside the SameSite cookie (the service's domain may
+        sit on the Public Suffix List): the Origin, else the Referer, must be
+        this service. A request with neither (a script, curl) is let through;
+        it carries no cookie a browser would add for someone else.
+        """
+        source = request.headers.get("origin") or request.headers.get("referer") or ""
+        if not source:
+            return False
+        if source == "null":
+            return True
+        host = urlsplit(source).netloc.lower()
+        allowed = {request.headers.get("host", "").lower()}
+        if cfg.base_url:
+            allowed.add(urlsplit(cfg.base_url).netloc.lower())
+        return host not in allowed
+
     @app.post("/audits")
     async def create_audit(
         request: Request,
@@ -1697,6 +1746,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         loc = _locale(locale)
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", loc), loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
             return _html_error(request, 400, message("consent_required", loc), loc)
         ip = _client_ip(request, cfg.trusted_proxy_hops)

@@ -1639,9 +1639,16 @@ changes what a report says.
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
   after); 10 failed sign-ins per hour per (address, e-mail) pair, with
   ceilings of 50 per address and 50 per e-mail (a slow-down against guesses
-  spread over many addresses), and 5 sign-ups per hour per
-  address; a password change or reset signs out the other
-  sessions; `next` only returns to `/audits/` or `/cuenta` paths.
+  spread over many addresses; past the e-mail ceiling an address gets
+  `SIGNIN_TRIES_PAST_EMAIL_CEILING = 2` tries on that e-mail, so a stranger
+  who knows it cannot lock the owner out), and 5 sign-ups per hour per
+  address. These counters and the panel's wrong-key limit live in the
+  `attempts` table (keys hashed, rows older than the hour deleted), so a
+  deploy does not reset them. A password change or reset signs out the other
+  sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
+  `/` and `/en` (with an anchor). POST `/audits` answers 403 when the
+  browser's Origin (else Referer) names another site, a second layer beside
+  the `SameSite=Lax` cookie; a request with neither header goes through.
 - **No e-mail service yet**. Nothing sends e-mail and addresses are not
   confirmed. A customer who forgets the password writes to the owner
   (WhatsApp link on `/olvide`); after checking the request comes from the
