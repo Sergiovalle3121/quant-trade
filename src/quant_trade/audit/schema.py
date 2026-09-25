@@ -392,7 +392,10 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         )
         warnings.extend(grid.warnings)
         ts_col = "timestamp"
-    if ts_col is None and what == "equity" and _is_trade_list(raw):
+    equity_col = _pick(raw, EQUITY_ALIASES)
+    return_col = _pick(raw, RETURN_ALIASES)
+    no_values = equity_col is None and return_col is None
+    if (ts_col is None or no_values) and what == "equity" and _is_trade_list(raw):
         raise ParseError(
             "the equity curve file looks like a list of trades, not a curve: upload it "
             'in the "Your platform report" box',
@@ -411,9 +414,7 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
             ),
             code="missing_timestamp",
         )
-    equity_col = _pick(raw, EQUITY_ALIASES)
-    return_col = _pick(raw, RETURN_ALIASES)
-    if equity_col is None and return_col is None:
+    if no_values:
         raise ParseError(
             f"the {what} file needs an equity column (one of: {', '.join(EQUITY_ALIASES)}) "
             f"or a return column (one of: {', '.join(RETURN_ALIASES)})",
