@@ -91,6 +91,10 @@ def test_publish_shows_only_the_allowed_fields(tmp_path: Path) -> None:
     text = page.text
     assert VERIFICATION_NOTICE["es"] in text
     assert "Significación estadística" in text
+    # Dimensions read as cards, and the hash and detail tables stack on phones.
+    assert text.count("<div class='item s-") == 6 and "<div class='meaning'>" in text
+    assert text.count("<table class='kv'>") == 2
+    assert "None (" not in text
     for secret in (SECRET_DESCRIPTION, token, audit_id, "entry_time", "timestamp,equity"):
         assert secret not in text
     assert find_claims(text) == []

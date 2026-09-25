@@ -1100,6 +1100,13 @@ On phones the stress tables and the day and hour tables read as one card per
 row, with each figure labelled, instead of scrolling sideways. A lone last key
 figure spans the row.
 
+The public /v page shows each dimension as the same card the report uses. On
+phones, its hash and audit-detail tables stack the label above the value. An
+undeclared trial count reads "—" and not "None".
+
+On phones the deposit list in "El dinero real de la cuenta" also reads as cards.
+In the PDF, fact cards sit three to a row.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

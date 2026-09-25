@@ -270,3 +270,11 @@ def test_stress_and_timing_tables_become_cards_on_phones(tmp_path: Path) -> None
     # A lone last key figure spans the row on phones instead of leaving a gap.
     assert ".kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}" in KPI_CSS
     assert find_claims(page) == []
+
+
+def test_deposit_rows_are_cards_on_phones_and_facts_share_a_printed_row(tmp_path: Path) -> None:
+    page = _client(tmp_path).get("/ejemplo").text
+    deposits = page.split("<table class='metrics deposits'>", 1)[1].split("</table>", 1)[0]
+    assert "data-l='Importe'" in deposits and "data-l='Balance antes'" in deposits
+    assert ".deposits td[data-l]::before" in STYLE
+    assert ".facts{display:block}.fact{break-inside:avoid;display:inline-block" in STYLE
