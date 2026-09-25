@@ -87,6 +87,20 @@ Limits, each written into the report as a reading warning:
 - XML (the optimisation export and every XLSX member) is refused when it
   declares a document type, in any encoding; a damaged, encrypted or
   size-lying workbook gets a plain "could not be read" message.
+- A workbook cell past column XFD, or past column 256
+  (`MAX_XLSX_COLUMNS`), is ignored, and a sheet whose rows spread over more
+  than 5,000,000 cells (`MAX_XLSX_CELLS`) is refused as too large: one cell
+  at column ZZZZZZZZ used to ask for a row of hundreds of millions of cells.
+- An HTML report is parsed once; detecting its format no longer reads it a
+  second time.
+- An equity curve that reaches zero or a negative value, or a return file
+  with a return of -100 % or worse, is refused before the audit with the
+  first date it happens (`equity_not_positive`, `return_below_total_loss`):
+  the audit needs the account balance, not a cumulative profit that starts
+  at 0. Values such as `inf` or `1e400` count as unreadable rows.
+- The grid and concurrency scan over trades is one sweep in entry order, so
+  a 50,000-trade upload is scanned in well under a second (it was quadratic:
+  about a minute for 20,000 trades).
 - The MT5 optimisation pass count is what the optimiser tried; a genetic
   optimisation lists only the passes it evaluated. The deflated Sharpe uses
   the largest of the declared trials, the uploaded variants and the passes.
@@ -276,7 +290,14 @@ and report wire them in during the integration step):
   NOT_MEASURED with the reason (no trades, no losses, a single side).
 - `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
   the uploaded returns over one year, 2,000 paths by default, capped at
-  2,000,000 resampled cells. Maximum drawdown p50/p95/p99, the share of
+  2,000,000 resampled cells. A curve finer than 10,000 periods a year
+  (`MAX_RISK_PATH_PERIODS`, about hourly around the clock) is first
+  compounded into consecutive blocks so a path stays that short
+  (`method.periods_per_step`), and the time under water and the fan are
+  reported back in the uploaded periods; when too few blocks remain the
+  figures are NOT_MEASURED ("the history is too short to resample a year at
+  this frequency"). Before this, a curve logged every second asked for
+  gigabytes. Maximum drawdown p50/p95/p99, the share of
   paths reaching 10/20/30/50 %, the longest time under water p50/p95, and a
   p5–p95 fan of at most 120 points. Every figure is noted "resampled from
   the uploaded history, not a forecast".
@@ -355,7 +376,11 @@ answers 402. `audit/pdf.py` lays out the same report page with WeasyPrint
 (needs Pango: `Dockerfile.web` installs it) and serves only the site's own
 fonts and `data:` URIs to the renderer; every other URL is refused, so a
 PDF never reaches the network. At most `MAX_CONCURRENT_PDFS = 2` render at
-once; a busy or missing renderer answers 503 with a hint to use print.
+once; a download waits up to `PDF_WAIT_SECONDS = 25` for a free slot (a
+double click or a second customer waits its turn), then a busy or missing
+renderer answers 503 with a hint to use print. `HEAD` is answered like
+`GET` without the body, so link-preview bots and uptime checks do not get
+a 405.
 The response is `private, no-store` and `noindex`. The sample report offers the same
 download at `/ejemplo.pdf` and `/sample.pdf`, built once per language and
 cached, so a buyer sees the deliverable before paying.

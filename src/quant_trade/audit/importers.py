@@ -107,6 +107,12 @@ DEFAULT_INITIAL_BALANCE = 10_000.0
 #: A workbook may not inflate past this many bytes, nor hold more members.
 MAX_XLSX_UNCOMPRESSED_BYTES = 40_000_000
 MAX_XLSX_MEMBERS = 500
+#: Cells past this column are ignored (platform exports use a few dozen),
+#: and a sheet may not spread past this many cells once its rows are laid
+#: out: a single cell at column ZZZZZZ would otherwise ask for a row of
+#: hundreds of millions of empty cells.
+MAX_XLSX_COLUMNS = 256
+MAX_XLSX_CELLS = 5_000_000
 
 FLOATING_DRAWDOWN_WARNING = (
     "the balance curve is built from closed trades only; it does not show floating "
@@ -1912,9 +1918,12 @@ def _local(tag: str) -> str:
 
 
 def _column_index(reference: str) -> int:
-    letters = re.match(r"[A-Z]+", reference.upper())
+    letters = re.match(r"[A-Z]+", reference[:8].upper())
     if letters is None:
         return -1
+    if len(letters.group(0)) > 3:
+        # Past XFD, Excel's last column: never a real cell.
+        return 26**4
     index = 0
     for char in letters.group(0):
         index = index * 26 + (ord(char) - 64)
@@ -2007,6 +2016,7 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
 
 def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]]:
     rows: list[list[Any]] = []
+    cells = 0
     for row in sheet.iter():
         if _local(row.tag) != "row":
             continue
@@ -2018,6 +2028,8 @@ def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]
             reference = cell.get("r")
             index = _column_index(reference) if reference else next_index
             next_index = index + 1
+            if not 0 <= index < MAX_XLSX_COLUMNS:
+                continue
             kind = cell.get("t", "n")
             raw = next((child.text for child in cell if _local(child.tag) == "v"), None)
             value: Any
@@ -2035,6 +2047,9 @@ def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]
             values[index] = value
         if values:
             width = max(values) + 1
+            cells += width
+            if cells > MAX_XLSX_CELLS:
+                raise _xlsx_too_big()
             rows.append([values.get(i) for i in range(width)])
         else:
             rows.append([])
@@ -2996,30 +3011,37 @@ def detect_format(data: bytes, filename: str | None = None) -> str | None:
 
     ``filename`` is only a tie-breaker; the content decides.
     """
+    return _detect(data)[0]
+
+
+def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
+    """The format of ``data`` and, for an HTML report, its parsed tables, so
+    the import reads a large report once instead of twice."""
     if not data:
-        return None
+        return None, None
     if _is_zip(data):
         try:
             sheets = read_xlsx(data)
         except ParseError:
-            return None
+            return None, None
         if any(rows and _is_tradingview_header(rows[0]) for rows in sheets.values()):
-            return TRADINGVIEW_XLSX
+            return TRADINGVIEW_XLSX, None
         workbook = _mt5_workbook(sheets)
-        return workbook[0] if workbook is not None else None
+        return (workbook[0] if workbook is not None else None), None
     text = decode_text(data)
     stripped = text.lstrip()
     if stripped.startswith("<?xml") or stripped[:200].lower().startswith("<workbook"):
         if _is_optimization_xml(text):
-            return MT5_OPTIMIZATION_XML
-        return None
+            return MT5_OPTIMIZATION_XML, None
+        return None, None
     lowered = stripped[:4000].lower()
     if "<html" in lowered or "<table" in lowered or "<!doctype html" in lowered:
-        return _html_format(_read_html(text))
+        reader = _read_html(text)
+        return _html_format(reader), reader
     header, _, _ = _read_delimited(text)
     if header:
-        return _table_format(header)
-    return None
+        return _table_format(header), None
+    return None, None
 
 
 def import_report(
@@ -3049,7 +3071,7 @@ def import_report(
         )
         workbook_draft.source_format = workbook_format
         return _assemble(workbook_draft, initial_balance)
-    source_format = detect_format(data, filename)
+    source_format, html_reader = _detect(data)
     if source_format == MT5_OPTIMIZATION_XML:
         raise ReportFormatError(
             "optimization_file",
@@ -3068,7 +3090,7 @@ def import_report(
         )
     draft: _Draft
     if source_format in {MT5_TESTER_HTML, MT5_HISTORY_HTML, MT4_TESTER_HTML, MT4_STATEMENT_HTML}:
-        reader = _read_html(decode_text(data))
+        reader = html_reader if html_reader is not None else _read_html(decode_text(data))
         parser = {
             MT5_TESTER_HTML: _parse_mt5_tester,
             MT5_HISTORY_HTML: _parse_mt5_history,
