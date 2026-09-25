@@ -14,6 +14,19 @@ title and badge. A new name must pass the
 guard in both languages and must not suggest verification, certification,
 approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
+## Why trust it (`pages.TRUST_COPY`, landing `#confianza`)
+
+The landing has a section for a first-time visitor, "Trabajo real, no humo"
+(Real work, not hype), in Spanish, English and Portuguese. Every point links
+to the page that proves it: the full sample report, the methodology and its
+papers, the check page for a report's SHA-256, the privacy policy (a file is
+never published, is deleted after the retention days if unpaid, and an account
+can be deleted) and the terms (refund when the report misreads the file). One
+point says Rigor sells no bots or signals and that the guard stops any text
+promising results. "Who is behind it" shows `AUDIT_OPERATOR_NAME` and
+`AUDIT_OPERATOR_ADDRESS` only when both are set, and the WhatsApp line only
+with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_trust.py`).
+
 ## Portuguese pages (`audit/portuguese.py`, `/pt`)
 
 The landing, its prices and its questions exist in Portuguese (Brazil and

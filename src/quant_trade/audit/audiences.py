@@ -860,8 +860,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("O seu CSV do NinjaTrader 8 (futuros).", "ninjatrader"),
                     (
                         "Ou o histórico de operações da sua plataforma em CSV ou Excel: o Rigor "
-                        "reconhece o formato do Tradovate, TopstepX e Sierra Chart, entre "
-                        "outros.",
+                        "reconhece o formato do Tradovate, TopstepX, Rithmic, cTrader e Sierra "
+                        "Chart, entre outros.",
                         "csv-universal",
                     ),
                     (

@@ -47,6 +47,7 @@ from quant_trade.audit.portuguese import (
     METHOD_LINK_PT,
     MONTHS_PT,
     STATUS_TEXT_PT,
+    TRUST_PT,
     UI_PT,
     link_locale,
 )
@@ -1662,6 +1663,189 @@ def _evidence(locale: str, copy: dict[str, Any]) -> str:
     )
 
 
+#: Why a stranger can trust Rigor before paying: each claim comes with the
+#: page where they can check it. Nothing here promises a result.
+TRUST_COPY: dict[str, dict[str, Any]] = {
+    "es": {
+        "eyebrow": "Trabajo real, no humo",
+        "title": ("Sin bots, sin señales,", "sin promesas."),
+        "lead": (
+            "Rigor no vende estrategias ni resultados: mide el archivo que subes y te enseña "
+            "cómo lo mide. Todo lo de esta sección lo puedes comprobar antes de pagar."
+        ),
+        "items": [
+            (
+                "eye",
+                "Mira un informe entero antes de pagar",
+                "El ejemplo es un informe completo, con su PDF, hecho con datos sintéticos: ves "
+                "exactamente lo que recibes.",
+                "Ver el ejemplo",
+                "sample",
+            ),
+            (
+                "layers",
+                "Métodos publicados, no una caja negra",
+                "Sharpe probabilístico y deflactado (Bailey y López de Prado), probabilidad de "
+                "sobreajuste y bootstrap estacionario (Politis y Romano). Cada prueba y cada "
+                "umbral están escritos.",
+                "Leer la metodología",
+                "method",
+            ),
+            (
+                "shield",
+                "No vendemos bots ni señales",
+                "No ejecutamos órdenes ni pedimos las claves de tu bróker, y ningún informe "
+                "promete resultados: un filtro automático frena cualquier texto que lo haga.",
+                "",
+                "",
+            ),
+            (
+                "hash",
+                "Un informe que no se puede retocar",
+                "Cada informe lleva la huella SHA-256 de tus archivos y de su resultado; "
+                "cualquiera puede comprobar que un PDF o un JSON no se editó.",
+                "Comprobar un informe",
+                "check",
+            ),
+            (
+                "lock",
+                "Tu archivo es tuyo",
+                "Nunca se publica. Si no desbloqueas el informe, se borra a los {retention} "
+                "días, y puedes borrar tu cuenta y tus informes cuando quieras.",
+                "Política de privacidad",
+                "privacy",
+            ),
+            (
+                "card",
+                "Si lee mal tu archivo, te devolvemos el importe",
+                "Si las operaciones, el saldo o las fechas no coinciden con tu plataforma y no "
+                "podemos corregirlo, te devolvemos lo que pagaste por ese informe.",
+                "Términos del servicio",
+                "terms",
+            ),
+        ],
+        "who": "Quién está detrás: {name}, {address}.",
+        "ask": "¿Dudas antes de subir? Escríbenos por WhatsApp; responde una persona.",
+        "ask_link": "Escribir por WhatsApp",
+    },
+    "en": {
+        "eyebrow": "Real work, not hype",
+        "title": ("No bots, no signals,", "no promises."),
+        "lead": (
+            "Rigor sells no strategies and no results: it measures the file you upload and "
+            "shows you how it measures it. You can check everything in this section before "
+            "you pay."
+        ),
+        "items": [
+            (
+                "eye",
+                "See a whole report before you pay",
+                "The sample is a full report, with its PDF, built from synthetic data: you see "
+                "exactly what you get.",
+                "See the sample",
+                "sample",
+            ),
+            (
+                "layers",
+                "Published methods, not a black box",
+                "Probabilistic and deflated Sharpe (Bailey and López de Prado), probability of "
+                "backtest overfitting and the stationary bootstrap (Politis and Romano). Every "
+                "test and every threshold is written down.",
+                "Read the methodology",
+                "method",
+            ),
+            (
+                "shield",
+                "We sell no bots and no signals",
+                "We place no orders and ask for no broker keys, and no report promises results: "
+                "an automatic filter stops any text that does.",
+                "",
+                "",
+            ),
+            (
+                "hash",
+                "A report that cannot be retouched",
+                "Every report carries the SHA-256 fingerprint of your files and of its result; "
+                "anyone can check that a PDF or JSON was not edited.",
+                "Check a report",
+                "check",
+            ),
+            (
+                "lock",
+                "Your file stays yours",
+                "It is never published. If you do not unlock the report it is deleted after "
+                "{retention} days, and you can delete your account and your reports whenever "
+                "you like.",
+                "Privacy policy",
+                "privacy",
+            ),
+            (
+                "card",
+                "If it misreads your file, you get your money back",
+                "If the trades, balance or dates do not match your platform and we cannot fix "
+                "it, we refund what you paid for that report.",
+                "Terms of service",
+                "terms",
+            ),
+        ],
+        "who": "Who is behind it: {name}, {address}.",
+        "ask": "Questions before you upload? Write to us on WhatsApp; a person answers.",
+        "ask_link": "Write on WhatsApp",
+    },
+    "pt": TRUST_PT,
+}
+
+
+def _trust(
+    locale: str,
+    *,
+    retention_days: int,
+    operator: tuple[str, str],
+    contact_url: str,
+    free_mode: bool = False,
+) -> str:
+    """Why trust Rigor, each point with the page that proves it (in free mode
+    nothing is sold, so the refund point is left out)."""
+    words = TRUST_COPY[locale]
+    linked = link_locale(locale)
+    hrefs = {
+        "sample": _sample_url(linked),
+        "method": method_url(linked),
+        "check": _check_url(linked),
+        "privacy": legal_url("privacy", linked),
+        "terms": legal_url("terms", linked),
+    }
+    cards = "".join(
+        f"<div class='card spot' data-reveal style='--i:{i % 3}'>"
+        f"<div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3>"
+        f"<p>{_e(text.format(retention=retention_days))}</p>"
+        + (f"<p><a href='{_e(hrefs[target])}'>{_e(label)}</a></p>" if target else "")
+        + "</div>"
+        for i, (name, title, text, label, target) in enumerate(
+            item for item in words["items"] if not (free_mode and item[4] == "terms")
+        )
+    )
+    name, address = operator
+    who = (
+        f"<p class='trust-who'>{_e(words['who'].format(name=name, address=address))}</p>"
+        if name and address
+        else ""
+    )
+    ask = (
+        f"<p class='trust-ask'>{_e(words['ask'])} "
+        f"<a href='{_e(contact_url)}' rel='noopener'>{_e(words['ask_link'])}</a></p>"
+        if contact_url
+        else ""
+    )
+    return (
+        "<section class='section light' id='confianza'><div class='wrap'>"
+        + _section_head(words["eyebrow"], _title_pair(words["title"]), words["lead"])
+        + f"<div class='cards'>{cards}</div>"
+        + (f"<div class='trust-foot' data-reveal>{who}{ask}</div>" if who or ask else "")
+        + "</div></section>"
+    )
+
+
 def _differences(locale: str) -> str:
     ui = _UI[locale]
     cards = "".join(
@@ -2109,8 +2293,11 @@ def landing(
     pack_price_usd: float = 0.0,
     extras_open: bool = False,
     signed_in: bool | None = None,
+    operator: tuple[str, str] = ("", ""),
 ) -> str:
-    """``signed_in=False`` says, above the file fields, that an upload needs an account."""
+    """``signed_in=False`` says, above the file fields, that an upload needs an account.
+
+    ``operator`` (name, address) is shown under "who is behind it" when both are set."""
     locale = _locale(locale)
     copy = _COPY[locale]
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
@@ -2127,6 +2314,13 @@ def landing(
         + _evidence(locale, copy)
         + _how_html(copy, locale)
         + _differences(locale)
+        + _trust(
+            locale,
+            retention_days=retention_days,
+            operator=operator,
+            contact_url=contact_url,
+            free_mode=free_mode,
+        )
         + _prices_html(
             copy,
             locale,
