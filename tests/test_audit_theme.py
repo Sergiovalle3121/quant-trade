@@ -740,3 +740,26 @@ def test_audience_pages_show_problems_checks_price_and_other_cases_as_cards(
         assert "?.</strong>" not in html
     assert "@media (min-width:760px){.aud-checks{grid-template-columns:repeat(2" in STYLE
     assert ".prose .aud-pains,.prose .aud-checks,.prose .aud-others{padding-left:0}" in STYLE
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_the_name_its_columns_step_groups_fields_by_file_shape(tmp_path: Path, locale: str) -> None:
+    page = _client(tmp_path).get(f"/?lang={locale}").text
+    groups = (
+        ("Una fila por operación", "Una fila por ejecución", "En los dos casos")
+        if locale == "es"
+        else ("One row per trade", "One row per fill", "Either way")
+    )
+    starts = [page.index(f"<legend>{title}</legend>") for title in groups]
+    assert starts == sorted(starts)
+    assert all(find_claims(title) == [] for title in groups)
+    # Each group holds its own fields: per trade has the entry, per fill the fill time.
+    trade = page[starts[0] : starts[1]]
+    fill = page[starts[1] : starts[2]]
+    assert "name='col_entry_time'" in trade and "name='col_time'" not in trade
+    assert "name='col_time'" in fill and "name='col_price'" in fill
+    for role in ("side", "quantity", "symbol", "profit", "commission", "multiplier"):
+        assert f"name='col_{role}'" in page[starts[2] :]
+    # The file's own column names show as chips once a file is picked (filled by app.js).
+    assert "id='report-columns-shown' hidden>" in page
+    assert ".map-found code{display:inline-block" in STYLE
