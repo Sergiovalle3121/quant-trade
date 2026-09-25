@@ -737,6 +737,14 @@ color:var(--text-3)}
 line-height:1;font-variant-numeric:tabular-nums}
 .fact p{margin:10px 0 0;color:var(--text-2);font-size:.92rem}
 .paper table.timing{table-layout:fixed}
+.paper table.stress{table-layout:fixed}
+.stress .c-n{width:17%}.stress .c-b{width:190px}
+.stress .val{text-align:right;padding-right:28px;white-space:nowrap}
+.stress td.val{font-weight:600}.stress td.delta{font-weight:400;color:var(--text-3)}
+.stress td.neg{color:#b91c1c}
+.stress tr.base>td{background:var(--surface-2);font-weight:600}
+@media (max-width:759px){.paper table.stress{table-layout:auto}.stress .val{padding-right:16px}
+.stress td:first-child{min-width:190px}}
 .timing .c-k{width:24%}.timing .c-n{width:14%}
 .timing .val{text-align:right}
 .timing td.val{font-weight:600;white-space:nowrap}

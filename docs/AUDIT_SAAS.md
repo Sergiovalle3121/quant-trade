@@ -697,6 +697,10 @@ of the net result as large figures, and each row draws its net result as a
 bar (dark for a gain, red for a loss, scaled to the largest group). Phones
 hide the bars and keep the numbers.
 
+The stress-test tables follow the same columns: the original result sits on a
+grey first row with its evidence label, what remains is bold and turns red at
+zero or below, and the change is muted.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and

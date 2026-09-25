@@ -1144,9 +1144,8 @@ def _stress_table(
     names = STRESS_SCENARIOS.get(locale, STRESS_SCENARIOS["es"])
     original = block["original"]
     rows = [
-        f"<tr><td>{_e(labels['original'])}</td>"
-        f"<td>{_stress_value(original['value'], percent=percent)} "
-        f"{_badge(original['evidence'])}</td>"
+        f"<tr class='base'><td>{_e(labels['original'])} {_badge(original['evidence'])}</td>"
+        f"<td class='val'>{_stress_value(original['value'], percent=percent)}</td>"
         "<td></td><td></td></tr>"
     ]
     for row in block.get("rows", []):
@@ -1154,18 +1153,24 @@ def _stress_table(
             removed=row.get("removed", ""), month=row.get("month", "")
         )
         ok = row.get("stays_positive")
+        below = row["result"]["value"] <= 0
         rows.append(
             f"<tr><td>{_e(name)}</td>"
-            f"<td>{_stress_value(row['result']['value'], percent=percent)}</td>"
-            f"<td>{_stress_value(row['change']['value'], percent=percent, signed=True)}</td>"
+            f"<td class='val{' neg' if below else ''}'>"
+            f"{_stress_value(row['result']['value'], percent=percent)}</td>"
+            f"<td class='val delta'>"
+            f"{_stress_value(row['change']['value'], percent=percent, signed=True)}</td>"
             f"<td><span class='badge {'PASS' if ok else 'FAIL'}'>"
             f"{_e((labels['yes'] if ok else labels['no']).capitalize())}</span></td></tr>"
         )
     return (
-        f"<table><tr><th>{_e(labels['scenario'])}</th><th>{_e(labels['stress_result'])}</th>"
-        f"<th>{_e(labels['stress_change'])}</th><th>{_e(labels['stress_positive'])}</th></tr>"
+        "<table class='stress'><colgroup><col><col class='c-n'><col class='c-n'>"
+        "<col class='c-b'></colgroup><thead>"
+        f"<tr><th>{_e(labels['scenario'])}</th><th class='val'>{_e(labels['stress_result'])}</th>"
+        f"<th class='val'>{_e(labels['stress_change'])}</th>"
+        f"<th>{_e(labels['stress_positive'])}</th></tr></thead><tbody>"
         + "".join(rows)
-        + "</table>"
+        + "</tbody></table>"
     )
 
 
