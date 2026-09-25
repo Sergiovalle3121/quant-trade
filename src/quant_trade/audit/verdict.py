@@ -200,10 +200,12 @@ def assess_multiplicity(
             [_reason("statistical significance not measured")],
             inputs,
         )
-    def dsr_reason(relation: str) -> Reason:
+
+    def dsr_reason(relation: str, relation_es: str | None = None) -> Reason:
         return (
-            f"DSR at {trials_phrase(trials, trials_evidence, 'en')} {dsr:.3f} {relation}",
-            f"DSR con {trials_phrase(trials, trials_evidence, 'es')} {dsr:.3f} {relation}",
+            f"DSR {dsr:.3f} {relation} with {trials_phrase(trials, trials_evidence, 'en')}",
+            f"DSR {dsr:.3f} {relation_es or relation} con "
+            f"{trials_phrase(trials, trials_evidence, 'es')}",
         )
 
     pbo_bad = pbo is not None and pbo >= thresholds.pbo_max
@@ -222,7 +224,12 @@ def assess_multiplicity(
     return _dimension(
         MULTIPLICITY,
         "WEAK",
-        [dsr_reason(f"in [{thresholds.dsr_weak}, {thresholds.dsr_pass})")],
+        [
+            dsr_reason(
+                f"between {thresholds.dsr_weak} and {thresholds.dsr_pass}",
+                f"entre {thresholds.dsr_weak} y {thresholds.dsr_pass}",
+            )
+        ],
         inputs,
     )
 
