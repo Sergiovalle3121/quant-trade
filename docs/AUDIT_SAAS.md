@@ -301,6 +301,15 @@ each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
 variety to show. The class stays C.
 
+"Qué hacer ahora" / "What to do now" follows "Qué significa para ti": up to
+three checks for whoever runs the robot, from the live comparison, serious
+data flags, costs, trials and out-of-sample, then the seller questions and
+keeping the report, each linked to its section. They are questions and
+checks, never a trading instruction. A line under the verdict explains the
+MEASURED / DECLARED / NOT_MEASURED tags. Generic prop-firm rules show no
+preset id and no "published on the date shown" assumption, and the
+simulator's column reads "En las simulaciones del historial".
+
 When a live account is uploaded, one line under the verdict gives its
 comparison badge (Coherente, En el borde, No coherente, Revisar) and the
 account's trading result against the money deposited, linked to the
