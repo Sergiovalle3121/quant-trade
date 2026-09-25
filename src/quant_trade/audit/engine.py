@@ -589,6 +589,17 @@ def fund_record(inputs: AuditInputs) -> bool:
     )
 
 
+def _fund_benchmark(inputs: AuditInputs) -> tuple[pd.Series | None, str]:
+    """The benchmark the fund section compares with: an uploaded benchmark
+    file first (the customer chose it), else the one the fund's file carries.
+    Only the fund section reads it; the benchmark dimension reads the upload."""
+    if inputs.benchmark is not None:
+        return fund_lib.monthly_returns(inputs.benchmark.frame), "upload"
+    if inputs.equity.benchmark is not None:
+        return fund_lib.benchmark_months(inputs.equity.benchmark), "file"
+    return None, "file"
+
+
 def net_of_fees(inputs: AuditInputs) -> bool:
     """The client's net-of-fees declaration, honoured only on a fund record."""
     return inputs.declared.net_of_fees and fund_record(inputs)
@@ -976,7 +987,10 @@ def run_audit(
         if inputs.trades is not None
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
-    fund = fund_lib.fund_review(inputs.equity.frame, inputs.periods_per_year)
+    bench_months, bench_source = _fund_benchmark(inputs)
+    fund = fund_lib.fund_review(
+        inputs.equity.frame, inputs.periods_per_year, bench_months, bench_source
+    )
     if fund.get("status") == "MEASURED":
         # Titles the report as a fund's track record rather than a backtest.
         fund["track_record"] = fund_record(inputs)
