@@ -271,6 +271,11 @@ LABELS: dict[str, dict[str, str]] = {
             "No vimos depósitos en plena pérdida, ni una pérdida abierta grande, ni un "
             "porcentaje que se aparte del dinero."
         ),
+        "account_clean_unseen": (
+            "No vimos depósitos en plena pérdida ni un porcentaje que se aparte del dinero. "
+            "El archivo no dice cuánto perdían las posiciones abiertas: pide al proveedor la "
+            "curva de equity con flotante."
+        ),
         "account_live": (
             "Revisión del historial que subiste como cuenta real. Sus banderas se muestran "
             "aquí y no cambian la clase del backtest."
@@ -434,6 +439,12 @@ LABELS: dict[str, dict[str, str]] = {
         "challenge": "Simulador de reto de prop firm",
         "challenge_rules": "Reglas simuladas",
         "open_loss_badge": "Pérdidas abiertas",
+        "hidden_loss": (
+            "El archivo solo muestra el balance y las banderas rojas encontraron pérdidas "
+            "abiertas que el balance oculta (Drawdown flotante oculto). Aquí no entran, así "
+            "que estas cifras salen optimistas: no decidas con ellas sin la curva de equity "
+            "con flotante."
+        ),
         "challenge_open_loss": (
             "Tu plataforma imprime un drawdown de {dd} con las operaciones abiertas, más que "
             "el límite de pérdida total del reto ({limit}). La simulación usa el balance de "
@@ -478,6 +489,8 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_drawdown": "Drawdown máximo",
         "kpi_dd_platform": "Drawdown con operaciones abiertas, según tu plataforma",
         "kpi_dd_p95": "Drawdown p95 remuestreado, 1 año",
+        "kpi_drawdown_closed": "Drawdown máximo (solo cerradas)",
+        "kpi_dd_p95_closed": "Drawdown p95 a 1 año (solo cerradas)",
         "kpi_sharpe": "Sharpe anualizado",
         "kpi_pf": "Profit factor",
         "kpi_trades": "Operaciones · % de aciertos",
@@ -695,6 +708,11 @@ LABELS: dict[str, dict[str, str]] = {
             "We saw no deposit in a deep drawdown, no large open loss and no percentage that "
             "departs from the money."
         ),
+        "account_clean_unseen": (
+            "We saw no deposit in a deep drawdown and no percentage that departs from the "
+            "money. The file does not say how much the open positions were losing: ask the "
+            "provider for the equity curve with floating results."
+        ),
         "account_live": (
             "Review of the history you uploaded as the live account. Its flags are shown "
             "here and do not change the backtest's class."
@@ -857,6 +875,12 @@ LABELS: dict[str, dict[str, str]] = {
         "challenge": "Prop-firm challenge simulator",
         "challenge_rules": "Rules simulated",
         "open_loss_badge": "Open losses",
+        "hidden_loss": (
+            "The file shows the balance only, and the red flags found open losses the balance "
+            "hides (Hidden floating drawdown). They are not counted here, so these figures come "
+            "out optimistic: do not decide with them without the equity curve with floating "
+            "results."
+        ),
         "challenge_open_loss": (
             "Your platform prints a {dd} drawdown with open trades, deeper than the "
             "challenge's total loss limit ({limit}). The simulation uses the closed-trade "
@@ -901,6 +925,8 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_drawdown": "Maximum drawdown",
         "kpi_dd_platform": "Drawdown with open trades, per your platform",
         "kpi_dd_p95": "Resampled drawdown p95, 1 year",
+        "kpi_drawdown_closed": "Maximum drawdown (closed trades only)",
+        "kpi_dd_p95_closed": "Drawdown p95, 1 year (closed trades only)",
         "kpi_sharpe": "Annualised Sharpe",
         "kpi_pf": "Profit factor",
         "kpi_trades": "Trades · win rate",
@@ -1625,6 +1651,12 @@ def _ev_value(block: Any) -> float | None:
     return None
 
 
+def _pct(value: float) -> str:
+    """A share at one decimal, without the "-0.0%" a tiny negative prints."""
+    shown = f"{value:.1%}"
+    return shown[1:] if shown == "-0.0%" else shown
+
+
 def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, str, str]]:
     """``(label, shown value, tone)`` for each key figure that was measured."""
     perf = data.get("performance") or {}
@@ -1640,14 +1672,25 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
 
     total = _ev_value(perf.get("total_return"))
     add("kpi_return", total, f"{total:+.1%}" if total is not None else "")
+    # A balance rebuilt from closed trades cannot see open losses; the tiles say so,
+    # and turn red when the red flags found losses the balance hides.
+    closed = bool((data.get("inputs") or {}).get("balance_only"))
+    hidden = closed and any(
+        flag.get("code") == "HIDDEN_FLOATING_DRAWDOWN" for flag in data.get("red_flags") or []
+    )
     dd = _ev_value(perf.get("max_drawdown"))
-    add("kpi_drawdown", dd, f"{dd:.1%}" if dd is not None else "")
+    add(
+        "kpi_drawdown_closed" if closed else "kpi_drawdown",
+        dd,
+        _pct(dd) if dd is not None else "",
+        "bad" if hidden else "",
+    )
     platform_dd = _ev_value(perf.get("platform_equity_drawdown"))
     if platform_dd is not None and (dd is None or platform_dd < dd - 0.005):
         # Deeper than the closed-trade curve shows: the buyer sees both, side by side.
         out.append((labels["kpi_dd_platform"], f"{platform_dd:.1%}", "bad"))
     p95 = _ev_value((risk.get("max_drawdown") or {}).get("p95"))
-    add("kpi_dd_p95", p95, f"{p95:.1%}" if p95 is not None else "")
+    add("kpi_dd_p95_closed" if closed else "kpi_dd_p95", p95, _pct(p95) if p95 is not None else "")
     sharpe = _ev_value(perf.get("sharpe"))
     add("kpi_sharpe", sharpe, f"{sharpe:.2f}" if sharpe is not None else "")
     pf = _ev_value(stats.get("profit_factor"))
@@ -1856,10 +1899,25 @@ def _assumptions(block: Any, locale: str, labels: dict[str, str]) -> str:
     )
 
 
-def _risk_html(risk: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+def _hidden_loss_note(data: dict[str, Any], labels: dict[str, str]) -> str:
+    """A callout when the red flags found open losses a balance-only file hides."""
+    codes = {flag.get("code") for flag in data.get("red_flags") or []}
+    if "HIDDEN_FLOATING_DRAWDOWN" not in codes:
+        return ""
+    return (
+        f"<p class='live-verdict lv-FAIL'><span class='badge FAIL'>"
+        f"{_e(labels['open_loss_badge'])}</span> {_e(labels['hidden_loss'])}</p>"
+    )
+
+
+def _risk_html(
+    risk: dict[str, Any] | None, locale: str, labels: dict[str, str], hidden_note: str = ""
+) -> str:
     if not risk:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     html_text = _status_line(risk, labels)
+    if risk.get("status") == "MEASURED":
+        html_text += hidden_note
     if risk.get("status") == "MEASURED":
         dd = risk["max_drawdown"]
         html_text += (
@@ -1907,6 +1965,7 @@ def _challenge_html(
     locale: str,
     labels: dict[str, str],
     platform_dd: float | None = None,
+    hidden_note: str = "",
 ) -> str:
     if not challenge:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
@@ -1930,7 +1989,8 @@ def _challenge_html(
         )
     )
     html_text += _status_line(challenge, labels)
-    html_text += _open_loss_note(challenge, platform_dd, labels)
+    open_loss = _open_loss_note(challenge, platform_dd, labels)
+    html_text += open_loss or (hidden_note if challenge.get("status") == "MEASURED" else "")
     if challenge.get("status") == "MEASURED":
         probability = challenge["probability"]
         html_text += (
@@ -2406,7 +2466,10 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
             f"</tr></thead><tbody>{rows}</tbody></table>"
         )
     if account.get("clean"):
-        out += f"<p class='live-verdict lv-PASS'>{_e(labels['account_clean'])}</p>"
+        # "No large open loss" only when the file states the open result at all.
+        seen = (account.get("floating_pnl") or {}).get("evidence") != "NOT_MEASURED"
+        key = "account_clean" if seen else "account_clean_unseen"
+        out += f"<p class='live-verdict lv-PASS'>{_e(labels[key])}</p>"
     out += f"<p class='muted'>{_e(labels['account_scope'])}</p>"
     return out
 
@@ -3089,6 +3152,7 @@ def render_html(
     if fees:
         cost_html += f"<h3>{_e(labels['fees'])}</h3>" + _evidence_rows(fees, labels, skip=set())
 
+    hidden = _hidden_loss_note(data, labels)
     detail: list[tuple[str, str]] = [
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
@@ -3110,7 +3174,7 @@ def render_html(
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
         (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
-        (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
+        (labels["risk"], _risk_html(data.get("risk"), locale, labels, hidden)),
         *(
             [(labels["plateau"], _plateau_html(data.get("plateau"), labels))]
             if (data.get("plateau") or {}).get("status") == "MEASURED"
@@ -3143,6 +3207,7 @@ def render_html(
                 locale,
                 labels,
                 _ev_value((data.get("performance") or {}).get("platform_equity_drawdown")),
+                hidden,
             ),
         ),
         (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
