@@ -125,7 +125,9 @@ def _longest_run(flags: Sequence[bool]) -> int:
     return longest
 
 
-def _side_split(pnl: np.ndarray, sides: Sequence[str], side: str) -> dict[str, Any]:
+def _side_split(
+    pnl: np.ndarray, sides: Sequence[str], side: str, wins_on: np.ndarray | None = None
+) -> dict[str, Any]:
     mask = np.array([value == side for value in sides], dtype=bool)
     count = int(mask.sum())
     if count == 0:
@@ -138,7 +140,7 @@ def _side_split(pnl: np.ndarray, sides: Sequence[str], side: str) -> dict[str, A
     selected = pnl[mask]
     return {
         "trade_count": measured(count),
-        "win_rate": measured(float((selected > 0).mean())),
+        "win_rate": measured(float(((pnl if wins_on is None else wins_on)[mask] > 0).mean())),
         "net_pnl": measured(float(selected.sum()), "before commission and swap"),
     }
 
@@ -148,8 +150,14 @@ def trade_statistics(
     sides: Sequence[str],
     *,
     fees_total: float = 0.0,
+    trade_fees: Sequence[float] | None = None,
 ) -> dict[str, Any]:
     """Per-trade statistics from closed round trips, ordered by exit time.
+
+    When ``trade_fees`` itemises each trade's cost (aligned with ``trades``,
+    positive is a cost), the win rate counts a trade as won only when it
+    stays positive after its own fees, the figure every per-trade table of
+    the report uses; the gross share is kept as ``win_rate_gross``.
 
     ``Trade.pnl`` is the gross result of each trade. ``fees_total`` (for
     example commission plus swap from a platform report, as a positive cost)
@@ -170,6 +178,16 @@ def trade_statistics(
     ordered_sides = [sides[i] for i in order]
     pnl = np.array([trade.pnl for trade in ordered], dtype=float)
     n = int(len(pnl))
+    itemised = (
+        trade_fees is not None
+        and len(trade_fees) == len(trades)
+        and any(float(fee) != 0 for fee in trade_fees)
+    )
+    net_each = (
+        pnl - np.array([float(trade_fees[i]) for i in order], dtype=float)
+        if itemised and trade_fees is not None
+        else None
+    )
     wins = pnl[pnl > 0]
     losses = pnl[pnl < 0]
     gross_profit = float(wins.sum())
@@ -179,7 +197,12 @@ def trade_statistics(
 
     out = {
         "trade_count": measured(n),
-        "win_rate": measured(float(len(wins) / n), "share of trades with pnl > 0"),
+        "win_rate": measured(float(len(wins) / n), "share of trades with pnl > 0")
+        if net_each is None
+        else measured(
+            float((net_each > 0).mean()),
+            "share of trades with a net profit after the fees the file itemises",
+        ),
         "gross_profit": measured(gross_profit),
         "gross_loss": measured(gross_loss),
         "fees_total": measured(fees, "commission and swap as reported, a positive cost")
@@ -188,6 +211,8 @@ def trade_statistics(
         "net_pnl": measured(net, "gross pnl minus reported fees"),
         "expectancy": measured(net / n, "average net result per trade, account currency"),
     }
+    if net_each is not None:
+        out["win_rate_gross"] = measured(float(len(wins) / n), "share of trades with pnl > 0")
     if len(losses) and gross_loss < 0:
         out["profit_factor"] = measured(gross_profit / abs(gross_loss), PROFIT_FACTOR_NOTE)
     else:
@@ -235,8 +260,8 @@ def trade_statistics(
         if span_days >= 1.0
         else not_measured("trades span less than one day")
     )
-    out["long"] = _side_split(pnl, ordered_sides, "long")
-    out["short"] = _side_split(pnl, ordered_sides, "short")
+    out["long"] = _side_split(pnl, ordered_sides, "long", net_each)
+    out["short"] = _side_split(pnl, ordered_sides, "short", net_each)
     return out
 
 

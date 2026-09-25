@@ -93,3 +93,48 @@ def test_generic_prop_firm_rules_show_no_internal_id_or_missing_date() -> None:
     assert "generic-2step" not in page
     assert "publicadas en la fecha indicada" not in page
     assert "En las simulaciones del historial" in page
+
+
+def test_one_win_rate_after_itemised_fees_across_the_report() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from quant_trade.audit.analytics import trade_statistics
+    from quant_trade.audit.timing import timing_breakdown
+    from quant_trade.core.models import Trade
+
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
+    trades = [
+        Trade(
+            entry_time=t0 + timedelta(days=i),
+            exit_time=t0 + timedelta(days=i, hours=3),
+            quantity=1.0,
+            entry_price=1.0,
+            exit_price=1.0,
+            pnl=pnl,
+            return_pct=0.0,
+        )
+        for i, pnl in enumerate([5.0, 0.5, -3.0, 0.4] * 5)
+    ]
+    fees = [1.0] * len(trades)
+    sides = ["long", "short"] * 10
+    stats = trade_statistics(trades, sides, fees_total=20.0, trade_fees=fees)
+    # 0.5 and 0.4 are gross wins that the 1.0 fee turns into losses.
+    assert stats["win_rate"]["value"] == 0.25
+    assert stats["win_rate_gross"]["value"] == 0.75
+    assert stats["long"]["win_rate"]["value"] == 0.5
+    timing = timing_breakdown(trades, fees)
+    assert sum(row["net"]["value"] for row in timing["weekdays"]) == sum(
+        t.pnl - 1.0 for t in trades
+    )
+    # Without itemised fees nothing changes.
+    plain = trade_statistics(trades, sides, trade_fees=[0.0] * len(trades))
+    assert plain["win_rate"]["value"] == 0.75 and "win_rate_gross" not in plain
+
+
+def test_the_sample_shows_the_net_win_rate_once_in_the_tiles_and_tables() -> None:
+    page = _page("es")
+    assert "560 · 54%" in page
+    assert "Aciertos antes de comisiones" in page
+    # The gross share (55.54%) shows once, on its own labelled row, not
+    # again in the annualised table.
+    assert page.count("55.54%") == 1

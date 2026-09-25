@@ -5,7 +5,7 @@ fragile in a way the totals hide: a change of broker server time, a holiday
 calendar or a news schedule can remove it. This module groups the closed
 trades by the weekday and the four-hour block of their entry, as the file
 states them (platform or server time), and reports each group's count, net
-result before itemised fees, and hit rate. Nothing is resampled or
+result after the fees the file itemises per trade, and hit rate. Nothing is resampled or
 forecast; every figure is MEASURED from the uploaded trades.
 
 The time-of-day table is left out when every entry carries the same clock
@@ -29,7 +29,7 @@ BLOCK_HOURS = 4
 
 NOTE = (
     "Entry times as the file states them (platform or server time); "
-    "net result before itemised fees."
+    "net result after the fees the file itemises per trade."
 )
 
 
@@ -57,12 +57,15 @@ def _best_share(rows: list[dict[str, Any]], total: float) -> dict[str, Any] | No
     return {"key": best["key"], "share": measured(best["net"]["value"] / total)}
 
 
-def timing_breakdown(trades: Sequence[Trade]) -> dict[str, Any]:
+def timing_breakdown(
+    trades: Sequence[Trade], fees: Sequence[float] | None = None
+) -> dict[str, Any]:
     """Closed trades grouped by entry weekday (0 = Monday) and four-hour block."""
     if len(trades) < MIN_TRADES:
         return {"status": "NOT_MEASURED", "reason": f"fewer than {MIN_TRADES} closed trades"}
     entries = [pd.Timestamp(trade.entry_time) for trade in trades]
-    pnl = [float(trade.pnl) for trade in trades]
+    costs = list(fees) if fees is not None and len(fees) == len(trades) else [0.0] * len(trades)
+    pnl = [float(trade.pnl) - float(fee) for trade, fee in zip(trades, costs, strict=True)]
     total = float(sum(pnl))
     weekdays = _group([entry.weekday() for entry in entries], pnl)
     clock_times = {(entry.hour, entry.minute) for entry in entries}
