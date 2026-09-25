@@ -111,8 +111,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Too many audits from this address in the last hour; try again later.",
     },
     "too_large": {
-        "es": "El archivo {what} supera el límite de {limit} bytes.",
-        "en": "The {what} file exceeds {limit} bytes.",
+        "es": (
+            "El archivo {what} pesa más de {limit}, el máximo que aceptamos: sube una versión "
+            "más pequeña (por ejemplo, un periodo más corto o menos pasadas de optimización)."
+        ),
+        "en": (
+            "The {what} file is larger than {limit}, the most we accept: upload a smaller "
+            "version (for example a shorter period or fewer optimisation passes)."
+        ),
     },
     "equity_required": {
         "es": (
@@ -238,8 +244,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         ),
     },
     "body_too_large": {
-        "es": "La petición supera el tamaño máximo de {limit} bytes.",
-        "en": "The request exceeds the maximum size of {limit} bytes.",
+        "es": (
+            "La subida pesa más de {limit} en total, el tamaño máximo que aceptamos: sube menos "
+            "archivos a la vez o versiones más pequeñas."
+        ),
+        "en": (
+            "The upload is larger than {limit} in total, the maximum size we accept: upload "
+            "fewer files at once or smaller versions."
+        ),
     },
     "publish_locked": {
         "es": "Solo se puede publicar la verificación de un informe completo.",
@@ -311,6 +323,13 @@ UPLOAD_NAMES: dict[str, dict[str, str]] = {
     "optimization": {"es": "de optimización", "en": "optimisation"},
     "live": {"es": "de la cuenta real", "en": "live statement"},
 }
+
+
+def _megabytes(size: int) -> str:
+    """A byte limit as a customer reads it: 8 MB, 1.5 MB, 500 KB."""
+    if size >= 1_000_000:
+        return f"{size / 1_000_000:.1f}".rstrip("0").rstrip(".") + " MB"
+    return f"{max(size // 1000, 1)} KB"
 
 
 def message(key: str, locale: str, **values: Any) -> str:
@@ -758,7 +777,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _too_large_response(scope: Any) -> Any:
         locale = _scope_locale(scope)
-        text = message("body_too_large", locale, limit=f"{body_limit:,}")
+        text = message("body_too_large", locale, limit=_megabytes(body_limit))
         accept = dict(scope.get("headers") or []).get(b"accept", b"").decode("latin-1")
         response: Any
         if "application/json" in accept:
@@ -1084,7 +1103,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 "too_large",
                 loc,
                 what=UPLOAD_NAMES[exc.what][loc],
-                limit=f"{_field_limit(exc.what):,}",
+                limit=_megabytes(_field_limit(exc.what)),
             )
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:

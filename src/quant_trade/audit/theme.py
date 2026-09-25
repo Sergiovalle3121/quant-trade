@@ -641,12 +641,13 @@ font-size:.92rem;border:1px solid;line-height:1.5}
 border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
 .error{color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent);
 border-color:color-mix(in srgb,var(--bad) 32%,transparent)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 24%,transparent)}
 .dot.bad{background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 24%,transparent)}
 .error-card{display:grid;grid-template-columns:44px minmax(0,1fr);gap:18px;align-items:start;
-background:#fff;border:1px solid var(--border);border-left:4px solid var(--bad);border-radius:20px;
+background:#fff;border:1px solid var(--border);border-left:4px solid var(--warn);border-radius:20px;
 padding:24px 26px;box-shadow:var(--shadow-sm,0 1px 2px rgba(0,0,0,.04))}
 .error-card .err-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
-color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .error-card .err-ico svg{width:22px;height:22px}
 .error-card p{margin:0}
 .err-field{font:500 .72rem/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;

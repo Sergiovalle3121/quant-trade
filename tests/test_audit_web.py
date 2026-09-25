@@ -142,7 +142,7 @@ def test_bad_uploads_are_refused_plainly(tmp_path: Path) -> None:
         headers={"accept": "application/json"},
     )
     assert big.status_code == 413
-    assert "supera el límite" in big.json()["error"]
+    assert "el máximo que aceptamos" in big.json()["error"]
     bad_trials = _upload(_client(tmp_path / "b"), trials="0")
     assert bad_trials.status_code == 400
     assert "número de intentos" in bad_trials.text

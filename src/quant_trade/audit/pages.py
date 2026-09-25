@@ -1936,7 +1936,10 @@ _ERROR_TITLES = {
 #: Where an importer's message starts listing the formats it reads.
 _EXPECTED_MARKERS = ("Se espera:", "Expected:")
 #: "...: sube la optimización del mismo robot" reads as the fix, so it gets its own line.
-_ACTION = re.compile(r":\s+(?=(?:sube|vuelve|exporta|pide|upload|export|ask|re-export)\b)", re.I)
+_ACTION = re.compile(
+    r"[:;]\s+(?=(?:sube|vuelve|exp[oó]rta\w*|revisa|pide|upload|export|check|ask|re-export)\b)",
+    re.I,
+)
 _ACTION_LABEL = {"es": "Qué hacer:", "en": "What to do:"}
 
 
@@ -1960,12 +1963,13 @@ def _error_card(message: str, locale: str = "es") -> str:
         if len(parts) == 2 and parts[0].strip() and parts[1].strip():
             rest, action = parts[0].strip(), parts[1].strip()
             rest = rest if rest[-1] in ".!?" else rest + "."
-            action = action[:1].upper() + action[1:]
+            action = action[:1].upper() + action[1:].rstrip(".") + "."
             expected = (
                 f"<p class='err-exp'><b>{_e(_ACTION_LABEL.get(locale, _ACTION_LABEL['es']))}</b> "
                 f"{_e(action)}</p>"
             )
     rest = rest[:1].upper() + rest[1:]
+    rest = rest if rest[-1:] in ".!?" else rest + "."
     return (
         f"<div class='error-card' role='alert'><div class='err-ico'>{icon('alert')}</div><div>"
         + (f"<p class='err-field'>{_e(field)}</p>" if field else "")
@@ -1981,7 +1985,7 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
     body = (
-        _page_hero(ui["error_eyebrow"], title, dot="bad")
+        _page_hero(ui["error_eyebrow"], title, dot="warn")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"{_error_card(message, locale)}<div class='back-row'>"
         f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"

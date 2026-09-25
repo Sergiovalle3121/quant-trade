@@ -1260,6 +1260,8 @@ The landing's report mockup always settles flat and sharp: the hero clips with `
 
 The forward section answers first ("Aguanta" / "No aguanta" callout under the intro), then shows its four figures as a two-by-two grid on screens wider than a phone and two per row in the PDF, so no card is left alone on a row.
 
+Refusals read calm: the error card and the page's eyebrow dot are amber (a fix to make, not an alarm), size limits read in MB or KB instead of bytes, every refusal ends with a period, and a fix after a colon or semicolon (sube, exporta, revisa, upload, export, check...) goes on its own "Qué hacer:" / "What to do:" line. The size and value-too-large refusals now say what to do (a smaller file; check the exported values).
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

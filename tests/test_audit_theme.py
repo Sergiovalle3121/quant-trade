@@ -225,7 +225,7 @@ def test_error_page_shows_the_field_problem_and_expected_formats_apart() -> None
     card = page.split("<div class='error-card' role='alert'>", 1)[1]
     assert "<p class='err-field'>Estado de cuenta real</p>" in card
     assert "<p class='err-msg'>El archivo no es un informe compatible.</p>" in card
-    assert "<b>Se espera:</b>" in card and "<span class='dot bad'>" in page
+    assert "<b>Se espera:</b>" in card and "<span class='dot warn'>" in page
     # A plain sentence keeps its words and gets no field label.
     plain = error_page("No encontramos esa página. Revisa el enlace.", locale="es")
     assert "<p class='err-field'>" not in plain and "Revisa el enlace." in plain
@@ -486,3 +486,28 @@ def test_landing_mockup_ends_sharp() -> None:
     rise = STYLE[STYLE.index(".rise{") :]
     assert "filter" not in rise[: rise.index("}")]
     assert "@keyframes rise{to{opacity:1;transform:none}}" in STYLE
+
+
+def test_refusals_read_calm_with_sizes_and_what_to_do() -> None:
+    from quant_trade.audit.pages import error_page
+    from quant_trade.audit.theme import STYLE
+    from quant_trade.audit.web import _megabytes, message
+
+    assert _megabytes(10_000_000) == "10 MB" and _megabytes(1_500_000) == "1.5 MB"
+    assert _megabytes(25_000) == "25 KB"
+    for locale, label in (("es", "Qué hacer:"), ("en", "What to do:")):
+        big = error_page(
+            message("too_large", locale, what="de optimización", limit="10 MB"), locale=locale
+        )
+        assert f"<p class='err-exp'><b>{label}</b> " in big and "10 MB" in big
+        assert "bytes" not in big
+        assert find_claims(big) == []
+    dates = error_page(
+        "las fechas pueden ser día/mes o mes/día; expórtalas como AAAA-MM-DD y vuelve a subir "
+        "el archivo"
+    )
+    assert "mes/día.</p><p class='err-exp'><b>Qué hacer:</b> Expórtalas como" in dates
+    assert dates.rstrip().count("el archivo.</p>") == 1
+    # A refusal is a fix to make, not an alarm: amber rail and dot, not red.
+    assert "border-left:4px solid var(--warn)" in STYLE
+    assert "class='dot warn'" in dates or 'class="dot warn"' in dates

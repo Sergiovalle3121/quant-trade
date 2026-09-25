@@ -424,10 +424,12 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     if bool(huge.any()):
         when = frame.loc[huge.idxmax(), "timestamp"].strftime("%Y-%m-%d")
         raise ParseError(
-            f"the {what} file has a value too large to be real on {when} (over {limit:,.0f})",
+            f"the {what} file has a value too large to be real on {when} (over {limit:,.0f}): "
+            "check that the file's values were exported correctly and upload it again",
             message_es=(
                 f"El archivo {_file_es(what)} tiene un valor demasiado grande para ser real "
-                f"el {when} (más de {limit:,.0f})."
+                f"el {when} (más de {limit:,.0f}): revisa que los valores del archivo se hayan "
+                "exportado bien y vuelve a subirlo."
             ),
             code="value_too_large",
         )
