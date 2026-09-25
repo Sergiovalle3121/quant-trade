@@ -58,6 +58,10 @@ class PageMeta:
     og_type: str = "website"
 
 
+#: Pixel size of the share images in ``static/`` (og-es.png, og-en.png).
+OG_IMAGE_SIZE = (1200, 630)
+
+
 def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -82,11 +86,22 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
         f"<meta property='og:type' content='{_e(meta.og_type)}'>",
         f"<meta property='og:site_name' content='{_e(SITE_NAME[locale])}'>",
         f"<meta property='og:locale' content='{OG_LOCALE[locale]}'>",
-        "<meta name='twitter:card' content='summary'>",
+        f"<meta name='twitter:card' content='{'summary_large_image' if base_url else 'summary'}'>",
         f"<meta name='twitter:title' content='{_e(meta.title)}'>",
         f"<meta name='twitter:description' content='{_e(meta.description)}'>",
     ]
     base = base_url.rstrip("/")
+    if base:
+        # Messaging apps need an absolute URL to show a picture with the link.
+        image = f"{base}/static/og-{locale}.png"
+        tags += [
+            f"<meta property='og:image' content='{_e(image)}'>",
+            "<meta property='og:image:type' content='image/png'>",
+            f"<meta property='og:image:width' content='{OG_IMAGE_SIZE[0]}'>",
+            f"<meta property='og:image:height' content='{OG_IMAGE_SIZE[1]}'>",
+            f"<meta property='og:image:alt' content='{_e(SITE_NAME[locale])}'>",
+            f"<meta name='twitter:image' content='{_e(image)}'>",
+        ]
     own = meta.paths.get(locale)
     if base and own:
         tags.append(f"<link rel='canonical' href='{_e(base + own)}'>")

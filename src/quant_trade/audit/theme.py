@@ -29,6 +29,9 @@ STATIC_FILES: dict[str, str] = {
     "app.js": "text/javascript; charset=utf-8",
     "fonts/inter-var.woff2": "font/woff2",
     "fonts/jetbrains-mono-var.woff2": "font/woff2",
+    # The link preview shown when a page is shared (tools/make_og_images.py).
+    "og-es.png": "image/png",
+    "og-en.png": "image/png",
 }
 
 #: Cache static files for a week; their names change when their content does.
