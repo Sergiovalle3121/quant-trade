@@ -65,11 +65,14 @@ RECOGNISED_PLATFORMS: tuple[str, ...] = (
     "tastytrade",
     "eToro",
     "XTB",
+    "DEGIRO",
+    "Trading 212",
     "cTrader",
     "Sierra Chart",
     "Binance",
     "Kraken",
     "Coinbase",
+    "KuCoin",
 )
 
 

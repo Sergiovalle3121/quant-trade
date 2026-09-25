@@ -357,6 +357,150 @@ def test_contracts_names_the_instrument_when_exec_qty_is_the_size() -> None:
     assert report.metadata["column_quantity"] == "Exec Qty"
 
 
+def test_numeric_contracts_is_the_size_not_the_instrument() -> None:
+    header = "Time,Side,Contracts,Filled Qty,Price"
+    rows = ["2026-03-02 10:00,Buy,2,2,5000", "2026-03-02 11:00,Sell,2,2,5010"]
+    report = _read([header, *rows], "executions.csv")
+    assert report.symbols == [""]
+    assert "column_symbol" not in report.metadata
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [20.0]
+
+
+# DEGIRO's Transactions export in each language it ships (layouts from
+# open-source portfolio trackers that read it). Two unnamed currency columns
+# follow the price and the local value; the quantity's sign is the side.
+DEGIRO_LAYOUTS = {
+    "en": (
+        "Date,Time,Product,ISIN,Reference exchange,Venue,Quantity,Price,,Local value,,Value EUR,"
+        "Exchange rate,AutoFX Fee,Transaction and/or third party fees EUR,Total EUR,Order ID",
+        "{d},{t},{p},{i},NDQ,XNAS,{q},{px},USD,{lv},USD,{v},1.00,{fx},{fee},{tot},{o}",
+    ),
+    "es": (
+        "Fecha,Hora,Producto,ISIN,Bolsa de referencia,Centro de ejecución,Número,Precio,,"
+        "Valor local,,Valor EUR,Tipo de cambio,Comision AutoFX,"
+        "Costes de transaccion y/o externos EUR,Total EUR,ID Orden,",
+        "{d},{t},{p},{i},NDQ,XNAS,{q},{px},USD,{lv},USD,{v},1.00,{fx},{fee},{tot},{o},",
+    ),
+    "pt": (
+        "Data,Hora,Produto,ISIN,Bolsa de referência,Bolsa,Quantidade,Preços,,Valor local,,"
+        "Valor EUR,Taxa de Câmbio,Taxa Autofx,Custos de transação e/ou taxas de terceiros,"
+        "Total EUR,ID da Ordem,",
+        "{d},{t},{p},{i},NDQ,XNAS,{q},{px},USD,{lv},USD,{v},1.00,{fx},{fee},{tot},{o},",
+    ),
+    "fr": (
+        "Date,Heure,Produit,Code ISIN,Place boursière sectionnée,Lieu d'exécution,Quantité,"
+        "Cours,,Montant devise locale,,Montant EUR,Taux de change,Frais conversion AutoFX,"
+        "Frais de courtage et/ou de parties,Montant négocié EUR,ID Ordre",
+        "{d},{t},{p},{i},NDQ,XNAS,{q},{px},USD,{lv},USD,{v},1.00,{fx},{fee},{tot},{o}",
+    ),
+    "nl": (
+        "Datum,Tijd,Product,ISIN,Beurs,Uitvoeringsplaats,Aantal,Koers,,Lokale waarde,,Waarde,,"
+        "Wisselkoers,Transactiekosten,,Totaal,,Order ID",
+        "{d},{t},{p},{i},NDQ,XNAS,{q},{px},USD,{lv},USD,{v},EUR,1.00,{fee},EUR,{tot},EUR,{o}",
+    ),
+    "de": (
+        "Datum,Uhrzeit,Produkt,ISIN,Referenzbörse,Anzahl,,Kurs,,Wert in Lokalwährun,,Wert,"
+        "Wechselkurs,,Transaktionskost,,Gesamt,Order-ID",
+        "{d},{t},{p},{i},NDQ,{q},,{px},USD,{lv},USD,{v},1.00,EUR,{fee},EUR,{tot},{o}",
+    ),
+}
+DEGIRO_FILLS = [
+    # 10 Apple bought at 190, sold at 195 the next day: +50 less 2.5 of costs.
+    ("15-03-2026", "10:00", "APPLE INC", "US0378331005", "10", "190.00", "0.50", "-1.00", "a1"),
+    ("16-03-2026", "15:30", "APPLE INC", "US0378331005", "-10", "195.00", "", "-1.00", "b2"),
+    # 5 Microsoft bought at 400 and sold at 398 the same day: -10 less 2 of costs.
+    ("17-03-2026", "09:15", "MICROSOFT CORP", "US5949181045", "5", "400.00", "", "-1.00", "c3"),
+    ("17-03-2026", "16:05", "MICROSOFT CORP", "US5949181045", "-5", "398.00", "", "-1.00", "d4"),
+]
+
+
+@pytest.mark.parametrize("language", sorted(DEGIRO_LAYOUTS))
+def test_degiro_transactions_in_every_language(language: str) -> None:
+    header, template = DEGIRO_LAYOUTS[language]
+    rows = []
+    for day, clock, product, isin, quantity, price, autofx, fee, order in DEGIRO_FILLS:
+        value = -float(quantity) * float(price)
+        rows.append(
+            template.format(
+                d=day,
+                t=clock,
+                p=product,
+                i=isin,
+                q=quantity,
+                px=price,
+                lv=f"{value:.2f}",
+                v=f"{value:.2f}",
+                fx=f"-{autofx}" if autofx else "",
+                fee=fee,
+                tot=f"{value - 1:.2f}",
+                o=order,
+            )  # fmt: skip
+        )
+    report = _read([header, *rows], "Transactions.csv")
+    assert report.source_format == UNIVERSAL_FILLS_CSV
+    assert report.symbols == ["APPLE INC", "MICROSOFT CORP"]
+    assert report.trades.sides == ["long", "long"]
+    # The clock sits in its own column next to the date and is kept.
+    assert report.trades.trades[0].entry_time == datetime(2026, 3, 15, 10, 0, tzinfo=UTC)
+    assert report.trades.trades[1].exit_time == datetime(2026, 3, 17, 16, 5, tzinfo=UTC)
+    has_autofx = language not in {"nl", "de"}
+    assert _net(report) == [47.5 if has_autofx else 48.0, -12.0]
+
+
+@pytest.mark.parametrize(
+    ("time_header", "buy_time", "sell_time"),
+    [
+        ("Time", "2026-03-15 14:30:03.613", "2026-03-16 15:30:03.120"),
+        ("Time (UTC)", "2026-03-15 14:30:03+00:00", "2026-03-16 15:30:03+00:00"),
+    ],
+)
+def test_trading212_history_reads_the_order_type_and_skips_cash_rows(
+    time_header: str, buy_time: str, sell_time: str
+) -> None:
+    header = (
+        f"Action,{time_header},ISIN,Ticker,Name,No. of shares,Price / share,"
+        "Currency (Price / share),Exchange rate,Result,Currency (Result),Total,Currency (Total),"
+        "Withholding tax,Currency (Withholding tax),Notes,ID,Currency conversion fee,"
+        "Currency (Currency conversion fee)"
+    )
+    rows = [
+        "Deposit,2026-03-01 09:00:00,,,,,,,,,,1000.00,EUR,,,,D1,,",
+        f"Market buy,{buy_time},DE0007164600,SAP,SAP SE,2,200.00,EUR,1.00,,EUR,400.00,EUR,,,,"
+        "EOF1,,",
+        f"Limit sell,{sell_time},DE0007164600,SAP,SAP SE,2,205.00,EUR,1.00,10.00,EUR,410.00,"
+        "EUR,,,,EOF2,,",
+        "Dividend (Dividend),2026-03-20 08:00:00,DE0007164600,SAP,SAP SE,2,1.10,EUR,1.00,,EUR,"
+        "2.20,EUR,0.30,EUR,,DV1,,",
+    ]
+    report = _read([header, *rows], "trading212.csv")
+    assert report.symbols == ["SAP"]
+    assert report.trades.sides == ["long"]
+    assert _net(report) == [10.0]
+    entry = report.trades.trades[0].entry_time.replace(microsecond=0)
+    assert entry == datetime(2026, 3, 15, 14, 30, 3, tzinfo=UTC)
+
+
+def test_kucoin_fills_use_the_zone_in_the_column_name() -> None:
+    header = (
+        "UID,Account Type,Order ID,Symbol,Side,Order Type,Avg. Filled Price,Filled Amount,"
+        "Filled Volume,Filled Volume (USDT),Filled Time(UTC+02:00),Fee,Tax,Maker/Taker,"
+        "Fee Currency,Account Mode"
+    )
+    rows = [
+        "1001,mainAccount,o1,BTC-USDT,BUY,LIMIT,60000,0.1,6000,6000,2026-03-15 11:00:00,6,,"
+        "MAKER,USDT,CLASSIC",
+        "1001,mainAccount,o2,BTC-USDT,SELL,LIMIT,61000,0.1,6100,6100,2026-03-16 11:00:00,6.1,,"
+        "TAKER,USDT,CLASSIC",
+    ]
+    report = _read([header, *rows], "kucoin.csv")
+    assert report.symbols == ["BTC-USDT"]
+    assert report.metadata["column_quantity"] == "Filled Amount"
+    assert _net(report) == [87.9]
+    # 11:00 at UTC+2 is 09:00 UTC, and the times are no longer read as naive.
+    assert report.trades.trades[0].entry_time == datetime(2026, 3, 15, 9, 0, tzinfo=UTC)
+    assert not any("no timezone" in warning for warning in report.warnings)
+
+
 def test_ctrader_history() -> None:
     header = (
         "ID,Symbol,Opening Direction,Opening Time (UTC+0),Closing Time (UTC+0),Entry price,"

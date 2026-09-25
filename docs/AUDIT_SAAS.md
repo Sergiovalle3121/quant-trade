@@ -172,8 +172,20 @@ tastytrade (multiplier column), Fidelity ("YOU BOUGHT ..."), E*TRADE, eToro
 closed positions, XTB xStation 5 closed position history (CSV, or the XLSX with account
 rows above the header and an empty first column; the `Total` row is skipped by
 `universal.without_totals` and a second financing column such as `Rollover`
-is added to the costs), cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
-Sierra Chart's Trade Activity Log (only `Fills` rows). Time styles read:
+is added to the costs), DEGIRO Transactions in English, Spanish, Portuguese,
+French, Dutch or German (the quantity's sign is the side; the date and the
+clock-only time column are joined; the transaction and AutoFX costs, in euros,
+are subtracted as they are even on shares quoted in another currency),
+Trading 212 history (`Market buy`/`Limit sell` in `Action`; deposit and
+dividend rows have no price and are dropped; `Result` is in the account
+currency, so the contract size inferred from it absorbs the exchange rate),
+KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader, Binance
+(with `Fee Coin`), Kraken, Coinbase and Sierra Chart's Trade Activity Log (only
+`Fills` rows). A zone stated in a time column's name (`Filled Time(UTC+02:00)`,
+`Transaction Time(UTC+10)`, `Date(UTC)`) applies to every cell that carries
+none, so those times are no longer reported as naive. A `Contracts` column is
+taken as the instrument only when there is no symbol column and its cells are
+not numbers. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
 order that no day past 12 settles is taken from a year-first column of the
