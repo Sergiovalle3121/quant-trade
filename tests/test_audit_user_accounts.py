@@ -1150,3 +1150,21 @@ def test_network_claims_hold_only_a_hash_and_the_purge_drops_them(tmp_path: Path
     with store.engine.connect() as conn:  # type: ignore[attr-defined]
         left = [row[0] for row in conn.execute(store.free_claims.select())]  # type: ignore[attr-defined]
     assert left == ["preview:account:a:2026-01:0"]
+
+
+def test_landing_says_before_the_file_that_an_upload_needs_an_account(tmp_path: Path) -> None:
+    client, _store, _settings_ = _client(tmp_path)
+    for path, words, signup in (
+        ("/", "Antes de subir, crea tu cuenta gratis", "/registro"),
+        ("/en", "Before you upload, create your free account", "/signup"),
+    ):
+        page = client.get(path).text
+        box = page.split("class='signin-first'")[1].split("</div></div>")[0]
+        assert words in box and f"href='{signup}'" in box
+        # It sits above the file fields, so nobody fills the form in to be turned away.
+        assert page.index("class='signin-first'") < page.index("name='report'")
+        assert find_claims(box) == []
+    _signup(client)
+    assert "class='signin-first'" not in client.get("/").text
+    free, _store, _settings_ = _client(tmp_path / "free", free_mode=True)
+    assert "class='signin-first'" not in free.get("/").text
