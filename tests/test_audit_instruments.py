@@ -160,3 +160,34 @@ def test_a_share_above_the_total_says_the_others_subtract() -> None:
     review = instrument_review(trades, symbols)
     html = _instruments_html(review, "es", LABELS["es"])
     assert "Más que el resultado neto viene de XAUUSD: los demás juntos restan" in html
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_instrument_named_with_promotional_wording_is_withheld(locale: str) -> None:
+    # The names come from the file; one the guard refuses used to crash the render.
+    inputs = _inputs(locale)
+    count = len(inputs.trades.trades)
+    symbols = (["EURUSD", "GANANCIAS GARANTIZADAS", "GARANTIZADO"] * count)[:count]
+    inputs = dataclasses.replace(inputs, trade_symbols=symbols)
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300)
+    assert result.instruments is not None and result.instruments["status"] == "MEASURED"
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    assert "GANANCIAS GARANTIZADAS" not in html and "GARANTIZADO<" not in html
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_live_symbol_named_with_promotional_wording_is_withheld() -> None:
+    inputs = _inputs("es")
+    count = len(inputs.trades.trades)
+    inputs = dataclasses.replace(
+        inputs,
+        trade_symbols=["EURUSD"] * count,
+        live_trades=inputs.trades,
+        live_symbols=["GANANCIAS GARANTIZADAS"] * count,
+    )
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300)
+    assert result.live is not None and result.live["new_symbols"]
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    assert "GANANCIAS GARANTIZADAS" not in html

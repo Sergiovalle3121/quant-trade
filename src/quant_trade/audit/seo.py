@@ -25,8 +25,8 @@ LOCALES: tuple[str, ...] = ("es", "en")
 #: approval, earnings or passing a challenge.
 BRAND = "Rigor"
 TAGLINE: dict[str, str] = {
-    "es": "Auditoría estadística independiente de backtests",
-    "en": "Independent statistical backtest audit",
+    "es": "Auditoría estadística independiente de backtests e historiales",
+    "en": "Independent statistical audit of backtests and track records",
 }
 SITE_NAME: dict[str, str] = {locale: f"{BRAND} · {TAGLINE[locale]}" for locale in TAGLINE}
 OG_LOCALE: dict[str, str] = {"es": "es_ES", "en": "en_US"}

@@ -951,7 +951,10 @@ def run_audit(
     )
     instruments = (
         instruments_lib.instrument_review(
-            inputs.trades.trades, inputs.trade_symbols, inputs.trades.fees
+            inputs.trades.trades,
+            # Instrument names come from the file and are echoed in the report.
+            [_safe_text(s) for s in inputs.trade_symbols] if inputs.trade_symbols else None,
+            inputs.trades.fees,
         )
         if inputs.trades is not None
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
@@ -967,6 +970,8 @@ def run_audit(
         if inputs.live_trades is not None
         else None
     )
+    if live and live.get("new_symbols"):
+        live["new_symbols"] = [_safe_text(s) for s in live["new_symbols"]]
     risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
     challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
 

@@ -442,6 +442,8 @@ rgba(31,94,255,.06),transparent 45%)}
 .spot:hover::before{opacity:1}
 .card h3{font-size:1.2rem;font-weight:620;letter-spacing:-.025em;margin:28px 0 10px}
 .card p{margin:0;color:var(--text-2);font-size:.96rem;line-height:1.6}
+.audience p+p{margin-top:10px}
+.audience strong{color:var(--text)}
 .icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
 color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
 .icon svg{width:22px;height:22px}
