@@ -73,6 +73,10 @@ COPY: dict[str, dict[str, str]] = {
         "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
         "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
         "password_bad": "La contraseña tiene un carácter que no se puede usar.",
+        "password_common": (
+            "Esa contraseña es de las primeras que prueba cualquier lista de adivinanzas. Usa una "
+            "frase propia, por ejemplo tres o cuatro palabras que solo tú asocies."
+        ),
         "taken": (
             "No se pudo crear una cuenta con ese correo. Si ya tienes una, entra con tu contraseña."
         ),
@@ -284,6 +288,10 @@ COPY: dict[str, dict[str, str]] = {
         "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
         "password_long": "The password is too long (256 characters at most).",
         "password_bad": "The password has a character that cannot be used.",
+        "password_common": (
+            "That password is among the first any guessing list tries. Use a phrase of your own, "
+            "for example three or four words only you would put together."
+        ),
         "taken": (
             "An account could not be created with that e-mail. If you already have one, sign "
             "in with your password."

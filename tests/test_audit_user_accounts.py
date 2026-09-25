@@ -1335,3 +1335,46 @@ def test_an_upload_posted_from_another_site_is_refused(tmp_path: Path) -> None:
     assert post({"Origin": "null"}) == 401
     assert post({"Origin": "http://testserver"}) == 401
     assert post({}) == 401
+
+
+def test_common_passwords_are_refused_offline() -> None:
+    from quant_trade.audit.accounts import common_password, password_problem
+
+    for weak in (
+        "1234567890",
+        "qwertyuiop",
+        "password123",
+        "Password2024!",
+        "contraseña123",
+        "aaaaaaaaaaaa",
+        "abcabcabcabc",
+        "iloveyou2020",
+        "1qaz2wsx3edc",
+        "trader12345",
+        "20240521198801",
+    ):
+        assert common_password(weak), weak
+        assert password_problem(weak) == "password_common", weak
+    assert password_problem("anapaula1990", email="anapaula@example.com") == "password_common"
+    for fine in (PASSWORD, "long safe phrase", "correct horse battery", "MiPerroSeLlamaTobi"):
+        assert not common_password(fine), fine
+
+
+def test_sign_up_and_password_change_refuse_a_common_password(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    csrf = _csrf(client.get("/registro").text)
+    refused = client.post(
+        "/registro",
+        data={"email": "weak@example.com", "password": "password123", "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert refused.status_code == 400 and "primeras que prueba cualquier lista" in refused.text
+    _signup(client, "strong@example.com")
+    page = client.get("/cuenta").text
+    answer = client.post(
+        "/cuenta/contrasena",
+        data={"current": PASSWORD, "password": "qwertyuiop123", "csrf": _csrf(page)},
+        follow_redirects=False,
+    )
+    assert answer.headers["location"].endswith("?error=password_common")
+    assert "primeras que prueba cualquier lista" in client.get(answer.headers["location"]).text
