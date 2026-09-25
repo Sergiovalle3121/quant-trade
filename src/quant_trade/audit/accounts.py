@@ -176,6 +176,7 @@ def same_secret(a: str | None, b: str | None) -> bool:
 
 #: Where a form may send the customer back after signing in.
 _NEXT_PREFIXES = ("/audits/", "/cuenta", "/account")
+_NEXT_HOMES = ("/", "/en")
 
 
 def safe_next(value: str | None) -> str:
@@ -191,7 +192,10 @@ def safe_next(value: str | None) -> str:
     parts = urlsplit(value)
     if parts.scheme or parts.netloc or value.startswith("//"):
         return ""
-    if not parts.path.startswith(_NEXT_PREFIXES):
+    # The home page only as itself (with the upload form's anchor), never
+    # as a prefix: "/" would otherwise allow every path.
+    home = parts.path in _NEXT_HOMES and not parts.query
+    if not (home or parts.path.startswith(_NEXT_PREFIXES)):
         return ""
     return value
 

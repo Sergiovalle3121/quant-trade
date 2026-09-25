@@ -129,7 +129,17 @@ def test_emails_and_return_paths_are_checked() -> None:
     assert not valid_email("ana@example") and not valid_email("a b@example.com")
     assert safe_next("/audits/abc?token=x&lang=es") == "/audits/abc?token=x&lang=es"
     assert safe_next("/cuenta") == "/cuenta"
-    for bad in ("https://evil.example/", "//evil.example/cuenta", "/panel", "/\\evil", ""):
+    assert safe_next("/#subir") == "/#subir" and safe_next("/en#subir") == "/en#subir"
+    for bad in (
+        "https://evil.example/",
+        "//evil.example/cuenta",
+        "/panel",
+        "/\\evil",
+        "",
+        "/?x=1",
+        "/enx",
+        "///evil.example",
+    ):
         assert safe_next(bad) == ""
 
 
@@ -796,7 +806,7 @@ def test_a_preview_needs_an_account_unless_a_working_code_pays_for_it(tmp_path: 
     refused = _upload(client)
     assert refused.status_code == 401
     assert "tu primer informe completo no se paga" in refused.text
-    assert "href='/registro'" in refused.text and "3 vistas previas gratis" in refused.text
+    assert "href='/registro?next=" in refused.text and "3 vistas previas gratis" in refused.text
     assert not find_claims(re.sub(r"<[^>]+>", " ", refused.text))
     as_json = client.post(
         "/audits",
@@ -1168,3 +1178,47 @@ def test_landing_says_before_the_file_that_an_upload_needs_an_account(tmp_path: 
     assert "class='signin-first'" not in client.get("/").text
     free, _store, _settings_ = _client(tmp_path / "free", free_mode=True)
     assert "class='signin-first'" not in free.get("/").text
+
+
+# -- small screens after sign-up ---------------------------------------------------
+def test_a_new_account_is_invited_to_upload_its_first_file(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client)
+    page = client.get("/cuenta").text
+    assert "Subir mi primer archivo" in page and "Auditar otro archivo" not in page
+    _upload(client)
+    assert "Auditar otro archivo" in client.get("/cuenta").text
+
+
+def test_the_sign_in_gate_says_the_file_was_not_kept_and_returns_to_the_form(
+    tmp_path: Path,
+) -> None:
+    client, _, _ = _client(tmp_path)
+    refused = _upload(client)
+    assert refused.status_code == 401
+    assert "Tu archivo no se guardó" in refused.text
+    assert "href='/registro?next=/%23subir'" in refused.text
+    assert not find_claims(re.sub(r"<[^>]+>", " ", refused.text))
+    signup = client.get("/registro?next=/%23subir").text
+    assert "name='next' value='/#subir'" in signup
+    answer = client.post(
+        "/registro",
+        data={
+            "email": "back@example.com",
+            "password": PASSWORD,
+            "csrf": _csrf(signup),
+            "next": "/#subir",
+        },
+        follow_redirects=False,
+    )
+    assert answer.status_code == 303 and answer.headers["location"] == "/#subir"
+
+
+def test_the_account_buys_on_whatsapp_with_the_same_three_steps(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client)
+    page = client.get("/cuenta").text
+    assert "Comprar por WhatsApp" in page and "Pedir un código" not in page
+    assert page.count("<li>", page.index("buy-steps")) >= 3
+    assert "Responde una persona" in page
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))

@@ -90,6 +90,7 @@ COPY: dict[str, dict[str, str]] = {
         "reports": "Informes",
         "paid_reports": "Informes completos",
         "new_audit": "Auditar otro archivo",
+        "first_audit": "Subir mi primer archivo",
         "reports_title": "Tus informes",
         "reports_none": (
             "Aún no hay informes en tu cuenta. Sube un archivo con la sesión iniciada, o abre "
@@ -155,7 +156,17 @@ COPY: dict[str, dict[str, str]] = {
         "col_paid": "Pagado",
         "col_method": "Con",
         "buy_title": "¿Necesitas créditos?",
-        "buy_code": "Pedir un código por WhatsApp",
+        "buy_code": "Comprar por WhatsApp",
+        "buy_code_how": (
+            "Nos escribes por WhatsApp; el mensaje ya dice que es para tu cuenta.|"
+            "Te respondemos con los datos para pagar.|"
+            "Al confirmarse el pago recibes un código: lo escribes en «Código de acceso» y los "
+            "créditos quedan en tu cuenta."
+        ),
+        "buy_code_wait": (
+            "Responde una persona. Si escribes de noche o en fin de semana, te contestamos en "
+            "cuanto lo veamos."
+        ),
         "buy_prices_single": "Un informe completo: {price}.",
         "buy_prices_pack": "Paquete de 3 créditos: {price}.",
         "buy_message": (
@@ -207,8 +218,9 @@ COPY: dict[str, dict[str, str]] = {
         "gate_signin_lead": (
             "Al crear tu cuenta, el primer archivo que subas sale como informe completo, con "
             "PDF, sin pagar. Después tienes {limit} vistas previas gratis cada mes: la clase de "
-            "A a D, las gráficas y las señales de alerta. Si ya tienes un código de acceso, "
-            "escríbelo en el formulario y no necesitas cuenta."
+            "A a D, las gráficas y las señales de alerta. Tu archivo no se guardó: al crear tu "
+            "cuenta vuelves al formulario para subirlo otra vez. Si ya tienes un código de "
+            "acceso, escríbelo en el formulario y no necesitas cuenta."
         ),
         "gate_code_title": "Ese código no sirve",
         "gate_code_lead": (
@@ -288,6 +300,7 @@ COPY: dict[str, dict[str, str]] = {
         "reports": "Reports",
         "paid_reports": "Full reports",
         "new_audit": "Audit another file",
+        "first_audit": "Upload my first file",
         "reports_title": "Your reports",
         "reports_none": (
             "No reports on your account yet. Upload a file while signed in, or open a report "
@@ -353,7 +366,17 @@ COPY: dict[str, dict[str, str]] = {
         "col_paid": "Paid",
         "col_method": "With",
         "buy_title": "Need credits?",
-        "buy_code": "Ask for a code on WhatsApp",
+        "buy_code": "Buy on WhatsApp",
+        "buy_code_how": (
+            "You message us on WhatsApp; the message already says it is for your account.|"
+            "We reply with the payment details.|"
+            "Once the payment is confirmed you get a code: enter it under Access code and the "
+            "credits land on your account."
+        ),
+        "buy_code_wait": (
+            "A person replies. If you write at night or at the weekend, we answer as soon as "
+            "we see it."
+        ),
         "buy_prices_single": "One full report: {price}.",
         "buy_prices_pack": "Pack of 3 credits: {price}.",
         "buy_message": "Hi, I want credits for my account: one full report or the pack of 3.",
@@ -401,8 +424,9 @@ COPY: dict[str, dict[str, str]] = {
         "gate_signin_lead": (
             "When you create your account, the first file you upload comes out as a full "
             "report, with the PDF, at no cost. Then you get {limit} free previews every month: "
-            "the A to D class, the charts and the red flags. If you already have an access "
-            "code, type it in the form and you need no account."
+            "the A to D class, the charts and the red flags. Your file was not kept: once your "
+            "account exists you are back at the form to upload it again. If you already have "
+            "an access code, type it in the form and you need no account."
         ),
         "gate_code_title": "That code does not work",
         "gate_code_lead": (
@@ -548,9 +572,16 @@ def _email_field(copy: dict[str, str], email: str) -> str:
     )
 
 
+def _q(next_path: str) -> str:
+    """A ``next`` path as a query value: ``#`` and ``&`` must not end the link."""
+    from urllib.parse import quote
+
+    return quote(next_path, safe="/")
+
+
 def _switch(kind: str, locale: str, next_path: str = "") -> str:
     other = "en" if locale == "es" else "es"
-    query = f"?next={_e(next_path)}" if next_path else ""
+    query = f"?next={_e(_q(next_path))}" if next_path else ""
     return path(kind, other) + query
 
 
@@ -561,7 +592,7 @@ def signup_page(
     copy = COPY[locale]
     from quant_trade.audit.legal import legal_url
 
-    signin = path("signin", locale) + (f"?next={_e(next_path)}" if next_path else "")
+    signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
         _alert(copy, error)
         + f"<form method='post' action='{path('signup', locale)}'>"
@@ -605,7 +636,7 @@ def signin_page(
 ) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
-    signup = path("signup", locale) + (f"?next={_e(next_path)}" if next_path else "")
+    signup = path("signup", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
         _alert(copy, error, flash)
         + f"<form method='post' action='{path('signin', locale)}'>"
@@ -670,10 +701,12 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
     reason = reason if reason in ("signin", "code", "quota", "network") else "signin"
     home = "/en" if locale == "en" else "/"
     if reason in ("signin", "code"):
+        # After signing up or in, back to the upload form: the file was not kept.
+        back = "?next=" + _e(_q(home + "#subir"))
         buttons = (
-            f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}'>"
+            f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}{back}'>"
             f"{_e(copy['gate_signup'])}</a>"
-            f"<a class='btn btn-ghost btn-lg' href='{path('signin', locale)}'>"
+            f"<a class='btn btn-ghost btn-lg' href='{path('signin', locale)}{back}'>"
             f"{_e(copy['gate_signin'])}</a>"
         )
     else:
@@ -917,7 +950,7 @@ def account_page(
         "<div class='acct-head'>"
         f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(_safe_text(account.email))}</b></p>"
         f"<div class='inline-form'><a class='btn btn-primary' href='{home}#subir'>"
-        f"{_e(copy['new_audit'])}</a>{signout}</div></div>"
+        f"{_e(copy['new_audit'] if audits else copy['first_audit'])}</a>{signout}</div></div>"
     )
     free_value = copy["free_left_value"].format(left=free_left, limit=free_limit)
     kpis = (
@@ -981,6 +1014,9 @@ def account_page(
             lines += (
                 f"<p><a class='btn btn-dark' href='{_e(href)}' rel='noopener noreferrer' "
                 f"target='_blank'>{icon('chat')}{_e(copy['buy_code'])}</a></p>"
+                "<ol class='buy-steps'>"
+                + "".join(f"<li>{_e(step)}</li>" for step in copy["buy_code_how"].split("|"))
+                + f"</ol><p class='muted'>{_e(copy['buy_code_wait'])}</p>"
             )
         if card_payments:
             lines += f"<p class='muted'>{_e(copy['buy_card'])}</p>"
@@ -1067,7 +1103,7 @@ def report_box(
     base = f"/audits/{audit_id}"
     parts: list[str] = []
     if state == "anon":
-        suffix = f"?next={_e(next_path)}" if next_path else ""
+        suffix = f"?next={_e(_q(next_path))}" if next_path else ""
         parts.append(
             f"<span>{_e(copy['anon_box'])}</span>"
             f"<a class='btn btn-dark btn-sm' href='{path('signup', locale)}{suffix}'>"
