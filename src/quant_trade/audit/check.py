@@ -50,9 +50,10 @@ COPY: dict[str, dict[str, Any]] = {
         "missing_title": "Rigor no tiene registro de este archivo",
         "missing": (
             "No coincide con ningún archivo que Rigor tenga registrado. Puede haberse editado, "
-            "venir de otro sitio o ser anterior al 25 de septiembre de 2026, cuando Rigor "
-            "empezó a registrar los informes que entrega. Pide al vendedor el enlace a su "
-            "página pública en Rigor, o que descargue el informe de nuevo y te lo envíe."
+            "venir de otro sitio, no haber llegado a registrarse o ser anterior al 25 de "
+            "septiembre de 2026, cuando Rigor empezó a registrar los informes que entrega. "
+            "Pide al vendedor el enlace a su página pública en Rigor, o que descargue el "
+            "informe de nuevo y te lo envíe."
         ),
         "scope": (
             "Esto solo dice si el archivo cambió desde que Rigor lo generó. No dice nada sobre "
@@ -99,9 +100,9 @@ COPY: dict[str, dict[str, Any]] = {
         "missing_title": "Rigor has no record of this file",
         "missing": (
             "It matches no file Rigor has on record. It may have been edited, come from "
-            "elsewhere, or predate 25 September 2026, when Rigor started recording the "
-            "reports it hands out. Ask the seller for the link to its public page on Rigor, "
-            "or to download the report again and send it to you."
+            "elsewhere, never have been recorded, or predate 25 September 2026, when Rigor "
+            "started recording the reports it hands out. Ask the seller for the link to its "
+            "public page on Rigor, or to download the report again and send it to you."
         ),
         "scope": (
             "This only says whether the file changed since Rigor produced it. It says nothing "

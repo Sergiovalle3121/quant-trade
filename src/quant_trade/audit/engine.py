@@ -29,6 +29,7 @@ import pandas as pd
 
 from quant_trade.audit import account as account_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
+from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import decay as decay_lib
 from quant_trade.audit import forward as forward_lib
@@ -920,6 +921,11 @@ def run_audit(
         else ({"status": "NOT_MEASURED", "reason": "no trades uploaded"}, [])
     )
     flags.extend(recent_flags)
+    behaviour = (
+        behaviour_lib.behaviour_review(inputs.trades.trades, inputs.trades.fees)
+        if inputs.trades is not None
+        else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    )
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
     stress_tests = _stress(inputs, frame)
@@ -1118,6 +1124,7 @@ def run_audit(
         plateau=plateau,
         forward=forward,
         recent=recent,
+        behaviour=behaviour,
         vendor_questions=questions,
     )
 
