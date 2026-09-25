@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.report import LABELS, _account_html, _pct, render_html
+from quant_trade.audit.report import LABELS, _account_html, _pct, _table_pct, render_html
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import AuditResult
 
@@ -174,3 +174,44 @@ def test_stress_figures_never_print_a_signed_zero(value: float, percent: bool, s
 
 def test_the_class_plan_reads_in_spanish() -> None:
     assert "PASS" not in LABELS["es"]["plan_class"]
+
+
+@pytest.mark.parametrize(
+    ("value", "shown"),
+    [
+        (0.0, "0.00%"),
+        (-0.0, "0.00%"),
+        (-1.2e-7, "-0.000012%"),
+        (3.14159e-7, "0.000031%"),
+        (-0.00005, "-0.01%"),
+        (0.1234, "12.34%"),
+        (1e-15, "0.00%"),
+    ],
+)
+def test_table_percentages_keep_small_digits_and_never_a_signed_zero(
+    value: float, shown: str
+) -> None:
+    assert _table_pct(value) == shown
+
+
+def test_a_history_in_tiny_units_prints_no_signed_zero_percent() -> None:
+    from datetime import UTC, datetime
+
+    import numpy as np
+    import pandas as pd
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    rng = np.random.default_rng(1)
+    equity = 10_000 + np.cumsum(rng.normal(0.0002, 0.001, 900))
+    frame = pd.DataFrame(
+        {"date": pd.date_range("2021-01-04", periods=900, freq="D").date, "equity": equity}
+    )
+    inputs = build_inputs(frame.to_csv(index=False).encode(), DeclaredMetadata(trials=1))
+    result = run_audit(inputs, now=datetime(2026, 1, 1, tzinfo=UTC), bootstrap_samples=100)
+    for locale in ("es", "en"):
+        page = render_html(result, watermark=False, locale=locale)
+        page = html.unescape(re.sub(r"<[^>]+>", " ", page))
+        assert "-0.00%" not in page
+        assert "-0.0%" not in page
