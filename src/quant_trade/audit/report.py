@@ -252,6 +252,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
+        "my_account": "Mi cuenta",
         "yes": "sí",
         "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
@@ -949,6 +950,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
         "pdf_check_link": "How they check",
         "switch": "Español",
+        "my_account": "My account",
         "yes": "yes",
         "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
@@ -4121,6 +4123,7 @@ def render_html(
     code_error: bool = False,
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
+    account_box: str = "",
 ) -> str:
     """The audit as one HTML document.
 
@@ -4663,8 +4666,10 @@ def render_html(
             "<button type='button' class='print-btn' "
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
+    account_href = "/account" if locale == "en" else "/cuenta"
     toolbar = (
         "<div class='nav-end no-print'>"
+        + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
             f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
@@ -4697,6 +4702,7 @@ def render_html(
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
         + _pack_notice(labels, pack_code, pack_credits_left)
+        + account_box
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
         + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
@@ -4941,6 +4947,7 @@ def render(
     code_error: bool = False,
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
+    account_box: str = "",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -4965,6 +4972,7 @@ def render(
         code_error=code_error,
         pay_links=pay_links,
         notice_ok=notice_ok,
+        account_box=account_box,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
