@@ -230,7 +230,10 @@ def test_the_verdict_sentence_speaks_plainly() -> None:
     from quant_trade.audit.verdict import _TEXT
 
     page = _page("es")
-    assert "El resultado es demasiado constante para explicarse solo por azar" in page
+    assert (
+        "Como una sola prueba, el resultado es demasiado constante para explicarse solo por azar"
+        in page
+    )
     assert "no con 3 veces ese coste" in page
     assert "En el periodo apartado para comprobar (fuera de muestra)" in page
     assert "estadísticamente distinguible" not in page and "se degrada" not in page

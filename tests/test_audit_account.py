@@ -19,7 +19,7 @@ from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import MT4_STATEMENT_HTML, MT5_TESTER_HTML, import_report
-from quant_trade.audit.report import render
+from quant_trade.audit.report import render, render_html
 from quant_trade.audit.schema import DeclaredMetadata, ParsedTrades, build_inputs
 from quant_trade.core.models import Trade
 
@@ -234,3 +234,41 @@ def test_account_uploaded_as_live_is_reviewed_without_touching_the_class() -> No
     html, _ = render(with_live, watermark=False)
     assert_report_clean(html)
     assert "como cuenta real" in html
+
+
+def test_a_history_without_its_opening_deposit_is_flagged_as_possibly_trimmed() -> None:
+    whole, _ = account_review(
+        source_format=MT4_STATEMENT_HTML,
+        cash_flows=[(START - timedelta(days=1), 10_000.0)],
+        trades=_trades([10.0, 20.0]),
+        frame=_frame([10_000.0, 10_010.0, 10_030.0]),
+        metadata={},
+    )
+    assert whole["starts_with_deposit"] is True
+    cut, flags = account_review(
+        source_format=MT4_STATEMENT_HTML,
+        cash_flows=[(START + timedelta(days=5), 500.0)],
+        trades=_trades([10.0, 20.0]),
+        frame=_frame([10_000.0, 10_010.0, 10_030.0]),
+        metadata={},
+    )
+    # Informational only: no red flag, so the class does not move.
+    assert cut["starts_with_deposit"] is False and flags == []
+    assert cut["first_trade"] == START.isoformat()
+
+
+def test_the_report_says_when_the_start_may_be_missing() -> None:
+    trimmed = _statement(TOPPED_UP[1:], floating=0.0, balance=19_500.0)
+    for locale, words in (
+        ("es", "sin el depósito que abrió la cuenta"),
+        ("en", "without the deposit that funded the account"),
+    ):
+        result = _audit(trimmed, locale)
+        assert result.account is not None and result.account["starts_with_deposit"] is False
+        page = render_html(result, watermark=False)
+        assert words in page
+        assert_report_clean(page)
+    whole = render_html(
+        _audit(_statement(TOPPED_UP, floating=0.0, balance=19_500.0)), watermark=False
+    )
+    assert "sin el depósito que abrió la cuenta" not in whole

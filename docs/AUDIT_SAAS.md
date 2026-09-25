@@ -682,6 +682,14 @@ the floating result is the platform's figure at print time, not a history
 of floating losses; a history printed after the open losers close shows
 none of it.
 
+A history whose first trade comes before any deposit (no deposit on or
+before the first entry) gets an informational line in the account section,
+"Para preguntar": the start may have been cut, the % gain is measured from
+the file's first balance, and the buyer should ask for the export from the
+day the account opened (`starts_with_deposit`, `first_trade`). It is not a
+red flag and does not change the class. Real Myfxbook export
+Eric-Lingren ParseFolio shows it; the other five do not.
+
 ### Lone peak or plateau (`audit/plateau.py`)
 
 For buyers of an optimised robot. Needs the MT5 optimisation export (at
@@ -1121,8 +1129,9 @@ Class A is worded as "no evidence of overfitting found in what was
 supplied". It is not a prediction.
 
 The verdict sentence speaks to a buyer first and keeps the measure's name in
-brackets: significance reads "too consistent to be explained by chance alone
-(Sharpe ratio distinguishable from zero)", the held-out check reads "the
+brackets: significance reads "as a single test, too consistent to be explained
+by chance alone (Sharpe ratio distinguishable from zero)" (the next sentence,
+and the luck section, then discount the configurations tried), the held-out check reads "the
 period held back for checking (out of sample)", and "deflated Sharpe" reads
 "the Sharpe adjusted for those trials". The thresholds are unchanged.
 

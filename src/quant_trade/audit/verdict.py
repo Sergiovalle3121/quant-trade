@@ -496,8 +496,8 @@ _TEXT: dict[str, dict[str, str]] = {
             "no se pueden tomar tal cual."
         ),
         f"{STATISTICAL}.PASS": (
-            "El resultado es demasiado constante para explicarse solo por azar (Sharpe "
-            "distinguible de cero)."
+            "Como una sola prueba, el resultado es demasiado constante para explicarse solo "
+            "por azar (Sharpe distinguible de cero)."
         ),
         f"{STATISTICAL}.WEAK": (
             "No está claro que el resultado supere al azar: el rango probable del Sharpe "
@@ -589,8 +589,8 @@ _TEXT: dict[str, dict[str, str]] = {
             "cannot be taken as they stand."
         ),
         f"{STATISTICAL}.PASS": (
-            "The result is too consistent to be explained by chance alone (Sharpe ratio "
-            "distinguishable from zero)."
+            "As a single test, the result is too consistent to be explained by chance alone "
+            "(Sharpe ratio distinguishable from zero)."
         ),
         f"{STATISTICAL}.WEAK": (
             "It is unclear whether the result beats chance: the likely range of the Sharpe "
