@@ -484,6 +484,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "When you redeem an access code: which code unlocked the audit, by its "
                     "internal id. Codes are stored only as a hash.",
                     "When you publish a verification page: its public id and the date.",
+                    "When you download your report as a PDF or JSON: the SHA-256 hash of that "
+                    "file, so anyone holding it can check at /check that it was not edited. "
+                    "A file checked there is read and discarded, never kept.",
                     "When you join the updates list: your e-mail address.",
                 ),
             ),
@@ -576,6 +579,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Si canjeas un código de acceso: qué código desbloqueó la auditoría, por su "
                 "identificador interno. Los códigos se guardan solo como hash.",
                 "Si publicas una página de verificación: su identificador público y la fecha.",
+                "Si descargas tu informe en PDF o JSON: el hash SHA-256 de ese archivo, para "
+                "que quien lo tenga pueda comprobar en /comprobar que no se editó. Un archivo "
+                "que se comprueba ahí se lee y se descarta, nunca se guarda.",
                 "Si te apuntas a la lista de avisos: tu correo.",
             ),
         ),

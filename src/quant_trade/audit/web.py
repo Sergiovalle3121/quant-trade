@@ -37,6 +37,7 @@ from typing import Annotated, Any
 
 from pydantic import ValidationError
 
+from quant_trade.audit import check as check_lib
 from quant_trade.audit import payments
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.compare import COPY as COMPARE_COPY
@@ -57,6 +58,7 @@ from quant_trade.audit.owner import (
 from quant_trade.audit.pages import (
     SAMPLE_BANNER,
     badge_svg,
+    check_page,
     compare_page,
     error_page,
     guide_page,
@@ -762,6 +764,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
     panel_failures = AttemptLog()
+    check_attempts = AttemptLog()
     app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
     # Waiting for a slot happens in the event loop (an await, not a blocked
     # thread), so a queue of uploads never starves the pages that share the
@@ -888,6 +891,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             chunks.append(chunk)
         data = b"".join(chunks)
         return data or None
+
+    def _record_issued(content: bytes, *, audit_id: str, kind: str) -> None:
+        """Remember a handed-out file's hash; a failure never blocks the download."""
+        try:
+            db.record_issued(content, audit_id=audit_id, kind=kind, at=datetime.now(UTC))
+        except Exception:  # noqa: BLE001 - the customer still gets the file
+            logger.warning("could not record an issued %s file", kind)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
@@ -1299,6 +1309,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _html_error(request, 503, message("pdf_busy", locale), locale)
             except pdf_lib.PdfUnavailable:
                 return _html_error(request, 503, message("pdf_unavailable", locale), locale)
+            _record_issued(content, audit_id=record.id, kind="pdf")
             with pdf_cache_lock:
                 pdf_cache[key] = content
                 while len(pdf_cache) > PDF_CACHE_SIZE:
@@ -1320,7 +1331,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         record = _load(audit_id, token)
         if not record.paid and not cfg.free_mode:
             raise HTTPException(status_code=402, detail="payment_required")
-        return Response(content=record.result_json, media_type="application/json")
+        content = record.result_json.encode("utf-8")
+        _record_issued(content, audit_id=record.id, kind="json")
+        return Response(content=content, media_type="application/json")
 
     @app.get("/audits/{audit_id}", response_class=HTMLResponse)
     def audit_page(
@@ -1528,6 +1541,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
+                    _record_issued(
+                        sample_pdfs[locale], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
+                    )
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(
                         error_page(message("pdf_busy", locale), locale=locale), status_code=503
@@ -1685,6 +1701,62 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
         return _compare(link_a, link_b, lang, "en")
+
+    def _check_page(request: Request, locale: str, content: str, status: int = 200) -> Response:
+        page = check_page(content, locale=locale, base_url=_site_url(request))
+        return HTMLResponse(guard_page(page), status_code=status)
+
+    @app.get("/comprobar", response_class=HTMLResponse)
+    def check_es(request: Request, lang: str | None = None) -> Response:
+        locale = _locale(lang or "es")
+        return _check_page(request, locale, check_lib.check_form(locale))
+
+    @app.get("/check", response_class=HTMLResponse)
+    def check_en(request: Request, lang: str | None = None) -> Response:
+        locale = _locale(lang or "en")
+        return _check_page(request, locale, check_lib.check_form(locale))
+
+    async def _check(request: Request, report: UploadFile | None, locale: str) -> Response:
+        copy = check_lib.COPY[locale]
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        if check_attempts.hit(ip, datetime.now(UTC)) >= check_lib.CHECKS_PER_HOUR_PER_IP:
+            return _html_error(request, 429, message("rate_limited", locale), locale)
+        if report is None or not report.filename:
+            return _check_page(
+                request, locale, check_lib.check_form(locale, error=copy["no_file"]), 400
+            )
+        digest = hashlib.sha256()
+        size = 0
+        while chunk := await report.read(1 << 16):
+            size += len(chunk)
+            if size > check_lib.MAX_CHECK_BYTES:
+                return _check_page(
+                    request, locale, check_lib.check_form(locale, error=copy["too_large"]), 413
+                )
+            digest.update(chunk)
+        if size == 0:
+            return _check_page(
+                request, locale, check_lib.check_form(locale, error=copy["no_file"]), 400
+            )
+        hexdigest = digest.hexdigest()
+        found = await run_in_threadpool(db.find_issued, hexdigest)
+        return _check_page(request, locale, check_lib.check_result(found, hexdigest, locale))
+
+    @app.post("/comprobar", response_class=HTMLResponse)
+    async def check_post_es(
+        request: Request,
+        report: Annotated[UploadFile | None, File()] = None,
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return await _check(request, report, _locale(lang or "es"))
+
+    @app.post("/check", response_class=HTMLResponse)
+    async def check_post_en(
+        request: Request,
+        report: Annotated[UploadFile | None, File()] = None,
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return await _check(request, report, _locale(lang or "en"))
 
     @app.get("/terminos", response_class=HTMLResponse)
     def terms_es(request: Request, lang: str | None = None) -> str:

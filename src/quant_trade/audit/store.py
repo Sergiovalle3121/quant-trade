@@ -112,6 +112,18 @@ class PublicationRecord:
     created_at: str
 
 
+@dataclass(frozen=True)
+class IssuedFile:
+    """A report file the service handed out, found by its SHA-256."""
+
+    audit_id: str
+    kind: str
+    issued_at: str
+    #: ``None`` for the sample report, which has no audit row.
+    overall_class: str | None
+    public_id: str | None
+
+
 class _RedeemRace(RuntimeError):
     """Raised inside a transaction to roll back a credit spent for nothing."""
 
@@ -203,6 +215,18 @@ class Store:
             sa.Column("result_sha256", sa.String(64), nullable=False),
             sa.Column("view_json", sa.Text, nullable=False),
             sa.Column("kept_at", sa.String(40), nullable=False),
+        )
+        #: The SHA-256 of every report file the service handed out (PDF, JSON),
+        #: so anyone holding one can check it was not edited afterwards. Only
+        #: the hash is kept, never the file; it survives the retention purge
+        #: like the audit's own hashes and goes with ``delete_audit``.
+        self.issued_files = sa.Table(
+            "issued_files",
+            self.metadata,
+            sa.Column("sha256", sa.String(64), primary_key=True),
+            sa.Column("audit_id", sa.String(64), nullable=False, index=True),
+            sa.Column("kind", sa.String(16), nullable=False),
+            sa.Column("issued_at", sa.String(40), nullable=False),
         )
         self.metadata.create_all(self.engine)
 
@@ -656,6 +680,63 @@ class Store:
             rows = conn.execute(sa.select(self.waitlist.c.email).order_by(self.waitlist.c.id)).all()
         return [row[0] for row in rows]
 
+    # -- issued report files ---------------------------------------------
+    def record_issued(self, content: bytes, *, audit_id: str, kind: str, at: datetime) -> str:
+        """Remember the SHA-256 of a file handed out; the first issue date wins."""
+        digest = hashlib.sha256(content).hexdigest()
+        with self.engine.begin() as conn:
+            known = conn.execute(
+                self._sa.select(self.issued_files.c.sha256).where(
+                    self.issued_files.c.sha256 == digest
+                )
+            ).first()
+            if known is not None:
+                return digest
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.issued_files.insert().values(
+                        sha256=digest, audit_id=audit_id, kind=kind, issued_at=_iso(at)
+                    )
+                )
+        except self._sa.exc.IntegrityError:  # two downloads of the same bytes at once
+            pass
+        return digest
+
+    def find_issued(self, digest: str) -> IssuedFile | None:
+        """The issued file with this SHA-256, with its audit's class and public id."""
+        sa = self._sa
+        if len(digest) != 64:
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(
+                    self.issued_files.c.audit_id,
+                    self.issued_files.c.kind,
+                    self.issued_files.c.issued_at,
+                    self.audits.c.overall_class,
+                    self.publications.c.public_id,
+                )
+                .select_from(
+                    self.issued_files.outerjoin(
+                        self.audits, self.audits.c.id == self.issued_files.c.audit_id
+                    ).outerjoin(
+                        self.publications,
+                        self.publications.c.audit_id == self.issued_files.c.audit_id,
+                    )
+                )
+                .where(self.issued_files.c.sha256 == digest)
+            ).first()
+        if row is None:
+            return None
+        return IssuedFile(
+            audit_id=row[0],
+            kind=row[1],
+            issued_at=row[2],
+            overall_class=row[3],
+            public_id=row[4],
+        )
+
     # -- deletion on request ---------------------------------------------
     def delete_audit(self, audit_id: str) -> bool:
         """Remove every trace of one audit: row, hashes, files and publication.
@@ -671,6 +752,7 @@ class Store:
                 self.publication_views.delete().where(self.publication_views.c.audit_id == audit_id)
             )
             conn.execute(self.audit_files.delete().where(self.audit_files.c.audit_id == audit_id))
+            conn.execute(self.issued_files.delete().where(self.issued_files.c.audit_id == audit_id))
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
         return bool(deleted.rowcount)
 

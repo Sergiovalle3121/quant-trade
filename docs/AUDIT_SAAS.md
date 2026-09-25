@@ -1360,3 +1360,24 @@ site itself), `X-Frame-Options: DENY` and, when `AUDIT_BASE_URL` is
   them.
 - The terms and privacy pages pass the guard in both languages; anything the
   privacy page promises needs a command that does it and a test.
+
+## Check a report file (`audit/check.py`, `/comprobar`, `/check`)
+
+A buyer usually gets a Rigor report from the seller, as the PDF or the JSON
+result. Every PDF and JSON the service hands out (a paid report's downloads
+and the sample PDF) has its SHA-256 recorded in `issued_files` with the
+audit id, the kind and the first issue date; the file itself is never kept.
+On `/comprobar` (Spanish) and `/check` (English) anyone uploads the file
+they were given: the server hashes it as it streams in (up to 20 MB,
+60 checks per address and hour), discards it, and says either that those
+exact bytes came from Rigor on that date for a report of that class (with
+the link to its public page when the owner published one), or that Rigor has no
+record of them (edited, from elsewhere, or issued before 25 September 2026,
+when recording started; the page never says Rigor did not produce them). The wording says only whether the file changed since Rigor
+produced it, never anything about the strategy, and passes the guard.
+
+A hash, not a digital signature, was chosen on purpose: it needs no key to
+keep secret and no Railway variable, and the buyer checks on the site in two
+clicks instead of with a tool. The records survive the retention purge like
+the audit's other hashes and go with `audit delete ID --yes`. A PDF printed
+again, a screenshot or any re-save never matches.
