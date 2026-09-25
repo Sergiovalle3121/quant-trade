@@ -145,3 +145,20 @@ def test_metric_tables_share_columns_so_values_line_up() -> None:
     assert tables >= 3
     assert page.count("<col class='c-v'>") == tables
     assert page.count("<td class='val'>") >= 3 * tables
+
+
+def test_stress_tables_mark_scenarios_that_fall_to_zero_or_below() -> None:
+    from quant_trade.audit.sample import sample_result
+
+    result = sample_result("es", bootstrap_samples=60)
+    page = render_html(result, watermark=False, locale="es")
+    tables = page.count("<table class='stress'>")
+    assert tables >= 1 and page.count("<tr class='base'>") == tables
+    stress = result.stress or {}
+    below = sum(
+        1
+        for block in (stress.get("returns") or {}, stress.get("trades") or {})
+        for row in block.get("rows", [])
+        if row["result"]["value"] <= 0
+    )
+    assert page.count("<td class='val neg'>") == below
