@@ -1262,7 +1262,7 @@ def _fmt(value: Any, *, key: str = "") -> str:
         if key in MONEY_KEYS:
             return f"{value:,.2f}"
         if key in RATIO_KEYS:
-            return f"{value:.2f}"
+            return f"{value:,.2f}"
         if value.is_integer() and abs(value) < 1e15:
             return f"{int(value):,}"
         # Four decimals only where they carry information (a per-period Sharpe of
@@ -1653,10 +1653,19 @@ def _ev_value(block: Any) -> float | None:
     return None
 
 
-def _pct(value: float) -> str:
-    """A share at one decimal, without the "-0.0%" a tiny negative prints."""
-    shown = f"{value:.1%}"
-    return shown[1:] if shown == "-0.0%" else shown
+def _pct(value: float, *, signed: bool = False, places: int = 1) -> str:
+    """A share at ``places`` decimals, readable at the edges.
+
+    A tiny negative never prints as "-0.0%", and a share short of a whole
+    (-99.7 %) never rounds to "-100%", which would read as a total loss.
+    """
+    spec = f"{'+' if signed else ''},.{places}%"
+    shown = f"{value:{spec}}"
+    if float(shown.rstrip("%").replace(",", "")) == 0:
+        return f"{0:.{places}%}"
+    if abs(value) != 1 and abs(float(shown.rstrip("%").replace(",", ""))) == 100:
+        return _pct(value, signed=signed, places=places + 1)
+    return shown
 
 
 def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, str, str]]:
@@ -1673,7 +1682,7 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
             out.append((labels[label], shown, tone))
 
     total = _ev_value(perf.get("total_return"))
-    add("kpi_return", total, f"{total:+,.1%}" if total is not None else "")
+    add("kpi_return", total, _pct(total, signed=True) if total is not None else "")
     # A balance rebuilt from closed trades cannot see open losses; the tiles say so,
     # and turn red when the red flags found losses the balance hides.
     closed = bool((data.get("inputs") or {}).get("balance_only"))
@@ -1696,7 +1705,7 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
     sharpe = _ev_value(perf.get("sharpe"))
     add("kpi_sharpe", sharpe, f"{sharpe:.2f}" if sharpe is not None else "")
     pf = _ev_value(stats.get("profit_factor"))
-    add("kpi_pf", pf, f"{pf:.2f}" if pf is not None else "")
+    add("kpi_pf", pf, f"{pf:,.2f}" if pf is not None else "")
     count = _ev_value(stats.get("trade_count"))
     rate = _ev_value(stats.get("win_rate"))
     if count is not None and rate is not None:
@@ -2417,21 +2426,24 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     gain = account["percent_gain"]["value"]
     if gain is not None:
         facts.append(
-            f"<div class='fact{' neg' if gain < 0 else ''}'><b>{gain:,.0%}</b>"
-            f"<p>{_e(labels['account_gain'])}</p></div>"
+            f"<div class='fact{' neg' if gain < 0 else ''}'><b>{_pct(gain, places=0)}</b>"
+            f"<p>{_e(labels['account_gain'])} "
+            f"{_badge(account['percent_gain']['evidence'])}</p></div>"
         )
     money = account["trading_result"]["value"]
     deposited = _fmt(float(account["deposits"]["total"]["value"]), key="deposits_total")
     facts.append(
         f"<div class='fact{' neg' if float(money) < 0 else ''}'>"
         f"<b>{_fmt(float(money), key='trading_result')}</b>"
-        f"<p>{_e(labels['account_money'].format(deposited=deposited))}</p></div>"
+        f"<p>{_e(labels['account_money'].format(deposited=deposited))} "
+        f"{_badge(account['trading_result']['evidence'])}</p></div>"
     )
     floating = account["floating_share"]["value"]
     if floating is not None and floating < 0:
         facts.append(
-            f"<div class='fact neg'><b>{-floating:.0%}</b>"
-            f"<p>{_e(labels['account_floating'])}</p></div>"
+            f"<div class='fact neg'><b>{_pct(-floating, places=0)}</b>"
+            f"<p>{_e(labels['account_floating'])} "
+            f"{_badge(account['floating_share']['evidence'])}</p></div>"
         )
     out += f"<div class='facts'>{''.join(facts)}</div>"
     flat = {
@@ -2506,7 +2518,7 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         if value is not None:
             facts.append(
                 f"<div class='fact{tone}'><b>{max(float(value), 0.0):.0%}</b>"
-                f"<p>{_e(labels[label])}</p></div>"
+                f"<p>{_e(labels[label])} {_badge(plateau[key]['evidence'])}</p></div>"
             )
     verdict = ""
     if plateau["neighbours_keep"]["value"] is not None:
@@ -2611,18 +2623,20 @@ def _capital_html(
     out += (
         "<div class='facts'>"
         f"<div class='fact'><b>{_fmt(reference, key='fall_reference')}</b>"
-        f"<p>{_e(label('capital_fall'))}</p></div>"
+        f"<p>{_e(label('capital_fall'))} {_badge(capital['fall_reference']['evidence'])}</p></div>"
         f"<div class='fact'><b>{_fmt(history, key='fall_history')}</b>"
-        f"<p>{_e(labels['capital_history'])}</p></div>"
+        f"<p>{_e(labels['capital_history'])} "
+        f"{_badge(capital['fall_history']['evidence'])}</p></div>"
         + (
             f"<div class='fact'><b>{_fmt(float(platform), key='fall_platform')}</b>"
-            f"<p>{_e(labels['capital_platform'])}</p></div>"
+            f"<p>{_e(labels['capital_platform'])} "
+            f"{_badge(capital['fall_platform']['evidence'])}</p></div>"
             if platform is not None
             else ""
         )
         # The pace the year is drawn at, as a card beside the falls it sizes.
-        + f"<div class='fact'><b>{_fmt(per_year['value'])}</b><p>{_e(pace_text)}</p></div>"
-        + "</div>"
+        + f"<div class='fact'><b>{_fmt(per_year['value'])}</b>"
+        f"<p>{_e(pace_text)} {_badge(per_year['evidence'])}</p></div>" + "</div>"
     )
     balance = capital["starting_balance"]["value"]
     scale_head = (
@@ -2694,8 +2708,8 @@ def _test_data_html(review: dict[str, Any] | None, labels: dict[str, str]) -> st
     return out
 
 
-def _timing_fact(share: float, sentence: str) -> str:
-    return f"<div class='fact'><b>{share:.0%}</b><p>{_e(sentence)}</p></div>"
+def _timing_fact(share: float, sentence: str, evidence: str = "MEASURED") -> str:
+    return f"<div class='fact'><b>{share:.0%}</b><p>{_e(sentence)} {_badge(evidence)}</p></div>"
 
 
 def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
@@ -2713,12 +2727,12 @@ def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, s
     if best_day:
         share = best_day["share"]["value"]
         text = labels["timing_best_day"].format(share=share, day=days[best_day["key"]])
-        facts += _timing_fact(share, text)
+        facts += _timing_fact(share, text, best_day["share"].get("evidence", "MEASURED"))
     best_block = timing.get("best_block")
     if best_block:
         share = best_block["share"]["value"]
         text = labels["timing_best_block"].format(share=share, block=_block_name(best_block["key"]))
-        facts += _timing_fact(share, text)
+        facts += _timing_fact(share, text, best_block["share"].get("evidence", "MEASURED"))
     if facts:
         out += f"<div class='facts'>{facts}</div>"
     out += _timing_table(timing["weekdays"], labels["timing_day"], lambda k: days[k], labels)

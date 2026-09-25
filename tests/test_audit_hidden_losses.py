@@ -114,5 +114,41 @@ def test_the_capital_section_carries_the_open_loss_callout(locale: str) -> None:
 
 def test_the_trade_pace_is_a_fact_card() -> None:
     page = render_html(_result(), watermark=False, locale="es")
-    assert "Operaciones cerradas por año en el historial</p></div>" in page
+    assert (
+        "Operaciones cerradas por año en el historial "
+        '<span class="badge MEASURED">MEASURED</span></p></div>' in page
+    )
     assert "Operaciones por año:" not in _visible(page)
+
+
+def test_every_fact_card_carries_its_evidence_tag() -> None:
+    page = render_html(_result(), watermark=False, locale="es")
+    cards = re.findall(r"<div class='fact[^']*'><b>.*?</p></div>", page, flags=re.S)
+    assert len(cards) >= 5
+    for card in cards:
+        assert 'class="badge ' in card, card
+
+
+@pytest.mark.parametrize(
+    ("value", "signed", "places", "shown"),
+    [
+        (-0.00001, True, 1, "0.0%"),
+        (0.00001, True, 1, "0.0%"),
+        (-0.003, False, 0, "0%"),
+        (-0.997, False, 0, "-99.7%"),
+        (-1.0, False, 0, "-100%"),
+        (0.9996, False, 0, "99.96%"),
+        (12.5, True, 1, "+1,250.0%"),
+    ],
+)
+def test_shares_read_right_at_the_edges(
+    value: float, signed: bool, places: int, shown: str
+) -> None:
+    assert _pct(value, signed=signed, places=places) == shown
+
+
+def test_ratios_and_break_even_pips_carry_thousands_separators() -> None:
+    from quant_trade.audit.report import _fmt
+
+    assert _fmt(877194.39, key="profit_factor") == "877,194.39"
+    assert _fmt(10985.5, key="break_even_pips") == "10,985.50"

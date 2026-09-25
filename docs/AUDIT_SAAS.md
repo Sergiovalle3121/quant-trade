@@ -436,6 +436,10 @@ the floating result; otherwise it asks for the equity curve with floating result
 A file that already loses before any extra cost shows its break-even tile as 0
 with "already negative before any extra cost", never a negative cost, and large
 percentages carry thousands separators (+191,136.0 %).
+Ratios and break-even pips carry them too (877,194.39). No share prints as -0.0 %
+or -0 %, and a share short of a whole (-99.7 %) never rounds to -100 %. Every fact
+card (risk, account, plateau, timing, capital and its trade pace) shows its
+MEASURED / DECLARED / NOT_MEASURED tag beside the number.
 
 Trades against an uploaded equity curve (`redflags.scan_trades_against_equity`;
 skipped when the curve was rebuilt from the same report):
