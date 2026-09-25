@@ -1700,6 +1700,8 @@ The same pass styles the buyer's "What to do now" box from #207. Each step is a 
 
 Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…) more shape without changing their words or order. The problems are cards with an amber warning icon. "What Rigor checks" is a grid of cards, two per row on a desktop, each with its name in bold. The price sits in a panel with its buttons. "Other cases" are link cards with an arrow. A check whose name is a question no longer gets an extra full stop ("¿Pico aislado o meseta?.").
 
+Redesign pass 46 tidies the "Name its columns" step from #212 on the upload form. The twelve fields sit in three labelled groups: one row per trade, one row per fill, and either way. On a phone they sit two per row. Once a CSV is picked, the file's own column names show as chips above the fields (read in the browser by `app.js`, the same header row that feeds the suggestions), so the customer can copy them without opening the file.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
