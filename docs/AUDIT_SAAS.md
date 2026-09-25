@@ -423,6 +423,9 @@ come out optimistic. On any balance-only file the summary tiles read "Maximum
 drawdown (closed trades only)", and a fall under 0.05 % prints as 0.0 %, never -0.0 %.
 A clean account review vouches for "no large open loss" only when the file states
 the floating result; otherwise it asks for the equity curve with floating results.
+A file that already loses before any extra cost shows its break-even tile as 0
+with "already negative before any extra cost", never a negative cost, and large
+percentages carry thousands separators (+191,136.0 %).
 
 Trades against an uploaded equity curve (`redflags.scan_trades_against_equity`;
 skipped when the curve was rebuilt from the same report):
@@ -1146,6 +1149,12 @@ On desktop the upload form pairs the language and access-code fields, so no fiel
 In "El dinero real de la cuenta", a negative percent gain, a negative money result and the open loss show in red.
 Reading notes from the file importer read as a short list, not one run-on sentence.
 A capital section held back for a short history reads as a grey card with the reason and what to upload.
+
+Accessibility: secondary grey text, the green and amber state colours meet 4.5:1 on the page and card backgrounds in light and dark areas.
+Every form label and help text is tied to its field.
+File drop zones show a visible keyboard focus ring.
+The phone menu button and the report header buttons have 44 px tap areas.
+On a slow phone (150 ms latency, 1.6 Mbps, 4x CPU) the landing's first screen paints in about 0.7 s and /ejemplo in about 1.5 s; production serves pages gzipped.
 
 ## Security
 
