@@ -156,7 +156,10 @@ lines dropped), Charles Schwab Realized Gain/Loss and Transactions,
 Webull orders (the fill price, not the limit), thinkorswim's Account Trade
 History section, TradeStation (a clock-only `Exec Time` joined to `T/D`),
 tastytrade (multiplier column), Fidelity ("YOU BOUGHT ..."), E*TRADE, eToro
-closed positions, cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
+closed positions, XTB xStation 5 closed position history (CSV, or the XLSX with account
+rows above the header and an empty first column; the `Total` row is skipped by
+`universal.without_totals` and a second financing column such as `Rollover`
+is added to the costs), cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
 Sierra Chart's Trade Activity Log (only `Fills` rows). Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month

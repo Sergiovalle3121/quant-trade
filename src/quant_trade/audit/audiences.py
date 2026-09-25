@@ -64,6 +64,7 @@ RECOGNISED_PLATFORMS: tuple[str, ...] = (
     "Webull",
     "tastytrade",
     "eToro",
+    "XTB",
     "cTrader",
     "Sierra Chart",
     "Binance",

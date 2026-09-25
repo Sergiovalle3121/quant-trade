@@ -713,6 +713,13 @@ def resolve(header: Sequence[str], chosen: Mapping[str, str] | None = None) -> C
         else {"entry_time", "exit_time", "entry_price", "exit_price"}
     )
     columns = {role: index for role, index in columns.items() if role not in dropped}
+    if "swap" in columns and "swap" not in taken:
+        # A second financing column (XTB lists Swap and Rollover) is a cost too.
+        fees += [
+            position
+            for _, position in _ranked(header).get("swap", [])
+            if position != columns["swap"] and position not in taken.values()
+        ]
     names = {role: str(header[index]).strip() for role, index in columns.items()}
     others = [
         position
@@ -803,6 +810,19 @@ def statement_section(table: list[list[str]]) -> tuple[list[str], list[list[str]
                 body.append(line)
             return table[index + 1], body
     return None
+
+
+#: A summary row's first filled cell (XTB ends its closed positions with "Total").
+TOTAL_WORDS = frozenset({"total", "totals", "totales", "totaal", "gesamt", "suma", "razem"})
+
+
+def without_totals(rows: list[list[str]]) -> list[list[str]]:
+    """The rows minus a summary row, which is neither a trade nor damage."""
+
+    def first(row: list[str]) -> str:
+        return next((cell for cell in row if cell.strip()), "")
+
+    return [row for row in rows if normalise(first(row)) not in TOTAL_WORDS]
 
 
 def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
@@ -1047,7 +1067,7 @@ def parse(
         for account in accounts:
             closed[account] = closed.get(account, 0) + 1
         rows = imp._busiest_account(rows, accounts, closed, draft.warnings)
-    rows = only_fills(header, rows)
+    rows = only_fills(header, without_totals(rows))
     if mapping.shape == UNIVERSAL_TRADES_CSV:
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:

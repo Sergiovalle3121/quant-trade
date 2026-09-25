@@ -871,7 +871,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Activity Statement en CSV), Tradovate (Performance u Orders), TopstepX y "
                     "otras cuentas de ProjectX (Trades), TradeStation, thinkorswim (Account "
                     "Statement), Charles Schwab (Transactions o Realized Gain/Loss), Fidelity, "
-                    "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), cTrader, Sierra "
+                    "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), XTB (xStation 5, "
+                    "historial de posiciones cerradas), cTrader, Sierra "
                     "Chart (Trade Activity Log), Binance, Kraken y Coinbase.",
                     "Con una fila por ejecución, las compras y ventas se emparejan por símbolo "
                     "en orden de llegada (FIFO); las posiciones que siguen abiertas al final "
@@ -914,7 +915,8 @@ GUIDES: tuple[Guide, ...] = (
                     "the Activity Statement as CSV), Tradovate (Performance or Orders), "
                     "TopstepX and other ProjectX accounts (Trades), TradeStation, thinkorswim "
                     "(Account Statement), Charles Schwab (Transactions or Realized Gain/Loss), "
-                    "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), cTrader, "
+                    "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), XTB "
+                    "(xStation 5 closed position history), cTrader, "
                     "Sierra Chart (Trade Activity Log), Binance, Kraken and Coinbase.",
                     "With one row per fill, buys and sells are paired per symbol first in, "
                     "first out; positions still open at the end are left out and the report "
