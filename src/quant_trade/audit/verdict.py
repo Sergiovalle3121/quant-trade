@@ -247,6 +247,7 @@ def assess_costs(
     reference_bps: float | None,
     reference_is_assumption: bool,
     fees_reported: bool = False,
+    real_fills: bool = False,
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Dimension:
     if not rows:
@@ -263,7 +264,7 @@ def assess_costs(
         "reference_bps_per_side": {
             "value": reference_bps,
             "evidence": "DECLARED",
-            "note": reference_note(reference_is_assumption, fees_reported),
+            "note": reference_note(reference_is_assumption, fees_reported, real_fills),
         },
         "net_pnl_at_1x": measured(at_one.net_pnl) if at_one else not_measured("no 1x row"),
         f"net_pnl_at_{multiple}": (
@@ -485,6 +486,15 @@ _TEXT: dict[str, dict[str, str]] = {
             "Clase D: el backtest no supera la auditoría; los números de cabecera no se "
             "pueden tomar tal cual."
         ),
+        # The same classes when the upload is a real or demo account history.
+        "C.account": (
+            "Clase C: hay una debilidad importante; no confiaríamos en este historial de "
+            "cuenta sin resolverla."
+        ),
+        "D.account": (
+            "Clase D: el historial de cuenta no supera la auditoría; los números de cabecera "
+            "no se pueden tomar tal cual."
+        ),
         f"{STATISTICAL}.PASS": "El Sharpe es estadísticamente distinguible de cero.",
         f"{STATISTICAL}.WEAK": (
             "El Sharpe no es concluyente: el intervalo bootstrap se acerca a cero."
@@ -557,6 +567,14 @@ _TEXT: dict[str, dict[str, str]] = {
         "D": (
             "Class D: the backtest does not pass the audit; the headline numbers cannot be "
             "taken as they stand."
+        ),
+        "C.account": (
+            "Class C: there is a material weakness; we would not rely on this account "
+            "history until it is resolved."
+        ),
+        "D.account": (
+            "Class D: the account history does not pass the audit; the headline numbers "
+            "cannot be taken as they stand."
         ),
         f"{STATISTICAL}.PASS": "The Sharpe ratio is statistically distinguishable from zero.",
         f"{STATISTICAL}.WEAK": (
@@ -833,11 +851,14 @@ def summary(
     locale: Locale = "es",
     trials: int = 1,
     trials_evidence: str = "DECLARED",
+    account: bool = False,
 ) -> str:
-    """Plain-language summary from fixed templates; never a promise."""
+    """Plain-language summary from fixed templates; never a promise.
+
+    ``account`` names the upload an account history rather than a backtest."""
     text = _TEXT[locale]
     source = TRIAL_SOURCE[locale].get(trials_evidence, TRIAL_SOURCE[locale]["DECLARED"])
-    lines = [text[overall]]
+    lines = [text.get(f"{overall}.account", text[overall]) if account else text[overall]]
     by_name = {dimension.name: dimension for dimension in dimensions}
     for name in DIMENSION_ORDER:
         dimension = by_name.get(name)
@@ -869,12 +890,18 @@ def build_verdict(
     trials: int,
     trials_evidence: str = "DECLARED",
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
+    account: bool = False,
 ) -> Verdict:
     overall = overall_class(dimensions)
     return Verdict(
         overall=overall,
         summary=summary(
-            dimensions, overall, locale=locale, trials=trials, trials_evidence=trials_evidence
+            dimensions,
+            overall,
+            locale=locale,
+            trials=trials,
+            trials_evidence=trials_evidence,
+            account=account,
         ),
         thresholds=thresholds.model_dump(),
         dimensions=dimensions,

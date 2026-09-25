@@ -765,6 +765,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("assumed: client declared zero cost", "supuesto: el cliente declaró coste cero"),
     (
+        "assumed slippage: an account history's prices are the broker's fills, so the spread "
+        "is already in each result; charged on top",
+        "deslizamiento supuesto: los precios de un historial de cuenta son las ejecuciones "
+        "del bróker, así que el spread ya está en cada resultado; se cobra además",
+    ),
+    (
         "declared by the client; charged on top of the fees the report itemises",
         "declarado por el cliente; se cobra además de los costes que desglosa el informe",
     ),

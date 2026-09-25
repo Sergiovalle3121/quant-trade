@@ -531,6 +531,19 @@ def simulate_challenge(
 # ---------------------------------------------------------------------------
 
 _QUESTIONS: dict[str, dict[str, str]] = {
+    # Asked instead of the backtest questions when the upload is an account history.
+    "other_accounts": {
+        "es": "¿Es la única cuenta con esta estrategia? Pide también las cuentas que se "
+        "cerraron o se reiniciaron: enseñar solo la que salió bien es habitual.",
+        "en": "Is this the only account running this strategy? Ask for the accounts that "
+        "were closed or restarted too: showing only the one that went well is common.",
+    },
+    "backtest_match": {
+        "es": "Pide el backtest del mismo robot con la misma configuración: subido junto a "
+        "esta cuenta, el informe compara los dos operación por operación.",
+        "en": "Ask for the backtest of the same robot with the same settings: uploaded "
+        "together with this account, the report compares the two trade by trade.",
+    },
     "live_record": {
         "es": "¿Hay una cuenta real o demo con al menos {months} meses de historial auditable "
         "con el mismo robot y la misma configuración?",
@@ -634,6 +647,8 @@ _FLAG_QUESTIONS: dict[str, str] = {
 }
 
 _QUESTION_ORDER: tuple[str, ...] = tuple(_QUESTIONS)
+#: Questions about how a backtest was made; they do not apply to an account.
+_BACKTEST_ONLY: frozenset[str] = frozenset({"modelling", "trials", "out_of_sample", "costs"})
 
 
 def vendor_questions(
@@ -644,6 +659,7 @@ def vendor_questions(
     has_out_of_sample: bool,
     has_costs: bool,
     balance_only: bool,
+    account_history: bool = False,
     min_track_record_months: float | None = None,
 ) -> list[dict[str, str]]:
     """Questions a buyer can put to the seller of a trading robot.
@@ -651,18 +667,25 @@ def vendor_questions(
     Driven by the red flags raised and by what the upload did not contain.
     Neutral wording: a question is something to ask, not an accusation, and
     the list never says whether to buy.
+
+    An account history (``account_history``) is the live record itself and
+    its prices are real fills, so the backtest questions (modelling, trials,
+    held-out period, assumed costs) give way to the ones an investor needs.
     """
-    wanted: set[str] = {"live_record", "modelling"}
+    wanted: set[str] = (
+        {"other_accounts", "backtest_match"} if account_history else {"live_record", "modelling"}
+    )
     for code in flag_codes:
         key = _FLAG_QUESTIONS.get(code)
-        if key:
+        if key and not (account_history and key in _BACKTEST_ONLY):
             wanted.add(key)
-    if not trials_measured:
-        wanted.add("trials")
-    if not has_out_of_sample:
-        wanted.add("out_of_sample")
-    if not has_costs:
-        wanted.add("costs")
+    if not account_history:
+        if not trials_measured:
+            wanted.add("trials")
+        if not has_out_of_sample:
+            wanted.add("out_of_sample")
+        if not has_costs:
+            wanted.add("costs")
     if balance_only:
         wanted.add("equity_curve")
     if not has_trades:
