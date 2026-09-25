@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -498,3 +498,42 @@ def test_a_refused_paid_session_leaves_a_log_line_without_amounts(
     assert any("cs_test_1" in line and audit_id in line and "below" in line for line in lines)
     assert any("xy" in line and "unknown audit" in line for line in lines)
     assert not any("\n" in line for line in lines)
+
+
+# -- refused live payments show on /panel --------------------------------------
+def test_a_charged_live_payment_that_unlocks_nothing_shows_on_the_panel(tmp_path: Path) -> None:
+    key = "k" * 40
+    client = _client(tmp_path, admin_key=key, stripe_test_audits=frozenset({"listed"}))
+    audit_id, _ = _upload(client)
+    assert _webhook(client, _session(audit_id, amount_total=100)) == 200
+    assert _webhook(client, _session(audit_id, amount_total=100)) == 200  # a retry, once
+    assert _webhook(client, _session("gone", sid="cs_gone")) == 200
+    # Test payments stay in the log only: anyone can pay a test link.
+    assert _webhook(client, _session("x", sid="cs_test_x", livemode=False)) == 200
+    store = client.app.state.store
+    refused = store.list_refused_payments()
+    assert {(r.session_id, r.audit_id, r.reason) for r in refused} == {
+        ("cs_test_1", audit_id, "below the plan price"),
+        ("cs_gone", "gone", "unknown audit"),
+    }
+    page = client.post("/panel", data={"key": key}).text
+    assert "Pagos con tarjeta que no abrieron un informe" in page
+    assert "cs_gone" in page and "pagó menos que el precio" in page
+    assert "cs_test_x" not in page and "2900" not in page
+    assert find_claims(page) == []
+
+    later = datetime.now(UTC) + timedelta(days=400)
+    store.purge_expired(later, retention_days=30)
+    assert store.list_refused_payments() == []
+
+
+def test_every_refusal_reason_has_a_spanish_panel_label() -> None:
+    import inspect
+    import re
+
+    from quant_trade.audit import payments
+    from quant_trade.audit.owner import REFUSAL_REASONS
+
+    source = inspect.getsource(payments.refusal) + inspect.getsource(payments.fulfil)
+    reasons = set(re.findall(r'(?:reason = |return )"([a-zA-Z ]+)"', source))
+    assert reasons and reasons <= set(REFUSAL_REASONS)

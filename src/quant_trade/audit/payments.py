@@ -251,6 +251,12 @@ def fulfil(
             _safe(audit_id),
             reason,
         )
+        # Live ones also go to /panel, where the owner looks. Test payments
+        # stay in the log: anyone can pay a test link with the public card.
+        if session.get("livemode") is True and session_id.startswith(SESSION_PREFIX):
+            store.record_refused_payment(
+                session_id=_safe(session_id), audit_id=_safe(audit_id), reason=reason, at=at
+            )
         return None
     store.mark_paid(audit_id, stripe_session_id=session_id, at=at)
     if plan == PLAN_PACK and settings.stripe_webhook_secret:
