@@ -1109,3 +1109,50 @@ def test_new_real_layout_warnings_have_spanish() -> None:
     assert any(w.startswith(CONVERSION_DRIFT_WARNING) for w in warnings)
     assert any(w.startswith("hedging account") for w in warnings)
     assert [w for w in warnings if spanish(w) is None] == []
+
+
+def test_tradingview_rounded_small_pnl_is_not_another_contract_size() -> None:
+    """A one-unit forex trade that made 0.00127 is printed 0.001: that is
+    rounding, not a contract size of 0.79 or a hidden cost."""
+    from datetime import UTC, datetime
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs, printed_step
+
+    assert printed_step(0.001) == pytest.approx(0.001)
+    assert printed_step(-0.0005) == pytest.approx(0.0001)
+    assert printed_step(437.5) == pytest.approx(0.1)
+    header = (
+        "Trade #,Type,Date/Time,Signal,Price USD,Position size (qty),Position size (value),"
+        "Net P&L USD,Net P&L %,Run-up USD,Run-up %,Drawdown USD,Drawdown %,"
+        "Cumulative P&L USD,Cumulative P&L %"
+    )
+    lines = [header]
+    price, cumulative = 1.1295, 0.0
+    for number in range(1, 41):
+        move = (0.00127 if number % 3 else -0.00212) * (1 if number % 2 else -1)
+        side = "long" if number % 2 else "short"
+        exit_price = round(price + (move if side == "long" else -move), 5)
+        pnl = round(move, 3) or (0.001 if move > 0 else -0.001)
+        cumulative = round(cumulative + pnl, 3)
+        day = f"2022-01-{number % 28 + 1:02d}"
+        for kind, when, at in (
+            ("Entry", f"{day}T09:00:00-0500", price),
+            ("Exit", f"{day}T15:00:00-0500", exit_price),
+        ):
+            lines.append(
+                f"{number},{kind} {side},{day},sig,{at},1,{price},{pnl},0.1,0.003,0.2,"
+                f"-0.002,-0.2,{cumulative},0".replace(f",{day},", f",{when},", 1)
+            )
+        price = exit_price
+    data = ("\n".join(lines) + "\n").encode()
+    report = import_report(data, "trades.csv")
+    assert all(trade.quantity == 1.0 for trade in report.trades.trades)
+    assert not any("contract size" in warning for warning in report.warnings)
+    result = run_audit(
+        build_inputs(None, DeclaredMetadata(), report_bytes=data, report_filename="trades.csv"),
+        now=datetime(2026, 1, 1, tzinfo=UTC),
+        audit_id="tv-round",
+        bootstrap_samples=20,
+    )
+    assert "TRADE_PNL_MISMATCH" not in {flag["code"] for flag in result.red_flags}

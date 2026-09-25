@@ -25,6 +25,7 @@ from quant_trade.audit.schema import (
     DeclaredMetadata,
     IngestedSeries,
     ParsedTrades,
+    printed_step,
 )
 from quant_trade.core.models import Trade
 
@@ -309,7 +310,11 @@ def scan(
             ]
             if reported:
                 gross = sum(abs(ours) for _, ours in reported)
-                mismatch = sum(abs(client - ours) for client, ours in reported)
+                # A difference within half the file's printed precision is rounding.
+                mismatch = sum(
+                    max(abs(client - ours) - printed_step(client) / 2, 0.0)
+                    for client, ours in reported
+                )
                 if gross > 0 and mismatch / gross > PNL_MISMATCH_SHARE:
                     flags.append(
                         RedFlag(

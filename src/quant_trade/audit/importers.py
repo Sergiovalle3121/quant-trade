@@ -62,7 +62,13 @@ from typing import Any
 from xml.etree import ElementTree
 from xml.parsers import expat
 
-from quant_trade.audit.schema import MAX_TRADES, MAX_UPLOAD_BYTES, ParsedTrades, ParseError
+from quant_trade.audit.schema import (
+    MAX_TRADES,
+    MAX_UPLOAD_BYTES,
+    ParsedTrades,
+    ParseError,
+    printed_step,
+)
 from quant_trade.core.models import Trade
 
 MT5_TESTER_HTML = "mt5_tester_html"
@@ -2047,7 +2053,7 @@ def _parse_tradingview(
         estimate = _capital_from_percent(*capital_hint)
         if estimate is not None:
             draft.initial_balance = estimate
-            draft.initial_note = "inferred from cumulative P&L and cumulative P&L %"
+            draft.initial_note = "the cumulative P&L and cumulative P&L % columns"
     return draft
 
 
@@ -2441,7 +2447,21 @@ def _contract_sizes(trips: list[_Trip]) -> dict[str, float]:
         if move > 0 and trip.volume > 0 and trip.gross != 0:
             ratios.setdefault(trip.symbol, []).append(abs(trip.gross) / (move * trip.volume))
     sizes = {symbol: _snap(statistics.median(values)) for symbol, values in ratios.items()}
+    for symbol in sizes:
+        if _unit_size_fits([trip for trip in trips if trip.symbol == symbol]):
+            sizes[symbol] = 1.0
     return {trip.symbol: sizes.get(trip.symbol, 1.0) for trip in trips}
+
+
+def _unit_size_fits(trips: list[_Trip]) -> bool:
+    """True when a contract size of one reproduces every reported profit to
+    the precision the file prints it (a one-unit forex trade that made
+    0.00127 shows 0.001), so rounding is not mistaken for another size."""
+    return all(
+        abs(abs(trip.gross) - abs(trip.exit_price - trip.entry_price) * trip.volume)
+        <= printed_step(trip.gross) / 2 + _EPS
+        for trip in trips
+    )
 
 
 #: A symbol whose recomputed gross P&L misses the reported one by more

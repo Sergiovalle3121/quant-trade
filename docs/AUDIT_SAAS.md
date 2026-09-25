@@ -62,7 +62,11 @@ Limits, each written into the report as a reading warning:
   by more than 1 % (`CONVERSION_DRIFT_SHARE`: a pair quoted in another
   currency than the account's, such as USDJPY in a USD account), that
   symbol is sized per trade from its own profit, within 0.8x to 1.25x of
-  the symbol's size (`CONVERSION_DRIFT_BAND`), with a warning.
+  the symbol's size (`CONVERSION_DRIFT_BAND`), with a warning. A size of
+  one is kept when it reproduces every reported profit to the precision
+  the file prints it (`schema.printed_step`: TradingView prints a
+  one-unit forex profit of 0.00127 as 0.001), and `TRADE_PNL_MISMATCH`
+  ignores per-trade differences within half that printed step.
 - One closing deal is one trade, as the tester counts "Total Trades". A
   hedging report does not say which entry a close belongs to: the close
   takes the open entry of its own volume whose price explains its profit

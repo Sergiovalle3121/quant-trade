@@ -191,3 +191,11 @@ def test_profit_factor_note_explains_a_lower_platform_figure() -> None:
     spanish = localize(PROFIT_FACTOR_NOTE, "es")
     assert "antes de comisiones y swap" in spanish
     assert find_claims(PROFIT_FACTOR_NOTE) == [] and find_claims(spanish) == []
+
+
+def test_every_starting_balance_source_reads_in_spanish() -> None:
+    from quant_trade.audit.i18n import _INITIAL_SOURCES, localize
+
+    for source, spanish_source in _INITIAL_SOURCES.items():
+        text = localize(f"initial balance 1,000.00 taken from {source}", "es")
+        assert text == f"balance inicial 1,000.00 tomado de {spanish_source}"
