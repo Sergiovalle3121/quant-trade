@@ -149,7 +149,9 @@ entry timing cannot be measured, so it asks for the executions export (Bybit
 Trade History) instead. A `Contracts` column names the instrument when no
 symbol column exists and `Exec Qty` is the size.
 Rows repeated in every column are counted once when the table has an id
-column (Position, Ticket, Order, ID, Trade number...), as when two exports
+column (Position, Ticket, Deal, Transaction ID, Trade number...; never an
+order id, which an order's partial fills share, nor a bare ID) and the row's
+id is filled in, as when two exports
 are pasted together (`universal.drop_repeated_rows`, for the universal reader
 and every delimited named format); the report says how many. Rows that share
 an id but differ (partial closes) are all kept, and a table without an id
