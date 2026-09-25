@@ -388,6 +388,7 @@ def test_a_card_pack_bought_from_an_account_report_lands_on_it(tmp_path: Path) -
     session = {
         "id": "cs_test_1",
         "payment_status": "paid",
+        "livemode": True,
         "metadata": {"audit_id": "a2", "plan": "pack"},
     }
     assert fulfil(store, settings, session, at=NOW) == "a2"
