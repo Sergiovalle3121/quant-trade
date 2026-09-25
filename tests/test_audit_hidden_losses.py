@@ -155,3 +155,22 @@ def test_ratios_and_break_even_pips_carry_thousands_separators() -> None:
 
     assert _fmt(877194.39, key="profit_factor") == "877,194.39"
     assert _fmt(10985.5, key="break_even_pips") == "10,985.50"
+
+
+@pytest.mark.parametrize(
+    ("value", "percent", "shown"),
+    [
+        (-0.00001, True, "0.0%"),
+        (-0.001, False, "0.00"),
+        (-0.997, True, "-99.7%"),
+        (-12_562.1, False, "-12,562.10"),
+    ],
+)
+def test_stress_figures_never_print_a_signed_zero(value: float, percent: bool, shown: str) -> None:
+    from quant_trade.audit.report import _stress_value
+
+    assert _stress_value(value, percent=percent, signed=True) == shown
+
+
+def test_the_class_plan_reads_in_spanish() -> None:
+    assert "PASS" not in LABELS["es"]["plan_class"]

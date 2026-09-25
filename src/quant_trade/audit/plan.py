@@ -156,8 +156,16 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
         "en": "Stretches repeat the same value: use data with a quote in every period.",
     },
     "MAD_SPIKES": {
-        "es": "Hay saltos extremos: revisa depósitos, retiros o errores de precio en esas fechas.",
-        "en": "There are extreme jumps: check deposits, withdrawals or bad prices on those dates.",
+        "es": (
+            "Hay días en que la cuenta se mueve más de un 15 %: si vienen de depósitos, "
+            "retiros o precios erróneos, corrígelos; si son operaciones reales, el tamaño "
+            "es muy agresivo para la cuenta."
+        ),
+        "en": (
+            "On some days the account moves more than 15 %: if they come from deposits, "
+            "withdrawals or bad prices, fix them; if they are real trades, the size is very "
+            "aggressive for the account."
+        ),
     },
     "IMPLAUSIBLE_SHARPE": {
         "es": (
