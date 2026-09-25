@@ -295,6 +295,12 @@ expected range is the 5th to 95th percentile of the draws).
   not preserved; the comparison says whether the files are alike, never
   what the account will do next.
 
+The `/ejemplo` backtest trades two pairs, EURUSD and AUDUSD (`SAMPLE_SYMBOLS`,
+the pair drawn from its own random stream, so no result changes), and holds
+each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
+so the per-instrument and "Cómo se comporta al perder" sections have real
+variety to show. The class stays C.
+
 The `/ejemplo` report carries a synthetic live account, a Myfxbook CSV
 export built in `audit/sample.py` (0.1 lots, a fifth of the backtest's
 size). It trades the backtest's last 60 business days too, skipping about

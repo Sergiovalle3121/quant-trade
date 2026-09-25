@@ -243,3 +243,15 @@ def test_the_plateau_section_says_what_a_forward_export_adds() -> None:
         assert LABELS[locale]["plateau_forward_hint"] in html.unescape(page)
         assert words in LABELS[locale]["plateau_forward_hint"]
         assert find_claims(LABELS[locale]["plateau_forward_hint"]) == []
+
+
+def test_the_sample_trades_two_pairs_with_varied_hold_times() -> None:
+    from quant_trade.audit.importers import import_report
+    from quant_trade.audit.sample import SAMPLE_SYMBOLS, _sample_report, synthetic_live_statement
+
+    report = import_report(_sample_report(), "SyntheticSampleEA.html")
+    assert sorted(set(report.symbols)) == sorted(SAMPLE_SYMBOLS)
+    holds = {trade.exit_time - trade.entry_time for trade in report.trades.trades}
+    assert len(holds) > 50
+    live = import_report(synthetic_live_statement(), "SyntheticSampleLive.csv")
+    assert sorted(set(live.symbols)) == sorted(SAMPLE_SYMBOLS)
