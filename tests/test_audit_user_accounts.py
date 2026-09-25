@@ -1560,9 +1560,63 @@ def test_strategies_stay_inside_their_account(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert "error=file_bad" in bad.headers["location"]
+    # The refused filing left no empty strategy behind.
+    other_account = store.find_account("two@example.com")  # type: ignore[attr-defined]
+    assert store.list_strategies(other_account.id) == []  # type: ignore[attr-defined]
     assert other.post(f"{where}/borrar", data={"csrf": other_csrf}).status_code == 404
     assert client.get(where).status_code == 200
     # Deleting the account removes its strategies.
     account = store.find_account("one@example.com")  # type: ignore[attr-defined]
     store.delete_account(account.id)  # type: ignore[attr-defined]
     assert store.list_strategies(account.id) == []  # type: ignore[attr-defined]
+
+
+def test_strategy_names_drop_invisible_and_control_characters(tmp_path: Path) -> None:
+    from quant_trade.audit.store import strategy_name
+
+    assert strategy_name("EA\x00Oro") == "EAOro"
+    assert strategy_name("EA \u202eOro\u200b\x07") == "EA Oro"
+    assert strategy_name("\u202e\u200b") == "" and strategy_name(" \u0301 ") == ""
+    assert strategy_name("  EA   Oro  ") == "EA Oro" and len(strategy_name("x" * 300)) == 80
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    mine = _audit_id(_upload(client).headers["location"])
+    csrf = _csrf(client.get("/cuenta").text)
+    invisible = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": mine, "strategy": "new", "name": "\u202e\u200b", "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "error=file_bad" in invisible.headers["location"]
+    where = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": mine, "strategy": "new", "name": "EA\x00Oro\u202e", "csrf": csrf},
+        follow_redirects=False,
+    ).headers["location"]
+    assert "EAOro" in client.get(where).text
+    # An invisible rename keeps the old name.
+    client.post(f"{where}/nombre", data={"name": "\u200b\u202e", "csrf": csrf})
+    assert "EAOro" in client.get(where).text
+
+
+def test_account_forms_refuse_a_cross_site_post(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    mine = _audit_id(_upload(client).headers["location"])
+    csrf = _csrf(client.get("/cuenta").text)
+    data = {"audit_id": mine, "strategy": "new", "name": "EA", "csrf": csrf}
+    refused = client.post(
+        "/cuenta/estrategias/guardar",
+        data=data,
+        headers={"Sec-Fetch-Site": "cross-site"},
+        follow_redirects=False,
+    )
+    assert "error=csrf" in refused.headers["location"]
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.list_strategies(account.id) == []  # type: ignore[attr-defined]
+    # A real browser form: same-origin, or Origin: null under no-referrer.
+    for headers in ({"Sec-Fetch-Site": "same-origin"}, {"Origin": "null"}):
+        answer = client.post(
+            "/cuenta/estrategias/guardar", data=data, headers=headers, follow_redirects=False
+        )
+        assert answer.headers["location"].startswith("/cuenta/estrategias/")

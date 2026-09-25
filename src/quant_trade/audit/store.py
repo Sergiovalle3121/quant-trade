@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -62,6 +63,16 @@ def normalise_access_code(code: str) -> str:
 
 def hash_access_code(code: str) -> str:
     return hashlib.sha256(normalise_access_code(code).encode("utf-8")).hexdigest()
+
+
+def strategy_name(name: str) -> str:
+    """A strategy name as stored: no control, format or bidi characters
+    (Postgres refuses NUL; the others hide or reorder text), whitespace
+    squeezed, at most 80 characters, and ``""`` unless something visible is left."""
+    kept = "".join(ch for ch in name if unicodedata.category(ch) not in ("Cc", "Cf"))
+    clean = " ".join(kept.split())[:80].strip()
+    visible = any(unicodedata.category(ch)[0] not in ("M", "Z", "C") for ch in clean)
+    return clean if visible else ""
 
 
 def _iso(value: datetime) -> str:
@@ -1455,7 +1466,7 @@ class Store:
         """A new strategy on the account; ``""`` when the name is empty or the
         account already has :attr:`MAX_STRATEGIES_PER_ACCOUNT`."""
         sa = self._sa
-        name = " ".join(name.split())[:80]
+        name = strategy_name(name)
         if not name:
             return ""
         table = self.strategies
@@ -1550,7 +1561,7 @@ class Store:
         return True
 
     def rename_strategy(self, account_id: str, strategy_id: str, name: str) -> bool:
-        name = " ".join(name.split())[:80]
+        name = strategy_name(name)
         if not name:
             return False
         table = self.strategies

@@ -97,6 +97,7 @@ from quant_trade.audit.store import (
     VIA_UPLOAD,
     Store,
     make_store,
+    strategy_name,
 )
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
@@ -1477,8 +1478,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base = account_pages.path("account", locale)
             now = datetime.now(UTC)
             strategy_id = strategy
+            # Only a report on the account's own list can be filed: check it
+            # before a new strategy is made, so a refused filing leaves nothing.
+            listed = {item.audit_id for item in db.account_audits_list(account.id)}
+            if audit_id not in listed:
+                return RedirectResponse(f"{base}?error=file_bad#estrategias", 303)
             if strategy in ("", "new") or name.strip():
-                if not name.strip():
+                if not strategy_name(name):
                     return RedirectResponse(f"{base}?error=file_bad#estrategias", 303)
                 strategy_id = db.create_strategy(account.id, name, at=now)
                 if not strategy_id:
@@ -1614,7 +1620,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         session = _session(request)
         if session is None:
             return _signin_redirect(locale, next_path=account_pages.path("account", locale))
-        if not acct.same_secret(session[1], csrf):
+        # The CSRF token decides; the browser's own cross-site signal is a
+        # second layer, with the same rules as uploads (Origin: null passes).
+        if not acct.same_secret(session[1], csrf) or _cross_site(request):
             return RedirectResponse(
                 account_pages.path("account", locale) + "?error=csrf", status_code=303
             )
