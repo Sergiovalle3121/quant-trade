@@ -356,6 +356,15 @@ each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
 variety to show. The class stays C.
 
+"Qué hacer ahora" / "What to do now" follows "Qué significa para ti": up to
+three checks for whoever runs the robot, from the live comparison, serious
+data flags, costs, trials and out-of-sample, then the seller questions and
+keeping the report, each linked to its section. They are questions and
+checks, never a trading instruction. A line under the verdict explains the
+MEASURED / DECLARED / NOT_MEASURED tags. Generic prop-firm rules show no
+preset id and no "published on the date shown" assumption, and the
+simulator's column reads "En las simulaciones del historial".
+
 When a live account is uploaded, one line under the verdict gives its
 comparison badge (Coherente, En el borde, No coherente, Revisar) and the
 account's trading result against the money deposited, linked to the
@@ -777,6 +786,9 @@ Instrument names come from the file, so a name the profit-claim guard
 refuses (here and in the live comparison's new-symbols note) is shown as
 withheld promotional wording, like report metadata, instead of stopping the
 audit with an error page.
+Names keep the file's own case (a broker suffix like `EURUSD.m` is not
+uppercased); trades are grouped regardless of case, and a row shows the
+name as the file first writes it.
 
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
