@@ -1243,6 +1243,27 @@ questions, instead of repeating the verdict between the plan and the findings;
 the multiplicity dimension is titled "Número de configuraciones probadas" /
 "Number of settings tried".
 
+### The report in Portuguese
+
+The report, the verdict sentence, the class plan, the charts and the PDF
+footer also read in Brazilian Portuguese (`locale="pt"`).
+`audit/report_pt.py` holds the Portuguese of every Spanish-and-English table
+(labels, figure names, dimension titles, red-flag titles, plan hints, chart
+words) and `report_pt.install` adds it under `"pt"`, over the English, so a
+text still missing in Portuguese reads in English, never blank. The engine's
+English notes, the verdict's reasons (one `; `-separated part at a time) and
+the seller questions and assumptions a result stores in Spanish and English
+are translated when the page is rendered, as the Spanish ones are: the stored
+result, and so its hash, is the same whatever language reads it.
+
+Limits: the Portuguese was written for this report and checked for its
+placeholders and by the profit-claim guard, not by a native reviewer; the
+comparison page and the account screens have no Portuguese yet and send a
+Portuguese reader to their English pages. Tests
+(`tests/test_audit_portuguese_report.py`) fail when an English label has no
+Portuguese, and `i18n.untranslated` now reports a note that lacks a Spanish
+or a Portuguese rule.
+
 ## Assumptions and limitations
 
 - No market data is used. The audit sees only what the client uploads; a
