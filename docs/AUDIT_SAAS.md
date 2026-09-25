@@ -1258,6 +1258,8 @@ The report ends with one tidy footer: the notice card, the audit JSON fingerprin
 
 The landing's report mockup always settles flat and sharp: the hero clips with `overflow:clip` so the scroll-driven tilt follows the page scroll (with `overflow:hidden` the hero became its scroller and the mockup stayed tilted and soft), and the entrance fade no longer animates a blur. With reduced motion the mockup is flat from the start.
 
+The forward section answers first ("Aguanta" / "No aguanta" callout under the intro), then shows its four figures as a two-by-two grid on screens wider than a phone and two per row in the PDF, so no card is left alone on a row.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
