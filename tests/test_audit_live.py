@@ -203,6 +203,108 @@ def test_the_upload_form_offers_a_live_statement() -> None:
     assert "name='live'" in landing(locale="en") and "Live or demo" in landing(locale="en")
 
 
+def _priced(
+    n: int, *, size: float, worse: float = 0.0, start: datetime = datetime(2024, 1, 1, tzinfo=UTC)
+) -> ParsedTrades:
+    """Alternating long and short EURUSD trades; ``worse`` moves both fills against the account."""
+    rng = np.random.default_rng(1)
+    rows, sides = [], []
+    for i in range(n):
+        side = "long" if i % 2 == 0 else "short"
+        sign = 1.0 if side == "long" else -1.0
+        price_in = 1.1 + 0.001 * np.sin(i)
+        price_out = price_in + rng.normal(0.0002, 0.001)
+        price_in, price_out = price_in + sign * worse, price_out - sign * worse
+        when = start + i * timedelta(hours=5)
+        rows.append(
+            Trade(
+                entry_time=when,
+                exit_time=when + timedelta(hours=2),
+                quantity=size,
+                entry_price=price_in,
+                exit_price=price_out,
+                pnl=sign * (price_out - price_in) * size * 100_000,
+                return_pct=0.0,
+            )
+        )
+        sides.append(side)
+    return ParsedTrades(trades=rows, sides=sides, client_pnl=[None] * n, invalid_rows=0)
+
+
+def _slice(parsed: ParsedTrades, first: int, last: int) -> ParsedTrades:
+    return ParsedTrades(
+        trades=parsed.trades[first:last],
+        sides=parsed.sides[first:last],
+        client_pnl=parsed.client_pnl[first:last],
+        invalid_rows=0,
+    )
+
+
+def test_live_trades_on_the_backtests_dates_are_paired_one_by_one() -> None:
+    # The live account is the backtest's own trades at a tenth of the size,
+    # each filled half a pip worse at entry and at exit.
+    backtest = _priced(300, size=1.0)
+    live = _slice(_priced(300, size=0.1, worse=0.00005), 100, 200)
+    result = compare_live(
+        backtest, live, backtest_symbols=["EURUSD"] * 300, live_symbols=["EURUSD.m"] * 100
+    )
+    assert result["new_symbols"] == []  # a broker suffix is the same symbol
+    pairing = result["pairing"]
+    assert pairing["matched"]["value"] == 100
+    assert pairing["matched_share"]["value"] == 1.0
+    assert pairing["missing_live"]["value"] == 0
+    assert pairing["low_match"] is False
+    assert pairing["entry_bps"]["value"] == pytest.approx(0.45, abs=0.01)
+    assert pairing["exit_bps"]["value"] == pytest.approx(0.45, abs=0.01)
+    # One pip lost per trade at one lot is 10 per trade, at the backtest's size.
+    assert pairing["result_gap_per_trade"]["value"] == pytest.approx(-10.0)
+    assert pairing["result_gap"]["value"] == pytest.approx(-1000.0)
+
+
+def test_live_trades_missing_from_the_backtest_say_it_may_be_another_robot() -> None:
+    backtest = _priced(300, size=1.0)
+    # Same dates, but every live trade opens two and a half hours off the backtest's.
+    shifted = _priced(100, size=1.0, start=datetime(2024, 1, 21, 22, 30, tzinfo=UTC))
+    result = compare_live(backtest, shifted)
+    pairing = result["pairing"]
+    assert pairing["matched"]["value"] == 0
+    assert pairing["low_match"] is True
+    assert pairing["entry_bps"]["evidence"] == "NOT_MEASURED"
+    assert pairing["entry_bps"]["note"] == f"fewer than {live_lib.MIN_MATCHED} paired trades"
+
+
+def test_files_without_shared_dates_are_not_paired() -> None:
+    live = _trades([5.0, -4.0] * 20, start=LIVE_START)
+    assert compare_live(_backtest(), live)["pairing"] is None
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_the_pairing_is_shown_in_both_languages(locale: str) -> None:
+    from html import escape
+
+    from quant_trade.audit.report import _pairing_html
+
+    backtest = _priced(300, size=1.0)
+    few = compare_live(backtest, _slice(_priced(300, size=1.0), 100, 103), seed=1)
+    assert few["status"] == "NOT_MEASURED"
+    paired = compare_live(backtest, _slice(_priced(300, size=0.1, worse=0.00005), 100, 200))
+    shifted = compare_live(
+        backtest, _priced(100, size=1.0, start=datetime(2024, 1, 21, 22, 30, tzinfo=UTC))
+    )
+    labels = LABELS[locale]
+    good = _pairing_html(paired["pairing"], locale, labels)
+    assert labels["live_pair"] in good and "100" in good and "-1,000.00" in good
+    low = escape(labels["live_pair_low"])
+    assert low not in good
+    bad = _pairing_html(shifted["pairing"], locale, labels)
+    assert low in bad
+    assert localize(f"fewer than {live_lib.MIN_MATCHED} paired trades", locale) in bad
+    for page in (good, bad):
+        assert find_claims(page) == []
+        if locale == "es":
+            assert "Paired by" not in page and "fewer than" not in page
+
+
 def test_live_section_reads_as_cards_on_small_screens() -> None:
     from quant_trade.audit.report import render_html
     from quant_trade.audit.sample import sample_result
