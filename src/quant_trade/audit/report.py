@@ -264,10 +264,16 @@ LABELS: dict[str, dict[str, str]] = {
             "Cópialo tal como te llegó y vuelve a canjearlo."
         ),
         "code_error_contact": "Si sigue sin funcionar, escríbenos por el botón de arriba.",
-        "buy_code": "¿No tienes código? Pídelo por WhatsApp",
+        "buy_code": "Comprar por WhatsApp",
         "buy_code_how": (
-            "Te respondemos con los datos de pago y, al confirmarse, te enviamos el código. "
-            "Lo escribes aquí abajo y el informe se abre completo."
+            "Nos escribes por WhatsApp; el mensaje ya lleva el número de este informe.|"
+            "Te respondemos con los datos para pagar.|"
+            "Al confirmarse el pago recibes un código: lo escribes aquí abajo y el informe "
+            "se abre completo."
+        ),
+        "buy_code_wait": (
+            "Responde una persona. Si escribes de noche o en fin de semana, te contestamos en "
+            "cuanto lo veamos; mientras tanto tu informe sigue en este enlace."
         ),
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
@@ -714,6 +720,10 @@ LABELS: dict[str, dict[str, str]] = {
         "engine": "versión del motor",
         "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
+        "code_request_price": (
+            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). "
+            "¿Cómo pago?"
+        ),
         "keep_link": (
             "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
             "No pedimos correo ni cuenta."
@@ -998,10 +1008,16 @@ LABELS: dict[str, dict[str, str]] = {
             "or has expired. Copy it exactly as you received it and redeem it again."
         ),
         "code_error_contact": "If it still does not work, message us with the button above.",
-        "buy_code": "No code yet? Ask for one on WhatsApp",
+        "buy_code": "Buy on WhatsApp",
         "buy_code_how": (
-            "We reply with the payment details and, once it is confirmed, send you the code. "
-            "Enter it below and the full report opens."
+            "You message us on WhatsApp; the message already carries this report's number.|"
+            "We reply with the payment details.|"
+            "Once the payment is confirmed you get a code: enter it below and the full "
+            "report opens."
+        ),
+        "buy_code_wait": (
+            "A person replies. If you write at night or at the weekend, we answer as soon as "
+            "we see it; meanwhile your report stays at this link."
         ),
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
@@ -1430,6 +1446,10 @@ LABELS: dict[str, dict[str, str]] = {
         "engine": "engine version",
         "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
+        "code_request_price": (
+            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). "
+            "How do I pay?"
+        ),
         "keep_link": (
             "Save this page's link: it is the only way back to your report. "
             "We ask for no email and no account."
@@ -4359,9 +4379,12 @@ def render_html(
     if locked and redeem_url:
         if contact_url:
             # Where a client without a code buys one (bank transfer, WhatsApp).
-            contact_url = _prefilled(
-                contact_url, labels["code_request"].format(id=data["audit_id"])
+            request = (
+                labels["code_request_price"].format(id=data["audit_id"], price=price)
+                if price
+                else labels["code_request"].format(id=data["audit_id"])
             )
+            contact_url = _prefilled(contact_url, request)
             if card_on:
                 # With card payment on, WhatsApp is the alternative, not the main button.
                 paybox += (
@@ -4376,7 +4399,11 @@ def render_html(
                     + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
                     f"{_e(labels['buy_code'])}</a>"
-                    f"<p class='muted pay-secure'>{_e(labels['buy_code_how'])}</p>"
+                    "<ol class='buy-steps'>"
+                    + "".join(
+                        f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|")
+                    )
+                    + f"</ol><p class='muted pay-secure'>{_e(labels['buy_code_wait'])}</p>"
                     f"{includes_html}</div>"
                 )
         main_button = contact_url or card_on
