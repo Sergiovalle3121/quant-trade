@@ -875,8 +875,9 @@ GUIDES: tuple[Guide, ...] = (
                     "conviene una columna Multiplicador.",
                     "Las comisiones cobradas en otra moneda (por ejemplo BNB en un par USDT) "
                     "quedan fuera de los costes y el informe lo avisa.",
-                    "En el informe verás qué columna se leyó como qué. Si falta alguna, el "
-                    "mensaje de error dice cuál y qué columnas encontró.",
+                    "En el informe verás qué columna se leyó como qué. Si alguna no se "
+                    "reconoce, indícala en «¿Tu plataforma no aparece o su archivo da error? "
+                    "Indica sus columnas», justo debajo del campo del informe.",
                     _BALANCE_ES,
                     _FLOATING_ES,
                 ),
@@ -917,8 +918,9 @@ GUIDES: tuple[Guide, ...] = (
                     "column.",
                     "Fees charged in another coin (BNB on a USDT pair, for example) are left "
                     "out of the costs and the report says so.",
-                    "The report shows which column was read as what. If one is missing, the "
-                    "error message names it and lists the columns it found.",
+                    "The report shows which column was read as what. If one is not "
+                    "recognised, name it under 'Platform not listed, or its file fails? Name "
+                    "its columns', right below the report field.",
                     _BALANCE_EN,
                     _FLOATING_EN,
                 ),

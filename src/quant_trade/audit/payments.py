@@ -60,10 +60,34 @@ PRODUCT_NAMES = {
 
 
 def card_mode(settings: AuditSettings) -> str:
-    """``off``, ``test`` or ``live``: read from the key's prefix, never the key."""
-    if not settings.stripe_enabled:
+    """``off``, ``test`` or ``live``: read from a key or link prefix, never a secret."""
+    if not (settings.stripe_enabled or settings.links_enabled):
         return "off"
-    return "live" if "_live_" in settings.stripe_secret_key else "test"
+    return "test" if settings.card_test_mode else "live"
+
+
+def card_via(settings: AuditSettings) -> str:
+    """How a card payment starts: a Checkout session the service creates, or a Payment Link."""
+    if settings.stripe_enabled:
+        return "checkout"
+    return "links" if settings.links_enabled else "off"
+
+
+def payment_link_urls(settings: AuditSettings, audit_id: str, locale: str) -> tuple[str, str]:
+    """The Payment Links for one audit and for the pack, tagged with the audit id.
+
+    ``client_reference_id`` is how the webhook knows which audit was paid;
+    the pack link is empty when the pack is not on sale or has no link.
+    """
+    lang = "en" if locale == "en" else "es"
+    query = f"?client_reference_id={audit_id}&locale={lang}"
+    single = settings.stripe_link_single + query if settings.stripe_link_single else ""
+    pack = (
+        settings.stripe_link_pack + query
+        if settings.stripe_link_pack and settings.pack_price_usd
+        else ""
+    )
+    return single, pack
 
 
 def pack_code(secret: str, session_id: str) -> str:
@@ -157,9 +181,15 @@ def fulfil(
         return None
     session_id = str(session.get("id") or "")
     metadata = session.get("metadata") or {}
-    audit_id = str(metadata.get("audit_id") or "")
+    # A Checkout session this service created names the audit in its
+    # metadata; a Payment Link carries it as ``client_reference_id``.
+    audit_id = str(metadata.get("audit_id") or session.get("client_reference_id") or "")
     plan = str(metadata.get("plan") or PLAN_SINGLE)
     if not session_id.startswith(SESSION_PREFIX) or not audit_id:
+        return None
+    # Anyone can pay a test-mode checkout with Stripe's public test card, so
+    # a test payment unlocks only an audit listed for testing.
+    if session.get("livemode") is not True and audit_id not in settings.stripe_test_audits:
         return None
     if store.get_audit(audit_id) is None:
         return None
@@ -200,6 +230,8 @@ __all__ = [
     "PLAN_SINGLE",
     "PRODUCT_NAMES",
     "card_mode",
+    "card_via",
+    "payment_link_urls",
     "checkout_params",
     "fulfil",
     "pack_code",

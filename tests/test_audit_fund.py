@@ -249,3 +249,152 @@ def test_the_upload_form_offers_the_declaration(tmp_path) -> None:  # type: igno
     assert response.status_code == 303
     page = client.get(response.headers["location"]).text
     assert "Costes declarados en cero" not in page
+
+
+# --- Grid reading: scale, stray rows, unreadable cells, total headers --------
+
+
+def _plain_grid(rows: list[list[object]], header: list[str] | None = None) -> bytes:
+    head = header or ["Year", *MONTHS_EN]
+    lines = [",".join(head)] + [",".join("" if c is None else str(c) for c in row) for row in rows]
+    return ("\n".join(lines) + "\n").encode()
+
+
+def _money_market_rows(years: int = 3, total: bool = False) -> list[list[object]]:
+    rows: list[list[object]] = []
+    for i in range(years):
+        months = [0.03, 0.05, 0.12, 0.04, 0.06, 0.02, 0.05, 0.07, 0.03, 0.04, 0.05, 0.06]
+        row: list[object] = [2019 + i, *months]
+        if total:
+            row.append(round((float(np.prod([1 + m / 100 for m in months])) - 1) * 100, 2))
+        rows.append(row)
+    return rows
+
+
+def test_a_low_volatility_grid_without_percent_signs_reads_as_percentages() -> None:
+    series = parse_equity_csv(_plain_grid(_money_market_rows()))
+    assert series.frame["ret"].dropna().iloc[0] == pytest.approx(0.0003)
+    assert any("the file shows no % sign" in w for w in series.warnings)
+    ret = series.frame["ret"].dropna().to_numpy()
+    assert 0.004 < float(np.prod(1 + ret)) ** (12 / len(ret)) - 1 < 0.007
+
+
+def test_year_totals_decide_the_scale_both_ways() -> None:
+    data = _plain_grid(_money_market_rows(total=True), ["Year", *MONTHS_EN, "YTD"])
+    series = parse_equity_csv(data)
+    assert series.frame["ret"].dropna().iloc[0] == pytest.approx(0.0003)
+    assert any("percentages, as the year totals confirm" in w for w in series.warnings)
+    r = _returns(24, seed=3)
+    rows = [
+        [
+            2020 + i,
+            *[f"{v:.6f}" for v in r[12 * i : 12 * i + 12]],
+            f"{float(np.prod(1 + r[12 * i : 12 * i + 12])) - 1:.6f}",
+        ]
+        for i in range(2)
+    ]
+    series = parse_equity_csv(_plain_grid(rows, ["Year", *MONTHS_EN, "Total"]))
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r, abs=1e-6)
+    assert any("fractions, as the year totals confirm" in w for w in series.warnings)
+
+
+def test_an_excel_cell_formatted_as_percent_is_a_percentage() -> None:
+    import io
+    import re
+    import zipfile
+
+    from test_audit_importers import xlsx
+
+    r = np.full(24, 0.0012)
+    rows: list[list[object]] = [["Year", *MONTHS_EN]]
+    rows += [[2020 + i, *[float(v) for v in r[12 * i : 12 * i + 12]]] for i in range(2)]
+    source = zipfile.ZipFile(io.BytesIO(xlsx({"Returns": rows})))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as archive:
+        for info in source.infolist():
+            body = source.read(info.filename)
+            if info.filename.startswith("xl/worksheets/"):
+                # Every month cell (columns B to M) shows as 0.12 %.
+                body = re.sub(rb'<c r="([B-M]\d+)">', rb'<c r="\1" s="1">', body)
+            archive.writestr(info.filename, body)
+        archive.writestr(
+            "xl/styles.xml",
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            '<cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="10"/></cellXfs></styleSheet>',
+        )
+    series = parse_equity_csv(out.getvalue())
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r)
+    assert any("values taken as percentages" in w for w in series.warnings)
+
+
+def test_footnotes_and_blank_rows_are_skipped() -> None:
+    r = _returns(24, seed=4)
+    text = _grid_csv(r).decode().splitlines()
+    text.insert(2, ",,,,,,,,,,,,,")
+    text.append("Source: fund administrator,,,,,,,,,,,,,")
+    text.append("2018,,,,,,,,,,,,,")
+    series = parse_equity_csv(("\n".join(text) + "\n").encode())
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r, abs=5e-5)
+
+
+@pytest.mark.parametrize(
+    ("edit", "code", "words"),
+    [
+        (lambda t: t.__setitem__(2, "," + t[2].split(",", 1)[1]), "grid_no_year", "a year such"),
+        (lambda t: t.append(t[1]), "grid_duplicate_year", "2016 more than once"),
+    ],
+)
+def test_a_grid_without_a_year_or_with_one_twice_says_so(edit, code, words) -> None:  # type: ignore[no-untyped-def]
+    from quant_trade.audit.schema import ParseError
+
+    text = _grid_csv(_returns(24)).decode().splitlines()
+    edit(text)
+    with pytest.raises(ParseError) as caught:
+        parse_equity_csv(("\n".join(text) + "\n").encode())
+    assert caught.value.code == code and words in str(caught.value)
+    assert "timestamp" not in str(caught.value) and caught.value.message_es
+
+
+def test_an_unreadable_month_is_named() -> None:
+    r = _returns(36)
+    text = _grid_csv(r).decode().splitlines()
+    cells = text[2].split(",")
+    cells[3], cells[7] = "abc", "inf"
+    text[2] = ",".join(cells)
+    series = parse_equity_csv(("\n".join(text) + "\n").encode())
+    assert series.observations == 35
+    assert any(
+        w == "2 unreadable month(s) left out of the table: 2017-03, 2017-07"
+        for w in series.warnings
+    )
+
+
+@pytest.mark.parametrize(
+    ("year", "total"),
+    [
+        ("Year", "YTD %"),
+        ("Year", "Full Year"),
+        ("Year", "Yearly"),
+        ("Year", "Year"),
+        ("Año", "Año "),
+    ],
+)
+def test_total_headers_are_matched_loosely(year: str, total: str) -> None:
+    r = _returns(36)
+    text = _grid_csv(r, year=year, total=total).decode().splitlines()
+    cells = text[2].split(",")
+    cells[3] = "9.99%"
+    text[2] = ",".join(cells)
+    series = parse_equity_csv(("\n".join(text) + "\n").encode())
+    assert any("does not match its months for 2017" in w for w in series.warnings)
+
+
+def test_new_grid_warnings_are_translated() -> None:
+    from quant_trade.audit.i18n import spanish
+
+    for text in (
+        "2 unreadable month(s) left out of the table: 2017-03, 2017-07",
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as percentages (the file shows no % sign: check one month against the factsheet)",
+    ):
+        assert spanish(text) is not None

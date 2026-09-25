@@ -35,7 +35,7 @@ from quant_trade.audit.web import create_app, sign_stripe_payload  # noqa: E402
 
 WEBHOOK_SECRET = "whsec_test"
 SELLING = {
-    "stripe_secret_key": "sk_test_x",
+    "stripe_secret_key": "sk_live_x",
     "stripe_webhook_secret": WEBHOOK_SECRET,
     "free_mode": False,
     "access_codes": True,
@@ -73,6 +73,7 @@ def _session(audit_id: str, *, plan: str = PLAN_SINGLE, sid: str = "cs_test_1", 
     return {
         "id": sid,
         "payment_status": "paid",
+        "livemode": True,
         "metadata": {"audit_id": audit_id, "plan": plan},
         **extra,
     }
@@ -196,7 +197,7 @@ def test_locked_report_puts_card_payment_first_with_the_pack_and_keeps_codes(
 ) -> None:
     client = _client(tmp_path)
     audit_id, token = _upload(client)
-    assert client.get("/health").json()["card_mode"] == "test"
+    assert client.get("/health").json()["card_mode"] == "live"
     for lang, pay, pack, alt in (
         ("es", "Pagar con tarjeta", "Comprar el paquete de 3 (USD 69)", "Prefieres pagar por"),
         ("en", "Pay by card", "Buy the pack of 3 (USD 69)", "Prefer a bank transfer"),
@@ -312,3 +313,103 @@ def test_legal_pages_name_stripe_and_explain_the_card_pack(tmp_path: Path) -> No
     assert "code with 2 credits" in terms_en and "misreads your file" in terms_en
     for page in (terms, terms_en, client.get("/privacidad").text):
         assert find_claims(page) == []
+
+
+# -- test mode never unlocks a real report ---------------------------------------
+def test_a_test_mode_key_offers_no_card_and_a_test_payment_unlocks_nothing(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path, stripe_secret_key="sk_test_x")
+    audit_id, token = _upload(client)
+    health = client.get("/health").json()
+    assert health["card_mode"] == "test" and health["card_via"] == "checkout"
+    page = client.get(f"/audits/{audit_id}?token={token}").text
+    assert "name='plan'" not in page and "wa.me" in page  # codes and WhatsApp still work
+    assert client.post(f"/audits/{audit_id}/checkout?token={token}").status_code == 503
+    assert "Stripe" not in client.get("/terminos").text  # not offered to the public
+    # Stripe's public test card pays a test checkout: that alone unlocks nothing.
+    assert _webhook(client, _session(audit_id, livemode=False)) == 200
+    assert not client.app.state.store.get_audit(audit_id).paid
+
+
+def test_a_listed_test_audit_can_be_paid_in_test_mode(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, stripe_secret_key="sk_test_x")
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    audit_id, _ = _upload(client)
+    other_id, _ = _upload(client)
+    listed = _settings(tmp_path, stripe_secret_key="sk_test_x", stripe_test_audits={audit_id})
+    listed_client = TestClient(create_app(listed, make_store(listed.database_url)))
+    assert listed.card_for(audit_id) and not listed.card_for(other_id)
+    assert _webhook(listed_client, _session(audit_id, livemode=False)) == 200
+    assert _webhook(listed_client, _session(other_id, sid="cs_2", livemode=False)) == 200
+    store = listed_client.app.state.store
+    assert store.get_audit(audit_id).paid and not store.get_audit(other_id).paid
+
+
+# -- Payment Links: no secret key on the service ------------------------------------
+LINKS = {
+    "stripe_secret_key": "",
+    "stripe_link_single": "https://buy.stripe.com/abc123",
+    "stripe_link_pack": "https://buy.stripe.com/pack456",
+}
+
+
+def test_payment_links_from_env_need_the_webhook_secret() -> None:
+    env = {
+        "STRIPE_WEBHOOK_SECRET": "whsec_x",
+        "STRIPE_PAYMENT_LINK_SINGLE": "https://buy.stripe.com/abc",
+        "STRIPE_PAYMENT_LINK_PACK": "https://buy.stripe.com/def",
+        "AUDIT_FREE_MODE": "false",
+        "AUDIT_STRIPE_TEST_AUDITS": "a1, a2",
+    }
+    settings = AuditSettings.from_env(env)
+    assert settings.links_enabled and not settings.stripe_enabled
+    assert card_mode(settings) == "live" and settings.card_public
+    assert settings.stripe_test_audits == frozenset({"a1", "a2"})
+    no_secret = AuditSettings.from_env({**env, "STRIPE_WEBHOOK_SECRET": ""})
+    assert not no_secret.links_enabled and no_secret.free_mode
+    not_stripe = AuditSettings.from_env({**env, "STRIPE_PAYMENT_LINK_SINGLE": "https://x.io/a"})
+    assert not not_stripe.links_enabled
+    test_links = AuditSettings.from_env(
+        {**env, "STRIPE_PAYMENT_LINK_SINGLE": "https://buy.stripe.com/test_abc"}
+    )
+    assert card_mode(test_links) == "test" and not test_links.card_public
+
+
+def test_report_links_carry_the_audit_and_the_webhook_unlocks_it(tmp_path: Path) -> None:
+    client = _client(tmp_path, **LINKS)
+    audit_id, token = _upload(client)
+    assert client.get("/health").json()["card_via"] == "links"
+    page = client.get(f"/audits/{audit_id}?token={token}").text
+    single = f"https://buy.stripe.com/abc123?client_reference_id={audit_id}&amp;locale=es"
+    pack = f"https://buy.stripe.com/pack456?client_reference_id={audit_id}&amp;locale=es"
+    assert single in page and pack in page
+    assert "Ya pagué: ver mi informe" in page and "&amp;pay=done" in page
+    assert "wa.me" in page and "name='code'" in page
+    assert find_claims(page) == []
+    # No Checkout session is ever created in this mode.
+    assert client.post(f"/audits/{audit_id}/checkout?token={token}").status_code == 503
+
+    waiting = client.get(f"/audits/{audit_id}?token={token}&pay=done").text
+    assert "Estamos confirmando tu pago" in waiting
+    link_session = {
+        "id": "cs_live_link",
+        "payment_status": "paid",
+        "livemode": True,
+        "client_reference_id": audit_id,
+        "metadata": {"plan": PLAN_PACK},
+    }
+    assert _webhook(client, link_session) == 200
+    done = client.get(f"/audits/{audit_id}?token={token}&pay=done").text
+    assert "Pago recibido" in done and "class='lockbox'" not in done
+    assert pack_code(WEBHOOK_SECRET, "cs_live_link") in done
+
+
+def test_test_mode_links_are_shown_only_on_listed_audits(tmp_path: Path) -> None:
+    test_links = {**LINKS, "stripe_link_single": "https://buy.stripe.com/test_abc"}
+    client = _client(tmp_path, **test_links)
+    audit_id, token = _upload(client)
+    assert "buy.stripe.com" not in client.get(f"/audits/{audit_id}?token={token}").text
+    assert "Stripe" not in client.get("/").text.split("id='pricing'")[-1]
+    listed = _client(tmp_path, **test_links, stripe_test_audits={audit_id})
+    assert "buy.stripe.com/test_abc" in listed.get(f"/audits/{audit_id}?token={token}").text
