@@ -1029,7 +1029,16 @@ dot-com bust (2000-09 to 2002-09), the 2008 financial crisis (2007-11 to
 (2020-02 to 2020-03), inflation and rates in 2022 (2022-01 to 2022-09) and
 the 2022 crypto winter (2021-11 to 2022-12). Equity windows follow US
 equities, the crypto one bitcoin; they are fixed in advance and never fitted
-to the file, and only dates are bundled, no market data. For each window the
+to the file. Beside each window the table shows what public indices did over
+the same months, as context only (`crises.MARKET`): the change from the close
+of the month before the window to the close of its last month, computed once
+from FRED's daily closes (S&P 500 from 2016 on, the series' start; Nasdaq
+Composite for every equity window; bitcoin on Coinbase for the crypto one),
+read on `MARKET_AS_OF`. These are a handful of fixed figures with their
+source URLs, not a data file; they never enter the result JSON, a finding or
+the class. A note under the table names the sources and says plainly that for
+a strategy trading another market (currencies, commodities, another country)
+they are context, not its yardstick. For each window the
 record covers in full, MEASURED: the fund's compounded return and, when a
 benchmark is present, the benchmark's. With 24 months or more, the worst and
 best 12-month return and the share of rolling 12-month periods that ended
