@@ -143,6 +143,11 @@ the curve box gets `trade_list_as_curve` too). A column the customer mapped
 that holds no numbers (or no dates, for a time) gets
 `universal_column_unreadable`, naming the column and its role. Format codes
 never appear in customer text (`tests/test_audit_import_messages.py`).
+A table with entry and exit prices but a single time (Bybit's Closed P&L)
+gets `universal_close_time_only`: without opening times holding time and
+entry timing cannot be measured, so it asks for the executions export (Bybit
+Trade History) instead. A `Contracts` column names the instrument when no
+symbol column exists and `Exec Qty` is the size.
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
 Platform exports the universal reader is checked against
