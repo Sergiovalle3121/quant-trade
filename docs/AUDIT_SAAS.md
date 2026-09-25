@@ -775,7 +775,9 @@ months, compounded, miss the stated totals by less than half the other's
 miss wins (summing cannot tell the two apart). Without totals, or when
 neither reading clearly wins, the grid is read as percentages, as
 factsheets publish, and the warning asks the customer to check one month
-against the factsheet. A money-market fund's `0.03` is therefore 0.03 %,
+against the factsheet. The total column's own scale is settled apart (its
+`%`, else the reading its years match best), so Excel months shown as
+1.23 % beside a General 0.07 total read as one. A money-market fund's `0.03` is therefore 0.03 %,
 not 3 % (the old median rule read it as a fraction, a 100x misread). A
 year whose stated total matches neither its months compounded nor summed
 (beyond 0.15 points) is listed in a warning: an edited month usually leaves
