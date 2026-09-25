@@ -679,8 +679,23 @@ box-shadow:0 1px 0 rgba(255,255,255,.07) inset,var(--shadow)}
 .verdict .ring::before{background:#101013}
 .verdict-k{font:500 .68rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);
 margin-bottom:10px}
-.verdict-text{font-size:clamp(1.05rem,1.7vw,1.3rem);line-height:1.5;color:#ececf0;margin:0;
-letter-spacing:-.015em}
+.verdict-text{font-size:clamp(.98rem,1.3vw,1.08rem);line-height:1.65;color:#a3a3aa;margin:0;
+letter-spacing:-.005em}
+.verdict-lead{display:block;font-size:clamp(1.3rem,2.3vw,1.75rem);line-height:1.22;font-weight:600;
+letter-spacing:-.03em;color:#f4f4f6;margin:0 0 14px}
+.report-toc{position:sticky;top:60px;z-index:40;background:rgba(244,244,246,.95);
+border-bottom:1px solid var(--border);backdrop-filter:saturate(180%) blur(18px);
+-webkit-backdrop-filter:saturate(180%) blur(18px)}
+.report-toc ol{list-style:none;margin:0;padding:10px 0;display:flex;gap:4px;overflow-x:auto;
+scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);
+mask-image:linear-gradient(90deg,#000 92%,transparent)}
+.report-toc ol::-webkit-scrollbar{display:none}
+.report-toc a{display:block;white-space:nowrap;padding:7px 13px;border-radius:999px;font-size:.8rem;
+font-weight:500;color:#6e6e76;text-decoration:none;transition:color .2s,background .25s}
+.report-toc a:hover{color:#111113}
+.report-toc a.on{background:#111113;color:#f4f4f6}
+.report-main .rsec,.report-main .detail,#unlock{scroll-margin-top:130px}
+.paper td{font-variant-numeric:tabular-nums}
 @media (max-width:620px){.verdict{flex-direction:column;align-items:flex-start;gap:22px}}
 .report-main{padding:clamp(48px,7vw,88px) 0 clamp(64px,9vw,112px)}
 .rsec{margin:0 0 clamp(48px,6vw,72px)}
@@ -848,7 +863,7 @@ box-shadow:none!important}
 display:none!important}
 .report-hero{padding:0}.report-main{padding:12px 0}
 .wrap{max-width:none;padding:0}body{font-size:10.5pt}
-.verdict-text,.report-hero h1,.lockbox>p:first-child{color:#000!important}
+.verdict-text,.verdict-lead,.report-hero h1,.lockbox>p:first-child{color:#000!important}
 .verdict .ring::before{background:#fff}
 [data-reveal],.rise{opacity:1!important;transform:none!important;filter:none!important;animation:none!important}
 .ring{--p:var(--to);animation:none}
