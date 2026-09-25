@@ -50,17 +50,16 @@ from quant_trade.audit.store import (  # noqa: E402
 from quant_trade.audit.theme import SCRIPT_SRC  # noqa: E402
 from quant_trade.audit.web import (  # noqa: E402
     CONTENT_SECURITY_POLICY,
-    FORM_OVERHEAD_BYTES,
     PRINT_HANDLER,
     SECURITY_HEADERS,
     UPLOAD_ATTEMPTS_PER_UPLOAD,
-    UPLOAD_FIELDS,
     WAITLIST_PER_HOUR_PER_IP,
     AttemptLog,
     RedactSecretsFilter,
     create_app,
     message,
     redact_secrets,
+    request_body_limit,
     uvicorn_log_config,
 )
 
@@ -200,7 +199,7 @@ def test_a_long_intraday_curve_finishes_within_a_time_budget() -> None:
 
 def test_a_declared_oversized_body_is_refused_before_it_is_read(tmp_path: Path) -> None:
     client = _client(tmp_path, max_upload_bytes=1_000)
-    limit = 1_000 * UPLOAD_FIELDS + FORM_OVERHEAD_BYTES
+    limit = request_body_limit(1_000)
     body = b"x" * (limit + 1)
     response = client.post(
         "/audits?lang=en",
@@ -214,7 +213,7 @@ def test_a_declared_oversized_body_is_refused_before_it_is_read(tmp_path: Path) 
 
 def test_a_streamed_oversized_body_is_cut_off_with_a_clear_message(tmp_path: Path) -> None:
     client = _client(tmp_path, max_upload_bytes=1_000)
-    limit = 1_000 * UPLOAD_FIELDS + FORM_OVERHEAD_BYTES
+    limit = request_body_limit(1_000)
 
     def chunks():
         sent = 0

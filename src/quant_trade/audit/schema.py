@@ -40,6 +40,9 @@ NOT_MEASURED: EvidenceClass = "NOT_MEASURED"
 #: Upload limits. Generous for a retail backtest, small enough that a single
 #: request cannot pin the process.
 MAX_UPLOAD_BYTES = 5_000_000
+#: A platform report may be twice that: MetaTrader writes its HTML reports
+#: in UTF-16, two bytes per character, so 5 MB held only ~6,000 trades.
+MAX_REPORT_BYTES = 2 * MAX_UPLOAD_BYTES
 MAX_ROWS = 200_000
 MAX_TRADES = 50_000
 MAX_VARIANTS = 500
@@ -250,7 +253,27 @@ def _pick(frame: pd.DataFrame, aliases: tuple[str, ...]) -> str | None:
     return None
 
 
+def _as_utf8_csv(data: bytes) -> bytes:
+    """A curve saved as an Excel workbook, or by Excel as "Unicode text"
+    (UTF-16 with tabs) or in a Windows code page, as UTF-8 CSV bytes.
+    Plain UTF-8 comes back unchanged."""
+    # Imported here: the importers build on this module's types.
+    from quant_trade.audit.importers import decode_text, xlsx_as_csv
+
+    if data.startswith(b"PK\x03\x04"):
+        return xlsx_as_csv(data, TIMESTAMP_ALIASES)
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:4000]:
+        return decode_text(data).encode("utf-8")
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return decode_text(data).encode("utf-8")
+    return data
+
+
 def _read_csv(data: bytes, *, what: str) -> pd.DataFrame:
+    if data and len(data) <= MAX_UPLOAD_BYTES:
+        data = _as_utf8_csv(data)
     if not data or not data.strip():
         raise ParseError(
             f"the {what} file is empty",
@@ -863,6 +886,7 @@ __all__ = [
     "DECLARED",
     "MAX_ROWS",
     "MAX_TRADES",
+    "MAX_REPORT_BYTES",
     "MAX_UPLOAD_BYTES",
     "MAX_CSV_LINE_BYTES",
     "MAX_VARIANTS",

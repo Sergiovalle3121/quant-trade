@@ -42,6 +42,7 @@ from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guides import GUIDES_BY_SLUG
+from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
 from quant_trade.audit.owner import (
     MAX_CREDITS,
@@ -289,7 +290,11 @@ FORM_OVERHEAD_BYTES = 1 << 20
 #: page: two customers (or one double click) must not get an error.
 PDF_WAIT_SECONDS = 25.0
 #: How many upload fields ``POST /audits`` takes.
-UPLOAD_FIELDS = 6
+UPLOAD_FIELDS = 7
+#: The fields that may carry a platform report, and how much larger than
+#: ``max_upload_bytes`` they may be.
+REPORT_FIELDS = frozenset({"equity", "report", "live"})
+REPORT_SIZE_FACTOR = 2
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 #: Query values that are secrets: the owner token and an access code.
@@ -357,10 +362,12 @@ def looks_like_platform_report(filename: str | None, data: bytes) -> bool:
     its byte-order mark before looking for the HTML tag.
     """
     name = (filename or "").lower()
-    if name.endswith((".htm", ".html", ".xlsx")):
-        return True
     head = data[:4096]
-    if head.startswith(b"PK\x03\x04"):
+    if head.startswith(b"PK\x03\x04") or name.endswith(".xlsx"):
+        # A workbook is a report only when an importer knows it; a sheet
+        # with a date and an equity column stays an equity curve.
+        return detect_format(data) is not None
+    if name.endswith((".htm", ".html")):
         return True
     if head[:2] in (b"\xff\xfe", b"\xfe\xff"):
         text = head.decode("utf-16", errors="ignore")
@@ -443,6 +450,14 @@ async def _take_slot(slots: Any, wait_seconds: float) -> bool:
 
 class BodyTooLarge(Exception):
     """The request body passed the service's limit while it was being read."""
+
+
+def request_body_limit(max_upload_bytes: int) -> int:
+    """The largest ``POST /audits`` body: every field at its limit (the
+    fields that may carry a platform report take ``REPORT_SIZE_FACTOR``
+    times it, since MetaTrader writes UTF-16) plus the form overhead."""
+    extra = max_upload_bytes * (REPORT_SIZE_FACTOR - 1) * len(REPORT_FIELDS)
+    return max_upload_bytes * UPLOAD_FIELDS + extra + FORM_OVERHEAD_BYTES
 
 
 class HeadAsGetMiddleware:
@@ -718,7 +733,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # thread pool.
     audit_slots = anyio.CapacityLimiter(cfg.max_concurrent_audits)
     app.state.audit_slots = audit_slots
-    body_limit = cfg.max_upload_bytes * UPLOAD_FIELDS + FORM_OVERHEAD_BYTES
+    report_upload_bytes = cfg.max_upload_bytes * REPORT_SIZE_FACTOR
+    body_limit = request_body_limit(cfg.max_upload_bytes)
 
     def _secure(response: Any, *, path: str = "") -> Any:
         """The headers every response carries, errors included."""
@@ -819,6 +835,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         kind = "page" if key == "page_missing" else "audit"
         return _html_error(request, exc.status_code, message(key, locale), locale, kind=kind)
 
+    def _field_limit(what: str) -> int:
+        return report_upload_bytes if what in REPORT_FIELDS else cfg.max_upload_bytes
+
     async def _read_limited(upload: UploadFile | None, *, what: str) -> bytes | None:
         if upload is None or not upload.filename:
             return None
@@ -829,7 +848,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not chunk:
                 break
             size += len(chunk)
-            if size > cfg.max_upload_bytes:
+            if size > _field_limit(what):
                 raise UploadTooLarge(what)
             chunks.append(chunk)
         data = b"".join(chunks)
@@ -1060,7 +1079,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 "too_large",
                 loc,
                 what=UPLOAD_NAMES[exc.what][loc],
-                limit=f"{cfg.max_upload_bytes:,}",
+                limit=f"{_field_limit(exc.what):,}",
             )
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:

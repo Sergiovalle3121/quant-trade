@@ -63,8 +63,8 @@ from xml.etree import ElementTree
 from xml.parsers import expat
 
 from quant_trade.audit.schema import (
+    MAX_REPORT_BYTES,
     MAX_TRADES,
-    MAX_UPLOAD_BYTES,
     ParsedTrades,
     ParseError,
     printed_step,
@@ -182,11 +182,11 @@ class OptimizationSummary:
 def _check_size(data: bytes) -> None:
     if not data or not data.strip():
         raise ReportFormatError("empty_file", "the file is empty", "el archivo está vacío")
-    if len(data) > MAX_UPLOAD_BYTES:
+    if len(data) > MAX_REPORT_BYTES:
         raise ReportFormatError(
             "file_too_large",
-            f"the file is {len(data):,} bytes; the limit is {MAX_UPLOAD_BYTES:,}",
-            f"el archivo pesa {len(data):,} bytes; el límite es {MAX_UPLOAD_BYTES:,}",
+            f"the file is {len(data):,} bytes; the limit is {MAX_REPORT_BYTES:,}",
+            f"el archivo pesa {len(data):,} bytes; el límite es {MAX_REPORT_BYTES:,}",
         )
 
 
@@ -2012,6 +2012,38 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
             if sheet is not None:
                 sheets[node.get("name", f"Sheet{position}")] = _sheet_rows(sheet, shared)
         return sheets
+
+
+def xlsx_as_csv(data: bytes, time_headers: Sequence[str]) -> bytes:
+    """The first non-empty sheet of a workbook as UTF-8 CSV bytes.
+
+    Excel stores dates as day serials, so a column whose header names a
+    time (``time_headers``, compared lower-case and stripped) has its
+    numbers written as ISO timestamps. A workbook with no data gives b"".
+    """
+    import csv
+
+    sheets = read_xlsx(data)
+    rows = next((rows for rows in sheets.values() if any(any(r) for r in rows)), [])
+    rows = [row for row in rows if any(cell not in (None, "") for cell in row)]
+    if not rows:
+        return b""
+    header = [_as_text(cell).lower() for cell in rows[0]]
+    times = {i for i, name in enumerate(header) if name in set(time_headers)}
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    writer.writerow([_as_text(cell) for cell in rows[0]])
+    for row in rows[1:]:
+        cells: list[str] = []
+        for i, cell in enumerate(row):
+            moment = (
+                _excel_serial(float(cell))
+                if i in times and isinstance(cell, float | int) and not isinstance(cell, bool)
+                else None
+            )
+            cells.append(moment.isoformat() if moment is not None else _as_text(cell))
+        writer.writerow(cells)
+    return out.getvalue().encode("utf-8")
 
 
 def _sheet_rows(sheet: ElementTree.Element, shared: list[str]) -> list[list[Any]]:
