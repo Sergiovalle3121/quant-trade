@@ -255,3 +255,18 @@ def test_capital_limits_read_as_four_cards() -> None:
         assert "<b>10%</b>" in tiles and "<b>50%</b>" in tiles
         assert find_claims(page) == []
     assert "@media print{ol.caps{display:block}" in STYLE
+
+
+def test_stress_and_timing_tables_become_cards_on_phones(tmp_path: Path) -> None:
+    from quant_trade.audit.report import KPI_CSS
+
+    page = _client(tmp_path).get("/ejemplo").text
+    stress = page.split("<table class='stress'>", 1)[1].split("</table>", 1)[0]
+    timing = page.split("<table class='timing'>", 1)[1].split("</table>", 1)[0]
+    assert "data-l='Queda'" in stress and "data-l='¿Sigue sobre cero?'" in stress
+    assert "<td class='empty'></td>" in stress
+    assert "data-l='Operaciones'" in timing and "data-l='Aciertos'" in timing
+    assert ".stress td[data-l]::before,.timing td[data-l]::before" in STYLE
+    # A lone last key figure spans the row on phones instead of leaving a gap.
+    assert ".kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}" in KPI_CSS
+    assert find_claims(page) == []

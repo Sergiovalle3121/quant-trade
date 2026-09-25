@@ -1462,7 +1462,8 @@ def _plan_html(data: dict[str, Any], locale: str, labels: dict[str, str], *, loc
 
 KPI_CSS = (
     ".kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0}"
-    "@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}"
+    "@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}"
+    ".kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}}"
     ".kpi{border:1px solid var(--border);border-radius:16px;padding:16px 18px;background:#fff}"
     ".kpi b{display:block;font-family:var(--serif);font-weight:400;"
     "font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.1;letter-spacing:-.01em}"
@@ -1592,8 +1593,9 @@ def _stress_table(
     original = block["original"]
     rows = [
         f"<tr class='base'><td>{_e(labels['original'])} {_badge(original['evidence'])}</td>"
-        f"<td class='val'>{_stress_value(original['value'], percent=percent)}</td>"
-        "<td></td><td></td></tr>"
+        f"<td class='val' data-l='{_e(labels['stress_result'])}'>"
+        f"{_stress_value(original['value'], percent=percent)}</td>"
+        "<td class='empty'></td><td class='empty'></td></tr>"
     ]
     for row in block.get("rows", []):
         name = names.get(row["scenario"], row["scenario"]).format(
@@ -1603,11 +1605,12 @@ def _stress_table(
         below = row["result"]["value"] <= 0
         rows.append(
             f"<tr><td>{_e(name)}</td>"
-            f"<td class='val{' neg' if below else ''}'>"
+            f"<td class='val{' neg' if below else ''}' data-l='{_e(labels['stress_result'])}'>"
             f"{_stress_value(row['result']['value'], percent=percent)}</td>"
-            f"<td class='val delta'>"
+            f"<td class='val delta' data-l='{_e(labels['stress_change'])}'>"
             f"{_stress_value(row['change']['value'], percent=percent, signed=True)}</td>"
-            f"<td><span class='badge {'PASS' if ok else 'FAIL'}'>"
+            f"<td data-l='{_e(labels['stress_positive'])}'>"
+            f"<span class='badge {'PASS' if ok else 'FAIL'}'>"
             f"{_e((labels['yes'] if ok else labels['no']).capitalize())}</span></td></tr>"
         )
     return (
@@ -2157,14 +2160,17 @@ def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict
         width = max(2.0, abs(net) / widest * 100)
         side = "neg" if net < 0 else "pos"
         return (
-            f"<td class='val tbar {side}'><span class='tbar-track' aria-hidden='true'>"
+            f"<td class='val tbar {side}' data-l='{_e(labels['timing_net'])}'>"
+            "<span class='tbar-track' aria-hidden='true'>"
             f"<span style='--w:{width:.0f}%'></span></span><b>{net:+,.2f}</b></td>"
         )
 
     body = "".join(
-        f"<tr><td>{_e(name(row['key']))}</td><td class='val'>{row['trades']['value']:,}</td>"
+        f"<tr><td>{_e(name(row['key']))}</td>"
+        f"<td class='val' data-l='{_e(labels['timing_trades'])}'>{row['trades']['value']:,}</td>"
         f"{net_cell(row['net']['value'])}"
-        f"<td class='val'>{row['win_rate']['value']:.0%}</td></tr>"
+        f"<td class='val' data-l='{_e(labels['timing_hits'])}'>{row['win_rate']['value']:.0%}</td>"
+        "</tr>"
         for row in rows
     )
     return (

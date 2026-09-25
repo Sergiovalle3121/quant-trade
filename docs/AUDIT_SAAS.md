@@ -1052,6 +1052,10 @@ and 50 %): the capital needed at the backtest's size, then the size fraction on
 the file's balance. The cards sit two to a row on phones, four on desktop and in
 the PDF.
 
+On phones the stress tables and the day and hour tables read as one card per
+row, with each figure labelled, instead of scrolling sideways. A lone last key
+figure spans the row.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
