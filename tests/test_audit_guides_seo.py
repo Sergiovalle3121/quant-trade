@@ -88,6 +88,7 @@ def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
         "myfxbook",
         "mql5-signal",
         "fxblue",
+        "csv-universal",
     }
     for guide in GUIDES:
         assert set(guide.text) == {"es", "en"}

@@ -123,8 +123,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "report_help": (
             "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4 "
             "(o el XLSX que exporta MetaTrader 5), "
-            "lista de operaciones de TradingView (CSV o XLSX), o el CSV de operaciones de "
-            "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 10 MB."
+            "lista de operaciones de TradingView (CSV o XLSX), el CSV de operaciones de "
+            "NinjaTrader, QuantConnect, backtesting.py o vectorbt, o el historial de "
+            "operaciones en CSV o Excel de cualquier otro bróker o exchange. Hasta 10 MB."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -244,7 +245,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 "El informe de tu plataforma tal cual: MetaTrader 5 o 4 (HTML), TradingView "
                 "(CSV o XLSX), NinjaTrader, QuantConnect, backtesting.py o vectorbt. Para "
                 "revisar la cuenta de otro trader, el historial en CSV que exporta Myfxbook, "
-                "FX Blue o una señal de MQL5. También sirve una curva de equity en CSV.",
+                "FX Blue o una señal de MQL5. De cualquier otro bróker, exchange o diario, "
+                "su historial de operaciones en CSV o Excel: las columnas se reconocen por su "
+                "nombre. También sirve una curva de equity en CSV.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -334,8 +337,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "report_help": (
             "The file as it is: a MetaTrader 5 or 4 tester or history HTML report (or the "
             "XLSX MetaTrader 5 exports), a "
-            "TradingView list of trades (CSV or XLSX), or the trades CSV of NinjaTrader, "
-            "QuantConnect, backtesting.py or vectorbt. Up to 10 MB."
+            "TradingView list of trades (CSV or XLSX), the trades CSV of NinjaTrader, "
+            "QuantConnect, backtesting.py or vectorbt, or the CSV or Excel trade history of "
+            "any other broker or exchange. Up to 10 MB."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -452,7 +456,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 "Your platform report as it is: MetaTrader 5 or 4 (HTML), TradingView (CSV or "
                 "XLSX), NinjaTrader, QuantConnect, backtesting.py or vectorbt. To review another "
                 "trader's account, the CSV history exported by Myfxbook, FX Blue or an MQL5 "
-                "signal. An equity curve in CSV works too.",
+                "signal. From any other broker, exchange or journal, its trade history as CSV "
+                "or Excel: the columns are recognised by their names. An equity curve in CSV "
+                "works too.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -1026,7 +1032,8 @@ def sample_meta(locale: str, base_url: str) -> str:
 
 def _guide_links(locale: str) -> str:
     return " · ".join(
-        f"<a href='{_e(guide_url(g.slug, locale))}'>{_e(g.platform)}</a>" for g in REPORT_GUIDES
+        f"<a href='{_e(guide_url(g.slug, locale))}'>{_e(g.platform_for(locale))}</a>"
+        for g in REPORT_GUIDES
     )
 
 

@@ -186,6 +186,33 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "every trade has zero commission and fees",
         "todas las operaciones tienen comisión y costes cero",
     ),
+    # --- Parse warnings: any trade or fill list (universal.py) ---
+    (
+        "the profit column already subtracts commission (it matches the price move after "
+        "costs), so it was read as net",
+        "la columna de resultado ya descuenta la comisión (cuadra con el movimiento del "
+        "precio después de costes), así que se leyó como neta",
+    ),
+    (
+        "the file has no profit column: each trade's result is the price move times the "
+        "quantity, with no contract multiplier",
+        "el archivo no tiene columna de resultado: el de cada operación es el movimiento del "
+        "precio por la cantidad, sin multiplicador de contrato",
+    ),
+    (
+        "no side column; the side was taken from the sign of the quantity",
+        "no hay columna de lado; se tomó del signo de la cantidad",
+    ),
+    (
+        "no side column; the side was taken from the sign of the profit",
+        "no hay columna de lado; se tomó del signo del resultado",
+    ),
+    (
+        "{n} fee(s) charged in another coin than the price were left out of the costs, so "
+        "costs are understated",
+        "{n} comisión(es) cobradas en otra moneda distinta a la del precio quedaron fuera de "
+        "los costes, así que los costes están subestimados",
+    ),
     (
         "{n} multi-leg trade(s) kept as single trades",
         "{n} operación(es) de varias patas se tratan como una sola",
@@ -1250,6 +1277,13 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} trade number(s) without one entry and one exit row": (
         "{n} trade number without one entry and one exit row",
         "{n} número de operación sin una fila de entrada y una de salida",
+    ),
+    "{n} fee(s) charged in another coin than the price were left out of the costs, so "
+    "costs are understated": (
+        "{n} fee charged in another coin than the price was left out of the costs, so costs "
+        "are understated",
+        "{n} comisión cobrada en otra moneda distinta a la del precio quedó fuera de los "
+        "costes, así que los costes están subestimados",
     ),
     "{n} multi-leg trade(s) kept as single trades": (
         "{n} multi-leg trade kept as a single trade",
