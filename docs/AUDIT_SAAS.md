@@ -1353,6 +1353,15 @@ footer names the tagline and the legal pages once instead of twice. The preview'
 red flags use the same cards as the full report, the gravest first, without the
 detail that the payment unlocks.
 
+Redesign pass 39 styles the report check (`/comprobar`, `/check`): the file
+goes into the same drop zone as the upload, the button spans the card, "How
+it works" reads as three icon steps, and the answer is a tinted card with a
+mark (green check when the bytes match, amber caution when Rigor has no
+record, since an unmatched file may simply predate the recording). The page
+is linked from every footer's Product column, from a note on the public /v
+page ("Were you sent this report's PDF or JSON?") and from a line under the
+report's PDF download.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -1397,6 +1406,9 @@ the link to its public page when the owner published one), or that Rigor has no
 record of them (edited, from elsewhere, or issued before 25 September 2026,
 when recording started; the page never says Rigor did not produce them). The wording says only whether the file changed since Rigor
 produced it, never anything about the strategy, and passes the guard.
+These two paths have their own request body limit (20 MB plus 1 MB of form),
+so a bigger upload gets the page's 413 message before the server receives
+and spools it, instead of after, under the whole-service limit.
 
 A hash, not a digital signature, was chosen on purpose: it needs no key to
 keep secret and no Railway variable, and the buyer checks on the site in two

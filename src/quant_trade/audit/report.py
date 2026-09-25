@@ -160,6 +160,8 @@ LABELS: dict[str, dict[str, str]] = {
             "que produce el error de muestreo."
         ),
         "pdf_long": "Descargar el informe en PDF",
+        "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
+        "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
         "yes": "sí",
         "no": "no",
@@ -658,6 +660,8 @@ LABELS: dict[str, dict[str, str]] = {
             "and the one sampling error produces."
         ),
         "pdf_long": "Download the report as PDF",
+        "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
+        "pdf_check_link": "How they check",
         "switch": "Español",
         "yes": "yes",
         "no": "no",
@@ -3715,6 +3719,9 @@ def render_html(
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
             f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
+            f"<p class='muted pdf-check rise no-print' style='--i:4'>{_e(labels['pdf_check'])} "
+            f"<a href='{'/check' if locale == 'en' else '/comprobar'}'>"
+            f"{_e(labels['pdf_check_link'])}</a></p>"
             if pdf_url and not locked
             else ""
         )

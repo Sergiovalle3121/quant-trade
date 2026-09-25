@@ -535,6 +535,9 @@ def test_verification_details_show_figures_with_their_evidence_badge() -> None:
         assert "(DECLARED)" not in page and "(MEASURED)" not in page
         assert "<span class='vc'>120 <span class='badge DECLARED'>DECLARED</span></span>" in page
         assert f"<code>{sha}</code>" in page
+        # A buyer holding the PDF or JSON is pointed to the page that checks it.
+        check = "/check" if locale == "en" else "/comprobar"
+        assert "<p class='check-cta'>" in page and f"<a href='{check}'>" in page
         assert find_claims(page) == []
 
 
@@ -576,3 +579,33 @@ def test_landing_form_help_is_short_and_the_footer_says_things_once() -> None:
         assert find_claims(page) == []
     # How it works: number and text share a row on phones.
     assert ".steps li{display:grid;grid-template-columns:44px minmax(0,1fr)" in STYLE
+
+
+def test_check_page_is_a_drop_zone_and_is_linked_where_a_buyer_needs_it(tmp_path: Path) -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+
+    client = _client(tmp_path)
+    for path, other, link in (
+        ("/comprobar", "/check", "Cómo lo comprueba"),
+        ("/check", "/comprobar", "How they check"),
+    ):
+        page = client.get(path).text
+        # The same drop zone as the upload, with how the check works as icon steps.
+        assert "<div class='drop drop-main'>" in page and "<ol class='chk-steps'>" in page
+        assert "btn btn-primary btn-lg" in page
+        # Every footer links the page, in the page's own language.
+        foot = page.split("<footer class='foot'>", 1)[1]
+        assert f"href='{path}'" in foot and f"href='{other}'" not in foot
+        locale = "en" if path == "/check" else "es"
+        report = render_html(
+            sample_result(locale, bootstrap_samples=60),
+            watermark=False,
+            locale=locale,
+            pdf_url="/audits/x/pdf",
+        )
+        # Next to the report's PDF download, the page that checks it.
+        assert f"<a href='{path}'>{link}</a>" in report
+        assert find_claims(page) == [] and find_claims(report) == []
+    # An unmatched file reads as a caution, not as an alarm.
+    assert ".chk-result.bad{--tone:var(--warn)}" in client.get("/comprobar").text
