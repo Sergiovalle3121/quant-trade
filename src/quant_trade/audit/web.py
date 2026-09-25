@@ -85,7 +85,15 @@ from quant_trade.audit.schema import (
 )
 from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
 from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings
-from quant_trade.audit.store import CODE_REFERENCE_PREFIX, REQUIRE_WEB, Store, make_store
+from quant_trade.audit.store import (
+    CODE_REFERENCE_PREFIX,
+    REQUIRE_WEB,
+    VIA_PAID,
+    VIA_SAVED,
+    VIA_UPLOAD,
+    Store,
+    make_store,
+)
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps
 
@@ -1089,6 +1097,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     secure_cookies = cfg.base_url.startswith("https://")
     signin_failures = AttemptLog()
     signin_email_failures = AttemptLog()
+    signin_ip_failures = AttemptLog()
     signup_attempts = AttemptLog()
     account_actions = AttemptLog()
 
@@ -1272,9 +1281,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("csrf", 400)
             ip = _client_ip(request, cfg.trusted_proxy_hops)
             now = datetime.now(UTC)
+            # Keyed on (address, e-mail) so that failures from elsewhere never
+            # lock the real owner out; the per-address and per-e-mail ceilings
+            # are much higher and only stop wide guessing.
+            pair = f"{ip}|{clean}"
             if (
-                signin_failures.count(ip, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
-                or signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
+                signin_failures.count(pair, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
+                or signin_ip_failures.count(ip, now) >= acct.MAX_FAILED_SIGNINS_PER_IP
+                or signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_EMAIL
             ):
                 return again("too_many", 429)
             found = db.account_with_hash(clean) if acct.valid_email(clean) else None
@@ -1284,7 +1298,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             else:
                 ok = acct.verify_password(found[1], password)
             if not ok or found is None:
-                signin_failures.hit(ip, now)
+                signin_failures.hit(pair, now)
+                signin_ip_failures.hit(ip, now)
                 signin_email_failures.hit(clean, now)
                 return again("wrong", 401)
             db.purge_sessions(now)
@@ -1506,13 +1521,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(paths["reset"], _reset_get(path_locale), **html_get)
         app.add_api_route(paths["reset"], _reset_post(path_locale), methods=["POST"])
 
-    def _link_to_session(request: Request, audit_id: str, reference: str | None = None) -> None:
-        """Put a report (and the code that paid it) on the signed-in account, if any."""
+    def _link_to_session(
+        request: Request, audit_id: str, reference: str | None = None, *, via: str = VIA_SAVED
+    ) -> None:
+        """Put a report (and the code that paid it) on the signed-in account, if any.
+
+        ``via`` says whether it is the account's own report (uploaded or paid
+        while signed in) or only saved there; only its own can be deleted with it.
+        """
         session = _session(request)
         if session is None:
             return
         now = datetime.now(UTC)
-        db.link_audit(session[0].id, audit_id, at=now)
+        db.link_audit(session[0].id, audit_id, at=now, via=via)
         if reference and reference.startswith(CODE_REFERENCE_PREFIX):
             db.link_code(session[0].id, reference[len(CODE_REFERENCE_PREFIX) :], at=now)
 
@@ -1702,7 +1723,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         audit_id, token, paid = outcome
         if paid or _session(request) is not None:
             linked = db.get_audit(audit_id)
-            _link_to_session(request, audit_id, linked.stripe_session_id if linked else None)
+            _link_to_session(
+                request, audit_id, linked.stripe_session_id if linked else None, via=VIA_UPLOAD
+            )
         location = f"/audits/{audit_id}?token={token}"
         if code:
             location += "&code=" + ("applied" if paid else "rejected")
@@ -1965,6 +1988,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if db.link_audit(account_id, record.id, at=now) == "other":
             return RedirectResponse(f"{back}&lang={locale}", status_code=303)
         applied = db.redeem_with_account(record.id, account_id, at=now)
+        if applied:
+            db.link_audit(account_id, record.id, at=now, via=VIA_PAID)
         done = "credit" if applied else "nocredit"
         return RedirectResponse(f"{back}&lang={locale}&acct={done}", status_code=303)
 
@@ -2025,7 +2050,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if applied:
             paid_record = db.get_audit(audit_id)
             _link_to_session(
-                request, audit_id, paid_record.stripe_session_id if paid_record else None
+                request,
+                audit_id,
+                paid_record.stripe_session_id if paid_record else None,
+                via=VIA_PAID,
             )
         outcome = "applied" if applied else "rejected"
         if _wants_json(request):

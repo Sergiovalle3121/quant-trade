@@ -75,11 +75,13 @@ def _signup(client: TestClient, email: str = "ana@example.com", password: str = 
     )
 
 
-def _signin(client: TestClient, email: str, password: str = PASSWORD):
+def _signin(client: TestClient, email: str, password: str = PASSWORD, ip: str = ""):
+    headers = {"X-Forwarded-For": ip} if ip else {}
     csrf = _csrf(client.get("/entrar").text)
     return client.post(
         "/entrar",
         data={"email": email, "password": password, "csrf": csrf},
+        headers=headers,
         follow_redirects=False,
     )
 
@@ -106,6 +108,7 @@ def test_passwords_are_hashed_with_scrypt_and_checked() -> None:
     assert password_problem("short") == "password_short"
     assert password_problem("x" * 300) == "password_long"
     assert password_problem(PASSWORD) == ""
+    assert password_problem("una frase\x00muy larga") == "password_bad"
 
 
 def test_emails_and_return_paths_are_checked() -> None:
@@ -531,3 +534,61 @@ def test_forms_before_sign_in_set_a_csrf_cookie(tmp_path: Path) -> None:
     page = client.get("/entrar")
     assert CSRF_COOKIE in page.headers["set-cookie"]
     assert client.cookies.get(CSRF_COOKIE) == _csrf(page.text)
+
+
+# -- security review findings ------------------------------------------------------
+def test_a_report_saved_from_a_link_is_never_deleted_with_the_account(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    location = _upload(client).headers["location"]  # A uploads, never signs up
+    audit_id = _audit_id(location)
+    thief = TestClient(client.app)
+    _signup(thief, "b@example.com")
+    page = thief.get(location).text
+    query = location[location.index("?") :]
+    thief.post(f"/audits/{audit_id}/save{query}", data={"csrf": _csrf(page)})
+    listing = thief.get("/cuenta").text
+    assert "Guardado desde un enlace" in listing
+    thief.post(
+        "/cuenta/borrar",
+        data={"current": PASSWORD, "csrf": _csrf(listing), "with_reports": "yes"},
+    )
+    assert store.get_audit(audit_id) is not None  # type: ignore[attr-defined]
+    assert store.account_for_audit(audit_id) is None  # type: ignore[attr-defined]
+    assert client.get(location).status_code == 200
+
+
+def test_paying_with_a_credit_makes_a_saved_report_the_accounts_own(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    location = _upload(client).headers["location"]
+    audit_id = _audit_id(location)
+    _signup(client, "own@example.com")
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post("/cuenta/codigo", data={"code": code, "csrf": csrf})
+    page = client.get(location).text
+    query = location[location.index("?") :]
+    client.post(f"/audits/{audit_id}/save{query}", data={"csrf": _csrf(page)})
+    client.post(f"/audits/{audit_id}/credit{query}", data={"csrf": _csrf(page)})
+    [item] = store.account_audits_list(store.find_account("own@example.com").id)  # type: ignore[attr-defined]
+    assert item.paid and item.own
+
+
+def test_a_promotional_description_is_withheld_on_the_account_page(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client, "u@example.com")
+    _upload(client, description="Ganancias garantizadas cada mes")
+    page = client.get("/cuenta")
+    assert page.status_code == 200
+    assert "Ganancias garantizadas" not in page.text and "withheld" in page.text
+    assert find_claims(page.text) == []
+
+
+def test_failures_from_elsewhere_do_not_lock_the_owner_out(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client, "v@example.com")
+    client.cookies.clear()
+    for _ in range(MAX_FAILED_SIGNINS_PER_HOUR):
+        _signin(client, "v@example.com", "otra frase distinta", ip="203.0.113.9")
+    assert _signin(client, "v@example.com", ip="203.0.113.9").status_code == 429
+    client.cookies.clear()
+    assert _signin(client, "v@example.com", ip="198.51.100.4").status_code == 303

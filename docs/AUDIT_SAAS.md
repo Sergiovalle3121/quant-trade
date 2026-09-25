@@ -1119,8 +1119,9 @@ without one, and an account never changes what a report says.
   session cookie `rigor_session`, 256-bit, `HttpOnly`, `SameSite=Lax`,
   `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
-  after); 10 failed sign-ins per hour per address and per e-mail, 5 sign-ups
-  per hour per address; a password change or reset signs out the other
+  after); 10 failed sign-ins per hour per (address, e-mail) pair, with
+  ceilings of 50 per address and 200 per e-mail, and 5 sign-ups per hour per
+  address; a password change or reset signs out the other
   sessions; `next` only returns to `/audits/` or `/cuenta` paths.
 - **No e-mail service yet**. Nothing sends e-mail and addresses are not
   confirmed. A customer who forgets the password writes to the owner
@@ -1132,7 +1133,8 @@ without one, and an account never changes what a report says.
   sending domain, and its API key as a Railway variable; the hooks are listed
   in `accounts.EMAIL_HOOKS`.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
-  required), optionally with all its reports; the owner does it with
+  required), optionally with the reports they uploaded or paid for while
+  signed in; a report saved from someone else's link is only unlinked; the owner does it with
   `quant-trade audit account-delete EMAIL [--with-reports] --yes`. Deleting an
   audit (`audit delete ID --yes`) also removes it from its account.
 - **Storage**: five new tables (`accounts`, `account_sessions`,

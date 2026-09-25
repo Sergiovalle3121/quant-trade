@@ -42,8 +42,11 @@ MAX_PASSWORD_CHARS = 256
 MAX_EMAIL_CHARS = 254
 SESSION_DAYS = 30
 RESET_HOURS = 24
-#: Per address and per e-mail, per hour.
+#: Failed sign-ins per hour for one (address, e-mail) pair; the per-address
+#: and per-e-mail ceilings are higher so nobody can lock another person out.
 MAX_FAILED_SIGNINS_PER_HOUR = 10
+MAX_FAILED_SIGNINS_PER_IP = 50
+MAX_FAILED_SIGNINS_PER_EMAIL = 200
 MAX_SIGNUPS_PER_HOUR = 5
 MAX_ACCOUNT_ACTIONS_PER_HOUR = 30
 
@@ -75,8 +78,8 @@ def password_problem(password: str) -> str:
         return "password_short"
     if len(password) > MAX_PASSWORD_CHARS:
         return "password_long"
-    if "\x00" in password:
-        return "password_short"
+    if any(not char.isprintable() and char != " " for char in password):
+        return "password_bad"
     return ""
 
 
@@ -170,7 +173,9 @@ def safe_next(value: str | None) -> str:
 __all__ = [
     "CSRF_COOKIE",
     "EMAIL_HOOKS",
+    "MAX_FAILED_SIGNINS_PER_EMAIL",
     "MAX_FAILED_SIGNINS_PER_HOUR",
+    "MAX_FAILED_SIGNINS_PER_IP",
     "MAX_SIGNUPS_PER_HOUR",
     "MIN_PASSWORD_CHARS",
     "RESET_HOURS",

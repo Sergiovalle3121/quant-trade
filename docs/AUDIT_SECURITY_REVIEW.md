@@ -84,6 +84,17 @@ Every change below has an offline, deterministic test in
   and in the audit row that the retention purge clears.
 - A person with the report link has the report: the token is the only key,
   by design, so customers should share the `/v/` page instead.
+- Customer accounts (PR #205, reviewed by the bug hunt on SQLite and
+  PostgreSQL 16): sign-up answers 409 when an e-mail already has an account,
+  so an address's registration can be learnt (5 sign-ups per hour per
+  address). Without e-mail verification this is the accepted trade-off; it
+  goes away once confirmation by e-mail exists. Fixed in the same review: a
+  report saved from someone else's link is only unlinked when that account
+  is deleted, never deleted (only reports uploaded or paid while signed in
+  are); the customer's description is withheld on `/cuenta` when the guard
+  refuses it; failed sign-ins are limited per (address, e-mail) pair with
+  higher per-address and per-e-mail ceilings, so nobody can lock the real
+  owner out from elsewhere.
 
 ## What the operator sets on Railway
 

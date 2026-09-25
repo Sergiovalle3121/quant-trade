@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from quant_trade.audit.accounts import MIN_PASSWORD_CHARS
+from quant_trade.audit.compare import guard_page
+from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord
@@ -69,6 +71,7 @@ COPY: dict[str, dict[str, str]] = {
         "email_bad": "Ese correo no parece válido.",
         "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
         "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
+        "password_bad": "La contraseña tiene un carácter que no se puede usar.",
         "taken": (
             "No se pudo crear una cuenta con ese correo. Si ya tienes una, entra con tu contraseña."
         ),
@@ -100,6 +103,7 @@ COPY: dict[str, dict[str, str]] = {
         "status_preview": "Vista previa",
         "status_purged": "Archivos borrados",
         "status_published": "Página pública",
+        "status_saved": "Guardado desde un enlace",
         "paid_card": "tarjeta",
         "paid_code": "código",
         "no_description": "Sin descripción",
@@ -139,9 +143,10 @@ COPY: dict[str, dict[str, str]] = {
         "delete_help": (
             "Borra tu correo, tu contraseña, tus sesiones y la lista de tus informes y códigos. "
             "Los informes siguen abriendo con su enlace privado hasta su plazo de conservación, "
-            "salvo que marques la casilla para borrarlos también."
+            "salvo que marques la casilla para borrar también los que subiste o pagaste con esta "
+            "cuenta. Los que guardaste desde un enlace solo salen de tu lista."
         ),
-        "delete_reports": "Borrar también todos mis informes (no se puede deshacer)",
+        "delete_reports": "Borrar también los informes que subí o pagué (no se puede deshacer)",
         "delete_button": "Borrar mi cuenta",
         "deleted": "Tu cuenta se borró.",
         "forgot_title": "Recupera tu contraseña",
@@ -207,6 +212,7 @@ COPY: dict[str, dict[str, str]] = {
         "email_bad": "That e-mail address does not look valid.",
         "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
         "password_long": "The password is too long (256 characters at most).",
+        "password_bad": "The password has a character that cannot be used.",
         "taken": (
             "An account could not be created with that e-mail. If you already have one, sign "
             "in with your password."
@@ -239,6 +245,7 @@ COPY: dict[str, dict[str, str]] = {
         "status_preview": "Preview",
         "status_purged": "Files deleted",
         "status_published": "Public page",
+        "status_saved": "Saved from a link",
         "paid_card": "card",
         "paid_code": "code",
         "no_description": "No description",
@@ -278,9 +285,10 @@ COPY: dict[str, dict[str, str]] = {
         "delete_help": (
             "Deletes your e-mail, password, sessions and the list of your reports and codes. "
             "The reports still open with their private link until their retention period "
-            "ends, unless you tick the box to delete them too."
+            "ends, unless you tick the box to also delete the ones you uploaded or paid for "
+            "with this account. Reports saved from a link only leave your list."
         ),
-        "delete_reports": "Also delete all my reports (cannot be undone)",
+        "delete_reports": "Also delete the reports I uploaded or paid for (cannot be undone)",
         "delete_button": "Delete my account",
         "deleted": "Your account was deleted.",
         "forgot_title": "Recover your password",
@@ -370,7 +378,9 @@ def _shell(locale: str, title: str, lead: str, body: str, *, switch: str) -> str
         + body
         + "</div></div>"
     )
-    return _page(title, locale, content, switch_href=switch, solid_nav=True)
+    # Customer text (an e-mail, a description) is passed through ``_safe_text``
+    # before it gets here; the guard is the last check, as on other pages.
+    return guard_page(_page(title, locale, content, switch_href=switch, solid_nav=True))
 
 
 def _alert(copy: dict[str, str], error: str = "", flash: str = "") -> str:
@@ -393,7 +403,7 @@ def _email_field(copy: dict[str, str], email: str) -> str:
     return _field(
         copy["email"],
         f"<input type='email' name='email' required maxlength='254' autocomplete='email' "
-        f"value='{_e(email)}'>",
+        f"value='{_e(_safe_text(email))}'>",
     )
 
 
@@ -567,7 +577,11 @@ def _reports_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAu
             tags.append(copy["status_preview"])
         if item.published:
             tags.append(copy["status_published"])
+        if not item.own:
+            tags.append(copy["status_saved"])
         status = "".join(f"<span class='acct-tag'>{_e(t)}</span>" for t in tags)
+        # The description is the customer's text: wording the guard refuses is withheld.
+        what = _safe_text(item.description) if item.description else copy["no_description"]
         opener = (
             ""
             if item.purged
@@ -576,7 +590,8 @@ def _reports_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAu
         )
         rows.append(
             f"<tr><td>{_e(_date(item.created_at))}</td><td>{_class_badge(item.overall_class)}</td>"
-            f"<td>{status}</td><td>{_e(item.description or copy['no_description'])}</td>"
+            f"<td>{status}</td>"
+            f"<td>{_e(what)}</td>"
             f"<td>{opener}</td></tr>"
         )
     return (
@@ -666,7 +681,7 @@ def account_page(
     )
     header = (
         "<div class='acct-head'>"
-        f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(account.email)}</b></p>"
+        f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(_safe_text(account.email))}</b></p>"
         f"<div class='inline-form'><a class='btn btn-primary' href='{home}#subir'>"
         f"{_e(copy['new_audit'])}</a>{signout}</div></div>"
     )

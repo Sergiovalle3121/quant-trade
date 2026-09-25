@@ -149,6 +149,8 @@ class AccountAudit:
     purged: bool
     published: bool
     description: str
+    #: Uploaded or paid while signed in, as opposed to saved from a link.
+    own: bool = True
 
 
 @dataclass(frozen=True)
@@ -164,6 +166,14 @@ class AccountCode:
             and self.code.credits_left > 0
             and (self.code.expires_at is None or self.code.expires_at > now)
         )
+
+
+#: How a report reached an account. Only an account's own reports (uploaded
+#: or paid while signed in) can be deleted with it; a saved one is unlinked.
+VIA_UPLOAD = "upload"
+VIA_PAID = "paid"
+VIA_SAVED = "saved"
+OWN_VIAS = (VIA_UPLOAD, VIA_PAID)
 
 
 class _RedeemRace(RuntimeError):
@@ -298,6 +308,9 @@ class Store:
             sa.Column("audit_id", sa.String(64), primary_key=True),
             sa.Column("account_id", sa.String(32), nullable=False, index=True),
             sa.Column("linked_at", sa.String(40), nullable=False),
+            #: How it got there: ``upload`` or ``paid`` while signed in (the
+            #: account's own report), or ``saved`` from a link someone shared.
+            sa.Column("via", sa.String(8), nullable=False, default=VIA_SAVED),
         )
         #: One account per access code: its credits show on that account.
         self.account_codes = sa.Table(
@@ -923,18 +936,20 @@ class Store:
     def delete_account(self, account_id: str, *, with_reports: bool = False) -> list[str]:
         """Remove an account, its sessions, reset links and links to codes.
 
-        With ``with_reports`` its reports are deleted too (as ``delete_audit``);
-        otherwise they stay reachable by their private link and follow the
+        With ``with_reports`` its own reports (uploaded or paid while signed
+        in) are deleted too (as ``delete_audit``); a report saved from a link
+        is only unlinked. Otherwise they stay reachable by their private link and follow the
         normal retention. Returns the ids of the reports deleted.
         """
         sa = self._sa
         with self.engine.connect() as conn:
+            # A report saved from someone else's link is only unlinked.
             audit_ids = [
                 str(row[0])
                 for row in conn.execute(
-                    sa.select(self.account_audits.c.audit_id).where(
-                        self.account_audits.c.account_id == account_id
-                    )
+                    sa.select(self.account_audits.c.audit_id)
+                    .where(self.account_audits.c.account_id == account_id)
+                    .where(self.account_audits.c.via.in_(OWN_VIAS))
                 ).all()
             ]
         deleted = [a for a in audit_ids if self.delete_audit(a)] if with_reports else []
@@ -1054,15 +1069,42 @@ class Store:
         return str(row[0]) if row else None
 
     # -- what an account holds -------------------------------------------
-    def link_audit(self, account_id: str, audit_id: str, *, at: datetime) -> str:
-        """Put a report on an account: ``linked``, ``already`` or ``other``."""
-        return self._link(self.account_audits, "audit_id", audit_id, account_id, at)
+    def link_audit(
+        self, account_id: str, audit_id: str, *, at: datetime, via: str = VIA_SAVED
+    ) -> str:
+        """Put a report on an account: ``linked``, ``already`` or ``other``.
+
+        A report already saved on this account becomes its own when the
+        account uploads or pays for it (``via`` upload or paid).
+        """
+        outcome = self._link(
+            self.account_audits, "audit_id", audit_id, account_id, at, extra={"via": via}
+        )
+        if outcome == "already" and via in OWN_VIAS:
+            table = self.account_audits
+            with self.engine.begin() as conn:
+                conn.execute(
+                    table.update()
+                    .where(table.c.audit_id == audit_id)
+                    .where(table.c.account_id == account_id)
+                    .where(table.c.via == VIA_SAVED)
+                    .values(via=via)
+                )
+        return outcome
 
     def link_code(self, account_id: str, code_id: str, *, at: datetime) -> str:
         """Put an access code on an account: ``linked``, ``already`` or ``other``."""
         return self._link(self.account_codes, "code_id", code_id, account_id, at)
 
-    def _link(self, table: Any, key: str, value: str, account_id: str, at: datetime) -> str:
+    def _link(
+        self,
+        table: Any,
+        key: str,
+        value: str,
+        account_id: str,
+        at: datetime,
+        extra: dict[str, str] | None = None,
+    ) -> str:
         sa = self._sa
         column = table.c[key]
         try:
@@ -1072,7 +1114,8 @@ class Store:
                     return "already" if owner[0] == account_id else "other"
                 conn.execute(
                     table.insert().values(
-                        **{key: value, "account_id": account_id, "linked_at": _iso(at)}
+                        **{key: value, "account_id": account_id, "linked_at": _iso(at)},
+                        **(extra or {}),
                     )
                 )
         except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same row
@@ -1110,6 +1153,7 @@ class Store:
                     a.c.purged_at,
                     a.c.declared_json,
                     self.publications.c.public_id,
+                    link.c.via,
                 )
                 .select_from(
                     link.join(a, a.c.id == link.c.audit_id).outerjoin(
@@ -1143,6 +1187,7 @@ class Store:
                     purged=bool(row[7]),
                     published=row[9] is not None,
                     description=" ".join(description.split())[:120],
+                    own=row[10] in OWN_VIAS,
                 )
             )
         return out
@@ -1371,6 +1416,10 @@ __all__ = [
     "AccountAudit",
     "AccountCode",
     "AccountRecord",
+    "OWN_VIAS",
+    "VIA_PAID",
+    "VIA_SAVED",
+    "VIA_UPLOAD",
     "REQUIRE_WEB",
     "AccessCodeRecord",
     "AuditRecord",
