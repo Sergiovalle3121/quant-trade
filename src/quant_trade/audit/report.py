@@ -160,6 +160,8 @@ LABELS: dict[str, dict[str, str]] = {
             "que produce el error de muestreo."
         ),
         "pdf_long": "Descargar el informe en PDF",
+        "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
+        "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
         "yes": "sí",
         "no": "no",
@@ -201,6 +203,11 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_badge_clean": "Meseta",
         "plateau_badge_peak": "Pico aislado",
+        "plateau_forward_hint": (
+            "Si en el probador de MT5 activas el periodo forward y subes esa optimización, el "
+            "informe añade «¿Aguanta en el periodo forward?»: compara cada configuración en el "
+            "periodo optimizado y en uno posterior que el optimizador no usó para elegir."
+        ),
         "forward": "¿Aguanta en el periodo forward?",
         "forward_intro": (
             "MetaTrader puede probar las mismas configuraciones en un periodo posterior que el "
@@ -684,6 +691,8 @@ LABELS: dict[str, dict[str, str]] = {
             "and the one sampling error produces."
         ),
         "pdf_long": "Download the report as PDF",
+        "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
+        "pdf_check_link": "How they check",
         "switch": "Español",
         "yes": "yes",
         "no": "no",
@@ -725,6 +734,11 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_badge_clean": "Plateau",
         "plateau_badge_peak": "Lone peak",
+        "plateau_forward_hint": (
+            "If you turn on the forward period in the MT5 tester and upload that optimisation, "
+            "the report adds \u201cDoes it hold in the forward period?\u201d: it compares every "
+            "pass on the optimised period and on a later one the optimiser did not use to choose."
+        ),
         "forward": "Does it hold in the forward period?",
         "forward_intro": (
             "MetaTrader can run the same settings on a later period the optimiser did not use "
@@ -2866,6 +2880,8 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         )
     }
     out += _evidence_rows(rows_data, labels, skip=set())
+    # A normal export: say what a forward one adds, since the plateau steps aside for it.
+    out += f"<p class='muted'>{_e(labels['plateau_forward_hint'])}</p>"
     return out
 
 
@@ -3831,6 +3847,9 @@ def render_html(
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
             f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
+            f"<p class='muted pdf-check rise no-print' style='--i:4'>{_e(labels['pdf_check'])} "
+            f"<a href='{'/check' if locale == 'en' else '/comprobar'}'>"
+            f"{_e(labels['pdf_check_link'])}</a></p>"
             if pdf_url and not locked
             else ""
         )

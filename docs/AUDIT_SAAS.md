@@ -288,7 +288,9 @@ The sample backtest also starts with 60 business days from a random stream
 of their own (from October 2022), so its trades span more than two years
 and "¿Sigue funcionando en el periodo reciente?" is measured: the average
 per trade falls from +15.24 to +3.97 in the last third, a drop within
-chance (-1.0 standard errors) that reads "Se mantiene".
+chance (-1.0 standard errors) that reads "Se mantiene". Its optimisation file is a
+normal export, so the plateau section is shown; that section ends with a
+line saying that a forward export adds "¿Aguanta en el periodo forward?".
 
 ### Plan to reach a better class
 
@@ -1356,6 +1358,15 @@ phone, "How it works" puts each number beside its text, joined by a line. The
 footer names the tagline and the legal pages once instead of twice. The preview's
 red flags use the same cards as the full report, the gravest first, without the
 detail that the payment unlocks.
+
+Redesign pass 39 styles the report check (`/comprobar`, `/check`): the file
+goes into the same drop zone as the upload, the button spans the card, "How
+it works" reads as three icon steps, and the answer is a tinted card with a
+mark (green check when the bytes match, amber caution when Rigor has no
+record, since an unmatched file may simply predate the recording). The page
+is linked from every footer's Product column, from a note on the public /v
+page ("Were you sent this report's PDF or JSON?") and from a line under the
+report's PDF download.
 
 ## Security
 

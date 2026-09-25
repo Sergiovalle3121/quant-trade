@@ -234,3 +234,12 @@ def test_a_history_in_tiny_units_prints_no_signed_zero_percent() -> None:
         assert "-0.00%" not in page
         assert "-0.0%" not in page
         assert re.search(r"-0\.00(?![0-9])", page) is None
+
+
+def test_the_plateau_section_says_what_a_forward_export_adds() -> None:
+    result = sample_result("es", bootstrap_samples=60)
+    for locale, words in (("es", "«¿Aguanta en el periodo forward?»"), ("en", "Does it hold")):
+        page = render_html(result, watermark=False, locale=locale)
+        assert LABELS[locale]["plateau_forward_hint"] in html.unescape(page)
+        assert words in LABELS[locale]["plateau_forward_hint"]
+        assert find_claims(LABELS[locale]["plateau_forward_hint"]) == []
