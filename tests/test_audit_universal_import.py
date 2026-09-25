@@ -210,6 +210,29 @@ def test_names_are_normalised_across_languages_and_units() -> None:
     assert columns["side"] == 4 and columns["quantity"] == 6
 
 
+def test_german_and_french_closing_columns_are_recognised() -> None:
+    # "ß" folds to "ss", and French writes "clôture" as often as "fermeture".
+    german = ["Symbol", "Richtung", "Menge", "Eröffnungszeit", "Schließzeit",
+              "Einstiegspreis", "Ausstiegspreis", "Gewinn", "Kommission"]  # fmt: skip
+    french = ["Symbole", "Sens", "Quantité", "Date d'ouverture", "Date de clôture",
+              "Prix d'entrée", "Prix de clôture", "Profit", "Commission"]  # fmt: skip
+    for header in (german, french):
+        columns = guess_columns(header)
+        assert columns["exit_time"] == 4 and columns["exit_price"] == 6
+        assert columns["commission"] == 8
+
+
+def test_fees_all_in_another_coin_are_not_also_called_zero_commission() -> None:
+    lines = ["Date(UTC),Pair,Side,Price,Executed,Fee"]
+    for day in range(1, 7):
+        lines.append(f"2026-03-{day:02d} 10:00:00,BTCUSDT,BUY,60000,0.01,0.00001 BNB")
+        lines.append(f"2026-03-{day:02d} 16:00:00,BTCUSDT,SELL,60300,0.01,0.00001 BNB")
+    report = import_report(("\n".join(lines) + "\n").encode(), "fills.csv", initial_balance=2_000)
+    assert any("another coin" in warning for warning in report.warnings)
+    assert not any("zero commission" in warning for warning in report.warnings)
+    _clean(report)
+
+
 def test_ninjatrader_executions_no_longer_call_the_point_value_an_inference() -> None:
     header = "Instrument;Action;Quantity;Price;Time;ID;E/X;Commission;Account display name"
     rows = [
