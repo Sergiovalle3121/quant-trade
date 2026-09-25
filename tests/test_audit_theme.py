@@ -825,3 +825,10 @@ def test_the_side_by_side_tables_fit_a_phone() -> None:
     # The two report columns keep their badges inside the card at 390 px.
     assert "@media screen and (max-width:620px){.cmp th,.cmp td{padding:10px 8px}" in COMPARE_CSS
     assert ".cmp .badge{white-space:nowrap;font-size:.62rem" in COMPARE_CSS
+
+
+def test_the_pdf_link_shows_a_small_loader_while_the_pdf_is_made() -> None:
+    # Full colour and a spinning ring, not the faded look of a disabled button.
+    assert "a[data-busy][aria-busy=true]{opacity:1;pointer-events:auto;cursor:progress" in STYLE
+    assert "a[data-busy][aria-busy=true]::before{content:''" in STYLE
+    assert "animation:spin .9s linear infinite}" in STYLE
