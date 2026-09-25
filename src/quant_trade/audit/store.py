@@ -270,6 +270,8 @@ class Store:
         return code_id is not None
 
     def get_audit(self, audit_id: str, *, with_blobs: bool = False) -> AuditRecord | None:
+        if not _usable_key(audit_id):
+            return None
         with self.engine.connect() as conn:
             row = (
                 conn.execute(self._sa.select(self.audits).where(self.audits.c.id == audit_id))
@@ -328,6 +330,8 @@ class Store:
     def mark_paid(self, audit_id: str, *, stripe_session_id: str, at: datetime) -> bool:
         """Flip an audit to paid. Idempotent: a second call changes nothing
         and returns ``False``; an unknown id returns ``False`` too."""
+        if not _usable_key(audit_id):
+            return False
         with self.engine.begin() as conn:
             result = conn.execute(
                 self.audits.update()
@@ -343,6 +347,8 @@ class Store:
         Both updates share one transaction: a credit is spent only when the
         audit flips to paid, and an already paid audit spends nothing.
         """
+        if not _usable_key(audit_id):
+            return False
         try:
             with self.engine.begin() as conn:
                 unpaid = conn.execute(
@@ -514,6 +520,8 @@ class Store:
         ]
 
     def disable_access_code(self, code_id: str) -> bool:
+        if not _usable_key(code_id):
+            return False
         with self.engine.begin() as conn:
             result = conn.execute(
                 self.access_codes.update()
@@ -571,6 +579,8 @@ class Store:
         return PublicationRecord(public_id=public_id, audit_id=audit_id, created_at=_iso(at))
 
     def unpublish(self, audit_id: str) -> bool:
+        if not _usable_key(audit_id):
+            return False
         with self.engine.begin() as conn:
             conn.execute(
                 self.publication_views.delete().where(self.publication_views.c.audit_id == audit_id)
@@ -581,10 +591,14 @@ class Store:
             return bool(result.rowcount)
 
     def publication_for_audit(self, audit_id: str) -> PublicationRecord | None:
+        if not _usable_key(audit_id):
+            return None
         return self._publication(self.publications.c.audit_id == audit_id)
 
     def publication_view(self, audit_id: str) -> tuple[dict[str, Any], str] | None:
         """``(view, result_sha256)`` kept for a purged, published audit."""
+        if not _usable_key(audit_id):
+            return None
         sa = self._sa
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -597,6 +611,8 @@ class Store:
         return json.loads(row[0]), str(row[1])
 
     def get_publication(self, public_id: str) -> PublicationRecord | None:
+        if not _usable_key(public_id):
+            return None
         return self._publication(self.publications.c.public_id == public_id)
 
     def _publication(self, condition: Any) -> PublicationRecord | None:
@@ -647,6 +663,8 @@ class Store:
         Unlike the retention purge nothing verifiable is kept: this answers a
         client's deletion request. ``False`` when the id is unknown.
         """
+        if not _usable_key(audit_id):
+            return False
         with self.engine.begin() as conn:
             conn.execute(self.publications.delete().where(self.publications.c.audit_id == audit_id))
             conn.execute(
@@ -765,6 +783,14 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
     }
     digest = sha256_of_text(canonical_dumps(data))
     return view, digest
+
+
+def _usable_key(value: str) -> bool:
+    """Whether an id from a URL or form can be looked up at all.
+
+    PostgreSQL refuses text holding a NUL, so ``/v/%00`` was a server error;
+    no id ever holds one, so the lookup simply finds nothing."""
+    return "\x00" not in value
 
 
 def make_store(url: str) -> Store:

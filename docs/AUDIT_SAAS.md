@@ -111,7 +111,8 @@ Limits, each written into the report as a reading warning:
   from the stored report page: PostgreSQL refuses text holding one, so a
   stray NUL in a robot's name failed the upload with a server error. A
   waitlist address with a space or control character, and an owner-panel
-  note with a control character, are refused for the same reason.
+  note with a control character, are refused for the same reason, and an
+  id holding a NUL in a URL (`/v/%00`) is simply not found (`_usable_key`).
 - XML (the optimisation export and every XLSX member) is refused when it
   declares a document type, in any encoding; a damaged, encrypted or
   size-lying workbook gets a plain "could not be read" message.
