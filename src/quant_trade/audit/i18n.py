@@ -951,6 +951,142 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
 )
 
+#: The same sentences when their count ``{n}`` is 1: English template ->
+#: (English singular, Spanish singular). The result JSON keeps the ``(s)``
+#: form; a page shows the singular for one item and the plural otherwise.
+_SINGULAR: dict[str, tuple[str, str]] = {
+    "{n} row(s) with an unreadable timestamp or value dropped": (
+        "{n} row with an unreadable timestamp or value dropped",
+        "se descartó {n} fila con fecha o valor ilegible",
+    ),
+    "{n} trade row(s) with unreadable or non-positive fields dropped": (
+        "{n} trade row with unreadable or non-positive fields dropped",
+        "se descartó {n} fila de operaciones con campos ilegibles o no positivos",
+    ),
+    "{n} row(s) with unreadable or non-positive fields dropped": (
+        "{n} row with unreadable or non-positive fields dropped",
+        "se descartó {n} fila con campos ilegibles o no positivos",
+    ),
+    "{n} closing deal(s) had no matching open volume; their money is in the balance but "
+    "not in the trade list": (
+        "{n} closing deal had no matching open volume; its money is in the balance but "
+        "not in the trade list",
+        "{n} cierre no tenía volumen abierto con el que emparejarse; su dinero está en el "
+        "balance pero no en la lista de operaciones",
+    ),
+    "{n} position(s) still open at the end of the report; excluded from the closed trades": (
+        "{n} position still open at the end of the report; excluded from the closed trades",
+        "{n} posición seguía abierta al final del informe; queda fuera de las operaciones cerradas",
+    ),
+    "{n} deal(s) closed by the tester at the end of the test": (
+        "{n} deal closed by the tester at the end of the test",
+        "el probador cerró {n} operación al final de la prueba",
+    ),
+    "{n} trade(s) closed by the tester at the end of the test": (
+        "{n} trade closed by the tester at the end of the test",
+        "el probador cerró {n} operación al final de la prueba",
+    ),
+    "{n} position(s) opened in the report were not closed; excluded": (
+        "{n} position opened in the report was not closed; excluded",
+        "{n} posición abierta en el informe no se cerró; queda fuera",
+    ),
+    "{n} close row(s) referenced an unknown ticket and were linked to the one open ticket "
+    "with the same size": (
+        "{n} close row referenced an unknown ticket and was linked to the one open ticket "
+        "with the same size",
+        "{n} fila de cierre citaba un ticket desconocido y se unió al único ticket abierto "
+        "del mismo tamaño",
+    ),
+    "{n} close row(s) could not be paired with an entry; their money is in the balance "
+    "but not in the trade list": (
+        "{n} close row could not be paired with an entry; its money is in the balance "
+        "but not in the trade list",
+        "{n} fila de cierre no se pudo emparejar con una entrada; su dinero está en el "
+        "balance pero no en la lista de operaciones",
+    ),
+    "{n} position(s) never closed; excluded": (
+        "{n} position never closed; excluded",
+        "{n} posición nunca se cerró; queda fuera",
+    ),
+    "{n} credit row(s) excluded: broker credit is not the trader's balance": (
+        "{n} credit row excluded: broker credit is not the trader's balance",
+        "se excluyó {n} fila de crédito: el crédito del bróker no es balance del trader",
+    ),
+    "{n} open trade(s) at the end of the export; excluded": (
+        "{n} open trade at the end of the export; excluded",
+        "{n} operación abierta al final de la exportación; queda fuera",
+    ),
+    "{n} trade number(s) without one entry and one exit row": (
+        "{n} trade number without one entry and one exit row",
+        "{n} número de operación sin una fila de entrada y una de salida",
+    ),
+    "{n} multi-leg trade(s) kept as single trades": (
+        "{n} multi-leg trade kept as a single trade",
+        "{n} operación de varias patas se trata como una sola",
+    ),
+    "{n} open trade(s) excluded": (
+        "{n} open trade excluded",
+        "se excluyó {n} operación abierta",
+    ),
+    "{n} cash flow(s) after the last trade ignored": (
+        "{n} cash flow after the last trade ignored",
+        "se ignoró {n} movimiento de dinero posterior a la última operación",
+    ),
+    "{n} Balance cell(s) do not equal the previous balance plus the row's money; the "
+    "reported Balance was kept": (
+        "{n} Balance cell does not equal the previous balance plus the row's money; the "
+        "reported Balance was kept",
+        "{n} celda de Balance no es el balance anterior más el dinero de la fila; se "
+        "mantuvo el Balance del informe",
+    ),
+    "{n} repeated pass number(s) counted once": (
+        "{n} repeated pass number counted once",
+        "{n} número de pasada repetido se contó una vez",
+    ),
+    "{n} equity value(s) at or below zero; returns are undefined there": (
+        "{n} equity value at or below zero; returns are undefined there",
+        "{n} valor de equity en cero o por debajo; ahí los retornos no están definidos",
+    ),
+    "{n} duplicated timestamp(s); the last value was kept": (
+        "{n} duplicated timestamp; the last value was kept",
+        "{n} fecha duplicada; se conservó el último valor",
+    ),
+    "{n} single-period move(s) are extreme outliers; check for bad prints": (
+        "{n} single-period move is an extreme outlier; check for bad prints",
+        "{n} movimiento de un solo periodo es un atípico extremo; revisa si hay precios erróneos",
+    ),
+    "{n} trial(s) declared but the files show {m} variants or optimisation passes; the "
+    "declared count is too low": (
+        "{n} trial declared but the files show {m} variants or optimisation passes; the "
+        "declared count is too low",
+        "se declaró {n} intento pero los archivos muestran {m} variantes o pasadas de "
+        "optimización; el número declarado es demasiado bajo",
+    ),
+    "{n} trade row(s) dropped as unreadable": (
+        "{n} trade row dropped as unreadable",
+        "se descartó {n} fila de operaciones ilegible",
+    ),
+    "{n} deposit(s) arrived while the account was at least {p} below its peak": (
+        "{n} deposit arrived while the account was at least {p} below its peak",
+        "{n} depósito llegó cuando la cuenta estaba al menos un {p} por debajo de su máximo",
+    ),
+    "{n} trade(s) fall outside the dates the header says were tested; ask for the "
+    "original report file": (
+        "{n} trade falls outside the dates the header says were tested; ask for the "
+        "original report file",
+        "{n} operación queda fuera de las fechas que el encabezado dice que se probaron; "
+        "pide el archivo original del informe",
+    ),
+    "PSR against E[max Sharpe] of {n} trial(s)": (
+        "PSR against E[max Sharpe] of {n} trial",
+        "PSR frente a E[Sharpe máximo] de {n} intento",
+    ),
+    "PSR against E[max Sharpe] of {n} trial(s), {source}": (
+        "PSR against E[max Sharpe] of {n} trial, {source}",
+        "PSR frente a E[Sharpe máximo] de {n} intento, {source}",
+    ),
+}
+
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 
@@ -965,8 +1101,8 @@ def _compile(english: str) -> re.Pattern[str]:
     return re.compile("".join(parts), re.DOTALL)
 
 
-_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
-    (_compile(english), spanish) for english, spanish in _RULES_SOURCE
+_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = tuple(
+    (english, _compile(english), spanish) for english, spanish in _RULES_SOURCE
 )
 
 
@@ -981,29 +1117,69 @@ def _translate_values(values: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def spanish(text: str) -> str | None:
-    """The Spanish for one of the audit's English sentences, or ``None``."""
+def _render(text: str, locale: str) -> str | None:
+    """``text`` as a rule writes it in ``locale``, or ``None`` when no rule knows it.
+
+    English comes back unchanged except for a count of one, which takes the
+    singular sentence.
+    """
     head, sep, rest = text.partition(": ")
     if sep and head in _PREFIXES:
-        inner = spanish(rest)
-        return None if inner is None else f"{_PREFIXES[head]}: {inner}"
-    if text in NOT_MEASURED_ES:
+        inner = _render(rest, locale)
+        if inner is None:
+            return None
+        return f"{_PREFIXES[head] if locale == 'es' else head}: {inner}"
+    if locale == "es" and text in NOT_MEASURED_ES:
         return NOT_MEASURED_ES[text]
-    if text in _TRIAL_SOURCES:
+    if locale == "es" and text in _TRIAL_SOURCES:
         return _TRIAL_SOURCES[text]
-    for pattern, template in _RULES:
+    for english, pattern, template in _RULES:
         match = pattern.fullmatch(text)
-        if match:
-            return template.format(**_translate_values(match.groupdict()))
+        if not match:
+            continue
+        values = match.groupdict()
+        singular = _SINGULAR.get(english) if values.get("n") == "1" else None
+        if locale == "es":
+            chosen = singular[1] if singular else template
+            return chosen.format(**_translate_values(values))
+        return singular[0].format(**values) if singular else text
     return None
 
 
+def spanish(text: str) -> str | None:
+    """The Spanish for one of the audit's English sentences, or ``None``."""
+    return _render(text, "es")
+
+
+#: A word with an optional plural ending, as the English notes write it.
+_PLURAL_MARK = re.compile(r"(\w+)\((e?s)\)")
+_LAST_NUMBER = re.compile(r"(\d[\d,.]*)\D*$")
+
+
+def _agree(text: str) -> str:
+    """Resolve ``word(s)`` from the nearest count before it: one or many."""
+
+    def fix(match: re.Match[str]) -> str:
+        word, ending = match.group(1), match.group(2)
+        count = _LAST_NUMBER.search(text[: match.start()])
+        if count is not None and count.group(1) == "1":
+            return word
+        if ending == "es" and word.endswith("ión"):
+            word = word[:-3] + "ion"
+        return word + ending
+
+    return _PLURAL_MARK.sub(fix, text)
+
+
 def localize(text: str, locale: str) -> str:
-    """``text`` in ``locale``: Spanish when a rule knows it, else unchanged."""
-    if locale != "es" or not text:
+    """``text`` in ``locale``: Spanish when a rule knows it, else unchanged.
+
+    Either way a count reads as one item or several, never ``item(s)``.
+    """
+    if not text:
         return text
-    translated = spanish(text)
-    return text if translated is None else translated
+    rendered = _render(text, "es" if locale == "es" else "en")
+    return _agree(text if rendered is None else rendered)
 
 
 def _result_sentences(data: dict[str, Any]) -> Iterable[str]:
