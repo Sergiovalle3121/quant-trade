@@ -24,6 +24,15 @@ SAMPLE_DAYS = 500
 #: history spans over two years and the recent-period section is measured.
 SAMPLE_LEAD_DAYS = 60
 SAMPLE_PASSES = 120
+#: The sample robot trades two majors (the same pip value in a USD account), so
+#: the per-instrument section has something to show; each trade's result is
+#: the same whichever pair it lands on.
+SAMPLE_SYMBOLS = ("EURUSD", "AUDUSD")
+#: Where each synthetic pair's price path starts.
+_START_PRICE = {"EURUSD": 1.1, "GBPUSD": 1.27, "AUDUSD": 0.66}
+#: Hours a sample trade stays open, drawn apart from its result, so the hold
+#: times vary as a real robot's do.
+SAMPLE_HOLD_HOURS = (1.0, 7.0)
 #: A fixed clock so the sample (and its hashes) never change between restarts.
 SAMPLE_NOW = datetime(2026, 9, 24, tzinfo=UTC)
 SAMPLE_BOOTSTRAP = 500
@@ -53,12 +62,17 @@ def synthetic_mt5_report(
     lots: float = 0.5,
     start: str = "2023-01-02",
     lead_days: int = 0,
+    symbols: tuple[str, ...] = ("EURUSD",),
+    hold_hours: tuple[float, float] | None = None,
 ) -> bytes:
     """An MT5 tester HTML report (UTF-16 LE with BOM, as the terminal writes
-    it) with one EURUSD round trip per business day. Synthetic by design.
+    it) with one round trip per business day. Synthetic by design.
 
     ``lead_days`` business days before ``start`` come from their own random
-    stream, so the ``days`` from ``start`` on keep the same results."""
+    stream, so the ``days`` from ``start`` on keep the same results. The pair
+    of each trade (from ``symbols``, pips worth the same) and, with
+    ``hold_hours``, how long it stays open come from their own streams too,
+    so neither changes any result; without it every trade lasts 3.5 hours."""
     rng = np.random.default_rng(seed)
     lead_rng = np.random.default_rng(seed + 2)
     # Entry hours come from their own stream so the trades' results stay the
@@ -70,8 +84,10 @@ def synthetic_mt5_report(
     dates = lead_dates.append(main_dates) if lead_days else main_dates
     hours = np.concatenate([lead_hours, hours])
     streams = [lead_rng] * lead_days + [rng] * days
+    pairs = np.random.default_rng(seed + 4).choice(len(symbols), size=len(dates))
+    holds = np.random.default_rng(seed + 5).uniform(*(hold_hours or (3.5, 3.5)), size=len(dates))
     balance = 10_000.0
-    price = 1.1
+    prices = {symbol: _START_PRICE.get(symbol, 1.1) for symbol in symbols}
     first = dates[0].strftime("%Y.%m.%d")
     rows = [
         f"<tr><td>{first} 00:00:00</td><td>1</td><td></td><td>balance</td><td></td><td></td>"
@@ -81,25 +97,29 @@ def synthetic_mt5_report(
     deal = 2
     # 7.00 per lot per side: 3.50 at the sample's 0.5 lots.
     fee = round(7.0 * lots, 2)
-    for day, hour, draw in zip(dates, hours, streams, strict=True):
+    for day, hour, draw, pair, hold in zip(dates, hours, streams, pairs, holds, strict=True):
+        symbol = symbols[pair]
         side = "buy" if draw.random() < 0.5 else "sell"
         sign = 1.0 if side == "buy" else -1.0
-        entry = round(price, 5)
+        entry = round(prices[symbol], 5)
         pips = edge_pips + draw.normal(0.0, 25.0)
         exit_price = round(entry + sign * pips * 0.0001, 5)
-        price = exit_price
+        prices[symbol] = exit_price
+        # Whole minutes, and never past the day's last hour.
+        minutes = int(round(min(hold, 23.9 - hour) * 60))
+        exit_at = day + pd.Timedelta(hours=int(hour), minutes=minutes)
         profit = round(pips * 10.0 * lots, 2)
         stamp = day.strftime("%Y.%m.%d")
         balance -= fee
         rows.append(
-            f"<tr><td>{stamp} {hour:02d}:00:00</td><td>{deal}</td><td>EURUSD</td><td>{side}</td>"
+            f"<tr><td>{stamp} {hour:02d}:00:00</td><td>{deal}</td><td>{symbol}</td><td>{side}</td>"
             f"<td>in</td><td>{lots}</td><td>{entry:.5f}</td><td>{deal}</td><td>{-fee:.2f}</td>"
             f"<td>0.00</td><td>0.00</td><td>{_money(balance)}</td><td></td></tr>"
         )
         balance += profit - fee
         close = "sell" if side == "buy" else "buy"
         rows.append(
-            f"<tr><td>{stamp} {hour + 3:02d}:30:00</td><td>{deal + 1}</td><td>EURUSD</td>"
+            f"<tr><td>{exit_at:%Y.%m.%d %H:%M}:00</td><td>{deal + 1}</td><td>{symbol}</td>"
             f"<td>{close}</td>"
             f"<td>out</td><td>{lots}</td><td>{exit_price:.5f}</td><td>{deal + 1}</td>"
             f"<td>{-fee:.2f}</td><td>0.00</td><td>{profit:.2f}</td><td>{_money(balance)}</td>"
@@ -139,6 +159,13 @@ def _stamp(moment: pd.Timestamp) -> str:
     return moment.strftime("%m/%d/%Y %H:%M")
 
 
+def _sample_report() -> bytes:
+    """The sample's backtest: two pairs, varied hold times, over two years."""
+    return synthetic_mt5_report(
+        lead_days=SAMPLE_LEAD_DAYS, symbols=SAMPLE_SYMBOLS, hold_hours=SAMPLE_HOLD_HOURS
+    )
+
+
 def synthetic_live_statement() -> bytes:
     """The sample's live account as a Myfxbook CSV export. Synthetic by design.
 
@@ -152,16 +179,18 @@ def synthetic_live_statement() -> bytes:
     """
     from quant_trade.audit.importers import import_report
 
-    backtest = import_report(
-        synthetic_mt5_report(lead_days=SAMPLE_LEAD_DAYS), "SyntheticSampleEA.html"
-    ).trades
+    imported = import_report(_sample_report(), "SyntheticSampleEA.html")
+    backtest = imported.trades
     rng = np.random.default_rng(SAMPLE_SEED + 7)
+    # The pair of each trade after the backtest, from its own stream.
+    pair_rng = np.random.default_rng(SAMPLE_SEED + 8)
     lots, fee, pip = 0.1, 0.70, 0.0001
-    trades: list[tuple[pd.Timestamp, pd.Timestamp, str, float, float]] = []
+    trades: list[tuple[pd.Timestamp, pd.Timestamp, str, float, float, str]] = []
     shared = sorted(
-        zip(backtest.trades, backtest.sides, strict=True), key=lambda pair: pair[0].entry_time
+        zip(backtest.trades, backtest.sides, imported.symbols, strict=True),
+        key=lambda pair: pair[0].entry_time,
     )[-SAMPLE_LIVE_OVERLAP:]
-    for trade, side in shared:
+    for trade, side, symbol in shared:
         if rng.random() < 0.12:
             continue  # the account skipped this signal
         sign = 1.0 if side == "long" else -1.0
@@ -171,23 +200,26 @@ def synthetic_live_statement() -> bytes:
         exit_price = trade.exit_price - sign * pip * 0.6
         opened = pd.Timestamp(trade.entry_time).tz_localize(None) + delay
         closed = pd.Timestamp(trade.exit_time).tz_localize(None) + delay
-        trades.append((opened, closed, side, entry, exit_price))
-    price = shared[-1][0].exit_price
+        trades.append((opened, closed, side, entry, exit_price, symbol))
+    prices = {symbol: trade.exit_price for trade, _, symbol in shared}
     for index, day in enumerate(pd.bdate_range(SAMPLE_LIVE_START, periods=SAMPLE_LIVE_DAYS)):
+        symbol = SAMPLE_SYMBOLS[int(pair_rng.integers(0, len(SAMPLE_SYMBOLS)))]
         side = "long" if rng.random() < 0.5 else "short"
         sign = 1.0 if side == "long" else -1.0
         # A bad stretch a month in, then the thinner live edge.
         pips = (-22.0 if 20 <= index < 32 else 1.0) + rng.normal(0.0, 25.0)
         opened = day + pd.Timedelta(hours=int(rng.choice([2, 5, 9, 11, 14, 16, 19])))
-        entry = round(price, 5)
-        price = round(entry + sign * pips * pip, 5)
-        trades.append((opened, opened + pd.Timedelta(hours=3, minutes=30), side, entry, price))
+        entry = round(prices.get(symbol, _START_PRICE.get(symbol, 1.1)), 5)
+        prices[symbol] = round(entry + sign * pips * pip, 5)
+        closed = opened + pd.Timedelta(hours=3, minutes=30)
+        trades.append((opened, closed, side, entry, prices[symbol], symbol))
     for _ in range(4):
         # Trades the backtest never took: the same robot rarely matches every signal.
-        trade = shared[int(rng.integers(0, len(shared)))][0]
+        trade, _, symbol = shared[int(rng.integers(0, len(shared)))]
         opened = pd.Timestamp(trade.entry_time).tz_localize(None) + pd.Timedelta(hours=5)
         entry = trade.entry_price
-        trades.append((opened, opened + pd.Timedelta(hours=2), "long", entry, entry + 3 * pip))
+        closed = opened + pd.Timedelta(hours=2)
+        trades.append((opened, closed, "long", entry, entry + 3 * pip, symbol))
     trades.sort()
 
     # The top-up lands after the bad stretch's deepest point.
@@ -197,7 +229,7 @@ def synthetic_live_statement() -> bytes:
     balance, peak, worst, worst_at = SAMPLE_LIVE_DEPOSIT, SAMPLE_LIVE_DEPOSIT, 0.0, trades[0][1]
     rows: list[str] = []
     ticket = 5000
-    for opened, closed, side, entry, exit_price in trades:
+    for opened, closed, side, entry, exit_price, symbol in trades:
         sign = 1.0 if side == "long" else -1.0
         pips = sign * (exit_price - entry) / pip
         profit = round(pips * 10.0 * lots - fee, 2)
@@ -206,7 +238,7 @@ def synthetic_live_statement() -> bytes:
         if closed < stretch_end and balance / peak - 1.0 < worst:
             worst, worst_at = balance / peak - 1.0, closed
         rows.append(
-            f",{ticket},{_stamp(opened)},{_stamp(closed)},EURUSD,"
+            f",{ticket},{_stamp(opened)},{_stamp(closed)},{symbol},"
             f"{'Buy' if side == 'long' else 'Sell'},{lots:.2f},0,0,{entry:.5f},{exit_price:.5f},"
             f"{-fee:.4f},0.0000,{pips:.1f},{profit:.2f},0,,7,00:03:30:00"
         )
@@ -266,7 +298,7 @@ def sample_result(locale: str = "es", *, bootstrap_samples: int = SAMPLE_BOOTSTR
     inputs = build_inputs(
         None,
         declared,
-        report_bytes=synthetic_mt5_report(lead_days=SAMPLE_LEAD_DAYS),
+        report_bytes=_sample_report(),
         report_filename="SyntheticSampleEA.html",
         optimization_bytes=synthetic_mt5_optimization(),
         live_bytes=synthetic_live_statement(),
