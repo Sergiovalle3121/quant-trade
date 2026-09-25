@@ -131,3 +131,13 @@ def test_section_renders_clean_with_the_tester_report(locale: str) -> None:
     assert_report_clean(html)
     assert ("¿Pico aislado o meseta?" if locale == "es" else "Lone peak or plateau?") in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_result_column_is_never_read_as_profit() -> None:
+    summary = parse_optimization(_export(_peak))
+    balances = [{k: v for k, v in row.items() if k != "Profit"} for row in summary.table]
+    review, flags = parameter_stability(
+        balances, summary.parameters, report_inputs="FastMA=12; SlowMA=48"
+    )
+    assert review["status"] == "NOT_MEASURED" and flags == []
+    assert "Result column is the optimisation criterion" in review["reason"]
