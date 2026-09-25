@@ -533,7 +533,7 @@ _UI: dict[str, dict[str, Any]] = {
             ),
         ],
         "dims_eyebrow": "Qué medimos",
-        "dims_title": ("Seis dimensiones.", "Un veredicto de A a D."),
+        "dims_title": ("Seis dimensiones.", "Un veredicto de A\u00a0a\u00a0D."),
         "dims_lead": (
             "Cada dimensión sale como Supera, Débil, No supera o No medido, con dos frases en "
             "lenguaje llano sobre qué significa para ti."
@@ -707,7 +707,7 @@ _UI: dict[str, dict[str, Any]] = {
             ),
         ],
         "dims_eyebrow": "What we measure",
-        "dims_title": ("Six dimensions.", "One verdict from A to D."),
+        "dims_title": ("Six dimensions.", "One verdict from A\u00a0to\u00a0D."),
         "dims_lead": (
             "Each dimension comes out as Pass, Weak, Fail or Not measured, with two plain "
             "sentences on what it means for you."

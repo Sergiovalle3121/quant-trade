@@ -701,6 +701,10 @@ The stress-test tables follow the same columns: the original result sits on a
 grey first row with its evidence label, what remains is bold and turns red at
 zero or below, and the change is muted.
 
+On phones the landing's long statement drops to body-like size, and the
+class range ("A a D", "A to D") is joined with non-breaking spaces so it never
+splits across lines.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and
