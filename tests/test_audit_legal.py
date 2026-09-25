@@ -20,7 +20,6 @@ from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.legal import (  # noqa: E402
     LEGAL_PATHS,
     LegalContext,
-    legal_links_html,
     privacy_text,
     terms_text,
 )
@@ -163,7 +162,9 @@ def test_pages_are_served_in_both_languages_and_linked_everywhere(tmp_path: Path
 def test_consent_uses_the_configured_retention() -> None:
     assert "a los 14 días" in landing(retention_days=14)
     assert "after 14 days" in landing(locale="en", retention_days=14)
-    assert legal_links_html("en") in error_page("x", locale="en")
+    # Every page links both legal pages from its footer.
+    foot = error_page("x", locale="en").split("<footer", 1)[1]
+    assert "href='/terms?lang=en'" in foot and "href='/privacy?lang=en'" in foot
 
 
 def test_health_reports_missing_operator_details(tmp_path: Path) -> None:

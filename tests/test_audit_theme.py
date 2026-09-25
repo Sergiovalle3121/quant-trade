@@ -12,6 +12,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.legal import legal_url  # noqa: E402
 from quant_trade.audit.pages import landing  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -557,3 +558,21 @@ def test_phone_report_is_compact_and_reads_in_words() -> None:
         assert "<p class='no-flags'>" in html_text and none_text in html_text
         assert "<td>sharpe_annualised</td>" not in html_text and "<td>gap</td>" not in html_text
         assert gap in html_text
+
+
+def test_landing_form_help_is_short_and_the_footer_says_things_once() -> None:
+    for locale, short, question in (
+        ("es", "Tal cual lo guarda tu plataforma: HTML, XLSX o CSV, hasta 10 MB.", "¿Qué archivo"),
+        ("en", "As your platform saves it: HTML, XLSX or CSV, up to 10 MB.", "Which file"),
+    ):
+        page = landing(locale=locale, free_mode=False, price_usd=29, access_codes=True)
+        # One line under the main file; the formats and export guides open on demand.
+        assert short in page
+        assert f"<details class='more-help'><summary>{question}" in page
+        assert page.count(">MetaTrader 5</a>") >= 1
+        # The footer names the brand, the notice and the legal pages once each.
+        foot = page.split("<footer class='foot'>", 1)[1]
+        assert "foot-base" not in foot and foot.count(legal_url("terms", locale)) == 1
+        assert find_claims(page) == []
+    # How it works: number and text share a row on phones.
+    assert ".steps li{display:grid;grid-template-columns:44px minmax(0,1fr)" in STYLE

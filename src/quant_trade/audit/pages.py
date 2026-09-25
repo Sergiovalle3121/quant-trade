@@ -23,7 +23,7 @@ from quant_trade.audit.guides import (
     guide_url,
     guides_index_url,
 )
-from quant_trade.audit.legal import LegalText, legal_links_html, legal_url
+from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import REFERENCES, dimension_rows, method_url
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
@@ -119,6 +119,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "form_title": "Solicitar una auditoría",
         "report": "Informe de tu plataforma (recomendado)",
+        "report_short": "Tal cual lo guarda tu plataforma: HTML, XLSX o CSV, hasta 10 MB.",
         "report_help": (
             "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4 "
             "(o el XLSX que exporta MetaTrader 5), "
@@ -196,7 +197,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "guía corta para cada una."
         ),
         "guides_link": "Ver las guías de exportación",
-        "guide_for": "¿Qué archivo exporto? Guía para",
+        "guide_q": "¿Qué archivo exporto?",
+        "guide_list": "Guía para",
         "optimization_guide": "Cómo exportar el XML de optimización",
         "v_description": "{cls_label} {overall} · auditada el {date} · {notice}.",
         "how_title": "Cómo funciona",
@@ -328,6 +330,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "form_title": "Request an audit",
         "report": "Your platform report (recommended)",
+        "report_short": "As your platform saves it: HTML, XLSX or CSV, up to 10 MB.",
         "report_help": (
             "The file as it is: a MetaTrader 5 or 4 tester or history HTML report (or the "
             "XLSX MetaTrader 5 exports), a "
@@ -404,7 +407,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "export, there is a short guide for each."
         ),
         "guides_link": "See the export guides",
-        "guide_for": "Which file do I export? Guide for",
+        "guide_q": "Which file do I export?",
+        "guide_list": "Guide for",
         "optimization_guide": "How to export the optimisation XML",
         "v_description": "{cls_label} {overall} · audited on {date} · {notice}.",
         "how_title": "How it works",
@@ -1044,9 +1048,7 @@ def _footer(locale: str) -> str:
         f"</div><div><h4>{_e(ui['footer_product'])}</h4><ul>{product}</ul></div>"
         f"<div><h4>{_e(ui['footer_legal'])}</h4><ul>{legal}</ul></div></div>"
         f"<div class='disclaimer'><strong>{_e(copy['disclaimer'])}.</strong> "
-        f"{_e(DISCLAIMER[locale])}</div>{legal_links_html(locale)}"
-        f"<div class='foot-base'><span>{_e(BRAND)} · {_e(TAGLINE[locale])}</span>"
-        f"<span>{_e(ui['footer_base'])}</span></div></div></footer>"
+        f"{_e(DISCLAIMER[locale])}</div></div></footer>"
     )
 
 
@@ -1452,7 +1454,13 @@ def _upload_form(
             "placeholder='AUD-XXXX-XXXX-XXXX' spellcheck='false'>",
             copy["access_code_help"],
         )
-    report_help = f"{_e(copy['report_help'])}<br>{_e(copy['guide_for'])}: {_guide_links(locale)}"
+    # One short line; the full list of formats and the export guides open on demand.
+    report_help = (
+        f"{_e(copy['report_short'])}<details class='more-help'><summary>"
+        f"{_e(copy['guide_q'])}</summary>"
+        f"<p>{_e(copy['report_help'])}</p>"
+        f"<p>{_e(copy['guide_list'])}: {_guide_links(locale)}</p></details>"
+    )
     optimization_help = (
         f"{_e(copy['optimization_help'])} <a href='{_e(guide_url('mt5-optimization', locale))}'>"
         f"{_e(copy['optimization_guide'])}</a>"
