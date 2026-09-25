@@ -2997,7 +2997,7 @@ def _snap(size: float) -> float:
     of 1); real contract sizes are round numbers, and a size that is not
     (a quote currency converted to the account currency) is left alone.
     """
-    if size <= 0:
+    if size <= 0 or not math.isfinite(size):
         return size
     power = 10.0 ** math.floor(math.log10(size))
     for base in (1.0, 2.0, 2.5, 5.0, 10.0):
@@ -3212,6 +3212,12 @@ def _size_text(size: float) -> str:
     return f"{size:,.0f}" if abs(size) >= 100 else f"{size:,.4g}"
 
 
+def _finite_trip(trip: _Trip, notional: float) -> bool:
+    """Whether every amount of a round trip is a real number, not an overflow."""
+    amounts = (trip.gross, trip.commission, trip.swap, trip.fee, notional)
+    return all(math.isfinite(amount) for amount in amounts)
+
+
 def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     if not draft.trips:
         raise ReportFormatError(
@@ -3252,6 +3258,17 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         if trip.symbol in drifting:
             quantity = trip.volume * _trip_size(trip, sizes[trip.symbol])
         notional = trip.entry_price * quantity
+        if not _finite_trip(trip, notional):
+            # 9e307 x 100 overflows: no account holds such a value.
+            raise ReportFormatError(
+                "value_too_large",
+                f"a trade closed on {trip.exit_time:%Y-%m-%d} has a price, quantity or "
+                "profit too large to be real: check that the file's values were exported "
+                "correctly and upload it again",
+                f"una operación cerrada el {trip.exit_time:%Y-%m-%d} tiene un precio, una "
+                "cantidad o un resultado demasiado grande para ser real: revisa que los "
+                "valores del archivo se hayan exportado bien y vuelve a subirlo",
+            )
         try:
             trade = Trade(
                 entry_time=trip.entry_time,
