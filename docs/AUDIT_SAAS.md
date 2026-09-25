@@ -1332,7 +1332,12 @@ charged buyer who stays locked can be found and refunded or unlocked. Live
 ones are also listed on `/panel` ("Pagos con tarjeta que no abrieron un
 informe": date, Stripe session id, audit id, reason), and the retention purge
 deletes those rows; test-mode ones stay in the log only, since anyone can pay a
-test link with Stripe's public card.
+test link with Stripe's public card. Only sessions that name an audit or carry
+`app=rigor` are listed, so a sale from another app on the same Stripe account
+never shows there. The return page asks Stripe about a session at most 10 times
+an hour per address and per audit (`CARD_LOOKUPS_PER_HOUR`) and does not ask
+again within the hour about a session that did not unlock, so looping the
+return URL cannot use up the account's API rate; the webhook needs no lookup.
 
 ### Selling with access codes
 
