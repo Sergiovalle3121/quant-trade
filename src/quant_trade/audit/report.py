@@ -478,8 +478,7 @@ LABELS: dict[str, dict[str, str]] = {
             "(DSR) es del {dsr}, y para aprobar esta dimensión pedimos {need}."
         ),
         "luck_beats": (
-            "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin "
-            "habilidad."
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin habilidad."
         ),
         "luck_below": (
             "Con {n} configuraciones, la pura suerte daría un Sharpe de {luck}, igual o más "
@@ -874,8 +873,7 @@ LABELS: dict[str, dict[str, str]] = {
         "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
         "code_request_price": (
-            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). "
-            "¿Cómo pago?"
+            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). ¿Cómo pago?"
         ),
         "keep_link": (
             "Guarda el enlace de esta página: con él vuelves a tu informe. Si lo subiste con tu "
@@ -1377,7 +1375,7 @@ LABELS: dict[str, dict[str, str]] = {
             "none has an edge. Here the file's Sharpe sits next to what pure luck would give "
             "with the configurations counted, using the published math of Bailey and López de "
             "Prado and of Harvey and Liu. It is the same calculation that decides the "
-            "\"Number of settings tried\" dimension, in numbers."
+            '"Number of settings tried" dimension, in numbers.'
         ),
         "luck_badge_beats": "Beats luck",
         "luck_badge_below": "Does not beat luck",
@@ -1767,8 +1765,7 @@ LABELS: dict[str, dict[str, str]] = {
         "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
         "code_request_price": (
-            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). "
-            "How do I pay?"
+            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). How do I pay?"
         ),
         "keep_link": (
             "Save this page's link: it brings you back to your report. If you uploaded it with "
@@ -3358,9 +3355,7 @@ def _firm_fit_html(
     def pct(item: dict[str, Any] | None, label: str) -> str:
         if not item:
             return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
-        return (
-            f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
-        )
+        return f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
 
     def risk(key: str) -> str:
         return labels["ff_risk_none"] if key == "none" else labels[key]
@@ -3394,9 +3389,7 @@ def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[s
     if not questions:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
-        "<ol>"
-        + "".join(f"<li>{_e(_question_text(q, locale))}</li>" for q in questions)
-        + "</ol>"
+        "<ol>" + "".join(f"<li>{_e(_question_text(q, locale))}</li>" for q in questions) + "</ol>"
     )
 
 
@@ -4362,6 +4355,7 @@ def _luck_html(
             f"<p>{_e(labels['luck_span_line'].format(sharpe=sharpe, span=span))} "
             f"{_badge(luck['sharpe']['evidence'])}</p>"
         )
+
     def enough(row: dict[str, Any]) -> str:
         return "yes" if float(row["years_needed"]["value"]) <= span_value else "no"
 
@@ -5218,9 +5212,7 @@ def render_html(
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
                     f"{_e(labels['buy_code'])}</a>"
                     "<ol class='buy-steps'>"
-                    + "".join(
-                        f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|")
-                    )
+                    + "".join(f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|"))
                     + f"</ol><p class='muted pay-secure'>{_e(labels['buy_code_wait'])}</p>"
                     f"{includes_html}</div>"
                 )
@@ -5581,7 +5573,10 @@ def render_html(
             else []
         ),
         *(
-            [(labels["luck"], _luck_html(
+            [
+                (
+                    labels["luck"],
+                    _luck_html(
                         data.get("luck"),
                         locale,
                         labels,
@@ -5591,7 +5586,9 @@ def render_html(
                                 "dsr_pass", DEFAULT_THRESHOLDS.dsr_pass
                             )
                         ),
-                    ))]
+                    ),
+                )
+            ]
             if (data.get("luck") or {}).get("status") == "MEASURED"
             else []
         ),
