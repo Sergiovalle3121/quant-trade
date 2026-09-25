@@ -18,7 +18,7 @@ from __future__ import annotations
 import html
 from pathlib import Path
 
-from quant_trade.audit.seo import BRAND
+from quant_trade.audit.seo import BRAND, OG_IMAGES
 
 STATIC_DIR = Path(__file__).with_name("static")
 
@@ -29,9 +29,8 @@ STATIC_FILES: dict[str, str] = {
     "app.js": "text/javascript; charset=utf-8",
     "fonts/inter-var.woff2": "font/woff2",
     "fonts/jetbrains-mono-var.woff2": "font/woff2",
-    # The link preview shown when a page is shared (tools/make_og_images.py).
-    "og-es.png": "image/png",
-    "og-en.png": "image/png",
+    # The link previews shown when a page is shared (tools/make_og_images.py).
+    **dict.fromkeys(OG_IMAGES, "image/png"),
 }
 
 #: Cache static files for a week; their names change when their content does.
@@ -83,14 +82,34 @@ def logo(home: str) -> str:
     return f"<a class='logo' href='{_e(home)}'>{logo_mark()}<span>{_e(BRAND)}</span></a>"
 
 
+def ring_svg(overall: str, *, css_class: str, letter: bool = False) -> str:
+    """The class ring drawn as SVG, for print: WeasyPrint draws no conic gradient."""
+    colour = CLASS_COLOURS.get(overall, "#64748b")
+    arc = 2 * 3.14159 * 46 * CLASS_RING.get(overall, 0) / 100
+    text = (
+        "<text x='50' y='50' text-anchor='middle' dominant-baseline='central' "
+        f"font-size='44' font-weight='700' fill='{colour}'>{_e(overall)}</text>"
+        if letter
+        else ""
+    )
+    return (
+        f"<svg class='{css_class}' viewBox='0 0 100 100' aria-hidden='true'>"
+        "<circle cx='50' cy='50' r='46' fill='none' stroke='#ececef' stroke-width='7'/>"
+        f"<circle cx='50' cy='50' r='46' fill='none' stroke='{colour}' stroke-width='7' "
+        f"stroke-linecap='round' stroke-dasharray='{arc:.1f} 290' transform='rotate(-90 50 50)'/>"
+        f"{text}</svg>"
+    )
+
+
 def class_ring(overall: str, *, size: str = "") -> str:
-    """The class letter inside a ring that fills on load."""
+    """The class letter inside a ring that fills on load (an SVG copy draws it in print)."""
     colour = CLASS_COLOURS.get(overall, "#64748b")
     fill = CLASS_RING.get(overall, 0)
     extra = f" ring-{size}" if size else ""
     return (
         f"<div class='ring{extra}' style='--c:{colour};--to:{fill}'>"
-        f"<span class='cls' style='color:{colour}'>{_e(overall)}</span></div>"
+        + ring_svg(overall, css_class="ring-svg")
+        + f"<span class='cls' style='color:{colour}'>{_e(overall)}</span></div>"
     )
 
 
@@ -942,6 +961,7 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .tbar-track span{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--text)}
 .tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
 @media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
+@media screen and (max-width:620px){.paper table.firms,.firms thead,.firms tbody,.firms tr,.firms td{display:block}.paper table.firms{overflow:visible;border:0;background:none;box-shadow:none}.firms thead{display:none}.firms tr{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 0 8px}.firms td{border:0!important;padding:3px 0!important;width:auto!important}.firms td:first-child{white-space:normal!important;padding:0 0 6px!important}.firms td:last-child{padding-right:0!important}.firms td[data-l]{display:flex;justify-content:space-between;align-items:baseline;text-align:right!important;white-space:normal}.firms td[data-l]::before{content:attr(data-l);flex:none;max-width:60%;margin-right:12px;text-align:left;color:var(--text-3);font-size:.8rem;font-weight:400}}
 .crises td small{display:block;margin-top:2px;font-weight:400;font-size:.8rem}.crises td.val.neg{color:#b42318}.crises td.val.muted{white-space:normal;font-weight:400;font-size:.86rem;color:var(--text-3)}
 @media screen and (max-width:620px){.paper table.crises{display:table;width:100%}.crises td:first-child{white-space:normal!important}.crises td.val.muted{max-width:9.5em}}
 .live .val{text-align:right;white-space:nowrap}.live th{white-space:normal}.live td:first-child{font-weight:500}
@@ -1172,6 +1192,26 @@ animation-delay:0s!important;animation-iteration-count:1!important;transition-du
 scroll-behavior:auto!important}.js [data-reveal]:not(.in){opacity:1;transform:none;filter:none}
 .stage .mock{animation:none!important}.js .statement{animation:none!important;color:var(--text);
 background:none}}
+.pdf-cover,.ring-svg{display:none}
+@media print{.ring{display:block;text-align:center}.ring::before{content:none}.ring .cls{display:block;line-height:86px}.ring-lg .cls{line-height:136px}.ring-xl .cls{line-height:172px}.ring-svg{display:block;position:absolute;top:0;left:0;width:86px;height:86px}.ring-lg .ring-svg{width:136px;height:136px}.ring-xl .ring-svg{width:172px;height:172px}}
+@media print{.pdf-cover{display:block;break-after:page;page-break-after:always;color:#000;font-size:10pt}
+.pc-top{display:flex;justify-content:space-between;align-items:center;padding-bottom:10pt;border-bottom:1px solid #ddd;font:8pt var(--mono);color:#555}
+.pc-brand{display:flex;align-items:center;font:700 13pt var(--sans);letter-spacing:-.02em;color:#000}.pc-brand .mark{margin-right:7pt}
+.pc-notice{margin:12pt 0 0;padding:8pt 12pt;border:1px solid #ddd;border-radius:8pt;font-size:9pt;line-height:1.45;color:#333}
+.pc-eyebrow{margin:22pt 0 10pt;font:500 8pt var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#555}
+.pc-hero{display:flex;align-items:center}.pc-ring{flex:none;width:100pt;height:100pt;margin-right:22pt}
+.pc-ring text{font-family:var(--sans)}.pc-hero .verdict-k{margin-bottom:6pt}
+.pc-lead{margin:0;font:600 17pt/1.3 var(--sans);letter-spacing:-.02em;color:#000}
+.pdf-cover h2.pc-h{display:block;margin:18pt 0 9pt;padding-top:9pt;border-top:1px solid #ddd;font:500 8pt var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#555}
+.pdf-cover h2.pc-h::before{content:none;display:none}
+.pc-dims{list-style:none;margin:0;padding:0}.pc-dims li{display:inline-block;width:48.5%;margin:0 3% 6pt 0;padding:7pt 10pt;border:1px solid #ddd;border-radius:8pt;font-size:9.5pt;vertical-align:top}
+.pc-dims li:nth-child(2n){margin-right:0}.pc-dims .badge{float:right;margin-left:8pt}
+.pc-kpis{display:block}.pc-kpi{display:inline-block;vertical-align:top;width:23.5%;margin:0 2% 0 0;padding:9pt 10pt;border:1px solid #ddd;border-radius:8pt}
+.pc-kpi:last-child{margin-right:0}.pc-kpi b{display:block;font:600 15pt var(--sans);letter-spacing:-.03em;color:#000}
+.pc-kpi.bad b{color:#c42b21}.pc-kpi.good b{color:#17742f}.pc-kpi span{display:block;margin-top:3pt;font-size:7.5pt;line-height:1.35;color:#555}
+.pc-next{margin:0;padding:0;list-style:none;counter-reset:pcn}.pc-next li{counter-increment:pcn;position:relative;margin:0 0 7pt;padding:7pt 10pt 7pt 36pt;border:1px solid #ddd;border-radius:8pt;font-size:9.5pt;line-height:1.45}
+.pc-next li::before{content:counter(pcn);position:absolute;left:10pt;top:6pt;width:18pt;height:18pt;border-radius:50%;background:#000;color:#fff;font:600 8pt/18pt var(--sans);text-align:center}
+.pc-legend{margin:14pt 0 0;font-size:7.5pt;line-height:1.5;color:#555}}
 """
 
 PRINT = """
@@ -1227,6 +1267,7 @@ __all__ = [
     "STYLE",
     "aurora",
     "class_ring",
+    "ring_svg",
     "grid_bg",
     "icon",
     "logo",

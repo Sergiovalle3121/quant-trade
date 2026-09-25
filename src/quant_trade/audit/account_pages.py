@@ -73,6 +73,10 @@ COPY: dict[str, dict[str, str]] = {
         "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
         "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
         "password_bad": "La contraseña tiene un carácter que no se puede usar.",
+        "password_common": (
+            "Esa contraseña es de las primeras que prueba cualquier lista de adivinanzas. Usa una "
+            "frase propia, por ejemplo tres o cuatro palabras que solo tú asocies."
+        ),
         "taken": (
             "No se pudo crear una cuenta con ese correo. Si ya tienes una, entra con tu contraseña."
         ),
@@ -155,6 +159,23 @@ COPY: dict[str, dict[str, str]] = {
         "never": "nunca",
         "purchases_title": "Tus compras",
         "purchases_none": "Aún no hay compras en tu cuenta.",
+        "col_report": "Informe",
+        "stores_title": "Qué guardamos y cómo borrarlo",
+        "stores": (
+            "Tu correo y una huella de tu contraseña (scrypt): nunca la contraseña en sí.|"
+            "Tus informes y los archivos que subes. De los que no se pagan borramos archivos e "
+            "informe a los {days} días (queda solo su huella); los pagados y tu informe gratis "
+            "quedan para que sigas abriéndolos.|"
+            "La dirección IP de cada subida, para los límites de uso; la borramos a los {days} "
+            "días.|"
+            "Tus códigos y compras, con fecha. Nunca vemos ni guardamos los datos de tu "
+            "tarjeta: el pago con tarjeta lo procesa Stripe.|"
+            "Una marca aleatoria de tu navegador y la huella del archivo, solo para dar el "
+            "informe gratis una vez. Se conservan aunque borres la cuenta, sin tu correo.|"
+            "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
+            "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
+            "subiste."
+        ),
         "col_paid": "Pagado",
         "col_method": "Con",
         "buy_title": "¿Necesitas créditos?",
@@ -284,6 +305,10 @@ COPY: dict[str, dict[str, str]] = {
         "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
         "password_long": "The password is too long (256 characters at most).",
         "password_bad": "The password has a character that cannot be used.",
+        "password_common": (
+            "That password is among the first any guessing list tries. Use a phrase of your own, "
+            "for example three or four words only you would put together."
+        ),
         "taken": (
             "An account could not be created with that e-mail. If you already have one, sign "
             "in with your password."
@@ -367,6 +392,23 @@ COPY: dict[str, dict[str, str]] = {
         "never": "never",
         "purchases_title": "Your purchases",
         "purchases_none": "No purchases on your account yet.",
+        "col_report": "Report",
+        "stores_title": "What we keep and how to delete it",
+        "stores": (
+            "Your e-mail and a fingerprint of your password (scrypt): never the password itself.|"
+            "Your reports and the files you upload. For unpaid ones we delete the files and the "
+            "report after {days} days (only their fingerprint stays); paid ones and your free "
+            "report stay so you can keep opening them.|"
+            "The IP address of each upload, for the usage limits; we delete it after {days} "
+            "days.|"
+            "Your codes and purchases, with dates. We never see or keep your card details: card "
+            "payments are processed by Stripe.|"
+            "A random mark of your browser and the file's fingerprint, only to give the free "
+            "report once. They stay even if you delete the account, without your e-mail.|"
+            "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
+            "e-mail, password, sessions and lists at once; you can delete the reports you "
+            "uploaded too."
+        ),
         "col_paid": "Paid",
         "col_method": "With",
         "buy_title": "Need credits?",
@@ -464,6 +506,9 @@ align-items:start}
 .acct-card{border:1px solid var(--border);border-radius:18px;padding:24px;
 background:#fff}
 .acct-perks{background:var(--surface-2)}
+.acct-side{display:grid;gap:18px}
+.acct-stores h3{margin:0 0 12px;font-size:1rem}
+.acct-sec .acct-stores{margin-top:18px}
 .acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
 box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .acct-form form>p:last-child{margin-bottom:0}
@@ -579,6 +624,18 @@ def _benefits(copy: dict[str, str]) -> str:
     return f"<div class='acct-card acct-perks'><ul class='acct-list'>{items}</ul></div>"
 
 
+def _stores(copy: dict[str, str], retention_days: int) -> str:
+    """What the account keeps and how to delete it, in plain words."""
+    items = "".join(
+        f"<li>{icon('check')}<span>{_e(item)}</span></li>"
+        for item in copy["stores"].format(days=retention_days).split("|")
+    )
+    return (
+        f"<div class='acct-card acct-stores'><h3>{_e(copy['stores_title'])}</h3>"
+        f"<ul class='acct-list'>{items}</ul></div>"
+    )
+
+
 def _email_field(copy: dict[str, str], email: str) -> str:
     return _field(
         copy["email"],
@@ -601,7 +658,13 @@ def _switch(kind: str, locale: str, next_path: str = "") -> str:
 
 
 def signup_page(
-    *, locale: str, csrf: str, error: str = "", email: str = "", next_path: str = ""
+    *,
+    locale: str,
+    csrf: str,
+    error: str = "",
+    email: str = "",
+    next_path: str = "",
+    retention_days: int = 30,
 ) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
@@ -630,7 +693,10 @@ def signup_page(
         "</button></form>" + f"<p class='acct-alt'>{_e(copy['have_account'])} "
         f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"
     )
-    body = f"<div class='acct-grid'><div class='acct-form'>{form}</div>{_benefits(copy)}</div>"
+    body = (
+        f"<div class='acct-grid'><div class='acct-form'>{form}</div>"
+        f"<div class='acct-side'>{_benefits(copy)}{_stores(copy, retention_days)}</div></div>"
+    )
     return _shell(
         locale,
         copy["signup_title"],
@@ -927,9 +993,12 @@ def _purchases_table(copy: dict[str, str], locale: str, audits: Sequence[Account
     paid = sorted((a for a in audits if a.paid), key=lambda a: a.paid_at or "", reverse=True)
     if not paid:
         return f"<p class='muted'>{_e(copy['purchases_none'])}</p>"
-    head = "".join(f"<th>{_e(copy[k])}</th>" for k in ("col_paid", "col_method", "col_class"))
+    head = "".join(
+        f"<th>{_e(copy[k])}</th>" for k in ("col_paid", "col_report", "col_method", "col_class")
+    )
     rows = [
         f"<tr><td>{_e(_date(a.paid_at))}</td>"
+        f"<td><code title='{_e(a.audit_id)}'>{_e(a.audit_id[:8])}</code></td>"
         f"<td>{_e(copy.get(f'paid_{a.paid_with}', copy['paid_code']))}</td>"
         f"<td>{_class_badge(a.overall_class)}</td><td>"
         + (
@@ -966,6 +1035,7 @@ def account_page(
     free_left: int = 0,
     free_limit: int = 0,
     welcome: str = "",
+    retention_days: int = 30,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -1091,7 +1161,7 @@ def account_page(
         + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
         f"<span>{_e(copy['delete_reports'])}</span></label>"
         f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
-        "</form></div></section>"
+        "</form></div>" + _stores(copy, retention_days) + "</section>"
     )
     body = (
         _alert(copy, error, flash)

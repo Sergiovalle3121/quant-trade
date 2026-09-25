@@ -29,6 +29,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 #: Month header prefixes, lower case without accents or dots, by month.
@@ -79,6 +80,15 @@ BLANKS = {"", "-", "--", "—", "n/a", "na", "nan", "none"}
 #: The year totals settle the scale only when one reading misses them by less
 #: than this share of the other's miss.
 SCALE_MARGIN = 0.5
+#: Without a % sign or deciding year totals, a grid is read as fractions when
+#: this share of its months carry at least FRACTION_PLACES decimals and none
+#: reaches 1: factsheets round percentages to two decimals, a fraction
+#: ("0.0123") needs four to show a hundredth of a percent.
+FRACTION_PLACES = 4
+FRACTION_SHARE = 0.8
+#: ... and the typical month read that way stays under 10 %: a low-volatility
+#: percent grid ("0.3456" meaning 0.35 %) would read as 35 % a month.
+FRACTION_MEDIAN = 0.1
 #: Roles of a table's rows.
 FUND = "fund"
 BENCHMARK = "benchmark"
@@ -154,6 +164,16 @@ def _number(cell: object) -> tuple[float | None, bool]:
     except ValueError:
         return None, percent
     return (-value if negative else value), percent
+
+
+def _places(cell: object) -> int:
+    """How many decimals a cell is written with (its text, or a float's repr)."""
+    text = str(cell).strip().replace("%", "").rstrip(")")
+    mark = max(text.rfind("."), text.rfind(","))
+    if mark < 0:
+        return 0
+    tail = text[mark + 1 :]
+    return len(tail) - len(tail.lstrip("0123456789"))
 
 
 def _header(text: str) -> str:
@@ -348,12 +368,14 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
     unreadable: list[str] = []
     any_percent = False
     total_percent = False
+    long_places = 0
     for year, row in zip(years, rows, strict=True):
         for i, month in month_of.items():
             value, percent = _number(row[i])
             any_percent |= percent
             if value is not None and math.isfinite(value):
                 cells.append((year, month, value))
+                long_places += _places(row[i]) >= FRACTION_PLACES
             elif not _blank(row[i]):
                 unreadable.append(f"{year}-{month:02d}")
         if total_col is not None:
@@ -384,6 +406,16 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
         scale, how = 1.0, "values taken as fractions, as the year totals confirm"
     elif totals and as_percent < SCALE_MARGIN * as_fraction:
         scale, how = 100.0, "values taken as percentages, as the year totals confirm"
+    elif (
+        long_places >= FRACTION_SHARE * len(cells)
+        and all(abs(v) < 1 for _, _, v in cells)
+        and float(np.median([abs(v) for _, _, v in cells])) < FRACTION_MEDIAN
+    ):
+        scale = 1.0
+        how = (
+            "values taken as fractions (four or more decimals and none reaching 1, with no % "
+            "sign: check one month against the factsheet)"
+        )
     else:
         scale = 100.0
         how = (

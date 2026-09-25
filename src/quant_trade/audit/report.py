@@ -49,6 +49,8 @@ from quant_trade.audit.theme import (
     grid_bg,
     icon,
     logo,
+    logo_mark,
+    ring_svg,
 )
 from quant_trade.audit.verdict import (
     DEFAULT_THRESHOLDS,
@@ -626,7 +628,7 @@ LABELS: dict[str, dict[str, str]] = {
             "debajo de su índice en los meses en común."
         ),
         "fund_fees_behind": (
-            "El fondo ya queda por debajo de su índice antes de cualquier comisión."
+            "El fondo ya queda igual o por debajo de su índice antes de cualquier comisión."
         ),
         "fund_bench_excess": "Diferencia anual frente al índice (fondo {fund}, índice {index})",
         "fund_bench_beat": "Meses en que superó al índice",
@@ -1524,7 +1526,9 @@ LABELS: dict[str, dict[str, str]] = {
             "At a fee of {rate} a year or more, the fund would have ended level with or below "
             "its benchmark over the months they share."
         ),
-        "fund_fees_behind": "The fund already trails its benchmark before any fee.",
+        "fund_fees_behind": (
+            "The fund already ends level with or below its benchmark before any fee."
+        ),
         "fund_bench_excess": "Annual difference against the benchmark (fund {fund}, index {index})",
         "fund_bench_beat": "Months it beat the benchmark",
         "fund_bench_te": "Annual tracking error (information ratio {ir})",
@@ -3372,7 +3376,7 @@ def _firm_fit_html(
         for row in fit["firms"]
     )
     return out + (
-        f"<table class='timing'><thead><tr><th>{_e(labels['ff_program'])}</th>"
+        f"<table class='timing firms'><thead><tr><th>{_e(labels['ff_program'])}</th>"
         f"<th class='val'>{_e(labels['ff_pass'])}</th>"
         f"<th class='val'>{_e(labels['ff_clean'])}</th>"
         f"<th>{_e(labels['ff_risk'])}</th></tr></thead><tbody>{body}</tbody></table>"
@@ -4764,9 +4768,11 @@ def _market_note(keys: list[str], labels: dict[str, str]) -> str:
             sources.setdefault(move.index, move.source_url)
     if not sources:
         return ""
-    listed = ", ".join(f"{name}: {url}" for name, url in sources.items())
-    text = labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources=listed)
-    return f"<p class='muted'><small>{_e(text)}</small></p>"
+    listed = ", ".join(
+        f"<a href='{_e(url)}' rel='noopener'>{_e(name)}</a>" for name, url in sources.items()
+    )
+    text = _e(labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources="\x00"))
+    return f"<p class='muted'><small>{text.replace(chr(0), listed)}</small></p>"
 
 
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
@@ -4875,8 +4881,10 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
     if break_even:
         rate = float(break_even["value"])
         text = (
-            labels["fund_fees_break_even"].format(rate=f"{rate * 100:.1f} %")
-            if rate > 0
+            labels["fund_fees_break_even"].format(
+                rate=f"{rate * 100:.2f} %" if rate < 0.001 else f"{rate * 100:.1f} %"
+            )
+            if rate >= 0.00005
             else labels["fund_fees_behind"]
         )
         out += f"<p>{_e(text)} {_badge('MEASURED')}</p>"
@@ -5726,7 +5734,8 @@ def render_html(
         (f"r-d{i}" for i, (title, _) in enumerate(detail, 1) if title == labels["live"]), ""
     )
     hero = (
-        "<section class='report-hero'>"
+        ("" if locked else _pdf_cover(data, verdict, labels, "" if notice_ok else notice or ""))
+        + "<section class='report-hero'>"
         + aurora()
         + grid_bg()
         + "<div class='wrap wrap-mid'>"
@@ -5884,16 +5893,56 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
     return f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
 
 
-def _next_steps_html(
-    data: dict[str, Any],
-    verdict: dict[str, Any],
-    labels: dict[str, str],
-    anchors: dict[str, str],
+def _pdf_cover(
+    data: dict[str, Any], verdict: dict[str, Any], labels: dict[str, str], notice: str = ""
 ) -> str:
-    """ "What to do now": the few things a buyer should clear up first, in
-    order, from the dimensions that did not pass and the live comparison.
-    The class plan speaks to whoever builds the robot; this speaks to whoever
-    runs it. Questions to ask and checks to make, never a trading instruction."""
+    """The PDF's first page, print only: the class, the verdict's headline, how each
+    test came out, the key figures and the first things to do. Everything on it
+    is already in the report; this puts it on one page for whoever reads the PDF.
+    A page notice (the sample's "synthetic data") repeats here, so the cover alone
+    never passes for a real account."""
+    locale = _locale_of(labels)
+    overall = str(verdict["overall"])
+    ring = ring_svg(overall, css_class="pc-ring", letter=True)
+    lead = str(verdict["summary"]).partition(". ")[0].rstrip(".") + "."
+    by_name = {d["name"]: d for d in verdict["dimensions"]}
+    dims = "".join(
+        f"<li><span>{_e(_dimension_title(name, locale))}</span>"
+        f"{_status_badge(by_name[name]['status'], locale)}</li>"
+        for name in DIMENSION_ORDER
+        if name in by_name
+    )
+    kpis = "".join(
+        f"<div class='pc-kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
+        for label, shown, tone in _kpi_list(data, labels)[:4]
+    )
+    steps = [key for key, _ in _next_steps(data, verdict, labels) if key != "next_keep"][:3]
+    next_html = "".join(f"<li>{_e(labels[key])}</li>" for key in steps or ["next_keep"])
+    return (
+        "<section class='pdf-cover'>"
+        f"<div class='pc-top'><span class='pc-brand'>{logo_mark(22)}{_e(BRAND)}</span>"
+        f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])} · "
+        f"{_e(_short_time(data['generated_at_utc']))}</span></div>"
+        + (f"<p class='pc-notice'>{_e(notice)}</p>" if notice else "")
+        + f"<div class='pc-eyebrow'>{_e(_title(data, labels))}</div>"
+        f"<div class='pc-hero'>{ring}<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
+        f"<p class='pc-lead'>{_e(lead)}</p></div></div>"
+        f"<h2 class='pc-h'>{_e(labels['dimensions'])}</h2><ul class='pc-dims'>{dims}</ul>"
+        + (
+            f"<h2 class='pc-h'>{_e(labels['kpis'])}</h2><div class='pc-kpis'>{kpis}</div>"
+            if kpis
+            else ""
+        )
+        + f"<h2 class='pc-h'>{_e(labels['next'])}</h2><ol class='pc-next'>{next_html}</ol>"
+        f"<p class='pc-legend'>{_e(labels['evidence_legend'])}</p>"
+        "</section>"
+    )
+
+
+def _next_steps(
+    data: dict[str, Any], verdict: dict[str, Any], labels: dict[str, str]
+) -> list[tuple[str, str]]:
+    """The "what to do now" items as (label key, section title), in order."""
     status = {str(item["name"]): str(item["status"]) for item in verdict.get("dimensions", [])}
     open_ = {"WEAK", "FAIL"}
     account = is_account_history(data)
@@ -5915,6 +5964,20 @@ def _next_steps_html(
     if data.get("vendor_questions"):
         steps.append(("next_questions", labels["questions"]))
     steps.append(("next_keep", ""))
+    return steps
+
+
+def _next_steps_html(
+    data: dict[str, Any],
+    verdict: dict[str, Any],
+    labels: dict[str, str],
+    anchors: dict[str, str],
+) -> str:
+    """ "What to do now": the few things a buyer should clear up first, in
+    order, from the dimensions that did not pass and the live comparison.
+    The class plan speaks to whoever builds the robot; this speaks to whoever
+    runs it. Questions to ask and checks to make, never a trading instruction."""
+    steps = _next_steps(data, verdict, labels)
 
     def item(key: str, section: str) -> str:
         anchor = anchors.get(section, "")

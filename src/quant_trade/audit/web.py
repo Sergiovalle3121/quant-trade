@@ -1220,6 +1220,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         target = account_pages.path("signin", locale) + ("?" + "&".join(query) if query else "")
         return RedirectResponse(target, status_code=303)
 
+    def _account_email(account_id: str) -> str:
+        found = db.get_account(account_id)
+        return found.email if found is not None else ""
+
     def _account_locale(path_locale: str, lang: str | None) -> str:
         return _locale(lang) if lang in LOCALES else path_locale
 
@@ -1234,6 +1238,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "csrf",
         "too_many",
         "compare_pick",
+        "password_common",
+        "password_short",
     )
 
     def _signup_get(path_locale: str) -> Callable[..., Response]:
@@ -1243,7 +1249,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _account_redirect(locale)
             csrf = _anon_csrf(request)
             page = account_pages.signup_page(
-                locale=locale, csrf=csrf, next_path=acct.safe_next(next)
+                retention_days=cfg.retention_days,
+                locale=locale,
+                csrf=csrf,
+                next_path=acct.safe_next(next),
             )
             return _anon_page(page, csrf)
 
@@ -1265,6 +1274,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
             def again(error: str, status: int) -> Response:
                 page = account_pages.signup_page(
+                    retention_days=cfg.retention_days,
                     locale=locale,
                     csrf=new_csrf,
                     error=error,
@@ -1281,7 +1291,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
-            problem = acct.password_problem(password)
+            problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
             account = db.create_account(
@@ -1439,6 +1449,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         - db.free_previews_since(acct.month_start(now), account_id=account.id),
                     ),
                     free_limit=0 if cfg.free_mode else acct.FREE_PREVIEWS_PER_MONTH,
+                    retention_days=cfg.retention_days,
                     welcome=(
                         ""
                         if cfg.free_mode or not acct.WELCOME_FULL_REPORT
@@ -1557,8 +1568,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
                 return RedirectResponse(f"{base}?error=wrong", status_code=303)
-            if acct.password_problem(password):
-                return RedirectResponse(f"{base}?error=wrong", status_code=303)
+            problem = acct.password_problem(password, email=account.email)
+            if problem:
+                shown = problem if problem in account_errors else "wrong"
+                return RedirectResponse(f"{base}?error={shown}", status_code=303)
             db.set_password(account.id, acct.hash_password(password))
             db.delete_sessions(account.id, keep=session_hash)
             return RedirectResponse(f"{base}?done=password_changed", status_code=303)
@@ -1625,10 +1638,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             new_csrf = _anon_csrf(request)
             now = datetime.now(UTC)
             digest = acct.hash_secret(token) if token else ""
-            if not token or db.reset_account(digest, now) is None:
+            resetting = db.reset_account(digest, now) if token else None
+            if resetting is None:
                 page = account_pages.reset_page(locale=locale, csrf=new_csrf, token="", valid=False)
                 return _anon_page(page, new_csrf, 410)
-            error = "csrf" if not _anon_ok(request, csrf) else acct.password_problem(password)
+            error = (
+                "csrf"
+                if not _anon_ok(request, csrf)
+                else acct.password_problem(password, email=_account_email(resetting))
+            )
             if error:
                 page = account_pages.reset_page(
                     locale=locale, csrf=new_csrf, token=token, error=error

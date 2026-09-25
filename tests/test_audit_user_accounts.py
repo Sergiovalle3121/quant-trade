@@ -1335,3 +1335,100 @@ def test_an_upload_posted_from_another_site_is_refused(tmp_path: Path) -> None:
     assert post({"Origin": "null"}) == 401
     assert post({"Origin": "http://testserver"}) == 401
     assert post({}) == 401
+
+
+def test_common_passwords_are_refused_offline() -> None:
+    from quant_trade.audit.accounts import common_password, password_problem
+
+    for weak in (
+        "1234567890",
+        "qwertyuiop",
+        "password123",
+        "Password2024!",
+        "contraseña123",
+        "aaaaaaaaaaaa",
+        "abcabcabcabc",
+        "iloveyou2020",
+        "1qaz2wsx3edc",
+        "trader12345",
+        "20240521198801",
+    ):
+        assert common_password(weak), weak
+        assert password_problem(weak) == "password_common", weak
+    assert password_problem("anapaula1990", email="anapaula@example.com") == "password_common"
+    for fine in (PASSWORD, "long safe phrase", "correct horse battery", "MiPerroSeLlamaTobi"):
+        assert not common_password(fine), fine
+
+
+def test_sign_up_and_password_change_refuse_a_common_password(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    csrf = _csrf(client.get("/registro").text)
+    refused = client.post(
+        "/registro",
+        data={"email": "weak@example.com", "password": "password123", "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert refused.status_code == 400 and "primeras que prueba cualquier lista" in refused.text
+    _signup(client, "strong@example.com")
+    page = client.get("/cuenta").text
+    answer = client.post(
+        "/cuenta/contrasena",
+        data={"current": PASSWORD, "password": "qwertyuiop123", "csrf": _csrf(page)},
+        follow_redirects=False,
+    )
+    assert answer.headers["location"].endswith("?error=password_common")
+    assert "primeras que prueba cualquier lista" in client.get(answer.headers["location"]).text
+
+
+def test_sign_up_and_the_account_say_what_is_kept_and_how_to_delete_it(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path, retention_days=21)
+    for path, words in (
+        ("/registro", "Qué guardamos y cómo borrarlo"),
+        ("/signup", "What we keep and how to delete it"),
+    ):
+        page = client.get(path).text
+        assert words in page and "21" in page and "Stripe" in page
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    _signup(client)
+    upload = _upload(client)
+    audit_id = _audit_id(upload.headers["location"])
+    store.mark_paid(audit_id, stripe_session_id="cs_x", at=NOW)  # type: ignore[attr-defined]
+    page = client.get("/cuenta").text
+    assert "Qué guardamos y cómo borrarlo" in page and "Borrar mi cuenta" in page
+    # Each purchase names its report.
+    purchases = page.split("Tus compras", 1)[1]
+    assert f"<code title='{audit_id}'>{audit_id[:8]}</code>" in purchases
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+
+
+def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> None:
+    """The free report stays past the retention days and its upload IP goes, as promised."""
+    client, store, _ = _client(tmp_path, retention_days=21)
+    _signup(client, welcome=True)
+    audit_id = _audit_id(_upload(client).headers["location"])
+    store.purge_expired(NOW + timedelta(days=400), retention_days=21)  # type: ignore[attr-defined]
+    record = store.get_audit(audit_id)  # type: ignore[attr-defined]
+    assert record is not None and record.result_json and record.client_ip == ""
+    for path, kept, ip, stays in (
+        (
+            "/cuenta",
+            "los pagados y tu informe gratis quedan",
+            "La dirección IP de cada subida",
+            "Se conservan aunque borres la cuenta, sin tu correo",
+        ),
+        (
+            "/account",
+            "paid ones and your free report stay",
+            "The IP address of each upload",
+            "They stay even if you delete the account, without your e-mail",
+        ),
+    ):
+        page = re.sub(r"\s+", " ", client.get(path).text)
+        assert kept in page and ip in page and stays in page and "21" in page
+    ctx = LegalContext(retention_days=21)
+    es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
+    en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
+    assert "tu primer informe completo gratis: se conservan" in es
+    assert "aunque borres tu cuenta y sin tu correo" in es
+    assert "your free first full report: kept" in en
+    assert "even if you delete your account and without your e-mail" in en

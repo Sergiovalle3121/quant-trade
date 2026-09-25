@@ -101,7 +101,7 @@ def valid_email(value: str) -> bool:
     return bool(_EMAIL.match(clean))
 
 
-def password_problem(password: str) -> str:
+def password_problem(password: str, *, email: str = "") -> str:
     """``""`` when the password is acceptable, else a copy key for the form."""
     if len(password) < MIN_PASSWORD_CHARS:
         return "password_short"
@@ -109,7 +109,185 @@ def password_problem(password: str) -> str:
         return "password_long"
     if any(not char.isprintable() and char != " " for char in password):
         return "password_bad"
+    if common_password(password, email=email):
+        return "password_common"
     return ""
+
+
+#: Words that head the most common long passwords (English, Spanish and
+#: Portuguese), checked offline. A password that is one of them, possibly
+#: repeated, with digits, a year or symbols around it, is refused: those
+#: fall first to a guessing list at a couple of thousand tries an hour.
+COMMON_WORDS = frozenset(
+    (
+        "password",
+        "passw0rd",
+        "passwort",
+        "contraseña",
+        "contrasena",
+        "senha",
+        "minhasenha",
+        "qwerty",
+        "qwertyuiop",
+        "asdfgh",
+        "asdfghjkl",
+        "zxcvbnm",
+        "azerty",
+        "iloveyou",
+        "teamo",
+        "teamomucho",
+        "tequiero",
+        "amor",
+        "amorcito",
+        "princesa",
+        "princess",
+        "sunshine",
+        "football",
+        "futbol",
+        "baseball",
+        "soccer",
+        "basketball",
+        "dragon",
+        "monkey",
+        "letmein",
+        "welcome",
+        "bienvenido",
+        "admin",
+        "administrator",
+        "administrador",
+        "master",
+        "login",
+        "abc",
+        "abcdef",
+        "abcdefg",
+        "abcdefgh",
+        "trustno1",
+        "superman",
+        "batman",
+        "shadow",
+        "michael",
+        "jennifer",
+        "jordan",
+        "hunter",
+        "killer",
+        "freedom",
+        "whatever",
+        "starwars",
+        "pokemon",
+        "charlie",
+        "donald",
+        "computer",
+        "internet",
+        "samsung",
+        "iphone",
+        "google",
+        "facebook",
+        "secret",
+        "secreto",
+        "mexico",
+        "america",
+        "brasil",
+        "argentina",
+        "colombia",
+        "chile",
+        "españa",
+        "espana",
+        "madrid",
+        "barcelona",
+        "realmadrid",
+        "boca",
+        "river",
+        "corinthians",
+        "flamengo",
+        "trading",
+        "trader",
+        "forex",
+        "bitcoin",
+        "crypto",
+        "money",
+        "dinero",
+        "dineros",
+        "millonario",
+        "rigor",
+        "rigoraudit",
+        "metatrader",
+        "mt4",
+        "mt5",
+        "tradingview",
+        "binance",
+        "bybit",
+        "changeme",
+        "cambiame",
+        "mudar",
+        "default",
+        "test",
+        "testing",
+        "prueba",
+        "pruebas",
+        "usuario",
+        "user",
+        "guest",
+        "invitado",
+        "family",
+        "familia",
+        "jesus",
+        "jesucristo",
+        "dios",
+        "diosesamor",
+        "maria",
+        "jose",
+    )
+)
+
+_KEYBOARD_ROWS = (
+    "`1234567890-=",
+    "qwertyuiop[]\\",
+    "asdfghjkl;'",
+    "zxcvbnm,./",
+    "1qaz2wsx3edc4rfv5tgb6yhn7ujm8ik,9ol.0p;/",
+    "qazwsxedcrfvtgbyhnujmikolp",
+    "abcdefghijklmnopqrstuvwxyz",
+)
+
+
+def _is_run(text: str) -> bool:
+    """A stretch of a keyboard row, the alphabet or digits, either direction."""
+    for row in _KEYBOARD_ROWS:
+        if text in row or text in row[::-1]:
+            return True
+        doubled = row + row  # 0123456789 wraps to 0123...
+        if text in doubled or text in doubled[::-1]:
+            return True
+    return False
+
+
+def _repeats(text: str) -> bool:
+    """Built from one short unit repeated (``aaaa``, ``abcabc``, ``12121212``)."""
+    for size in range(1, len(text) // 2 + 1):
+        unit = text[:size]
+        if len(text) % size == 0 and unit * (len(text) // size) == text:
+            return True
+    return False
+
+
+def common_password(password: str, *, email: str = "") -> bool:
+    """Whether ``password`` is one of the easy guesses a list tries first."""
+    text = password.strip().lower()
+    compact = re.sub(r"[\s._\-!@#$%^&*+=?¡¿]+", "", text)
+    if not compact or _repeats(compact) or _is_run(compact) or len(set(compact)) <= 3:
+        return True
+    # A common word (or the e-mail's name) with only digits, a year or
+    # symbols around it, or the word repeated.
+    core = re.sub(r"^[0-9]+|[0-9]+$", "", compact)
+    words = set(COMMON_WORDS)
+    local = email.split("@", 1)[0].lower() if email else ""
+    if len(local) >= 3:
+        words.add(re.sub(r"[^a-z0-9ñ]+", "", local))
+    if not core:
+        return True  # digits only: dates, phone-like runs and counts fall fast
+    if core in words or (_repeats(core) and any(core.startswith(w) for w in words if w)):
+        return True
+    return any(core == word * (len(core) // len(word)) for word in words if word) or _is_run(core)
 
 
 def _b64(data: bytes) -> str:
@@ -222,6 +400,7 @@ __all__ = [
     "WELCOME_FULL_REPORT",
     "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
+    "common_password",
     "claim_month",
     "content_fingerprint",
     "hash_password",

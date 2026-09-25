@@ -80,8 +80,14 @@ def subperiod_analysis(equity_curve: pd.DataFrame) -> pd.DataFrame:
     e = equity_curve.copy()
     e["year"] = pd.to_datetime(e["timestamp"], utc=True).dt.year
     rows = []
+    # Each year after the first starts from the previous year's last value, so
+    # the move across the turn of the year belongs to the year it lands in and
+    # the yearly returns chain to the total return.
+    previous_close: float | None = None
     for y, g in e.groupby("year"):
         eq = g["equity"].astype(float)
+        if previous_close is not None:
+            eq = pd.concat([pd.Series([previous_close]), eq], ignore_index=True)
         rows.append(
             {
                 "year": int(y),
@@ -89,6 +95,7 @@ def subperiod_analysis(equity_curve: pd.DataFrame) -> pd.DataFrame:
                 "max_drawdown": float((eq / eq.cummax() - 1).min()),
             }
         )
+        previous_close = float(eq.iloc[-1])
     return pd.DataFrame(rows)
 
 

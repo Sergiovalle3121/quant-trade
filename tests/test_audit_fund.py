@@ -429,3 +429,34 @@ def test_an_excel_total_column_formatted_apart_from_its_months() -> None:
     series = parse_equity_csv(out.getvalue())
     assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r)
     assert not any("does not match its months" in w for w in series.warnings)
+
+
+def test_a_grid_of_fractions_without_percent_signs_reads_as_fractions() -> None:
+    r = _returns(36, seed=4, mean=0.006, vol=0.02)
+    rows: list[list[object]] = [
+        [2019 + i, *[f"{v:.4f}" for v in r[12 * i : 12 * i + 12]]] for i in range(3)
+    ]
+    series = parse_equity_csv(_plain_grid(rows))
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r, abs=6e-5)
+    assert any("four or more decimals" in w for w in series.warnings)
+
+
+def test_a_low_volatility_percent_grid_with_long_decimals_stays_in_percent() -> None:
+    # 0.3456 meaning 0.35 %: as fractions the typical month would be 35 %.
+    r = np.random.default_rng(6).normal(0.35, 0.1, 36)
+    rows: list[list[object]] = [
+        [2019 + i, *[f"{v:.4f}" for v in r[12 * i : 12 * i + 12]]] for i in range(3)
+    ]
+    series = parse_equity_csv(_plain_grid(rows))
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r / 100, abs=1e-6)
+    assert any("the file shows no % sign" in w for w in series.warnings)
+
+
+def test_the_fraction_warning_is_translated() -> None:
+    from quant_trade.audit.i18n import spanish
+
+    assert spanish(
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as fractions (four or more decimals and none reaching 1, with no % sign: check one "
+        "month against the factsheet)"
+    )

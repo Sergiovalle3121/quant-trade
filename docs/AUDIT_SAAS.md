@@ -217,7 +217,13 @@ it) is that trade's direction on a closed-trade row; on a fill, closing a long
 sells and closing a short buys. `Fees Paid` and `Exec Fee` are costs. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date, and a month
-name in English or Spanish (`07 Aug 2026`, `02-Jan-2026`, `15 ene 2026`). Day/month
+name in English, Spanish, Portuguese, French, German or Italian (`07 Aug
+2026`, `02-Jan-2026`, `15 ene 2026`, `09 out 2026`, `03 août 2026`, `06 Okt
+2026`, `07 ott 2026`). When a file has several `Net <currency>` columns, the
+one in the currency of its `Balance <currency>` column is the result. A zone
+word in a column name (`EDT`, `CST`) is a fixed offset for every row: a
+Rithmic export that prints the zone at export time reads winter trades one
+hour off under `EDT` (limitation, not corrected). Day/month
 order that no day past 12 settles is taken from a year-first column of the
 same rows (Tradovate's `Trade Date`) or another day/month column of the file;
 otherwise the `ambiguous_dates` error stands. A file listed newest first
@@ -950,8 +956,15 @@ The scale: values are percentages when any cell has `%` (an Excel cell
 formatted as a percentage counts: Excel stores 1.23 % as 0.0123, and the
 reader keeps its `%`). Otherwise the year totals decide: the reading whose
 months, compounded, miss the stated totals by less than half the other's
-miss wins (summing cannot tell the two apart). Without totals, or when
-neither reading clearly wins, the grid is read as percentages, as
+miss wins (summing cannot tell the two apart). Without that, a grid is read
+as fractions when at least 80 % of its months are written with four or more
+decimals (`factsheet.FRACTION_PLACES`, `FRACTION_SHARE`), none reaches 1 and
+the median month is under 0.1 (`FRACTION_MEDIAN`, so a low-volatility
+`0.3456` percent grid stays in percent); the warning still asks to check one
+month. Factsheets round percentages to two decimals, a fraction needs four to
+show a hundredth of a percent. A money-market percent grid written with four
+decimals (`0.0300`) is the remaining misread, and the warning names it.
+Otherwise, when neither reading clearly wins, the grid is read as percentages, as
 factsheets publish, and the warning asks the customer to check one month
 against the factsheet. The total column's own scale is settled apart (its
 `%`, else the reading its years match best), so Excel months shown as
@@ -1692,6 +1705,10 @@ changes what a report says.
 - **Opening a report**: the owner opens `/audits/{id}` without the token; any
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
+  at sign-up, password change and reset `accounts.common_password` refuses,
+  offline, keyboard and digit runs, repeated units, digits only, and common
+  EN/ES/PT words or the e-mail's name with digits or symbols around them;
+  sign-up and "Mi cuenta" list what the account keeps and how to delete it;
   session cookie `rigor_session`, 256-bit, `HttpOnly`, `SameSite=Lax`,
   `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
@@ -2103,6 +2120,12 @@ Redesign pass 54 walks the free tier's path on a phone first: upload without an 
 
 Redesign pass 55 makes each locked figure in a preview's summary a link to the unlock box (`a.kpi.locked`, `href='#unlock'`, labelled with the figure's name and "Desbloquear"), so tapping what someone wants to see takes them to how to see it. The tile looks the same; on hover or focus its border darkens.
 
+Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
+
+Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
+
+Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -2215,7 +2238,20 @@ with no date or value column the curve reader knows (`missing_timestamp`,
 `Equity` column preselected. A cell with both marks, a repeated mark or a lone
 mark not followed by three digits is read with the mark it settles; only
 `1.234`-like cells follow the column's vote, so a hand-typed column mixing
-`12.34` and `-5,60` is never read a hundred times too large. The decimal mark of a named figure column comes from its cells
+`12.34` and `-5,60` is never read a hundred times too large. A repeated mark
+is a thousands separator only when groups of exactly three digits follow it
+(`1.234.567`); `1.2.3`, `1,,2` or `1.234.56` are unreadable and counted with
+the rows left out.
+
+A list with no header row whose first row holds a date (an exported P&L list
+often has none) is shown with numbered columns (`Col. 1`, `Col. 2`...), in
+the report and in the curve field, and read with a date and a result or a
+balance chosen among them; a row with a date in it is never taken for the
+header. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
+column in the report field too. When the file has no price column and either a balance column or
+fewer than two date columns, the date-and-balance-or-result group comes first
+and alone is preselected (a `Volumen` column is not guessed as a trade's
+quantity); a trade list keeps the trade fields first. The decimal mark of a named figure column comes from its cells
 (`12.34` in a semicolon file is twelve), not from the delimiter alone.
 
 A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched

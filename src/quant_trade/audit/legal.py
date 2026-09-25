@@ -568,7 +568,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
                     "SHA-256 of the file and the network address, so the same browser or file "
                     "gets it only once. The address is cleared after "
-                    f"{days} days; the two hashes stay so the offer cannot be repeated.",
+                    f"{days} days; the two hashes stay, even if you delete your account and "
+                    "without your e-mail, so the offer cannot be repeated.",
                 ),
             ),
             (
@@ -603,8 +604,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "and the date remain so the record stays checkable.",
                     f"The upload IP address is deleted in that same clean-up after {days} "
                     "days, for paid audits too.",
-                    "Paid audits: kept so you can reopen the report, until you ask us to "
-                    "delete them.",
+                    "Paid audits and your free first full report: kept so you can reopen the "
+                    "report, until you delete them with your account or ask us to delete them.",
                     "Verification page: public until you withdraw it from your report or ask us to"
                     " withdraw it or to delete the audit. If you published it, the clean-up keeps "
                     "only what that page shows (class, dimension statuses, hashes, dates, trial "
@@ -683,7 +684,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
                 "el SHA-256 del archivo y la dirección de red, para que el mismo navegador o "
                 f"archivo lo reciba una sola vez. La dirección se borra a los {days} días; los "
-                "dos hashes se quedan para que la oferta no se repita.",
+                "dos hashes se quedan, aunque borres tu cuenta y sin tu correo, para que la "
+                "oferta no se repita.",
             ),
         ),
         (
@@ -719,8 +721,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "comprobable.",
                 f"La IP de la subida se borra en esa misma limpieza a los {days} días, también "
                 "en las auditorías pagadas.",
-                "Auditorías pagadas: se conservan para que puedas volver a abrir el informe, "
-                "hasta que pidas borrarlas.",
+                "Auditorías pagadas y tu primer informe completo gratis: se conservan para que "
+                "puedas volver a abrir el informe, hasta que los borres con tu cuenta o nos "
+                "pidas borrarlos.",
                 "Página de verificación: pública hasta que la retires desde tu informe o nos pidas"
                 " retirarla o borrar la auditoría. Si la publicaste, la limpieza conserva solo lo "
                 "que muestra esa página (clase, estado de cada dimensión, hashes, fechas, número "

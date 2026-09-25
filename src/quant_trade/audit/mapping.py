@@ -229,9 +229,28 @@ def _header_at(rows: Sequence[Sequence[str]]) -> int | None:
     mostly words (a preamble line such as ``UID: 123`` has one cell)."""
     for index, row in enumerate(rows[: imp.UNIVERSAL_HEADER_SCAN]):
         filled = [cell for cell in row if cell.strip()]
-        if len(filled) >= 2 and sum(_is_number(cell) for cell in filled) * 2 < len(filled):
+        if (
+            len(filled) >= 2
+            and sum(_is_number(cell) for cell in filled) * 2 < len(filled)
+            and not any(_is_date(cell.strip()) for cell in filled)
+        ):
             return index
     return None
+
+
+#: The name a column gets in a file with no header row, in both languages.
+UNNAMED_COLUMN = "Col. {n}"
+
+
+def _headerless(rows: list[list[str]]) -> list[list[str]] | None:
+    """Rows with a date in the first one and no header at all (an exported
+    P&L list often has none), under ``Col. 1``, ``Col. 2``..., else ``None``."""
+    if len(rows) < 2 or not any(_is_date(cell.strip()) for cell in rows[0]):
+        return None
+    width = max(len(row) for row in rows[: imp.UNIVERSAL_HEADER_SCAN])
+    if width < 2 or width > MAX_HEADER:
+        return None
+    return [[UNNAMED_COLUMN.format(n=n) for n in range(1, width + 1)], *rows]
 
 
 @dataclass(frozen=True)
@@ -247,6 +266,10 @@ class _Body:
 def _body(rows: list[list[str]], *, serial: bool, decimal: str) -> _Body | None:
     rows = [row for row in rows if any(cell.strip() for cell in row)]
     at = _header_at(rows)
+    if at is None:
+        named = _headerless(rows)
+        if named is not None:
+            rows, at = named, 0
     if at is None or at + 1 >= len(rows) or len(rows[at]) > MAX_HEADER:
         return None
     header = [cell.strip() for cell in rows[at]]
@@ -351,10 +374,18 @@ def curve_kind(columns: Mapping[str, str]) -> str | None:
     return None
 
 
+#: A number whose repeated mark separates groups of exactly three digits.
+_GROUPED = re.compile(r"^[-+(]?[^\d]*\d{1,3}([.,])\d{3}(?:\1\d{3})+(?:[^\d.,].*)?$")
+#: What ``_cell_mark`` answers for a cell no mark can make a number of.
+_UNREADABLE = "?"
+
+
 def _cell_mark(text: str) -> str | None:
     """The decimal mark one cell settles on its own, else ``None``: the later
     of ``.`` and ``,`` when both appear; the other mark when one repeats
     (``1.234.567``); a lone mark not followed by exactly three digits."""
+    if re.search(r"[.,]{2}", text):
+        return _UNREADABLE
     marks = [mark for mark in ".," if mark in text]
     if len(marks) == 2:
         return "." if text.rfind(".") > text.rfind(",") else ","
@@ -362,7 +393,8 @@ def _cell_mark(text: str) -> str | None:
         return None
     mark = marks[0]
     if text.count(mark) > 1:
-        return "," if mark == "." else "."
+        # 1.234.567: every group after a mark has three digits, else unreadable.
+        return ("," if mark == "." else ".") if _GROUPED.search(text) else _UNREADABLE
     tail = text[text.index(mark) + 1 :]
     digits = len(tail) - len(tail.lstrip("0123456789"))
     return None if digits == 3 else mark
@@ -374,7 +406,7 @@ def _decimal_mark(values: Sequence[str], default: str) -> str:
     votes = {".": 0, ",": 0}
     for value in values:
         mark = _cell_mark(value.strip())
-        if mark is not None:
+        if mark in votes:
             votes[mark] += 1
     if votes["."] != votes[","]:
         return "." if votes["."] > votes[","] else ","
@@ -386,7 +418,11 @@ def _figures(values: list[str], decimal: str) -> list[float | None]:
     so a hand-typed column mixing ``12.34`` and ``-5,60`` is never read a
     hundred times too large; only ``1.234``-like cells take the column's."""
     column = _decimal_mark(values, decimal)
-    return [universal._amount(value, _cell_mark(value.strip()) or column) for value in values]
+    marks = [_cell_mark(value.strip()) for value in values]
+    return [
+        None if mark == _UNREADABLE else universal._amount(value, mark or column)
+        for value, mark in zip(values, marks, strict=True)
+    ]
 
 
 #: Column names (normalised) read as the account's balance when a curve file
@@ -632,16 +668,32 @@ def mapping_page(
     words = COPY[locale]
     form_copy = _COPY[locale]
     labels: Mapping[str, str] = form_copy["map_roles"]
-    picked = dict(guessed(table))
+    guess = guessed(table)
+    curve_guess = results_guess(table, with_result=False)
+    # With no price column the file is a list of results or balances: the
+    # two-field path comes first and alone is preselected (a "Volumen" column
+    # is not offered as a trade's quantity).
+    dates = sum(1 for name in table.names if _is_date(_example(table, name)))
+    simple = not any(role in guess for role in ("price", "entry_price", "exit_price")) and (
+        "balance" in curve_guess or dates < 2
+    )
+    if simple:
+        picked = dict(curve_guess)
+        if "balance" not in picked and "profit" in guess:
+            picked["profit"] = guess["profit"]
+    else:
+        picked = dict(guess)
+        for role, name in curve_guess.items():
+            picked.setdefault(role, name)
     picked.update(usable_mapping(chosen or {}, table))
-    groups = "".join(
+    trade_groups = "".join(
         f"<fieldset class='map-group'><legend>{_e(title)}</legend><div class='form-grid'>"
         + "".join(_select(role, labels[role], table, picked.get(role, ""), words) for role in roles)
         + "</div></fieldset>"
         for title, roles in form_copy["map_groups"]
     )
     curve_labels = {"date": words["role_date"], "balance": words["role_balance"]}
-    groups += (
+    curve_group = (
         f"<fieldset class='map-group'><legend>{_e(words['curve_group'])}</legend>"
         f"<p class='help'>{_e(words['curve_help'])}</p><div class='form-grid'>"
         + "".join(
@@ -650,6 +702,7 @@ def mapping_page(
         )
         + "</div></fieldset>"
     )
+    groups = curve_group + trade_groups if simple else trade_groups + curve_group
     hidden = "".join(
         f"<input type='hidden' name='{name}' value='{_e(value)}'>"
         for name, value in (carried or {}).items()

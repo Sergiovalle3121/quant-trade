@@ -572,6 +572,22 @@ def test_ctrader_history_with_month_names_and_the_account_currency() -> None:
     assert closed == datetime(2026, 8, 7, 18, 50, 45, tzinfo=UTC)
 
 
+def test_ctrader_net_column_in_the_balance_currency_wins() -> None:
+    for order in (("Net USD", "Net EUR"), ("Net EUR", "Net USD")):
+        header = (
+            "ID,Symbol,Opening Direction,Opening Time (UTC+0),Closing Time (UTC+0),"
+            f"Entry Price,Closing Price,Closing Quantity,{order[0]},{order[1]},Balance EUR"
+        )
+        rows = []
+        for n, (usd, eur) in enumerate(((110.0, 100.0), (-55.0, -50.0), (22.0, 20.0)), start=13):
+            net = (usd, eur) if order[0] == "Net USD" else (eur, usd)
+            rows.append(
+                f"{n},EURUSD,Buy,{n:02d}/03/2026 08:00:00.000,{n:02d}/03/2026 12:00:00.000,"
+                f"1.08000,1.08100,1.00 Lots,{net[0]},{net[1]},25000"
+            )
+        assert _net(_read([header, *rows], "cTrader_history.csv")) == [100.0, -50.0, 20.0]
+
+
 def test_rithmic_completed_orders_with_the_zone_named_in_words() -> None:
     lines = [
         "Completed Orders",
@@ -648,6 +664,14 @@ def test_sierra_chart_trade_activity_keeps_the_fills() -> None:
         ("07 Aug 2026 21:50:45", datetime(2026, 8, 7, 21, 50, 45, tzinfo=UTC)),
         ("02-Jan-2026 09:30", datetime(2026, 1, 2, 9, 30, tzinfo=UTC)),
         ("15 ene 2026", datetime(2026, 1, 15, tzinfo=UTC)),
+        ("09 out 2026", datetime(2026, 10, 9, tzinfo=UTC)),
+        ("08 set 2026", datetime(2026, 9, 8, tzinfo=UTC)),
+        ("12 fév 2026", datetime(2026, 2, 12, tzinfo=UTC)),
+        ("03 août 2026 10:00", datetime(2026, 8, 3, 10, tzinfo=UTC)),
+        ("05 Mär 2026", datetime(2026, 3, 5, tzinfo=UTC)),
+        ("06 Okt 2026", datetime(2026, 10, 6, tzinfo=UTC)),
+        ("07 ott 2026", datetime(2026, 10, 7, tzinfo=UTC)),
+        ("08 dez 2026", datetime(2026, 12, 8, tzinfo=UTC)),
     ],
 )
 def test_platform_time_styles(text: str, expected: datetime) -> None:

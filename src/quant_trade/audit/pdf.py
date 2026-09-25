@@ -42,6 +42,7 @@ body{font-size:9.5pt}
 .rsec,.detail{margin:0 0 22px}
 .report-main{padding:8px 0}
 table{page-break-inside:auto}tr{page-break-inside:avoid}
+.kpi b{font-size:15pt}
 .kpi,.meaning .item,.recon tr{page-break-inside:avoid;break-inside:avoid}
 svg{max-width:100%}
 table.live{table-layout:fixed;width:100%;font-size:8.5pt}
