@@ -188,6 +188,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # --- Parse warnings: any trade or fill list (universal.py) ---
     (
+        "futures results computed with each contract's point value: {listed}",
+        "resultados de futuros calculados con el valor por punto de cada contrato: {listed}",
+    ),
+    (
         "the profit column already subtracts commission (it matches the price move after "
         "costs), so it was read as net",
         "la columna de resultado ya descuenta la comisión (cuadra con el movimiento del "
