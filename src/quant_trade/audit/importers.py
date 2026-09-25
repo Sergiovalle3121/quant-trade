@@ -223,7 +223,14 @@ def _looks_utf16(data: bytes) -> str | None:
 
 def decode_text(data: bytes) -> str:
     """Decode by BOM, then BOM-less UTF-16, then strict UTF-8, then cp1251
-    when Russian report words appear, then cp1252."""
+    when Russian report words appear, then cp1252.
+
+    NUL characters are dropped: no report prints one, and PostgreSQL refuses
+    to store text that holds one (a stray NUL in a name failed the upload)."""
+    return _decode_text(data).replace("\x00", "")
+
+
+def _decode_text(data: bytes) -> str:
     if data.startswith(b"\xef\xbb\xbf"):
         return data[3:].decode("utf-8", errors="replace")
     if data.startswith(b"\xff\xfe"):

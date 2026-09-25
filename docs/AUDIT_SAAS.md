@@ -111,6 +111,12 @@ Limits, each written into the report as a reading warning:
 - An optimisation export cell placed past column 4,096 by `ss:Index`
   (`MAX_OPTIMIZATION_COLUMNS`) ends its row: a 200-byte crafted index
   would otherwise pad one row with hundreds of millions of empty cells.
+- NUL characters are dropped when a report is decoded (`decode_text`) and
+  from the stored report page: PostgreSQL refuses text holding one, so a
+  stray NUL in a robot's name failed the upload with a server error. A
+  waitlist address with a space or control character, and an owner-panel
+  note with a control character, are refused for the same reason, and an
+  id holding a NUL in a URL (`/v/%00`) is simply not found (`_usable_key`).
 - XML (the optimisation export and every XLSX member) is refused when it
   declares a document type, in any encoding; a damaged, encrypted or
   size-lying workbook gets a plain "could not be read" message.
