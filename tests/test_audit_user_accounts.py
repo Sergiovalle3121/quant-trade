@@ -18,7 +18,9 @@ from typer.testing import CliRunner  # noqa: E402
 from quant_trade.audit import account_pages  # noqa: E402
 from quant_trade.audit.accounts import (  # noqa: E402
     CSRF_COOKIE,
+    MAX_FAILED_SIGNINS_PER_EMAIL,
     MAX_FAILED_SIGNINS_PER_HOUR,
+    MAX_SIGNUPS_PER_HOUR,
     SESSION_COOKIE,
     hash_password,
     hash_secret,
@@ -632,6 +634,27 @@ def test_failures_from_elsewhere_do_not_lock_the_owner_out(tmp_path: Path) -> No
     assert _signin(client, "v@example.com", ip="203.0.113.9").status_code == 429
     client.cookies.clear()
     assert _signin(client, "v@example.com", ip="198.51.100.4").status_code == 303
+
+
+def test_guesses_spread_over_many_addresses_hit_the_per_email_ceiling(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client, "w@example.com")
+    client.cookies.clear()
+    # A pool of addresses, each staying under the per-address limits.
+    for n in range(MAX_FAILED_SIGNINS_PER_EMAIL):
+        ip = f"198.18.{n // 5}.{n % 5 + 1}"
+        assert _signin(client, "w@example.com", "otra frase distinta", ip=ip).status_code == 401
+    # Past the ceiling even the right password waits, from any address.
+    assert _signin(client, "w@example.com", ip="192.0.2.77").status_code == 429
+
+
+def test_sign_ups_stop_at_the_limit_exactly(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    for n in range(MAX_SIGNUPS_PER_HOUR):
+        client.cookies.clear()
+        assert _signup(client, f"s{n}@example.com").status_code == 303
+    client.cookies.clear()
+    assert _signup(client, "one-more@example.com").status_code == 429
 
 
 def test_the_landing_says_the_preview_needs_no_card_and_an_account_is_optional(

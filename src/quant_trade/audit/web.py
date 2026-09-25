@@ -1220,7 +1220,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("csrf", 400)
             ip = _client_ip(request, cfg.trusted_proxy_hops)
             now = datetime.now(UTC)
-            if signup_attempts.hit(ip, now) > acct.MAX_SIGNUPS_PER_HOUR:
+            if signup_attempts.hit(ip, now) >= acct.MAX_SIGNUPS_PER_HOUR:
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
@@ -1294,7 +1294,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             now = datetime.now(UTC)
             # Keyed on (address, e-mail) so that failures from elsewhere never
             # lock the real owner out; the per-address and per-e-mail ceilings
-            # are much higher and only stop wide guessing.
+            # are higher and only slow wide guessing.
             pair = f"{ip}|{clean}"
             if (
                 signin_failures.count(pair, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
@@ -1435,7 +1435,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 account_pages.path("account", locale) + "?error=csrf", status_code=303
             )
         ip = _client_ip(request, cfg.trusted_proxy_hops)
-        if account_actions.hit(ip, datetime.now(UTC)) > acct.MAX_ACCOUNT_ACTIONS_PER_HOUR:
+        if account_actions.hit(ip, datetime.now(UTC)) >= acct.MAX_ACCOUNT_ACTIONS_PER_HOUR:
             return RedirectResponse(
                 account_pages.path("account", locale) + "?error=too_many", status_code=303
             )

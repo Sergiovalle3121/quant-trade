@@ -1379,7 +1379,8 @@ without one, and an account never changes what a report says.
   `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
   after); 10 failed sign-ins per hour per (address, e-mail) pair, with
-  ceilings of 50 per address and 200 per e-mail, and 5 sign-ups per hour per
+  ceilings of 50 per address and 50 per e-mail (a slow-down against guesses
+  spread over many addresses), and 5 sign-ups per hour per
   address; a password change or reset signs out the other
   sessions; `next` only returns to `/audits/` or `/cuenta` paths.
 - **No e-mail service yet**. Nothing sends e-mail and addresses are not
