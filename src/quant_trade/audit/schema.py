@@ -221,6 +221,22 @@ class ParsedTrades:
         return self.fees is not None and any(fee != 0 for fee in self.fees)
 
 
+def printed_step(value: float, *, max_decimals: int = 8) -> float:
+    """The last printed digit of a figure, as a platform wrote it.
+
+    TradingView prints small P&L with few digits, so a one-unit forex trade
+    that made 0.00127 shows 0.001; a difference inside half that step is
+    rounding, not a different contract size or a hidden cost.
+    """
+    if not value or not math.isfinite(value):
+        return 10.0**-max_decimals
+    for decimals in range(0, max_decimals + 1):
+        scaled = abs(value) * 10.0**decimals
+        if abs(scaled - round(scaled)) < 1e-6 * max(scaled, 1.0):
+            return 10.0**-decimals
+    return 10.0**-max_decimals
+
+
 def _normalise_columns(frame: pd.DataFrame) -> pd.DataFrame:
     frame = frame.copy()
     frame.columns = [str(column).strip().lower().replace(" ", "_") for column in frame.columns]
@@ -791,6 +807,7 @@ class AuditResult(BaseModel):
 
 
 __all__ = [
+    "printed_step",
     "DECLARED",
     "MAX_ROWS",
     "MAX_TRADES",

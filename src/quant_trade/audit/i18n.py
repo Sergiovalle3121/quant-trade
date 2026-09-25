@@ -43,6 +43,20 @@ _COMPARED: dict[str, str] = {
     "Cum. net profit": "Cum. net profit",
 }
 
+#: Where an importer took the starting balance from (``_Draft.initial_note``).
+_INITIAL_SOURCES: dict[str, str] = {
+    "Initial Deposit": "Initial Deposit (depósito inicial del informe)",
+    "Initial deposit": "Initial deposit (depósito inicial del informe)",
+    "first Balance row minus its own amount": "la primera fila de Balance menos su propio importe",
+    "summary Balance minus Deposit/Withdrawal minus Closed Trade P/L": (
+        "el Balance del resumen menos Deposit/Withdrawal menos Closed Trade P/L"
+    ),
+    "the cumulative P&L and cumulative P&L % columns": (
+        "las columnas de P&L acumulado y P&L acumulado %"
+    ),
+    "Properties: Initial capital": "Propiedades: Initial capital (capital inicial)",
+}
+
 #: Where the number of trials comes from (``engine._trials_used``).
 _TRIAL_SOURCES: dict[str, str] = {
     "declared by the client": "declarado por el cliente",
@@ -721,7 +735,8 @@ def _translate_values(values: dict[str, str]) -> dict[str, str]:
     if "what" in out:
         out["what"] = _COMPARED.get(out["what"], out["what"])
     if "source" in out:
-        out["source"] = _TRIAL_SOURCES.get(out["source"], out["source"])
+        source = out["source"]
+        out["source"] = _TRIAL_SOURCES.get(source, _INITIAL_SOURCES.get(source, source))
     return out
 
 
