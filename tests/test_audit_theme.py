@@ -722,3 +722,21 @@ def test_what_to_do_now_reads_as_numbered_steps_with_a_link_to_each_section(
     assert ".next-steps a::after{content:' \\2192'}" in STYLE
     # Margins, not flex gap, so the PDF keeps the spacing.
     assert ".next-steps li{break-inside:avoid;font-size:9pt" in STYLE
+
+
+def test_audience_pages_show_problems_checks_price_and_other_cases_as_cards(
+    tmp_path: Path,
+) -> None:
+    from quant_trade.audit.audiences import audience_url
+
+    client = _client(tmp_path)
+    for locale in ("es", "en"):
+        page = client.get(audience_url("compradores-de-robots", locale))
+        assert page.status_code == 200
+        html = page.text
+        for cls in ("checks aud-pains", "checks aud-checks", "aud-price", "aud-others"):
+            assert f"class='{cls}'" in html
+        # A check named as a question keeps its question mark alone.
+        assert "?.</strong>" not in html
+    assert "@media (min-width:760px){.aud-checks{grid-template-columns:repeat(2" in STYLE
+    assert ".prose .aud-pains,.prose .aud-checks,.prose .aud-others{padding-left:0}" in STYLE

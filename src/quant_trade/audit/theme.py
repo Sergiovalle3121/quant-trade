@@ -844,6 +844,20 @@ color:var(--text-3)}
 line-height:1;font-variant-numeric:tabular-nums}
 .fact p{margin:10px 0 0;color:var(--text-2);font-size:.92rem}
 .paper table.timing{table-layout:fixed}
+.prose .aud-pains,.prose .aud-checks,.prose .aud-others{padding-left:0}
+.prose .aud-pains li,.prose .aud-checks li,.prose .aud-others li{margin:0}
+.aud-pains li{padding:14px 16px;background:#fff;border:1px solid var(--border);border-radius:14px;color:var(--text)}
+.aud-pains li svg{color:var(--warn)}
+.aud-checks li{padding:16px 18px;background:#fff;border:1px solid var(--border);border-radius:14px;line-height:1.55}
+.aud-checks li svg{color:var(--ok)}
+.aud-checks strong{display:block;margin-bottom:2px;color:var(--text)}
+@media (min-width:760px){.aud-checks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.aud-price{padding:22px 24px 12px;background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.aud-price>p{margin:0 0 6px;color:var(--text);line-height:1.6}
+.aud-others{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.aud-others a{display:flex;align-items:center;justify-content:space-between;height:100%;min-height:44px;padding:14px 16px;background:#fff;border:1px solid var(--border);border-radius:14px;color:var(--text);font-weight:500;line-height:1.4;text-decoration:none;transition:border-color .2s,transform .35s var(--ease)}
+.aud-others a:hover{border-color:var(--text-3);transform:translateY(-1px)}
+.aud-others svg{flex:none;width:16px;height:16px;margin-left:12px;color:var(--text-3)}
 .next-steps{list-style:none;counter-reset:ns;margin:16px 0 8px;padding:0}
 .next-steps li{counter-increment:ns;position:relative;margin:0 0 10px;padding:16px 18px 16px 62px;background:#fff;border:1px solid var(--border);border-radius:14px;line-height:1.55;color:var(--text)}
 .next-steps li::before{content:counter(ns);position:absolute;left:18px;top:14px;width:28px;height:28px;border-radius:50%;background:var(--text);color:#fff;font:600 .8rem/28px var(--mono);text-align:center}

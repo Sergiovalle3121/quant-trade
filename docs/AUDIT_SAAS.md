@@ -1569,6 +1569,8 @@ Redesign pass 44 turns the column lines from #203 into a column map. For a CSV o
 
 The same pass styles the buyer's "What to do now" box from #207. Each step is a card with its number in a dark disc and the link to its section in bold with an arrow. The last step (keep the report and its id) is dashed and quieter. The MEASURED/DECLARED/NOT_MEASURED legend under the verdict sits in smaller print. The PDF keeps the cards at 9 pt.
 
+Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…) more shape without changing their words or order. The problems are cards with an amber warning icon. "What Rigor checks" is a grid of cards, two per row on a desktop, each with its name in bold. The price sits in a panel with its buttons. "Other cases" are link cards with an arrow. A check whose name is a question no longer gets an extra full stop ("¿Pico aislado o meseta?.").
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
