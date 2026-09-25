@@ -325,3 +325,22 @@ def test_risk_percentiles_are_cards_and_values_keep_their_tag() -> None:
     assert page.count("Drawdown máximo a un año · p") == 3
     assert "<td></td><td>" not in page
     assert "<span class='vc'>" in page and ".vc{white-space:nowrap}" in STYLE
+
+
+def test_an_error_with_a_fix_puts_the_fix_on_its_own_line() -> None:
+    from quant_trade.audit.pages import error_page
+
+    es = error_page(
+        "El archivo de optimización es de otra prueba (símbolo GBPJPY; el informe dice "
+        "EURUSD): sube la optimización del mismo robot, símbolo y marco temporal.",
+        locale="es",
+    )
+    assert "<p class='err-msg'>El archivo de optimización es de otra prueba" in es
+    assert "EURUSD).</p><p class='err-exp'><b>Qué hacer:</b> Sube la optimización" in es
+    en = error_page(
+        "the optimisation file is for another test (symbol GBPJPY; the report says EURUSD): "
+        "upload the optimisation of the same robot, symbol and timeframe",
+        locale="en",
+    )
+    assert "<b>What to do:</b> Upload the optimisation" in en
+    assert find_claims(es) == [] and find_claims(en) == []

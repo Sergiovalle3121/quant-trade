@@ -1935,10 +1935,14 @@ _ERROR_TITLES = {
 
 #: Where an importer's message starts listing the formats it reads.
 _EXPECTED_MARKERS = ("Se espera:", "Expected:")
+#: "...: sube la optimización del mismo robot" reads as the fix, so it gets its own line.
+_ACTION = re.compile(r":\s+(?=(?:sube|vuelve|exporta|pide|upload|export|ask|re-export)\b)", re.I)
+_ACTION_LABEL = {"es": "Qué hacer:", "en": "What to do:"}
 
 
-def _error_card(message: str) -> str:
-    """The error as a card: the upload field, the problem, then what is expected."""
+def _error_card(message: str, locale: str = "es") -> str:
+    """The error as a card: the upload field, the problem, then what is expected
+    or what to do."""
     field, rest = "", message.strip()
     head, sep, tail = rest.partition(": ")
     # "Estado de cuenta real: el archivo..." names the field; a sentence never does.
@@ -1951,6 +1955,16 @@ def _error_card(message: str) -> str:
             rest = before.strip()
             expected = f"<p class='err-exp'><b>{_e(marker)}</b>{_e(after)}</p>"
             break
+    if not expected:
+        parts = _ACTION.split(rest, maxsplit=1)
+        if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+            rest, action = parts[0].strip(), parts[1].strip()
+            rest = rest if rest[-1] in ".!?" else rest + "."
+            action = action[:1].upper() + action[1:]
+            expected = (
+                f"<p class='err-exp'><b>{_e(_ACTION_LABEL.get(locale, _ACTION_LABEL['es']))}</b> "
+                f"{_e(action)}</p>"
+            )
     rest = rest[:1].upper() + rest[1:]
     return (
         f"<div class='error-card' role='alert'><div class='err-ico'>{icon('alert')}</div><div>"
@@ -1969,7 +1983,7 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     body = (
         _page_hero(ui["error_eyebrow"], title, dot="bad")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
-        f"{_error_card(message)}<div class='back-row'>"
+        f"{_error_card(message, locale)}<div class='back-row'>"
         f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"
         f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
         f"{_e(GUIDES_COPY[locale]['title'])}</a>"

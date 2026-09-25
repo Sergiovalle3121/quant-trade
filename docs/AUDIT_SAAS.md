@@ -1155,6 +1155,8 @@ On a slow phone (150 ms latency, 1.6 Mbps, 4x CPU) the landing's first screen pa
 The resampled risk shows its p50, p95 and p99 one-year drawdowns as three fact cards; on phones a value and its evidence tag stay on one line in the small tables.
 "No large open loss" keeps its green tone only when the file states the open result; otherwise the note is grey.
 
+When an upload error ends with the fix ("…: sube la optimización del mismo robot…"), the error card shows the problem, then the fix on its own line under "Qué hacer:" / "What to do:".
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
