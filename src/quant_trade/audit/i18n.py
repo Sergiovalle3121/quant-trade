@@ -620,14 +620,17 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "la mayor excursión adversa es {m}x la pérdida media; no hay señal de un stop fijo",
     ),
     (
-        "the best trade makes {share} of the total of the winning trades ({n} trades)",
-        "la mejor operación aporta el {share} del total de las operaciones ganadoras "
-        "({n} operaciones)",
+        "the best trade makes {share} of the total of the winning trades; without it and the "
+        "worst loss the rest keep {keep} of the net result ({n} trades)",
+        "la mejor operación aporta el {share} del total de las operaciones ganadoras; sin ella "
+        "y sin la peor pérdida, el resto conserva el {keep} del resultado neto ({n} operaciones)",
     ),
     (
-        "the best 5 trades make {share} of the total of the winning trades ({n} trades)",
-        "las 5 mejores operaciones aportan el {share} del total de las operaciones ganadoras "
-        "({n} operaciones)",
+        "the best {k} trades make {share} of the total of the winning trades; without them and "
+        "the {j} worst losses the rest keep {keep} of the net result ({n} trades)",
+        "las {k} mejores operaciones aportan el {share} del total de las operaciones ganadoras; "
+        "sin ellas y sin las {j} peores pérdidas, el resto conserva el {keep} del resultado "
+        "neto ({n} operaciones)",
     ),
     (
         "the largest loss is {m}x the average loss; no sign of a fixed stop",

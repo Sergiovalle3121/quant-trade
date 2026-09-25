@@ -357,14 +357,18 @@ CONCURRENT_WARN = 5
 HIGH_WINRATE = 0.85
 HIGH_WINRATE_LOSS_MULTIPLE = 3.0
 HIGH_WINRATE_MIN_TRADES = 20
-#: Trades needed before the share of the gains carried by the best trades is judged.
-CONCENTRATION_MIN_TRADES = 30
-#: The best trade carrying this share of all winning trades' total fails the data ...
-CONCENTRATION_FAIL_SHARE = 0.50
-#: ... and this share, or the best five carrying CONCENTRATION_TOP_SHARE, is a warning.
-CONCENTRATION_WARN_SHARE = 0.33
-CONCENTRATION_TOP = 5
-CONCENTRATION_TOP_SHARE = 0.80
+#: Trades needed before concentration is judged, and before it may fail.
+CONCENTRATION_MIN_TRADES = 10
+CONCENTRATION_FAIL_MIN_TRADES = 20
+#: Share of the winning trades' total the best k trades must carry to fail ...
+CONCENTRATION_FAIL: dict[int, float] = {1: 0.50, 2: 0.65, 3: 0.80}
+#: ... or to warn.
+CONCENTRATION_WARN: dict[int, float] = {1: 0.33, 2: 0.50, 3: 0.65, 5: 0.80}
+#: Share of the net result that must go when the best k trades and the k worst
+#: losses are removed, to fail or to warn. A big winner cancelled by a big
+#: loser leaves the net to the other trades and is not concentration.
+CONCENTRATION_FAIL_DEPENDENCE = 0.80
+CONCENTRATION_WARN_DEPENDENCE = 0.50
 #: Largest loss (or adverse excursion) over the mean loss.
 NO_STOP_LOSS_MULTIPLE = 8.0
 NO_STOP_MIN_LOSSES = 10
@@ -575,42 +579,70 @@ def scan_trade_patterns(
     return flags
 
 
-def _concentration(pnl: list[float], fees: list[float] | None) -> list[RedFlag]:
-    """The share of the winning trades' total carried by the best trade or best five.
+def _floor_percent(share: float) -> str:
+    """``0.4987`` as ``49.8%``: rounded down, so a share under a threshold never
+    prints as the threshold itself."""
+    return f"{math.floor(share * 1000) / 10:.1f}%"
 
-    Measured on the gains, not the net result, so a thin net over many noisy
-    trades is not mistaken for concentration. A history whose gains rest on
-    one trade says nothing about the rest of the system, and one outsized
-    trade is also what a data error looks like. Fees stay with every trade."""
+
+def _concentration(pnl: list[float], fees: list[float] | None) -> list[RedFlag]:
+    """The result carried by the best one, two, three or five trades.
+
+    Two conditions, both needed. The best k trades carry a large share of the
+    winning trades' total (measured on the gains, so a thin net over many
+    noisy trades is not mistaken for concentration), and removing them with
+    the k worst losses takes away most of the net result (so a big winner
+    cancelled by a big loser, which leaves the net to the other trades, is
+    not). A history whose result rests on a few trades says little about the
+    rest of the system, and one outsized trade is also what a data error
+    looks like. Fees stay with every trade. Under
+    ``CONCENTRATION_FAIL_MIN_TRADES`` trades it only warns."""
     n = len(pnl)
     costs = fees if fees is not None and len(fees) == n else [0.0] * n
     net = [value - cost for value, cost in zip(pnl, costs, strict=True)]
+    total = float(sum(net))
     wins = sorted((value for value in net if value > 0), reverse=True)
+    losses = sorted(value for value in net if value < 0)
     gains = float(sum(wins))
-    if n < CONCENTRATION_MIN_TRADES or sum(net) <= 0 or gains <= 0:
+    if n < CONCENTRATION_MIN_TRADES or total <= 0 or gains <= 0:
         return []
-    share = wins[0] / gains
-    top_share = sum(wins[:CONCENTRATION_TOP]) / gains
-    if share >= CONCENTRATION_WARN_SHARE:
-        return [
-            RedFlag(
-                "PROFIT_CONCENTRATION",
-                "FAIL" if share >= CONCENTRATION_FAIL_SHARE else "WARN",
-                f"the best trade makes {share:.0%} of the total of the winning trades ({n} trades)",
-                share,
-            )
-        ]
-    if top_share >= CONCENTRATION_TOP_SHARE:
-        return [
-            RedFlag(
-                "PROFIT_CONCENTRATION",
-                "WARN",
-                f"the best {CONCENTRATION_TOP} trades make {top_share:.0%} of the total of the "
-                f"winning trades ({n} trades)",
-                top_share,
-            )
-        ]
-    return []
+    found: tuple[Literal["FAIL", "WARN"], int, float, float] | None = None
+    for k in sorted(set(CONCENTRATION_FAIL) | set(CONCENTRATION_WARN)):
+        share = sum(wins[:k]) / gains
+        keep = (total - sum(wins[:k]) - sum(losses[:k])) / total
+        fail = CONCENTRATION_FAIL.get(k)
+        warn = CONCENTRATION_WARN.get(k)
+        if (
+            fail is not None
+            and n >= CONCENTRATION_FAIL_MIN_TRADES
+            and share >= fail
+            and 1 - keep >= CONCENTRATION_FAIL_DEPENDENCE
+        ):
+            found = ("FAIL", k, share, keep)
+            break
+        if (
+            found is None
+            and warn is not None
+            and share >= warn
+            and 1 - keep >= CONCENTRATION_WARN_DEPENDENCE
+        ):
+            found = ("WARN", k, share, keep)
+    if found is None:
+        return []
+    severity, k, share, keep = found
+    who = "the best trade makes" if k == 1 else f"the best {k} trades make"
+    without = (
+        "without it and the worst loss" if k == 1 else f"without them and the {k} worst losses"
+    )
+    return [
+        RedFlag(
+            "PROFIT_CONCENTRATION",
+            severity,
+            f"{who} {_floor_percent(share)} of the total of the winning trades; {without} the "
+            f"rest keep {_floor_percent(keep)} of the net result ({n} trades)",
+            share,
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
