@@ -393,8 +393,14 @@ class _TimeColumn:
     naive: bool
 
 
-def _parse_times(values: Sequence[Any], *, serial_numbers: bool = False) -> _TimeColumn:
-    """Parse one column of timestamps, deciding day-first versus month-first once."""
+def _parse_times(
+    values: Sequence[Any], *, serial_numbers: bool = False, dayfirst_hint: bool | None = None
+) -> _TimeColumn:
+    """Parse one column of timestamps, deciding day-first versus month-first once.
+
+    ``dayfirst_hint`` settles a column where every day is 12 or less (another
+    column of the same rows, written year first, can tell).
+    """
     texts = [
         None if value is None else value if isinstance(value, int | float) else str(value).strip()
         for value in values
@@ -418,6 +424,8 @@ def _parse_times(values: Sequence[Any], *, serial_numbers: bool = False) -> _Tim
         if second > 12:
             dayfirst = False
             break
+    if saw_dmy and dayfirst is None and dayfirst_hint is not None:
+        dayfirst = dayfirst_hint
     if saw_dmy and dayfirst is None:
         if saw_ampm:
             dayfirst = False
@@ -959,7 +967,7 @@ def _mt5_deals(reader: _TableReader) -> tuple[list[_Deal], int]:
         deals.append(
             _Deal(
                 time=moment,
-                symbol=cell("symbol").upper(),
+                symbol=cell("symbol").strip(),
                 type=kind,
                 direction=direction,
                 volume=volume or 0.0,
@@ -1486,7 +1494,7 @@ def _mt5_positions(reader: _TableReader) -> tuple[list[_Trip], int]:
         assert entry_time is not None and exit_time is not None
         trips.append(
             _Trip(
-                symbol=texts[index["symbol"]].upper(),
+                symbol=texts[index["symbol"]].strip(),
                 side="long" if texts[index["type"]].lower() == "buy" else "short",
                 volume=volume or 0.0,
                 entry_time=entry_time,
@@ -1796,7 +1804,7 @@ def _parse_mt4_tester(reader: _TableReader) -> _Draft:
 
 
 def _mt4_symbol(value: str) -> str:
-    return value.split("(")[0].strip().upper()
+    return value.split("(")[0].strip()
 
 
 def _parse_mt4_statement(reader: _TableReader) -> _Draft:
@@ -1824,7 +1832,7 @@ def _parse_mt4_statement(reader: _TableReader) -> _Draft:
                 continue
             assert entry_time is not None and exit_time is not None
             trip = _Trip(
-                symbol=cell("symbol").upper(),
+                symbol=cell("symbol").strip(),
                 side="long" if cell("type").lower() == "buy" else "short",
                 volume=volume or 0.0,
                 entry_time=entry_time,
@@ -2447,7 +2455,7 @@ def _parse_tradingview_xlsx(sheets: dict[str, list[list[Any]]]) -> _Draft:
             draft.metadata["inputs"] = str(len(inputs))
         symbol = values.get("symbol", "")
         for trip in draft.trips:
-            trip.symbol = symbol.upper()
+            trip.symbol = symbol.strip()
     return draft
 
 
@@ -2561,6 +2569,9 @@ def _universal_table(
     header, with the rows under it; ``None`` when none does."""
     from quant_trade.audit import universal
 
+    section = universal.statement_section([header, *rows])
+    if section is not None and universal.looks_like_trades(section[0]):
+        return section
     candidates = [header, *rows[: UNIVERSAL_HEADER_SCAN - 1]]
     for skip, candidate in enumerate(candidates):
         if universal.looks_like_trades(candidate):
@@ -2796,7 +2807,7 @@ def _parse_quantconnect(header: list[str], rows: list[list[str]]) -> _Draft:
             multi_leg += 1
         draft.trips.append(
             _Trip(
-                symbol=symbol.upper(),
+                symbol=symbol.strip(),
                 side=side,
                 volume=abs(volume),
                 entry_time=entry_time,
@@ -2910,7 +2921,7 @@ def _parse_vectorbt(header: list[str], rows: list[list[str]]) -> _Draft:
         )
         draft.trips.append(
             _Trip(
-                symbol=chosen.upper() if re.fullmatch(r"[\w\-./:]+", chosen) else "",
+                symbol=chosen if re.fullmatch(r"[\w\-./:]+", chosen) else "",
                 side=side,
                 volume=abs(volume),
                 entry_time=entry_time,
@@ -3342,7 +3353,7 @@ def _parse_myfxbook(header: list[str], rows: list[list[str]]) -> _Draft:
         assert volume is not None and entry_price is not None and exit_price is not None
         assert profit is not None and entry_time is not None and exit_time is not None
         trip = _Trip(
-            symbol=_cells(row, columns, "symbol").upper(),
+            symbol=_cells(row, columns, "symbol").strip(),
             side=side,
             volume=abs(volume),
             entry_time=entry_time,
@@ -3445,7 +3456,7 @@ def _parse_mql5_signal(header: list[str], rows: list[list[str]]) -> _Draft:
         assert volume is not None and entry_price is not None and exit_price is not None
         assert profit is not None and entry_time is not None and exit_time is not None
         trip = _Trip(
-            symbol=cell(row, columns["symbol"]).upper(),
+            symbol=cell(row, columns["symbol"]).strip(),
             side=side,
             volume=abs(volume),
             entry_time=entry_time,
@@ -3523,7 +3534,7 @@ def _parse_fxblue(header: list[str], rows: list[list[str]]) -> _Draft:
         assert volume is not None and entry_price is not None and exit_price is not None
         assert profit is not None and entry_time is not None and exit_time is not None
         trip = _Trip(
-            symbol=_cells(row, columns, "symbol").upper(),
+            symbol=_cells(row, columns, "symbol").strip(),
             side=side,
             volume=abs(volume),
             entry_time=entry_time,

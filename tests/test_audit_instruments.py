@@ -191,3 +191,13 @@ def test_a_live_symbol_named_with_promotional_wording_is_withheld() -> None:
     html, _ = render(result, watermark=False)
     assert_report_clean(html)
     assert "GANANCIAS GARANTIZADAS" not in html
+
+
+def test_names_keep_the_file_s_case_and_group_regardless_of_it() -> None:
+    trades, symbols = _book({"EURUSD.m": [12.0, -10.0] * 5, "EURUSD.M": [12.0, -10.0] * 5})
+    trades2, symbols2 = _book({"GBPUSD.m": [12.0, -10.0] * 10})
+    review = instrument_review(trades + trades2, symbols + symbols2)
+    assert [row["key"] for row in review["rows"]] == ["EURUSD.m", "GBPUSD.m"]
+    assert review["rows"][0]["trades"]["value"] == 20
+    same, one = _book({"eurusd": [1.0] * 20, "EURUSD": [1.0] * 20})
+    assert instrument_review(same, one)["status"] == "NOT_MEASURED"

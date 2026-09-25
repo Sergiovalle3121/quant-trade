@@ -15,6 +15,7 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass, field
 
+from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 
@@ -40,6 +41,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": guides_index_url("es"), "en": guides_index_url("en")},
     *({"es": guide_url(g.slug, "es"), "en": guide_url(g.slug, "en")} for g in GUIDES),
     dict(METHOD_PATH),
+    *({"es": audience_url(a.slug, "es"), "en": audience_url(a.slug, "en")} for a in AUDIENCE_PAGES),
     {"es": "/comprobar", "en": "/check"},
     {"es": "/terminos", "en": "/terms"},
     {"es": "/privacidad", "en": "/privacy"},

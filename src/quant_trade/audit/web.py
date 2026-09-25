@@ -42,6 +42,7 @@ from quant_trade.audit import account_pages, payments
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
+from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
@@ -59,6 +60,7 @@ from quant_trade.audit.owner import (
 )
 from quant_trade.audit.pages import (
     SAMPLE_BANNER,
+    audience_page,
     badge_svg,
     check_page,
     compare_page,
@@ -1605,6 +1607,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         challenge: Annotated[str, Form()] = "",
         initial_balance: Annotated[str, Form()] = "",
         access_code: Annotated[str, Form()] = "",
+        net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         loc = _locale(locale)
         if consent.lower() not in ("on", "yes", "true", "1"):
@@ -1657,6 +1660,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 locale=loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,
+                net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
             )
         except (ValidationError, ValueError):
             return _html_error(request, 400, message("invalid_declared", loc), loc)
@@ -2233,6 +2237,32 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 raise _not_found()
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
         return HTMLResponse(guide_page(guide, locale=locale, base_url=_site_url(request)))
+
+    def _audience(request: Request, slug: str, path_locale: str, locale: str) -> Response:
+        page = AUDIENCES_BY_PATH[path_locale].get(slug)
+        if page is None:
+            other = AUDIENCES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            if other is None:
+                raise _not_found()
+            return RedirectResponse(audience_url(other.slug, path_locale), status_code=301)
+        return HTMLResponse(
+            audience_page(
+                page,
+                locale=locale,
+                base_url=_site_url(request),
+                free_mode=cfg.free_mode,
+                price_usd=cfg.price_usd,
+                pack_price_usd=cfg.pack_price_usd,
+            )
+        )
+
+    @app.get("/para/{slug}", response_class=HTMLResponse)
+    def audience_es(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _audience(request, slug, "es", _locale(lang or "es"))
+
+    @app.get("/for/{slug}", response_class=HTMLResponse)
+    def audience_en(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _audience(request, slug, "en", _locale(lang or "en"))
 
     @app.get("/guias/{slug}", response_class=HTMLResponse)
     def guide_es(request: Request, slug: str, lang: str | None = None) -> Response:

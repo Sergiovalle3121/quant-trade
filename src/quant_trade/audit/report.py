@@ -76,6 +76,11 @@ DISCLAIMER = {
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
+        "title_fund": f"{BRAND} · Auditoría de historial de fondo",
+        "fund_net": (
+            "Rentabilidades declaradas netas de comisiones: son las cifras del propio fondo "
+            "tras sus comisiones y Rigor no midió los costes."
+        ),
         "generated": "Generada",
         "audit_id": "Identificador",
         "inputs": "Archivos auditados (sha256)",
@@ -567,6 +572,45 @@ LABELS: dict[str, dict[str, str]] = {
             "Crea una página pública con la clase, las dimensiones y los hashes, y un sello "
             "para tu web. Nunca muestra tus archivos, operaciones ni descripción."
         ),
+        "evidence_legend": (
+            "Cada cifra lleva su etiqueta: MEASURED, calculada de tus archivos; DECLARED, "
+            "declarada por ti o por el vendedor, sin verificar; NOT_MEASURED, faltó un dato "
+            "para calcularla."
+        ),
+        "next": "Qué hacer ahora",
+        "next_intro": (
+            "Si compraste o vas a comprar este robot o señal, esto es lo que conviene aclarar "
+            "primero, según lo que encontró la auditoría."
+        ),
+        "next_live": (
+            "Pregunta al vendedor por qué tu cuenta real queda fuera de lo que el backtest "
+            "hacía esperar."
+        ),
+        "next_costs": (
+            "Compara el spread y la comisión de tu bróker con los costes que aguanta el "
+            "resultado: con un coste algo mayor que el de referencia, el margen se pierde."
+        ),
+        "next_costs_fail": (
+            "Compara el spread y la comisión de tu bróker con el coste de referencia: con ese "
+            "coste las operaciones ya pierden dinero en neto."
+        ),
+        "next_trials": (
+            "Pregunta cuántas configuraciones se probaron antes de elegir esta y con qué "
+            "periodo se eligió."
+        ),
+        "next_oos": (
+            "Pide un informe del mismo robot, sin cambios, en fechas posteriores a su "
+            "optimización."
+        ),
+        "next_flags": (
+            "Revisa las banderas rojas: señalan cifras que no se pueden tomar tal cual."
+        ),
+        "next_questions": "Lleva al vendedor las preguntas de este informe.",
+        "next_keep": (
+            "Guarda este informe y su identificador; si el robot cambia, pide que se audite "
+            "de nuevo."
+        ),
+        "next_link": "Ir al apartado",
         "meaning": "Qué significa para ti",
         "ladder": "Qué pide cada clase",
         "ladder_intro": (
@@ -605,7 +649,7 @@ LABELS: dict[str, dict[str, str]] = {
             "reto pudo tocar el límite."
         ),
         "outcome": "Resultado",
-        "probability": "Probabilidad",
+        "probability": "En las simulaciones del historial",
         "pass": "Llega al objetivo",
         "fail_daily_loss": "Rompe la pérdida diaria",
         "fail_total_loss": "Rompe la pérdida total",
@@ -670,6 +714,11 @@ LABELS: dict[str, dict[str, str]] = {
     },
     "en": {
         "title": f"{BRAND} · Backtest audit",
+        "title_fund": f"{BRAND} · Fund track record audit",
+        "fund_net": (
+            "Returns declared net of fees: they are the fund's own figures after its fees, "
+            "and Rigor did not measure costs."
+        ),
         "generated": "Generated",
         "audit_id": "Identifier",
         "inputs": "Audited files (sha256)",
@@ -1145,6 +1194,41 @@ LABELS: dict[str, dict[str, str]] = {
             "Creates a public page with the class, the dimensions and the hashes, and a badge "
             "for your site. It never shows your files, trades or description."
         ),
+        "evidence_legend": (
+            "Every figure carries its tag: MEASURED, computed from your files; DECLARED, "
+            "stated by you or the seller, not verified; NOT_MEASURED, a piece was missing to "
+            "compute it."
+        ),
+        "next": "What to do now",
+        "next_intro": (
+            "If you bought or are about to buy this robot or signal, this is what is worth "
+            "clearing up first, from what the audit found."
+        ),
+        "next_live": (
+            "Ask the seller why your live account falls outside what the backtest led you "
+            "to expect."
+        ),
+        "next_costs": (
+            "Compare your broker's spread and commission with the costs the result can bear: "
+            "a cost a little above the reference erases the margin."
+        ),
+        "next_costs_fail": (
+            "Compare your broker's spread and commission with the reference cost: at that "
+            "cost the trades already lose money net."
+        ),
+        "next_trials": (
+            "Ask how many configurations were tried before this one was chosen, and on which "
+            "period it was chosen."
+        ),
+        "next_oos": (
+            "Ask for a report of the same robot, unchanged, on dates after its optimisation."
+        ),
+        "next_flags": "Read the red flags: they mark figures that cannot be taken as they stand.",
+        "next_questions": "Take this report's questions to the seller.",
+        "next_keep": (
+            "Keep this report and its identifier; if the robot changes, ask for a new audit."
+        ),
+        "next_link": "Go to the section",
         "meaning": "What this means for you",
         "ladder": "What each class requires",
         "ladder_intro": (
@@ -1183,7 +1267,7 @@ LABELS: dict[str, dict[str, str]] = {
             "may have hit the limit."
         ),
         "outcome": "Outcome",
-        "probability": "Probability",
+        "probability": "In the simulations of the history",
         "pass": "Reaches the target",
         "fail_daily_loss": "Breaks the daily loss limit",
         "fail_total_loss": "Breaks the total loss limit",
@@ -2430,7 +2514,11 @@ def _challenge_html(
                 locale,
             )
         )
-        + f" (<code>{_e(challenge.get('preset', ''))}</code>). "
+        + (
+            f" (<code>{_e(challenge.get('preset', ''))}</code>). "
+            if str(rules.get("source_url", "")).startswith("https://")
+            else ". "
+        )
         + (
             f"{_e(labels['source'])}: {_e(rules.get('source_url', ''))}, {_e(labels['as_of'])} "
             f"{_e(rules.get('as_of', ''))}.</p>"
@@ -3555,8 +3643,19 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     ]
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
+    if fund.get("net_of_fees"):
+        out += (
+            f"<p class='muted'>{_badge(fund['net_of_fees']['evidence'])} "
+            f"{_e(labels['fund_net'])}</p>"
+        )
     out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
     return out
+
+
+def _title(data: dict[str, Any], labels: dict[str, str]) -> str:
+    """The report's name: a fund's track record, or a backtest."""
+    fund = data.get("fund") or {}
+    return labels["title_fund" if fund.get("track_record") else "title"]
 
 
 #: What each class requires, in the words of ``verdict.overall_class``.
@@ -4206,7 +4305,7 @@ def render_html(
         + _notice_html(notice, ok=notice_ok)
         + _pack_notice(labels, pack_code, pack_credits_left)
         + account_box
-        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(labels['title'])}</div>"
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
         + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
         + "<div class='verdict rise' style='--i:3'>"
@@ -4214,6 +4313,7 @@ def render_html(
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         + _verdict_html(str(verdict["summary"]))
         + ("" if locked else _hero_live(data, labels, live_anchor))
+        + f"<p class='muted evidence-legend'>{_e(labels['evidence_legend'])}</p>"
         + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
@@ -4271,6 +4371,18 @@ def render_html(
             _meaning_html(verdict, locale, account=is_account_history(data)),
             "r-meaning",
         ),
+        section(
+            labels["next"],
+            _next_steps_html(
+                data,
+                verdict,
+                labels,
+                {}
+                if locked
+                else {title: f"r-d{i}" for i, (title, _) in enumerate(detail, 1)},
+            ),
+            "r-next",
+        ),
         section(labels["ladder"], _ladder_html(str(verdict["overall"]), labels), "r-ladder"),
         section(labels["charts"], _charts_html(data, locale), "r-charts"),
         section(
@@ -4295,7 +4407,7 @@ def render_html(
         else [(f"r-d{i}", title) for i, (title, _) in enumerate(detail, 1)]
     )
     toc = toc[:-1] + detail_toc + toc[-1:]
-    page_title = f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}"
+    page_title = f"{_title(data, labels)} {verdict['overall']} · {data['audit_id'][:8]}"
     return (
         "<!doctype html><html lang='"
         + _e(locale)
@@ -4342,6 +4454,49 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
     tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
     return (
         f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
+    )
+
+
+def _next_steps_html(
+    data: dict[str, Any],
+    verdict: dict[str, Any],
+    labels: dict[str, str],
+    anchors: dict[str, str],
+) -> str:
+    """"What to do now": the few things a buyer should clear up first, in
+    order, from the dimensions that did not pass and the live comparison.
+    The class plan speaks to whoever builds the robot; this speaks to whoever
+    runs it. Questions to ask and checks to make, never a trading instruction."""
+    status = {str(item["name"]): str(item["status"]) for item in verdict.get("dimensions", [])}
+    open_ = {"WEAK", "FAIL"}
+    account = is_account_history(data)
+    steps: list[tuple[str, str]] = []
+    live = data.get("live") or {}
+    if live.get("status") == "MEASURED" and live.get("outcome") != "CONSISTENT":
+        steps.append(("next_live", labels["live"]))
+    if status.get("data_quality") == "FAIL":
+        steps.append(("next_flags", labels["red_flags"]))
+    if status.get("costs") == "FAIL":
+        steps.append(("next_costs_fail", labels["costs"]))
+    elif status.get("costs") == "WEAK":
+        steps.append(("next_costs", labels["costs"]))
+    if not account and status.get("multiplicity") in open_:
+        steps.append(("next_trials", labels["plan"]))
+    if not account and (status.get("out_of_sample") in open_ | {"NOT_MEASURED"}):
+        steps.append(("next_oos", labels["plan"]))
+    steps = steps[:3]
+    if data.get("vendor_questions"):
+        steps.append(("next_questions", labels["questions"]))
+    steps.append(("next_keep", ""))
+
+    def item(key: str, section: str) -> str:
+        anchor = anchors.get(section, "")
+        link = f" <a href='#{_e(anchor)}'>{_e(labels['next_link'])}</a>" if anchor else ""
+        return f"<li>{_e(labels[key])}{link}</li>"
+
+    return (
+        f"<p class='muted'>{_e(labels['next_intro'])}</p>"
+        f"<ol class='next-steps'>{''.join(item(key, section) for key, section in steps)}</ol>"
     )
 
 

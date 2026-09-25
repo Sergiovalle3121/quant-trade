@@ -427,7 +427,14 @@ def simulate_challenge(
     """
     values = _clean(daily_returns)
     outcome_keys = ("pass", "fail_daily_loss", "fail_total_loss", "unfinished")
-    base: dict[str, Any] = {"rules": rules.to_dict(), "assumptions": CHALLENGE_ASSUMPTIONS}
+    # The last assumption is about a firm's published rules; generic rules have none.
+    published = str(rules.to_dict().get("source_url", "")).startswith("https://")
+    assumptions = (
+        CHALLENGE_ASSUMPTIONS
+        if published
+        else {locale: lines[:-1] for locale, lines in CHALLENGE_ASSUMPTIONS.items()}
+    )
+    base: dict[str, Any] = {"rules": rules.to_dict(), "assumptions": assumptions}
     if len(values) < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
         reason = (
             f"needs at least {MIN_OBSERVATIONS} daily returns that are not all identical; "

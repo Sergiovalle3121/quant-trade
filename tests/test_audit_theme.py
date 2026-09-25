@@ -644,3 +644,16 @@ def test_instrument_findings_read_like_behaviour_ones_and_a_lone_fact_sits_in_a_
         assert find_claims(html) == []
     # One headline figure reads as a row beside its sentence on screens, not a lone tile.
     assert "@media screen and (min-width:621px){.facts>.fact:only-child{display:flex" in STYLE
+
+
+def test_the_live_account_line_sits_apart_under_the_verdict_with_its_tone(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    page = client.get("/ejemplo").text
+    # The sample carries a live account: one line under the verdict, toned by the outcome.
+    assert "<p class='verdict-live weak'>" in page
+    for tone, token in (("pass", "--ok"), ("weak", "--warn"), ("fail", "--bad")):
+        assert f".verdict-live.{tone}::before{{background:var({token})" in STYLE
+    assert ".verdict-live{margin:20px 0 0;padding-top:16px;border-top:1px solid" in STYLE
+    # In the PDF it keeps the verdict's print size and turns black like it.
+    assert ".verdict-text,.verdict-lead,.verdict-live," in STYLE
+    assert ".verdict-live{border-top-color:#ddd;font-size:9pt" in STYLE
