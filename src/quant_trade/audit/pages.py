@@ -11,6 +11,7 @@ the guard over these pages.
 from __future__ import annotations
 
 import html
+from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.guides import (
@@ -1541,6 +1542,30 @@ def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "") -> st
     )
 
 
+_MONTHS = {
+    "es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"),
+    "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+}
+
+
+def _utc_time(stamp: str, locale: str) -> str:
+    """An ISO UTC stamp as a readable ``<time>`` (24 sep 2026 · 17:30 UTC).
+
+    The exact stamp stays in the ``datetime`` attribute; anything that does
+    not parse is shown as it came.
+    """
+    try:
+        when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return _e(stamp)
+    month = _MONTHS[locale][when.month - 1]
+    if locale == "es":
+        day = f"{when.day} {month} {when.year}"
+    else:
+        day = f"{month} {when.day}, {when.year}"
+    return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
+
+
 def verification_page(
     result: dict[str, Any],
     *,
@@ -1631,8 +1656,8 @@ def verification_page(
         + f"<div><div class='verdict-k'>{_e(cls_label)} {_e(overall)}</div>"
         f"<p class='verdict-text'>{_e(class_text(overall, locale))}</p>"
         "<div class='v-facts'>"
-        f"<div><b>{_e(copy['v_audited'])}</b><span>{_e(audited)}</span></div>"
-        f"<div><b>{_e(copy['v_published'])}</b><span>{_e(published_at)}</span></div>"
+        f"<div><b>{_e(copy['v_audited'])}</b><span>{_utc_time(audited, locale)}</span></div>"
+        f"<div><b>{_e(copy['v_published'])}</b><span>{_utc_time(published_at, locale)}</span></div>"
         f"<div><b>{_e(ui['v_id'])}</b><span>{_e(public_id)}</span></div>"
         "</div></div></div></div></section>"
     )
@@ -1742,13 +1767,21 @@ def compare_page(content: str, *, locale: str = "es") -> str:
     return _page(copy["title"], locale, body, switch_href=other_path, solid_nav=True)
 
 
-def error_page(message: str, *, locale: str = "es") -> str:
+_ERROR_TITLES = {
+    "es": {"page": "Página no encontrada", "server": "Algo falló"},
+    "en": {"page": "Page not found", "server": "Something went wrong"},
+}
+
+
+def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
+    """An error page; ``kind`` picks the title: audit, page (404) or server."""
     locale = _locale(locale)
     copy = _COPY[locale]
     ui = _UI[locale]
     other = "en" if locale == "es" else "es"
+    title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
     body = (
-        _page_hero(ui["error_eyebrow"], copy["error_title"])
+        _page_hero(ui["error_eyebrow"], title)
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"<div class='error'>{_e(message)}</div><div class='back-row'>"
         f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"
@@ -1757,7 +1790,7 @@ def error_page(message: str, *, locale: str = "es") -> str:
         f"<a class='btn btn-ghost' href='/?lang={other}' hreflang='{other}'>{_other_name(locale)}"
         "</a></div></div></div>"
     )
-    return _page(copy["error_title"], locale, body, switch_href=f"/?lang={other}", solid_nav=True)
+    return _page(title, locale, body, switch_href=f"/?lang={other}", solid_nav=True)
 
 
 def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
