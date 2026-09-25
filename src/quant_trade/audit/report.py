@@ -2279,14 +2279,17 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     if listed:
         rows = "".join(
             f"<tr><td>{_e(str(item['time'])[:10])}</td>"
-            f"<td class='val'>{_fmt(float(item['amount']['value']), key='amount')}</td>"
-            f"<td class='val'>{_fmt(item['balance_before']['value'], key='balance_before')}</td>"
-            f"<td class='val'>{_fmt(item['drawdown']['value'], key='drawdown')}</td></tr>"
+            f"<td class='val' data-l='{_e(labels['account_amount'])}'>"
+            f"{_fmt(float(item['amount']['value']), key='amount')}</td>"
+            f"<td class='val' data-l='{_e(labels['account_before'])}'>"
+            f"{_fmt(item['balance_before']['value'], key='balance_before')}</td>"
+            f"<td class='val' data-l='{_e(labels['account_drawdown'])}'>"
+            f"{_fmt(item['drawdown']['value'], key='drawdown')}</td></tr>"
             for item in listed
         )
         out += (
             f"<h3>{_e(labels['account_deposits'])}</h3>"
-            "<table class='metrics'><thead><tr>"
+            "<table class='metrics deposits'><thead><tr>"
             f"<th>{_e(labels['account_date'])}</th>"
             f"<th class='val'>{_e(labels['account_amount'])}</th>"
             f"<th class='val'>{_e(labels['account_before'])}</th>"
