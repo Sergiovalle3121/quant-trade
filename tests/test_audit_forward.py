@@ -134,13 +134,23 @@ def test_plateau_leaves_a_forward_export_alone() -> None:
 
 
 def test_forward_columns_with_other_names_are_not_read_as_a_plain_export() -> None:
-    header = ["Pass", "Resultado forward", "Resultado back", *HEADER[3:]]
+    # Names that do not say which period each column is (a translation the
+    # importer has no words for) stay unnamed.
+    header = ["Pass", "Columna 1", "Columna 2", *HEADER[3:]]
     summary = parse_optimization(_export(_lost, header))
     assert not is_forward(summary.table) and unnamed_forward(summary.table)
     for check in (forward_review, parameter_stability):
         review, flags = check(summary.table, summary.parameters, report_inputs="FastMA=12")
         assert review["status"] == "NOT_MEASURED" and flags == []
         assert review["reason"] == UNNAMED_FORWARD
+
+
+def test_a_translated_forward_export_is_reviewed() -> None:
+    header = ["Проход", "Форвард результат", "Бэк результат", "Прибыль", *HEADER[4:]]
+    summary = parse_optimization(_export(_lost, header))
+    assert is_forward(summary.table)
+    review, _ = forward_review(summary.table, summary.parameters, report_inputs="FastMA=12")
+    assert review["status"] == "MEASURED"
 
 
 def test_a_plain_export_is_not_taken_for_an_unnamed_forward_one() -> None:
