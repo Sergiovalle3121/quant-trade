@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,18 @@ def test_landing_leads_with_the_product_and_real_key_figures() -> None:
     # One sans family plus the mono; the old serif is gone from pages and static files.
     assert "Instrument Serif" not in STYLE
     assert not any("instrument" in name for name in STATIC_FILES)
+
+
+def test_long_pages_have_an_index_that_links_every_section(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path, label in (
+        ("/terminos", "En esta página"),
+        ("/privacy", "On this page"),
+        ("/guias/mt5", "En esta página"),
+    ):
+        page = client.get(path).text
+        assert label in page and "data-toc" in page, path
+        headings = re.findall(r"<h2 id='(s\d+)'>", page)
+        links = re.findall(r"<li><a href='#(s\d+)'>", page)
+        assert headings and headings == links, path
+        assert find_claims(page) == []
