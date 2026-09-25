@@ -3527,6 +3527,16 @@ _OPTIMIZATION_STANDARD = {
 }
 
 
+#: Metrics a translated export may list between the trade count and the inputs.
+_METRICS_AFTER_TRADES = {
+    "profit factor",
+    "expected payoff",
+    "equity dd %",
+    "recovery factor",
+    "sharpe ratio",
+}
+
+
 #: "MyEA EURUSD,H1 2024.01.01-2024.06.30", as MetaTrader titles the export.
 _OPTIMIZATION_TITLE = re.compile(
     r"^(?P<expert>.+?)\s+(?P<symbol>[^\s,]+),(?P<timeframe>[A-Z]{1,2}\d{0,2})\b"
@@ -3621,8 +3631,8 @@ _OPTIMIZATION_NAMES = {
     alias: english for english, aliases in _OPTIMIZATION_ALIASES.items() for alias in aliases
 }
 #: Words that mark the forward and the back criterion in a translated forward export.
-_FORWARD_WORDS = ("forward", "форвард", "vorwärts", "前向", "フォワード")
-_BACK_WORDS = ("back", "бэк", "回测", "バック")
+_FORWARD_WORDS = ("forward", "форвард", "vorwärts", "adelante", "前向", "フォワード")
+_BACK_WORDS = ("back", "бэк", "rückwärts", "atrás", "回测", "バック")
 
 
 def _optimization_name(name: str) -> str:
@@ -3631,22 +3641,42 @@ def _optimization_name(name: str) -> str:
     return _OPTIMIZATION_NAMES.get(key, name.strip())
 
 
-def _optimization_header(names: list[str]) -> list[str]:
-    """A translated header under English names, the forward pair included.
+def _optimization_header(names: list[str]) -> tuple[list[str], int | None]:
+    """A translated header under English names, and where the EA inputs start.
 
     A forward export reads Pass, Forward Result, Back Result, Profit. In
     another language the two result columns are named only when their own
     words say which period each one is; otherwise they stay as written and
     the forward review asks for an English export.
+
+    The inputs follow the trade count. An English export lists them right
+    after it; a translated one may first list the ratio metrics there. Past
+    the first input nothing is renamed, so an input called Drawdown, Symbol
+    or Custom stays an input, and so does a name already read before Trades.
+    Without a trade count the index is None.
     """
     out = [_optimization_name(name) for name in names]
+    trades_at = next((i for i, name in enumerate(out) if name == "Trades"), None)
+    first_input = None
+    if trades_at is not None:
+        seen = {name.lower() for name in out[: trades_at + 1]}
+        translated = names[trades_at].strip().lower() != "trades"
+        first_input = len(out)
+        for i in range(trades_at + 1, len(out)):
+            key = out[i].lower()
+            if translated and key in _METRICS_AFTER_TRADES and key not in seen:
+                seen.add(key)
+                continue
+            first_input = i
+            break
+        out[first_input:] = [name.strip() for name in names[first_input:]]
     if len(out) > 3 and out[0] == "Pass" and out[3] == "Profit" and "Result" not in out[1:3]:
         first, second = (name.lower() for name in names[1:3])
         if any(word in first for word in _FORWARD_WORDS) and any(
             word in second for word in _BACK_WORDS
         ):
             out[1], out[2] = "Forward Result", "Back Result"
-    return out
+    return out, first_input
 
 
 #: Passes kept for the parameter-stability check.
@@ -3714,19 +3744,15 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
     if header_at is None:
         raise ReportFormatError(
             "optimization_header",
-            "the optimisation file has no 'Pass' header row",
-            "el archivo de optimización no tiene la fila de encabezado 'Pass'",
+            "we do not recognise the column names of this optimisation file; export it with "
+            "the terminal in English or Spanish (View > Languages)",
+            "no reconocemos los nombres de las columnas de este archivo de optimización; "
+            "expórtalo con el terminal en inglés o en español (Ver > Idiomas)",
         )
     header = rows[header_at]
-    names = _optimization_header(header)
-    lowered = [name.lower() for name in names]
-    if "trades" in lowered:
-        # A translated export may list more metrics after Trades; they are not inputs.
-        parameters = [
-            name
-            for name in names[lowered.index("trades") + 1 :]
-            if name and name.lower() not in _OPTIMIZATION_STANDARD
-        ]
+    names, first_input = _optimization_header(header)
+    if first_input is not None:
+        parameters = [name for name in names[first_input:] if name]
     else:
         parameters = [name for name in names if name and name.lower() not in _OPTIMIZATION_STANDARD]
     passes: set[str] = set()

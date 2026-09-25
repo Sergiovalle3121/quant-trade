@@ -83,6 +83,8 @@ def test_a_russian_export_is_read_under_english_names() -> None:
     [
         ("Форвард результат", "Бэк результат", True),
         ("Resultado forward", "Resultado back", True),
+        ("Resultado hacia adelante", "Resultado hacia atrás", True),
+        ("Vorwärts Ergebnis", "Rückwärts Ergebnis", True),
         ("Columna uno", "Columna dos", False),
     ],
 )
@@ -108,3 +110,44 @@ def test_an_unknown_language_still_says_which_header_is_missing() -> None:
     with pytest.raises(ReportFormatError) as error:
         parse_optimization(_export(["Numéro", "Valeur"], [[1, 2.0]]))
     assert error.value.code == "optimization_header"
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        ["Pass", "Result", "Profit", "Custom", "Equity DD %", "Trades", "Drawdown", "Symbol"],
+        ["Pass", "Result", "Profit", "Custom", "Equity DD %", "Trades", "Custom", "Lots"],
+        [
+            "Paso",
+            "Resultado",
+            "Beneficio",
+            "Total de operaciones",
+            "Reducción %",
+            "Symbol",
+            "Drawdown",
+            "Custom",
+        ],
+    ],
+)
+def test_inputs_named_like_a_metric_stay_inputs(header: list[str]) -> None:
+    rows = [[n, 1.0, 5.0 + n, 7.0, 3.0, 10, 2 + n, 4 + n] for n in range(3)]
+    summary = parse_optimization(_export(header, rows))
+    inputs = header[-2:] if header[0] == "Pass" else header[-3:]
+    assert summary.parameters == inputs
+    assert summary.table[1][inputs[-1]] == rows[1][-1]
+    assert summary.table[1]["Profit"] == 6.0
+
+
+def test_a_translated_metric_after_trades_is_not_an_input() -> None:
+    header = ["Paso", "Resultado", "Beneficio", "Total de operaciones", "Reducción %", "FastMA"]
+    summary = parse_optimization(_export(header, [[n, 1.0, 5.0, 10, 3.0, n] for n in range(3)]))
+    assert summary.parameters == ["FastMA"]
+    assert summary.table[0]["Equity DD %"] == 3.0
+
+
+def test_an_unknown_language_says_how_to_export_it() -> None:
+    turkish = ["Geçiş", "Sonuç", "Kâr", "Toplam işlem", "FastMA"]
+    with pytest.raises(ReportFormatError) as error:
+        parse_optimization(_export(turkish, [[1, 1.0, 5.0, 10, 3]]))
+    assert "View > Languages" in str(error.value)
+    assert "Ver > Idiomas" in error.value.message_es
