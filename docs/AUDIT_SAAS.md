@@ -1381,6 +1381,9 @@ the link to its public page when the owner published one), or that Rigor has no
 record of them (edited, from elsewhere, or issued before 25 September 2026,
 when recording started; the page never says Rigor did not produce them). The wording says only whether the file changed since Rigor
 produced it, never anything about the strategy, and passes the guard.
+These two paths have their own request body limit (20 MB plus 1 MB of form),
+so a bigger upload gets the page's 413 message before the server receives
+and spools it, instead of after, under the whole-service limit.
 
 A hash, not a digital signature, was chosen on purpose: it needs no key to
 keep secret and no Railway variable, and the buyer checks on the site in two
