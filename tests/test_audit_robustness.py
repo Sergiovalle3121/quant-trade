@@ -437,7 +437,8 @@ def test_an_mql5_signal_header_without_a_closing_price_is_not_a_crash() -> None:
     )
     with pytest.raises(ReportFormatError) as caught:
         import_report(data, "history.csv")
-    assert caught.value.code == "unknown_format"
+    # Two times but one price: neither a signal history nor a trade list.
+    assert caught.value.code in {"unknown_format", "universal_columns_missing"}
 
 
 def test_a_trade_that_closes_before_it_opens_is_dropped() -> None:

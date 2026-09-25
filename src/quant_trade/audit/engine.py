@@ -33,6 +33,7 @@ from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import decay as decay_lib
 from quant_trade.audit import forward as forward_lib
+from quant_trade.audit import fund as fund_lib
 from quant_trade.audit import instruments as instruments_lib
 from quant_trade.audit import live as live_lib
 from quant_trade.audit import plateau as plateau_lib
@@ -949,6 +950,7 @@ def run_audit(
         if inputs.trades is not None
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
+    fund = fund_lib.fund_review(inputs.equity.frame, inputs.periods_per_year)
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1139,6 +1141,7 @@ def run_audit(
         recent=recent,
         behaviour=behaviour,
         instruments=instruments,
+        fund=fund,
         vendor_questions=questions,
     )
 

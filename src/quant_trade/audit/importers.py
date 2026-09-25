@@ -54,7 +54,7 @@ import re
 import statistics
 import zipfile
 import zlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
 from html.parser import HTMLParser
@@ -88,6 +88,9 @@ FXBLUE_CSV = "fxblue_csv"
 MT5_OPTIMIZATION_XML = "mt5_optimization_xml"
 MT5_TESTER_XLSX = "mt5_tester_xlsx"
 MT5_HISTORY_XLSX = "mt5_history_xlsx"
+#: Any other trade or fill list, read by its column names (``audit/universal.py``).
+UNIVERSAL_TRADES_CSV = "universal_trades_csv"
+UNIVERSAL_FILLS_CSV = "universal_fills_csv"
 
 #: Every format ``import_report`` turns into trades and a balance curve.
 REPORT_FORMATS: tuple[str, ...] = (
@@ -107,6 +110,8 @@ REPORT_FORMATS: tuple[str, ...] = (
     MYFXBOOK_CSV,
     MQL5_SIGNAL_CSV,
     FXBLUE_CSV,
+    UNIVERSAL_TRADES_CSV,
+    UNIVERSAL_FILLS_CSV,
 )
 
 #: Used when the file does not state a starting balance and none is supplied.
@@ -544,6 +549,9 @@ class _Draft:
     metadata: dict[str, str] = field(default_factory=dict)
     invalid_rows: int = 0
     naive_times: bool = True
+    #: True when the parser priced every trip with a known money-per-point
+    #: value, so the size ``_assemble`` finds is not an inference to report.
+    sized: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -2542,6 +2550,38 @@ def _table_format(header: list[str]) -> str | None:
     return None
 
 
+#: Title or summary lines some platforms print above the table's header.
+UNIVERSAL_HEADER_SCAN = 15
+
+
+def _universal_table(
+    header: list[str], rows: list[list[str]]
+) -> tuple[list[str], list[list[str]]] | None:
+    """The first of the top lines that reads as a trade or fill table's
+    header, with the rows under it; ``None`` when none does."""
+    from quant_trade.audit import universal
+
+    candidates = [header, *rows[: UNIVERSAL_HEADER_SCAN - 1]]
+    for skip, candidate in enumerate(candidates):
+        if universal.looks_like_trades(candidate):
+            return candidate, rows[skip:]
+    return None
+
+
+def _universal_sheet(
+    sheets: dict[str, list[list[Any]]],
+) -> tuple[list[str], list[list[str]]] | None:
+    """The first worksheet holding a trade or fill table, as text cells."""
+    for sheet in sheets.values():
+        texts = [[_as_text(cell) for cell in row] for row in sheet]
+        texts = [row for row in texts if any(texts_cell for texts_cell in row)]
+        if texts:
+            found = _universal_table(texts[0], texts[1:])
+            if found is not None:
+                return found
+    return None
+
+
 def _cells(row: list[str], columns: dict[str, int], name: str) -> str:
     index = columns.get(name)
     return row[index] if index is not None and index < len(row) else ""
@@ -2642,6 +2682,7 @@ def _parse_ninjatrader_executions(
     draft = _Draft(NINJATRADER_EXECUTIONS_CSV, [])
     draft.itemised = {"commission"}
     draft.naive_times = True
+    draft.sized = True
     times = _parse_times([_cells(row, columns, "time") for row in rows])
     fills: list[tuple[datetime, int, str, str, float, float, float]] = []
     for position, row in enumerate(rows):
@@ -3139,7 +3180,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     unusual = sorted(
         {(trip.symbol, sizes[trip.symbol]) for trip in trips if abs(sizes[trip.symbol] - 1) > 0.005}
     )
-    if unusual:
+    if unusual and not draft.sized:
         listed = ", ".join(f"{symbol or 'all'} x{_size_text(size)}" for symbol, size in unusual)
         warnings.append(f"{CONTRACT_SIZE_WARNING}: {listed}")
     trades: list[Trade] = []
@@ -3568,14 +3609,83 @@ def _unknown_format() -> ReportFormatError:
         "statement (HTML, or XLSX for MetaTrader 5), a TradingView list of trades "
         "(CSV or XLSX), a trades or executions CSV from NinjaTrader, a trades CSV from "
         "QuantConnect, backtesting.py "
-        "or vectorbt, or an account history CSV from Myfxbook, FX Blue or an MQL5 signal",
+        "or vectorbt, an account history CSV from Myfxbook, FX Blue or an MQL5 signal, or "
+        "any CSV or Excel list with one trade or one fill per row (entry and exit time, "
+        "quantity and prices)",
         "el archivo no es un informe compatible. Se espera: un informe o estado de cuenta "
         "de MetaTrader 5 o 4 (HTML, o XLSX de MetaTrader 5), una lista de operaciones de "
         "TradingView (CSV o XLSX), "
         "un CSV de operaciones o de ejecuciones de NinjaTrader, uno de operaciones de "
         "QuantConnect, backtesting.py o vectorbt, "
-        "o el historial en CSV de Myfxbook, FX Blue o una señal de MQL5",
+        "el historial en CSV de Myfxbook, FX Blue o una señal de MQL5, o cualquier lista "
+        "en CSV o Excel con una operación o una ejecución por fila (hora de entrada y de "
+        "salida, cantidad y precios)",
     )
+
+
+def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
+    """The customer's table read with their own column mapping."""
+    from quant_trade.audit import universal
+
+    if _is_zip(data):
+        sheets = read_xlsx(data)
+        for sheet in sheets.values():
+            texts = [[_as_text(cell) for cell in row] for row in sheet]
+            texts = [row for row in texts if any(cell for cell in row)]
+            header_at = _mapped_header(texts, columns)
+            if header_at is not None:
+                return universal.parse(
+                    texts[header_at], texts[header_at + 1 :], ",", columns, serial_dates=True
+                )
+        raise _mapped_not_found()
+    text = decode_text(data)
+    lowered = text.lstrip()[:4000].lower()
+    if "<html" in lowered or "<table" in lowered or text.lstrip().startswith("<?xml"):
+        raise ReportFormatError(
+            "universal_not_a_table",
+            "column mapping works on a CSV or Excel list of trades; this file is a report "
+            "page: upload it without choosing columns",
+            "indicar las columnas solo sirve para una lista de operaciones en CSV o Excel; "
+            "este archivo es una página de informe: súbelo sin elegir columnas",
+        )
+    header, rows, delimiter = _read_delimited(text)
+    table = [header, *rows]
+    header_at = _mapped_header(table, columns)
+    if header_at is None:
+        raise _mapped_not_found()
+    return universal.parse(table[header_at], table[header_at + 1 :], delimiter, columns)
+
+
+def _mapped_header(table: list[list[str]], columns: Mapping[str, str]) -> int | None:
+    """The first top line holding every column the customer named."""
+    wanted = {name.strip() for name in columns.values() if name and name.strip()}
+    for index, row in enumerate(table[:UNIVERSAL_HEADER_SCAN]):
+        if wanted <= {cell.strip() for cell in row}:
+            return index
+    return None
+
+
+def _mapped_not_found() -> ReportFormatError:
+    return ReportFormatError(
+        "universal_unknown_column",
+        "the columns you chose are not in the file's header; check their names",
+        "las columnas que elegiste no están en la cabecera del archivo; revisa sus nombres",
+    )
+
+
+def _unrecognised(data: bytes) -> ReportFormatError:
+    """A table whose columns half match a trade list names what is missing;
+    anything else gets the list of supported formats."""
+    from quant_trade.audit import universal
+
+    text = decode_text(data)
+    if "<" not in text.lstrip()[:1]:
+        header, rows, _ = _read_delimited(text)
+        for candidate in [header, *rows[: UNIVERSAL_HEADER_SCAN - 1]]:
+            found = universal.guess_columns(candidate)
+            if len(set(found) & {*universal.TRADE_ROLES, *universal.FILL_ROLES}) >= 2:
+                return universal.missing_columns(candidate, found)
+    return _unknown_format()
 
 
 def detect_format(data: bytes, filename: str | None = None) -> str | None:
@@ -3599,7 +3709,10 @@ def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
         if any(rows and _is_tradingview_header(rows[0]) for rows in sheets.values()):
             return TRADINGVIEW_XLSX, None
         workbook = _mt5_workbook(sheets)
-        return (workbook[0] if workbook is not None else None), None
+        if workbook is not None:
+            return workbook[0], None
+        found = _universal_sheet(sheets)
+        return (_universal_format(found) if found else None), None
     text = decode_text(data)
     stripped = text.lstrip()
     if stripped.startswith("<?xml") or stripped[:200].lower().startswith("<workbook"):
@@ -3610,22 +3723,46 @@ def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
     if "<html" in lowered or "<table" in lowered or "<!doctype html" in lowered:
         reader = _read_html(text)
         return _html_format(reader), reader
-    header, _, _ = _read_delimited(text)
+    header, rows, _ = _read_delimited(text)
     if header:
-        return _table_format(header), None
+        known = _table_format(header)
+        if known is not None:
+            return known, None
+        found = _universal_table(header, rows)
+        return (_universal_format(found) if found else None), None
     return None, None
 
 
+def _universal_format(found: tuple[list[str], list[list[str]]]) -> str:
+    from quant_trade.audit import universal
+
+    return universal.resolve(found[0]).shape
+
+
 def import_report(
-    data: bytes, filename: str | None = None, *, initial_balance: float | None = None
+    data: bytes,
+    filename: str | None = None,
+    *,
+    initial_balance: float | None = None,
+    columns: Mapping[str, str] | None = None,
 ) -> ImportedReport:
     """Import one platform file into trades and a closed-trade balance curve.
 
     ``initial_balance`` is used only when the file itself does not state
     the starting balance (the client's declaration beats the 10 000 default
-    but never overrides the file).
+    but never overrides the file). ``columns`` is the customer's own mapping
+    of roles (``universal.ROLES``) to column names; with it the file is read
+    as a plain trade or fill table, whatever platform wrote it.
     """
     _check_size(data)
+    if initial_balance is not None and not (math.isfinite(initial_balance) and initial_balance > 0):
+        raise ReportFormatError(
+            "bad_initial_balance",
+            "the starting balance must be a positive number",
+            "el balance inicial debe ser un número positivo",
+        )
+    if columns:
+        return _assemble(_mapped_draft(data, columns), initial_balance)
     if _is_zip(data):
         # Read the workbook here so that its own errors (too large, damaged)
         # reach the client instead of a generic "unknown format".
@@ -3634,7 +3771,14 @@ def import_report(
             return _assemble(_parse_tradingview_xlsx(sheets), initial_balance)
         workbook = _mt5_workbook(sheets)
         if workbook is None:
-            raise _unknown_format()
+            found = _universal_sheet(sheets)
+            if found is None:
+                raise _unknown_format()
+            from quant_trade.audit import universal
+
+            return _assemble(
+                universal.parse(found[0], found[1], ",", serial_dates=True), initial_balance
+            )
         workbook_format, reader = workbook
         workbook_draft = (
             _parse_mt5_tester(reader)
@@ -3653,13 +3797,7 @@ def import_report(
             "optimización, y el informe de la prueba individual como informe",
         )
     if source_format is None:
-        raise _unknown_format()
-    if initial_balance is not None and not (math.isfinite(initial_balance) and initial_balance > 0):
-        raise ReportFormatError(
-            "bad_initial_balance",
-            "the starting balance must be a positive number",
-            "el balance inicial debe ser un número positivo",
-        )
+        raise _unrecognised(data)
     draft: _Draft
     if source_format in {MT5_TESTER_HTML, MT5_HISTORY_HTML, MT4_TESTER_HTML, MT4_STATEMENT_HTML}:
         reader = html_reader if html_reader is not None else _read_html(decode_text(data))
@@ -3689,6 +3827,12 @@ def import_report(
             draft = _parse_mql5_signal(header, rows)
         elif source_format == FXBLUE_CSV:
             draft = _parse_fxblue(header, rows)
+        elif source_format in {UNIVERSAL_TRADES_CSV, UNIVERSAL_FILLS_CSV}:
+            from quant_trade.audit import universal
+
+            found = _universal_table(header, rows)
+            assert found is not None  # _detect found it
+            draft = universal.parse(found[0], found[1], delimiter)
         else:
             draft = _parse_vectorbt(header, rows)
     return _assemble(draft, initial_balance)

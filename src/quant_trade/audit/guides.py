@@ -35,9 +35,14 @@ class Guide:
     text: dict[str, GuideText]
     #: The English path segment when it differs from the Spanish ``slug``.
     slug_en: str | None = None
+    #: The English platform name when it differs from ``platform``.
+    platform_en: str | None = None
 
     def slug_for(self, locale: str) -> str:
         return self.slug_en if locale == "en" and self.slug_en else self.slug
+
+    def platform_for(self, locale: str) -> str:
+        return self.platform_en if locale == "en" and self.platform_en else self.platform
 
 
 #: Index and page paths per language. A guide lives at ``<index>/<slug>``.
@@ -822,6 +827,86 @@ GUIDES: tuple[Guide, ...] = (
                     "counted.",
                     "If the file holds several accounts, the one with the most closed trades is "
                     "read and the report says so. Export one account per file.",
+                    _FLOATING_EN,
+                ),
+            ),
+        },
+    ),
+    Guide(
+        slug="csv-universal",
+        slug_en="universal-csv",
+        platform="Otra plataforma (CSV o Excel)",
+        platform_en="Any other platform (CSV or Excel)",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo subir las operaciones de cualquier plataforma",
+                summary=(
+                    "Si tu bróker, exchange o diario de trading no está en la lista, exporta su "
+                    "historial de operaciones en CSV o Excel y súbelo: las columnas se "
+                    "reconocen por su nombre."
+                ),
+                file=(
+                    "Un .csv o .xlsx con una fila por operación cerrada (fecha de entrada y de "
+                    "salida, cantidad, precio de entrada y de salida) o una fila por ejecución "
+                    "(fecha, compra o venta, cantidad y precio)."
+                ),
+                steps=(
+                    "En tu plataforma, busca el historial de operaciones, de órdenes ejecutadas "
+                    "o de transacciones (Trade history, Order history, Fills o Executions).",
+                    "Elige el periodo completo que quieres revisar y expórtalo en CSV o Excel.",
+                    "Súbelo tal cual: no hace falta cambiar nada si las columnas tienen nombres "
+                    "habituales en español, inglés, portugués, francés, alemán o italiano.",
+                ),
+                upload="En el campo «Informe de tu plataforma».",
+                tips=(
+                    "Con una fila por ejecución, las compras y ventas se emparejan por símbolo "
+                    "en orden de llegada (FIFO); las posiciones que siguen abiertas al final "
+                    "quedan fuera y el informe lo dice.",
+                    "Si hay columna de resultado, se usa para el valor por punto de cada "
+                    "contrato. Sin ella, el resultado es el movimiento del precio por la "
+                    "cantidad, y conviene añadir una columna Multiplicador para futuros u "
+                    "opciones.",
+                    "Las comisiones cobradas en otra moneda (por ejemplo BNB en un par USDT) "
+                    "quedan fuera de los costes y el informe lo avisa.",
+                    "En el informe verás qué columna se leyó como qué. Si falta alguna, el "
+                    "mensaje de error dice cuál y qué columnas encontró.",
+                    _BALANCE_ES,
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to upload the trades of any platform",
+                summary=(
+                    "If your broker, exchange or trading journal is not listed, export its "
+                    "trade history as CSV or Excel and upload it: the columns are recognised "
+                    "by their names."
+                ),
+                file=(
+                    "A .csv or .xlsx with one row per closed trade (entry and exit time, "
+                    "quantity, entry and exit price) or one row per fill (time, buy or sell, "
+                    "quantity and price)."
+                ),
+                steps=(
+                    "On your platform, find the trade, filled order or transaction history "
+                    "(Trade history, Order history, Fills or Executions).",
+                    "Pick the full period you want reviewed and export it as CSV or Excel.",
+                    "Upload it as it is: nothing needs changing when the columns carry common "
+                    "names in English, Spanish, Portuguese, French, German or Italian.",
+                ),
+                upload="In the field 'Your platform report'.",
+                tips=(
+                    "With one row per fill, buys and sells are paired per symbol first in, "
+                    "first out; positions still open at the end are left out and the report "
+                    "says so.",
+                    "A profit column, when there is one, gives each contract's value per "
+                    "point. Without it the result is the price move times the quantity, so add "
+                    "a Multiplier column for futures or options.",
+                    "Fees charged in another coin (BNB on a USDT pair, for example) are left "
+                    "out of the costs and the report says so.",
+                    "The report shows which column was read as what. If one is missing, the "
+                    "error message names it and lists the columns it found.",
+                    _BALANCE_EN,
                     _FLOATING_EN,
                 ),
             ),
