@@ -344,3 +344,21 @@ def test_an_error_with_a_fix_puts_the_fix_on_its_own_line() -> None:
     )
     assert "<b>What to do:</b> Upload the optimisation" in en
     assert find_claims(es) == [] and find_claims(en) == []
+
+
+def test_long_key_figures_step_down_to_fit_a_phone_tile() -> None:
+    from quant_trade.audit.report import KPI_CSS, render_html
+    from quant_trade.audit.sample import sample_result
+    from quant_trade.audit.schema import AuditResult
+
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    data["performance"]["total_return"]["value"] = 1911.36
+    page = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
+    assert "<div class='kpi  long'><b>+191,136.0%</b>" in page
+    assert "<div class='kpi good long'><b>+3,472.25</b>" in page
+    assert "class='kpi  long'><b>500 · 55%" not in page
+    assert "<div class='tscroll'><table>" in page
+    assert ".kpi.long b{font-size:" in KPI_CSS and ".kpi.xlong b{font-size:" in KPI_CSS
+    data["performance"]["total_return"]["value"] = 100000.046
+    huge = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
+    assert "<div class='kpi  xlong'><b>+10,000,004.6%</b>" in huge
