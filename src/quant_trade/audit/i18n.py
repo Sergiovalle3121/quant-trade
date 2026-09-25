@@ -1062,6 +1062,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "under a year of history; annualising it would exaggerate",
         "menos de un año de historial; anualizarlo lo exageraría",
     ),
+    (
+        "no losing period; downside deviation is zero",
+        "ningún periodo en pérdida; la desviación a la baja es cero",
+    ),
     ("no variants uploaded", "no se subió la matriz de variantes"),
     ("fewer than ten returns", "menos de diez retornos"),
     (
