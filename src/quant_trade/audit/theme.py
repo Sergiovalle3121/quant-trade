@@ -399,8 +399,8 @@ line-height:1;font-variant-numeric:tabular-nums}
 .platforms{padding:clamp(40px,5vw,64px) 0 0;text-align:center}
 .platforms p{font:500 .7rem var(--mono);letter-spacing:.14em;text-transform:uppercase;
 color:var(--text-3);margin:0 0 22px}
-.platforms ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;
-gap:14px 40px}
+.platforms ul{list-style:none;margin:0 auto;padding:0;display:flex;flex-wrap:wrap;justify-content:center;
+gap:14px 40px;max-width:880px}
 .platforms li{font-weight:600;font-size:1.1rem;letter-spacing:-.03em;color:var(--text-3);
 transition:color .3s}
 .platforms li:hover{color:var(--text)}
@@ -915,6 +915,9 @@ color:var(--text-3);margin-bottom:6px}
 .badge-preview{padding:32px;border-radius:var(--r-lg);background:#fff;text-align:center;
 box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .copy-row{display:flex;justify-content:flex-end;margin-top:10px}
+.guide-group+.guide-group{margin-top:clamp(48px,6vw,72px)}
+.guide-group h2{font-size:1.5rem;font-weight:620;letter-spacing:-.035em;margin:0 0 6px}
+.guide-group>p{color:var(--text-2);margin:0 0 22px}
 .guide-list{list-style:none;padding:0;margin:0;display:grid;gap:14px;
 grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:700px){.guide-list{grid-template-columns:minmax(0,1fr)}}

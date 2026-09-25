@@ -2006,6 +2006,23 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
     return _page(title, locale, body, meta_html=meta, switch_href=method_url(other), solid_nav=True)
 
 
+#: Guides for an account's history rather than a backtest, listed apart on /guias.
+ACCOUNT_GUIDES = frozenset({"cuenta-proveedor", "myfxbook", "mql5-signal", "fxblue"})
+_GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+    "es": (
+        ("Backtests", "Informes del probador de estrategias y listas de operaciones."),
+        (
+            "Cuentas reales",
+            "El historial de una cuenta, la tuya o la de alguien a quien vas a copiar.",
+        ),
+    ),
+    "en": (
+        ("Backtests", "Strategy tester reports and trade lists."),
+        ("Live accounts", "An account's history, yours or that of someone you plan to copy."),
+    ),
+}
+
+
 def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     """The list of export guides."""
     locale = _locale(locale)
@@ -2020,12 +2037,22 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
         guides_index_url(locale),
         base_url,
     )
-    items = "".join(
-        f"<li data-reveal style='--i:{i % 2}'><a href='{_e(guide_url(g.slug, locale))}'>"
-        f"<b>{_e(g.text[locale].title)}{icon('arrow')}</b>"
-        f"<span>{_e(g.text[locale].summary)}</span></a></li>"
-        for i, g in enumerate(GUIDES)
-    )
+    groups = ""
+    for account, (title, lead) in (
+        (False, _GUIDE_GROUPS[locale][0]),
+        (True, _GUIDE_GROUPS[locale][1]),
+    ):
+        chosen = [g for g in GUIDES if (g.slug in ACCOUNT_GUIDES) == account]
+        items = "".join(
+            f"<li data-reveal style='--i:{i % 2}'><a href='{_e(guide_url(g.slug, locale))}'>"
+            f"<b>{_e(g.text[locale].title)}{icon('arrow')}</b>"
+            f"<span>{_e(g.text[locale].summary)}</span></a></li>"
+            for i, g in enumerate(chosen)
+        )
+        groups += (
+            f"<section class='guide-group'><h2>{_e(title)}</h2><p>{_e(lead)}</p>"
+            f"<ul class='guide-list guides'>{items}</ul></section>"
+        )
     crumbs = (
         f"<a href='/?lang={_e(locale)}'>{_e(words['back'])}</a><span>/</span>"
         f"<a href='{_e(guides_index_url(other))}' hreflang='{other}'>{_other_name(locale)}</a>"
@@ -2033,7 +2060,7 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     body = (
         _page_hero(ui["guides_eyebrow"], words["title"], words["intro"], crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
-        f"<ul class='guide-list guides'>{items}</ul><div class='back-row'>"
+        f"{groups}<div class='back-row'>"
         f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(words['form'])}"
         f"<span class='go'>{icon('arrow')}</span></a></div></div></div>"
     )
