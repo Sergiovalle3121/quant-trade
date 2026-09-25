@@ -668,19 +668,32 @@ def mapping_page(
     words = COPY[locale]
     form_copy = _COPY[locale]
     labels: Mapping[str, str] = form_copy["map_roles"]
-    picked = dict(guessed(table))
-    # A date and a balance column, as on a curve: both fields preselected.
-    for role, name in results_guess(table, with_result=False).items():
-        picked.setdefault(role, name)
+    guess = guessed(table)
+    curve_guess = results_guess(table, with_result=False)
+    # With no price column the file is a list of results or balances: the
+    # two-field path comes first and alone is preselected (a "Volumen" column
+    # is not offered as a trade's quantity).
+    dates = sum(1 for name in table.names if _is_date(_example(table, name)))
+    simple = not any(role in guess for role in ("price", "entry_price", "exit_price")) and (
+        "balance" in curve_guess or dates < 2
+    )
+    if simple:
+        picked = dict(curve_guess)
+        if "balance" not in picked and "profit" in guess:
+            picked["profit"] = guess["profit"]
+    else:
+        picked = dict(guess)
+        for role, name in curve_guess.items():
+            picked.setdefault(role, name)
     picked.update(usable_mapping(chosen or {}, table))
-    groups = "".join(
+    trade_groups = "".join(
         f"<fieldset class='map-group'><legend>{_e(title)}</legend><div class='form-grid'>"
         + "".join(_select(role, labels[role], table, picked.get(role, ""), words) for role in roles)
         + "</div></fieldset>"
         for title, roles in form_copy["map_groups"]
     )
     curve_labels = {"date": words["role_date"], "balance": words["role_balance"]}
-    groups += (
+    curve_group = (
         f"<fieldset class='map-group'><legend>{_e(words['curve_group'])}</legend>"
         f"<p class='help'>{_e(words['curve_help'])}</p><div class='form-grid'>"
         + "".join(
@@ -689,6 +702,7 @@ def mapping_page(
         )
         + "</div></fieldset>"
     )
+    groups = curve_group + trade_groups if simple else trade_groups + curve_group
     hidden = "".join(
         f"<input type='hidden' name='{name}' value='{_e(value)}'>"
         for name, value in (carried or {}).items()

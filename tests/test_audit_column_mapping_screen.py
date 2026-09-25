@@ -438,3 +438,22 @@ def test_the_report_field_preselects_a_date_and_a_balance(tmp_path: Path) -> Non
 @pytest.mark.parametrize("cell", ["1.2.3", "1,,2", "1.234.56", "12.3.4.5"])
 def test_a_malformed_number_is_unreadable_not_guessed(cell: str) -> None:
     assert mapping._figures([cell, "5,5"], ",") == [None, 5.5]
+
+
+def test_a_sheet_without_prices_puts_the_two_field_path_first() -> None:
+    lines = ["Día;Saldo;Volumen;Beneficio diario"]
+    lines += [f"{day:02d}/03/2025;{10_000 + day * 7};{day % 4 + 1};7" for day in range(13, 29)]
+    table = mapping.read_table(("\n".join(lines) + "\n").encode())
+    assert table is not None
+    page = mapping.mapping_page(table, "problema")
+    curve_at = page.index("Si solo tienes fecha y resultado")
+    assert curve_at < page.index("Una fila por operación")
+    assert re.search(r"name='col_date'>.*?<option value='Día'[^>]* selected", page)
+    assert re.search(r"name='col_balance'>.*?<option value='Saldo'[^>]* selected", page)
+    assert not re.search(r"name='col_quantity'>[^/]*?selected", page.split("</select>")[0])
+    assert "value='Volumen' selected" not in page
+    # A trade list keeps the trade fields first.
+    trades = mapping.read_table(_journal())
+    assert trades is not None
+    listed = mapping.mapping_page(trades, "problema")
+    assert listed.index("Una fila por operación") < listed.index("Si solo tienes fecha")
