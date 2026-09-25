@@ -1951,7 +1951,7 @@ _ERROR_TITLES = {
 _EXPECTED_MARKERS = ("Se espera:", "Expected:")
 #: "...: sube la optimización del mismo robot" reads as the fix, so it gets its own line.
 _ACTION = re.compile(
-    r"[:;]\s+(?=(?:sube|vuelve|exp[oó]rta\w*|revisa|pide|upload|export|check|ask|re-export)\b)",
+    r"[:;]\s+(?=(?:sube|vuelve|exp[oó]rta\w*|revisa|pide|upload|export|check|ask|re-export|optimi[sz]e)\b)",
     re.I,
 )
 _ACTION_LABEL = {"es": "Qué hacer:", "en": "What to do:"}

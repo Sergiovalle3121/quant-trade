@@ -175,7 +175,7 @@ def test_every_web_error_is_spanish_by_default_and_passes_the_guard(tmp_path: Pa
     for key, texts in MESSAGES.items():
         assert set(texts) == {"es", "en"}, key
         for locale in ("es", "en"):
-            assert find_claims(message(key, locale, what="x", limit="1")) == [], key
+            assert find_claims(message(key, locale, what="x", limit="1", passes="1")) == [], key
 
 
 def test_the_audit_runs_off_the_event_loop(tmp_path: Path, monkeypatch) -> None:
