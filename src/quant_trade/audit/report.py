@@ -21,6 +21,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from quant_trade.audit import charts
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
+from quant_trade.audit.importers import lead_number
 from quant_trade.audit.legal import legal_links_html
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
@@ -1469,7 +1470,14 @@ READING_CHECKS: tuple[tuple[str, str, float, bool], ...] = (
 
 
 def _lead_number(text: object) -> float | None:
-    """The first number in a platform figure such as ``'1 279.20 (38.80%)'``."""
+    """The first number in a platform figure such as ``'1 279.20 (38.80%)'``.
+
+    Read as the importers read it, so ``'1 279,20'`` from a terminal set to
+    Spanish or Portuguese is 1279.20 too.
+    """
+    number = lead_number(str(text or ""))
+    if number is not None:
+        return number
     match = re.match(r"\s*(-?[\d\s]+(?:\.\d+)?)", str(text or ""))
     if not match:
         return None
