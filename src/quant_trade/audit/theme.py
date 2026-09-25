@@ -906,6 +906,27 @@ color:#fff;font-variant-numeric:tabular-nums}
 .paybox.buy .btn{gap:10px}.paybox.buy .btn svg{width:18px;height:18px;flex:none}
 .pay-secure{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;font-size:.85rem}
 .pay-secure svg{width:15px;height:15px;flex:none;margin-top:3px}
+.buy-incl,.lockbox .buy-incl{flex:1 1 100%;list-style:none;margin:2px 0 0;padding:16px 0 0;border-top:1px solid var(--border-2);
+display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px}
+.lockbox .buy-incl li::before{content:none}
+.lockbox .buy-incl li{padding:0;display:flex;gap:9px;align-items:flex-start;color:var(--text-2);font-size:.88rem;line-height:1.45}
+.buy-incl svg{width:15px;height:15px;flex:none;margin-top:2px;color:#4ade80}
+@media (max-width:620px){.buy-incl,.lockbox .buy-incl{grid-template-columns:minmax(0,1fr)}}
+ol.caps{list-style:none;padding:0!important;margin:18px 0 10px;display:grid;
+grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cap{background:#fff;border:1px solid var(--border);border-radius:18px;padding:18px 20px;
+display:flex;flex-direction:column;gap:4px;min-width:0}
+.cap-lim{font:500 .7rem/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.cap-lim b{color:var(--text);font-weight:600}
+.cap-money{font-size:1.7rem;font-weight:640;letter-spacing:-.04em;font-variant-numeric:tabular-nums;
+margin-top:8px;overflow-wrap:anywhere}
+.cap-sub{color:var(--text-2);font-size:.82rem;line-height:1.4}
+.cap-size{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);color:var(--text-2);
+font-size:.82rem;line-height:1.4}
+.cap-size b{display:block;font-size:1.15rem;font-weight:620;color:var(--text);font-variant-numeric:tabular-nums}
+@media (max-width:900px){ol.caps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:400px){.cap{padding:16px}.cap-money{font-size:1.4rem}}
+@media print{ol.caps{display:block}.cap{display:inline-block;vertical-align:top;width:22.5%;margin:0 1.5% 8px 0;padding:10px 12px;break-inside:avoid}.cap-lim,.cap-money,.cap-sub,.cap-size,.cap-size b{display:block}.cap-money{font-size:14pt!important;margin:6px 0 2px}}
 .paybox.pay-alt{padding:14px 18px}
 .pay-alt a{display:inline-flex;align-items:center;gap:10px;color:var(--text-2);font-weight:500;text-decoration:none}
 .pay-alt a:hover{color:#fff}
