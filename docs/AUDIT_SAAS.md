@@ -1111,6 +1111,13 @@ undeclared trial count reads "—" and not "None".
 On phones the deposit list in "El dinero real de la cuenta" also reads as cards.
 In the PDF, fact cards sit three to a row.
 
+"¿Pico aislado o meseta?" answers its question under its two key figures:
+a green "Meseta" callout, or an amber "Pico aislado" callout that points to the red flag.
+On a lone peak those two figures and the losing neighbours show in red.
+The chosen settings read as chips.
+The capital warning for a history under a year is an amber callout.
+On desktop the upload form pairs the language and access-code fields, so no field sits alone.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

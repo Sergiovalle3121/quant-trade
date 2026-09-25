@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 
 from quant_trade.audit.engine import run_audit
-from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import parse_optimization
 from quant_trade.audit.plateau import parameter_stability
-from quant_trade.audit.report import render
+from quant_trade.audit.report import LABELS, render
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 
 FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
@@ -141,3 +141,20 @@ def test_result_column_is_never_read_as_profit() -> None:
     )
     assert review["status"] == "NOT_MEASURED" and flags == []
     assert "Result column is the optimisation criterion" in review["reason"]
+
+
+def test_section_answers_its_question_up_front() -> None:
+    from quant_trade.audit.report import _plateau_html
+
+    labels = LABELS["es"]
+    peak = _plateau_html(_review(_peak)[0], labels)
+    assert "<span class='param'>FastMA <b>12</b></span>" in peak
+    assert "<div class='fact neg'>" in peak and "class='val neg'" in peak
+    assert "lv-WEAK" in peak and labels["plateau_badge_peak"] in peak
+    # The verdict sits under the two key figures, before the neighbour table.
+    assert peak.index("live-verdict") < peak.index("<table class='metrics neighbours'>")
+    flat = _plateau_html(_review(_plateau)[0], labels)
+    assert "lv-PASS" in flat and "<div class='fact'>" in flat and "fact neg" not in flat
+    for locale in ("es", "en"):
+        for key in ("plateau_peak", "plateau_badge_peak", "plateau_badge_clean"):
+            assert find_claims(LABELS[locale][key]) == []
