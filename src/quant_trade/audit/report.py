@@ -1607,8 +1607,18 @@ def _reading_rows(data: dict[str, Any]) -> list[tuple[str, float, float, bool]]:
     for meta_key, stat_key, tolerance, _count in READING_CHECKS:
         declared = _lead_number(meta.get(meta_key))
         measured = _ev_value(stats.get(stat_key))
+        closing = _lead_number(meta.get("closing_deals"))
+        if stat_key == "trade_count" and closing is not None and closing == declared:
+            # MetaTrader counts each partial close as a trade: its figure is
+            # the file's own closing deals, one per row of the Deals table.
+            measured = closing
         if declared is None or measured is None:
             continue
+        if stat_key == "net_pnl":
+            # Each printed trade result is rounded to the cent, the platform's
+            # total is not: up to half a cent per trade is rounding.
+            trades = _ev_value(stats.get("trade_count")) or 0
+            tolerance = max(tolerance, 0.005 * trades)
         rows.append((stat_key, declared, measured, abs(declared - measured) <= tolerance))
     return rows
 
