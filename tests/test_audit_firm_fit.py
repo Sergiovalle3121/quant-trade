@@ -166,3 +166,29 @@ def test_figures_are_capped_and_open_losses_repeat_the_warning() -> None:
     assert LABELS["es"]["ff_optimistic"] in html
     for key in ("ff_optimistic", "ff_all_pass", "ff_all_fail", "ff_risk_none"):
         assert find_claims(LABELS["es"][key]) == [] and find_claims(LABELS["en"][key]) == []
+
+
+def test_the_chosen_firm_row_shows_its_own_section_figure() -> None:
+    result = run_audit(
+        build_inputs(_daily_csv(), DeclaredMetadata(locale="es", challenge="ftmo-1step")),
+        bootstrap_samples=3000,
+    )
+    assert result.challenge is not None
+    row = next(r for r in result.challenge["firm_fit"]["firms"] if r["keys"] == ["ftmo-1step"])
+    section = result.challenge["probability"]["pass"]["value"]
+    assert row["pass"]["value"] == pytest.approx(section)
+
+
+def test_shares_never_round_to_all_or_nothing() -> None:
+    from quant_trade.audit.report import _share_pct
+
+    assert _share_pct(0.998) == ">99%"
+    assert _share_pct(1.0) == "100%"
+    assert _share_pct(0.003) == "<1%"
+    assert _share_pct(0.0) == "0%"
+    assert _share_pct(0.42) == "42%"
+
+
+def test_all_fail_says_almost_none() -> None:
+    assert "1 %" in LABELS["es"]["ff_all_fail"] and "casi" in LABELS["es"]["ff_all_fail"]
+    assert "almost no" in LABELS["en"]["ff_all_fail"]

@@ -600,6 +600,26 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_bench_gross": (
             "Si las cifras del fondo son antes de comisiones, esta comparación lo favorece."
         ),
+        "fund_fees": "¿Cuánto se llevarían las comisiones?",
+        "fund_fees_intro": (
+            "Las cifras no se declararon netas de comisiones. Así quedaría el mismo historial "
+            "con las comisiones anuales habituales de un fondo activo, descontadas mes a mes."
+        ),
+        "fund_fees_rate": "Comisión anual",
+        "fund_fees_cagr": "Rentabilidad anual",
+        "fund_fees_growth": "Crecimiento total",
+        "fund_fees_none": "Sin comisión",
+        "fund_fees_management": (
+            "Solo comisión de gestión. Muchos fondos cobran además una comisión de éxito, a "
+            "menudo el 20 % de las ganancias, así que el 2.5 % no es el peor caso."
+        ),
+        "fund_fees_break_even": (
+            "Con una comisión de {rate} al año o más, el fondo habría quedado igual o por "
+            "debajo de su índice en los meses en común."
+        ),
+        "fund_fees_behind": (
+            "El fondo ya queda por debajo de su índice antes de cualquier comisión."
+        ),
         "fund_bench_excess": "Diferencia anual frente al índice (fondo {fund}, índice {index})",
         "fund_bench_beat": "Meses en que superó al índice",
         "fund_bench_te": "Error de seguimiento anual (ratio de información {ir})",
@@ -980,8 +1000,8 @@ LABELS: dict[str, dict[str, str]] = {
             "simulaciones: sus reglas no los distinguen."
         ),
         "ff_all_fail": (
-            "Con este historial ningún programa se pasa en las simulaciones; lo que más lo "
-            "impide es {risk}."
+            "Con este historial casi ningún programa se pasa (1 % de las simulaciones o "
+            "menos); lo que más lo impide es {risk}."
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
@@ -1463,6 +1483,24 @@ LABELS: dict[str, dict[str, str]] = {
             "From {first} to {last}, {n} months shared with the benchmark file you uploaded."
         ),
         "fund_bench_gross": ("If the fund's figures are before fees, this comparison flatters it."),
+        "fund_fees": "How much would fees take?",
+        "fund_fees_intro": (
+            "The figures were not declared net of fees. This is the same history with the "
+            "yearly fees an active fund commonly charges, taken out month by month."
+        ),
+        "fund_fees_rate": "Yearly fee",
+        "fund_fees_cagr": "Yearly return",
+        "fund_fees_growth": "Total growth",
+        "fund_fees_none": "No fee",
+        "fund_fees_management": (
+            "Management fees only. Many funds also take a performance fee, often 20 % of "
+            "gains, so the 2.5 % row is not the worst case."
+        ),
+        "fund_fees_break_even": (
+            "At a fee of {rate} a year or more, the fund would have ended level with or below "
+            "its benchmark over the months they share."
+        ),
+        "fund_fees_behind": "The fund already trails its benchmark before any fee.",
         "fund_bench_excess": "Annual difference against the benchmark (fund {fund}, index {index})",
         "fund_bench_beat": "Months it beat the benchmark",
         "fund_bench_te": "Annual tracking error (information ratio {ir})",
@@ -1833,8 +1871,8 @@ LABELS: dict[str, dict[str, str]] = {
             "rules do not tell them apart."
         ),
         "ff_all_fail": (
-            "With this history no program passes in the simulations; what stops it most is "
-            "{risk}."
+            "With this history almost no program passes (1 % of the simulations or less); "
+            "what stops it most is {risk}."
         ),
         "ff_phases": "{n} phases",
         "ff_phase": "1 phase",
@@ -3211,7 +3249,7 @@ def _challenge_html(
         if best_day.get("breach_share_of_passes"):
             share = float(best_day["breach_share_of_passes"]["value"])
             html_text += (
-                f"<p>{_e(labels['best_day_line'].format(share=f'{share:.0%}'))} "
+                f"<p>{_e(labels['best_day_line'].format(share=_share_pct(share)))} "
                 f"{_badge('MEASURED')}</p>"
             )
     notes = rules.get("notes") or []
@@ -3231,6 +3269,16 @@ def _challenge_html(
 
 def _phases(count: int, labels: dict[str, str]) -> str:
     return labels["ff_phase"] if count == 1 else labels["ff_phases"].format(n=count)
+
+
+def _share_pct(value: float) -> str:
+    """A share rounded to whole percent that never rounds to all or nothing
+    when it is not."""
+    if 0.995 <= value < 1:
+        return ">99%"
+    if 0 < value < 0.005:
+        return "<1%"
+    return f"{value:.0%}"
 
 
 def _firm_pct(value: float) -> str:
@@ -4617,6 +4665,7 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
     out += _fund_benchmark_html(fund, locale, labels)
+    out += _fund_fees_html(fund.get("fees"), labels)
     out += f"<h3>{_e(labels['fund_stress'])}</h3>" if _crises_shown(fund.get("crises")) else ""
     out += _crises_html(fund.get("crises"), labels, fund=True)
     if fund.get("net_of_fees"):
@@ -4698,6 +4747,44 @@ def _crises_html(
             )
             + f" {_badge('MEASURED')}</p>"
         )
+    return out
+
+
+def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """The record under common yearly fees, when it was not declared net."""
+    if not fees or fees.get("status") != "MEASURED":
+        return ""
+    gross_growth = fees.get("gross_growth")
+    gross = _fund_pct(float(gross_growth["value"])) if gross_growth else "—"
+    first = (
+        f"<tr><td>{_e(labels['fund_fees_none'])}</td>"
+        f"<td class='val'>{_e(_fund_pct(float(fees['gross_cagr']['value'])))}</td>"
+        f"<td class='val'>{_e(gross)}</td></tr>"
+    )
+    body = first + "".join(
+        f"<tr><td>{float(row['rate']) * 100:.1f} %</td>"
+        f"<td class='val'>{_e(_fund_pct(float(row['cagr']['value'])))}</td>"
+        f"<td class='val'>{_e(_fund_pct(float(row['growth']['value'])))}</td></tr>"
+        for row in fees.get("rows") or []
+    )
+    out = (
+        f"<h3>{_e(labels['fund_fees'])}</h3>"
+        f"<p class='muted'>{_e(labels['fund_fees_intro'])} {_badge('MEASURED')}</p>"
+        f"<table class='timing'><thead><tr><th>{_e(labels['fund_fees_rate'])}</th>"
+        f"<th class='val'>{_e(labels['fund_fees_cagr'])}</th>"
+        f"<th class='val'>{_e(labels['fund_fees_growth'])}</th></tr></thead>"
+        f"<tbody>{body}</tbody></table>"
+        f"<p class='muted'>{_e(labels['fund_fees_management'])}</p>"
+    )
+    break_even = fees.get("break_even")
+    if break_even:
+        rate = float(break_even["value"])
+        text = (
+            labels["fund_fees_break_even"].format(rate=f"{rate * 100:.1f} %")
+            if rate > 0
+            else labels["fund_fees_behind"]
+        )
+        out += f"<p>{_e(text)} {_badge('MEASURED')}</p>"
     return out
 
 

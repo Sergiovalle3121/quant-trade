@@ -790,7 +790,7 @@ def _challenge(inputs: AuditInputs, *, samples: int, seed: int) -> dict[str, Any
         out["reason"] = result["probability"]["pass"]["note"]
     else:
         out["firm_fit"] = firmfit_lib.firm_fit(
-            daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed
+            daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed, known={key: result}
         )
     return out
 
@@ -1017,6 +1017,10 @@ def run_audit(
         fund["track_record"] = fund_record(inputs)
     if fund.get("status") == "MEASURED" and net_of_fees(inputs):
         fund["net_of_fees"] = declared(True, NET_OF_FEES_NOTE)
+    elif fund.get("status") == "MEASURED" and fund_record(inputs):
+        fund["fees"] = fund_lib.fee_drag(
+            fund_lib.monthly_returns(inputs.equity.frame), fund.get("benchmark")
+        )
     # A fund record shows the crises in its own section; any other dated
     # curve (a backtest, a trade history) gets them on their own.
     crises = (
