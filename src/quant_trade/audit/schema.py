@@ -544,6 +544,7 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
             side is None
             or pd.isna(t_in)
             or pd.isna(t_out)
+            or t_out < t_in
             or not all(math.isfinite(v) for v in (qty, price_in, price_out))
         ):
             invalid += 1
