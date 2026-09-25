@@ -112,21 +112,27 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Too many audits from this address in the last hour; try again later.",
     },
     "too_large": {
-        "es": "El archivo {what} supera el límite de {limit} bytes.",
-        "en": "The {what} file exceeds {limit} bytes.",
+        "es": (
+            "El archivo {what} pesa más de {limit}, el máximo que aceptamos: sube una versión "
+            "más pequeña (por ejemplo, un periodo más corto o menos pasadas de optimización)."
+        ),
+        "en": (
+            "The {what} file is larger than {limit}, the most we accept: upload a smaller "
+            "version (for example a shorter period or fewer optimisation passes)."
+        ),
     },
     "optimization_too_large": {
         "es": (
-            "El XML de optimización supera el límite de {limit} bytes (unas {passes} pasadas). "
-            "Vuelve a optimizar con el algoritmo genético o con rangos de parámetros más "
-            "cortos y exporta de nuevo. También puedes subir el informe sin el XML y "
-            "escribir el número de pasadas en «Configuraciones probadas»."
+            "El XML de optimización pesa más de {limit} (unas {passes} pasadas), el máximo que "
+            "aceptamos: vuelve a optimizar con el algoritmo genético o con rangos de "
+            "parámetros más cortos y exporta de nuevo. También puedes subir el informe "
+            "sin el XML y escribir el número de pasadas en «Configuraciones probadas»."
         ),
         "en": (
-            "The optimisation XML exceeds {limit} bytes (about {passes} passes). Optimise "
-            "again with the genetic algorithm or narrower parameter ranges and export it "
-            "again. You can also upload the report without the XML and type the number of "
-            'passes in "Configurations tried".'
+            "The optimisation XML is larger than {limit} (about {passes} passes), the most we "
+            "accept: optimise again with the genetic algorithm or narrower parameter "
+            "ranges and export it again. You can also upload the report without the "
+            'XML and type the number of passes in "Configurations tried".'
         ),
     },
     "equity_required": {
@@ -207,16 +213,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Código de acceso aplicado: este es el informe completo.",
         "en": "Access code applied: this is the full report.",
     },
-    "code_rejected": {
-        "es": (
-            "No se pudo aplicar el código de acceso (no válido, agotado o caducado). "
-            "Esta es la vista previa."
-        ),
-        "en": (
-            "The access code could not be applied (invalid, used up or expired). "
-            "This is the preview."
-        ),
-    },
     "codes_disabled": {
         "es": "Este servicio no acepta códigos de acceso.",
         "en": "This service does not accept access codes.",
@@ -253,8 +249,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         ),
     },
     "body_too_large": {
-        "es": "La petición supera el tamaño máximo de {limit} bytes.",
-        "en": "The request exceeds the maximum size of {limit} bytes.",
+        "es": (
+            "La subida pesa más de {limit} en total, el tamaño máximo que aceptamos: sube menos "
+            "archivos a la vez o versiones más pequeñas."
+        ),
+        "en": (
+            "The upload is larger than {limit} in total, the maximum size we accept: upload "
+            "fewer files at once or smaller versions."
+        ),
     },
     "publish_locked": {
         "es": "Solo se puede publicar la verificación de un informe completo.",
@@ -334,6 +336,13 @@ UPLOAD_NAMES: dict[str, dict[str, str]] = {
     "optimization": {"es": "de optimización", "en": "optimisation"},
     "live": {"es": "de la cuenta real", "en": "live statement"},
 }
+
+
+def _megabytes(size: int) -> str:
+    """A byte limit as a customer reads it: 8 MB, 1.5 MB, 500 KB."""
+    if size >= 1_000_000:
+        return f"{size / 1_000_000:.1f}".rstrip("0").rstrip(".") + " MB"
+    return f"{max(size // 1000, 1)} KB"
 
 
 def message(key: str, locale: str, **values: Any) -> str:
@@ -781,7 +790,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _too_large_response(scope: Any) -> Any:
         locale = _scope_locale(scope)
-        text = message("body_too_large", locale, limit=f"{body_limit:,}")
+        text = message("body_too_large", locale, limit=_megabytes(body_limit))
         accept = dict(scope.get("headers") or []).get(b"accept", b"").decode("latin-1")
         response: Any
         if "application/json" in accept:
@@ -1107,10 +1116,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if exc.what == "optimization":
                 count = limit // OPTIMIZATION_PASS_BYTES
                 passes = f"{round(count, -3) if count >= 1_000 else count:,}"
-                text = message("optimization_too_large", loc, limit=f"{limit:,}", passes=passes)
+                text = message(
+                    "optimization_too_large", loc, limit=_megabytes(limit), passes=passes
+                )
             else:
                 text = message(
-                    "too_large", loc, what=UPLOAD_NAMES[exc.what][loc], limit=f"{limit:,}"
+                    "too_large", loc, what=UPLOAD_NAMES[exc.what][loc], limit=_megabytes(limit)
                 )
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:
@@ -1200,6 +1211,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if code:
                 body["access_code"] = "applied" if paid else "rejected"
             return JSONResponse(body, status_code=201)
+        if code and not paid:
+            # Open the preview at the code field, where the refusal and its fix are shown.
+            location += "#canjear"
         return RedirectResponse(location, status_code=303)
 
     def _load(audit_id: str, token: str | None) -> Any:
@@ -1210,7 +1224,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise HTTPException(status_code=410, detail="purged")
         return record
 
-    def _report_html(record: Any, token: str, locale: str, *, notice: str | None = None) -> str:
+    def _report_html(
+        record: Any,
+        token: str,
+        locale: str,
+        *,
+        notice: str | None = None,
+        code_error: bool = False,
+        notice_ok: bool = False,
+    ) -> str:
         result = AuditResult.model_validate_json(record.result_json)
         unlockable = not record.paid and cfg.stripe_enabled
         redeemable = not record.paid and cfg.access_codes_enabled
@@ -1234,6 +1256,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pack_price_usd=cfg.pack_price_usd if (redeemable or unlockable) else 0.0,
             pack_code=pack_code,
             pack_credits_left=pack_left,
+            code_error=code_error and not record.paid,
+            notice_ok=notice_ok and record.paid,
             legal_links=True,
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
@@ -1319,9 +1343,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = message("card_cancelled", locale)
         elif code == "applied" and record.paid:
             notice = message("code_applied", locale)
-        elif code == "rejected" and not record.paid:
-            notice = message("code_rejected", locale)
-        return _report_html(record, token or "", locale, notice=notice)
+        # A rejected code is answered next to the code field, not in this banner.
+        code_error = code == "rejected" and not record.paid
+        return _report_html(
+            record,
+            token or "",
+            locale,
+            notice=notice,
+            code_error=code_error,
+            notice_ok=record.paid and notice is not None,
+        )
 
     def _confirm_card_payment(record: Any, session_id: str) -> Any:
         """Back from Stripe: ask Stripe about that session and unlock what it paid.

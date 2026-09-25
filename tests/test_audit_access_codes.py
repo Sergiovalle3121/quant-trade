@@ -221,9 +221,9 @@ def test_an_upload_with_a_code_is_born_paid(tmp_path: Path) -> None:
     assert find_claims(page.text) == []
     # The credit is spent: the same code now yields a preview.
     second = _upload(client, access_code=code)
-    assert second.headers["location"].endswith("&code=rejected")
+    assert second.headers["location"].endswith("&code=rejected#canjear")
     preview = client.get(second.headers["location"])
-    assert "class='lockbox'" in preview.text and "No se pudo aplicar el código" in preview.text
+    assert "class='lockbox'" in preview.text and "Ese código no desbloqueó" in preview.text
     assert "/redeem?token=" in preview.text
     assert find_claims(preview.text) == []
     # A client without a working code is told where to buy one, and the price.
@@ -329,3 +329,35 @@ def test_every_buy_box_lists_what_the_payment_unlocks(tmp_path: Path) -> None:
     assert "Reembolso" in included
     assert find_claims(included) == []
     assert find_claims(LABELS["en"]["buy_includes"]) == []
+
+
+@pytest.mark.parametrize(
+    ("lang", "error", "done"),
+    [
+        ("es", "Ese código no desbloqueó el informe", "Código de acceso aplicado"),
+        ("en", "That code did not unlock the report", "Access code applied"),
+    ],
+)
+def test_a_wrong_code_is_answered_at_the_field_and_a_right_one_in_green(
+    tmp_path: Path, lang: str, error: str, done: str
+) -> None:
+    client, store = _selling_client(tmp_path)
+    location = _upload(client, locale=lang).headers["location"]
+    audit_id = location.split("/audits/")[1].split("?")[0]
+    token = location.split("token=")[1].split("&")[0]
+    page = client.get(f"/audits/{audit_id}?token={token}&lang={lang}&code=rejected").text
+    # The refusal sits under the code field, says what to do, and marks the field.
+    form = page.split("id='canjear'", 1)[1].split("</form>", 1)[0]
+    assert "#canjear'" in page and "class='code-error'" in form and error in form
+    assert "aria-invalid='true' aria-describedby='redeem-error'" in form
+    assert "https://wa.me/000" in page  # the button the refusal points to
+    assert "class='notice" not in page
+    assert find_claims(page) == []
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    client.post(f"/audits/{audit_id}/redeem?token={token}", data={"code": code})
+    paid = client.get(f"/audits/{audit_id}?token={token}&lang={lang}&code=applied").text
+    assert "<div class='notice ok' role='status'>" in paid and done in paid
+    assert "class='code-error'" not in paid
+    # A stale "rejected" link on a paid report shows no refusal.
+    stale = client.get(f"/audits/{audit_id}?token={token}&lang={lang}&code=rejected").text
+    assert "class='code-error'" not in stale and "class='notice" not in stale
