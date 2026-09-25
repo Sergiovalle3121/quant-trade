@@ -889,3 +889,37 @@ def test_the_gate_buttons_sit_in_a_card() -> None:
 
 def test_a_long_price_note_drops_under_the_price() -> None:
     assert "@media screen{.price-amount{display:flex;flex-wrap:wrap;align-items:baseline" in STYLE
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_the_pdf_opens_on_a_one_page_summary_that_the_screen_never_shows(locale: str) -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+
+    result = sample_result(locale, bootstrap_samples=60)
+    page = render_html(result, watermark=False, free_mode=True, notice="Synthetic sample.")
+    cover = page.split("<section class='pdf-cover'>", 1)[1].split("</section>", 1)[0]
+    # The class ring is SVG (WeasyPrint draws no conic gradient), then the verdict's
+    # headline, every dimension with its badge, the key figures and the first steps.
+    assert "<svg class='pc-ring'" in cover and ">C</text>" in cover
+    assert cover.count('<span class="badge ') == 6
+    assert cover.count("<div class='pc-kpi ") == 4
+    assert 1 <= cover.count("<li>") - 6 <= 3
+    # A page notice (the sample's "synthetic data") repeats on the cover.
+    assert "<p class='pc-notice'>Synthetic sample.</p>" in cover
+    assert find_claims(re.sub(r"<[^>]+>", " ", cover)) == []
+    # Hidden on screen, one page of its own in print, with margins instead of flex gap.
+    assert ".pdf-cover,.ring-svg{display:none}" in STYLE
+    assert ".pdf-cover{display:block;break-after:page;page-break-after:always" in STYLE
+    assert "gap:" not in STYLE.split("@media print{.pdf-cover{", 1)[1].split("}}", 1)[0]
+    # A locked preview gets no cover: its figures stay behind the pay box.
+    locked = render_html(result, watermark=True, free_mode=False)
+    assert "class='pdf-cover'" not in locked
+
+
+def test_the_class_ring_has_an_svg_copy_for_print() -> None:
+    from quant_trade.audit.theme import class_ring
+
+    ring = class_ring("B", size="lg")
+    assert "<svg class='ring-svg'" in ring and "stroke-dasharray=" in ring
+    assert ".ring-lg .ring-svg{width:136px;height:136px}" in STYLE
