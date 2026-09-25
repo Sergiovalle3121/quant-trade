@@ -328,6 +328,7 @@ def test_assumptions_and_questions_pass_the_guard_in_both_languages() -> None:
         "NEGATIVE_PAYOFF_HIGH_WINRATE",
         "MAD_SPIKES",
         "ZERO_DECLARED_COSTS",
+        "REPORT_HEADER_MISMATCH",
     ]
     questions = analytics.vendor_questions(
         every_flag,
@@ -337,7 +338,7 @@ def test_assumptions_and_questions_pass_the_guard_in_both_languages() -> None:
         has_costs=False,
         balance_only=True,
     )
-    assert len(questions) == 12
+    assert len(questions) == 13
     _assert_clean(questions)
     for preset in PRESETS.values():
         _assert_clean(preset.to_dict())

@@ -377,6 +377,82 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "el historial; el balance no la muestra",
     ),
     (
+        "the test ran on control points: prices between those points were not simulated, so "
+        "stops, targets and intrabar exits may have filled where the market never let them",
+        "la prueba se hizo con puntos de control: los precios entre esos puntos no se "
+        "simularon, así que stops, objetivos y salidas dentro de la vela pueden haberse "
+        "llenado donde el mercado nunca lo permitió",
+    ),
+    (
+        "the test ran on open prices only: prices between those points were not simulated, "
+        "so stops, targets and intrabar exits may have filled where the market never let them",
+        "la prueba se hizo solo con precios de apertura: los precios entre esos puntos no se "
+        "simularon, así que stops, objetivos y salidas dentro de la vela pueden haberse "
+        "llenado donde el mercado nunca lo permitió",
+    ),
+    (
+        "the report states a data quality of {p}: part of the price history was missing or "
+        "generated",
+        "el informe declara una calidad de datos del {p}: parte del historial de precios "
+        "faltaba o era generado",
+    ),
+    (
+        "the header states {p} modelling quality with control points, which MT4 does not "
+        "print for that mode; ask for the original report file",
+        "el encabezado declara un {p} de calidad de modelado con puntos de control, algo que "
+        "MT4 no imprime en ese modo; pide el archivo original del informe",
+    ),
+    (
+        "the header states {p} modelling quality with open prices only, which MT4 does not "
+        "print for that mode; ask for the original report file",
+        "el encabezado declara un {p} de calidad de modelado con solo precios de apertura, "
+        "algo que MT4 no imprime en ese modo; pide el archivo original del informe",
+    ),
+    (
+        "{n} trade(s) fall outside the dates the header says were tested; ask for the "
+        "original report file",
+        "{n} operación(es) quedan fuera de las fechas que el encabezado dice que se probaron; "
+        "pide el archivo original del informe",
+    ),
+    (
+        "the tester's modelling mode, as printed in the report header",
+        "el modo de modelado del probador, tal como lo imprime el encabezado del informe",
+    ),
+    (
+        "share of the price history the tester had, as printed in the report header",
+        "parte del historial de precios que tuvo el probador, tal como lo imprime el "
+        "encabezado del informe",
+    ),
+    ("as printed in the report header", "tal como lo imprime el encabezado del informe"),
+    (
+        "as printed in the report header; 'Current' is the spread when the test ran",
+        "tal como lo imprime el encabezado del informe; 'Current' es el spread del momento "
+        "en que se hizo la prueba",
+    ),
+    (
+        "trades that open or close outside the dates the header says were tested",
+        "operaciones que abren o cierran fuera de las fechas que el encabezado dice que se "
+        "probaron",
+    ),
+    (
+        "the file is not a MetaTrader tester report",
+        "el archivo no es un informe del probador de MetaTrader",
+    ),
+    (
+        "the report does not state a modelling mode we recognise",
+        "el informe no indica un modo de modelado que reconozcamos",
+    ),
+    (
+        "the report prints no data quality (n/a)",
+        "el informe no imprime la calidad de datos (n/a)",
+    ),
+    ("the report prints no test window", "el informe no imprime las fechas de la prueba"),
+    (
+        "no test window or no trades to compare",
+        "no hay fechas de prueba u operaciones con las que comparar",
+    ),
+    ("the report does not print it", "el informe no lo imprime"),
+    (
         "the file is a backtest, not an account history",
         "el archivo es un backtest, no el historial de una cuenta",
     ),

@@ -69,7 +69,7 @@ def dimension_rows(locale: str, t: Thresholds = DEFAULT_THRESHOLDS) -> list[tupl
             (
                 "Is the data sound?",
                 f"{len(FLAG_TITLES)} red flags: duplicates, spikes, frozen marks, martingale, "
-                "grid, deposits and more.",
+                "grid, deposits, backtest modelling and more.",
                 "No red flag. A serious flag fails the dimension; a warning makes it weak.",
             ),
             (
@@ -111,7 +111,7 @@ def dimension_rows(locale: str, t: Thresholds = DEFAULT_THRESHOLDS) -> list[tupl
         (
             "¿Los datos están sanos?",
             f"{len(FLAG_TITLES)} banderas rojas: duplicados, saltos, valores congelados, "
-            "martingala, rejilla, depósitos y más.",
+            "martingala, rejilla, depósitos, modelado del backtest y más.",
             "Ninguna bandera. Una bandera grave hace que no supere; un aviso la deja en débil.",
         ),
         (

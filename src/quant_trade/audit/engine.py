@@ -31,6 +31,7 @@ from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import live as live_lib
 from quant_trade.audit import stress as stress_lib
+from quant_trade.audit import testdata as testdata_lib
 from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
@@ -777,6 +778,12 @@ def run_audit(
         )
         account["source"] = "live"
     account["flags"] = [flag.to_dict() for flag in account_flags]
+    test_data, test_data_flags = testdata_lib.review_test_data(
+        source_format=inputs.source_format,
+        metadata=inputs.report_metadata,
+        trades=inputs.trades,
+    )
+    flags.extend(test_data_flags)
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
     stress_tests = _stress(inputs, frame)
@@ -953,6 +960,7 @@ def run_audit(
         risk=risk,
         challenge=challenge,
         account=account,
+        test_data=test_data,
         vendor_questions=questions,
     )
 

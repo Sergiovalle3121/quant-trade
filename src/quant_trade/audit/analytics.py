@@ -543,6 +543,12 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "Which modelling mode and history quality was the backtest run with "
         "(real ticks, 1-minute OHLC, open prices only)?",
     },
+    "original_file": {
+        "es": "¿Puedes enviar el archivo original que exportó MetaTrader, sin editar, con el "
+        "encabezado y la lista completa de operaciones?",
+        "en": "Can you send the original file MetaTrader exported, unedited, with the header "
+        "and the full list of trades?",
+    },
     "trials": {
         "es": "¿Cuántas combinaciones de parámetros se probaron antes de elegir esta? "
         "Pide el archivo de optimización.",
@@ -617,6 +623,9 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "GAIN_INFLATED_BY_FLOWS": "deposits",
     "DEPOSIT_DURING_DRAWDOWN": "deposits",
     "FLOATING_LOSS_AT_END": "open_positions",
+    "COARSE_TICK_MODEL": "modelling",
+    "TEST_DATA_QUALITY_LOW": "modelling",
+    "REPORT_HEADER_MISMATCH": "original_file",
     "MAD_SPIKES": "data_quality",
     "STALE_MARKS": "data_quality",
     "LARGE_GAPS": "data_quality",
