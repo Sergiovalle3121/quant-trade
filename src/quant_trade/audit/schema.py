@@ -959,6 +959,8 @@ class AuditResult(BaseModel):
     #: The optimisation's back against forward results (``audit/forward.py``);
     #: None on older results.
     forward: dict[str, Any] | None = None
+    #: The recent third of the history against the earlier two (``audit/decay.py``).
+    recent: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

@@ -570,6 +570,27 @@ Limitations: one forward window, chosen by whoever ran the optimisation;
 the criterion is compared by rank, so a custom criterion works too; a
 genetic optimisation lists only the passes it evaluated.
 
+### Does it still work in the recent period (`audit/decay.py`)
+
+For buyers of a robot or a signal with a long history: "the total looks
+good, but does the last stretch still add up?". Needs at least 60 closed
+trades over at least two years. The span from the first entry to the last
+exit is cut in three equal stretches of time; the trades that exit in the
+last one are the recent period (at least 20), the rest the earlier one (at
+least 20). MEASURED for each period: trade count, net result after the fees
+the file itemises, average net per trade and hit rate; the Welch distance
+between the two averages in standard errors; and a table of each calendar
+year of exit (trades, net result, hit rate).
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `EDGE_FADING` | the earlier trades average a profit, the recent ones zero or a loss, and the recent average sits 2 or more standard errors below the earlier one | — |
+
+Limitations: the thirds are cut by time, so a history whose pace changed
+has periods of different sizes; trades are treated as independent, which
+understates the noise of a strategy whose trades cluster; it describes the
+history and says nothing about later periods.
+
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
 For anyone about to run or copy a strategy: "with my account, at what size

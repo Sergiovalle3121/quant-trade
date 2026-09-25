@@ -575,6 +575,12 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "What happened in the best trade (date, size, price), and what result does the "
         "system leave without it?",
     },
+    "recent_period": {
+        "es": "¿Qué cambió en el último tramo del historial, en el que las operaciones dejan de "
+        "sumar? ¿Se reoptimizó el sistema después?",
+        "en": "What changed in the last stretch of the history, where the trades stop adding "
+        "up? Was the system reoptimised afterwards?",
+    },
     "original_file": {
         "es": "¿Puedes enviar el archivo original que exportó MetaTrader, sin editar, con el "
         "encabezado y la lista completa de operaciones?",
@@ -661,6 +667,7 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "REPORT_HEADER_MISMATCH": "original_file",
     "ISOLATED_OPTIMUM": "out_of_sample",
     "FORWARD_NOT_HELD": "out_of_sample",
+    "EDGE_FADING": "recent_period",
     "MAD_SPIKES": "data_quality",
     "STALE_MARKS": "data_quality",
     "LARGE_GAPS": "data_quality",
