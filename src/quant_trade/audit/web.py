@@ -664,6 +664,8 @@ def _positive_or_none(value: str) -> float | None:
 
 def _valid_email(value: str) -> bool:
     value = value.strip()
+    if any(char.isspace() or not char.isprintable() for char in value):
+        return False
     return 3 <= len(value) <= _EMAIL_MAX and "@" in value and "." in value.rsplit("@", 1)[-1]
 
 
@@ -907,6 +909,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if (
                 1 <= total <= MAX_CREDITS
                 and len(clean_note) <= MAX_NOTE_CHARS
+                # A NUL or control character cannot be stored in PostgreSQL.
+                and clean_note.isprintable()
                 and (days is None or 1 <= days <= MAX_EXPIRES_DAYS)
             ):
                 new_code, _ = db.create_access_code(
