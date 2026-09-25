@@ -330,6 +330,17 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
             "even at a lower result, and check them on an out-of-sample stretch."
         ),
     },
+    "FORWARD_NOT_HELD": {
+        "es": (
+            "Las mejores pasadas del backtest no destacan con datos nuevos: optimiza menos "
+            "parámetros o con rangos más amplios, y elige una configuración que también "
+            "funcione en el periodo forward."
+        ),
+        "en": (
+            "The best backtest passes do not stand out on new data: optimise fewer parameters "
+            "or wider ranges, and pick settings that also work in the forward period."
+        ),
+    },
     "REPORT_HEADER_MISMATCH": {
         "es": (
             "Pide el archivo original que exporta MetaTrader, no una captura, y vuelve a "

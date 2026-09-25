@@ -30,6 +30,7 @@ import pandas as pd
 from quant_trade.audit import account as account_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
+from quant_trade.audit import forward as forward_lib
 from quant_trade.audit import live as live_lib
 from quant_trade.audit import plateau as plateau_lib
 from quant_trade.audit import sizing as sizing_lib
@@ -906,6 +907,12 @@ def run_audit(
         report_inputs=inputs.report_metadata.get("input_values"),
     )
     flags.extend(plateau_flags)
+    forward, forward_flags = forward_lib.forward_review(
+        inputs.optimization_table,
+        inputs.optimization_parameters,
+        report_inputs=inputs.report_metadata.get("input_values"),
+    )
+    flags.extend(forward_flags)
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
     stress_tests = _stress(inputs, frame)
@@ -1102,6 +1109,7 @@ def run_audit(
         test_data=test_data,
         capital=capital,
         plateau=plateau,
+        forward=forward,
         vendor_questions=questions,
     )
 

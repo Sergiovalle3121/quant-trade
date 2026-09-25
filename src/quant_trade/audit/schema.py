@@ -956,6 +956,9 @@ class AuditResult(BaseModel):
     #: The chosen settings against their neighbours in an MT5 optimisation
     #: export (``audit/plateau.py``); None on older results.
     plateau: dict[str, Any] | None = None
+    #: The optimisation's back against forward results (``audit/forward.py``);
+    #: None on older results.
+    forward: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

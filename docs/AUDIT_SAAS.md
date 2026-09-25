@@ -436,7 +436,7 @@ Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
 | `HIDDEN_FLOATING_DRAWDOWN` | a balance-only curve while positions overlapped | — |
 | `NEGATIVE_PAYOFF_HIGH_WINRATE` | ≥ 20 trades, win rate > 85 % and average loss ≥ 3x average win | — |
 | `NO_STOP_EVIDENCE` | ≥ 10 losses and the largest loss (or adverse excursion) ≥ 8x the average loss | — |
-| `PROFIT_CONCENTRATION` | ≥ 10 trades with a net gain after fees; the best 1, 2, 3 or 5 trades carry ≥ 33, 50, 65 or 80 % of the winning trades' total and removing them with as many worst losses takes ≥ 50 % of the net result | ≥ 20 trades; the best 1, 2 or 3 carry ≥ 50, 65 or 80 % and removing them with as many worst losses takes ≥ 80 % of the net result |
+| `PROFIT_CONCENTRATION` | ≥ 10 trades with a net gain after fees; the best 1, 2, 3 or 5 trades carry ≥ 33, 50, 65 or 80 % of the winning trades' total and removing them with as many worst losses takes ≥ 50 % of the net result | ≥ 20 trades (from 10, only one trade carrying ≥ 90 % of the gains and taking ≥ 90 % of the net result with it); the best 1, 2 or 3 carry ≥ 50, 65 or 80 % and removing them with as many worst losses takes ≥ 80 % of the net result |
 
 `PROFIT_CONCENTRATION` needs both conditions. The share of the winning trades'
 total keeps a thin net over many noisy trades from reading as concentration (on
@@ -531,6 +531,37 @@ Limitations: the profits are the optimiser's, not re-computed trades; a
 genetic or sparse optimisation may not have tried the neighbours (the
 section then shows them as NOT_MEASURED and raises nothing); only the MT5
 tester report's English "Inputs:" rows are matched.
+
+### Does it hold in the forward period (`audit/forward.py`)
+
+For buyers and developers of an optimised robot. MT5 can run every pass of
+an optimisation again on a later "forward" period the optimiser did not
+rank on; its forward export (Forward Results tab, Export to XML) has a
+"Forward Result" and a "Back Result" column for each pass (the criterion in
+the forward and in the main period, per the MT5 help and MQL5 article
+14549), and its Profit, Trades and other columns are the forward period's.
+The same upload field takes it; the plateau section then steps aside
+(NOT_MEASURED: its Profit would be the forward one). Needs at least 20
+passes. MEASURED from the rows: the Spearman rank correlation between back
+and forward results, how often the best tenth of the passes by back result
+(at least five) end the forward period with a profit against all passes,
+their median forward profits, and where the pass matching the tester
+report's inputs lands in the forward period.
+
+| Code | WARN | FAIL |
+|---|---|---|
+| `FORWARD_NOT_HELD` | ≥ 20 passes and a rank correlation ≤ 0, or the best backtest passes end the forward period with a profit less than half the time and no more often than all passes | — |
+
+The columns are matched by their English names. A file with two unknown
+columns between Pass and Profit (the forward layout, from a terminal in
+another language, for example) is not read as a plain export: both this
+section and the plateau section say NOT_MEASURED and ask for an export from a
+terminal set to English, because its Profit column would be the forward
+period's.
+
+Limitations: one forward window, chosen by whoever ran the optimisation;
+the criterion is compared by rank, so a custom criterion works too; a
+genetic optimisation lists only the passes it evaluated.
 
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
@@ -1224,6 +1255,10 @@ When capital is held back because the trades overlap as a grid or hide open loss
 Very large figures stay on the page: chart axes switch to T and then to powers of ten (2.0e18) and widen their left margin to fit the longest label, and in the PDF the monthly returns table shrinks its type, with the widest cells (+10,300,003.0%) set smaller still, so the Total column is never cut. When capital is held back because the trades lose in total, the grey card reads as one capitalised sentence.
 
 In the full report the red flags are cards, gravest first: severity badge, the flag's name in the customer's language, the detail as a sentence and the code in small type underneath (the old three-column table cut the detail off on phones). The "No medido" / "Not measured" list is one card with each check's name in bold over its reason. A not-measured section no longer adds "none" under its reason, the declared holdout seal names its rows in plain words, and a declared midnight date shows as the day (2024-06-03, not 2024-06-03T00:00:00Z). In the PDF a huge figure (95,766,086,888,191,808.00%) wraps inside its table cell instead of running off the page; label columns keep whole words.
+
+The report ends with one tidy footer: the notice card, the audit JSON fingerprint in small monospace type, then a single bar with the brand on the left and "Cómo auditamos", terms and privacy on the right (in the PDF the method link is dropped and the other two sit on one line).
+
+The landing's report mockup always settles flat and sharp: the hero clips with `overflow:clip` so the scroll-driven tilt follows the page scroll (with `overflow:hidden` the hero became its scroller and the mockup stayed tilted and soft), and the entrance fade no longer animates a blur. With reduced motion the mockup is flat from the start.
 
 ## Security
 

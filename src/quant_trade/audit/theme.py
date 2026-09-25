@@ -295,7 +295,7 @@ text-decoration:none;font-size:1rem;letter-spacing:-.01em}
 """
 
 HERO = """
-.hero{position:relative;overflow:hidden;padding:clamp(72px,11vw,148px) 0 0;isolation:isolate;
+.hero{position:relative;overflow:hidden;overflow:clip;padding:clamp(72px,11vw,148px) 0 0;isolation:isolate;
 text-align:center}
 .grid-bg{position:absolute;inset:0;z-index:-2;pointer-events:none;
 background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
@@ -315,7 +315,7 @@ background:radial-gradient(closest-side,rgba(255,255,255,.1),rgba(140,165,255,.0
 list-style:none;color:var(--text-3);font-size:.84rem}
 .trust li{display:flex;align-items:center;gap:8px}
 .trust svg{width:15px;height:15px;color:var(--text-2);flex:none}
-.rise{opacity:0;transform:translateY(22px);filter:blur(6px);animation:rise 1.1s var(--ease) forwards;
+.rise{opacity:0;transform:translateY(22px);animation:rise 1.1s var(--ease) forwards;
 animation-delay:calc(var(--i,0) * 90ms + 60ms)}
 .page-hero{position:relative;overflow:hidden;isolation:isolate;padding:clamp(56px,8vw,104px) 0
 clamp(48px,6vw,80px);border-bottom:1px solid var(--border)}
@@ -952,6 +952,11 @@ padding:26px 28px;border-radius:var(--r-lg);background:#fff;box-shadow:0 1px 2px
 margin:0 0 40px}
 .publish p{margin:0;max-width:40em}
 .report-foot{display:grid;gap:14px}
+.rf-sha{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;row-gap:4px;font-size:.8rem;color:var(--text-3)}.rf-sha code{font-size:.74rem;color:var(--text-2);background:none;padding:0;overflow-wrap:anywhere}
+.rf-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px;padding-top:16px;border-top:1px solid var(--border);font-size:.85rem;color:var(--text-2)}
+.rf-brand{margin:0}.rf-brand b{color:var(--text);font-weight:600}
+.rf-links{display:flex;flex-wrap:wrap;gap:4px 20px}.rf-links a{color:var(--text-2);text-decoration:none;display:inline-flex;align-items:center;min-height:44px}.rf-links a:hover{color:var(--text);text-decoration:underline}
+@media print{.rf-links{display:block}.rf-links a{display:inline;min-height:0;margin-left:16px}.rf-bar{padding-top:10px}}
 """
 
 VERIFY = """
@@ -1013,7 +1018,7 @@ MOTION = """
 [data-reveal]{transition:opacity 1.1s var(--ease),transform 1.1s var(--ease),filter 1.1s var(--ease);
 transition-delay:calc(var(--i,0) * 90ms)}
 .js [data-reveal]:not(.in){opacity:0;transform:translateY(32px);filter:blur(6px)}
-@keyframes rise{to{opacity:1;transform:none;filter:none}}
+@keyframes rise{to{opacity:1;transform:none}}
 @keyframes drop{from{opacity:0;transform:translateY(-8px)}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @keyframes on{to{opacity:1;color:#f4f4f6}}

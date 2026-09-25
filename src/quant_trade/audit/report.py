@@ -25,7 +25,7 @@ from quant_trade.audit.account import is_account_history
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
-from quant_trade.audit.legal import legal_links_html
+from quant_trade.audit.legal import LINK_TEXT, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
@@ -194,6 +194,27 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_badge_clean": "Meseta",
         "plateau_badge_peak": "Pico aislado",
+        "forward": "¿Aguanta en el periodo forward?",
+        "forward_intro": (
+            "MetaTrader puede probar las mismas configuraciones en un periodo posterior que el "
+            "optimizador no usó para elegir (forward). Comparamos el orden que da el backtest "
+            "con lo que pasa después en ese periodo."
+        ),
+        "forward_rank": (
+            "Correlación de rangos entre backtest y forward (1 = mismo orden, 0 = sin relación)."
+        ),
+        "forward_top": "De las {n} mejores pasadas del backtest terminan el forward con ganancia.",
+        "forward_all": "De todas las pasadas terminan el forward con ganancia.",
+        "forward_chosen": "De las demás pasadas quedan por debajo de la elegida en el forward.",
+        "forward_held": (
+            "Las mejores pasadas del backtest siguen por delante en el periodo forward."
+        ),
+        "forward_lost": (
+            "El orden del backtest no se sostiene en el periodo forward. "
+            "Lo verás también en las banderas rojas."
+        ),
+        "forward_badge_held": "Aguanta",
+        "forward_badge_lost": "No aguanta",
         "capital_intro": (
             "Cuánto dinero hace falta para que un año malo no se lleve más de cierto porcentaje "
             "de la cuenta, con las operaciones de este archivo. Sorteamos {samples:,} años de "
@@ -639,6 +660,25 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_badge_clean": "Plateau",
         "plateau_badge_peak": "Lone peak",
+        "forward": "Does it hold in the forward period?",
+        "forward_intro": (
+            "MetaTrader can run the same settings on a later period the optimiser did not use "
+            "to choose (forward). We compare the order the backtest gives with what happens "
+            "afterwards in that period."
+        ),
+        "forward_rank": (
+            "Rank correlation between backtest and forward (1 = same order, 0 = no relation)."
+        ),
+        "forward_top": "Of the {n} best backtest passes end the forward period with a profit.",
+        "forward_all": "Of all passes end the forward period with a profit.",
+        "forward_chosen": "Of the other passes land below the chosen one in the forward period.",
+        "forward_held": "The best backtest passes stay ahead in the forward period.",
+        "forward_lost": (
+            "The backtest's order does not hold in the forward period. "
+            "You will also see it in the red flags."
+        ),
+        "forward_badge_held": "Holds",
+        "forward_badge_lost": "Does not hold",
         "capital_intro": (
             "How much money it takes so that a bad year does not take more than a given share "
             "of the account, with this file's trades. We drew {samples:,} years of trades at "
@@ -2569,6 +2609,44 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     return out
 
 
+def _forward_html(forward: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """The optimisation's backtest ranking against its forward period."""
+    if not forward or forward.get("status") != "MEASURED":
+        return ""
+    out = f"<p class='muted'>{_e(labels['forward_intro'])}</p>"
+    tone = " neg" if forward.get("clean") is False else ""
+    rho = forward["rank_correlation"]
+    facts = [
+        f"<div class='fact{tone}'><b>{float(rho['value']):.2f}</b>"
+        f"<p>{_e(labels['forward_rank'])} {_badge(rho['evidence'])}</p></div>"
+    ]
+    top_n = int(forward["top_count"]["value"])
+    for key, label in (
+        ("top_in_profit", labels["forward_top"].format(n=top_n)),
+        ("all_in_profit", labels["forward_all"]),
+        ("chosen_forward_share", labels["forward_chosen"]),
+    ):
+        item = forward.get(key) or {}
+        if item.get("value") is not None:
+            facts.append(
+                f"<div class='fact{tone if key == 'top_in_profit' else ''}'>"
+                f"<b>{float(item['value']):.0%}</b>"
+                f"<p>{_e(label)} {_badge(item['evidence'])}</p></div>"
+            )
+    out += f"<div class='facts'>{''.join(facts)}</div>"
+    if forward.get("clean"):
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['forward_badge_held'])}</span> {_e(labels['forward_held'])}</p>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['forward_badge_lost'])}</span> {_e(labels['forward_lost'])}</p>"
+        )
+    return out
+
+
 def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str:
     """The chosen optimisation pass against its neighbours."""
     if not plateau or plateau.get("status") != "MEASURED":
@@ -3303,6 +3381,11 @@ def render_html(
             else []
         ),
         *(
+            [(labels["forward"], _forward_html(data.get("forward"), labels))]
+            if (data.get("forward") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
             [
                 (
                     labels["capital"],
@@ -3449,15 +3532,24 @@ def render_html(
         anchor = f" id='{_e(key)}'" if key else ""
         return f"<section class='rsec'{anchor}><h2>{_e(title)}</h2>{content}</section>"
 
+    links = [
+        f"<a class='no-print' href='{_e(method_url(locale))}'>"
+        f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a>"
+    ]
+    if legal_links:
+        links += [
+            f"<a href='{_e(legal_url(kind, locale))}'>{_e(LINK_TEXT[locale][kind])}</a>"
+            for kind in ("terms", "privacy")
+        ]
     footer = (
         "<div class='report-foot'>"
         f"<div class='disclaimer'><strong>{_e(labels['disclaimer'])}.</strong> "
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>"
-        f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>"
-        + (legal_links_html(locale) if legal_links else "")
-        + f"<p class='muted no-print'><a href='{_e(method_url(locale))}'>"
-        f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a></p>"
-        + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
+        f"<p class='rf-sha'><span>{_e(labels['json_sha'])}</span>"
+        f"<code>{_e(result_sha256(result))}</code></p>"
+        "<div class='rf-bar'>"
+        f"<p class='rf-brand'><b>{_e(BRAND)}</b> · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p>"
+        f"<nav class='rf-links'>{''.join(links)}</nav></div></div>"
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     reading_html = _reading_html(data, labels)

@@ -620,6 +620,83 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "la mayor excursión adversa es {m}x la pérdida media; no hay señal de un stop fijo",
     ),
     (
+        "the {k} best passes of the backtest end the forward period with a profit in {a} of "
+        "cases, against {b} for all passes; rank correlation between the periods {r}",
+        "las {k} mejores pasadas del backtest terminan el periodo forward con ganancia en el "
+        "{a} de los casos, frente al {b} de todas las pasadas; correlación de rangos entre "
+        "periodos {r}",
+    ),
+    (
+        "rank correlation between the back and forward results {r}",
+        "correlación de rangos entre los resultados del backtest y del forward {r}",
+    ),
+    (
+        "the optimisation file has two result columns before Profit, as a forward export does, "
+        "but they are not named Forward Result and Back Result; export it again from a terminal "
+        "set to English",
+        "el archivo de optimización tiene dos columnas de resultado antes de Profit, como una "
+        "exportación forward, pero no se llaman Forward Result y Back Result; vuelve a "
+        "exportarlo desde una terminal en inglés",
+    ),
+    (
+        "the optimisation file is not a forward export (no Forward Result and Back Result columns)",
+        "el archivo de optimización no es una exportación forward (no tiene las columnas "
+        "Forward Result y Back Result)",
+    ),
+    (
+        "needs at least {n} passes with a back and a forward result",
+        "hacen falta al menos {n} pasadas con resultado de backtest y de forward",
+    ),
+    (
+        "every pass has the same back or forward result",
+        "todas las pasadas tienen el mismo resultado de backtest o de forward",
+    ),
+    ("from the rows of the forward optimisation export", "de las filas de la exportación forward"),
+    (
+        "Spearman correlation between the back and the forward result of every pass",
+        "correlación de Spearman entre el resultado de backtest y el de forward de cada pasada",
+    ),
+    (
+        "the best tenth of the passes by back result, at least five",
+        "la mejor décima parte de las pasadas por resultado de backtest, al menos cinco",
+    ),
+    (
+        "share of the best backtest passes with a forward profit",
+        "parte de las mejores pasadas del backtest con ganancia en el forward",
+    ),
+    (
+        "share of all passes with a forward profit",
+        "parte de todas las pasadas con ganancia en el forward",
+    ),
+    (
+        "median forward profit of the best backtest passes",
+        "ganancia mediana en el forward de las mejores pasadas del backtest",
+    ),
+    ("median forward profit of all passes", "ganancia mediana en el forward de todas las pasadas"),
+    (
+        "the export has no Profit column for the forward period",
+        "la exportación no tiene la columna Profit del periodo forward",
+    ),
+    (
+        "share of the other passes with a lower forward result",
+        "parte de las demás pasadas con un resultado forward menor",
+    ),
+    (
+        "forward profit of the pass matching the tester report",
+        "ganancia en el forward de la pasada que coincide con el informe del probador",
+    ),
+    (
+        "no pass matches the inputs of the uploaded tester report",
+        "ninguna pasada coincide con las entradas del informe del probador subido",
+    ),
+    (
+        "a forward export: its Profit column is the forward period's; the forward section "
+        "reads it, and this check needs the main optimisation export",
+        "una exportación forward: su columna Profit es la del periodo forward; la sección "
+        "forward la lee, y esta comprobación necesita la exportación principal de la "
+        "optimización",
+    ),
+    (
         "the best trade makes {share} of the total of the winning trades; without it and the "
         "worst loss the rest keep {keep} of the net result ({n} trades)",
         "la mejor operación aporta el {share} del total de las operaciones ganadoras; sin ella "
