@@ -671,13 +671,15 @@ month, the deepest fall and the longest run of months below a previous high
   more and above 1.96/sqrt(n) (Getmansky, Lo and Makarov, 2004); the
   volatility is then also shown unsmoothed, from
   `(r_t - rho r_{t-1}) / (1 - rho)` (Geltner, 1993);
-- `few_small_losses`: months in (0, sd/4] against months in [-sd/4, 0),
-  with at least 10 in the two bins, and a one-sided binomial p-value below
-  0.01 against the split a normal with the fund's own mean and volatility
-  predicts (Bollen and Pool, 2009).
+- `few_small_losses`: months in [-sd/2, 0) against the average of the two
+  neighbouring bins, (0, sd/2] and [-sd, -sd/2), with at least 10 months in
+  those two, and a one-sided Poisson p-value below 0.01 (the discontinuity
+  at zero of Bollen and Pool, 2009). Bins of a quarter deviation, or a
+  normal reference, made honest US market windows (2000-2024) fire; at half
+  a deviation no 5, 10 or 20-year window of the US market since 1927 does.
 
-No red flag and no class change. Limitations: the normal is only a
-reference for the two bins; smoothing can also come from a genuinely
+No red flag and no class change. Limitations: a short record has few
+months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are
 taken as the file states them, usually after the fund's fees.
 

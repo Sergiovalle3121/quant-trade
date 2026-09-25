@@ -158,3 +158,10 @@ def test_the_calendar_shows_each_month_and_the_year() -> None:
     assert "-0.0%" not in html
     # A volatility is a size, never signed.
     assert f"<b>{review['volatility']['value']:.1%}</b>" in html
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_fat_tailed_honest_returns_do_not_read_as_missing_losses(seed: int) -> None:
+    # Peaked, fat-tailed months like a stock index's: no losses were hidden.
+    r = 0.008 + 0.03 * np.random.default_rng(seed).standard_t(4, 300) / np.sqrt(2)
+    assert "few_small_losses" not in fund_review(_frame(r), 12.0)["findings"]

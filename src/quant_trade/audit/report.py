@@ -370,7 +370,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_few_small_losses": (
             "Hay muchos meses con una ganancia pequeña y muy pocos con una pérdida pequeña "
-            "({gains} frente a {losses}), menos de lo que su propia volatilidad haría esperar. "
+            "({gains} frente a {losses}), menos de lo que hacen esperar los meses vecinos. "
             "Los estudios sobre fondos relacionan ese patrón con valoraciones que evitan cerrar "
             "un mes en negativo. Pregunta quién calcula el valor liquidativo y si lo revisa "
             "un tercero."
@@ -947,7 +947,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_few_small_losses": (
             "There are many months with a small gain and very few with a small loss ({gains} "
-            "against {losses}), fewer than its own volatility would lead you to expect. Studies "
+            "against {losses}), fewer than the neighbouring months lead you to expect. Studies "
             "of funds link that pattern to valuations that avoid closing a month negative. Ask "
             "who calculates the net asset value and whether a third party checks it."
         ),

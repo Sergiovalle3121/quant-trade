@@ -10,10 +10,12 @@ from the fund-due-diligence literature go further:
   makes volatility look lower than it is (Getmansky, Lo and Makarov, 2004).
   The volatility is recomputed on the unsmoothed series
   ``(r_t - rho * r_{t-1}) / (1 - rho)`` (Geltner, 1993).
-* **Few small losses.** Many small gains and very few small losses,
-  compared with what the fund's own mean and volatility predict, is the
+* **Few small losses.** Far fewer months with a small loss than the two
+  neighbouring bins (small gains, and slightly larger losses) predict is the
   discontinuity at zero that Bollen and Pool (2009) tie to reported values
-  that avoid a negative month.
+  that avoid a negative month. The bins are half a monthly standard
+  deviation wide and the test is one-sided Poisson against the neighbours'
+  average.
 
 Every figure is MEASURED from the uploaded series. The section raises no red
 flag and never changes the class: each finding is a question to ask.
@@ -36,21 +38,24 @@ MIN_MONTHS = 24
 #: Autocorrelation at or above this, and beyond chance, is a finding.
 SMOOTHING_RHO = 0.2
 #: Width of the "small" bins either side of zero, in monthly standard deviations.
-SMALL_BIN = 0.25
-#: Months needed in the two small bins together, and the one-sided p-value.
+#: Half a deviation: narrower bins made honest index windows (US market,
+#: 2000-2024) read as missing small losses.
+SMALL_BIN = 0.5
+#: Months needed in the two neighbouring bins together, and the one-sided p-value.
 MIN_SMALL = 10
 SMALL_P_VALUE = 0.01
 
 NOTE = "month-end returns as the file states them"
 
 
-def _normal_cdf(x: float) -> float:
-    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
-
-
-def _binomial_cdf(k: int, n: int, p: float) -> float:
-    """P(X <= k) for X ~ Binomial(n, p)."""
-    return sum(math.comb(n, i) * p**i * (1.0 - p) ** (n - i) for i in range(k + 1))
+def _poisson_cdf(k: int, mean: float) -> float:
+    """P(X <= k) for X ~ Poisson(mean)."""
+    if mean <= 0:
+        return 1.0
+    return min(
+        1.0,
+        sum(math.exp(-mean + i * math.log(mean) - math.lgamma(i + 1)) for i in range(k + 1)),
+    )
 
 
 def monthly_returns(frame: pd.DataFrame) -> pd.Series:
@@ -90,7 +95,7 @@ def fund_review(frame: pd.DataFrame, periods_per_year: float) -> dict[str, Any]:
         return {"status": "NOT_MEASURED", "reason": f"needs at least {MIN_MONTHS} monthly returns"}
     r = series.to_numpy(dtype=float)
     n = len(r)
-    mean, std = float(r.mean()), float(r.std(ddof=1))
+    std = float(r.std(ddof=1))
     if not std > 0:
         return {"status": "NOT_MEASURED", "reason": "the monthly returns do not vary"}
 
@@ -134,19 +139,18 @@ def fund_review(frame: pd.DataFrame, periods_per_year: float) -> dict[str, Any]:
         if rho > 1.96 / math.sqrt(n):
             review["findings"].append("smoothed")
 
-    # 2. Small gains against small losses, against what a normal with the
-    # fund's own mean and volatility predicts for the two bins.
+    # 2. Months with a small loss against their two neighbouring bins: a
+    # histogram of returns is smooth across zero unless losses were avoided.
     width = SMALL_BIN * std
     small_gains = int(((r > 0) & (r <= width)).sum())
     small_losses = int(((r < 0) & (r >= -width)).sum())
+    larger_losses = int(((r < -width) & (r >= -2 * width)).sum())
     review["small_gains"] = measured(small_gains)
     review["small_losses"] = measured(small_losses)
-    total_small = small_gains + small_losses
-    if total_small >= MIN_SMALL:
-        gain_mass = _normal_cdf((width - mean) / std) - _normal_cdf(-mean / std)
-        loss_mass = _normal_cdf(-mean / std) - _normal_cdf((-width - mean) / std)
-        p_loss = loss_mass / (gain_mass + loss_mass)
-        p_value = _binomial_cdf(small_losses, total_small, p_loss)
+    if small_gains + larger_losses >= MIN_SMALL:
+        expected = (small_gains + larger_losses) / 2
+        p_value = _poisson_cdf(small_losses, expected)
+        review["small_losses_expected"] = measured(expected)
         review["small_losses_p_value"] = measured(p_value)
         if p_value < SMALL_P_VALUE:
             review["findings"].append("few_small_losses")
