@@ -1920,6 +1920,8 @@ Redesign pass 51 styles the PDF link while the PDF is made ("Generando tu PDF…
 
 Redesign pass 52 checks the two new report sections on screen, on a phone and in the PDF. The "history needed" table in "¿Cuánto queda al descontar la suerte?" (`table.luck`) turns into one card per row on a phone, each figure under its column name, and its yes/no answer is green or red. In the PDF a block of figures may now split across pages (orphans and widows 1), so a heading such as "Cómo se vivió este historial" no longer sits alone above half a blank page; subsection headings stay with what follows.
 
+Redesign pass 53 checks the screens that landed after pass 51 on a phone first. The line naming the 20 recognised platforms under the landing's platform row is no longer one long underlined link: the names stay in a lighter grey, the link ends in an arrow and underlines on hover. "¿Cómo le fue en las crisis conocidas?" (`table.timing.crises`) now spans the card on a phone, wraps the crisis name, shows losses in red and wraps "sin operaciones cerradas en la ventana" instead of running off the screen. /para/copiar-senales and the longer verdict on /ejemplo read well and needed nothing.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

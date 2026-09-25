@@ -846,3 +846,25 @@ def test_print_lets_a_block_of_figures_split_across_pages() -> None:
     assert "h2,.detail h3{break-after:avoid;page-break-after:avoid}.facts{orphans:1;widows:1}" in (
         STYLE
     )
+
+
+def test_the_platform_names_link_reads_as_a_list_not_a_wall_of_underlines() -> None:
+    assert ".platforms .platforms-also a{color:var(--text-2);text-decoration:none" in STYLE
+    assert ".platforms .platforms-also a::after{content:' \\2192'" in STYLE
+
+
+def test_the_crisis_table_fits_a_phone_and_marks_losses() -> None:
+    from quant_trade.audit.report import LABELS, _crises_html
+
+    stress = {
+        "status": "MEASURED",
+        "windows": [
+            {"key": "gfc", "first": "2007-11", "last": "2009-02", "no_trades": True},
+            {"key": "euro", "first": "2011-05", "last": "2011-09", "fund": {"value": -0.024}},
+        ],
+    }
+    html = _crises_html(stress, LABELS["es"])
+    assert "<table class='timing crises'>" in html
+    assert ".crises td.val.neg{color:#b42318}" in STYLE
+    assert ".crises td.val.muted{white-space:normal" in STYLE
+    assert "(max-width:620px){.paper table.crises{display:table;width:100%}" in STYLE
