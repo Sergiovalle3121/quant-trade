@@ -138,3 +138,67 @@ def test_the_sample_shows_the_net_win_rate_once_in_the_tiles_and_tables() -> Non
     # The gross share (55.54%) shows once, on its own labelled row, not
     # again in the annualised table.
     assert page.count("55.54%") == 1
+
+
+def test_figures_carry_their_unit_and_plain_names() -> None:
+    page = _page("es")
+    # Header: the engine version and seed say what they are.
+    assert "versión del motor 0.1.0" in page and "semilla de las simulaciones" in page
+    assert "quant_trade.audit" not in page
+    # Resampled time under the peak says median and 1 in 20, not p50/p95.
+    assert "Periodos seguidos bajo el máximo, en las simulaciones: mediana" in page
+    assert "en 1 de cada 20" in page
+    # The capital cards say whose balance they scale to.
+    assert "Tamaño sobre el balance inicial del archivo (10,000)" in page
+    # The drop distance says which values matter.
+    assert "(-2 o menos: una caída que el azar difícilmente explica)" in page
+    # The cost table explains its few cents of difference with the trades' net.
+    assert "sin coste extra da 6,425.50, 0.47 de diferencia" in page
+    english = _page("en")
+    assert "engine version 0.1.0" in english and "in 1 of every 20" in english
+    assert "with no extra cost it gives 6,425.50" in english
+
+
+def test_long_and_short_results_are_net_after_itemised_fees() -> None:
+    page = _page("es")
+    # Long plus short now add up to the trades' net result.
+    assert "después de los costes que el archivo detalla por operación" in page
+    assert "antes de comisión y swap" not in page
+
+
+def test_a_weaker_recent_stretch_is_not_called_steady() -> None:
+    page = _page("es")
+    assert "Más débil</span> La media por operación bajó de +15.24 a +3.97 (-74%)" in page
+    assert ">Se mantiene</span>" not in page
+    assert "Weaker</span> The average per trade fell from +15.24 to +3.97" in _page("en")
+
+
+def test_seller_questions_follow_the_report_s_findings() -> None:
+    from quant_trade.audit.analytics import vendor_questions
+    from quant_trade.audit.guard import assert_report_clean
+
+    base = {
+        "has_trades": True,
+        "trials_measured": True,
+        "has_out_of_sample": True,
+        "has_costs": True,
+        "balance_only": False,
+    }
+    plain = {q["code"] for q in vendor_questions([], **base)}
+    asked = vendor_questions(
+        [],
+        **base,
+        findings=["one_carries", "losers_held_longer", "worse_after_streak", "recent_weaker"],
+    )
+    codes = [q["code"] for q in asked]
+    assert {"one_instrument", "exit_losses", "after_losses", "recent_weaker"} <= set(codes)
+    assert not {"one_instrument", "exit_losses", "after_losses", "recent_weaker"} & plain
+    # A faded edge already asks what changed; the weaker question is not repeated.
+    faded = vendor_questions(["EDGE_FADING"], **base, findings=["recent_weaker"])
+    assert "recent_weaker" not in {q["code"] for q in faded}
+    # A thin cost margin asks about costs even when the file lists them.
+    assert "costs" in {q["code"] for q in vendor_questions([], **base, findings=["costs_thin"])}
+    for q in asked:
+        assert_report_clean(q["es"] + " " + q["en"])
+    sample = {q["code"] for q in sample_result("es", bootstrap_samples=60).vendor_questions}
+    assert {"one_instrument", "recent_weaker", "costs"} <= sample

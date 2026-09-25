@@ -151,10 +151,15 @@
   ready(function () {
     var input = d.querySelector("input[type=file][name=report]");
     var list = d.getElementById("report-columns");
+    var shown = d.getElementById("report-columns-shown");
     if (!input || !list || !window.FileReader) return;
     input.addEventListener("change", function () {
       var file = input.files && input.files[0];
       while (list.firstChild) list.removeChild(list.firstChild);
+      if (shown) {
+        while (shown.children.length > 1) shown.removeChild(shown.lastChild);
+        shown.hidden = true;
+      }
       if (!file || !/\.(csv|txt|tsv)$/i.test(file.name)) return;
       var reader = new FileReader();
       reader.onload = function () {
@@ -171,6 +176,12 @@
           var option = d.createElement("option");
           option.value = name;
           list.appendChild(option);
+          if (shown) {
+            var chip = d.createElement("code");
+            chip.textContent = name;
+            shown.appendChild(chip);
+            shown.hidden = false;
+          }
         });
       };
       reader.readAsText(file.slice(0, 65536));

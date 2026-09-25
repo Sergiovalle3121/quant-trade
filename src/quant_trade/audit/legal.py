@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
-LEGAL_UPDATED = "2026-09-24"
+LEGAL_UPDATED = "2026-09-25"
 
 STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
 
@@ -289,6 +289,26 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 ),
             ),
             (
+                "Your account",
+                (
+                    "The account is optional: the preview and each report's private link "
+                    "work without it. It shows your reports, credits and purchases in one "
+                    "place.",
+                    "You are responsible for your password. If you forget it, we send you a "
+                    "one-time link after checking that you write from the account's e-mail. "
+                    "You can delete the account at any time from its page.",
+                    *(
+                        (
+                            "An access code saved on an account still belongs to the code's "
+                            "holder: its credits are used from that account or by typing the "
+                            "code.",
+                        )
+                        if ctx.access_codes
+                        else ()
+                    ),
+                ),
+            ),
+            (
                 "Accuracy",
                 (
                     "The report depends entirely on the files you upload, which are not "
@@ -377,6 +397,26 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 f"Las subidas se limitan a {ctx.max_uploads_per_hour_per_ip} por hora por "
                 "dirección IP. No subas archivos que no sean resultados de backtest o de "
                 "cuenta.",
+            ),
+        ),
+        (
+            "Tu cuenta",
+            (
+                "La cuenta es opcional: la vista previa y el enlace privado de cada informe "
+                "funcionan sin ella. Sirve para ver en un solo lugar tus informes, tus créditos "
+                "y tus compras.",
+                "Eres responsable de tu contraseña. Si la olvidas, te enviamos un enlace de un "
+                "solo uso después de comprobar que nos escribes desde el correo de la cuenta. "
+                "Puedes borrar la cuenta cuando quieras desde su página.",
+                *(
+                    (
+                        "Un código de acceso guardado en una cuenta sigue siendo del titular "
+                        "del código: sus créditos se usan desde esa cuenta o escribiendo el "
+                        "código.",
+                    )
+                    if ctx.access_codes
+                    else ()
+                ),
             ),
         ),
         (
@@ -488,14 +528,20 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "file, so anyone holding it can check at /check that it was not edited. "
                     "A file checked there is read and discarded, never kept.",
                     "When you join the updates list: your e-mail address.",
+                    "If you create an account: your e-mail address, a scrypt hash of your "
+                    "password (never the password), which reports and access codes are on it, "
+                    "and a hash of each sign-in session. There is no e-mail check yet and we "
+                    "send no e-mail.",
                 ),
             ),
             (
                 "What we do not keep",
                 (
                     "We never ask for or store broker or exchange keys, trading account "
-                    "passwords or card details. There are no user accounts, no cookies and "
-                    "no third-party analytics or advertising on these pages. Our own access "
+                    "passwords or card details. There is no third-party analytics or "
+                    "advertising on these pages. The only cookies are our own: one that keeps "
+                    "you signed in and one that protects the sign-in forms; none tracks you "
+                    "or is shared. Our own access "
                     "log keeps only a shortened address (the last part of the IP is "
                     "removed) and never the report link's secret. Our hosting provider may "
                     "keep its own request logs, with full IP addresses, for its own "
@@ -526,6 +572,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "only what that page shows (class, dimension statuses, hashes, dates, trial "
                     "counts and engine version), so the page and its badge keep working.",
                     "Updates list: until you ask to be removed.",
+                    "Account: until you delete it from your account page or ask us to. "
+                    "Deleting it removes the e-mail, the password hash, the sessions and the "
+                    "list of your reports and codes; the reports follow the rules above unless "
+                    "you choose to delete them too. A sign-in session ends after 30 days or "
+                    "when you sign out.",
                 ),
             ),
             (
@@ -552,7 +603,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "your data. To show the audit is yours, include its private link. "
                     "Deletion removes everything we hold on that audit: files, report, "
                     "hashes, class and verification page. To leave the updates list, write "
-                    "from that address. We answer within 30 days.",
+                    "from that address. You can delete your account yourself from your "
+                    "account page. We answer within 30 days.",
                     "You can also complain to the data protection authority of your country.",
                 ),
             ),
@@ -583,14 +635,19 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "que quien lo tenga pueda comprobar en /comprobar que no se editó. Un archivo "
                 "que se comprueba ahí se lee y se descarta, nunca se guarda.",
                 "Si te apuntas a la lista de avisos: tu correo.",
+                "Si creas una cuenta: tu correo, un hash scrypt de tu contraseña (nunca la "
+                "contraseña), qué informes y códigos de acceso tiene y un hash de cada sesión "
+                "iniciada. Todavía no comprobamos el correo ni enviamos correos.",
             ),
         ),
         (
             "Qué no guardamos",
             (
                 "Nunca pedimos ni guardamos claves de bróker ni de exchange, contraseñas de "
-                "cuentas de trading ni datos de tarjeta. No hay cuentas de usuario, ni "
-                "cookies, ni analítica o publicidad de terceros en estas páginas. Nuestro propio "
+                "cuentas de trading ni datos de tarjeta. No hay analítica ni publicidad de "
+                "terceros en estas páginas. Las únicas cookies son nuestras: una que mantiene "
+                "tu sesión iniciada y otra que protege los formularios de acceso; ninguna te "
+                "sigue ni se comparte. Nuestro propio "
                 "registro de accesos guarda solo una dirección acortada (se quita la última "
                 "parte de la IP) y nunca el secreto del enlace al informe. Nuestro proveedor "
                 "de alojamiento puede guardar sus propios registros de peticiones, con la IP "
@@ -623,6 +680,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "de intentos y versión del motor), para que la página y su sello sigan "
                 "funcionando.",
                 "Lista de avisos: hasta que pidas darte de baja.",
+                "Cuenta: hasta que la borres desde la página de tu cuenta o nos pidas "
+                "borrarla. El borrado elimina el correo, el hash de la contraseña, las sesiones "
+                "y la lista de tus informes y códigos; los informes siguen las reglas de arriba "
+                "salvo que elijas borrarlos también. Una sesión termina a los 30 días o cuando "
+                "sales.",
             ),
         ),
         (
@@ -649,7 +711,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Para demostrar que la auditoría es tuya, incluye su enlace privado. El "
                 "borrado elimina todo lo que tenemos de esa auditoría: archivos, informe, "
                 "hashes, clase y página de verificación. Para darte de baja de la lista de "
-                "avisos, escribe desde ese correo. Respondemos en un plazo de 30 días.",
+                "avisos, escribe desde ese correo. Tu cuenta la puedes borrar tú desde la "
+                "página de tu cuenta. Respondemos en un plazo de 30 días.",
                 "También puedes reclamar ante la autoridad de protección de datos de tu país.",
             ),
         ),

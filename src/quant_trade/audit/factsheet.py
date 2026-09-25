@@ -79,6 +79,29 @@ BLANKS = {"", "-", "--", "—", "n/a", "na", "nan", "none"}
 #: The year totals settle the scale only when one reading misses them by less
 #: than this share of the other's miss.
 SCALE_MARGIN = 0.5
+#: Roles of a table's rows.
+FUND = "fund"
+BENCHMARK = "benchmark"
+#: Labels of a benchmark's rows: the word or a widely used index family.
+BENCHMARK_WORDS = re.compile(
+    r"\b(benchmark|bench|bmk|index|indice|índice|indices|referencia|référence|reference|"
+    r"vergleichsindex|s&p|msci|ftse|stoxx|russell|nasdaq|dow jones|ibex|dax|cac|nikkei|"
+    r"bloomberg|barclays|hfri|topix|hang seng|bovespa|ipc|merval|ipsa|60/40)",
+    re.IGNORECASE,
+)
+#: Labels of the fund's own rows; they win over a benchmark word ("Index Fund").
+FUND_WORDS = re.compile(
+    r"\b(fund|fondo|fonds|fundo|portfolio|cartera|carteira|strategy|estrategia|estratégia)\b",
+    re.IGNORECASE,
+)
+#: Labels of rows that are a difference between the two, left out.
+DIFFERENCE = re.compile(
+    r"(excess|difference|\bdiff\b|relative|\balpha\b|\bactive\b|spread|\+/-|\bvs\.?\b|"
+    r"exceso|diferencia|diferencial|relativ|différence|écart|differenz)",
+    re.IGNORECASE,
+)
+#: A row with no returns opens a block only when its label is this short.
+MAX_MARKER = 40
 #: Unreadable months named in the warning before the rest are counted.
 MAX_LISTED = 6
 #: A year's total may differ from its months by this much (in return units)
@@ -96,6 +119,8 @@ class MonthlyGrid:
     warnings: list[str] = field(default_factory=list)
     #: Years whose stated total matches neither the compounded nor the summed months.
     mismatched_years: list[int] = field(default_factory=list)
+    #: The benchmark's month-end returns (``timestamp``, ``ret``) when the table has them.
+    benchmark: pd.DataFrame | None = None
 
 
 def _month(header: str) -> int | None:
@@ -153,6 +178,20 @@ def _blank(cell: object) -> bool:
     return str(cell).strip().lower() in BLANKS
 
 
+def _month_end(year: int, month: int) -> pd.Timestamp:
+    return pd.Timestamp(year=year, month=month, day=1, tz="UTC") + pd.offsets.MonthEnd(0)
+
+
+def _role(text: str, default: str) -> str:
+    """Whose returns a row carries, from its label: the benchmark's when the
+    label names an index and not the fund, the fund's when it names the fund."""
+    if FUND_WORDS.search(text):
+        return FUND
+    if BENCHMARK_WORDS.search(text):
+        return BENCHMARK
+    return default
+
+
 def _no_grid(message: str, message_es: str, code: str) -> Exception:
     # Imported here: ``schema`` reads this module lazily and owns ParseError.
     from quant_trade.audit.schema import ParseError
@@ -207,12 +246,40 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
             (value := _number(row[i])[0]) is not None and math.isfinite(value) for i in month_of
         )
 
-    rows = [row for row in table if has_month(row)]
-    if len(rows) < 1:
-        return None
     others = [i for i in range(len(headers)) if i not in month_of]
+
+    def text_of(row: Any) -> str:
+        """The row's words outside the month columns (labels, not numbers)."""
+        words = [
+            str(row[i]).strip()
+            for i in others
+            if not _blank(row[i]) and _number(row[i])[0] is None and _year(row[i]) is None
+        ]
+        return " ".join(words)
+
+    # Each row with returns is the fund's, the benchmark's, or a difference
+    # between them (left out). A short row with no returns that names the
+    # benchmark or the fund opens that block.
+    section = FUND
+    entries: list[tuple[str, Any]] = []
+    left_out = 0
+    for row in table:
+        text = text_of(row)
+        if not has_month(row):
+            if text and len(text) <= MAX_MARKER:
+                section = _role(text, section)
+            continue
+        if text and DIFFERENCE.search(text):
+            left_out += 1
+            continue
+        entries.append((_role(text, section) if text else section, row))
+    if not entries:
+        return None
+    if all(role == BENCHMARK for role, _ in entries):
+        entries = [(FUND, row) for _, row in entries]
+    fund_rows = [row for role, row in entries if role == FUND]
     year_col = next(
-        (i for i in others if all(_year(row[i]) is not None for row in rows)),
+        (i for i in others if all(_year(row[i]) is not None for row in fund_rows)),
         None,
     )
     if year_col is None:
@@ -224,15 +291,37 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
             "columna.",
             "grid_no_year",
         )
-    years = [_year(row[year_col]) or 0 for row in rows]
-    repeated = sorted({y for y in years if years.count(y) > 1})
-    if repeated:
-        listed = ", ".join(str(y) for y in repeated)
-        raise _no_grid(
-            f"the monthly returns table lists {listed} more than once; keep one row per year",
-            f"La tabla de rentabilidades mensuales repite {listed}; deja una fila por año.",
-            "grid_duplicate_year",
-        )
+    # A benchmark row without a year belongs to the fund row above it.
+    keyed: list[tuple[str, int, Any]] = []
+    last_year: int | None = None
+    for role, row in entries:
+        year = _year(row[year_col])
+        if role == FUND:
+            last_year = year
+        elif year is None:
+            year = last_year
+        if year is None:
+            raise _no_grid(
+                "the file looks like a monthly returns table (one column per month) but a "
+                "benchmark row has no year and no fund row above it",
+                "El archivo parece una tabla de rentabilidades mensuales (una columna por mes), "
+                "pero una fila del índice de referencia no tiene año ni una fila del fondo encima.",
+                "grid_no_year",
+            )
+        keyed.append((role, year, row))
+    for role in (FUND, BENCHMARK):
+        years = [year for r, year, _ in keyed if r == role]
+        repeated = sorted({y for y in years if years.count(y) > 1})
+        if repeated:
+            listed = ", ".join(str(y) for y in repeated)
+            raise _no_grid(
+                f"the monthly returns table lists {listed} more than once; keep one row per year",
+                f"La tabla de rentabilidades mensuales repite {listed}; deja una fila por año.",
+                "grid_duplicate_year",
+            )
+    rows = [row for role, _, row in keyed if role == FUND]
+    years = [year for role, year, _ in keyed if role == FUND]
+    bench_keyed = [(year, row) for role, year, row in keyed if role == BENCHMARK]
     total_col = next((i for i in others if i != year_col and _is_total(headers[i])), None)
 
     cells: list[tuple[int, int, float]] = []
@@ -252,9 +341,17 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
             any_percent |= percent
             if value is not None and math.isfinite(value):
                 totals[year] = value
+    bench_cells: list[tuple[int, int, float]] = []
+    for year, row in bench_keyed:
+        for i, month in month_of.items():
+            value, percent = _number(row[i])
+            any_percent |= percent
+            if value is not None and math.isfinite(value):
+                bench_cells.append((year, month, value))
     if len(cells) < 2:
         return None
     cells.sort()
+    bench_cells.sort()
 
     # The scale: a % sign settles it; otherwise the year totals, when the
     # file states them; otherwise percentages, as factsheets publish.
@@ -273,9 +370,7 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
             "values taken as percentages (the file shows no % sign: check one month "
             "against the factsheet)"
         )
-    stamps = [
-        pd.Timestamp(year=y, month=m, day=1, tz="UTC") + pd.offsets.MonthEnd(0) for y, m, _ in cells
-    ]
+    stamps = [_month_end(y, m) for y, m, _ in cells]
     out = pd.DataFrame({"timestamp": stamps, "ret": [v / scale for _, _, v in cells]})
     grid = MonthlyGrid(frame=out)
     grid.warnings.append(
@@ -287,6 +382,20 @@ def monthly_grid(frame: pd.DataFrame) -> MonthlyGrid | None:
             shown += ", …"
         grid.warnings.append(
             f"{len(unreadable)} unreadable month(s) left out of the table: {shown}"
+        )
+    if len(bench_cells) >= 2:
+        grid.benchmark = pd.DataFrame(
+            {
+                "timestamp": [_month_end(y, m) for y, m, _ in bench_cells],
+                "ret": [v / scale for _, _, v in bench_cells],
+            }
+        )
+        grid.warnings.append(
+            "benchmark rows read from the table: the fund section compares the fund with them"
+        )
+    if left_out:
+        grid.warnings.append(
+            f"{left_out} row(s) of differences between the fund and its benchmark left out"
         )
     for year, stated in sorted(totals.items()):
         if _matches(cells, {year: stated}, scale) == 0 and any(y == year for y, _, _ in cells):

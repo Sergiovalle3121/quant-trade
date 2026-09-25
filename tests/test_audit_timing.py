@@ -9,7 +9,7 @@ from audit_fixtures import csv_bytes, positive_drift, trades_frame
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import localize
-from quant_trade.audit.report import LABELS, _timing_html, render_html
+from quant_trade.audit.report import LABELS, LOCKED_GAINS, _timing_html, render_html
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 from quant_trade.audit.timing import MIN_TRADES, NOTE, timing_breakdown
 from quant_trade.core.models import Trade
@@ -89,7 +89,7 @@ def test_locked_report_shows_the_title_only() -> None:
     paid = render_html(result, watermark=False)
     assert LABELS["es"]["timing_intro"] in paid
     locked = render_html(result, watermark=True, free_mode=False, redeem_url="/r")
-    assert LABELS["es"]["timing"] in locked
+    assert LOCKED_GAINS["es"]["timing"] in locked
     assert LABELS["es"]["timing_intro"] not in locked
 
 

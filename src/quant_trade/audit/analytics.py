@@ -137,11 +137,18 @@ def _side_split(
             "win_rate": not_measured(reason),
             "net_pnl": not_measured(reason),
         }
-    selected = pnl[mask]
+    if wins_on is None:
+        return {
+            "trade_count": measured(count),
+            "win_rate": measured(float((pnl[mask] > 0).mean())),
+            "net_pnl": measured(float(pnl[mask].sum()), "before commission and swap"),
+        }
     return {
         "trade_count": measured(count),
-        "win_rate": measured(float(((pnl if wins_on is None else wins_on)[mask] > 0).mean())),
-        "net_pnl": measured(float(selected.sum()), "before commission and swap"),
+        "win_rate": measured(float((wins_on[mask] > 0).mean())),
+        "net_pnl": measured(
+            float(wins_on[mask].sum()), "after the fees the file itemises per trade"
+        ),
     }
 
 
@@ -613,6 +620,30 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "What changed in the last stretch of the history, where the trades stop adding "
         "up? Was the system reoptimised afterwards?",
     },
+    "recent_weaker": {
+        "es": "La media por operación del último tramo es menos de la mitad de la anterior: "
+        "¿cambió algo en el sistema o en el mercado en ese tiempo?",
+        "en": "The average per trade in the last stretch is under half the earlier one: did "
+        "anything change in the system or the market over that time?",
+    },
+    "one_instrument": {
+        "es": "Casi todo el resultado viene de un solo instrumento: ¿el sistema se diseñó "
+        "para él? ¿Qué resultado dio en los demás?",
+        "en": "Almost all of the result comes from one instrument: was the system designed "
+        "for it? What did it do on the others?",
+    },
+    "exit_losses": {
+        "es": "Las operaciones perdedoras duran más que las ganadoras: ¿cómo decide el "
+        "sistema cerrar una pérdida?",
+        "en": "Losing trades last longer than winners: how does the system decide to close "
+        "a loss?",
+    },
+    "after_losses": {
+        "es": "¿Qué hace el sistema después de varias pérdidas seguidas: cambia el tamaño, "
+        "hace una pausa o vuelve a entrar enseguida?",
+        "en": "What does the system do after several losses in a row: change size, pause, or "
+        "enter again straight away?",
+    },
     "original_file": {
         "es": "¿Puedes enviar el archivo original que exportó MetaTrader, sin editar, con el "
         "encabezado y la lista completa de operaciones?",
@@ -707,6 +738,17 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "TRIALS_BELOW_VARIANTS": "trials",
 }
 
+#: Findings of the report's sections (not red flags) that suggest a question.
+_FINDING_QUESTIONS: dict[str, str] = {
+    "recent_weaker": "recent_weaker",
+    "one_carries": "one_instrument",
+    "mostly_one": "one_instrument",
+    "losers_held_longer": "exit_losses",
+    "quick_after_loss": "after_losses",
+    "worse_after_streak": "after_losses",
+    "costs_thin": "costs",
+}
+
 _QUESTION_ORDER: tuple[str, ...] = tuple(k for k in _QUESTIONS if k != "live_record_long")
 #: Questions about how a backtest was made; they do not apply to an account.
 _BACKTEST_ONLY: frozenset[str] = frozenset({"modelling", "trials", "out_of_sample", "costs"})
@@ -722,10 +764,14 @@ def vendor_questions(
     balance_only: bool,
     account_history: bool = False,
     min_track_record_months: float | None = None,
+    findings: Iterable[str] = (),
 ) -> list[dict[str, str]]:
     """Questions a buyer can put to the seller of a trading robot.
 
-    Driven by the red flags raised and by what the upload did not contain.
+    Driven by the red flags raised, by the findings of the report's sections
+    (``findings``: an instrument carrying the rest, losers held longer, a
+    weaker recent stretch, a thin cost margin) and by what the upload did not
+    contain.
     Neutral wording: a question is something to ask, not an accusation, and
     the list never says whether to buy.
 
@@ -740,6 +786,12 @@ def vendor_questions(
         key = _FLAG_QUESTIONS.get(code)
         if key and not (account_history and key in _BACKTEST_ONLY):
             wanted.add(key)
+    for finding in findings:
+        key = _FINDING_QUESTIONS.get(finding)
+        if key and not (account_history and key in _BACKTEST_ONLY):
+            wanted.add(key)
+    if "recent_period" in wanted:
+        wanted.discard("recent_weaker")
     if not account_history:
         if not trials_measured:
             wanted.add("trials")
