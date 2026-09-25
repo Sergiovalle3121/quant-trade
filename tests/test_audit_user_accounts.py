@@ -1399,3 +1399,36 @@ def test_sign_up_and_the_account_say_what_is_kept_and_how_to_delete_it(tmp_path:
     purchases = page.split("Tus compras", 1)[1]
     assert f"<code title='{audit_id}'>{audit_id[:8]}</code>" in purchases
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+
+
+def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> None:
+    """The free report stays past the retention days and its upload IP goes, as promised."""
+    client, store, _ = _client(tmp_path, retention_days=21)
+    _signup(client, welcome=True)
+    audit_id = _audit_id(_upload(client).headers["location"])
+    store.purge_expired(NOW + timedelta(days=400), retention_days=21)  # type: ignore[attr-defined]
+    record = store.get_audit(audit_id)  # type: ignore[attr-defined]
+    assert record is not None and record.result_json and record.client_ip == ""
+    for path, kept, ip, stays in (
+        (
+            "/cuenta",
+            "los pagados y tu informe gratis quedan",
+            "La dirección IP de cada subida",
+            "Se conservan aunque borres la cuenta, sin tu correo",
+        ),
+        (
+            "/account",
+            "paid ones and your free report stay",
+            "The IP address of each upload",
+            "They stay even if you delete the account, without your e-mail",
+        ),
+    ):
+        page = re.sub(r"\s+", " ", client.get(path).text)
+        assert kept in page and ip in page and stays in page and "21" in page
+    ctx = LegalContext(retention_days=21)
+    es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
+    en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
+    assert "tu primer informe completo gratis: se conservan" in es
+    assert "aunque borres tu cuenta y sin tu correo" in es
+    assert "your free first full report: kept" in en
+    assert "even if you delete your account and without your e-mail" in en
