@@ -228,3 +228,21 @@ def test_unknown_method_raises():
     r = pd.Series(_ar1(50, 0.3, seed=1))
     with pytest.raises(ValueError, match="unknown bootstrap method"):
         bootstrap_confidence_intervals(r, method="magic", samples=10, seed=1)  # type: ignore[arg-type]
+
+
+def test_summarising_paths_in_blocks_gives_the_same_numbers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import quant_trade.research.bootstrap as bootstrap_module
+
+    returns = np.random.default_rng(3).normal(0.0005, 0.01, 250)
+    runs = {
+        "iid": lambda: bootstrap_module.iid_bootstrap(returns, samples=37, seed=1),
+        "block": lambda: bootstrap_module.moving_block_bootstrap(returns, samples=37, seed=1),
+        "stationary": lambda: bootstrap_module.stationary_bootstrap(returns, samples=37, seed=1),
+    }
+    whole = {name: run() for name, run in runs.items()}
+    # 1 000 cells a block: four paths of 250 at a time, the last block short.
+    monkeypatch.setattr(bootstrap_module, "_SUMMARY_CHUNK_CELLS", 1_000)
+    for name, run in runs.items():
+        pd.testing.assert_frame_equal(run(), whole[name])
