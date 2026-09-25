@@ -108,6 +108,25 @@
       d.querySelectorAll("[aria-busy=true]").forEach(function (b) { b.removeAttribute("aria-busy"); });
     });
 
+    // Long pages: the index marks the section being read.
+    var toc = d.querySelector("[data-toc]");
+    if (toc && "IntersectionObserver" in window) {
+      var links = {};
+      toc.querySelectorAll("a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+      var spy = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          Object.keys(links).forEach(function (id) { links[id].classList.remove("on"); });
+          var link = links[entry.target.id];
+          if (link) link.classList.add("on");
+        });
+      }, { rootMargin: "-90px 0px -65% 0px" });
+      Object.keys(links).forEach(function (id) {
+        var heading = d.getElementById(id);
+        if (heading) spy.observe(heading);
+      });
+    }
+
     // Copy buttons (the badge code on the verification page).
     d.querySelectorAll("[data-copy]").forEach(function (button) {
       var target = d.getElementById(button.getAttribute("data-copy"));

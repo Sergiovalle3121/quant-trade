@@ -90,7 +90,9 @@ each with its evidence tag. "What it means for you" gives two plain
 sentences per dimension. The "Print / save PDF" button uses the print
 stylesheet, which hides the buttons and the forms. Axis labels always
 differ from each other: a narrow range (an account that moved a few
-dollars) is written in full with the decimals it needs, never "10k, 10k".
+dollars) is written in full with the decimals it needs, never "10k, 10k",
+and one axis uses one unit (8k, 10k, 12k, not 8,000 next to 10k). On phones
+the charts keep a readable size and scroll sideways.
 Red-flag severities and the platform's declared fields are shown in the
 report's language (Grave / Aviso; Bróker, Beneficio neto total…).
 
@@ -649,6 +651,11 @@ Recomputing the sha256 of the original file and re-running the audit with
 the same seed reproduces the JSON byte for byte.
 
 ## Look and feel
+
+Long pages (terms, privacy, each export guide) show a sticky "En esta
+página" index beside the text on wide screens; `app.js` marks the section
+being read. It is hidden on narrow screens and in print.
+
 
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
