@@ -609,3 +609,18 @@ def test_check_page_is_a_drop_zone_and_is_linked_where_a_buyer_needs_it(tmp_path
         assert find_claims(page) == [] and find_claims(report) == []
     # An unmatched file reads as a caution, not as an alarm.
     assert ".chk-result.bad{--tone:var(--warn)}" in client.get("/comprobar").text
+
+
+@pytest.mark.parametrize(("locale", "lead"), [("es", "Pregunta"), ("en", "Ask")])
+def test_behaviour_findings_read_as_what_it_shows_then_the_question(locale: str, lead: str) -> None:
+    from quant_trade.audit.report import LABELS, _behaviour_ask
+
+    for code in ("losers_held_longer", "quick_after_loss", "worse_after_streak"):
+        text = LABELS[locale]["beh_" + code]
+        item = _behaviour_ask(text)
+        # The finding in bold, the question to the seller on its own line.
+        assert "<p class='beh-what'>" in item and "<p class='beh-ask'><svg" in item
+        assert f"<span>{lead} " in item
+        plain = re.sub(r"<[^>]+>", " ", item)
+        assert " ".join(plain.split()) == " ".join(text.split())
+    assert ".beh-asks li{margin-top:12px" in STYLE

@@ -1382,6 +1382,11 @@ is linked from every footer's Product column, from a note on the public /v
 page ("Were you sent this report's PDF or JSON?") and from a line under the
 report's PDF download.
 
+Redesign pass 40 styles "How it behaves after losing": each finding reads as
+what the trades show (bold) and, on its own line with a speech mark, the
+question to put to the seller (`report._behaviour_ask`, `.beh-asks`), in the
+screen and in the PDF.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
