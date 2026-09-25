@@ -10,6 +10,7 @@ import pytest
 from audit_fixtures import (
     csv_bytes,
     positive_drift,
+    signed_in,
     synthetic_mt5_optimization,
     synthetic_mt5_report,
     trades_frame,
@@ -45,7 +46,7 @@ def _client(tmp_path: Path, **overrides) -> TestClient:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db", bootstrap_samples=100, **overrides
     )
-    return TestClient(create_app(settings, make_store(settings.database_url)))
+    return signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
 
 
 def _upload(client: TestClient, **data):
@@ -91,6 +92,7 @@ def test_upload_redirects_to_a_tokenised_report(tmp_path: Path) -> None:
     assert page.status_code == 200
     assert "VISTA PREVIA" in page.text
     assert "<script>x</script>" not in page.text
+    client.cookies.clear()  # a visitor without the account
     assert client.get(f"/audits/{audit_id}?token=wrong").status_code == 404
     assert client.get(f"/audits/{audit_id}").status_code == 404
     assert client.get("/audits/nothere?token=x").status_code == 404

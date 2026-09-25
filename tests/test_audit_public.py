@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift
+from audit_fixtures import csv_bytes, positive_drift, signed_in
 
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
@@ -39,7 +39,7 @@ def _client(tmp_path: Path, **overrides) -> tuple[TestClient, object]:
         **overrides,
     )
     store = make_store(settings.database_url)
-    return TestClient(create_app(settings, store)), store
+    return signed_in(TestClient(create_app(settings, store))), store
 
 
 def _upload(client: TestClient) -> tuple[str, str]:
@@ -117,6 +117,7 @@ def test_publish_shows_only_the_allowed_fields(tmp_path: Path) -> None:
 def test_publish_needs_the_token_and_unknown_ids_are_404(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     audit_id, token = _upload(client)
+    client.cookies.clear()  # a visitor without the account
     assert client.post(f"/audits/{audit_id}/publish?token=wrong").status_code == 404
     missing = client.get("/v/doesnotexist")
     assert missing.status_code == 404

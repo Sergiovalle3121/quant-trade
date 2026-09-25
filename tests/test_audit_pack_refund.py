@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift
+from audit_fixtures import csv_bytes, positive_drift, signed_in
 
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
@@ -29,7 +29,7 @@ def _client(tmp_path: Path, **overrides) -> TestClient:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db", bootstrap_samples=100, **overrides
     )
-    return TestClient(create_app(settings, make_store(settings.database_url)))
+    return signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
 
 
 def test_pack_is_on_sale_only_with_codes_and_a_real_discount() -> None:

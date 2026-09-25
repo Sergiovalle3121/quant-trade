@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift
+from audit_fixtures import csv_bytes, positive_drift, signed_in
 
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
@@ -24,7 +24,7 @@ def _client(tmp_path: Path, **overrides) -> TestClient:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db", bootstrap_samples=100, **overrides
     )
-    return TestClient(create_app(settings, make_store(settings.database_url)))
+    return signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
 
 
 def _upload(client: TestClient) -> str:
@@ -60,6 +60,7 @@ def test_a_locked_report_has_no_pdf(tmp_path: Path) -> None:
     assert "/pdf?token=" not in page
     audit_id, query = location.removeprefix("/audits/").split("?")
     assert client.get(f"/audits/{audit_id}/pdf?{query}").status_code == 402
+    client.cookies.clear()  # a visitor without the account
     assert client.get(f"/audits/{audit_id}/pdf?token=wrong").status_code == 404
 
 
@@ -165,6 +166,7 @@ def test_a_second_download_of_the_same_report_is_not_rendered_again(
     assert first.content == second.content == b"%PDF-es"
     assert english.content == b"%PDF-en"
     assert calls == ["es", "en"]
+    client.cookies.clear()  # a visitor without the account
     assert client.get(f"/audits/{audit_id}/pdf?token=wrong").status_code == 404
 
 

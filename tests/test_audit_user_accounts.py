@@ -68,13 +68,24 @@ def _csrf(page: str) -> str:
     return match.group(1)
 
 
-def _signup(client: TestClient, email: str = "ana@example.com", password: str = PASSWORD):
+def _signup(
+    client: TestClient,
+    email: str = "ana@example.com",
+    password: str = PASSWORD,
+    *,
+    welcome: bool = False,
+):
+    """Sign up; the free full report is spent unless ``welcome`` is true."""
     csrf = _csrf(client.get("/registro").text)
-    return client.post(
+    response = client.post(
         "/registro",
         data={"email": email, "password": password, "csrf": csrf},
         follow_redirects=False,
     )
+    account = client.app.state.store.find_account(email)
+    if not welcome and account is not None:
+        client.app.state.store.spend_welcome(account.id, at=datetime.now(UTC))
+    return response
 
 
 def _signin(client: TestClient, email: str, password: str = PASSWORD, ip: str = ""):
@@ -250,7 +261,13 @@ def test_an_upload_while_signed_in_lands_on_the_account(tmp_path: Path) -> None:
 
 def test_a_report_opened_by_link_can_be_saved(tmp_path: Path) -> None:
     client, store, _ = _client(tmp_path)
+    _signup(client, "uploader@example.com")
     location = _upload(client).headers["location"]
+    client.cookies.clear()
+    # A deletes the account but keeps the report: only its link is left, as
+    # for every report uploaded before accounts existed.
+    uploader = store.find_account("uploader@example.com")  # type: ignore[attr-defined]
+    store.delete_account(uploader.id)  # type: ignore[attr-defined]
     audit_id = _audit_id(location)
     anon = client.get(location).text
     assert "Crea una cuenta gratis para guardar este informe" in anon
@@ -544,7 +561,13 @@ def test_forms_before_sign_in_set_a_csrf_cookie(tmp_path: Path) -> None:
 # -- security review findings ------------------------------------------------------
 def test_a_report_saved_from_a_link_is_never_deleted_with_the_account(tmp_path: Path) -> None:
     client, store, _ = _client(tmp_path)
-    location = _upload(client).headers["location"]  # A uploads, never signs up
+    _signup(client, "uploader@example.com")
+    location = _upload(client).headers["location"]
+    client.cookies.clear()
+    # A deletes the account but keeps the report: only its link is left, as
+    # for every report uploaded before accounts existed.
+    uploader = store.find_account("uploader@example.com")  # type: ignore[attr-defined]
+    store.delete_account(uploader.id)  # type: ignore[attr-defined]
     audit_id = _audit_id(location)
     thief = TestClient(client.app)
     _signup(thief, "b@example.com")
@@ -564,7 +587,13 @@ def test_a_report_saved_from_a_link_is_never_deleted_with_the_account(tmp_path: 
 
 def test_paying_for_someone_elses_report_never_allows_deleting_it(tmp_path: Path) -> None:
     client, store, _ = _client(tmp_path)
-    location = _upload(client).headers["location"]  # A uploads, never signs up
+    _signup(client, "uploader@example.com")
+    location = _upload(client).headers["location"]
+    client.cookies.clear()
+    # A deletes the account but keeps the report: only its link is left, as
+    # for every report uploaded before accounts existed.
+    uploader = store.find_account("uploader@example.com")  # type: ignore[attr-defined]
+    store.delete_account(uploader.id)  # type: ignore[attr-defined]
     audit_id = _audit_id(location)
     buyer = TestClient(client.app)
     _signup(buyer, "own@example.com")
@@ -591,7 +620,13 @@ def test_unlocking_someone_elses_report_without_saving_never_allows_deleting_it(
     tmp_path: Path, path: str
 ) -> None:
     client, store, _ = _client(tmp_path)
-    location = _upload(client).headers["location"]  # A uploads, never signs up
+    _signup(client, "uploader@example.com")
+    location = _upload(client).headers["location"]
+    client.cookies.clear()
+    # A deletes the account but keeps the report: only its link is left, as
+    # for every report uploaded before accounts existed.
+    uploader = store.find_account("uploader@example.com")  # type: ignore[attr-defined]
+    store.delete_account(uploader.id)  # type: ignore[attr-defined]
     audit_id = _audit_id(location)
     buyer = TestClient(client.app)
     _signup(buyer, "w@example.com")
@@ -657,16 +692,20 @@ def test_sign_ups_stop_at_the_limit_exactly(tmp_path: Path) -> None:
     assert _signup(client, "one-more@example.com").status_code == 429
 
 
-def test_the_landing_says_the_preview_needs_no_card_and_an_account_is_optional(
-    tmp_path: Path,
-) -> None:
+def test_the_landing_says_the_free_preview_comes_with_an_account(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     es = client.get("/").text
-    assert "cuenta opcional" in es and "sin crear cuenta" not in es
-    assert "Vista previa sin tarjeta" in es
+    assert "Tu primer informe completo, gratis al crear tu cuenta" in es
+    assert "después, 3 vistas previas gratis al mes. Sin tarjeta." in es
+    assert "Primer informe completo gratis con tu cuenta" in es
+    assert "el primer informe completo y 3 al mes" in es
+    assert "cuenta opcional" not in es and "cuenta es opcional" not in es
+    assert "sin crear cuenta" not in es and "Cuenta gratis opcional" not in es
     en = client.get("/en").text
-    assert "account optional" in en and "no account needed" not in en
-    assert "No card for the preview" in en
+    assert "Your first full report, free when you create your account" in en
+    assert "then 3 free previews a month. No card." in en
+    assert "account optional" not in en and "account is optional" not in en
+    assert "Optional free account" not in en
 
 
 def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path: Path) -> None:
@@ -749,3 +788,242 @@ def test_without_credits_my_account_shows_prices_and_a_ready_message_first(
     en = client.get("/account").text
     assert f"Pack of 3 credits: USD {pack}." in en
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+
+
+# -- the free tier: previews need an account, a few a month ------------------------
+def test_a_preview_needs_an_account_unless_a_working_code_pays_for_it(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    refused = _upload(client)
+    assert refused.status_code == 401
+    assert "tu primer informe completo no se paga" in refused.text
+    assert "href='/registro'" in refused.text and "3 vistas previas gratis" in refused.text
+    assert not find_claims(re.sub(r"<[^>]+>", " ", refused.text))
+    as_json = client.post(
+        "/audits",
+        files={"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")},
+        data={"consent": "on"},
+        headers={"Accept": "application/json"},
+    )
+    assert as_json.status_code == 401 and as_json.json() == {"error": "free_tier_signin"}
+    bad = _upload(client, access_code="AUD-NOPE-NOPE-NOPE")
+    assert bad.status_code == 401 and "Ese código no sirve" in bad.text
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    paid = _upload(client, access_code=code)
+    assert paid.status_code == 303 and paid.headers["location"].endswith("&code=applied")
+    english = client.post(
+        "/audits",
+        files={"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")},
+        data={"consent": "on", "locale": "en"},
+    )
+    assert "your first full report is on us" in english.text
+
+
+def test_each_account_gets_three_free_previews_a_month_then_uses_credits(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    assert "3 de 3" in client.get("/cuenta").text
+    for _ in range(3):
+        assert _upload(client).status_code == 303
+    page = client.get("/cuenta").text
+    assert "0 de 3" in page and "Vistas previas gratis este mes" in page
+    over = _upload(client)
+    assert over.status_code == 402
+    assert "Ya usaste tus 3 vistas previas gratis de este mes" in over.text
+    assert "href='/cuenta'" in over.text
+    # With credits on the account, the next file comes out as a full report.
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    client.post("/cuenta/codigo", data={"code": code, "csrf": _csrf(page)})
+    full = _upload(client)
+    assert full.status_code == 303 and "acct=upload_credit" in full.headers["location"]
+    report = client.get(full.headers["location"]).text
+    assert "Usamos 1 crédito de tu cuenta" in report and "class='lockbox'" not in report
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.account_credits(account.id, datetime.now(UTC)) == 0  # type: ignore[attr-defined]
+    assert _upload(client).status_code == 402  # and then it stops again
+
+
+def test_free_previews_are_also_counted_per_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "FREE_PREVIEWS_PER_IP_PER_MONTH", 2)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    ip = {"X-Forwarded-For": "203.0.113.50"}
+    files = {"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")}
+
+    def upload(who: TestClient) -> int:
+        answer = who.post(
+            "/audits", files=files, data={"consent": "on"}, headers=ip, follow_redirects=False
+        )
+        return answer.status_code
+
+    _signup(client, "first@example.com")
+    assert [upload(client), upload(client)] == [303, 303]
+    second = TestClient(client.app)
+    _signup(second, "second@example.com")
+    refused = second.post("/audits", files=files, data={"consent": "on"}, headers=ip)
+    assert refused.status_code == 402 and "Esta red ya usó" in refused.text
+    # Another network is not affected.
+    other = second.post(
+        "/audits",
+        files=files,
+        data={"consent": "on"},
+        headers={"X-Forwarded-For": "198.51.100.60"},
+        follow_redirects=False,
+    )
+    assert other.status_code == 303
+
+
+def test_free_previews_renew_each_calendar_month_and_lose_the_address(tmp_path: Path) -> None:
+    from quant_trade.audit.accounts import month_start
+
+    _, store, _ = _client(tmp_path)
+    april = datetime(2026, 4, 30, 23, 59, tzinfo=UTC)
+    may = datetime(2026, 5, 1, 0, 0, tzinfo=UTC)
+    store.record_free_preview("a" * 32, "acc", client_ip="1.2.3.4", at=april)  # type: ignore[attr-defined]
+    assert month_start(may) == may and month_start(april) == datetime(2026, 4, 1, tzinfo=UTC)
+    count = store.free_previews_since  # type: ignore[attr-defined]
+    assert count(month_start(april), account_id="acc") == 1
+    assert count(month_start(may), account_id="acc") == 0
+    assert count(month_start(april), client_ip="1.2.3.4") == 1
+    store.purge_expired(may + timedelta(days=40), retention_days=30)  # type: ignore[attr-defined]
+    assert count(month_start(april), client_ip="1.2.3.4") == 0
+    assert count(month_start(april), account_id="acc") == 1
+
+
+# -- the free first full report ----------------------------------------------------
+def _other_file() -> dict[str, tuple[str, bytes, str]]:
+    return {"equity": ("other.csv", csv_bytes(positive_drift(420, seed=7)), "text/csv")}
+
+
+def test_a_new_account_gets_its_first_full_report_free_then_previews(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, welcome=True)
+    page = client.get("/cuenta").text
+    assert "Primer informe completo gratis" in page and "Disponible" in page
+    first = _upload(client)
+    assert first.status_code == 303 and "acct=welcome" in first.headers["location"]
+    report = client.get(first.headers["location"]).text
+    assert "Tu primer informe completo es gratis por crear tu cuenta" in report
+    assert "class='lockbox'" not in report
+    assert not find_claims(re.sub(r"<[^>]+>", " ", report))
+    audit = store.get_audit(_audit_id(first.headers["location"]))  # type: ignore[attr-defined]
+    assert audit.paid and audit.stripe_session_id.startswith("welcome:")
+    # The free full report does not use one of the monthly previews.
+    page = client.get("/cuenta").text
+    assert "Usado" in page and "3 de 3" in page and "gratis, primer informe" in page
+    second = client.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, follow_redirects=False
+    )
+    assert second.status_code == 303 and "acct=" not in second.headers["location"]
+    assert "class='lockbox'" in client.get(second.headers["location"]).text
+
+
+def test_the_free_report_is_once_per_browser_and_once_per_file(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client, "first@example.com", welcome=True)
+    assert "acct=welcome" in _upload(client).headers["location"]
+    device = client.cookies.get("rigor_device")
+    assert device
+    # Another account in the same browser gets a preview, even with a new file.
+    client.cookies.clear()
+    client.cookies.set("rigor_device", device)
+    _signup(client, "second@example.com", welcome=True)
+    same_browser = client.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, follow_redirects=False
+    )
+    assert same_browser.status_code == 303
+    assert "acct=welcome" not in same_browser.headers["location"]
+    # A fresh browser with the same file gets a preview too.
+    fresh = TestClient(client.app)
+    _signup(fresh, "third@example.com", welcome=True)
+    same_file = _upload(fresh)
+    assert same_file.status_code == 303 and "acct=welcome" not in same_file.headers["location"]
+    # ...while a fresh browser with a new file still gets its free full report.
+    other = TestClient(client.app)
+    _signup(other, "fourth@example.com", welcome=True)
+    new_file = other.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, follow_redirects=False
+    )
+    assert "acct=welcome" in new_file.headers["location"]
+
+
+def test_free_reports_are_capped_per_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 1)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    ip = {"X-Forwarded-For": "203.0.113.70"}
+    _signup(client, "first@example.com", welcome=True)
+    first = client.post(
+        "/audits", files=_other_file(), data={"consent": "on"}, headers=ip, follow_redirects=False
+    )
+    assert "acct=welcome" in first.headers["location"]
+    second = TestClient(client.app)
+    _signup(second, "second@example.com", welcome=True)
+    files = {"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")}
+    capped = second.post(
+        "/audits", files=files, data={"consent": "on"}, headers=ip, follow_redirects=False
+    )
+    assert capped.status_code == 303 and "acct=welcome" not in capped.headers["location"]
+
+
+def test_a_deleted_account_cannot_sign_up_again_for_another_free_report(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, welcome=True)
+    assert "acct=welcome" in _upload(client).headers["location"]
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    store.delete_account(account.id)  # type: ignore[attr-defined]
+    assert store.welcome_used(account.id)  # type: ignore[attr-defined]
+
+
+def test_the_free_report_address_is_cleared_by_the_purge(tmp_path: Path) -> None:
+    _, store, _ = _client(tmp_path)
+    old = datetime(2026, 1, 1, tzinfo=UTC)
+    store.spend_welcome("acc", at=old)  # type: ignore[attr-defined]
+    store.grant_welcome(  # type: ignore[attr-defined]
+        "b" * 32, "acc2", device_sha256="d", file_sha256="f", client_ip="1.2.3.4", at=old
+    )
+    since = datetime(2025, 12, 1, tzinfo=UTC)
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="", client_ip="1.2.3.4", since=since, per_ip=1
+        )
+        == ""  # grant failed: there is no such audit, so nothing was recorded
+    )
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(
+            store.welcome_reports.insert().values(  # type: ignore[attr-defined]
+                account_id="acc3",
+                audit_id="",
+                device_sha256="d",
+                file_sha256="f",
+                client_ip="1.2.3.4",
+                created_at=old.isoformat(),
+            )
+        )
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="", client_ip="1.2.3.4", since=since, per_ip=1
+        )
+        == "network"
+    )
+    store.purge_expired(NOW, retention_days=30)  # type: ignore[attr-defined]
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="", client_ip="1.2.3.4", since=since, per_ip=1
+        )
+        == ""
+    )
+    # The device and the file still count after the purge.
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="d", file_sha256="", client_ip="", since=since, per_ip=1
+        )
+        == "device"
+    )
