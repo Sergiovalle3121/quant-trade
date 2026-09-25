@@ -104,7 +104,7 @@ def test_every_link_on_the_portuguese_landing_opens(tmp_path: Path) -> None:
         for href in HREF.findall(page.text)
         if href.startswith("/") and not href.startswith("//")
     }
-    assert "/pt" in links and "/sample?lang=en" in links and "/signup" in links
+    assert "/pt" in links and "/pt/exemplo" in links and "/signup" in links
     for href in sorted(links - {""}):
         response = client.get(href, follow_redirects=False)
         assert response.status_code < 400, (href, response.status_code)
