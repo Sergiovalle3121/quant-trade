@@ -385,3 +385,55 @@ def test_a_trade_closed_on_the_cents_a_withdrawal_left_is_measured_on_the_balanc
     note = [w for w in report.warnings if "balance a withdrawal left" in w]
     assert note and "2024-03-15" in note[0]
     assert untranslated({"inputs": {"parse_warnings": report.warnings}}) == []
+
+
+def _near_empty_statement() -> bytes:
+    """1,000 in; 30 winning days; 1,009.99 out, leaving 0.01; +20 on the cents;
+    1,000 in again and 30 more winning days."""
+    rows = [MYFXBOOK_HEAD, _flow_row(1, "03/01/2024 09:00", "Deposit", 1000.0)]
+    rows += [_win_row(10 + day, day, 1.0) for day in range(2, 12)]
+    rows.append(_flow_row(2, "03/12/2024 20:00", "Withdrawal", -1009.99))
+    rows.append(_win_row(40, 13, 20.0))
+    rows.append(_flow_row(3, "03/14/2024 09:00", "Deposit", 1000.0))
+    rows += [_win_row(50 + day, day, 1.0) for day in range(14, 29)]
+    return ("\n".join(rows) + "\n").encode("utf-8")
+
+
+def test_a_trade_on_an_almost_empty_account_is_named_in_the_account_section() -> None:
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.i18n import spanish
+    from quant_trade.audit.report import LABELS, render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=_near_empty_statement(),
+        report_filename="statement.csv",
+    )
+    result = run_audit(inputs, bootstrap_samples=50, risk_samples=50, challenge_samples=50)
+    data = result.model_dump(mode="json")
+    near = data["account"]["near_empty"]
+    assert near["days"]["value"] == 1 and near["first"] == "2024-03-13"
+    assert spanish(near["days"]["note"])
+    es = render_html(result, watermark=False, locale="es")
+    assert "El 13 mar 2024 una operación ganó o perdió más de lo que un retiro" in es
+    assert "(1 día)" in es
+    en = render_html(result, watermark=False, locale="en")
+    assert "was traded on an almost empty account (1 day)" in en
+    # Measured by the reader: never listed as the platform's own figures.
+    assert "near_empty" not in es
+    for locale in ("es", "en"):
+        assert find_claims(LABELS[locale]["account_near_empty"]) == []
+
+
+def test_an_ordinary_withdrawal_names_no_empty_account() -> None:
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(
+        None, DeclaredMetadata(), report_bytes=_myfxbook(), report_filename="statement.csv"
+    )
+    result = run_audit(inputs, bootstrap_samples=50, risk_samples=50, challenge_samples=50)
+    assert "near_empty" not in result.model_dump(mode="json")["account"]

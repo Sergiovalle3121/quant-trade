@@ -1446,6 +1446,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "mínima del backtest (Bailey, Borwein, López de Prado y Zhu); descuento de "
         "Bonferroni (Harvey y Liu)",
     ),
+    # audit/account.py: trades on the little a withdrawal left
+    (
+        "days with a trade result larger than the balance a withdrawal left, measured on the "
+        "balance before that withdrawal",
+        "días con un resultado mayor que el saldo que dejó un retiro, medidos sobre el saldo "
+        "de antes de ese retiro",
+    ),
     # audit/streaks.py
     (
         "too many trades to count the streak exactly",
