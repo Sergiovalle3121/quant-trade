@@ -118,3 +118,9 @@ def test_the_footer_links_the_sample_pdf(tmp_path: Path) -> None:
     client = _client(tmp_path)
     assert "href='/ejemplo.pdf'" in client.get("/").text
     assert "href='/sample.pdf'" in client.get("/en").text
+
+
+def test_summary_tiles_and_cards_never_split_across_pages() -> None:
+    from quant_trade.audit.pdf import PDF_CSS
+
+    assert ".kpi,.meaning .item,.recon tr{page-break-inside:avoid;break-inside:avoid}" in PDF_CSS
