@@ -1402,6 +1402,27 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "mínima del backtest (Bailey, Borwein, López de Prado y Zhu); descuento de "
         "Bonferroni (Harvey y Liu)",
     ),
+    # audit/streaks.py
+    (
+        "too many trades to count the streak exactly",
+        "demasiadas operaciones para contar la racha con exactitud",
+    ),
+    ("needs both losing and other trades", "necesita operaciones perdedoras y no perdedoras"),
+    (
+        "median longest losing run when trades lose as often as these, in random order",
+        "mediana de la racha perdedora más larga con el mismo porcentaje de perdedoras, "
+        "en orden al azar",
+    ),
+    (
+        "longest losing run chance reaches once in twenty, at the same loss rate",
+        "racha perdedora que el azar alcanza 1 de cada 20 veces, con el mismo porcentaje "
+        "de perdedoras",
+    ),
+    (
+        "chance of a losing run at least this long, at the same loss rate",
+        "probabilidad de una racha perdedora al menos así de larga, con el mismo "
+        "porcentaje de perdedoras",
+    ),
     # audit/ride.py
     ("fewer than twenty points on the curve", "menos de veinte puntos en la curva"),
     ("the curve reaches zero or below", "la curva llega a cero o por debajo"),

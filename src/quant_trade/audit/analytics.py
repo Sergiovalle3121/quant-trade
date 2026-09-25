@@ -23,6 +23,7 @@ import pandas as pd
 
 from quant_trade.audit.prop_presets import ChallengeRules
 from quant_trade.audit.schema import MIN_OBSERVATIONS, measured, not_measured
+from quant_trade.audit.streaks import loss_streak_review
 from quant_trade.core.models import Trade
 from quant_trade.research.bootstrap import stationary_bootstrap_indices
 
@@ -243,6 +244,7 @@ def trade_statistics(
     )
     out["max_consecutive_wins"] = measured(_longest_run([value > 0 for value in pnl]))
     out["max_consecutive_losses"] = measured(_longest_run([value < 0 for value in pnl]))
+    out.update(loss_streak_review(pnl))
 
     hours = np.array(
         [(t.exit_time - t.entry_time).total_seconds() / 3600.0 for t in ordered], dtype=float
