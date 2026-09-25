@@ -113,6 +113,37 @@ def _value(value: str, locale: str) -> str:
     return value or _NOT_SET[locale]
 
 
+def _card_refund_es(ctx: LegalContext) -> str:
+    """How a refund reaches a card, said only while card payment is on."""
+    if not ctx.card_payments:
+        return ""
+    share = (
+        f" Si el informe era parte de un paquete, devolvemos su parte (USD "
+        f"{ctx.pack_price_usd / PACK_CREDITS:.2f}) o, si lo prefieres, un crédito nuevo."
+        if ctx.pack_price_usd
+        else ""
+    )
+    return (
+        "Si pagaste con tarjeta, el reembolso vuelve a la misma tarjeta a través de Stripe; tu "
+        f"banco puede tardar unos días en mostrarlo.{share}"
+    )
+
+
+def _card_refund_en(ctx: LegalContext) -> str:
+    if not ctx.card_payments:
+        return ""
+    share = (
+        f" If the report was part of a pack, we refund its share (USD "
+        f"{ctx.pack_price_usd / PACK_CREDITS:.2f}) or, if you prefer, issue a new credit."
+        if ctx.pack_price_usd
+        else ""
+    )
+    return (
+        "If you paid by card, the refund goes back to the same card through Stripe; your bank "
+        f"may take a few days to show it.{share}"
+    )
+
+
 def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.free_mode:
         return (
@@ -126,8 +157,9 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     ]
     if ctx.card_payments:
         lines.append(
-            "El pago con tarjeta lo procesa Stripe. Nosotros no vemos ni guardamos los datos "
-            "de tu tarjeta."
+            "El pago con tarjeta lo procesa Stripe en su propia página de pago. El cargo se "
+            "hace en dólares estadounidenses (USD); tu banco puede cobrar una comisión por el "
+            "cambio de moneda. Nosotros no vemos ni guardamos los datos de tu tarjeta."
         )
     if ctx.access_codes:
         lines.append(
@@ -160,6 +192,8 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
         "momento, un informe ya desbloqueado no se reembolsa, salvo que la ley aplicable "
         "diga otra cosa."
     )
+    if ctx.card_payments:
+        lines.append(_card_refund_es(ctx))
     return tuple(lines)
 
 
@@ -173,7 +207,9 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
     lines = [f"The preview is free. The full report costs USD {ctx.price_usd:.2f} per audit."]
     if ctx.card_payments:
         lines.append(
-            "Card payments are processed by Stripe. We never see or store your card details."
+            "Card payments are processed by Stripe on its own checkout page. The charge is in "
+            "US dollars (USD); your bank may add a currency conversion fee. We never see or "
+            "store your card details."
         )
     if ctx.access_codes:
         lines.append(
@@ -205,6 +241,8 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
         "delivered at once, a report already unlocked is not refunded unless the applicable "
         "law says otherwise."
     )
+    if ctx.card_payments:
+        lines.append(_card_refund_en(ctx))
     return tuple(lines)
 
 
@@ -398,6 +436,29 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     return LegalText("Términos del servicio", warning, sections, LEGAL_UPDATED)
 
 
+def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
+    """What a card payment leaves with us and what Stripe receives; empty while off."""
+    if not ctx.card_payments:
+        return ()
+    if locale == "en":
+        return (
+            "When you pay by card: the Stripe checkout session id, the payment date and, for "
+            "a pack, the hash of the pack's access code.",
+            "Stripe receives your card details, the e-mail address you type on its checkout "
+            "page (it sends the receipt there) and your card's country, plus the report id and "
+            "whether you bought one report or the pack. Stripe processes them under its own "
+            f"policy: {STRIPE_PRIVACY_URL}. We never see your card details.",
+        )
+    return (
+        "Si pagas con tarjeta: el identificador de la sesión de pago de Stripe, la fecha del "
+        "pago y, si compras el paquete, el hash de su código de acceso.",
+        "Stripe recibe los datos de tu tarjeta, el correo que escribes en su página de pago "
+        "(ahí te envía el recibo) y el país de tu tarjeta, además del identificador del "
+        "informe y si compraste un informe o el paquete. Stripe los trata según su propia "
+        f"política: {STRIPE_PRIVACY_URL}. Nosotros nunca vemos los datos de tu tarjeta.",
+    )
+
+
 def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     locale = _locale(locale)
     name = _value(ctx.operator_name, locale)
@@ -419,9 +480,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "The IP address the upload came from, to enforce the limit of "
                     f"{limit} uploads per hour per address and to stop abuse.",
                     "A hash of your report's private token, never the token itself.",
-                    "When card payment is on: the Stripe checkout session id and the payment "
-                    "date. Stripe processes the card; we never see its details. Stripe's "
-                    f"policy: {STRIPE_PRIVACY_URL}.",
+                    *_stripe_keeps(ctx, "en"),
                     "When you redeem an access code: which code unlocked the audit, by its "
                     "internal id. Codes are stored only as a hash.",
                     "When you publish a verification page: its public id and the date.",
@@ -470,8 +529,13 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Who can see it",
                 (
                     "Only the operator, and the hosting and database providers that store "
-                    "it for us. Stripe sees what it needs to take a card payment. A "
-                    "verification page, only if you publish it, shows the class, the "
+                    "it for us."
+                    + (
+                        " Stripe sees what it needs to take a card payment."
+                        if ctx.card_payments
+                        else ""
+                    )
+                    + " A verification page, only if you publish it, shows the class, the "
                     "dimensions, the hashes, the date and a fixed notice; never your files, "
                     "trades, description or token.",
                     "The data may be hosted outside your country, on the servers of our "
@@ -508,9 +572,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "La dirección IP desde la que subes, para aplicar el límite de "
                 f"{limit} subidas por hora por dirección y frenar abusos.",
                 "Un hash del token privado de tu informe, nunca el token.",
-                "Si el pago con tarjeta está activo: el identificador de la sesión de pago "
-                "de Stripe y la fecha del pago. Stripe procesa la tarjeta; nosotros nunca "
-                f"vemos sus datos. Política de Stripe: {STRIPE_PRIVACY_URL}.",
+                *_stripe_keeps(ctx, "es"),
                 "Si canjeas un código de acceso: qué código desbloqueó la auditoría, por su "
                 "identificador interno. Los códigos se guardan solo como hash.",
                 "Si publicas una página de verificación: su identificador público y la fecha.",
@@ -561,8 +623,13 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             "Quién puede verlos",
             (
                 "Solo el operador y los proveedores de alojamiento y de base de datos que los "
-                "guardan por nosotros. Stripe ve lo que necesita para cobrar con tarjeta. Una "
-                "página de verificación, solo si la publicas, muestra la clase, las "
+                "guardan por nosotros."
+                + (
+                    " Stripe ve lo que necesita para cobrar con tarjeta."
+                    if ctx.card_payments
+                    else ""
+                )
+                + " Una página de verificación, solo si la publicas, muestra la clase, las "
                 "dimensiones, los hashes, la fecha y un aviso fijo; nunca tus archivos, "
                 "operaciones, descripción ni el token.",
                 "Los datos pueden alojarse fuera de tu país, en los servidores de nuestro "

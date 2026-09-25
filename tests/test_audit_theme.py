@@ -128,3 +128,8 @@ def test_a_chosen_report_turns_the_drop_zone_into_a_ready_state() -> None:
     assert ".drop-main.has .icon svg{display:none}" in STYLE
     assert ".drop-main.has .formats{display:none}" in STYLE
     assert 'zone.classList.toggle("has"' in (STATIC_DIR / "app.js").read_text()
+
+
+def test_guide_steps_wrap_long_code_lines_on_phones() -> None:
+    # A step like pf.trades.records_readable.to_csv(...) must not widen the page.
+    assert "grid-template-columns:minmax(0,1fr)}\n.list-steps li{overflow-wrap:anywhere}" in STYLE
