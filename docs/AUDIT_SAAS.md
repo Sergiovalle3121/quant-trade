@@ -217,7 +217,13 @@ it) is that trade's direction on a closed-trade row; on a fill, closing a long
 sells and closing a short buys. `Fees Paid` and `Exec Fee` are costs. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date, and a month
-name in English or Spanish (`07 Aug 2026`, `02-Jan-2026`, `15 ene 2026`). Day/month
+name in English, Spanish, Portuguese, French, German or Italian (`07 Aug
+2026`, `02-Jan-2026`, `15 ene 2026`, `09 out 2026`, `03 août 2026`, `06 Okt
+2026`, `07 ott 2026`). When a file has several `Net <currency>` columns, the
+one in the currency of its `Balance <currency>` column is the result. A zone
+word in a column name (`EDT`, `CST`) is a fixed offset for every row: a
+Rithmic export that prints the zone at export time reads winter trades one
+hour off under `EDT` (limitation, not corrected). Day/month
 order that no day past 12 settles is taken from a year-first column of the
 same rows (Tradovate's `Trade Date`) or another day/month column of the file;
 otherwise the `ambiguous_dates` error stands. A file listed newest first
@@ -2205,7 +2211,20 @@ with no date or value column the curve reader knows (`missing_timestamp`,
 `Equity` column preselected. A cell with both marks, a repeated mark or a lone
 mark not followed by three digits is read with the mark it settles; only
 `1.234`-like cells follow the column's vote, so a hand-typed column mixing
-`12.34` and `-5,60` is never read a hundred times too large. The decimal mark of a named figure column comes from its cells
+`12.34` and `-5,60` is never read a hundred times too large. A repeated mark
+is a thousands separator only when groups of exactly three digits follow it
+(`1.234.567`); `1.2.3`, `1,,2` or `1.234.56` are unreadable and counted with
+the rows left out.
+
+A list with no header row whose first row holds a date (an exported P&L list
+often has none) is shown with numbered columns (`Col. 1`, `Col. 2`...), in
+the report and in the curve field, and read with a date and a result or a
+balance chosen among them; a row with a date in it is never taken for the
+header. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
+column in the report field too. When the file has no price column and either a balance column or
+fewer than two date columns, the date-and-balance-or-result group comes first
+and alone is preselected (a `Volumen` column is not guessed as a trade's
+quantity); a trade list keeps the trade fields first. The decimal mark of a named figure column comes from its cells
 (`12.34` in a semicolon file is twelve), not from the delimiter alone.
 
 A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched

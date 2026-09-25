@@ -683,6 +683,15 @@ def guess_columns(header: Sequence[str]) -> dict[str, int]:
         if len(prices) >= 2:
             columns.setdefault("entry_price", prices[0])
             columns.setdefault("exit_price", prices[1])
+    profits = ranked.get("profit", [])
+    if len(profits) > 1:
+        # cTrader lists "Net USD" and "Net EUR": the one in the balance's currency.
+        names = [normalise(str(name)) for name in header]
+        balances = {name[7:] for name in names if name.startswith("balance") and len(name) == 10}
+        for _, position in profits:
+            if names[position].startswith("net") and names[position][3:] in balances:
+                columns["profit"] = position
+                break
     if "symbol" not in columns:
         # Bybit names the instrument column "Contracts" and its size "Qty".
         for position, name in enumerate(header):
@@ -970,29 +979,36 @@ _ZONES = {
 }  # fmt: skip
 _COMPACT = re.compile(r"^(\d{4})(\d{2})(\d{2})(?:[;,T ]+(\d{2}):?(\d{2}):?(\d{2})?)?$")
 _SHORT_YEAR = re.compile(r"^(\d{1,2})([/.\-])(\d{1,2})\2(\d{2})(?=\s|$)")
-#: ``07 Aug 2026`` (cTrader statements) and ``02-Jan-2025`` (Saxo), English or Spanish.
-_MONTH_NAME = re.compile(r"^(\d{1,2})[ \-]([A-Za-z]{3,10})\.?[ \-](\d{4})(?=[\sT]|$)")
+#: ``07 Aug 2026`` (cTrader statements) and ``02-Jan-2025`` (Saxo), with the
+#: month in English, Spanish, Portuguese, French, German or Italian.
+_MONTH_NAME = re.compile(r"^(\d{1,2})[ \-]([^\W\d_]{3,10})\.?[ \-](\d{4})(?=[\sT]|$)")
 _MONTHS = {
     name: number
     for number, names in enumerate(
         (
-            ("jan", "january", "ene", "enero"),
-            ("feb", "february", "febrero"),
-            ("mar", "march", "marzo"),
-            ("apr", "april", "abr", "abril"),
-            ("may", "mayo"),
-            ("jun", "june", "junio"),
-            ("jul", "july", "julio"),
-            ("aug", "august", "ago", "agosto"),
-            ("sep", "sept", "september", "septiembre", "set", "setiembre"),
-            ("oct", "october", "octubre"),
-            ("nov", "november", "noviembre"),
-            ("dec", "december", "dic", "diciembre"),
+            ("jan", "january", "ene", "enero", "janeiro", "janv", "janvier", "januar",
+             "gen", "gennaio"),
+            ("feb", "february", "febrero", "fev", "fevereiro", "fév", "févr", "fevr", "février",
+             "fevrier", "februar", "febbraio"),
+            ("mar", "march", "marzo", "março", "marco", "mars", "mär", "mrz", "märz",
+             "maerz"),
+            ("apr", "april", "abr", "abril", "avr", "avril", "aprile"),
+            ("may", "mayo", "mai", "maio", "mag", "maggio"),
+            ("jun", "june", "junio", "junho", "juin", "juni", "giu", "giugno"),
+            ("jul", "july", "julio", "julho", "juil", "juillet", "juli", "lug", "luglio"),
+            ("aug", "august", "ago", "agosto", "août", "aout"),
+            ("sep", "sept", "september", "septiembre", "set", "setiembre", "setembro",
+             "septembre", "settembre"),
+            ("oct", "october", "octubre", "out", "outubro", "octobre", "okt", "oktober",
+             "ott", "ottobre"),
+            ("nov", "november", "noviembre", "novembro", "novembre"),
+            ("dec", "december", "dic", "diciembre", "dez", "dezembro", "déc", "décembre",
+             "decembre", "dezember", "dicembre"),
         ),
         start=1,
     )
     for name in names
-}
+}  # fmt: skip
 _TAIL_OFFSET = re.compile(r"\s*(?:(?:UTC|GMT)?([+-])(\d{1,2}):?(\d{2})?)$")
 _CLOCK = re.compile(r"^\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?(\s*[AaPp][Mm])?$")
 _ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
