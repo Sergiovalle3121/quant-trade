@@ -505,6 +505,12 @@ and report wire them in during the integration step):
   after its own fees, the same rule as the weekday, hour, instrument and
   losing-streak tables; the gross share stays as "Aciertos antes de
   comisiones", and the annualised table no longer repeats the win rate.
+  The long/short net results use the same fees, so they add up to the
+  trades' net. The cost table recomputes each trade from price and size;
+  when its no-extra-cost row differs from the trades' net, a note gives the
+  gap (price rounding, currency conversion). The resampled time under the
+  peak reads "median" and "in 1 of every 20" instead of p50/p95, and the
+  header names the engine version and simulation seed in words.
 - `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
   the uploaded returns over one year, 2,000 paths by default, capped at
   2,000,000 resampled cells. A curve finer than 10,000 periods a year
