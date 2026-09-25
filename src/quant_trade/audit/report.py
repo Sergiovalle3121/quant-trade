@@ -811,13 +811,15 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
         shown = _e(labels["yes" if raw else "no"]) if isinstance(raw, bool) else _fmt(raw, key=key)
         note = localize(value.get("note", ""), _locale_of(labels))
         rows.append(
-            f"<tr><td>{_e(_key_label(key, labels))}</td><td>{shown}</td>"
+            f"<tr><td>{_e(_key_label(key, labels))}</td><td class='val'>{shown}</td>"
             f"<td>{_badge(value['evidence'])}</td><td class='muted'>{_e(note)}</td></tr>"
         )
     if not rows:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
-        f"<table><tr><th>{_e(labels['metric'])}</th><th>{_e(labels['value'])}</th>"
+        "<table class='metrics'><colgroup><col class='c-k'><col class='c-v'>"
+        "<col class='c-e'><col></colgroup>"
+        f"<tr><th>{_e(labels['metric'])}</th><th class='val'>{_e(labels['value'])}</th>"
         f"<th>{_e(labels['evidence'])}</th><th>{_e(labels['note'])}</th></tr>"
         + "".join(rows)
         + "</table>"

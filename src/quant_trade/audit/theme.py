@@ -730,6 +730,12 @@ th,td{padding:12px 15px;text-align:left;vertical-align:top;border-bottom:1px sol
 th{background:#fafafb;font:500 .68rem var(--mono);text-transform:uppercase;letter-spacing:.1em;
 color:var(--text-3)}
 .paper tr:hover>td{background:#fafafb}
+.paper table.metrics{table-layout:fixed}
+.metrics .c-k{width:30%}.metrics .c-v{width:15%}.metrics .c-e{width:170px}
+.metrics td:first-child{font-weight:500}
+.metrics .val{text-align:right;padding-right:28px}
+.metrics td.val{color:var(--text);font-size:.95rem;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+@media (max-width:759px){.paper table.metrics{table-layout:auto}.metrics .val{padding-right:18px}.metrics td:first-child{min-width:150px}}
 .paper figure.chart svg{background:#fff;border-radius:18px;border:1px solid var(--border)}
 @media (max-width:620px){
 .paper figure.chart{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -874,6 +880,7 @@ PRINT = """
 @media print{
 .recon-row{padding:12px 18px;gap:16px;break-inside:avoid;box-shadow:none!important}
 .recon-v span{min-width:0}
+.metrics .val{padding-right:14px}.metrics .c-v{width:17%}
 .recon-v i{margin:0 16px}.recon-row .badge{margin-left:18px}
 :root,.hero,.page-hero,.report-hero,.lockbox,.verdict{--bg:#fff;--surface:#fff;--surface-2:#f4f4f6;
 --surface-solid:#fff;--text:#000;--text-2:#333;--text-3:#555;--border:#ddd;--border-2:#ccc;

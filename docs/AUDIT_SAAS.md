@@ -675,6 +675,10 @@ phones and is left out of print and the PDF.
 from the rows as a card per figure (`=` when they match, a red `≠` and border
 when they do not), in the section row as its own link and in the PDF.
 
+Metric tables share fixed columns (metric, value, evidence, note) so values
+line up from one table to the next; values are right-aligned in the text
+face. On phones each table scrolls sideways inside its box, never the page.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and
