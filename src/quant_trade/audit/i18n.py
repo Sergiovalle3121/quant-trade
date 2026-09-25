@@ -744,6 +744,18 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "parte de las operaciones tras una ganancia abiertas en menos de 15 minutos",
     ),
     ("share of trades with a net profit", "parte de las operaciones con resultado neto positivo"),
+    ("the file has no time of day", "el archivo no tiene hora del día"),
+    (
+        "the file does not name each trade's instrument",
+        "el archivo no indica el instrumento de cada operación",
+    ),
+    ("every trade is on one instrument", "todas las operaciones son del mismo instrumento"),
+    (
+        "closed trades by the instrument the file names; net result after the fees the file "
+        "itemises",
+        "operaciones cerradas por el instrumento que indica el archivo; resultado neto tras los "
+        "costes que detalla el archivo",
+    ),
     (
         "share with a net profit among trades that follow {n} losses in a row",
         "parte con resultado neto positivo entre las operaciones que siguen a {n} pérdidas "

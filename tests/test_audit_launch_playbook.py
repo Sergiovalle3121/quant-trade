@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from quant_trade.audit.guard import assert_report_clean, find_claims
+from quant_trade.audit.seo import BRAND
 
 PLAYBOOK = Path(__file__).resolve().parents[1] / "docs" / "AUDIT_LAUNCH_PLAYBOOK.md"
 
@@ -38,6 +39,21 @@ TEMPLATE_ONLY_PATTERNS: tuple[str, ...] = (
     r"\bmake\s+money\b",
     r"\bpass\s+(?:the|your|a)\s+challenge",
     r"\bfunded\s+for\s+sure\b",
+)
+
+
+#: The owner asked to sell before giving anything away ("antes de dar pruebas
+#: gratis necesito vender algo bien"), so no template offers a free audit or
+#: a free full report. The free preview is the only free thing and may be
+#: named.
+FREE_AUDIT_PATTERNS: tuple[str, ...] = (
+    r"\bauditor[ií]as?\s+(?:completas?\s+)?gratis",
+    r"\binformes?\s+(?:completos?\s+)?gratis",
+    r"\bprimer[ao]s?\s+(?:\d+\s+)?(?:auditor[ií]as?|informes?)\s+(?:es|son)?\s*gratis",
+    r"\bgratis\s+a\s+cambio\b",
+    r"\bfree\s+(?:full\s+)?(?:audits?|reports?)\b",
+    r"\b(?:audit|report)s?\s+(?:is|are)\s+free\b",
+    r"\bfor\s+free\b",
 )
 
 
@@ -106,3 +122,33 @@ def test_every_community_row_has_a_url_and_a_check_date() -> None:
     assert len(rows) >= 8
     for row in rows:
         assert re.search(r"\b2026-\d{2}-\d{2}\b", row)
+
+
+def test_no_template_offers_a_free_audit() -> None:
+    for match in _templates():
+        lowered = match["body"].lower()
+        hits = [pattern for pattern in FREE_AUDIT_PATTERNS if re.search(pattern, lowered)]
+        assert hits == [], f"{match['id']}-{match['lang']}"
+
+
+def test_free_audit_patterns_catch_the_old_offers() -> None:
+    offers = [
+        "La primera auditoría es gratis",
+        "Primeras 10 auditorías completas gratis a cambio de opinión",
+        "The first audit is free",
+        "I will audit the public backtest of 10 robots for free",
+    ]
+    for offer in offers:
+        assert any(re.search(pattern, offer.lower()) for pattern in FREE_AUDIT_PATTERNS)
+    assert not any(
+        re.search(pattern, "la vista previa es gratis; the preview is free")
+        for pattern in FREE_AUDIT_PATTERNS
+    )
+
+
+def test_playbook_uses_the_brand_and_current_prices() -> None:
+    text = _playbook()
+    assert text.startswith(f"# Plan de lanzamiento de {BRAND}")
+    for match in _templates():
+        if match["id"][0] in {"P", "W", "D", "V"} and "USD" in match["body"]:
+            assert "USD 29" in match["body"]
