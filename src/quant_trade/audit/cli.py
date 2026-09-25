@@ -349,6 +349,70 @@ def waitlist_remove(
     typer.echo("removed from the list" if yes else "on the list; pass --yes to remove it")
 
 
+@audit_app.command("account-delete")
+def account_delete(
+    email: Annotated[str, typer.Argument(help="The account's e-mail")],
+    with_reports: Annotated[
+        bool, typer.Option("--with-reports", help="Also delete every report on the account")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", help="Actually delete")] = False,
+) -> None:
+    """Delete a customer account at its holder's request: e-mail, password hash,
+    sessions and the links to its reports and codes (and, with
+    ``--with-reports``, the reports). Without ``--yes`` only shows what would go.
+    """
+    from quant_trade.audit.accounts import normalise_email
+
+    store = _store()
+    account = store.find_account(normalise_email(email))
+    if account is None:
+        typer.echo("no account with that e-mail", err=True)
+        raise typer.Exit(code=1)
+    reports = len(store.account_audits_list(account.id))
+    what = (
+        f"account {account.id} (created {account.created_at}, {reports} report(s)"
+        f"{', reports included' if with_reports else ', reports kept'})"
+    )
+    if not yes:
+        typer.echo(f"would delete {what}; pass --yes")
+        return
+    store.delete_account(account.id, with_reports=with_reports)
+    typer.echo(f"deleted {what}")
+
+
+@audit_app.command("account-reset")
+def account_reset(
+    email: Annotated[str, typer.Argument(help="The account's e-mail")],
+) -> None:
+    """Print a one-time password reset link (24 hours) for a customer account.
+
+    Send it only after checking the request comes from the account's e-mail.
+    The link is printed once; only its hash is stored.
+    """
+    from datetime import UTC, datetime
+
+    from quant_trade.audit.account_pages import path
+    from quant_trade.audit.accounts import (
+        RESET_HOURS,
+        hash_secret,
+        new_secret,
+        normalise_email,
+    )
+    from quant_trade.audit.settings import AuditSettings
+
+    store = _store()
+    account = store.find_account(normalise_email(email))
+    if account is None:
+        typer.echo("no account with that e-mail", err=True)
+        raise typer.Exit(code=1)
+    secret = new_secret()
+    store.create_reset(
+        account.id, token_sha256=hash_secret(secret), at=datetime.now(UTC), hours=RESET_HOURS
+    )
+    base = AuditSettings.from_env().base_url
+    typer.echo(f"{base}{path('reset', account.locale)}?token={secret}")
+
+
 def _store() -> Any:
     try:
         from quant_trade.audit.settings import AuditSettings

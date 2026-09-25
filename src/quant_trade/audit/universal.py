@@ -1029,6 +1029,8 @@ def parse(
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:
         other_coin = _fills(draft, mapping, rows, decimal, serial_dates)
+    if not draft.trips and chosen:
+        _refuse_unreadable_choice(mapping, chosen, rows, decimal, serial_dates)
     if "commission" in mapping.columns or "swap" in mapping.columns:
         draft.itemised = {name for name in ("commission", "swap") if name in mapping.columns}
     if (
@@ -1039,6 +1041,50 @@ def parse(
     ):
         draft.warnings.append("every trade has zero commission and fees")
     return draft
+
+
+#: How a refusal names a role the customer mapped: (English, Spanish).
+ROLE_WORDS: dict[str, tuple[str, str]] = {
+    "quantity": ("quantity", "cantidad"),
+    "entry_time": ("entry time", "hora de entrada"),
+    "exit_time": ("exit time", "hora de salida"),
+    "time": ("fill time", "hora de la ejecución"),
+    "entry_price": ("entry price", "precio de entrada"),
+    "exit_price": ("exit price", "precio de salida"),
+    "price": ("fill price", "precio de la ejecución"),
+    "profit": ("trade result", "resultado de la operación"),
+}
+
+
+def _refuse_unreadable_choice(
+    mapping: ColumnMap,
+    chosen: Mapping[str, str],
+    rows: list[list[str]],
+    decimal: str,
+    serial: bool,
+) -> None:
+    """Name the column the customer mapped when it holds nothing readable
+    for its role (text chosen as the quantity), instead of the generic
+    "no closed trades"."""
+    for role, (word_en, word_es) in ROLE_WORDS.items():
+        if role not in chosen or role not in mapping.columns:
+            continue
+        values = [_cell(row, mapping.columns, role) for row in rows]
+        if role.endswith("time"):
+            times = _times(values, serial, rows, mapping.columns[role], mapping.date_column)
+            readable = any(moment is not None for moment in times.values)
+            kind_en, kind_es = "dates", "fechas"
+        else:
+            readable = any(_amount(value, decimal) is not None for value in values)
+            kind_en, kind_es = "numbers", "números"
+        if readable:
+            continue
+        name = imp._clip(mapping.names.get(role, chosen[role]), 60)
+        raise imp.ReportFormatError(
+            "universal_column_unreadable",
+            f'the column "{name}" you chose as {word_en} holds no {kind_en}',
+            f"la columna «{name}» que elegiste como {word_es} no tiene {kind_es}",
+        )
 
 
 @dataclass
