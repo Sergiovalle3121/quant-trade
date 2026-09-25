@@ -3958,18 +3958,18 @@ def _luck_html(luck: dict[str, Any] | None, locale: str, labels: dict[str, str])
         return "yes" if float(row["years_needed"]["value"]) <= span_value else "no"
 
     rows = "".join(
-        f"<tr><td>{int(row['trials']):,}</td>"
+        f"<tr><td data-l='{_e(labels['luck_table_trials'])}'>{int(row['trials']):,}</td>"
         f"<td class='val' data-l='{_e(labels['luck_table_luck'])}'>"
         f"{float(row['luck_sharpe']['value']):.2f}</td>"
         f"<td class='val' data-l='{_e(labels['luck_table_years'])}'>"
         f"{_e(years(float(row['years_needed']['value'])))}</td>"
-        f"<td class='val' data-l='{_e(labels['luck_table_enough'])}'>"
+        f"<td class='val enough-{enough(row)}' data-l='{_e(labels['luck_table_enough'])}'>"
         f"{_e(labels[enough(row)])}</td></tr>"
         for row in luck.get("what_if") or []
     )
     if rows:
         out += (
-            f"<table><thead><tr><th>{_e(labels['luck_table_trials'])}</th>"
+            f"<table class='luck'><thead><tr><th>{_e(labels['luck_table_trials'])}</th>"
             f"<th class='val'>{_e(labels['luck_table_luck'])}</th>"
             f"<th class='val'>{_e(labels['luck_table_years'])}</th>"
             f"<th class='val'>{_e(labels['luck_table_enough'])}</th></tr></thead>"
