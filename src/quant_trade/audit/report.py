@@ -237,6 +237,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Solo cuenta operaciones cerradas: las pérdidas de las posiciones mientras seguían "
             "abiertas no entran, así que el capital necesario puede ser mayor."
         ),
+        "what_to_do": "Qué hacer:",
         "capital_missing": (
             "Para calcular el capital y el tamaño, sube al menos 30 operaciones cerradas "
             "repartidas en 3 meses o más del mismo sistema; con un año completo las cifras son "
@@ -679,6 +680,7 @@ LABELS: dict[str, dict[str, str]] = {
             "It counts closed trades only: losses of positions while they were still open are "
             "not included, so the capital needed may be larger."
         ),
+        "what_to_do": "What to do:",
         "capital_missing": (
             "To work out the capital and the size, upload at least 30 closed trades spread "
             "over 3 months or more of the same system; a full year makes the figures firmer."
@@ -2596,6 +2598,17 @@ def _capital_html(
         # The hint answers "too few trades" or "too short"; not "no fall to size".
         short = str(capital.get("reason", "")).startswith("needs ")
         hint = f"<p class='muted'>{_e(labels['capital_missing'])}</p>" if short else ""
+        reason = _localized_reason(str(capital.get("reason", "")), locale)
+        parts = re.split(r";\s+(?=(?:sube|upload)\b)", reason, maxsplit=1)
+        if len(parts) == 2:
+            # "...understate the real fall; upload an equity curve..." puts the fix on its own line.
+            head = parts[0][:1].upper() + parts[0][1:]
+            fix = parts[1][:1].upper() + parts[1][1:].rstrip(".") + "."
+            return (
+                f"<div class='live-verdict held'><p>{_badge('NOT_MEASURED')} "
+                f"<span class='muted'>{_e(head)}.</span></p>"
+                f"<p class='muted'><b>{_e(labels['what_to_do'])}</b> {_e(fix)}</p>{hint}</div>"
+            )
         return f"<div class='live-verdict held'>{_status_line(capital, labels)}{hint}</div>"
 
     def label(key: str) -> str:

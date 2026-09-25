@@ -362,3 +362,17 @@ def test_long_key_figures_step_down_to_fit_a_phone_tile() -> None:
     data["performance"]["total_return"]["value"] = 100000.046
     huge = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
     assert "<div class='kpi  xlong'><b>+10,000,004.6%</b>" in huge
+
+
+def test_grid_capital_hold_back_puts_the_fix_on_its_own_line() -> None:
+    from quant_trade.audit.report import LABELS, _capital_html
+    from quant_trade.audit.sizing import HIDDEN_LOSSES
+
+    for locale in ("es", "en"):
+        held = _capital_html(
+            {"status": "NOT_MEASURED", "reason": HIDDEN_LOSSES}, locale, LABELS[locale]
+        )
+        assert held.startswith("<div class='live-verdict held'>")
+        assert f"<b>{LABELS[locale]['what_to_do']}</b> " in held
+        assert ("Sube una curva" if locale == "es" else "Upload an equity curve") in held
+        assert find_claims(held) == []

@@ -1169,6 +1169,8 @@ When an upload error ends with the fix ("…: sube la optimización del mismo ro
 
 Key figure tiles step their font down for long values (9+ and 12+ characters) so a figure like +10,000,004.6% stays inside a 360 px tile. The cost multiplier table scrolls inside its own box on tablets, and in the PDF it keeps every column on the page with smaller type.
 
+When capital is held back because the trades overlap as a grid or hide open losses, the grey card states the reason and puts what to upload on its own "Qué hacer:" line.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
