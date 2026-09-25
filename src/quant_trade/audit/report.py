@@ -3301,10 +3301,10 @@ def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[s
                 readable=int(review["readable"]["value"]),
             ),
         }
-        items = "".join(f"<li>{_e(texts[code])}</li>" for code in findings)
+        items = "".join(_behaviour_ask(texts[code]) for code in findings)
         out += (
-            f"<div class='live-verdict lv-WEAK'><span class='badge WEAK'>"
-            f"{_e(labels['beh_badge_found'])}</span><ul>{items}</ul></div>"
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>{items}</ul></div>"
         )
     elif review.get("best"):
         out += (
