@@ -50,6 +50,11 @@ MAX_VARIANTS = 500
 #: square of their count, and a 5 MB line of fields pins a worker for minutes;
 #: a header of 500 variant names, or a row of 500 returns, fits in 32 KB.
 MAX_CSV_LINE_BYTES = 32_768
+#: Largest account value read, and largest return in one period. No account
+#: holds a thousand trillion; a 1e308 balance overflowed every later sum and
+#: left the report without figures to print.
+MAX_ACCOUNT_VALUE = 1e15
+MAX_PERIOD_RETURN = 1e6
 MIN_OBSERVATIONS = 30
 
 TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha")
@@ -414,6 +419,18 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         )
 
     values = frame["value"].astype(float)
+    limit = MAX_ACCOUNT_VALUE if source == "equity" else MAX_PERIOD_RETURN
+    huge = values.abs() > limit
+    if bool(huge.any()):
+        when = frame.loc[huge.idxmax(), "timestamp"].strftime("%Y-%m-%d")
+        raise ParseError(
+            f"the {what} file has a value too large to be real on {when} (over {limit:,.0f})",
+            message_es=(
+                f"El archivo {_file_es(what)} tiene un valor demasiado grande para ser real "
+                f"el {when} (más de {limit:,.0f})."
+            ),
+            code="value_too_large",
+        )
     bad = values <= 0 if source == "equity" else values <= -1
     if bool(bad.any()):
         when = frame.loc[bad.idxmax(), "timestamp"].strftime("%Y-%m-%d")

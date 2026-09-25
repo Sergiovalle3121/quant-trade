@@ -687,3 +687,70 @@ def test_an_id_holding_a_nul_is_not_found_without_asking_the_database(tmp_path: 
     assert store.disable_access_code("a\x00") is False
     assert store.unpublish("a\x00") is False
     assert store.delete_audit("a\x00") is False
+
+
+def _signal_csv(profits: list[float]) -> bytes:
+    """An MQL5 signal history: a 10,000 deposit, then one trade a day."""
+    rows = [
+        "Time;Type;Volume;Symbol;Price;S/L;T/P;Time;Price;Commission;Swap;Profit",
+        "2023.12.31 08:00:00;Balance;;;;;;;;;;10000",
+    ]
+    for i, profit in enumerate(profits):
+        entry = datetime(2024, 1, 1) + timedelta(days=i)
+        leave = entry + timedelta(hours=1)
+        rows.append(
+            f"{entry:%Y.%m.%d %H:%M:%S};Buy;0.10;EURUSD;1.10000;;;"
+            f"{leave:%Y.%m.%d %H:%M:%S};1.10010;0;0;{profit}"
+        )
+    return "\n".join(rows).encode()
+
+
+def test_an_absurd_trade_profit_is_refused_not_a_blank_report() -> None:
+    # A 1e308 profit overflowed every later sum: the capital section had no
+    # fall to print and the report page failed with a server error.
+    data = _signal_csv([1e308 if i == 10 else 1.0 for i in range(60)])
+    with pytest.raises(ParseError) as caught:
+        build_inputs(None, DeclaredMetadata(), report_bytes=data, report_filename="h.csv")
+    assert caught.value.code == "value_too_large"
+    assert "demasiado grande" in caught.value.message_es
+
+
+@pytest.mark.parametrize(("value", "refused"), [(1e200, True), (9e14, False)])
+def test_an_equity_value_beyond_any_account_is_refused(value: float, refused: bool) -> None:
+    curve = positive_drift(300)
+    curve.loc[100, "equity"] = value
+    if refused:
+        with pytest.raises(ParseError) as caught:
+            parse_equity_csv(csv_bytes(curve))
+        assert caught.value.code == "value_too_large"
+    else:
+        assert len(parse_equity_csv(csv_bytes(curve)).frame) == 300
+
+
+def test_a_return_beyond_any_account_is_refused() -> None:
+    curve = positive_drift(300)
+    returns = pd.DataFrame({"timestamp": curve["timestamp"], "return": 0.001})
+    returns.loc[50, "return"] = 1e300
+    with pytest.raises(ParseError) as caught:
+        parse_equity_csv(csv_bytes(returns))
+    assert caught.value.code == "value_too_large"
+
+
+def test_capital_is_not_measured_when_the_fall_overflows() -> None:
+    from quant_trade.audit.sizing import capital_review
+
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    trades = [
+        Trade(
+            entry_time=start + timedelta(days=4 * i),
+            exit_time=start + timedelta(days=4 * i, hours=4),
+            quantity=1.0,
+            entry_price=1.0,
+            exit_price=1.0,
+            pnl=-1e308 if i % 2 else 1e308,
+            return_pct=0.0,
+        )
+        for i in range(60)
+    ]
+    review = capital_review(trades, fees=None, starting_balance=10_000.0, samples=50)
+    assert review["status"] == "NOT_MEASURED"
