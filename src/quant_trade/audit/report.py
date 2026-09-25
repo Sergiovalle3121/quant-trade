@@ -188,6 +188,12 @@ LABELS: dict[str, dict[str, str]] = {
         "plateau_value": "Valor",
         "plateau_result": "Beneficio",
         "plateau_clean": "Los vecinos conservan buena parte del resultado: parece una meseta.",
+        "plateau_peak": (
+            "Los vecinos pierden buena parte del resultado: parece un pico aislado. "
+            "Lo verás también en las banderas rojas."
+        ),
+        "plateau_badge_clean": "Meseta",
+        "plateau_badge_peak": "Pico aislado",
         "capital_intro": (
             "Cuánto dinero hace falta para que un año malo no se lleve más de cierto porcentaje "
             "de la cuenta, con las operaciones de este archivo. Sorteamos {samples:,} años de "
@@ -607,6 +613,12 @@ LABELS: dict[str, dict[str, str]] = {
         "plateau_value": "Value",
         "plateau_result": "Profit",
         "plateau_clean": "The neighbours keep much of the result: it looks like a plateau.",
+        "plateau_peak": (
+            "The neighbours lose much of the result: it looks like a lone peak. "
+            "It also shows among the red flags."
+        ),
+        "plateau_badge_clean": "Plateau",
+        "plateau_badge_peak": "Lone peak",
         "capital_intro": (
             "How much money it takes so that a bad year does not take more than a given share "
             "of the account, with this file's trades. We drew {samples:,} years of trades at "
@@ -2387,8 +2399,12 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         return ""
     out = f"<p class='muted'>{_e(labels['plateau_intro'])}</p>"
     by = "plateau_by_report" if plateau.get("chosen_by") == "report" else "plateau_by_best"
-    chosen = ", ".join(f"{name}={_fmt(value)}" for name, value in plateau["chosen"].items())
-    out += f"<p>{_e(labels[by])} <span class='muted'>{_e(chosen)}</span></p>"
+    chips = "".join(
+        f"<span class='param'>{_e(name)} <b>{_e(_fmt(value))}</b></span>"
+        for name, value in plateau["chosen"].items()
+    )
+    out += f"<p class='chosen'>{_e(labels[by])}</p><p class='params'>{chips}</p>"
+    tone = " neg" if plateau.get("clean") is False else ""
     facts = []
     for key, label in (
         ("neighbours_keep", "plateau_keep"),
@@ -2397,20 +2413,37 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         value = plateau[key]["value"]
         if value is not None:
             facts.append(
-                f"<div class='fact'><b>{max(float(value), 0.0):.0%}</b>"
+                f"<div class='fact{tone}'><b>{max(float(value), 0.0):.0%}</b>"
                 f"<p>{_e(labels[label])}</p></div>"
+            )
+    verdict = ""
+    if plateau["neighbours_keep"]["value"] is not None:
+        if plateau.get("clean"):
+            verdict = (
+                f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+                f"{_e(labels['plateau_badge_clean'])}</span> {_e(labels['plateau_clean'])}</p>"
+            )
+        else:
+            verdict = (
+                f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+                f"{_e(labels['plateau_badge_peak'])}</span> {_e(labels['plateau_peak'])}</p>"
             )
     if facts:
         out += f"<div class='facts'>{''.join(facts)}</div>"
+    out += verdict
     listed = plateau.get("neighbour_list") or []
     if listed:
         rows = "".join(
-            f"<tr><td>{_e(item['parameter'])}</td><td class='val'>{_fmt(item['value'])}</td>"
-            f"<td class='val'>{_fmt(float(item['result']), key='plateau_result')}</td></tr>"
+            f"<tr><td>{_e(item['parameter'])}</td>"
+            f"<td class='val' data-l='{_e(labels['plateau_value'])}'>{_fmt(item['value'])}</td>"
+            f"<td class='val{' neg' if float(item['result']) < 0 else ''}' "
+            f"data-l='{_e(labels['plateau_result'])}'>"
+            f"{_fmt(float(item['result']), key='plateau_result')}</td></tr>"
             for item in listed
         )
         out += (
-            f"<h3>{_e(labels['plateau_neighbours'])}</h3><table class='metrics'><thead><tr>"
+            f"<h3>{_e(labels['plateau_neighbours'])}</h3>"
+            "<table class='metrics neighbours'><thead><tr>"
             f"<th>{_e(labels['plateau_parameter'])}</th>"
             f"<th class='val'>{_e(labels['plateau_value'])}</th>"
             f"<th class='val'>{_e(labels['plateau_result'])}</th>"
@@ -2429,8 +2462,6 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         )
     }
     out += _evidence_rows(rows_data, labels, skip=set())
-    if plateau.get("clean") and plateau["neighbours_keep"]["value"] is not None:
-        out += f"<p>{_e(labels['plateau_clean'])}</p>"
     return out
 
 
@@ -2458,7 +2489,8 @@ def _capital_html(
     out = f"<p class='muted'>{_e(labels['capital_intro'].format(samples=samples))}</p>"
     if capital.get("short_history"):
         days = int((capital.get("span_days") or {}).get("value") or 0)
-        out += f"<p class='warning'><b>{_e(labels['capital_short'].format(days=days))}</b></p>"
+        head, _, rest = labels["capital_short"].format(days=days).partition(". ")
+        out += f"<p class='live-verdict lv-WEAK'><b>{_e(head)}.</b> {_e(rest)}</p>"
     reference = float(capital["fall_reference"]["value"])
     history = float(capital["fall_history"]["value"])
     platform = (capital.get("fall_platform") or {}).get("value")
