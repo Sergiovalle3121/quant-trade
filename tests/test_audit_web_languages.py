@@ -72,11 +72,11 @@ def test_the_report_opens_in_its_upload_language_and_switches(tmp_path: Path) ->
     default = client.get(f"/audits/{audit_id}?token={token}").text
     _assert_page(default, "es")
     assert f"/audits/{audit_id}?token={token}&amp;lang=en" in default
-    assert "Avisos de lectura: informe:" in default
+    assert "Avisos de lectura</p><ul><li>informe:" in default
     assert "closed trades only" not in default
     english = client.get(f"/audits/{audit_id}?token={token}&lang=en").text
     _assert_page(english, "en")
-    assert "Parse warnings: report:" in english and "closed trades only" in english
+    assert "Parse warnings</p><ul><li>report:" in english and "closed trades only" in english
     assert "Qué significa para ti" not in english
     assert f"/audits/{audit_id}?token={token}&amp;lang=es" in english
     # The stored result is the same whichever language reads it.

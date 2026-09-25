@@ -1278,6 +1278,7 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "end": "Fin",
         "inputs": "Parámetros",
         "input_names": "Nombres de los parámetros",
+        "input_values": "Valores elegidos",
         "variants": "Variantes",
         "declared_total_net_profit": "Beneficio neto total",
         "declared_total_trades": "Operaciones totales",
@@ -1310,6 +1311,7 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "end": "End",
         "inputs": "Inputs",
         "input_names": "Input names",
+        "input_values": "Chosen values",
         "variants": "Variants",
         "declared_total_net_profit": "Total net profit",
         "declared_total_trades": "Total trades",
@@ -2345,18 +2347,21 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     gain = account["percent_gain"]["value"]
     if gain is not None:
         facts.append(
-            f"<div class='fact'><b>{gain:.0%}</b><p>{_e(labels['account_gain'])}</p></div>"
+            f"<div class='fact{' neg' if gain < 0 else ''}'><b>{gain:.0%}</b>"
+            f"<p>{_e(labels['account_gain'])}</p></div>"
         )
     money = account["trading_result"]["value"]
     deposited = _fmt(float(account["deposits"]["total"]["value"]), key="deposits_total")
     facts.append(
-        f"<div class='fact'><b>{_fmt(float(money), key='trading_result')}</b>"
+        f"<div class='fact{' neg' if float(money) < 0 else ''}'>"
+        f"<b>{_fmt(float(money), key='trading_result')}</b>"
         f"<p>{_e(labels['account_money'].format(deposited=deposited))}</p></div>"
     )
     floating = account["floating_share"]["value"]
     if floating is not None and floating < 0:
         facts.append(
-            f"<div class='fact'><b>{-floating:.0%}</b><p>{_e(labels['account_floating'])}</p></div>"
+            f"<div class='fact neg'><b>{-floating:.0%}</b>"
+            f"<p>{_e(labels['account_floating'])}</p></div>"
         )
     out += f"<div class='facts'>{''.join(facts)}</div>"
     flat = {
@@ -2505,7 +2510,7 @@ def _capital_html(
         # The hint answers "too few trades" or "too short"; not "no fall to size".
         short = str(capital.get("reason", "")).startswith("needs ")
         hint = f"<p class='muted'>{_e(labels['capital_missing'])}</p>" if short else ""
-        return _status_line(capital, labels) + hint
+        return f"<div class='live-verdict held'>{_status_line(capital, labels)}{hint}</div>"
 
     def label(key: str) -> str:
         return labels.get(f"{key}_account", labels[key]) if account else labels[key]
@@ -2875,10 +2880,11 @@ def render_html(
         f"{_e(labels['source_' + data['inputs']['source']])}</p>"
     )
     if data["inputs"]["parse_warnings"]:
+        items = "".join(
+            f"<li>{_e(localize(w, locale))}</li>" for w in data["inputs"]["parse_warnings"]
+        )
         inputs_html += (
-            f"<p class='muted'>{_e(labels['warnings'])}: "
-            + _e("; ".join(localize(w, locale) for w in data["inputs"]["parse_warnings"]))
-            + "</p>"
+            f"<div class='read-notes'><p>{_e(labels['warnings'])}</p><ul>{items}</ul></div>"
         )
 
     declared_html = _evidence_rows(data["declared"], labels, skip=set())

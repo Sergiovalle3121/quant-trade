@@ -193,7 +193,7 @@ def test_spanish_report_shows_spanish_warnings_and_notes() -> None:
     )
     result = run_audit(inputs, bootstrap_samples=60)
     text = _visible(render_html(result, watermark=False))
-    assert "Avisos de lectura: informe:" in text
+    assert "Avisos de lectura" in text and "<li>informe:" in render_html(result, watermark=False)
     for english in (
         "the balance curve is built from closed trades only",
         "contract size inferred",
