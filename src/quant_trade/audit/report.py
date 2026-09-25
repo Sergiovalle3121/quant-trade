@@ -237,6 +237,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Solo cuenta operaciones cerradas: las pérdidas de las posiciones mientras seguían "
             "abiertas no entran, así que el capital necesario puede ser mayor."
         ),
+        "what_to_do": "Qué hacer:",
         "capital_missing": (
             "Para calcular el capital y el tamaño, sube al menos 30 operaciones cerradas "
             "repartidas en 3 meses o más del mismo sistema; con un año completo las cifras son "
@@ -679,6 +680,7 @@ LABELS: dict[str, dict[str, str]] = {
             "It counts closed trades only: losses of positions while they were still open are "
             "not included, so the capital needed may be larger."
         ),
+        "what_to_do": "What to do:",
         "capital_missing": (
             "To work out the capital and the size, upload at least 30 closed trades spread "
             "over 3 months or more of the same system; a full year makes the figures firmer."
@@ -1632,6 +1634,10 @@ KPI_CSS = (
     ".kpi{border:1px solid var(--border);border-radius:16px;padding:16px 18px;background:#fff}"
     ".kpi b{display:block;font-family:var(--serif);font-weight:400;"
     "font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.1;letter-spacing:-.01em}"
+    # A long figure (+191,136.0%, +3,472.25) steps down so it fits a phone's half-width tile.
+    ".kpi.long b{font-size:clamp(1.1rem,2.1vw,1.55rem)}"
+    ".kpi.xlong b{font-size:clamp(.85rem,1.5vw,1.2rem)}"
+    ".kpi b{overflow-wrap:anywhere}"
     ".kpi span{display:block;margin-top:6px;color:var(--text-2);font-size:.82rem}"
     ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
     ".kpi.locked b{display:flex;align-items:center;gap:10px;height:1.1em;color:var(--text-3)}"
@@ -1736,6 +1742,12 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
     return out
 
 
+def _kpi_size(shown: str) -> str:
+    """A size class so a long figure still fits a phone's half-width tile."""
+    length = len(shown.replace(" ", ""))
+    return " xlong" if length >= 12 else " long" if length >= 9 else ""
+
+
 def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) -> str:
     kpis = _kpi_list(data, labels)
     if not kpis:
@@ -1744,7 +1756,8 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         f"<div class='kpi locked'><b aria-hidden='true'>{icon('lock')}<i></i></b>"
         f"<span>{_e(label)}</span></div>"
         if locked
-        else f"<div class='kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
+        else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
+        f"<span>{_e(label)}</span></div>"
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""
@@ -2597,6 +2610,17 @@ def _capital_html(
         # The hint answers "too few trades" or "too short"; not "no fall to size".
         short = str(capital.get("reason", "")).startswith("needs ")
         hint = f"<p class='muted'>{_e(labels['capital_missing'])}</p>" if short else ""
+        reason = _localized_reason(str(capital.get("reason", "")), locale)
+        parts = re.split(r";\s+(?=(?:sube|upload)\b)", reason, maxsplit=1)
+        if len(parts) == 2:
+            # "...understate the real fall; upload an equity curve..." puts the fix on its own line.
+            head = parts[0][:1].upper() + parts[0][1:]
+            fix = parts[1][:1].upper() + parts[1][1:].rstrip(".") + "."
+            return (
+                f"<div class='live-verdict held'><p>{_badge('NOT_MEASURED')} "
+                f"<span class='muted'>{_e(head)}.</span></p>"
+                f"<p class='muted'><b>{_e(labels['what_to_do'])}</b> {_e(fix)}</p>{hint}</div>"
+            )
         return f"<div class='live-verdict held'>{_status_line(capital, labels)}{hint}</div>"
 
     def label(key: str) -> str:
@@ -3051,7 +3075,8 @@ def render_html(
     cost_html = _status_line(cost, labels) + _evidence_rows(cost, labels, skip={"rows"})
     if cost.get("rows"):
         cost_html += (
-            f"<table><tr><th>{_e(labels['multiplier'])}</th><th>{_e(labels['bps'])}</th>"
+            f"<div class='tscroll'><table><tr><th>{_e(labels['multiplier'])}</th>"
+            f"<th>{_e(labels['bps'])}</th>"
             f"<th>{_e(labels['gross'])}</th><th>{_e(labels['cost'])}</th><th>{_e(labels['net'])}"
             f"</th><th>{_e(labels['win_rate'])}</th><th>{_e(labels['trades'])}</th></tr>"
             + "".join(
@@ -3064,7 +3089,7 @@ def render_html(
                 f"<td>{_fmt(row['trades'])}</td></tr>"
                 for row in cost["rows"]
             )
-            + "</table>"
+            + "</table></div>"
         )
 
     bench_html = _status_line(data["benchmark"], labels) + _evidence_rows(

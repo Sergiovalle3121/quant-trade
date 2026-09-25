@@ -325,3 +325,54 @@ def test_risk_percentiles_are_cards_and_values_keep_their_tag() -> None:
     assert page.count("Drawdown máximo a un año · p") == 3
     assert "<td></td><td>" not in page
     assert "<span class='vc'>" in page and ".vc{white-space:nowrap}" in STYLE
+
+
+def test_an_error_with_a_fix_puts_the_fix_on_its_own_line() -> None:
+    from quant_trade.audit.pages import error_page
+
+    es = error_page(
+        "El archivo de optimización es de otra prueba (símbolo GBPJPY; el informe dice "
+        "EURUSD): sube la optimización del mismo robot, símbolo y marco temporal.",
+        locale="es",
+    )
+    assert "<p class='err-msg'>El archivo de optimización es de otra prueba" in es
+    assert "EURUSD).</p><p class='err-exp'><b>Qué hacer:</b> Sube la optimización" in es
+    en = error_page(
+        "the optimisation file is for another test (symbol GBPJPY; the report says EURUSD): "
+        "upload the optimisation of the same robot, symbol and timeframe",
+        locale="en",
+    )
+    assert "<b>What to do:</b> Upload the optimisation" in en
+    assert find_claims(es) == [] and find_claims(en) == []
+
+
+def test_long_key_figures_step_down_to_fit_a_phone_tile() -> None:
+    from quant_trade.audit.report import KPI_CSS, render_html
+    from quant_trade.audit.sample import sample_result
+    from quant_trade.audit.schema import AuditResult
+
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    data["performance"]["total_return"]["value"] = 1911.36
+    page = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
+    assert "<div class='kpi  long'><b>+191,136.0%</b>" in page
+    assert "<div class='kpi good long'><b>+3,472.25</b>" in page
+    assert "class='kpi  long'><b>500 · 55%" not in page
+    assert "<div class='tscroll'><table>" in page
+    assert ".kpi.long b{font-size:" in KPI_CSS and ".kpi.xlong b{font-size:" in KPI_CSS
+    data["performance"]["total_return"]["value"] = 100000.046
+    huge = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
+    assert "<div class='kpi  xlong'><b>+10,000,004.6%</b>" in huge
+
+
+def test_grid_capital_hold_back_puts_the_fix_on_its_own_line() -> None:
+    from quant_trade.audit.report import LABELS, _capital_html
+    from quant_trade.audit.sizing import HIDDEN_LOSSES
+
+    for locale in ("es", "en"):
+        held = _capital_html(
+            {"status": "NOT_MEASURED", "reason": HIDDEN_LOSSES}, locale, LABELS[locale]
+        )
+        assert held.startswith("<div class='live-verdict held'>")
+        assert f"<b>{LABELS[locale]['what_to_do']}</b> " in held
+        assert ("Sube una curva" if locale == "es" else "Upload an equity curve") in held
+        assert find_claims(held) == []
