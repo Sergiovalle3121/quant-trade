@@ -4151,6 +4151,22 @@ RULES: tuple[tuple[str, str], ...] = (
         "ficaram de fora {n} linha(s) sem data ou valor legível",
     ),
     (
+        (
+            "read as a monthly returns table (one row per year, one column per month); values "
+            "taken as fractions (four or more decimals and none reaching 1, with no % sign: "
+            "check one month against the factsheet)"
+        ),
+        (
+            "lido como tabela de rentabilidades mensais (uma linha por ano, uma coluna por mês); "
+            "valores tomados como frações (quatro ou mais casas decimais e nenhum chegando a 1, "
+            "sem o sinal %: compare um mês com a lâmina do fundo)"
+        ),
+    ),
+    (
+        "no losing period; downside deviation is zero",
+        "nenhum período com perda; o desvio negativo é zero",
+    ),
+    (
         "Resampled estimate from the supplied history: it is not a prediction.",
         "Estimativa reamostrada do histórico fornecido: não é uma previsão.",
     ),
