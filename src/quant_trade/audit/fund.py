@@ -274,10 +274,58 @@ def fund_review(
     return review
 
 
+#: Yearly fees an active fund commonly charges, for the fee table.
+FEE_RATES: tuple[float, ...] = (0.01, 0.015, 0.02, 0.025)
+FEE_NOTE = (
+    "the monthly returns with each yearly fee taken out month by month; shown because the "
+    "figures were not declared net of fees"
+)
+
+
+def fee_drag(series: pd.Series, comparison: dict[str, Any] | None = None) -> dict[str, Any]:
+    """What common yearly fees would leave of a record not declared net of
+    fees, and, with an index comparison, the fee at which the fund would only
+    match its index."""
+    r = series.to_numpy(dtype=float)
+    n = len(r)
+    if n < MIN_MONTHS:
+        return {"status": "NOT_MEASURED", "reason": f"needs at least {MIN_MONTHS} monthly returns"}
+    years = n / 12.0
+    rows = []
+    for rate in FEE_RATES:
+        monthly = (1.0 + rate) ** (1.0 / 12.0) - 1.0
+        net = (1.0 + r) / (1.0 + monthly) - 1.0
+        growth = float(np.prod(1.0 + net))
+        rows.append(
+            {
+                "rate": rate,
+                "cagr": measured(growth ** (1.0 / years) - 1.0, FEE_NOTE),
+                "growth": measured(growth - 1.0, FEE_NOTE),
+            }
+        )
+    out: dict[str, Any] = {
+        "status": "MEASURED",
+        "note": FEE_NOTE,
+        "gross_cagr": measured(float(np.prod(1.0 + r) ** (1.0 / years) - 1.0)),
+        "rows": rows,
+    }
+    if comparison and comparison.get("status") == "MEASURED":
+        fund_cagr = float(comparison["fund_cagr"]["value"])
+        index_cagr = float(comparison["index_cagr"]["value"])
+        out["break_even"] = measured(
+            (1.0 + fund_cagr) / (1.0 + index_cagr) - 1.0,
+            "the yearly fee that would leave the fund's months level with the benchmark's "
+            "over the months they share",
+        )
+    return out
+
+
 __all__ = [
+    "FEE_RATES",
     "MIN_MONTHS",
     "benchmark_months",
     "compare_with_benchmark",
+    "fee_drag",
     "fund_review",
     "monthly_returns",
 ]

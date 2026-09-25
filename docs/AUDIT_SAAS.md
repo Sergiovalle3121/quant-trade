@@ -989,6 +989,14 @@ flatters a fund whose figures are before fees. It never feeds the benchmark
 dimension (that reads only the uploaded benchmark file, as before), so the
 class does not move.
 
+What fees would take (`fund.fee_drag`). On a fund record not declared net
+of fees, a table shows the yearly return and total growth with a yearly fee
+of 1, 1.5, 2 and 2.5 % taken out month by month (MEASURED), beside the
+figures as given. With an index comparison it adds the break-even fee: the
+yearly fee at which the fund would only match its index over the months
+they share, or says the fund already trails before any fee. No class
+change; hidden when the record is declared net.
+
 Through the known crises (`audit/crises.py`). A fixed list of calendar
 windows, each the peak-to-trough months of a fall on the public record: the
 dot-com bust (2000-09 to 2002-09), the 2008 financial crisis (2007-11 to

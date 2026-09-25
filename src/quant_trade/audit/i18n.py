@@ -849,6 +849,18 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("the curve is shorter than two months", "la curva dura menos de dos meses"),
     (
+        "the monthly returns with each yearly fee taken out month by month; shown because the "
+        "figures were not declared net of fees",
+        "las rentabilidades mensuales con cada comisión anual descontada mes a mes; se muestra "
+        "porque las cifras no se declararon netas de comisiones",
+    ),
+    (
+        "the yearly fee that would leave the fund's months level with the benchmark's over "
+        "the months they share",
+        "la comisión anual que dejaría los meses del fondo al nivel de los del índice en los "
+        "meses en común",
+    ),
+    (
         "the curve never moves 0.1 % from its start",
         "la curva nunca se aleja un 0.1 % de su inicio",
     ),
