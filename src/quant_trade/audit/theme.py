@@ -816,6 +816,8 @@ color:var(--text-3)}
 .paper table.metrics{table-layout:fixed}
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:18px 0 8px}
 @media (min-width:621px){.facts.pairs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media screen and (min-width:621px){.facts>.fact:only-child{display:flex;align-items:center;gap:24px}
+.facts>.fact:only-child b{flex:none;min-width:4.2ch}.facts>.fact:only-child p{margin:0}}
 .fact{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px 22px}
 .fact.neg b{color:#b91c1c}
 .vc{white-space:nowrap}

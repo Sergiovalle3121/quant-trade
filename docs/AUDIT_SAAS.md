@@ -1410,6 +1410,12 @@ what the trades show (bold) and, on its own line with a speech mark, the
 question to put to the seller (`report._behaviour_ask`, `.beh-asks`), in the
 screen and in the PDF.
 
+Redesign pass 41 gives "Does it work on each instrument?" the same finding
+layout as the behaviour section (finding in bold, then the question) and lays a
+section's single headline figure out as a row beside its sentence on screens
+(`.facts>.fact:only-child`), so a lone figure no longer fills a full-width
+tile. Print keeps the tile.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
