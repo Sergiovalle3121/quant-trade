@@ -495,18 +495,24 @@ _TEXT: dict[str, dict[str, str]] = {
             "Clase D: el historial de cuenta no supera la auditoría; los números de cabecera "
             "no se pueden tomar tal cual."
         ),
-        f"{STATISTICAL}.PASS": "El Sharpe es estadísticamente distinguible de cero.",
-        f"{STATISTICAL}.WEAK": (
-            "El Sharpe no es concluyente: el intervalo bootstrap se acerca a cero."
+        f"{STATISTICAL}.PASS": (
+            "El resultado es demasiado constante para explicarse solo por azar (Sharpe "
+            "distinguible de cero)."
         ),
-        f"{STATISTICAL}.FAIL": "El Sharpe observado no se distingue de cero.",
+        f"{STATISTICAL}.WEAK": (
+            "No está claro que el resultado supere al azar: el rango probable del Sharpe "
+            "llega cerca de cero."
+        ),
+        f"{STATISTICAL}.FAIL": (
+            "El resultado no se distingue del azar (el Sharpe no se distingue de cero)."
+        ),
         f"{STATISTICAL}.NOT_MEASURED": "Significación no medida: {reason}.",
         f"{MULTIPLICITY}.PASS": (
             "Con {trials_phrase}, el resultado sigue por encima de lo que "
             "produciría el mejor intento sin habilidad."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "Con {trials_phrase}, el Sharpe deflactado no llega al umbral: "
+            "Con {trials_phrase}, el Sharpe ajustado por esas pruebas no llega al umbral: "
             "si se probaron más configuraciones, el resultado puede venir de elegir la mejor."
         ),
         f"{MULTIPLICITY}.FAIL": (
@@ -521,7 +527,7 @@ _TEXT: dict[str, dict[str, str]] = {
         ),
         f"{MULTIPLICITY}.WEAK.undeclared": (
             "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
-            "favorable, el Sharpe deflactado no llega al umbral."
+            "favorable, el Sharpe ajustado por las pruebas no llega al umbral."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
@@ -531,16 +537,22 @@ _TEXT: dict[str, dict[str, str]] = {
             "Con 3 veces el coste de referencia, el resultado de las operaciones sigue positivo."
         ),
         f"{COSTS}.WEAK": (
-            "Las operaciones sobreviven al coste de referencia pero no a 3x ese coste."
+            "Las operaciones siguen en positivo con el coste de referencia, pero no con 3 "
+            "veces ese coste."
         ),
         f"{COSTS}.FAIL": "Con el coste de referencia, las operaciones pierden dinero en neto.",
         f"{COSTS}.NOT_MEASURED": "Costes no medidos: {reason}.",
         f"{OUT_OF_SAMPLE}.PASS": (
-            "Fuera de muestra el Sharpe se mantiene y la degradación frente a la muestra es "
-            "pequeña."
+            "En el periodo apartado para comprobar (fuera de muestra) el resultado se "
+            "mantiene y cae poco frente al resto."
         ),
-        f"{OUT_OF_SAMPLE}.WEAK": "Fuera de muestra el Sharpe es positivo pero se degrada.",
-        f"{OUT_OF_SAMPLE}.FAIL": "Fuera de muestra el Sharpe es negativo.",
+        f"{OUT_OF_SAMPLE}.WEAK": (
+            "En el periodo apartado para comprobar (fuera de muestra) el resultado sigue "
+            "positivo pero empeora."
+        ),
+        f"{OUT_OF_SAMPLE}.FAIL": (
+            "En el periodo apartado para comprobar (fuera de muestra) el resultado es negativo."
+        ),
         f"{OUT_OF_SAMPLE}.NOT_MEASURED": "Fuera de muestra no medido: {reason}.",
         f"{DATA_QUALITY}.PASS": "Sin banderas rojas en los datos.",
         f"{DATA_QUALITY}.WEAK": "Banderas de aviso en los datos: {codes}.",
@@ -576,18 +588,25 @@ _TEXT: dict[str, dict[str, str]] = {
             "Class D: the account history does not pass the audit; the headline numbers "
             "cannot be taken as they stand."
         ),
-        f"{STATISTICAL}.PASS": "The Sharpe ratio is statistically distinguishable from zero.",
-        f"{STATISTICAL}.WEAK": (
-            "The Sharpe ratio is inconclusive: the bootstrap interval nears zero."
+        f"{STATISTICAL}.PASS": (
+            "The result is too consistent to be explained by chance alone (Sharpe ratio "
+            "distinguishable from zero)."
         ),
-        f"{STATISTICAL}.FAIL": "The observed Sharpe ratio is not distinguishable from zero.",
+        f"{STATISTICAL}.WEAK": (
+            "It is unclear whether the result beats chance: the likely range of the Sharpe "
+            "ratio comes close to zero."
+        ),
+        f"{STATISTICAL}.FAIL": (
+            "The result cannot be told apart from chance (the Sharpe ratio is not "
+            "distinguishable from zero)."
+        ),
         f"{STATISTICAL}.NOT_MEASURED": "Significance not measured: {reason}.",
         f"{MULTIPLICITY}.PASS": (
             "With {trials_phrase}, the result stays above what the best "
             "unskilled trial would produce."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "With {trials_phrase}, the deflated Sharpe misses the bar: if "
+            "With {trials_phrase}, the Sharpe adjusted for those trials misses the bar: if "
             "more configurations were tried, the result may come from picking the best one."
         ),
         f"{MULTIPLICITY}.FAIL": (
@@ -602,21 +621,29 @@ _TEXT: dict[str, dict[str, str]] = {
         ),
         f"{MULTIPLICITY}.WEAK.undeclared": (
             "The number of configurations tried was not declared, and even with 1, the most "
-            "favourable case, the deflated Sharpe misses the bar."
+            "favourable case, the Sharpe adjusted for trials misses the bar."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "The number of configurations tried was not declared, and even with 1, the most "
             "favourable case, the result does not exceed what an unskilled trial would produce."
         ),
         f"{COSTS}.PASS": "At 3 times the reference cost, the trades still end positive.",
-        f"{COSTS}.WEAK": "The trades survive the reference cost but not 3x that cost.",
+        f"{COSTS}.WEAK": (
+            "The trades stay positive at the reference cost, but not at 3 times that cost."
+        ),
         f"{COSTS}.FAIL": "At the reference cost, the trades lose money net.",
         f"{COSTS}.NOT_MEASURED": "Costs not measured: {reason}.",
         f"{OUT_OF_SAMPLE}.PASS": (
-            "Out of sample the Sharpe ratio holds and the degradation versus in-sample is small."
+            "In the period held back for checking (out of sample) the result holds and drops "
+            "little against the rest."
         ),
-        f"{OUT_OF_SAMPLE}.WEAK": "Out of sample the Sharpe ratio is positive but degraded.",
-        f"{OUT_OF_SAMPLE}.FAIL": "Out of sample the Sharpe ratio is negative.",
+        f"{OUT_OF_SAMPLE}.WEAK": (
+            "In the period held back for checking (out of sample) the result stays positive "
+            "but worsens."
+        ),
+        f"{OUT_OF_SAMPLE}.FAIL": (
+            "In the period held back for checking (out of sample) the result is negative."
+        ),
         f"{OUT_OF_SAMPLE}.NOT_MEASURED": "Out of sample not measured: {reason}.",
         f"{DATA_QUALITY}.PASS": "No red flags in the data.",
         f"{DATA_QUALITY}.WEAK": "Warning flags in the data: {codes}.",

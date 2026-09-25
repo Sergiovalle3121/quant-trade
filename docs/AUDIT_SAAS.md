@@ -1044,6 +1044,12 @@ without a declared holdout the best possible class is B, on purpose.
 Class A is worded as "no evidence of overfitting found in what was
 supplied". It is not a prediction.
 
+The verdict sentence speaks to a buyer first and keeps the measure's name in
+brackets: significance reads "too consistent to be explained by chance alone
+(Sharpe ratio distinguishable from zero)", the held-out check reads "the
+period held back for checking (out of sample)", and "deflated Sharpe" reads
+"the Sharpe adjusted for those trials". The thresholds are unchanged.
+
 ## Assumptions and limitations
 
 - No market data is used. The audit sees only what the client uploads; a

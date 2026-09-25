@@ -223,3 +223,17 @@ def test_trader_terms_in_the_tiles_carry_a_plain_line() -> None:
         assert_report_clean(
             " ".join(v for k, v in LABELS[locale].items() if k.startswith("kpi_hint_"))
         )
+
+
+def test_the_verdict_sentence_speaks_plainly() -> None:
+    from quant_trade.audit.guard import assert_report_clean
+    from quant_trade.audit.verdict import _TEXT
+
+    page = _page("es")
+    assert "El resultado es demasiado constante para explicarse solo por azar" in page
+    assert "no con 3 veces ese coste" in page
+    assert "En el periodo apartado para comprobar (fuera de muestra)" in page
+    assert "estadísticamente distinguible" not in page and "se degrada" not in page
+    assert "too consistent to be explained by chance alone" in _page("en")
+    for locale in ("es", "en"):
+        assert_report_clean(" ".join(_TEXT[locale].values()))
