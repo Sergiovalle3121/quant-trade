@@ -444,13 +444,19 @@ fechas, operación por operación" pair 55 of 59 trades with slightly worse
 fills. It then trades 120 business days after the backtest with a thinner
 edge and a losing stretch. It carries a 500 top-up after that stretch
 (DEPOSIT_DURING_DRAWDOWN), a 300 withdrawal and an open position with a
-35.00 floating loss, so "El dinero real de la cuenta" shows every part. It
-comes out "En el borde"; the dates overlap, and the report says so.
-The sample backtest also starts with 60 business days from a random stream
-of their own (from October 2022), so its trades span more than two years
-and "¿Sigue funcionando en el periodo reciente?" is measured: the average
-per trade falls from +15.24 to +3.97 in the last third, a drop within
-chance (-1.0 standard errors) that reads "Se mantiene". Its optimisation file is a
+35.00 floating loss, so "El dinero real de la cuenta" shows every part. Next
+to almost five years of backtest it comes out "No coherente"; the dates
+overlap, and the report says so.
+The sample backtest also starts with 782 business days from a random stream
+of their own (from 2 January 2020, `SAMPLE_LEAD_DAYS`), so its trades span
+almost five years: "¿Cómo le fue en las crisis conocidas?" covers the covid
+fall and both 2022 windows in full, and "¿Sigue funcionando en el periodo
+reciente?" reads "Se mantiene". With 120 passes counted, its Sharpe beats
+the luck of the search without the margin the multiplicity dimension asks
+(DSR 0.91 against 0.95), so the luck section reads "Supera a la suerte, sin
+margen": beating the luck is a DSR of 0.5, passing the dimension is 0.95,
+and a Sharpe between the two gets that third state instead of a plain
+"Supera". Its optimisation file is a
 normal export, so the plateau section is shown; that section ends with a
 line saying that a forward export adds "¿Aguanta en el periodo forward?".
 
