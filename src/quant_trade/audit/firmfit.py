@@ -95,13 +95,20 @@ def firm_fit(
     *,
     samples: int = SAMPLES,
     seed: int = 0,
+    known: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Every published program on the same paths, best pass odds first."""
+    """Every published program on the same paths, best pass odds first.
+
+    ``known`` maps a preset key to a result already simulated on the same
+    history and seed (the report's chosen firm), so that firm's row shows the
+    same figure as its own section."""
     programs: dict[tuple[str, str], list[tuple[str, dict[str, Any]]]] = {}
     for key, rules in PRESETS.items():
         if not rules.source_url.startswith("https://"):
             continue
-        result = simulate_challenge(daily_returns, rules, samples=samples, seed=seed)
+        result = (known or {}).get(key) or simulate_challenge(
+            daily_returns, rules, samples=samples, seed=seed
+        )
         if not result.get("method"):
             reason = result["probability"]["pass"].get("note", "not measured")
             return {"status": "NOT_MEASURED", "reason": reason}

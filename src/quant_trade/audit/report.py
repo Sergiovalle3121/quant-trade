@@ -986,8 +986,8 @@ LABELS: dict[str, dict[str, str]] = {
             "simulaciones: sus reglas no los distinguen."
         ),
         "ff_all_fail": (
-            "Con este historial ningún programa se pasa en las simulaciones; lo que más lo "
-            "impide es {risk}."
+            "Con este historial casi ningún programa se pasa (1 % de las simulaciones o "
+            "menos); lo que más lo impide es {risk}."
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
@@ -1851,8 +1851,8 @@ LABELS: dict[str, dict[str, str]] = {
             "rules do not tell them apart."
         ),
         "ff_all_fail": (
-            "With this history no program passes in the simulations; what stops it most is "
-            "{risk}."
+            "With this history almost no program passes (1 % of the simulations or less); "
+            "what stops it most is {risk}."
         ),
         "ff_phases": "{n} phases",
         "ff_phase": "1 phase",
@@ -3222,7 +3222,7 @@ def _challenge_html(
         if best_day.get("breach_share_of_passes"):
             share = float(best_day["breach_share_of_passes"]["value"])
             html_text += (
-                f"<p>{_e(labels['best_day_line'].format(share=f'{share:.0%}'))} "
+                f"<p>{_e(labels['best_day_line'].format(share=_share_pct(share)))} "
                 f"{_badge('MEASURED')}</p>"
             )
     notes = rules.get("notes") or []
@@ -3242,6 +3242,16 @@ def _challenge_html(
 
 def _phases(count: int, labels: dict[str, str]) -> str:
     return labels["ff_phase"] if count == 1 else labels["ff_phases"].format(n=count)
+
+
+def _share_pct(value: float) -> str:
+    """A share rounded to whole percent that never rounds to all or nothing
+    when it is not."""
+    if 0.995 <= value < 1:
+        return ">99%"
+    if 0 < value < 0.005:
+        return "<1%"
+    return f"{value:.0%}"
 
 
 def _firm_pct(value: float) -> str:

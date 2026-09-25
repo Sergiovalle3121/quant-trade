@@ -790,7 +790,7 @@ def _challenge(inputs: AuditInputs, *, samples: int, seed: int) -> dict[str, Any
         out["reason"] = result["probability"]["pass"]["note"]
     else:
         out["firm_fit"] = firmfit_lib.firm_fit(
-            daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed
+            daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed, known={key: result}
         )
     return out
 
