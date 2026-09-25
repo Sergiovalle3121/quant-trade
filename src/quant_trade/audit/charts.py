@@ -278,6 +278,12 @@ def _nice_ticks(lo: float, hi: float, count: int = 5) -> list[float]:
 
 def _fmt_number(value: float) -> str:
     magnitude = abs(value)
+    if magnitude >= 1e15:
+        # Past a thousand trillion a suffix stops helping: 2.0e18, not 2000000.0T.
+        mantissa, exponent = f"{value:.1e}".split("e")
+        return f"{mantissa}e{int(exponent)}"
+    if magnitude >= 1e12:
+        return f"{value / 1e12:.1f}T"
     if magnitude >= 1e9:
         return f"{value / 1e9:.1f}B"
     if magnitude >= 1e6:
@@ -332,10 +338,12 @@ def _fmt_signed_percent(value: float) -> str:
 class _Frame:
     """Maps data coordinates to the plot area of a fixed viewBox."""
 
-    def __init__(self, x_lo: float, x_hi: float, y_lo: float, y_hi: float) -> None:
+    def __init__(
+        self, x_lo: float, x_hi: float, y_lo: float, y_hi: float, left: float = MARGIN_LEFT
+    ) -> None:
         self.x_lo, self.x_hi = x_lo, x_hi if x_hi > x_lo else x_lo + 1.0
         self.y_lo, self.y_hi = y_lo, y_hi if y_hi > y_lo else y_lo + 1.0
-        self.left = MARGIN_LEFT
+        self.left = left
         self.right = WIDTH - MARGIN_RIGHT
         self.top = MARGIN_TOP
         self.bottom = HEIGHT - MARGIN_BOTTOM
@@ -351,6 +359,12 @@ class _Frame:
 
 def _path(points: Sequence[tuple[float, float]]) -> str:
     return " ".join(f"{'M' if i == 0 else 'L'}{x:.1f},{y:.1f}" for i, (x, y) in enumerate(points))
+
+
+def _axis_left(ticks: Sequence[float], fmt: Any) -> float:
+    """Left margin wide enough for the longest y-axis label (11px text)."""
+    longest = max(len(label) for label in _distinct_labels(ticks, fmt))
+    return max(float(MARGIN_LEFT), 14.0 + 6.6 * longest)
 
 
 def _y_axis(frame: _Frame, ticks: Sequence[float], fmt: Any) -> str:
@@ -446,7 +460,7 @@ def equity_chart(
     xs = [times[i].timestamp() for i in keep]
     ys = [values[i] for i in keep]
     ticks = _nice_ticks(min(ys), max(ys))
-    frame = _Frame(xs[0], xs[-1], ticks[0], ticks[-1])
+    frame = _Frame(xs[0], xs[-1], ticks[0], ticks[-1], _axis_left(ticks, _fmt_number))
     line = _path([(frame.x(x), frame.y(y)) for x, y in zip(xs, ys, strict=True)])
     body = (
         _y_axis(frame, ticks, _fmt_number)
@@ -489,7 +503,7 @@ def drawdown_chart(
     ys = [dd[i] for i in keep]
     worst = min(dd)
     ticks = [t for t in _nice_ticks(min(worst, -0.01), 0.0) if t <= 0]
-    frame = _Frame(xs[0], xs[-1], ticks[0], 0.0)
+    frame = _Frame(xs[0], xs[-1], ticks[0], 0.0, _axis_left(ticks, _fmt_percent))
     points = [(frame.x(x), frame.y(y)) for x, y in zip(xs, ys, strict=True)]
     zero = frame.y(0.0)
     area = _path(points) + f" L{points[-1][0]:.1f},{zero:.1f} L{points[0][0]:.1f},{zero:.1f} Z"
@@ -536,7 +550,7 @@ def fan_chart(
     n = len(median)
     all_values = [float(v) for path in fan.values() for v in path]
     ticks = _nice_ticks(min(all_values), max(all_values))
-    frame = _Frame(0.0, float(n - 1), ticks[0], ticks[-1])
+    frame = _Frame(0.0, float(n - 1), ticks[0], ticks[-1], _axis_left(ticks, _fmt_number))
 
     def band(lo_key: str, hi_key: str, color: str) -> str:
         if lo_key not in fan or hi_key not in fan:
@@ -597,6 +611,11 @@ def _cell_style(value: float, scale: float) -> str:
     return f"background:{background};color:{color}"
 
 
+def _long(value: float) -> str:
+    """Marks a cell whose figure is too wide for a 14-column page (+10300003.0%)."""
+    return ' class="long"' if len(_fmt_signed_percent(value)) >= 9 else ""
+
+
 def monthly_heatmap(
     timestamps: Sequence[TimeLike],
     equity: Sequence[float],
@@ -636,13 +655,13 @@ def monthly_heatmap(
                 continue
             label = f"{year}-{month:02d}: {_fmt_signed_percent(value)}"
             cells.append(
-                f'<td style="{_cell_style(value, scale)}" title="{_e(label)}">'
+                f'<td{_long(value)} style="{_cell_style(value, scale)}" title="{_e(label)}">'
                 f"{_e(_fmt_signed_percent(value))}</td>"
             )
         total = math.prod(1.0 + v for v in by_year[year].values()) - 1.0
         total_label = f"{year}: {_fmt_signed_percent(total)}"
         cells.append(
-            f'<td style="{_cell_style(total, max(scale, abs(total)))}" '
+            f'<td{_long(total)} style="{_cell_style(total, max(scale, abs(total)))}" '
             f'title="{_e(total_label)}">'
             f"<strong>{_e(_fmt_signed_percent(total))}</strong></td>"
         )

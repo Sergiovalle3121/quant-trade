@@ -2628,7 +2628,12 @@ def _capital_html(
                 f"<span class='muted'>{_e(head)}.</span></p>"
                 f"<p class='muted'><b>{_e(labels['what_to_do'])}</b> {_e(fix)}</p>{hint}</div>"
             )
-        return f"<div class='live-verdict held'>{_status_line(capital, labels)}{hint}</div>"
+        # One capitalised, closed sentence, like the reasons that carry a fix.
+        text = reason[:1].upper() + reason[1:].rstrip(".") + "." if reason else ""
+        return (
+            f"<div class='live-verdict held'><p>{_badge('NOT_MEASURED')} "
+            f"<span class='muted'>{_e(text)}</span></p>{hint}</div>"
+        )
 
     def label(key: str) -> str:
         return labels.get(f"{key}_account", labels[key]) if account else labels[key]

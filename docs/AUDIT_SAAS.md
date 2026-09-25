@@ -1200,6 +1200,8 @@ Key figure tiles step their font down for long values (9+ and 12+ characters) so
 
 When capital is held back because the trades overlap as a grid or hide open losses, the grey card states the reason and puts what to upload on its own "Qué hacer:" line.
 
+Very large figures stay on the page: chart axes switch to T and then to powers of ten (2.0e18) and widen their left margin to fit the longest label, and in the PDF the monthly returns table shrinks its type, with the widest cells (+10,300,003.0%) set smaller still, so the Total column is never cut. When capital is held back because the trades lose in total, the grey card reads as one capitalised sentence.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

@@ -376,3 +376,38 @@ def test_grid_capital_hold_back_puts_the_fix_on_its_own_line() -> None:
         assert f"<b>{LABELS[locale]['what_to_do']}</b> " in held
         assert ("Sube una curva" if locale == "es" else "Upload an equity curve") in held
         assert find_claims(held) == []
+
+
+def test_huge_chart_axes_and_monthly_cells_stay_on_the_page() -> None:
+    from quant_trade.audit import charts
+    from quant_trade.audit.theme import STYLE
+
+    assert charts._fmt_number(1.5e12) == "1.5T"
+    assert charts._fmt_number(2.0e18) == "2.0e18"
+    assert charts._fmt_number(-2.5e16) == "-2.5e16"
+    fan = {
+        k: [1.0, 1e15 * m]
+        for k, m in zip(charts.FAN_PERCENTILES, (0.2, 0.5, 1, 1.5, 2), strict=True)
+    }
+    svg = charts.fan_chart(fan)
+    assert "000000.0B" not in svg and "2.0e15" in svg
+    ticks = [0.0, 1_000_000.0, 2_000_000.0]
+    assert charts._axis_left(ticks, lambda v: f"{v:,.1f}B") > charts.MARGIN_LEFT
+    assert charts._axis_left([0.0, 0.5, 1.0], charts._fmt_number) == charts.MARGIN_LEFT
+    table = charts.monthly_heatmap(
+        ["2023-01-31", "2023-02-28", "2023-03-31"], [1e4, 1e4, 1e9], locale="es"
+    )
+    assert '<td class="long" style=' in table
+    assert "table.monthly td.long{" in STYLE and ".chart-scroll{overflow:visible}" in STYLE
+
+
+def test_losing_history_capital_card_reads_as_one_sentence() -> None:
+    from quant_trade.audit.report import LABELS, _capital_html
+    from quant_trade.audit.sizing import NET_LOSS
+
+    cases = (("es", "Las operaciones cerradas", "pierde."), ("en", "The closed trades", "loses."))
+    for locale, start, end in cases:
+        held = _capital_html({"status": "NOT_MEASURED", "reason": NET_LOSS}, locale, LABELS[locale])
+        assert held.startswith("<div class='live-verdict held'>")
+        assert f"<span class='muted'>{start}" in held and f"{end}</span>" in held
+        assert find_claims(held) == []
