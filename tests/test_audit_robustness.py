@@ -564,3 +564,49 @@ def test_the_best_pass_with_a_blank_parameter_is_not_a_crash() -> None:
     review, _ = parameter_stability(table, ["FastMA", "SlowMA"], report_inputs=None)
     assert review["status"] == "MEASURED"
     assert review["chosen"] == {"SlowMA": 51.0}
+
+
+_FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "what"),
+    [
+        ("<Title>FixtureEA ", "<Title>OtherEA ", "robot"),
+        ("EURUSD,H1", "GBPJPY,H1", "símbolo"),
+        ("EURUSD,H1", "EURUSD,M15", "marco temporal"),
+        (">FastMA<", ">TakeProfit<", "parámetros"),
+    ],
+)
+def test_an_optimization_file_from_another_test_is_refused(old: str, new: str, what: str) -> None:
+    from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs
+
+    report = (_FIXTURES / "mt5_tester.html").read_bytes()
+    optimization = (_FIXTURES / "mt5_optimization.xml").read_text(encoding="utf-8")
+    assert old in optimization
+    with pytest.raises(ParseError) as caught:
+        build_inputs(
+            None,
+            DeclaredMetadata(),
+            report_bytes=report,
+            report_filename="report.html",
+            optimization_bytes=optimization.replace(old, new).encode(),
+        )
+    assert caught.value.code == "optimization_mismatch"
+    assert what in caught.value.message_es
+
+
+def test_the_matching_optimization_file_and_a_broker_suffix_are_accepted() -> None:
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    report = (_FIXTURES / "mt5_tester.html").read_bytes()
+    optimization = (_FIXTURES / "mt5_optimization.xml").read_text(encoding="utf-8")
+    for text in (optimization, optimization.replace("EURUSD,H1", "EURUSD.m,H1")):
+        inputs = build_inputs(
+            None,
+            DeclaredMetadata(),
+            report_bytes=report,
+            report_filename="report.html",
+            optimization_bytes=text.encode(),
+        )
+        assert inputs.optimization_passes
