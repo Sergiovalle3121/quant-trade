@@ -173,7 +173,6 @@ def _pairing(
     live_idx = [i for i, t in enumerate(lv) if start <= t.entry_time <= end]
     bt_in = sum(1 for i in bt_idx if start <= bt[i].entry_time <= end)
     times = [bt[i].entry_time for i in bt_idx]
-    used: set[int] = set()
     pairs: list[tuple[int, int]] = []
     for j in sorted(live_idx, key=lambda k: (lv[k].entry_time, k)):
         when = lv[j].entry_time
@@ -181,17 +180,21 @@ def _pairing(
         for pos in range(bisect_left(times, when - window), len(times)):
             if times[pos] > when + window:
                 break
+            if best is not None and times[pos] - when >= best[0]:
+                break  # later entries are only further away
             i = bt_idx[pos]
-            if i in used or backtest.sides[i] != live.sides[j]:
+            if backtest.sides[i] != live.sides[j]:
                 continue
             if not _same_symbol(_at(backtest_symbols, i), _at(live_symbols, j)):
                 continue
             gap = abs(times[pos] - when)
             if best is None or gap < best[0]:
-                best = (gap, i)
+                best = (gap, pos)
         if best is not None:
-            used.add(best[1])
-            pairs.append((best[1], j))
+            # A paired backtest trade leaves the candidates, so thousands of
+            # trades opened in the same hour are not scanned again and again.
+            pairs.append((bt_idx.pop(best[1]), j))
+            del times[best[1]]
     out: dict[str, Any] = {
         "status": "MEASURED",
         "note": PAIRING_NOTE,

@@ -380,3 +380,49 @@ def test_report_past_the_new_limit_is_refused(tmp_path: Path) -> None:
         headers={"accept": "application/json"},
     )
     assert response.status_code == 413
+
+
+# --- live account statements --------------------------------------------------
+
+
+def test_a_live_statement_error_names_the_live_file() -> None:
+    blown = synthetic_mt5_report(60, edge_pips=-60, lots=5)
+    with pytest.raises(ParseError) as info:
+        build_inputs(
+            None,
+            DeclaredMetadata(),
+            report_bytes=synthetic_mt5_report(200),
+            report_filename="ReportTester.html",
+            live_bytes=blown,
+            live_filename="cuenta.html",
+        )
+    assert info.value.message_es.startswith("Estado de cuenta real: ")
+    assert str(info.value).startswith("the live account statement: ")
+    assert info.value.code == "balance_not_positive"
+
+
+def test_thousands_of_trades_in_one_hour_pair_quickly() -> None:
+    from quant_trade.audit.live import compare_live
+    from quant_trade.audit.schema import ParsedTrades
+
+    def parsed(n: int) -> ParsedTrades:
+        trades = [
+            Trade(
+                entry_time=T0,
+                exit_time=T0 + timedelta(minutes=30),
+                quantity=1.0,
+                entry_price=100.0,
+                exit_price=100.0 + (i % 5 - 2) * 0.1,
+                pnl=(i % 5 - 2) * 0.1,
+                return_pct=0.0,
+            )
+            for i in range(n)
+        ]
+        return ParsedTrades(
+            trades=trades, sides=["long"] * n, client_pnl=[None] * n, invalid_rows=0
+        )
+
+    # All entries share one timestamp: scanning every paired candidate again
+    # took ~80 s for 12,000 trades.
+    result = compare_live(parsed(12_000), parsed(12_000), samples=200)
+    assert result["pairing"]["matched"]["value"] == 12_000

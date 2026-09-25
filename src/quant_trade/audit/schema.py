@@ -800,7 +800,16 @@ def build_inputs(
         extra["optimization_passes"] = summary.passes
         extra["optimization_parameters"] = list(summary.parameters)
     if live_bytes:
-        live = import_report(live_bytes, live_filename)
+        try:
+            live = import_report(live_bytes, live_filename)
+        except ParseError as exc:
+            # Said of the live statement: the same words about the backtest
+            # would send the customer to fix the wrong file.
+            raise ParseError(
+                f"the live account statement: {exc}",
+                message_es=f"Estado de cuenta real: {exc.message_es}",
+                code=exc.code,
+            ) from exc
         digests[live_digest_name(live_filename)] = sha256_of_bytes(live_bytes)
         warnings.extend(f"live: {w}" for w in live.warnings)
         extra["live_trades"] = live.trades
