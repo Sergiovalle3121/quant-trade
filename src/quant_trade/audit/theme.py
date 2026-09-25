@@ -1021,6 +1021,9 @@ color:#fff;font-variant-numeric:tabular-nums}
 .paybox.buy .btn{gap:10px}.paybox.buy .btn svg{width:18px;height:18px;flex:none}
 .pay-secure{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;font-size:.85rem}
 .pay-secure svg{width:15px;height:15px;flex:none;margin-top:3px}
+.lockbox .buy-steps{flex:1 1 100%;list-style:none;counter-reset:step;padding:0;margin:16px 0 0;display:grid;gap:10px}
+.lockbox .buy-steps li{counter-increment:step;display:flex;gap:10px;align-items:flex-start;color:var(--text-2);font-size:.9rem;line-height:1.5}
+.lockbox .buy-steps li::before{content:counter(step);width:22px;height:22px;flex:none;opacity:1;background:none;border:1px solid var(--border-2);border-radius:50%;display:grid;place-items:center;font-size:.78rem;color:#fff;-webkit-mask:none;mask:none}
 .buy-incl,.lockbox .buy-incl{flex:1 1 100%;list-style:none;margin:2px 0 0;padding:16px 0 0;border-top:1px solid var(--border-2);
 display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px}
 .lockbox .buy-incl li::before{content:none}
