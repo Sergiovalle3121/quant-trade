@@ -46,6 +46,38 @@ class Audience:
 #: A page lives at ``<base>/<slug>`` in each language.
 AUDIENCE_BASE: dict[str, str] = {"es": "/para", "en": "/for"}
 
+#: Export formats the universal reader recognises by their published column
+#: layout (``audit/universal.py``). Named as "recognised", never as "tried":
+#: each was built from the platform's documentation and synthetic rows.
+RECOGNISED_PLATFORMS: tuple[str, ...] = (
+    "Interactive Brokers",
+    "Tradovate",
+    "TopstepX",
+    "thinkorswim",
+    "TradeStation",
+    "Charles Schwab",
+    "Fidelity",
+    "E*TRADE",
+    "Webull",
+    "tastytrade",
+    "eToro",
+    "cTrader",
+    "Sierra Chart",
+    "Binance",
+    "Kraken",
+    "Coinbase",
+)
+
+
+def platform_list(locale: str) -> str:
+    """The recognised platforms as one phrase ("A, B y C" / "A, B and C")."""
+    joiner = " y " if locale == "es" else " and "
+    return ", ".join(RECOGNISED_PLATFORMS[:-1]) + joiner + RECOGNISED_PLATFORMS[-1]
+
+
+PLATFORMS_ES = platform_list("es")
+PLATFORMS_EN = platform_list("en")
+
 AUDIENCE_COPY: dict[str, dict[str, str]] = {
     "es": {
         "eyebrow": "Para quién es",
@@ -285,8 +317,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Las operaciones de QuantConnect.", "quantconnect"),
                     ("Las operaciones de backtesting.py o vectorbt.", "backtesting-py"),
                     (
-                        "De cualquier otro bróker, exchange o diario, su historial de "
-                        "operaciones en CSV o Excel: las columnas se reconocen por su nombre.",
+                        "El historial de operaciones de tu bróker o exchange en CSV o Excel. "
+                        "Rigor reconoce el formato de exportación de "
+                        + PLATFORMS_ES
+                        + "; de cualquier otro bróker o diario, las columnas se reconocen por "
+                        "su nombre.",
                         "csv-universal",
                     ),
                     (
@@ -362,8 +397,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("The QuantConnect trades.", "quantconnect"),
                     ("The backtesting.py or vectorbt trades.", "backtesting-py"),
                     (
-                        "From any other broker, exchange or journal, its trade history as CSV "
-                        "or Excel: the columns are recognised by their names.",
+                        "Your broker's or exchange's trade history as CSV or Excel. Rigor "
+                        "recognises the export format of "
+                        + PLATFORMS_EN
+                        + "; from any other broker or journal, the columns are recognised by "
+                        "their names.",
                         "csv-universal",
                     ),
                     (
@@ -443,7 +481,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Tu lista de operaciones de TradingView.", "tradingview"),
                     ("Tu CSV de NinjaTrader 8 (futuros).", "ninjatrader"),
                     (
-                        "O el historial de operaciones de tu plataforma en CSV o Excel.",
+                        "O el historial de operaciones de tu plataforma en CSV o Excel: Rigor "
+                        "reconoce el formato de Tradovate, TopstepX y Sierra Chart, entre otros.",
                         "csv-universal",
                     ),
                     ("Y en el formulario eliges el reto que quieres simular.", ""),
@@ -513,7 +552,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Your MetaTrader 5 or 4 report.", "mt5"),
                     ("Your TradingView list of trades.", "tradingview"),
                     ("Your NinjaTrader 8 CSV (futures).", "ninjatrader"),
-                    ("Or your platform's trade history as CSV or Excel.", "csv-universal"),
+                    (
+                        "Or your platform's trade history as CSV or Excel: Rigor recognises the "
+                        "format of Tradovate, TopstepX and Sierra Chart, among others.",
+                        "csv-universal",
+                    ),
                     ("Then pick the challenge to simulate on the form.", ""),
                 ),
                 checks=(
@@ -764,7 +807,11 @@ __all__ = [
     "AUDIENCE_BASE",
     "AUDIENCE_COPY",
     "AUDIENCE_PAGES",
+    "PLATFORMS_EN",
+    "PLATFORMS_ES",
+    "RECOGNISED_PLATFORMS",
     "Audience",
     "AudienceText",
     "audience_url",
+    "platform_list",
 ]

@@ -15,7 +15,14 @@ import re
 from datetime import datetime
 from typing import Any
 
-from quant_trade.audit.audiences import AUDIENCE_COPY, AUDIENCE_PAGES, Audience, audience_url
+from quant_trade.audit.audiences import (
+    AUDIENCE_COPY,
+    AUDIENCE_PAGES,
+    PLATFORMS_EN,
+    PLATFORMS_ES,
+    Audience,
+    audience_url,
+)
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -126,7 +133,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "(o el XLSX que exporta MetaTrader 5), "
             "lista de operaciones de TradingView (CSV o XLSX), el CSV de operaciones de "
             "NinjaTrader, QuantConnect, backtesting.py o vectorbt, o el historial de "
-            "operaciones en CSV o Excel de cualquier otro bróker o exchange. Hasta 10 MB."
+            "operaciones en CSV o Excel de cualquier otro bróker o exchange. Reconoce el "
+            "formato de exportación de " + PLATFORMS_ES + ". Hasta 10 MB."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -276,8 +284,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 "El informe de tu plataforma tal cual: MetaTrader 5 o 4 (HTML), TradingView "
                 "(CSV o XLSX), NinjaTrader, QuantConnect, backtesting.py o vectorbt. Para "
                 "revisar la cuenta de otro trader, el historial en CSV que exporta Myfxbook, "
-                "FX Blue o una señal de MQL5. De cualquier otro bróker, exchange o diario, "
-                "su historial de operaciones en CSV o Excel: las columnas se reconocen por su "
+                "FX Blue o una señal de MQL5. De tu bróker, exchange o diario, "
+                "su historial de operaciones en CSV o Excel: reconoce el formato de exportación "
+                "de " + PLATFORMS_ES + ", y en cualquier otro las columnas se reconocen por su "
                 "nombre. También sirve una curva de equity en CSV.",
             ),
             (
@@ -387,7 +396,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "XLSX MetaTrader 5 exports), a "
             "TradingView list of trades (CSV or XLSX), the trades CSV of NinjaTrader, "
             "QuantConnect, backtesting.py or vectorbt, or the CSV or Excel trade history of "
-            "any other broker or exchange. Up to 10 MB."
+            "any other broker or exchange. It recognises the export format of "
+            + PLATFORMS_EN
+            + ". Up to 10 MB."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -532,8 +543,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 "Your platform report as it is: MetaTrader 5 or 4 (HTML), TradingView (CSV or "
                 "XLSX), NinjaTrader, QuantConnect, backtesting.py or vectorbt. To review another "
                 "trader's account, the CSV history exported by Myfxbook, FX Blue or an MQL5 "
-                "signal. From any other broker, exchange or journal, its trade history as CSV "
-                "or Excel: the columns are recognised by their names. An equity curve in CSV "
+                "signal. From your broker, exchange or journal, its trade history as CSV "
+                "or Excel: it recognises the export format of " + PLATFORMS_EN + ", and in any "
+                "other the columns are recognised by their names. An equity curve in CSV "
                 "works too.",
             ),
             (
@@ -1324,7 +1336,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "No sabes si tu ventaja es real o si la encontraste a fuerza de probar.",
                 "la lista de operaciones de TradingView o NinjaTrader, el CSV de QuantConnect, "
                 "backtesting.py o vectorbt, el historial en CSV o Excel de cualquier bróker, "
-                "exchange o diario, o tu curva de equity.",
+                "exchange o diario (Interactive Brokers, Tradovate, thinkorswim, Binance y "
+                "más), o tu curva de equity.",
                 "significación, Sharpe deflactado, costes, si sigue funcionando en el periodo "
                 "reciente y qué capital pide.",
                 "tradingview",
@@ -1379,8 +1392,9 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "You trade stocks, futures, forex or crypto",
                 "You do not know whether your edge is real or you found it by trying enough.",
                 "the TradingView or NinjaTrader list of trades, the QuantConnect, backtesting.py "
-                "or vectorbt CSV, the CSV or Excel history of any broker, exchange or journal, "
-                "or your equity curve.",
+                "or vectorbt CSV, the CSV or Excel history of any broker, exchange or journal "
+                "(Interactive Brokers, Tradovate, thinkorswim, Binance and more), or your "
+                "equity curve.",
                 "significance, deflated Sharpe, costs, whether it still works in the recent "
                 "period and how much capital it needs.",
                 "tradingview",

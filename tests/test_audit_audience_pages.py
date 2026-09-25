@@ -96,3 +96,29 @@ def test_trader_pages_link_the_universal_csv_guide(tmp_path: Path) -> None:
     assert "/guides/universal-csv" in client.get("/for/stock-futures-crypto-traders").text
     assert "cualquier bróker, exchange o diario" in client.get("/").text
     assert "any broker, exchange or journal" in client.get("/en").text
+
+
+def test_named_platforms_match_the_universal_guide_and_show_on_the_pages(tmp_path: Path) -> None:
+    from quant_trade.audit.audiences import RECOGNISED_PLATFORMS
+
+    assert len(RECOGNISED_PLATFORMS) == 16
+    guide = GUIDES_BY_SLUG["csv-universal"]
+    for locale in ("es", "en"):
+        tips = " ".join(guide.text[locale].tips)
+        for name in RECOGNISED_PLATFORMS:
+            assert name in tips, (locale, name)
+    client = _client(tmp_path)
+    for path in ("/para/traders-acciones-futuros-cripto", "/for/stock-futures-crypto-traders"):
+        page = client.get(path).text
+        for name in RECOGNISED_PLATFORMS:
+            assert name.replace("&", "&amp;") in page, (path, name)
+        assert find_claims(page) == []
+    for path in ("/", "/en"):
+        page = client.get(path).text
+        assert "Interactive Brokers" in page and "Coinbase" in page
+        assert find_claims(page) == []
+    # Recognised, never "tried" or "tested" on customer files.
+    for path in ("/para/retos-prop-firm", "/for/prop-firm-challenges"):
+        page = client.get(path).text.lower()
+        assert "tradovate" in page
+        assert "probado" not in page and "tested on" not in page
