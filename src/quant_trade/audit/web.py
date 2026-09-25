@@ -20,6 +20,7 @@ and ``/sample`` serve a full report of synthetic data.
 
 import base64
 import contextlib
+import dataclasses
 import hashlib
 import hmac
 import ipaddress
@@ -38,7 +39,7 @@ from urllib.parse import quote
 
 from pydantic import ValidationError
 
-from quant_trade.audit import account_pages, payments, universal
+from quant_trade.audit import account_pages, mapping, payments, universal
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
@@ -97,7 +98,7 @@ from quant_trade.audit.store import (
     make_store,
 )
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
-from quant_trade.evidence.canonical_json import canonical_dumps
+from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
 
 #: ``(settings, audit_id, token, *, plan, locale) -> Stripe Checkout URL``.
 CheckoutFactory = Callable[..., str]
@@ -1898,28 +1899,130 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # so a pasted name still matches and never reaches a page.
         report_columns = {
             role: _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()[:200]
-            for role in universal.ROLES
+            for role in mapping.FORM_ROLES
             if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
         }
+        # Named columns belong to the report: a file sent with them in the
+        # curve field is read with them, before any automatic reader.
+        if report_columns and uploads["equity"] and not uploads["report"]:
+            uploads["report"], uploads["equity"] = uploads["equity"], None
+            report_filename = equity_name
+            report_name = report_digest_name(report_filename)
+
+        # A signed-in customer's column choice is remembered per header.
+        signed_in = _session(request)
+        mapper = signed_in[0].id if signed_in is not None else ""
+        carried = {
+            "locale": loc,
+            "consent": consent,
+            "trials": trials,
+            "cost_bps": cost_bps,
+            "oos_start": oos_start,
+            "description": description,
+            "benchmark_applicable": benchmark_applicable,
+            "challenge": challenge,
+            "initial_balance": initial_balance,
+            "access_code": access_code,
+            "net_of_fees": net_of_fees,
+        }
+
+        def build(columns: dict[str, str] | None) -> Any:
+            return build_inputs(
+                uploads["equity"],
+                declared,
+                trades_bytes=uploads["trades"],
+                benchmark_bytes=uploads["benchmark"],
+                variants_bytes=uploads["variants"],
+                report_bytes=uploads["report"],
+                report_filename=report_filename,
+                optimization_bytes=uploads["optimization"],
+                live_bytes=uploads["live"],
+                live_filename=live_filename,
+                report_columns=columns if uploads["report"] else None,
+            )
+
+        def attempt(columns: dict[str, str]) -> Any:
+            """The report read with the customer's columns: a date with a
+            balance or with each trade's result becomes the equity curve, any
+            other choice goes to the universal reader."""
+            if not columns or not uploads["report"] or mapping.curve_kind(columns) is None:
+                known = {role: name for role, name in columns.items() if role in universal.ROLES}
+                return build(known or None)
+            curve, notes = mapping.curve_from_columns(
+                uploads["report"], columns, initial_balance=declared.initial_balance
+            )
+            inputs = build_inputs(
+                curve,
+                declared,
+                trades_bytes=uploads["trades"],
+                benchmark_bytes=uploads["benchmark"],
+                variants_bytes=uploads["variants"],
+                optimization_bytes=uploads["optimization"],
+                live_bytes=uploads["live"],
+                live_filename=live_filename,
+            )
+            # The digest is the customer's own file, not the curve built from it.
+            digests = {
+                name: digest for name, digest in inputs.digests.items() if name != "equity.csv"
+            }
+            digests[report_digest_name(report_filename)] = sha256_of_bytes(uploads["report"])
+            return dataclasses.replace(
+                inputs,
+                digests=digests,
+                warnings=[*(f"report: {note}" for note in notes), *inputs.warnings],
+            )
 
         def parse_and_audit() -> tuple[str, str, bool] | Response:
             """Parse, audit and store; runs in the thread pool under a slot."""
             try:
-                inputs = build_inputs(
-                    uploads["equity"],
-                    declared,
-                    trades_bytes=uploads["trades"],
-                    benchmark_bytes=uploads["benchmark"],
-                    variants_bytes=uploads["variants"],
-                    report_bytes=uploads["report"],
-                    report_filename=report_filename,
-                    optimization_bytes=uploads["optimization"],
-                    live_bytes=uploads["live"],
-                    live_filename=live_filename,
-                    report_columns=report_columns if uploads["report"] else None,
-                )
+                inputs = attempt(report_columns)
             except ParseError as exc:
-                return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
+                # A "curve" that starts at 0 or crosses it is a list of
+                # results, and a curve file with no value column may be one:
+                # both are offered to name, a result list preselected as such.
+                lone = bool(uploads["report"]) != bool(uploads["equity"])
+                sheet = uploads["report"] or uploads["equity"]
+                curve_like = (
+                    exc.code == "equity_not_positive"
+                    and sheet is not None
+                    and mapping.looks_like_results(sheet)
+                ) or (exc.code in ("missing_value", "missing_timestamp") and not uploads["report"])
+                if curve_like and lone and not report_columns:
+                    results = mapping.read_table(sheet) if sheet else None
+                    if results is not None:
+                        guess = mapping.results_guess(
+                            results, with_result=exc.code == "equity_not_positive"
+                        )
+                        # A curve file with no date in sight keeps its plain refusal.
+                        if "date" in guess or exc.code == "equity_not_positive":
+                            return _mapping_answer(request, results, exc, loc, carried, guess)
+                table = (
+                    mapping.read_table(uploads["report"])
+                    if uploads["report"] and exc.code in mapping.MAPPABLE_CODES
+                    else None
+                )
+                if table is None:
+                    return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
+                # The columns this account chose before for the same header.
+                saved = (
+                    mapping.usable_mapping(
+                        mapping.loads(
+                            db.column_map(mapper, mapping.header_signature(table.header))
+                        ),
+                        table,
+                    )
+                    if mapper and not report_columns
+                    else {}
+                )
+                if saved:
+                    try:
+                        inputs = attempt(saved)
+                    except Exception:
+                        # A saved choice that no longer reads the file is offered again.
+                        logger.info("a saved column mapping did not read the file")
+                        return _mapping_answer(request, table, exc, loc, carried, saved)
+                else:
+                    return _mapping_answer(request, table, exc, loc, carried, report_columns)
             except ValueError:
                 return _html_error(request, 400, message("invalid_upload", loc), loc)
             except Exception:
@@ -1952,6 +2055,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 db.release_free(reservation)
             return outcome
         audit_id, token, paid = outcome
+        if mapper and report_columns and uploads["report"]:
+            table = mapping.read_table(uploads["report"])
+            chosen = mapping.usable_mapping(report_columns, table) if table else {}
+            if table is not None and chosen:
+                db.save_column_map(
+                    mapper, mapping.header_signature(table.header), mapping.dumps(chosen), at=now
+                )
         credit_used = False
         welcomed = False
         if gate_account is not None and paid:
@@ -2009,6 +2119,36 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # A random id for this browser: one free full report per browser.
             _cookie(answer, acct.DEVICE_COOKIE, new_device, max_age=acct.DEVICE_DAYS * 86400)
         return answer
+
+    def _mapping_answer(
+        request: Request,
+        table: mapping.Table,
+        exc: ParseError,
+        locale: str,
+        carried: dict[str, str],
+        chosen: dict[str, str],
+    ) -> Response:
+        """A file whose columns were not recognised: its columns and first
+        rows, to name them. Nothing is spent: no preview, no free report."""
+        if exc.code in ("unknown_format", "universal_columns_missing"):
+            # Said on this page, not as "name them on the form".
+            text = (
+                mapping.missing_fields(chosen, locale)
+                if chosen
+                else mapping.COPY[locale]["unknown"]
+            )
+        elif exc.code == "equity_not_positive":
+            text = mapping.COPY[locale]["results"]
+        elif exc.code in ("missing_value", "missing_timestamp"):
+            text = mapping.COPY[locale]["unknown"]
+        else:
+            text = _sentence(exc.localized(locale))
+        if _wants_json(request):
+            return JSONResponse(
+                {"error": text, "code": exc.code, "columns": table.names}, status_code=422
+            )
+        page = mapping.mapping_page(table, text, locale=locale, carried=carried, chosen=chosen)
+        return HTMLResponse(page, status_code=422)
 
     def _gate(request: Request, locale: str, reason: str, status: int) -> Response:
         """The answer to an upload the free tier does not cover."""

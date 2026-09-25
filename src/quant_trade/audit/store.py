@@ -383,6 +383,17 @@ class Store:
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
+        #: A customer's own column mapping for a file no importer knows, per
+        #: account and header (``audit/mapping.py``): column names and a hash
+        #: of the header only, never a row; it goes with ``delete_account``.
+        self.column_maps = sa.Table(
+            "column_maps",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("header_sha256", sa.String(64), primary_key=True),
+            sa.Column("columns_json", sa.Text, nullable=False),
+            sa.Column("updated_at", sa.String(40), nullable=False),
+        )
         #: Claims that make the free tier's limits hold under simultaneous
         #: uploads: each free full report or free preview takes its keys (the
         #: account, the browser, the file, a numbered slot of the month) in one
@@ -397,6 +408,38 @@ class Store:
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
         self.metadata.create_all(self.engine)
+
+    # -- column maps -------------------------------------------------------
+    def save_column_map(
+        self, account_id: str, header_sha256: str, columns_json: str, *, at: datetime
+    ) -> None:
+        """Keep (or replace) an account's mapping for one header."""
+        table = self.column_maps
+        with self.engine.begin() as conn:
+            conn.execute(
+                table.delete()
+                .where(table.c.account_id == account_id)
+                .where(table.c.header_sha256 == header_sha256)
+            )
+            conn.execute(
+                table.insert().values(
+                    account_id=account_id,
+                    header_sha256=header_sha256,
+                    columns_json=columns_json,
+                    updated_at=_iso(at),
+                )
+            )
+
+    def column_map(self, account_id: str, header_sha256: str) -> str | None:
+        """The account's saved mapping for this header, as JSON, if any."""
+        table = self.column_maps
+        with self.engine.connect() as conn:
+            found = conn.execute(
+                self._sa.select(table.c.columns_json)
+                .where(table.c.account_id == account_id)
+                .where(table.c.header_sha256 == header_sha256)
+            ).scalar()
+        return str(found) if found is not None else None
 
     # -- audits ------------------------------------------------------------
     def create_audit(
@@ -1049,7 +1092,7 @@ class Store:
         return int(value or 0)
 
     def delete_account(self, account_id: str, *, with_reports: bool = False) -> list[str]:
-        """Remove an account, its sessions, reset links and links to codes.
+        """Remove an account, its sessions, reset links, links to codes and column maps.
 
         With ``with_reports`` the reports it uploaded are deleted too (as
         ``delete_audit``); a report paid for or saved from a link is only
@@ -1074,6 +1117,7 @@ class Store:
                 self.account_resets,
                 self.account_codes,
                 self.account_audits,
+                self.column_maps,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
