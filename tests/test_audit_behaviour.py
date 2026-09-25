@@ -161,8 +161,25 @@ def test_the_findings_render_as_questions() -> None:
     )
     review = behaviour_review(trades)
     html = _behaviour_html(review, "es", LABELS["es"])
-    assert "Deja correr las pérdidas" in html and "Vuelve a entrar deprisa" in html
+    assert "Las perdedoras siguen abiertas bastante más" in html
+    assert "Vuelve a entrar deprisa" in html
     assert "Para preguntar" in html and "9.0 h" in html and "2.0 h" in html
     english = _behaviour_html(review, "en", LABELS["en"])
-    assert "Losses are left to run" in english
+    assert "Losing trades stay open much longer" in english
     assert_report_clean(html + english)
+
+
+def test_short_losers_keep_their_digits() -> None:
+    from quant_trade.audit.report import _ratio_text
+
+    assert _ratio_text(0.036) == "0.036" and _ratio_text(4.52) == "4.5"
+    assert _ratio_text(0.1) == "0.1"
+
+
+def test_equal_reentry_rates_show_no_line() -> None:
+    from quant_trade.audit.report import _behaviour_html
+
+    trades = _history(_mixed(80, seed=4), hold={True: 5.0, False: 5.0}, gap={True: 0.1, False: 0.1})
+    review = behaviour_review(trades)
+    assert review["quick_after_loss"]["value"] == review["quick_after_win"]["value"] == 1.0
+    assert "15 minutos" not in _behaviour_html(review, "es", LABELS["es"])

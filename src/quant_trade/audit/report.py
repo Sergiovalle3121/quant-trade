@@ -360,8 +360,8 @@ LABELS: dict[str, dict[str, str]] = {
             "Aciertos tras {k} pérdidas seguidas ({n} operaciones; en todo el historial: {all})"
         ),
         "beh_losers_held_longer": (
-            "Deja correr las pérdidas: las perdedoras siguen abiertas bastante más que las "
-            "ganadoras. Pregunta dónde va el stop y si se mueve."
+            "Las perdedoras siguen abiertas bastante más que las ganadoras. Pregunta dónde va "
+            "el stop y si se mueve."
         ),
         "beh_quick_after_loss": (
             "Vuelve a entrar deprisa tras perder. Pregunta qué regla frena la siguiente "
@@ -879,8 +879,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "beh_streak": "Win rate after {k} losses in a row ({n} trades; whole history: {all})",
         "beh_losers_held_longer": (
-            "Losses are left to run: losing trades stay open much longer than winning ones. "
-            "Ask where the stop is and whether it moves."
+            "Losing trades stay open much longer than winning ones. Ask where the stop is and "
+            "whether it moves."
         ),
         "beh_quick_after_loss": (
             "A new trade follows a loss quickly. Ask what rule holds back the next trade "
@@ -3152,6 +3152,11 @@ def _duration_text(hours: float, locale: str) -> str:
     return f"{hours / 24:.1f} " + ("días" if locale == "es" else "days")
 
 
+def _ratio_text(ratio: float) -> str:
+    """``4.5`` as ``4.5``, ``0.036`` as ``0.036``: never a bare ``0.0``."""
+    return f"{ratio:.1f}" if ratio >= 0.1 else f"{ratio:.2g}"
+
+
 def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """Hold times, re-entries and streaks around losses; no class change."""
     if not behaviour or behaviour.get("status") != "MEASURED":
@@ -3178,11 +3183,12 @@ def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[
             win=_duration_text(float(behaviour["hold_win_hours"]["value"]), locale),
         )
         facts.append(
-            f"<div class='fact{tone}'><b>{float(ratio['value']):.1f}×</b>"
+            f"<div class='fact{tone}'><b>{_ratio_text(float(ratio['value']))}×</b>"
             f"<p>{_e(text)} {_badge(ratio['evidence'])}</p></div>"
         )
     quick = behaviour.get("quick_after_loss")
-    if quick:
+    # Only worth a line when re-entries after a loss outnumber those after a win.
+    if quick and float(quick["value"]) > float(behaviour["quick_after_win"]["value"]):
         tone = " neg" if "quick_after_loss" in findings else ""
         text = labels["beh_quick"].format(win=f"{float(behaviour['quick_after_win']['value']):.0%}")
         facts.append(
