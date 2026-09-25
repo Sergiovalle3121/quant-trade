@@ -1178,6 +1178,9 @@ class AuditResult(BaseModel):
     instruments: dict[str, Any] | None = None
     #: Calendar table and fund-investor checks of a monthly track record (``audit/fund.py``).
     fund: dict[str, Any] | None = None
+    #: A dated curve through fixed market-fall windows (``audit/crises.py``),
+    #: when the fund section does not already show them.
+    crises: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

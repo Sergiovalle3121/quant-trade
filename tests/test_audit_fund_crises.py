@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant_trade.audit.crises import WINDOWS, crisis_review
+from quant_trade.audit.crises import WINDOWS, crisis_review, curve_months
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
@@ -103,3 +103,63 @@ def test_a_record_that_covers_no_crisis_says_so(locale: str) -> None:
     html, _ = render(result, watermark=False)
     assert_report_clean(html)
     assert LABELS[locale]["fund_stress_none"].replace("'", "&#x27;") in html
+
+
+def _daily_csv(first: str, last: str, seed: int = 5) -> bytes:
+    stamps = pd.bdate_range(first, last)
+    steps = np.random.default_rng(seed).normal(0.0003, 0.01, len(stamps))
+    equity = 10_000 * np.cumprod(1 + steps)
+    rows = [f"{stamp.date()},{value:.4f}" for stamp, value in zip(stamps, equity, strict=True)]
+    return ("timestamp,equity\n" + "\n".join(rows) + "\n").encode()
+
+
+def test_curve_months_carry_quiet_months_and_drop_a_partial_last_month() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(
+                ["2020-01-05", "2020-01-31", "2020-03-31", "2020-04-10"], utc=True
+            ),
+            "equity": [100.0, 110.0, 99.0, 120.0],
+        }
+    )
+    months = curve_months(frame)
+    # February had no point: flat. April ends on the 10th: left out.
+    assert list(months.round(6)) == [0.0, -0.1]
+    assert [stamp.month for stamp in months.index] == [2, 3]
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_daily_backtest_shows_the_crises_it_covers(locale: str) -> None:
+    result = run_audit(
+        build_inputs(_daily_csv("2006-01-02", "2012-12-31"), DeclaredMetadata(locale=locale)),
+        bootstrap_samples=200,
+    )
+    assert result.fund is not None and result.fund["status"] == "NOT_MEASURED"
+    assert result.crises is not None and result.crises["status"] == "MEASURED"
+    assert [row["key"] for row in result.crises["windows"]] == ["gfc", "euro"]
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    assert LABELS[locale]["crises_subject"] in html
+    assert LABELS[locale]["fund_stress_gfc"] in html
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_curve_that_covers_no_crisis_shows_no_section() -> None:
+    result = run_audit(
+        build_inputs(_daily_csv("2023-01-02", "2024-12-31"), DeclaredMetadata(locale="es")),
+        bootstrap_samples=200,
+    )
+    assert result.crises is not None and result.crises["status"] == "NOT_MEASURED"
+    html, _ = render(result, watermark=False)
+    assert LABELS["es"]["crises_intro"] not in html
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_fund_record_keeps_the_crises_in_its_own_section() -> None:
+    values = np.random.default_rng(2).normal(0.006, 0.03, 180)
+    result = run_audit(
+        build_inputs(_grid(values, 2010), DeclaredMetadata(locale="es")), bootstrap_samples=200
+    )
+    assert result.crises is None
+    html, _ = render(result, watermark=False)
+    assert html.count(LABELS["es"]["fund_stress"]) == 1

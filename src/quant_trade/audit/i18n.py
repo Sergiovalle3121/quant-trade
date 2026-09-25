@@ -803,6 +803,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("needs at least {n} monthly returns", "hacen falta al menos {n} rentabilidades mensuales"),
     ("the monthly returns do not vary", "las rentabilidades mensuales no varían"),
     (
+        "the curve covers none of the dated market falls in full",
+        "la curva no cubre completa ninguna de las caídas de mercado con fecha",
+    ),
+    (
+        "the curve has no usable month-end levels",
+        "la curva no tiene saldos de fin de mes utilizables",
+    ),
+    (
         "month-end returns as the file states them",
         "rentabilidades de fin de mes tal como las da el archivo",
     ),

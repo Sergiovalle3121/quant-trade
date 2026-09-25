@@ -52,6 +52,8 @@ ROLLING = 12
 #: Share of covered windows in which trailing the benchmark is a finding.
 WORSE_SHARE = 2 / 3
 MIN_WINDOWS = 2
+#: A curve ending this close to a month's end counts that month in full.
+LAST_WEEK_DAYS = 7
 
 NOTE = (
     "fixed calendar windows of widely recorded market falls; the fund's months "
@@ -107,4 +109,39 @@ def crisis_review(fund: pd.Series, benchmark: pd.Series | None = None) -> dict[s
     return review
 
 
-__all__ = ["WINDOWS", "Window", "crisis_review"]
+def curve_months(frame: pd.DataFrame) -> pd.Series:
+    """Month-end returns of a dated equity curve of any frequency.
+
+    A month with no point carries the previous level (a trade list closes
+    nothing that month). The first month is only a starting level, and the
+    last month is dropped unless the curve reaches its final week, so a
+    window is never covered by a month the curve saw only in part."""
+    equity = frame.set_index("timestamp")["equity"].astype(float)
+    stamps = pd.DatetimeIndex(equity.index)
+    if stamps.tz is not None:
+        stamps = stamps.tz_convert("UTC").tz_localize(None)
+    equity = pd.Series(equity.to_numpy(), index=stamps).sort_index()
+    if len(equity) < 2:
+        return pd.Series(dtype=float)
+    month_end = equity.resample("ME").last().ffill()
+    if equity.index[-1] < month_end.index[-1] - pd.Timedelta(days=LAST_WEEK_DAYS):
+        month_end = month_end.iloc[:-1]
+    return month_end.pct_change().dropna()
+
+
+def curve_crises(frame: pd.DataFrame, benchmark: pd.Series | None = None) -> dict[str, Any]:
+    """The crisis windows for a backtest or trade history's equity curve;
+    NOT_MEASURED when the curve covers none of them in full."""
+    months = curve_months(frame)
+    if months.empty or (months <= -1.0).any():
+        return {"status": "NOT_MEASURED", "reason": "the curve has no usable month-end levels"}
+    review = crisis_review(months, benchmark)
+    if not review["windows"]:
+        return {
+            "status": "NOT_MEASURED",
+            "reason": "the curve covers none of the dated market falls in full",
+        }
+    return review
+
+
+__all__ = ["WINDOWS", "Window", "crisis_review", "curve_crises", "curve_months"]
