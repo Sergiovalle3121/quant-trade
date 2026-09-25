@@ -871,6 +871,12 @@ with an empty value):
 1. Create a service from this repository. `railway.json` selects
    `Dockerfile.web` and the `/health` check; the container listens on
    `$PORT`.
+   Every merge redeploys, and Railway's default draining time (SIGTERM to
+   SIGKILL) is 0 s. Set the service's Draining time to 120 s (Settings, or
+   the variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=120`); `railway.json`
+   carries `drainingSeconds: 120` too, but services created after Railway
+   deprecated config as code may not read it. The image `exec`s the server so
+   it receives the SIGTERM and finishes the audits and PDFs in flight.
 2. Storage: either add the Railway Postgres plugin and reference its
    variable from the service (`DATABASE_URL=${{Postgres.DATABASE_URL}}`), or
    mount a volume at `/data` and set `DATABASE_URL=sqlite:////data/audit.db`.
