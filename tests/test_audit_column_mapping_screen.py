@@ -295,3 +295,23 @@ def test_the_preview_shows_at_most_the_menu_width() -> None:
     page = mapping.mapping_page(table, "problema")
     assert page.count("<th>") == mapping.MAX_COLUMNS
     assert "y 20 columnas más, que no se muestran" in page
+
+
+def test_results_that_empty_the_account_ask_for_the_starting_balance(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    losing = b"Fecha cierre;Resultado neto\n13/01/2025;50\n14/01/2025;-400\n15/01/2025;20\n"
+    files = {"report": ("pnl.csv", losing, "text/csv")}
+    answer = client.post(
+        "/audits",
+        files=files,
+        data={
+            "consent": "on",
+            "initial_balance": "300",
+            "col_date": "Fecha cierre",
+            "col_profit": "Resultado neto",
+        },
+    )
+    assert answer.status_code == 400
+    assert "declara el balance inicial de la cuenta" in answer.text
+    assert "ganancia acumulada" not in answer.text
+    assert find_claims(answer.text) == []

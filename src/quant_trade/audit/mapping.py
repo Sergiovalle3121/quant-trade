@@ -420,6 +420,17 @@ def curve_from_columns(
         for when, figure in points:
             level += figure
             curve[when] = level
+            if level <= 0:
+                day = when.date().isoformat()
+                raise imp.ReportFormatError(
+                    "mapped_results_below_zero",
+                    f"the results add up to zero or less on {day} from a starting balance of "
+                    f"{start:,.0f}: state the account's starting balance on the form and "
+                    "upload it again",
+                    f"Los resultados suman cero o menos el {day} desde un balance inicial de "
+                    f"{start:,.0f}: declara el balance inicial de la cuenta en el formulario y "
+                    "vuelve a subirlo.",
+                )
     if dropped:
         warnings.append(MAPPED_DROPPED_WARNING.format(n=dropped))
     lines = ["timestamp,equity"]

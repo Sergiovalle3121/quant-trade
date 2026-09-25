@@ -2097,7 +2097,9 @@ before the first result. A date with the balance or equity column is read as
 the curve itself. Either way the file's own SHA-256 is the recorded digest,
 and a warning says the trade-level checks cannot be measured (`MAPPED_PROFIT_WARNING`
 and `MAPPED_BALANCE_WARNING`, with Spanish rules). Rows without a readable date
-or figure are counted in a warning, and fewer than two readable rows bring
+or figure are counted in a warning; results that bring the balance to zero or
+less are refused with a request to declare the starting balance
+(`mapped_results_below_zero`). Fewer than two readable rows bring
 the page back (`mapped_curve_unreadable`). A choice that still lacks fields
 is answered on the page itself, naming the missing fields for the way the
 choice points to (one row per trade, per fill, date and result, or date and
