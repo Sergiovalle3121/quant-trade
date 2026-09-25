@@ -172,8 +172,20 @@ tastytrade (multiplier column), Fidelity ("YOU BOUGHT ..."), E*TRADE, eToro
 closed positions, XTB xStation 5 closed position history (CSV, or the XLSX with account
 rows above the header and an empty first column; the `Total` row is skipped by
 `universal.without_totals` and a second financing column such as `Rollover`
-is added to the costs), cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
-Sierra Chart's Trade Activity Log (only `Fills` rows). Time styles read:
+is added to the costs), DEGIRO Transactions in English, Spanish, Portuguese,
+French, Dutch or German (the quantity's sign is the side; the date and the
+clock-only time column are joined; the transaction and AutoFX costs, in euros,
+are subtracted as they are even on shares quoted in another currency),
+Trading 212 history (`Market buy`/`Limit sell` in `Action`; deposit and
+dividend rows have no price and are dropped; `Result` is in the account
+currency, so the contract size inferred from it absorbs the exchange rate),
+KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader, Binance
+(with `Fee Coin`), Kraken, Coinbase and Sierra Chart's Trade Activity Log (only
+`Fills` rows). A zone stated in a time column's name (`Filled Time(UTC+02:00)`,
+`Transaction Time(UTC+10)`, `Date(UTC)`) applies to every cell that carries
+none, so those times are no longer reported as naive. A `Contracts` column is
+taken as the instrument only when there is no symbol column and its cells are
+not numbers. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
 order that no day past 12 settles is taken from a year-first column of the
@@ -954,6 +966,22 @@ positive. One finding, as a question: `fell_more_in_crises` when, over at
 least two windows with a benchmark, the fund did worse in two thirds or more
 of them. No red flag and no class change.
 
+The same windows apply to any dated curve that is not a fund record (a
+daily backtest, a platform report, a trade history), in their own section
+"How did it do in the known crises?". The curve is taken at month ends. On
+a curve rebuilt from a report's trades a month with no point carries the
+previous level (nothing closed); on an uploaded curve it stays missing, so a
+hole in the data never covers a window. The first month counts when the
+curve starts in its first week, the last when it reaches its final week, so
+no window is covered by a month seen in part. On a curve rebuilt from trades, a window
+with no trade closed in any of its months reads "no trades closed in the
+window" instead of 0.0 %. A curve that never moves 0.1 % from its start
+(for example a trade list in price points on a large base) is NOT_MEASURED
+and the section is left out. The benchmark
+is the uploaded file or the curve's own benchmark column. A curve that covers
+no window in full is NOT_MEASURED and the section is left out. A trade
+history with no stated starting balance inherits the assumed-balance warning.
+
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are
@@ -1469,8 +1497,39 @@ Tests: `tests/test_audit_owner_panel.py`.
 A customer can create an account with an e-mail and a password to find, in
 one place, the reports they uploaded or saved, the access codes they
 redeemed or added (with the credits left), and what they paid for. The
-account is optional: the free preview and each report's private link work
-without one, and an account never changes what a report says.
+free preview needs one (see "Free tier" below); each report's private link
+and a report paid with an access code work without one, and an account never
+changes what a report says.
+
+- **Free tier** (`accounts.FREE_PREVIEWS_PER_MONTH = 3`,
+  `FREE_PREVIEWS_PER_IP_PER_MONTH = 10`; not in free mode). An upload
+  without a working access code needs a signed-in account (401 page with
+  "Crear cuenta gratis" otherwise; `{"error": "free_tier_signin"}` for JSON).
+  Each account gets 3 free previews per calendar month (UTC), counted in
+  the `free_previews` table; free previews are also capped per network
+  address per month, across accounts. Past either limit, an account with
+  credits gets a full report and spends one credit (`acct=upload_credit`);
+  without credits the upload answers 402 with a link to buy. A code typed
+  in the form that still has credits pays the upload with no account, as
+  before. "Mi cuenta" shows the free previews left this month. The
+  address in `free_previews` is cleared by the retention purge.
+  What it does not stop: without e-mail verification, someone can open
+  several accounts with made-up addresses; the per-network cap and the
+  5 sign-ups per hour per address only slow that down. E-mail confirmation
+  (needs a mail provider) would close it.
+- **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
+  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3`; not in free mode). A signed-in
+  account's first upload comes out as a full report with PDF and a
+  publishable verification page, paid with the reference `welcome:<id>`
+  (`paid_with = "welcome"`, `acct=welcome` shows the notice). It does not
+  use a monthly preview. It is refused (the upload falls back to the
+  free-preview rules) when the account already had it, when this browser
+  already gave one (a `rigor_device` cookie holding a random id, stored as
+  its SHA-256), when the same file (SHA-256 of the upload) already got one
+  on any account, or when the network address reached the monthly cap. The
+  `welcome_reports` row outlives the account, so deleting and signing up
+  again does not repeat it. The purge clears the address; the device and
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado.
 
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
@@ -1889,6 +1948,8 @@ Redesign pass 49 checks the upload form after #230 (report first, extras in a cl
 Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, two reports picked from "My reports"). On a phone the dimension and figure tables now use tighter cells and smaller badges, so a "Fails" badge in the second report no longer spills past the card. It also checks the fund benchmark block and the plain lines under the headline figures on /ejemplo; both read well and needed nothing.
 
 Redesign pass 51 styles the PDF link while the PDF is made ("Generando tu PDF… (unos segundos)"): the button keeps its full colour, shows a small spinning ring like the upload loader, and keeps a progress cursor; on a phone the report's PDF button spans the width so the longer label fits on one line.
+
+Redesign pass 52 checks the two new report sections on screen, on a phone and in the PDF. The "history needed" table in "¿Cuánto queda al descontar la suerte?" (`table.luck`) turns into one card per row on a phone, each figure under its column name, and its yes/no answer is green or red. In the PDF a block of figures may now split across pages (orphans and widows 1), so a heading such as "Cómo se vivió este historial" no longer sits alone above half a blank page; subsection headings stay with what follows.
 
 ## Security
 

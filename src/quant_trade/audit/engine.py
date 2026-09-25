@@ -31,6 +31,7 @@ from quant_trade.audit import account as account_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import costs as cost_lib
+from quant_trade.audit import crises as crises_lib
 from quant_trade.audit import decay as decay_lib
 from quant_trade.audit import forward as forward_lib
 from quant_trade.audit import fund as fund_lib
@@ -1011,6 +1012,15 @@ def run_audit(
         fund["track_record"] = fund_record(inputs)
     if fund.get("status") == "MEASURED" and net_of_fees(inputs):
         fund["net_of_fees"] = declared(True, NET_OF_FEES_NOTE)
+    # A fund record shows the crises in its own section; any other dated
+    # curve (a backtest, a trade history) gets them on their own.
+    crises = (
+        None
+        if fund.get("status") == "MEASURED"
+        else crises_lib.curve_crises(
+            inputs.equity.frame, bench_months, from_trades=inputs.balance_only
+        )
+    )
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1218,6 +1228,7 @@ def run_audit(
         behaviour=behaviour,
         instruments=instruments,
         fund=fund,
+        crises=crises,
         luck=luck,
         ride=ride,
         vendor_questions=questions,

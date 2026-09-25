@@ -52,10 +52,19 @@ ROLLING = 12
 #: Share of covered windows in which trailing the benchmark is a finding.
 WORSE_SHARE = 2 / 3
 MIN_WINDOWS = 2
+#: A curve starting this close to a month's start, or ending this close to
+#: its end, counts that month in full.
+EDGE_WEEK_DAYS = 7
+#: A curve that never moves this far from its start has nothing to show.
+FLAT_CURVE = 0.001
 
 NOTE = (
     "fixed calendar windows of widely recorded market falls; the fund's months "
     "compounded over each window it covers in full"
+)
+CURVE_NOTE = (
+    "fixed calendar windows of widely recorded market falls; the curve's month-end "
+    "returns compounded over each window it covers in full"
 )
 
 
@@ -107,4 +116,63 @@ def crisis_review(fund: pd.Series, benchmark: pd.Series | None = None) -> dict[s
     return review
 
 
-__all__ = ["WINDOWS", "Window", "crisis_review"]
+def curve_months(frame: pd.DataFrame, *, from_trades: bool = False) -> pd.Series:
+    """Month-end returns of a dated equity curve of any frequency.
+
+    On a curve rebuilt from trades a month with no point carries the previous
+    level (nothing closed that month). On an uploaded curve it stays missing,
+    so a hole in the data never covers a window. The first month counts when
+    the curve starts in its first week, the last when it reaches its final
+    week: a window is never covered by a month the curve saw only in part."""
+    equity = frame.set_index("timestamp")["equity"].astype(float)
+    stamps = pd.DatetimeIndex(equity.index)
+    if stamps.tz is not None:
+        stamps = stamps.tz_convert("UTC").tz_localize(None)
+    equity = pd.Series(equity.to_numpy(), index=stamps).sort_index()
+    if len(equity) < 2:
+        return pd.Series(dtype=float)
+    first = equity.index[0]
+    if first.day <= EDGE_WEEK_DAYS:
+        # The first point stands in for the previous month's close.
+        opening = first.normalize().replace(day=1) - pd.Timedelta(days=1)
+        equity = pd.concat([pd.Series([equity.iloc[0]], index=[opening]), equity])
+    month_end = equity.resample("ME").last()
+    if from_trades:
+        month_end = month_end.ffill()
+    if equity.index[-1] < month_end.index[-1] - pd.Timedelta(days=EDGE_WEEK_DAYS):
+        month_end = month_end.iloc[:-1]
+    returns = month_end / month_end.shift(1) - 1.0
+    return returns.iloc[1:].dropna()
+
+
+def curve_crises(
+    frame: pd.DataFrame, benchmark: pd.Series | None = None, *, from_trades: bool = False
+) -> dict[str, Any]:
+    """The crisis windows for a backtest or trade history's equity curve;
+    NOT_MEASURED when the curve covers none of them in full."""
+    months = curve_months(frame, from_trades=from_trades)
+    if months.empty:
+        return {"status": "NOT_MEASURED", "reason": "the curve is shorter than two months"}
+    if (months <= -1.0).any():
+        return {"status": "NOT_MEASURED", "reason": "the curve has no usable month-end levels"}
+    equity = frame["equity"].astype(float).to_numpy()
+    if equity[0] > 0 and float(np.abs(equity / equity[0] - 1.0).max()) < FLAT_CURVE:
+        return {"status": "NOT_MEASURED", "reason": "the curve never moves 0.1 % from its start"}
+    review = crisis_review(months, benchmark)
+    review["note"] = CURVE_NOTE
+    if not review["windows"]:
+        return {
+            "status": "NOT_MEASURED",
+            "reason": "the curve covers none of the dated market falls in full",
+        }
+    if from_trades:
+        stamps = pd.DatetimeIndex(pd.to_datetime(frame["timestamp"], utc=True))
+        traded = set(stamps.tz_convert("UTC").tz_localize(None).to_period("M")[1:])
+        for row in review["windows"]:
+            span = pd.period_range(row["first"], row["last"], freq="M")
+            if not traded.intersection(span):
+                row["no_trades"] = True
+    return review
+
+
+__all__ = ["WINDOWS", "Window", "crisis_review", "curve_crises", "curve_months"]

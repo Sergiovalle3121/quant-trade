@@ -1379,6 +1379,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     free_mode=cfg.free_mode,
                     price_cents=cfg.price_usd_cents,
                     pack_price_cents=cfg.pack_price_usd_cents,
+                    free_left=max(
+                        0,
+                        acct.FREE_PREVIEWS_PER_MONTH
+                        - db.free_previews_since(acct.month_start(now), account_id=account.id),
+                    ),
+                    free_limit=0 if cfg.free_mode else acct.FREE_PREVIEWS_PER_MONTH,
+                    welcome=(
+                        ""
+                        if cfg.free_mode or not acct.WELCOME_FULL_REPORT
+                        else ("used" if db.welcome_used(account.id) else "available")
+                    ),
                 )
             )
 
@@ -1695,6 +1706,26 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             or attempts >= cfg.max_uploads_per_hour_per_ip * UPLOAD_ATTEMPTS_PER_UPLOAD
         ):
             return _html_error(request, 429, message("rate_limited", loc), loc)
+        # The free tier: without a code that still works, an upload needs an
+        # account, and each account gets FREE_PREVIEWS_PER_MONTH previews a
+        # calendar month (also capped per network address). Past it, a
+        # credit on the account turns the upload into a full report.
+        gate_account: Any = None
+        welcome = False
+        free_preview = False
+        spend_credit = False
+        device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+        new_device = ""
+        if not (0 < len(device) <= 128):
+            device = new_device = acct.new_secret()
+        if not cfg.free_mode:
+            typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+            usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
+            session = _session(request)
+            if not usable and session is None:
+                return _gate(request, loc, "code" if typed else "signin", 401)
+            if not usable and session is not None:
+                gate_account = session[0]
         try:
             uploads = {
                 "equity": await _read_limited(equity, what="equity"),
@@ -1720,6 +1751,35 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:
             return _html_error(request, 400, message("equity_required", loc), loc)
+        file_sha256 = hashlib.sha256(uploads["report"] or uploads["equity"] or b"").hexdigest()
+        if gate_account is not None:
+            # A new account's first file is a free full report (once per
+            # account, browser and file); then the month's free previews; then
+            # a credit; else the way to buy.
+            start = acct.month_start(now)
+            device_sha256 = acct.hash_secret(device)
+            if acct.WELCOME_FULL_REPORT and not db.welcome_refusal(
+                gate_account.id,
+                device_sha256=device_sha256,
+                file_sha256=file_sha256,
+                client_ip=ip,
+                since=start,
+                per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+            ):
+                welcome = True
+            else:
+                used = db.free_previews_since(start, account_id=gate_account.id)
+                network = db.free_previews_since(start, client_ip=ip)
+                if (
+                    used < acct.FREE_PREVIEWS_PER_MONTH
+                    and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
+                ):
+                    free_preview = True
+                elif db.account_credits(gate_account.id, now) > 0:
+                    spend_credit = True
+                else:
+                    reason = "quota" if used >= acct.FREE_PREVIEWS_PER_MONTH else "network"
+                    return _gate(request, loc, reason, 402)
         try:
             # A blank field is not a declaration: 1 trial is assumed (and never
             # held against the client) and no extra cost is added.
@@ -1808,23 +1868,62 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not isinstance(outcome, tuple):
             return outcome
         audit_id, token, paid = outcome
+        credit_used = False
+        welcomed = False
+        if gate_account is not None and not paid and welcome:
+            welcomed = db.grant_welcome(
+                audit_id,
+                gate_account.id,
+                device_sha256=acct.hash_secret(device),
+                file_sha256=file_sha256,
+                client_ip=ip,
+                at=now,
+            )
+            paid = welcomed
+            free_preview = not welcomed
+        if gate_account is not None and not paid:
+            if spend_credit:
+                credit_used = db.redeem_with_account(
+                    audit_id, gate_account.id, at=datetime.now(UTC)
+                )
+                paid = credit_used
+            if free_preview or not credit_used:
+                db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
         if paid or _session(request) is not None:
             linked = db.get_audit(audit_id)
             _link_to_session(
                 request, audit_id, linked.stripe_session_id if linked else None, via=VIA_UPLOAD
             )
         location = f"/audits/{audit_id}?token={token}"
-        if code:
+        if welcomed:
+            location += "&acct=welcome"
+        elif credit_used:
+            location += "&acct=upload_credit"
+        elif code:
             location += "&code=" + ("applied" if paid else "rejected")
         if _wants_json(request):
             body: dict[str, Any] = {"audit_id": audit_id, "token": token, "location": location}
             if code:
                 body["access_code"] = "applied" if paid else "rejected"
-            return JSONResponse(body, status_code=201)
-        if code and not paid:
-            # Open the preview at the code field, where the refusal and its fix are shown.
-            location += "#canjear"
-        return RedirectResponse(location, status_code=303)
+            answer: Response = JSONResponse(body, status_code=201)
+        else:
+            if code and not paid:
+                # Open the preview at the code field, where the refusal and its fix are shown.
+                location += "#canjear"
+            answer = RedirectResponse(location, status_code=303)
+        if new_device:
+            # A random id for this browser: one free full report per browser.
+            _cookie(answer, acct.DEVICE_COOKIE, new_device, max_age=acct.DEVICE_DAYS * 86400)
+        return answer
+
+    def _gate(request: Request, locale: str, reason: str, status: int) -> Response:
+        """The answer to an upload the free tier does not cover."""
+        if _wants_json(request):
+            return JSONResponse({"error": f"free_tier_{reason}"}, status_code=status)
+        page = account_pages.gate_page(
+            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH
+        )
+        return HTMLResponse(page, status_code=status)
 
     def _owns(request: Request | None, audit_id: str) -> bool:
         """Whether the signed-in account holds this report."""
@@ -1985,6 +2084,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = message("code_applied", locale)
         elif acct_done == "credit" and record.paid:
             notice = account_pages.COPY[locale]["credit_used"]
+        elif acct_done == "upload_credit" and record.paid:
+            notice = account_pages.COPY[locale]["credit_on_upload"]
+        elif acct_done == "welcome" and record.paid:
+            notice = account_pages.COPY[locale]["welcome_notice"].format(
+                limit=acct.FREE_PREVIEWS_PER_MONTH,
+                price=f"USD {cfg.price_usd:.0f}",
+                pack=f"USD {cfg.pack_price_usd:.0f}",
+            )
         elif acct_done == "saved":
             notice = account_pages.COPY[locale]["saved_notice"]
         elif acct_done == "nocredit" and not record.paid:

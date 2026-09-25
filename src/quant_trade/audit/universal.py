@@ -20,7 +20,7 @@ import re
 import statistics
 import unicodedata
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -272,6 +272,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "date et heure",
         "datum",
         "zeit",
+        "uhrzeit",
+        "tijd",
         "datum/zeit",
         "ora",
         "data e ora",
@@ -285,6 +287,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "avg. fill price",
         "filled average price",
         "average filled price",
+        "avg. filled price",
+        "price / share",
         "avg price",
         "average price",
         "execution price",
@@ -317,6 +321,9 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "preis",
         "ausfuhrungskurs",
         "prezzo",
+        "koers",
+        "cours",
+        "precos",
     ),
     "symbol": _names(
         "symbol",
@@ -329,6 +336,10 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "asset",
         "security",
         "product",
+        "producto",
+        "produto",
+        "produit",
+        "produkt",
         "underlying",
         "coin",
         "currency pair",
@@ -393,6 +404,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "quantity #",
         "no. of shares",
         "exec qty",
+        "filled amount",
         "quantity",
         "qty",
         "size",
@@ -428,6 +440,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "stuck",
         "quantita",
         "lotti",
+        "aantal",
+        "numero",
     ),
     "profit": _names(
         "profit",
@@ -520,6 +534,19 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "opening fee",
         "closing fee",
         "platform fee",
+        "transaction and/or third party fees eur",
+        "transaction and/or third party fees",
+        "transactiekosten",
+        "transaktionskost",
+        "transaktionskosten",
+        "costes de transaccion y/o externos eur",
+        "custos de transacao e/ou taxas de terceiros",
+        "frais de courtage et/ou de parties",
+        "autofx fee",
+        "comision autofx",
+        "taxa autofx",
+        "frais conversion autofx",
+        "currency conversion fee",
     ),
     "swap": _names(
         "swap",
@@ -927,6 +954,7 @@ _SHORT_YEAR = re.compile(r"^(\d{1,2})([/.\-])(\d{1,2})\2(\d{2})(?=\s|$)")
 _TAIL_OFFSET = re.compile(r"\s*(?:(?:UTC|GMT)?([+-])(\d{1,2}):?(\d{2})?)$")
 _CLOCK = re.compile(r"^\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?(\s*[AaPp][Mm])?$")
 _ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+_ISO_OFFSET = re.compile(r"\d:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})$")
 _DAY_MONTH = re.compile(r"^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})")
 
 
@@ -997,16 +1025,49 @@ def _dayfirst_hint(times: list[str], rows: list[list[str]], skip: int | None) ->
     return None
 
 
+_HEADER_ZONE = re.compile(r"(?:UTC|GMT)\s*(?:([+-])\s*(\d{1,2})(?::?(\d{2}))?)?", re.IGNORECASE)
+
+
+def header_zone(name: str) -> int | None:
+    """The offset from UTC in minutes a column name states (KuCoin's
+    ``Filled Time(UTC+02:00)``, Bybit's ``Transaction Time(UTC+10)``), or
+    ``None`` when the name states none."""
+    found = _HEADER_ZONE.search(name)
+    if found is None:
+        return None
+    sign, hours, minutes = found.groups()
+    if sign is None:
+        return 0
+    return (1 if sign == "+" else -1) * (int(hours) * 60 + int(minutes or 0))
+
+
 def _times(
     values: list[str],
     serial: bool,
     rows: list[list[str]] | None = None,
     column: int | None = None,
     date_column: int | None = None,
+    zone: int | None = None,
 ) -> imp._TimeColumn:
     """A time column; whole-number Unix times (seconds or milliseconds),
-    zone suffixes and a clock-only column joined to ``date_column`` too."""
+    zone suffixes and a clock-only column joined to ``date_column`` too.
+
+    A date-only column next to a clock-only ``date_column`` (DEGIRO's
+    ``Fecha`` and ``Hora``) is joined the same way, and ``zone`` is the
+    offset the column name states, used for cells that carry none."""
     filled = [value for value in values if value]
+    if rows is not None and date_column is not None and filled:
+        clocks = [row[date_column].strip() if date_column < len(row) else "" for row in rows]
+        if (
+            any(clocks)
+            and all(_CLOCK.match(clock) for clock in clocks if clock)
+            and not any(":" in value for value in filled)
+        ):
+            values = [
+                f"{value.strip()} {clock}".strip() if value else value
+                for value, clock in zip(values, clocks, strict=True)
+            ]
+            filled = [value for value in values if value]
     if filled and all(re.fullmatch(r"\d{10}(\d{3})?", value) for value in filled):
         parsed: list[datetime | None] = [
             datetime.fromtimestamp(int(value) / (1000 if len(value) == 13 else 1), tz=UTC)
@@ -1033,7 +1094,9 @@ def _times(
     column_times = imp._parse_times(texts, serial_numbers=serial, dayfirst_hint=hint)
     shifted: list[datetime | None] = []
     zoned = 0
-    for moment, (_, offset) in zip(column_times.values, cleaned, strict=True):
+    for moment, (text, offset) in zip(column_times.values, cleaned, strict=True):
+        if offset is None and not _ISO_OFFSET.search(text):
+            offset = zone
         if moment is not None and offset is not None:
             moment -= timedelta(minutes=offset)
             zoned += 1
@@ -1053,6 +1116,8 @@ def _side(text: str) -> str | None:
         return "long"
     if word in SHORT_WORDS:
         return "short"
+    # Trading 212's Action names the order type first: "Market buy", "Limit sell".
+    word = re.sub(r"^(?:market|limit|stoplimit|stop)(?=buy$|sell$)", "", word)
     if word.startswith(("buy", "compra", "youbought", "bought", "cover")):
         return "long"
     if word.startswith(("sell", "vend", "yousold", "sold", "shortsell")):
@@ -1114,6 +1179,27 @@ OTHER_COIN_WARNING = (
 )
 
 
+def _without_numeric_contracts(
+    mapping: ColumnMap, rows: list[list[str]], chosen: Mapping[str, str] | None, decimal: str
+) -> ColumnMap:
+    """Bybit's "Contracts" names the instrument, but a futures export whose
+    "Contracts" is the size would list an instrument called "2": a guessed
+    "Contracts" column that holds only numbers is no instrument."""
+    index = mapping.columns.get("symbol")
+    if (
+        index is None
+        or (chosen or {}).get("symbol")
+        or normalise(mapping.names.get("symbol", "")) != "contracts"
+    ):
+        return mapping
+    cells = [row[index].strip() for row in rows if index < len(row) and row[index].strip()]
+    if not cells or not all(imp._num(cell, decimal=decimal) is not None for cell in cells):
+        return mapping
+    columns = {role: at for role, at in mapping.columns.items() if role != "symbol"}
+    names = {role: name for role, name in mapping.names.items() if role != "symbol"}
+    return replace(mapping, columns=columns, names=names)
+
+
 def parse(
     header: list[str],
     rows: list[list[str]],
@@ -1123,8 +1209,8 @@ def parse(
     serial_dates: bool = False,
 ) -> imp._Draft:
     """Read a trade or fill table into a draft for ``importers._assemble``."""
-    mapping = resolve(header, chosen)
     decimal = "," if delimiter == ";" else "."
+    mapping = _without_numeric_contracts(resolve(header, chosen), rows, chosen, decimal)
     draft = imp._Draft(mapping.shape, [])
     for role in ROLES:
         if role == "commission" and mapping.fees:
@@ -1188,7 +1274,14 @@ def _refuse_unreadable_choice(
             continue
         values = [_cell(row, mapping.columns, role) for row in rows]
         if role.endswith("time"):
-            times = _times(values, serial, rows, mapping.columns[role], mapping.date_column)
+            times = _times(
+                values,
+                serial,
+                rows,
+                mapping.columns[role],
+                mapping.date_column,
+                header_zone(mapping.names.get(role, "")),
+            )
             readable = any(moment is not None for moment in times.values)
             kind_en, kind_es = "dates", "fechas"
         else:
@@ -1225,10 +1318,18 @@ def _trades(
     because they are charged in another coin."""
     columns = mapping.columns
     entry_times = _times(
-        [_cell(row, columns, "entry_time") for row in rows], serial, rows, columns["entry_time"]
+        [_cell(row, columns, "entry_time") for row in rows],
+        serial,
+        rows,
+        columns["entry_time"],
+        zone=header_zone(mapping.names.get("entry_time", "")),
     )
     exit_times = _times(
-        [_cell(row, columns, "exit_time") for row in rows], serial, rows, columns["exit_time"]
+        [_cell(row, columns, "exit_time") for row in rows],
+        serial,
+        rows,
+        columns["exit_time"],
+        zone=header_zone(mapping.names.get("exit_time", "")),
     )
     draft.naive_times = entry_times.naive or exit_times.naive
     parsed: list[_Row] = []
@@ -1449,6 +1550,7 @@ def _fills(
         rows,
         columns["time"],
         mapping.date_column,
+        header_zone(mapping.names.get("time", "")),
     )
     draft.naive_times = times.naive
     fills: list[tuple[datetime, int, str, str, float, float, float, float | None, float]] = []

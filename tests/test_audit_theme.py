@@ -832,3 +832,17 @@ def test_the_pdf_link_shows_a_small_loader_while_the_pdf_is_made() -> None:
     assert "a[data-busy][aria-busy=true]{opacity:1;pointer-events:auto;cursor:progress" in STYLE
     assert "a[data-busy][aria-busy=true]::before{content:''" in STYLE
     assert "animation:spin .9s linear infinite}" in STYLE
+
+
+def test_the_luck_table_turns_into_cards_on_a_phone() -> None:
+    assert "@media (max-width:620px){.paper table.luck,.luck thead" in STYLE
+    assert ".luck td[data-l]::before{content:attr(data-l)" in STYLE
+    assert ".luck td.enough-yes{color:var(--ok)" in STYLE
+
+
+def test_print_lets_a_block_of_figures_split_across_pages() -> None:
+    # Default orphans and widows pushed a three-row block of figures whole to the
+    # next page, leaving a heading alone above half a blank page.
+    assert "h2,.detail h3{break-after:avoid;page-break-after:avoid}.facts{orphans:1;widows:1}" in (
+        STYLE
+    )

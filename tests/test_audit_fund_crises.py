@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant_trade.audit.crises import WINDOWS, crisis_review
+from quant_trade.audit.crises import WINDOWS, crisis_review, curve_months
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
@@ -103,3 +103,143 @@ def test_a_record_that_covers_no_crisis_says_so(locale: str) -> None:
     html, _ = render(result, watermark=False)
     assert_report_clean(html)
     assert LABELS[locale]["fund_stress_none"].replace("'", "&#x27;") in html
+
+
+def _daily_csv(first: str, last: str, seed: int = 5) -> bytes:
+    stamps = pd.bdate_range(first, last)
+    steps = np.random.default_rng(seed).normal(0.0003, 0.01, len(stamps))
+    equity = 10_000 * np.cumprod(1 + steps)
+    rows = [f"{stamp.date()},{value:.4f}" for stamp, value in zip(stamps, equity, strict=True)]
+    return ("timestamp,equity\n" + "\n".join(rows) + "\n").encode()
+
+
+def test_curve_months_fill_quiet_trade_months_and_drop_partial_edges() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(
+                ["2020-01-05", "2020-01-31", "2020-03-31", "2020-04-10"], utc=True
+            ),
+            "equity": [100.0, 110.0, 99.0, 120.0],
+        }
+    )
+    # Trades: February closed nothing, so flat. January starts in its first
+    # week, so it counts. April ends on the 10th: left out.
+    months = curve_months(frame, from_trades=True)
+    assert list(months.round(6)) == [0.1, 0.0, -0.1]
+    assert [stamp.month for stamp in months.index] == [1, 2, 3]
+    # An uploaded curve with no February point: February and March are unknown.
+    assert list(curve_months(frame).round(6)) == [0.1]
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_daily_backtest_shows_the_crises_it_covers(locale: str) -> None:
+    result = run_audit(
+        build_inputs(_daily_csv("2006-01-02", "2012-12-31"), DeclaredMetadata(locale=locale)),
+        bootstrap_samples=200,
+    )
+    assert result.fund is not None and result.fund["status"] == "NOT_MEASURED"
+    assert result.crises is not None and result.crises["status"] == "MEASURED"
+    assert [row["key"] for row in result.crises["windows"]] == ["gfc", "euro"]
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    assert LABELS[locale]["crises_subject"] in html
+    assert LABELS[locale]["fund_stress_gfc"] in html
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_curve_that_covers_no_crisis_shows_no_section() -> None:
+    result = run_audit(
+        build_inputs(_daily_csv("2023-01-02", "2024-12-31"), DeclaredMetadata(locale="es")),
+        bootstrap_samples=200,
+    )
+    assert result.crises is not None and result.crises["status"] == "NOT_MEASURED"
+    html, _ = render(result, watermark=False)
+    assert LABELS["es"]["crises_intro"] not in html
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_fund_record_keeps_the_crises_in_its_own_section() -> None:
+    values = np.random.default_rng(2).normal(0.006, 0.03, 180)
+    result = run_audit(
+        build_inputs(_grid(values, 2010), DeclaredMetadata(locale="es")), bootstrap_samples=200
+    )
+    assert result.crises is None
+    html, _ = render(result, watermark=False)
+    assert html.count(LABELS["es"]["fund_stress"]) == 1
+
+
+def test_a_curve_under_two_months_says_so() -> None:
+    from quant_trade.audit.crises import CURVE_NOTE, curve_crises
+
+    short = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2020-03-02", "2020-03-20"], utc=True),
+            "equity": [100.0, 101.0],
+        }
+    )
+    assert curve_crises(short)["reason"] == "the curve is shorter than two months"
+    stamps = pd.bdate_range("2006-01-02", "2012-12-31", tz="UTC")
+    frame = pd.DataFrame({"timestamp": stamps, "equity": np.linspace(100, 200, len(stamps))})
+    assert curve_crises(frame)["note"] == CURVE_NOTE
+
+
+def _frame(stamps: pd.DatetimeIndex, seed: int = 1) -> pd.DataFrame:
+    steps = np.random.default_rng(seed).normal(0.0003, 0.01, len(stamps))
+    return pd.DataFrame({"timestamp": stamps, "equity": 10_000 * np.cumprod(1 + steps)})
+
+
+def test_a_hole_in_an_uploaded_curve_never_covers_a_crisis() -> None:
+    from quant_trade.audit.crises import curve_crises
+
+    # Nothing from November 2007 to May 2009: the 2008 window was never seen.
+    stamps = pd.bdate_range("2005-01-03", "2007-10-31", tz="UTC").append(
+        pd.bdate_range("2009-06-01", "2012-12-31", tz="UTC")
+    )
+    review = curve_crises(_frame(stamps))
+    assert [row["key"] for row in review["windows"]] == ["euro"]
+    # A curve rebuilt from trades closed nothing in the quiet months: flat.
+    rebuilt = curve_crises(_frame(stamps), from_trades=True)
+    gfc = next(row for row in rebuilt["windows"] if row["key"] == "gfc")
+    assert gfc["fund"]["value"] == 0.0
+
+
+def test_a_curve_starting_in_the_first_week_counts_that_month() -> None:
+    from quant_trade.audit.crises import curve_crises
+
+    covered = curve_crises(_frame(pd.bdate_range("2020-02-03", "2021-06-30", tz="UTC")))
+    assert [row["key"] for row in covered["windows"]] == ["covid"]
+    late = curve_crises(_frame(pd.bdate_range("2020-02-12", "2021-06-30", tz="UTC")))
+    assert late["status"] == "NOT_MEASURED"
+
+
+def test_a_flat_curve_shows_no_section() -> None:
+    from quant_trade.audit.crises import curve_crises
+
+    stamps = pd.bdate_range("2021-06-01", "2023-06-30", tz="UTC")
+    wiggle = 10_000 + 0.1 * np.sin(np.arange(len(stamps)))
+    review = curve_crises(pd.DataFrame({"timestamp": stamps, "equity": wiggle}))
+    assert review == {
+        "status": "NOT_MEASURED",
+        "reason": "the curve never moves 0.1 % from its start",
+    }
+
+
+def test_a_window_with_no_closed_trades_says_so(locale: str = "es") -> None:
+    from quant_trade.audit.crises import curve_crises
+    from quant_trade.audit.report import _crises_html
+
+    # Trades every month except through the 2008 window.
+    closes = [
+        stamp
+        for stamp in pd.date_range("2006-01-15", "2012-12-15", freq="MS", tz="UTC")
+        if not pd.Timestamp("2007-11-01", tz="UTC") <= stamp <= pd.Timestamp("2009-02-28", tz="UTC")
+    ]
+    closes = [pd.Timestamp("2006-01-02", tz="UTC"), *[c + pd.Timedelta(days=14) for c in closes]]
+    equity = 10_000 * np.cumprod(np.r_[1.0, np.full(len(closes) - 1, 1.004)])
+    frame = pd.DataFrame({"timestamp": closes, "equity": equity})
+    review = curve_crises(frame, from_trades=True)
+    gfc = next(row for row in review["windows"] if row["key"] == "gfc")
+    euro = next(row for row in review["windows"] if row["key"] == "euro")
+    assert gfc.get("no_trades") is True and "no_trades" not in euro
+    html = _crises_html(review, LABELS[locale])
+    assert LABELS[locale]["crises_no_trades"] in html

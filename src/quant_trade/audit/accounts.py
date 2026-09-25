@@ -3,8 +3,9 @@
 An account gathers what a customer already had scattered in links: the
 reports they uploaded or saved, the access codes they redeemed or added,
 and what they paid for. It never changes what a report says or how a
-report is unlocked; a report link keeps working without an account, and the
-free preview needs none.
+report is unlocked; a report link keeps working without an account. The free
+preview needs one: :data:`FREE_PREVIEWS_PER_MONTH` a month per account, after a
+first full report that is free once (:data:`WELCOME_FULL_REPORT`).
 
 Design choices, all standard library:
 
@@ -28,6 +29,7 @@ import hashlib
 import hmac
 import re
 import secrets
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 #: scrypt cost: about 16 MB and a few tens of milliseconds per hash.
@@ -52,6 +54,21 @@ MAX_FAILED_SIGNINS_PER_EMAIL = 50
 MAX_SIGNUPS_PER_HOUR = 5
 MAX_ACCOUNT_ACTIONS_PER_HOUR = 30
 
+#: The free tier: an account gets this many free previews per calendar month
+#: (UTC). Past it, an upload needs a credit or a code; full reports stay paid.
+FREE_PREVIEWS_PER_MONTH = 3
+#: Free previews per network address per calendar month, across accounts:
+#: slows throwaway accounts without blocking a shared office or carrier.
+FREE_PREVIEWS_PER_IP_PER_MONTH = 10
+
+#: A new account's first upload comes out as a free full report, once. The
+#: same browser (``DEVICE_COOKIE``) or the same file never gets a second one
+#: on another account, and each network address gets a few a month.
+WELCOME_FULL_REPORT = True
+WELCOME_REPORTS_PER_IP_PER_MONTH = 3
+DEVICE_COOKIE = "rigor_device"
+DEVICE_DAYS = 400
+
 SESSION_COOKIE = "rigor_session"
 CSRF_COOKIE = "rigor_csrf"
 
@@ -59,6 +76,12 @@ CSRF_COOKIE = "rigor_csrf"
 EMAIL_HOOKS = ("confirm_email", "reset_by_email")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def month_start(at: datetime) -> datetime:
+    """The first instant of ``at``'s calendar month, in UTC."""
+    at = at.astimezone(UTC)
+    return at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def normalise_email(value: str) -> str:
@@ -174,7 +197,10 @@ def safe_next(value: str | None) -> str:
 
 __all__ = [
     "CSRF_COOKIE",
+    "DEVICE_COOKIE",
     "EMAIL_HOOKS",
+    "FREE_PREVIEWS_PER_IP_PER_MONTH",
+    "FREE_PREVIEWS_PER_MONTH",
     "MAX_FAILED_SIGNINS_PER_EMAIL",
     "MAX_FAILED_SIGNINS_PER_HOUR",
     "MAX_FAILED_SIGNINS_PER_IP",
@@ -184,9 +210,12 @@ __all__ = [
     "RESET_HOURS",
     "SESSION_COOKIE",
     "SESSION_DAYS",
+    "WELCOME_FULL_REPORT",
+    "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
     "hash_password",
     "hash_secret",
+    "month_start",
     "new_secret",
     "normalise_email",
     "password_problem",

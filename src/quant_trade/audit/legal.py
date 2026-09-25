@@ -20,6 +20,7 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 
+from quant_trade.audit.accounts import DEVICE_COOKIE, FREE_PREVIEWS_PER_MONTH
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
@@ -291,9 +292,22 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             (
                 "Your account",
                 (
-                    "The account is optional: the preview and each report's private link "
-                    "work without it. It shows your reports, credits and purchases in one "
-                    "place.",
+                    (
+                        "A new account's first file is a free full report, once per account, "
+                        "browser and file, and a few per network address each month. "
+                        f"After it, the free preview needs an account: {FREE_PREVIEWS_PER_MONTH} "
+                        "a calendar month per account, also counted per network address. Past "
+                        "that, each file is a paid report. "
+                        + (
+                            "A report paid with an access code works without an account. "
+                            if ctx.access_codes
+                            else ""
+                        )
+                        + "Each report's private link works without an account."
+                        if not ctx.free_mode
+                        else "The account is optional while the service is in free mode."
+                    ),
+                    "The account shows your reports, credits and purchases in one place.",
                     "You are responsible for your password. If you forget it, we send you a "
                     "one-time link after checking that you write from the account's e-mail. "
                     "You can delete the account at any time from its page.",
@@ -402,9 +416,24 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         (
             "Tu cuenta",
             (
-                "La cuenta es opcional: la vista previa y el enlace privado de cada informe "
-                "funcionan sin ella. Sirve para ver en un solo lugar tus informes, tus créditos "
-                "y tus compras.",
+                (
+                    "El primer archivo de una cuenta nueva es un informe completo gratis, una vez "
+                    "por cuenta, navegador y archivo, y unos pocos por dirección de red al mes. "
+                    "Después, la vista previa gratis necesita una cuenta: "
+                    f"{FREE_PREVIEWS_PER_MONTH} por mes calendario y por cuenta, "
+                    "contadas también por dirección de red. "
+                    "Pasado ese número, cada archivo es un informe de pago. "
+                    + (
+                        "Un informe pagado con código de acceso funciona sin cuenta. "
+                        if ctx.access_codes
+                        else ""
+                    )
+                    + "El enlace privado de cada informe funciona sin cuenta."
+                    if not ctx.free_mode
+                    else "La cuenta es opcional mientras el servicio está en modo gratuito."
+                ),
+                "La cuenta sirve para ver en un solo lugar tus informes, tus créditos y tus "
+                "compras.",
                 "Eres responsable de tu contraseña. Si la olvidas, te enviamos un enlace de un "
                 "solo uso después de comprobar que nos escribes desde el correo de la cuenta. "
                 "Puedes borrar la cuenta cuando quieras desde su página.",
@@ -532,6 +561,14 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "password (never the password), which reports and access codes are on it, "
                     "and a hash of each sign-in session. There is no e-mail check yet and we "
                     "send no e-mail.",
+                    "To count free previews: which account used each one, when, and the "
+                    "network address it came from. The address is cleared with the rest "
+                    f"after {days} days.",
+                    "For the free first full report: a random identifier of your browser "
+                    f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
+                    "SHA-256 of the file and the network address, so the same browser or file "
+                    "gets it only once. The address is cleared after "
+                    f"{days} days; the two hashes stay so the offer cannot be repeated.",
                 ),
             ),
             (
@@ -540,7 +577,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "We never ask for or store broker or exchange keys, trading account "
                     "passwords or card details. There is no third-party analytics or "
                     "advertising on these pages. The only cookies are our own: one that keeps "
-                    "you signed in and one that protects the sign-in forms; none tracks you "
+                    "you signed in, one that protects the sign-in forms and one that marks "
+                    "your browser for the free first report; none tracks you across sites "
                     "or is shared. Our own access "
                     "log keeps only a shortened address (the last part of the IP is "
                     "removed) and never the report link's secret. Our hosting provider may "
@@ -638,6 +676,14 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Si creas una cuenta: tu correo, un hash scrypt de tu contraseña (nunca la "
                 "contraseña), qué informes y códigos de acceso tiene y un hash de cada sesión "
                 "iniciada. Todavía no comprobamos el correo ni enviamos correos.",
+                "Para contar las vistas previas gratis: qué cuenta usó cada una, cuándo y "
+                f"desde qué dirección de red. La dirección se borra con lo demás a los {days} "
+                "días.",
+                "Para el primer informe completo gratis: un identificador al azar de tu "
+                f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
+                "el SHA-256 del archivo y la dirección de red, para que el mismo navegador o "
+                f"archivo lo reciba una sola vez. La dirección se borra a los {days} días; los "
+                "dos hashes se quedan para que la oferta no se repita.",
             ),
         ),
         (
@@ -646,8 +692,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Nunca pedimos ni guardamos claves de bróker ni de exchange, contraseñas de "
                 "cuentas de trading ni datos de tarjeta. No hay analítica ni publicidad de "
                 "terceros en estas páginas. Las únicas cookies son nuestras: una que mantiene "
-                "tu sesión iniciada y otra que protege los formularios de acceso; ninguna te "
-                "sigue ni se comparte. Nuestro propio "
+                "tu sesión iniciada, otra que protege los formularios de acceso y otra que "
+                "marca tu navegador para el primer informe gratis; ninguna te sigue por otros "
+                "sitios ni se comparte. Nuestro propio "
                 "registro de accesos guarda solo una dirección acortada (se quita la última "
                 "parte de la IP) y nunca el secreto del enlace al informe. Nuestro proveedor "
                 "de alojamiento puede guardar sus propios registros de peticiones, con la IP "
