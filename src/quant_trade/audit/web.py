@@ -1408,7 +1408,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = _session(request)
             base = account_pages.path("account", locale)
             if session is None:
-                return _signin_redirect(locale, next_path=base)
+                # Back to this comparison after signing in, not to the list.
+                here = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+                return _signin_redirect(locale, next_path=here)
             picked = list(dict.fromkeys(id or []))
             mine = {item.audit_id: item for item in db.account_audits_list(session[0].id)}
             ready = {
@@ -2615,17 +2617,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base_url=_site_url(request),
         )
 
-    def _compare_form_page(locale: str, *, error: str = "", status: int = 200) -> Response:
-        page = compare_page(compare_form(locale, error=error), locale=locale)
+    def _compare_form_page(
+        locale: str, *, error: str = "", status: int = 200, request: Request | None = None
+    ) -> Response:
+        form = compare_form(locale, error=error)
+        if request is not None and _session(request) is not None:
+            # Signed in: their own reports compare without pasting links.
+            form = account_pages.compare_mine_note(locale) + form
+        page = compare_page(form, locale=locale)
         return HTMLResponse(page, status_code=status)
 
     @app.get("/comparar", response_class=HTMLResponse)
-    def compare_es(lang: str | None = None) -> Response:
-        return _compare_form_page(_locale(lang or "es"))
+    def compare_es(request: Request, lang: str | None = None) -> Response:
+        return _compare_form_page(_locale(lang or "es"), request=request)
 
     @app.get("/compare", response_class=HTMLResponse)
-    def compare_en(lang: str | None = None) -> Response:
-        return _compare_form_page(_locale(lang or "en"))
+    def compare_en(request: Request, lang: str | None = None) -> Response:
+        return _compare_form_page(_locale(lang or "en"), request=request)
 
     def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
         locale = _locale(lang or default)

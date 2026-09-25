@@ -1222,3 +1222,31 @@ def test_the_account_buys_on_whatsapp_with_the_same_three_steps(tmp_path: Path) 
     assert page.count("<li>", page.index("buy-steps")) >= 3
     assert "Responde una persona" in page
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+
+
+# -- comparing from the account ----------------------------------------------------
+def test_signing_in_from_a_comparison_returns_to_it(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    ids = "id=" + "a" * 32 + "&id=" + "b" * 32
+    answer = client.get(f"/cuenta/comparar?{ids}", follow_redirects=False)
+    assert answer.status_code == 303
+    where = answer.headers["location"]
+    assert where.startswith("/entrar?next=") and "%2Fcuenta%2Fcomparar%3Fid%3D" in where
+    page = client.get(where).text
+    assert f"name='next' value='/cuenta/comparar?{ids.replace('&', '&amp;')}'" in page
+
+
+def test_the_public_compare_page_points_a_signed_in_visitor_to_their_list(
+    tmp_path: Path,
+) -> None:
+    client, _, _ = _client(tmp_path)
+    assert "class='cmp-mine'" not in client.get("/comparar").text
+    _signup(client)
+    for path, words, href in (
+        ("/comparar", "Elegir en mis informes", "/cuenta#informes"),
+        ("/compare", "Pick from my reports", "/account#informes"),
+    ):
+        page = client.get(path).text
+        assert words in page and f"href='{href}'" in page
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    assert "id='informes'" in client.get("/cuenta").text
