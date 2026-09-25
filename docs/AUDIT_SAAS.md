@@ -438,7 +438,8 @@ with "already negative before any extra cost", never a negative cost, and large
 percentages carry thousands separators (+191,136.0 %).
 Ratios and break-even pips carry them too (877,194.39). No share prints as -0.0 %
 or -0 % (a month in the monthly table that rounds to zero reads 0.0 %),
-and a share short of a whole (-99.7 %) never rounds to -100 %. Every fact
+and a share short of a whole (-99.7 %) never rounds to -100 %: it gets one more
+decimal, and past that it reads as a bound (>99.99 %). Every fact
 card (risk, account, plateau, timing, capital and its trade pace) shows its
 MEASURED / DECLARED / NOT_MEASURED tag beside the number.
 

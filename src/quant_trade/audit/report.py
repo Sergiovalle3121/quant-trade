@@ -1653,18 +1653,25 @@ def _ev_value(block: Any) -> float | None:
     return None
 
 
-def _pct(value: float, *, signed: bool = False, places: int = 1) -> str:
+def _pct(value: float, *, signed: bool = False, places: int = 1, _widened: bool = False) -> str:
     """A share at ``places`` decimals, readable at the edges.
 
     A tiny negative never prints as "-0.0%", and a share short of a whole
-    (-99.7 %) never rounds to "-100%", which would read as a total loss.
+    (-99.7 %) never rounds to "-100%", which would read as a total loss: it
+    gets one more decimal, and past that it reads as a bound (">99.9%").
     """
     spec = f"{'+' if signed else ''},.{places}%"
     shown = f"{value:{spec}}"
     if float(shown.rstrip("%").replace(",", "")) == 0:
         return f"{0:.{places}%}"
     if abs(value) != 1 and abs(float(shown.rstrip("%").replace(",", ""))) == 100:
-        return _pct(value, signed=signed, places=places + 1)
+        if not _widened:
+            return _pct(value, signed=signed, places=places + 1, _widened=True)
+        if abs(value) > 1:
+            return shown
+        # Still a whole at one more decimal: say which side of it the value is.
+        bound = f"{1 - 10 ** -(places + 2):.{places}%}"
+        return f">{'+' if signed else ''}{bound}" if value > 0 else f"<-{bound}"
     return shown
 
 
