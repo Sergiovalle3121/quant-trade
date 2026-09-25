@@ -467,10 +467,26 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "mayor caída en dinero de las operaciones cerradas en su propio orden",
     ),
     (
-        "the largest of the resampled 95th percentile, the history's own fall and the "
-        "platform's drawdown with open trades",
-        "la mayor entre el percentil 95 remuestreado, la caída del propio historial y el "
-        "drawdown de la plataforma con operaciones abiertas",
+        "the largest of the resampled 95th percentile, the history's own fall and any "
+        "drawdown with open trades from the platform or the equity curve",
+        "la mayor entre el percentil 95 remuestreado, la caída del propio historial y "
+        "cualquier drawdown con operaciones abiertas de la plataforma o de la curva de equity",
+    ),
+    (
+        "deepest fall in money of the uploaded equity curve, open trades included",
+        "mayor caída en dinero de la curva de equity subida, con operaciones abiertas",
+    ),
+    (
+        "no equity curve with open trades in money",
+        "no hay una curva de equity en dinero con operaciones abiertas",
+    ),
+    (
+        "the trades overlap as a grid or with hidden open losses, so closed trades understate "
+        "the real fall; upload an equity curve that includes open trades or the platform report "
+        "with its equity drawdown",
+        "las operaciones se solapan en grid o con pérdidas abiertas ocultas, así que las "
+        "operaciones cerradas subestiman la caída real; sube una curva de equity que incluya "
+        "las operaciones abiertas o el informe de la plataforma con su drawdown de equity",
     ),
     (
         "the platform's maximal drawdown in money, open trades included",
