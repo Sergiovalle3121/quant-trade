@@ -1058,6 +1058,13 @@ brackets: significance reads "too consistent to be explained by chance alone
 period held back for checking (out of sample)", and "deflated Sharpe" reads
 "the Sharpe adjusted for those trials". The thresholds are unchanged.
 
+Each dimension is explained once for a buyer ("Qué significa para ti" and the
+plan). The threshold table ("Detalle técnico de cada dimensión" / "Technical
+detail by dimension") now opens the technical tables, after the seller
+questions, instead of repeating the verdict between the plan and the findings;
+the multiplicity dimension is titled "Número de configuraciones probadas" /
+"Number of settings tried".
+
 ## Assumptions and limitations
 
 - No market data is used. The audit sees only what the client uploads; a

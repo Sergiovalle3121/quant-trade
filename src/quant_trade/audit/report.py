@@ -798,7 +798,7 @@ LABELS: dict[str, dict[str, str]] = {
         "passes": "configuraciones probadas",
         "trials_used": "Intentos usados en el Sharpe deflactado",
         "horizon": "1 año",
-        "reasons_detail": "Razones por dimensión",
+        "reasons_detail": "Detalle técnico de cada dimensión",
         "fees": "Costes que detalla el informe",
         "plan": "Plan para subir de clase",
         "plan_intro": (
@@ -1480,7 +1480,7 @@ LABELS: dict[str, dict[str, str]] = {
         "passes": "configurations tried",
         "trials_used": "Trials used in the deflated Sharpe",
         "horizon": "1 year",
-        "reasons_detail": "Reasons by dimension",
+        "reasons_detail": "Technical detail by dimension",
         "fees": "Costs the report itemises",
         "plan": "Plan to reach a better class",
         "plan_intro": (
@@ -1536,7 +1536,7 @@ LABELS: dict[str, dict[str, str]] = {
 DIMENSION_TITLES: dict[str, dict[str, str]] = {
     "es": {
         "statistical_significance": "Significación estadística",
-        "multiplicity": "Número de intentos (Sharpe deflactado)",
+        "multiplicity": "Número de configuraciones probadas",
         "costs": "Costes",
         "out_of_sample": "Fuera de muestra",
         "data_quality": "Calidad de datos y forma de operar",
@@ -1544,7 +1544,7 @@ DIMENSION_TITLES: dict[str, dict[str, str]] = {
     },
     "en": {
         "statistical_significance": "Statistical significance",
-        "multiplicity": "Number of trials (deflated Sharpe)",
+        "multiplicity": "Number of settings tried",
         "costs": "Costs",
         "out_of_sample": "Out of sample",
         "data_quality": "Data quality and trading pattern",
@@ -4544,7 +4544,6 @@ def render_html(
     hidden = _hidden_loss_note(data, labels)
     detail: list[tuple[str, str]] = [
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
-        (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
         *(
             [(labels["live"], _live_html(data.get("live"), locale, labels))]
             if data.get("live")
@@ -4628,6 +4627,9 @@ def render_html(
             ),
         ),
         (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
+        # The dimension reasons repeat the verdict in thresholds, so they open the
+        # technical tables instead of sitting between the plan and the findings.
+        (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
         (
             labels["performance"],
             _evidence_rows(
