@@ -169,3 +169,15 @@ def test_without_a_count_the_report_shows_what_each_search_would_need() -> None:
     assert "Los archivos no dicen cuántas configuraciones se probaron" in section
     assert "Supera a la suerte" not in section and "No supera a la suerte" not in section
     assert "<td>1,000</td>" in section and "¿Alcanza este historial?" in section
+
+
+def test_a_history_with_no_losing_period_does_not_break_the_discount() -> None:
+    # A steady climb puts the p-value beyond double precision of 1 - Phi(x).
+    steady = pd.Series(np.abs(np.random.default_rng(3).normal(0.001, 0.0005, 500)))
+    for trials in (2, 1000, 1_000_000):
+        luck, _ = _luck_for(steady, trials)
+        assert luck["status"] == "MEASURED"
+        assert luck["beats_luck"]
+        after = float(luck["sharpe_after"]["value"])
+        observed = float(luck["sharpe"]["value"])
+        assert math.isfinite(after) and 0 < after <= observed
