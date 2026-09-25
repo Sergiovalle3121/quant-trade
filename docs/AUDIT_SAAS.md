@@ -422,7 +422,8 @@ Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
 | `NEGATIVE_PAYOFF_HIGH_WINRATE` | ≥ 20 trades, win rate > 85 % and average loss ≥ 3x average win | — |
 | `NO_STOP_EVIDENCE` | ≥ 10 losses and the largest loss (or adverse excursion) ≥ 8x the average loss | — |
 
-When `HIDDEN_FLOATING_DRAWDOWN` fires, the resampled risk and the prop simulator
+When `HIDDEN_FLOATING_DRAWDOWN` fires, the resampled risk, the prop simulator
+(and the capital section, when it still shows figures)
 open with an "Open losses" callout saying their figures leave those losses out and
 come out optimistic. On any balance-only file the summary tiles read "Maximum
 drawdown (closed trades only)", and a fall under 0.05 % prints as 0.0 %, never -0.0 %.
