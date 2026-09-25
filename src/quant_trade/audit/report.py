@@ -844,10 +844,10 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
     return (
         "<table class='metrics'><colgroup><col class='c-k'><col class='c-v'>"
         "<col class='c-e'><col></colgroup>"
-        f"<tr><th>{_e(labels['metric'])}</th><th class='val'>{_e(labels['value'])}</th>"
-        f"<th>{_e(labels['evidence'])}</th><th>{_e(labels['note'])}</th></tr>"
+        f"<thead><tr><th>{_e(labels['metric'])}</th><th class='val'>{_e(labels['value'])}</th>"
+        f"<th>{_e(labels['evidence'])}</th><th>{_e(labels['note'])}</th></tr></thead><tbody>"
         + "".join(rows)
-        + "</table>"
+        + "</tbody></table>"
     )
 
 
@@ -1457,17 +1457,34 @@ def _block_name(key: int) -> str:
 
 
 def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict[str, str]) -> str:
+    widest = max((abs(row["net"]["value"]) for row in rows), default=0.0) or 1.0
+
+    def net_cell(net: float) -> str:
+        width = max(2.0, abs(net) / widest * 100)
+        side = "neg" if net < 0 else "pos"
+        return (
+            f"<td class='val tbar {side}'><span class='tbar-track' aria-hidden='true'>"
+            f"<span style='--w:{width:.0f}%'></span></span><b>{net:+,.2f}</b></td>"
+        )
+
     body = "".join(
-        f"<tr><td>{_e(name(row['key']))}</td><td>{row['trades']['value']:,}</td>"
-        f"<td class='{'neg' if row['net']['value'] < 0 else ''}'>{row['net']['value']:+,.2f}</td>"
-        f"<td>{row['win_rate']['value']:.0%}</td></tr>"
+        f"<tr><td>{_e(name(row['key']))}</td><td class='val'>{row['trades']['value']:,}</td>"
+        f"{net_cell(row['net']['value'])}"
+        f"<td class='val'>{row['win_rate']['value']:.0%}</td></tr>"
         for row in rows
     )
     return (
-        f"<table><tr><th>{_e(head)}</th><th>{_e(labels['timing_trades'])}</th>"
-        f"<th>{_e(labels['timing_net'])}</th><th>{_e(labels['timing_hits'])}</th></tr>"
-        f"{body}</table>"
+        "<table class='timing'><colgroup><col class='c-k'><col class='c-n'><col>"
+        "<col class='c-n'></colgroup>"
+        f"<thead><tr><th>{_e(head)}</th><th class='val'>{_e(labels['timing_trades'])}</th>"
+        f"<th class='val'>{_e(labels['timing_net'])}</th>"
+        f"<th class='val'>{_e(labels['timing_hits'])}</th></tr></thead>"
+        f"<tbody>{body}</tbody></table>"
     )
+
+
+def _timing_fact(share: float, sentence: str) -> str:
+    return f"<div class='fact'><b>{share:.0%}</b><p>{_e(sentence)}</p></div>"
 
 
 def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
@@ -1480,28 +1497,19 @@ def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, s
         )
     days = WEEKDAYS.get(locale, WEEKDAYS["es"])
     out = f"<p class='muted'>{_e(labels['timing_intro'])}</p>"
+    facts = ""
     best_day = timing.get("best_weekday")
     if best_day:
-        out += (
-            "<p>"
-            + _e(
-                labels["timing_best_day"].format(
-                    share=best_day["share"]["value"], day=days[best_day["key"]]
-                )
-            )
-            + "</p>"
-        )
+        share = best_day["share"]["value"]
+        text = labels["timing_best_day"].format(share=share, day=days[best_day["key"]])
+        facts += _timing_fact(share, text)
     best_block = timing.get("best_block")
     if best_block:
-        out += (
-            "<p>"
-            + _e(
-                labels["timing_best_block"].format(
-                    share=best_block["share"]["value"], block=_block_name(best_block["key"])
-                )
-            )
-            + "</p>"
-        )
+        share = best_block["share"]["value"]
+        text = labels["timing_best_block"].format(share=share, block=_block_name(best_block["key"]))
+        facts += _timing_fact(share, text)
+    if facts:
+        out += f"<div class='facts'>{facts}</div>"
     out += _timing_table(timing["weekdays"], labels["timing_day"], lambda k: days[k], labels)
     if timing.get("blocks"):
         out += _timing_table(timing["blocks"], labels["timing_block"], _block_name, labels)

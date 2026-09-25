@@ -690,6 +690,12 @@ when they do not), in the section row as its own link and in the PDF.
 Metric tables share fixed columns (metric, value, evidence, note) so values
 line up from one table to the next; values are right-aligned in the text
 face. On phones each table scrolls sideways inside its box, never the page.
+Table headers sit in `<thead>`, so a table split across PDF pages repeats them.
+
+"Cuándo gana y cuándo pierde" leads with the best day's and time block's share
+of the net result as large figures, and each row draws its net result as a
+bar (dark for a gain, red for a loss, scaled to the largest group). Phones
+hide the bars and keep the numbers.
 
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
