@@ -149,7 +149,7 @@ class AccountAudit:
     purged: bool
     published: bool
     description: str
-    #: Uploaded or paid while signed in, as opposed to saved from a link.
+    #: Uploaded by this account while signed in (deletable with it).
     own: bool = True
 
 
@@ -168,12 +168,13 @@ class AccountCode:
         )
 
 
-#: How a report reached an account. Only an account's own reports (uploaded
-#: or paid while signed in) can be deleted with it; a saved one is unlinked.
+#: How a report reached an account. Only a report the account uploaded can
+#: be deleted with it; one paid for or saved from someone's link is unlinked,
+#: since paying for a report does not make its uploader's copy yours to delete.
 VIA_UPLOAD = "upload"
 VIA_PAID = "paid"
 VIA_SAVED = "saved"
-OWN_VIAS = (VIA_UPLOAD, VIA_PAID)
+OWN_VIAS = (VIA_UPLOAD,)
 
 
 class _RedeemRace(RuntimeError):
@@ -936,9 +937,9 @@ class Store:
     def delete_account(self, account_id: str, *, with_reports: bool = False) -> list[str]:
         """Remove an account, its sessions, reset links and links to codes.
 
-        With ``with_reports`` its own reports (uploaded or paid while signed
-        in) are deleted too (as ``delete_audit``); a report saved from a link
-        is only unlinked. Otherwise they stay reachable by their private link and follow the
+        With ``with_reports`` the reports it uploaded are deleted too (as
+        ``delete_audit``); a report paid for or saved from a link is only
+        unlinked. Otherwise they stay reachable by their private link and follow the
         normal retention. Returns the ids of the reports deleted.
         """
         sa = self._sa
@@ -1074,13 +1075,13 @@ class Store:
     ) -> str:
         """Put a report on an account: ``linked``, ``already`` or ``other``.
 
-        A report already saved on this account becomes its own when the
-        account uploads or pays for it (``via`` upload or paid).
+        A report saved on this account is recorded as paid when the account
+        pays for it; that never makes it deletable with the account.
         """
         outcome = self._link(
             self.account_audits, "audit_id", audit_id, account_id, at, extra={"via": via}
         )
-        if outcome == "already" and via in OWN_VIAS:
+        if outcome == "already" and via == VIA_PAID:
             table = self.account_audits
             with self.engine.begin() as conn:
                 conn.execute(

@@ -1142,8 +1142,8 @@ without one, and an account never changes what a report says.
   sending domain, and its API key as a Railway variable; the hooks are listed
   in `accounts.EMAIL_HOOKS`.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
-  required), optionally with the reports they uploaded or paid for while
-  signed in; a report saved from someone else's link is only unlinked; the owner does it with
+  required), optionally with the reports they uploaded while signed in; a
+  report saved or paid for from someone else's link is only unlinked; the owner does it with
   `quant-trade audit account-delete EMAIL [--with-reports] --yes`. Deleting an
   audit (`audit delete ID --yes`) also removes it from its account.
 - **Storage**: five new tables (`accounts`, `account_sessions`,

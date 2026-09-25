@@ -143,10 +143,10 @@ COPY: dict[str, dict[str, str]] = {
         "delete_help": (
             "Borra tu correo, tu contraseña, tus sesiones y la lista de tus informes y códigos. "
             "Los informes siguen abriendo con su enlace privado hasta su plazo de conservación, "
-            "salvo que marques la casilla para borrar también los que subiste o pagaste con esta "
-            "cuenta. Los que guardaste desde un enlace solo salen de tu lista."
+            "salvo que marques la casilla para borrar también los que subiste con esta cuenta. "
+            "Los que guardaste o pagaste desde el enlace de otra persona solo salen de tu lista."
         ),
-        "delete_reports": "Borrar también los informes que subí o pagué (no se puede deshacer)",
+        "delete_reports": "Borrar también los informes que subí (no se puede deshacer)",
         "delete_button": "Borrar mi cuenta",
         "deleted": "Tu cuenta se borró.",
         "forgot_title": "Recupera tu contraseña",
@@ -285,10 +285,10 @@ COPY: dict[str, dict[str, str]] = {
         "delete_help": (
             "Deletes your e-mail, password, sessions and the list of your reports and codes. "
             "The reports still open with their private link until their retention period "
-            "ends, unless you tick the box to also delete the ones you uploaded or paid for "
-            "with this account. Reports saved from a link only leave your list."
+            "ends, unless you tick the box to also delete the ones you uploaded with this "
+            "account. Reports saved or paid for from someone else's link only leave your list."
         ),
-        "delete_reports": "Also delete the reports I uploaded or paid for (cannot be undone)",
+        "delete_reports": "Also delete the reports I uploaded (cannot be undone)",
         "delete_button": "Delete my account",
         "deleted": "Your account was deleted.",
         "forgot_title": "Recover your password",

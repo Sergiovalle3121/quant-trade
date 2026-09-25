@@ -557,20 +557,28 @@ def test_a_report_saved_from_a_link_is_never_deleted_with_the_account(tmp_path: 
     assert client.get(location).status_code == 200
 
 
-def test_paying_with_a_credit_makes_a_saved_report_the_accounts_own(tmp_path: Path) -> None:
+def test_paying_for_someone_elses_report_never_allows_deleting_it(tmp_path: Path) -> None:
     client, store, _ = _client(tmp_path)
-    location = _upload(client).headers["location"]
+    location = _upload(client).headers["location"]  # A uploads, never signs up
     audit_id = _audit_id(location)
-    _signup(client, "own@example.com")
+    buyer = TestClient(client.app)
+    _signup(buyer, "own@example.com")
     code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
-    csrf = _csrf(client.get("/cuenta").text)
-    client.post("/cuenta/codigo", data={"code": code, "csrf": csrf})
-    page = client.get(location).text
+    buyer.post("/cuenta/codigo", data={"code": code, "csrf": _csrf(buyer.get("/cuenta").text)})
+    page = buyer.get(location).text
     query = location[location.index("?") :]
-    client.post(f"/audits/{audit_id}/save{query}", data={"csrf": _csrf(page)})
-    client.post(f"/audits/{audit_id}/credit{query}", data={"csrf": _csrf(page)})
-    [item] = store.account_audits_list(store.find_account("own@example.com").id)  # type: ignore[attr-defined]
-    assert item.paid and item.own
+    buyer.post(f"/audits/{audit_id}/save{query}", data={"csrf": _csrf(page)})
+    buyer.post(f"/audits/{audit_id}/credit{query}", data={"csrf": _csrf(page)})
+    account = store.find_account("own@example.com")  # type: ignore[attr-defined]
+    [item] = store.account_audits_list(account.id)  # type: ignore[attr-defined]
+    assert item.paid and not item.own
+    listing = buyer.get("/cuenta").text
+    buyer.post(
+        "/cuenta/borrar",
+        data={"current": PASSWORD, "csrf": _csrf(listing), "with_reports": "yes"},
+    )
+    assert store.get_audit(audit_id) is not None  # type: ignore[attr-defined]
+    assert client.get(location).status_code == 200
 
 
 def test_a_promotional_description_is_withheld_on_the_account_page(tmp_path: Path) -> None:
