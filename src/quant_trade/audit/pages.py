@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+from quant_trade.audit.audiences import AUDIENCE_COPY, AUDIENCE_PAGES, Audience, audience_url
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -1288,6 +1289,7 @@ AUDIENCES: dict[str, dict[str, Any]] = {
             ),
         ],
         "guide": "Qué archivo subir",
+        "more": "Ver qué revisa para tu caso",
         "start": "Empezar",
     },
     "en": {
@@ -1341,6 +1343,7 @@ AUDIENCES: dict[str, dict[str, Any]] = {
             ),
         ],
         "guide": "Which file to upload",
+        "more": "See what it checks for your case",
         "start": "Start",
     },
 }
@@ -1349,12 +1352,9 @@ AUDIENCES: dict[str, dict[str, Any]] = {
 def _audiences(locale: str) -> str:
     words = AUDIENCES[locale]
     cards = []
-    for i, (name, title, pain, upload, get, guide) in enumerate(words["items"]):
-        link = (
-            f"<a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>"
-            if guide
-            else f"<a href='#subir'>{_e(words['start'])}</a>"
-        )
+    for i, (name, title, pain, upload, get, _guide) in enumerate(words["items"]):
+        page = AUDIENCE_PAGES[i]
+        link = f"<a href='{_e(audience_url(page.slug, locale))}'>{_e(words['more'])}</a>"
         cards.append(
             f"<div class='card spot audience' data-reveal style='--i:{i % 2}'>"
             f"<div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3><p>{_e(pain)}</p>"
@@ -2423,10 +2423,98 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     )
 
 
+def audience_page(
+    audience: Audience,
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    free_mode: bool = False,
+    price_usd: float = 0.0,
+    pack_price_usd: float = 0.0,
+) -> str:
+    """One visitor's case: the problem, what to upload, what Rigor checks."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words = AUDIENCE_COPY[locale]
+    text = audience.text[locale]
+    other = "en" if locale == "es" else "es"
+    title = f"{text.title} · {BRAND}"
+    meta = _public_meta(title, text.summary, locale, audience_url(audience.slug, locale), base_url)
+    sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
+    pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
+    uploads = "".join(
+        f"<li>{icon('file')}<span>{_e(item)}"
+        + (f" <a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>" if guide else "")
+        + "</span></li>"
+        for item, guide in text.uploads
+    )
+    checks = "".join(
+        f"<li>{icon('check')}<span><strong>{_e(name)}.</strong> {_e(body)}</span></li>"
+        for name, body in text.checks
+    )
+    limits = "".join(f"<li>{icon('minus')}<span>{_e(item)}</span></li>" for item in text.limits)
+    price = (
+        copy["price_free_mode"]
+        if free_mode or not price_usd
+        else words["price_text"].format(price=price_usd, pack=pack_price_usd or price_usd * 3)
+    )
+    faq = "".join(
+        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(presets=len(PRESETS)))}</p></details>"
+        for q, a in text.faq
+    )
+    others = "".join(
+        f"<li><a href='{_e(audience_url(page.slug, locale))}'>"
+        f"{_e(page.text[locale].title)}</a></li>"
+        for page in AUDIENCE_PAGES
+        if page.slug != audience.slug
+    )
+    buttons = (
+        "<div class='hero-cta'>"
+        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(words['start'])}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
+        "</div>"
+    )
+    crumbs = (
+        f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a><span>/</span>"
+        f"<a href='{_e(audience_url(audience.slug, other))}' hreflang='{other}'>"
+        f"{_other_name(locale)}</a>"
+    )
+    body = (
+        _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            [
+                (words["pains"], f"<ul class='checks'>{pains}</ul>"),
+                (words["uploads"], f"<ul class='checks'>{uploads}</ul>"),
+                (words["checks"], f"<ul class='checks'>{checks}</ul>"),
+                (words["limits"], f"<ul class='checks'>{limits}</ul>"),
+                (words["price"], f"<p>{_e(price)}</p>{buttons}"),
+                (words["faq"], f"<div class='faq'>{faq}</div>"),
+                (words["others"], f"<ul>{others}</ul>"),
+            ],
+            locale,
+            lead=buttons,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            f"{_e(words['start'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + "</div></div>"
+    )
+    return _page(
+        title,
+        locale,
+        body,
+        meta_html=meta,
+        switch_href=audience_url(audience.slug, other),
+        solid_nav=True,
+    )
+
+
 __all__ = [
     "BADGE_NOTICE",
     "SAMPLE_BANNER",
     "VERIFICATION_NOTICE",
+    "audience_page",
     "badge_svg",
     "error_page",
     "guide_page",
