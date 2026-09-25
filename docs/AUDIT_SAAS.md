@@ -928,8 +928,15 @@ The scale: values are percentages when any cell has `%` (an Excel cell
 formatted as a percentage counts: Excel stores 1.23 % as 0.0123, and the
 reader keeps its `%`). Otherwise the year totals decide: the reading whose
 months, compounded, miss the stated totals by less than half the other's
-miss wins (summing cannot tell the two apart). Without totals, or when
-neither reading clearly wins, the grid is read as percentages, as
+miss wins (summing cannot tell the two apart). Without that, a grid is read
+as fractions when at least 80 % of its months are written with four or more
+decimals (`factsheet.FRACTION_PLACES`, `FRACTION_SHARE`), none reaches 1 and
+the median month is under 0.1 (`FRACTION_MEDIAN`, so a low-volatility
+`0.3456` percent grid stays in percent); the warning still asks to check one
+month. Factsheets round percentages to two decimals, a fraction needs four to
+show a hundredth of a percent. A money-market percent grid written with four
+decimals (`0.0300`) is the remaining misread, and the warning names it.
+Otherwise, when neither reading clearly wins, the grid is read as percentages, as
 factsheets publish, and the warning asks the customer to check one month
 against the factsheet. The total column's own scale is settled apart (its
 `%`, else the reading its years match best), so Excel months shown as

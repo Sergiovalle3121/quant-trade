@@ -89,3 +89,15 @@ def test_declared_net_of_fees_shows_no_fee_table() -> None:
     assert result.fund is not None and "fees" not in result.fund
     html, _ = render(result, watermark=False)
     assert LABELS["es"]["fund_fees"] not in html
+
+
+@pytest.mark.parametrize(
+    ("break_even", "words"),
+    [(0.0, "igual o por debajo"), (-0.01, "igual o por debajo"), (0.00038, "0.04 %")],
+)
+def test_break_even_wording_at_the_edges(break_even: float, words: str) -> None:
+    from quant_trade.audit.report import _fund_fees_html
+
+    fees = fee_drag(_series(np.full(36, 0.006)))
+    fees["break_even"] = {"value": break_even}
+    assert words in _fund_fees_html(fees, LABELS["es"])
