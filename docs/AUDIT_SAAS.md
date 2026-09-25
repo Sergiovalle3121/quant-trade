@@ -467,6 +467,14 @@ and a share short of a whole (-99.7 %) never rounds to -100 %: it gets one more
 decimal, and past that it reads as a bound (>99.99 %). Every fact
 card (risk, account, plateau, timing, capital and its trade pace) shows its
 MEASURED / DECLARED / NOT_MEASURED tag beside the number.
+The stress table and its tiles follow the same rule (0.0 %, 0.00), and contract
+sizes in the reading warnings print as plain numbers (5,000,000, never 5e+06).
+Cost reasons carry thousands separators, and the class plan says in plain Spanish
+what the class would be if the dimension passed. The vendor question on a live
+record asks for "at least N months" only up to 24 months; past that it asks for
+auditable history and says how many months it would take to tell the Sharpe
+apart from chance. MT4 header fields (initial deposit, modelling, modelling
+quality, chart errors, parameter values, spread) have Spanish and English names.
 
 Trades against an uploaded equity curve (`redflags.scan_trades_against_equity`;
 skipped when the curve was rebuilt from the same report):

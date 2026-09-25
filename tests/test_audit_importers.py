@@ -1252,3 +1252,12 @@ def test_numbers_with_a_decimal_comma(text: str, expected: float) -> None:
     from quant_trade.audit.importers import _num
 
     assert _num(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("size", "shown"), [(5e6, "5,000,000"), (84408.9, "84,409"), (0.1, "0.1"), (12.5, "12.5")]
+)
+def test_contract_sizes_never_read_in_scientific_notation(size: float, shown: str) -> None:
+    from quant_trade.audit.importers import _size_text
+
+    assert _size_text(size) == shown

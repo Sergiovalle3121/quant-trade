@@ -279,8 +279,8 @@ def assess_costs(
             "FAIL",
             [
                 (
-                    f"net pnl at 1x the reference cost is {at_one.net_pnl:.2f} <= 0",
-                    f"el resultado neto a 1x el coste de referencia es {at_one.net_pnl:.2f} <= 0",
+                    f"net pnl at 1x the reference cost is {at_one.net_pnl:,.2f} <= 0",
+                    f"el resultado neto a 1x el coste de referencia es {at_one.net_pnl:,.2f} <= 0",
                 )
             ],
             inputs,
@@ -291,9 +291,9 @@ def assess_costs(
             "PASS",
             [
                 (
-                    f"net pnl at {multiple} the reference cost is {at_pass.net_pnl:.2f} > 0",
+                    f"net pnl at {multiple} the reference cost is {at_pass.net_pnl:,.2f} > 0",
                     f"el resultado neto a {multiple} el coste de referencia es "
-                    f"{at_pass.net_pnl:.2f} > 0",
+                    f"{at_pass.net_pnl:,.2f} > 0",
                 )
             ],
             inputs,
@@ -303,10 +303,10 @@ def assess_costs(
         "WEAK",
         [
             (
-                f"net pnl at 1x is {at_one.net_pnl:.2f} > 0 but at {multiple} is "
-                f"{at_pass.net_pnl:.2f} <= 0",
-                f"el resultado neto a 1x es {at_one.net_pnl:.2f} > 0 pero a {multiple} es "
-                f"{at_pass.net_pnl:.2f} <= 0",
+                f"net pnl at 1x is {at_one.net_pnl:,.2f} > 0 but at {multiple} is "
+                f"{at_pass.net_pnl:,.2f} <= 0",
+                f"el resultado neto a 1x es {at_one.net_pnl:,.2f} > 0 pero a {multiple} es "
+                f"{at_pass.net_pnl:,.2f} <= 0",
             )
         ],
         inputs,
@@ -528,7 +528,7 @@ _TEXT: dict[str, dict[str, str]] = {
             "favorable, el resultado no supera lo que produciría un intento sin habilidad."
         ),
         f"{COSTS}.PASS": (
-            "Neto de 3x el coste de referencia, el resultado de las operaciones sigue positivo."
+            "Con 3 veces el coste de referencia, el resultado de las operaciones sigue positivo."
         ),
         f"{COSTS}.WEAK": (
             "Las operaciones sobreviven al coste de referencia pero no a 3x ese coste."
@@ -608,7 +608,7 @@ _TEXT: dict[str, dict[str, str]] = {
             "The number of configurations tried was not declared, and even with 1, the most "
             "favourable case, the result does not exceed what an unskilled trial would produce."
         ),
-        f"{COSTS}.PASS": "Net of 3x the reference cost, the trade ledger stays positive.",
+        f"{COSTS}.PASS": "At 3 times the reference cost, the trades still end positive.",
         f"{COSTS}.WEAK": "The trades survive the reference cost but not 3x that cost.",
         f"{COSTS}.FAIL": "At the reference cost, the trades lose money net.",
         f"{COSTS}.NOT_MEASURED": "Costs not measured: {reason}.",
