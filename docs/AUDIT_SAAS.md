@@ -582,8 +582,14 @@ and report wire them in during the integration step):
   chance is the product of its phases' (phases taken as fresh starts; The5ers
   Bootcamp counts its preset three times), with the same product within the
   best-day rule when a phase has one, and the weakest phase's main failure.
-  Ranked by pass chance. MEASURED under the simulator's assumptions; it
-  compares rules and never recommends buying a challenge. No class change.
+  Ranked by the figure that matters for a payout (within the best-day rule
+  where the firm has one), ties by name. Figures read "≥99%" at the top.
+  When every program is at or above 99 % or at or below 1 %, the table
+  gives way to one sentence (and, for all failing, the most common reason).
+  A program where no path fails reads "Nothing in the simulations". When
+  the balance hides open losses, the table repeats that its figures are
+  optimistic. MEASURED under the simulator's assumptions; it compares rules
+  and never recommends buying a challenge. No class change.
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.

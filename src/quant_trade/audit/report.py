@@ -934,7 +934,8 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_title": "¿Con qué firma encaja tu historial?",
         "ff_intro": (
             "El mismo historial, remuestreado igual, con las reglas publicadas de cada firma, "
-            "de más a menos probabilidad de pasar todas las fases del programa. Compara "
+            "de más a menos probabilidad de pasar todas las fases del programa dentro de la "
+            "regla del mejor día, si la firma la tiene; a igual cifra, por nombre. Compara "
             "reglas; no recomienda comprar ningún reto."
         ),
         "ff_program": "Reto",
@@ -942,6 +943,22 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_clean": "Pasa dentro de la regla del mejor día",
         "ff_risk": "Lo que más lo tumba",
         "ff_no_rule": "sin regla",
+        "ff_risk_none": "Nada en las simulaciones",
+        "ff_risk_fail_daily_loss": "romper la pérdida diaria",
+        "ff_risk_fail_total_loss": "romper la pérdida total",
+        "ff_risk_unfinished": "no llegar al objetivo a tiempo",
+        "ff_optimistic": (
+            "Las mismas cifras optimistas de arriba aplican a esta tabla: el balance esconde "
+            "pérdidas abiertas."
+        ),
+        "ff_all_pass": (
+            "Con este historial todos los programas se pasan en al menos el 99 % de las "
+            "simulaciones: sus reglas no los distinguen."
+        ),
+        "ff_all_fail": (
+            "Con este historial ningún programa se pasa en las simulaciones; lo que más lo "
+            "impide es {risk}."
+        ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
         "assumptions": "Supuestos",
@@ -1754,14 +1771,31 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_title": "Which firm's rules does your history fit?",
         "ff_intro": (
             "The same history, resampled the same way, under each firm's published rules, "
-            "from most to least likely to pass every phase of the program. It compares rules; "
-            "it does not recommend buying any challenge."
+            "from most to least likely to pass every phase of the program within the best-day "
+            "rule, where the firm has one; ties go by name. It compares rules; it does not "
+            "recommend buying any challenge."
         ),
         "ff_program": "Challenge",
         "ff_pass": "Passes",
         "ff_clean": "Passes within the best-day rule",
         "ff_risk": "What stops it most",
         "ff_no_rule": "no rule",
+        "ff_risk_none": "Nothing in the simulations",
+        "ff_risk_fail_daily_loss": "breaking the daily loss limit",
+        "ff_risk_fail_total_loss": "breaking the total loss limit",
+        "ff_risk_unfinished": "not reaching the target in time",
+        "ff_optimistic": (
+            "The same optimistic figures as above apply to this table: the balance hides open "
+            "losses."
+        ),
+        "ff_all_pass": (
+            "With this history every program passes in at least 99 % of the simulations: their "
+            "rules do not tell them apart."
+        ),
+        "ff_all_fail": (
+            "With this history no program passes in the simulations; what stops it most is "
+            "{risk}."
+        ),
         "ff_phases": "{n} phases",
         "ff_phase": "1 phase",
         "assumptions": "Assumptions",
@@ -3107,22 +3141,55 @@ def _challenge_html(
             + "</ul>"
         )
     html_text += _assumptions(challenge.get("assumptions"), locale, labels)
-    return html_text + _firm_fit_html(challenge.get("firm_fit"), locale, labels)
+    return html_text + _firm_fit_html(
+        challenge.get("firm_fit"),
+        labels,
+        optimistic=bool(open_loss or (hidden_note and challenge.get("status") == "MEASURED")),
+    )
 
 
 def _phases(count: int, labels: dict[str, str]) -> str:
     return labels["ff_phase"] if count == 1 else labels["ff_phases"].format(n=count)
 
 
-def _firm_fit_html(fit: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+def _firm_pct(value: float) -> str:
+    """A pass chance, capped so a resampled figure never reads as a certainty."""
+    if value >= 0.99:
+        return "≥99%"
+    if 0 < value <= 0.01:
+        return "≤1%"
+    return f"{value:.0%}"
+
+
+def _firm_fit_html(
+    fit: dict[str, Any] | None, labels: dict[str, str], *, optimistic: bool = False
+) -> str:
     """Every published challenge on the same resampled history, best odds first."""
     if not fit or fit.get("status") != "MEASURED" or not fit.get("firms"):
         return ""
+    out = (
+        f"<h3>{_e(labels['ff_title'])}</h3>"
+        f"<p class='muted'>{_e(labels['ff_intro'])} {_badge('MEASURED')}</p>"
+    )
+    if optimistic:
+        out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
+    uniform = fit.get("uniform")
+    if uniform == "all_pass":
+        return out + f"<p>{_e(labels['ff_all_pass'])}</p>"
+    if uniform == "all_fail":
+        common = fit.get("common_risk") or "none"
+        text = labels["ff_all_fail"].format(risk=labels[f"ff_risk_{common}"].lower())
+        return out + f"<p>{_e(text)}</p>"
 
     def pct(item: dict[str, Any] | None, label: str) -> str:
         if not item:
             return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
-        return f"<td class='val' data-l='{_e(label)}'>{float(item['value']):.0%}</td>"
+        return (
+            f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
+        )
+
+    def risk(key: str) -> str:
+        return labels["ff_risk_none"] if key == "none" else labels[key]
 
     body = "".join(
         "<tr><td>"
@@ -3131,12 +3198,10 @@ def _firm_fit_html(fit: dict[str, Any] | None, locale: str, labels: dict[str, st
         + "</td>"
         + pct(row["pass"], labels["ff_pass"])
         + pct(row.get("pass_within_best_day"), labels["ff_clean"])
-        + f"<td data-l='{_e(labels['ff_risk'])}'>{_e(labels[row['main_risk']])}</td></tr>"
+        + f"<td data-l='{_e(labels['ff_risk'])}'>{_e(risk(row['main_risk']))}</td></tr>"
         for row in fit["firms"]
     )
-    return (
-        f"<h3>{_e(labels['ff_title'])}</h3>"
-        f"<p class='muted'>{_e(labels['ff_intro'])} {_badge('MEASURED')}</p>"
+    return out + (
         f"<table class='timing'><thead><tr><th>{_e(labels['ff_program'])}</th>"
         f"<th class='val'>{_e(labels['ff_pass'])}</th>"
         f"<th class='val'>{_e(labels['ff_clean'])}</th>"

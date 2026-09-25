@@ -27,6 +27,10 @@ from quant_trade.audit.schema import measured
 
 #: Samples per preset; the ranking needs less precision than the chosen firm.
 SAMPLES = 2000
+#: When every program is at or above this, or at or below the low mark, the
+#: ranking says nothing and the report says so in one sentence.
+UNIFORM_HIGH = 0.99
+UNIFORM_LOW = 0.01
 #: Presets that stand for several identical phases in a row.
 REPEATS = {"the5ers-bootcamp-step": 3}
 
@@ -37,6 +41,18 @@ NOTE = (
 )
 
 _FAILS = ("fail_daily_loss", "fail_total_loss", "unfinished")
+
+
+def _main_risk(probability: dict[str, Any]) -> str:
+    """The failure that ends most paths, or "none" when no path fails."""
+    worst = max(_FAILS, key=lambda k: float(probability[k]["value"]))
+    return worst if float(probability[worst]["value"]) > 0 else "none"
+
+
+def _payable(row: dict[str, Any]) -> float:
+    """The figure that matters for getting paid: within the best-day rule when
+    the firm has one."""
+    return float((row.get("pass_within_best_day") or row["pass"])["value"])
 
 
 def _program(results: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
@@ -67,7 +83,7 @@ def _program(results: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
         "source_url": rules["source_url"],
         "as_of": rules["as_of"],
         "pass": measured(passing, NOTE),
-        "main_risk": max(_FAILS, key=lambda k: float(weakest[k]["value"])),
+        "main_risk": _main_risk(weakest),
     }
     if with_rule:
         row["pass_within_best_day"] = measured(clean, NOTE)
@@ -91,8 +107,22 @@ def firm_fit(
             return {"status": "NOT_MEASURED", "reason": reason}
         programs.setdefault((rules.firm, rules.program), []).append((key, result))
     rows = [_program(results) for results in programs.values()]
-    rows.sort(key=lambda row: (-float(row["pass"]["value"]), row["firm"], row["program"]))
-    return {"status": "MEASURED", "note": NOTE, "samples": samples, "seed": seed, "firms": rows}
+    rows.sort(key=lambda row: (-_payable(row), row["firm"], row["program"]))
+    out: dict[str, Any] = {
+        "status": "MEASURED",
+        "note": NOTE,
+        "samples": samples,
+        "seed": seed,
+        "firms": rows,
+    }
+    figures = [_payable(row) for row in rows]
+    if min(figures) >= UNIFORM_HIGH:
+        out["uniform"] = "all_pass"
+    elif max(figures) <= UNIFORM_LOW:
+        out["uniform"] = "all_fail"
+        risks = [row["main_risk"] for row in rows if row["main_risk"] != "none"]
+        out["common_risk"] = max(sorted(set(risks)), key=risks.count) if risks else "none"
+    return out
 
 
 __all__ = ["REPEATS", "SAMPLES", "firm_fit"]

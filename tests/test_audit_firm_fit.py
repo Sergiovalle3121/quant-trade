@@ -126,3 +126,43 @@ def test_one_huge_day_carries_every_pass_past_the_best_day_rule() -> None:
 def test_flat_or_short_histories_give_no_table_and_no_best_day(daily: np.ndarray) -> None:
     assert firm_fit(daily, samples=100)["status"] == "NOT_MEASURED"
     assert "best_day" not in simulate_challenge(daily, PRESETS["ftmo-1step"], samples=100)
+
+
+def test_every_program_passing_is_one_sentence_with_no_failure_named() -> None:
+    from quant_trade.audit.report import _firm_fit_html
+
+    daily = 0.01 + np.random.default_rng(2).normal(0, 0.0005, 300)
+    fit = firm_fit(daily, samples=200)
+    assert fit["uniform"] == "all_pass"
+    assert {row["main_risk"] for row in fit["firms"]} == {"none"}
+    html = _firm_fit_html(fit, LABELS["es"])
+    assert LABELS["es"]["ff_all_pass"] in html and "<table" not in html
+
+
+def test_no_program_passing_names_what_stops_it() -> None:
+    from quant_trade.audit.report import _firm_fit_html
+
+    daily = 0.00001 + np.random.default_rng(2).normal(0, 0.00002, 300)
+    fit = firm_fit(daily, samples=200)
+    assert fit["uniform"] == "all_fail" and fit["common_risk"] == "unfinished"
+    html = _firm_fit_html(fit, LABELS["en"])
+    assert "not reaching the target in time" in html and "<table" not in html
+
+
+def test_programs_rank_by_the_figure_within_the_best_day_rule() -> None:
+    fit = firm_fit(_daily(), samples=400, seed=7)
+    figures = [(row.get("pass_within_best_day") or row["pass"])["value"] for row in fit["firms"]]
+    assert figures == sorted(figures, reverse=True)
+    assert "uniform" not in fit
+
+
+def test_figures_are_capped_and_open_losses_repeat_the_warning() -> None:
+    from quant_trade.audit.report import _firm_fit_html, _firm_pct
+
+    assert _firm_pct(1.0) == "≥99%" and _firm_pct(0.995) == "≥99%"
+    assert _firm_pct(0.004) == "≤1%" and _firm_pct(0.0) == "0%"
+    fit = firm_fit(_daily(), samples=200, seed=7)
+    html = _firm_fit_html(fit, LABELS["es"], optimistic=True)
+    assert LABELS["es"]["ff_optimistic"] in html
+    for key in ("ff_optimistic", "ff_all_pass", "ff_all_fail", "ff_risk_none"):
+        assert find_claims(LABELS["es"][key]) == [] and find_claims(LABELS["en"][key]) == []
