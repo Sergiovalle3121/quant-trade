@@ -141,6 +141,11 @@ LABELS: dict[str, dict[str, str]] = {
             "Pago seguro con Stripe. Ves el informe completo en cuanto se confirma el pago; "
             "nosotros no vemos ni guardamos los datos de tu tarjeta."
         ),
+        "pay_links_note": (
+            "El pago se abre en otra pestaña. Cuando termines, vuelve aquí: el informe se "
+            "desbloquea en cuanto Stripe confirma el pago."
+        ),
+        "paid_check": "Ya pagué: ver mi informe",
         "buy_code_alt": "¿Prefieres pagar por transferencia? Pide un código aquí",
         "pack_left": (
             "Te quedan {n} informes de tu paquete. Para usarlos, escribe este código al "
@@ -695,6 +700,11 @@ LABELS: dict[str, dict[str, str]] = {
             "Secure payment with Stripe. You see the full report as soon as the payment is "
             "confirmed; we never see or store your card details."
         ),
+        "pay_links_note": (
+            "The payment opens in another tab. When you finish, come back here: the report "
+            "unlocks as soon as Stripe confirms the payment."
+        ),
+        "paid_check": "I have paid: show my report",
         "buy_code_alt": "Prefer a bank transfer? Ask for a code here",
         "pack_left": (
             "You have {n} reports left in your pack. To use them, enter this code when you "
@@ -3438,6 +3448,7 @@ def render_html(
     pack_code: str = "",
     pack_credits_left: int = 0,
     code_error: bool = False,
+    pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
 ) -> str:
     """The audit as one HTML document.
@@ -3483,6 +3494,26 @@ def render_html(
         )
         + "</ul>"
     )
+    card_on = bool(checkout_url or pay_links)
+    if locked and pay_links and not checkout_url:
+        # Payment Links open Stripe in another tab; the webhook unlocks this
+        # report and "Ya pagué" reloads it.
+        single_url, pack_url, done_url = pay_links
+        pack_link = (
+            f"<a class='btn btn-ghost btn-lg' href='{_e(pack_url)}' target='_blank' "
+            f"rel='noopener'>{_e(labels['pay_pack'].format(price=pack_price_usd))}</a>"
+            if pack_url and pack_price_usd
+            else ""
+        )
+        paybox = (
+            "<div class='paybox buy'>" + price_html + "<div><div class='inline-form'>"
+            f"<a class='btn btn-primary btn-lg' href='{_e(single_url)}' target='_blank' "
+            f"rel='noopener'>{icon('card')}{_e(labels['pay'])}</a>{pack_link}</div>"
+            f"<p class='muted pay-secure'>{icon('lock')}<span>{_e(labels['pay_secure'])}</span></p>"
+            f"<p class='muted'>{_e(labels['pay_links_note'])} "
+            f"<a href='{_e(done_url)}'>{_e(labels['paid_check'])}</a></p>"
+            f"</div>{includes_html}</div>"
+        )
     if locked and checkout_url:
         # Card payment is the main way to pay; the pack is the second button.
         pack_button = (
@@ -3506,7 +3537,7 @@ def render_html(
             contact_url = _prefilled(
                 contact_url, labels["code_request"].format(id=data["audit_id"])
             )
-            if checkout_url:
+            if card_on:
                 # With card payment on, WhatsApp is the alternative, not the main button.
                 paybox += (
                     f"<p class='paybox pay-alt'><a href='{_e(contact_url)}' "
@@ -3521,7 +3552,7 @@ def render_html(
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
                     f"{_e(labels['buy_code'])}</a>{includes_html}</div>"
                 )
-        main_button = contact_url or checkout_url
+        main_button = contact_url or card_on
         error_html, invalid = "", ""
         if code_error:
             # Next to the field the customer just used, with what to do next.
@@ -3920,7 +3951,7 @@ def render_html(
             f"<div class='watermark'>{_e(text)}</div><div class='banner'>{_e(text)}</div>"
         )
 
-    if locked and (redeem_url or checkout_url):
+    if locked and (redeem_url or checkout_url or pay_links):
         # A watermarked preview is not worth printing: the header offers the unlock instead.
         print_html = (
             f"<a class='print-btn' href='#unlock'>{icon('lock')}{_e(labels['unlock_nav'])}</a>"
@@ -3985,7 +4016,7 @@ def render_html(
             f"<p class='rise' style='--i:4'><a class='btn btn-primary' href='#unlock'>"
             f"{_e(labels['unlock_jump'])}</a></p>"
             f"<p class='muted keep-link rise' style='--i:4'>{_e(labels['keep_link'])}</p>"
-            if locked and (redeem_url or checkout_url)
+            if locked and (redeem_url or checkout_url or pay_links)
             else ""
         )
         + "</div></section>"
@@ -4127,6 +4158,7 @@ def render(
     pack_code: str = "",
     pack_credits_left: int = 0,
     code_error: bool = False,
+    pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
@@ -4150,6 +4182,7 @@ def render(
         pack_code=pack_code,
         pack_credits_left=pack_credits_left,
         code_error=code_error,
+        pay_links=pay_links,
         notice_ok=notice_ok,
     )
     guard_texts(result, html_text)

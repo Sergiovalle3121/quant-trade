@@ -922,6 +922,8 @@ with an empty value):
 | `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links, canonical and Open Graph links, the badge snippet, `robots.txt` and `sitemap.xml`. While it is left at the default, those links use the address the request reached (`https` when `AUDIT_TRUSTED_PROXY_HOPS` > 0). Set it to your domain in production. |
 | `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless both Stripe secrets are set or `AUDIT_ACCESS_CODES=true`. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | empty | Both are needed for card payments: a secret (`sk_…`) or restricted (`rk_…`) key and the webhook signing secret (`whsec_…`). A publishable key (`pk_…`) leaves card payments off. `/health` shows `card_mode` (`off`, `test`, `live`) from the key's prefix, never the key. |
+| `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK` | empty | Payment Links (`https://buy.stripe.com/…`) for one audit and for the pack. With `STRIPE_WEBHOOK_SECRET` they turn card payment on without any secret key on the service; ignored when `STRIPE_SECRET_KEY` is set. A link with `/test_` is test mode. `/health` shows `card_via` (`checkout`, `links`, `off`). |
+| `AUDIT_STRIPE_TEST_AUDITS` | empty | Comma-separated audit ids that a test-mode payment may unlock. In test mode the card button shows only on these audits, and a test payment for any other audit is ignored, so Stripe's public test card never unlocks a real report. Leave empty in normal operation. |
 | `STRIPE_PRICE_ID` | empty | Optional. Without it Checkout charges `AUDIT_PRICE_USD_CENTS` (and the pack `AUDIT_PACK_PRICE_USD_CENTS`) in USD with no Stripe product to create. |
 | `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
@@ -1036,6 +1038,26 @@ with an empty value):
 5. When the Stripe account is activated, swap both variables for the live
    ones (a live endpoint has its own signing secret); `card_mode` turns
    `live`.
+
+Test mode on the live site: card payments stay hidden from visitors and
+the legal pages do not mention them; list the audits you will pay in
+`AUDIT_STRIPE_TEST_AUDITS`, pay them, then empty the variable. A payment
+Stripe reports with `livemode: false` never unlocks any other audit.
+
+#### Without a secret key: Payment Links
+
+1. Create two Payment Links in Stripe: one for a report (USD 29) and one
+   for the pack (USD 69) with metadata `plan=pack`. Leave the confirmation
+   page as Stripe's own; the buyer comes back to the report tab.
+2. Create the webhook endpoint as above and put its signing secret in
+   `STRIPE_WEBHOOK_SECRET`.
+3. Set `STRIPE_PAYMENT_LINK_SINGLE` and `STRIPE_PAYMENT_LINK_PACK`, and leave
+   `STRIPE_SECRET_KEY` empty.
+
+The locked report links to them with `client_reference_id=<audit id>` in a
+new tab. The signed webhook is the only confirmation (the service has no key
+to ask Stripe), and "Ya pagué: ver mi informe" reloads the report. The pack
+code works as below, keyed by the Checkout session the link created.
 
 How it works: the checkout carries `metadata.audit_id` and `metadata.plan`.
 The payment is confirmed by the signed webhook and, when the buyer comes
