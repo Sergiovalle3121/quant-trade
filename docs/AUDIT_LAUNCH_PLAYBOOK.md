@@ -464,7 +464,7 @@ También: el resultado sin sus mejores operaciones, el modelo de ticks del proba
 
 Qué no hace: no se conecta a ningún bróker, no predice resultados y no recomienda comprar ningún robot.
 
-La vista previa es gratis; el informe completo cuesta USD 29 y se devuelve si lee mal el archivo. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
+Con una cuenta gratis, el primer informe completo no se paga; después, 3 vistas previas gratis al mes y USD 29 por informe completo, que se devuelven si lee mal el archivo. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
 
 Informe de ejemplo con datos sintéticos: https://<dominio>/ejemplo
 Cómo audita, con cada umbral: https://<dominio>/metodologia
@@ -483,7 +483,7 @@ Also: the result without its best trades, the tester's tick model, whether the b
 
 What it does not do: it never connects to a broker, it does not predict results and it does not recommend buying any robot.
 
-The preview is free; the full report is USD 29, refunded if it misreads the file. Vendors can publish a verification page with the hashes of the audited file.
+A free account gets its first full report free; after that, 3 free previews a month and USD 29 per full report, refunded if it misreads the file. Vendors can publish a verification page with the hashes of the audited file.
 
 Sample report built from synthetic data: https://<domain>/ejemplo
 How it audits, with every threshold: https://<domain>/methodology
