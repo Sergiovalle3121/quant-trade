@@ -16,7 +16,9 @@ def test_the_old_deployment_gets_time_to_finish_its_requests() -> None:
     # Every merge redeploys; Railway's default is SIGKILL right after SIGTERM,
     # which cut off the audits and PDFs of whoever was waiting on one.
     deploy = json.loads((ROOT / "railway.json").read_text())["deploy"]
-    draining = int(deploy["drainingSeconds"])
+    draining = deploy["drainingSeconds"]
+    # railway.schema.json takes a number; a string (as a docs example shows) is refused.
+    assert isinstance(draining, int)
     assert draining >= PDF_WAIT_SECONDS + 30
     assert draining >= DEFAULT_AUDIT_QUEUE_SECONDS + 30
 
