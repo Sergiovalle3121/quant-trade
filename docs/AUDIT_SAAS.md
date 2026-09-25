@@ -97,6 +97,10 @@ Limits, each written into the report as a reading warning:
   of the Balance column). A mismatch is a warning, never a silent repair.
 - A report without a starting balance uses the one the client declares,
   else 10,000 with a warning.
+- When the rebuilt balance reaches zero or below, the error asks for the real
+  starting balance only when 10,000 was assumed; when the file or the client
+  gave it, it says the account lost all its money on that date and asks for
+  the history up to that day.
 - A CSV line longer than 32 KB (`MAX_CSV_LINE_BYTES`) is refused: no real
   export has one, and pandas takes minutes on a 5 MB line of fields.
 - An optimisation export whose title names another robot, symbol or
