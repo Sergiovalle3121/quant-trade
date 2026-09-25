@@ -217,7 +217,13 @@ it) is that trade's direction on a closed-trade row; on a fill, closing a long
 sells and closing a short buys. `Fees Paid` and `Exec Fee` are costs. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date, and a month
-name in English or Spanish (`07 Aug 2026`, `02-Jan-2026`, `15 ene 2026`). Day/month
+name in English, Spanish, Portuguese, French, German or Italian (`07 Aug
+2026`, `02-Jan-2026`, `15 ene 2026`, `09 out 2026`, `03 août 2026`, `06 Okt
+2026`, `07 ott 2026`). When a file has several `Net <currency>` columns, the
+one in the currency of its `Balance <currency>` column is the result. A zone
+word in a column name (`EDT`, `CST`) is a fixed offset for every row: a
+Rithmic export that prints the zone at export time reads winter trades one
+hour off under `EDT` (limitation, not corrected). Day/month
 order that no day past 12 settles is taken from a year-first column of the
 same rows (Tradovate's `Trade Date`) or another day/month column of the file;
 otherwise the `ambiguous_dates` error stands. A file listed newest first
