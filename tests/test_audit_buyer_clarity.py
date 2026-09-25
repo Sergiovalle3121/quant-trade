@@ -202,3 +202,24 @@ def test_seller_questions_follow_the_report_s_findings() -> None:
         assert_report_clean(q["es"] + " " + q["en"])
     sample = {q["code"] for q in sample_result("es", bootstrap_samples=60).vendor_questions}
     assert {"one_instrument", "recent_weaker", "costs"} <= sample
+
+
+def test_trader_terms_in_the_tiles_carry_a_plain_line() -> None:
+    from quant_trade.audit.guard import assert_report_clean
+    from quant_trade.audit.report import LABELS
+
+    page = _page("es")
+    tiles = page[page.index("<div class='kpis'>") :]
+    tiles = tiles[: tiles.index("</div></div>", tiles.rindex("class='kpi"))]
+    for key in ("sharpe", "pf", "drawdown", "dd_p95", "breakeven", "return"):
+        assert f"<small>{LABELS['es']['kpi_hint_' + key]}</small>" in tiles
+    assert "<small>" in _page("en") and "what was won for every 1 lost" in _page("en")
+    # Locked tiles show no hint either.
+    locked = render_html(
+        sample_result("es", bootstrap_samples=60), watermark=True, free_mode=False
+    )
+    assert "lo ganado por cada 1 perdido" not in locked
+    for locale in ("es", "en"):
+        assert_report_clean(
+            " ".join(v for k, v in LABELS[locale].items() if k.startswith("kpi_hint_"))
+        )
