@@ -391,6 +391,41 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_clean": "Ni suavizado ni falta de meses con pérdida pequeña.",
         "fund_badge_clean": "Sin patrones",
+        "fund_bench": "Frente a su índice de referencia",
+        "fund_bench_file": (
+            "Del {first} al {last}, {n} meses en común con el índice que trae el propio archivo, "
+            "con sus cifras tal como vienen."
+        ),
+        "fund_bench_upload": (
+            "Del {first} al {last}, {n} meses en común con el archivo de benchmark que subiste."
+        ),
+        "fund_bench_gross": (
+            "Si las cifras del fondo son antes de comisiones, esta comparación lo favorece."
+        ),
+        "fund_bench_excess": "Diferencia anual frente al índice (fondo {fund}, índice {index})",
+        "fund_bench_beat": "Meses en que superó al índice",
+        "fund_bench_te": "Error de seguimiento anual (ratio de información {ir})",
+        "fund_bench_beta": "Beta frente al índice (correlación {corr})",
+        "fund_bench_up": "Captura al alza: parte de las subidas del índice que recoge",
+        "fund_bench_down": "Captura a la baja: parte de las caídas del índice que recoge",
+        "fund_bench_trails": (
+            "Rindió menos que su índice: {excess} al año en los meses en común. Pregunta qué "
+            "justifica pagar una gestión activa frente a un fondo indexado."
+        ),
+        "fund_bench_index_like": (
+            "Sigue a su índice muy de cerca (correlación {corr}, error de seguimiento {te} al "
+            "año), lo que los estudios llaman gestión indexada encubierta. Pregunta qué aportan "
+            "sus comisiones que no dé un fondo indexado."
+        ),
+        "fund_bench_worse": (
+            "Recoge menos de las subidas del índice ({up}) y más de sus caídas ({down}). "
+            "Pregunta en qué tipo de mercado espera el gestor hacerlo mejor."
+        ),
+        "fund_bench_clean": (
+            "Por delante de su índice en los meses en común y sin seguirlo como un fondo indexado."
+        ),
+        "fund_bench_badge_clean": "Por delante",
+        "fund_bench_nm": "Comparación con el índice:",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
@@ -1023,6 +1058,39 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_clean": "No smoothing and no shortage of months with a small loss.",
         "fund_badge_clean": "No pattern",
+        "fund_bench": "Against its benchmark",
+        "fund_bench_file": (
+            "From {first} to {last}, {n} months shared with the benchmark the file itself "
+            "carries, with its figures as they come."
+        ),
+        "fund_bench_upload": (
+            "From {first} to {last}, {n} months shared with the benchmark file you uploaded."
+        ),
+        "fund_bench_gross": ("If the fund's figures are before fees, this comparison flatters it."),
+        "fund_bench_excess": "Annual difference against the benchmark (fund {fund}, index {index})",
+        "fund_bench_beat": "Months it beat the benchmark",
+        "fund_bench_te": "Annual tracking error (information ratio {ir})",
+        "fund_bench_beta": "Beta to the benchmark (correlation {corr})",
+        "fund_bench_up": "Up capture: share of the benchmark's rises it takes",
+        "fund_bench_down": "Down capture: share of the benchmark's falls it takes",
+        "fund_bench_trails": (
+            "It returned less than its benchmark: {excess} a year over the shared months. Ask "
+            "what justifies paying for active management over an index fund."
+        ),
+        "fund_bench_index_like": (
+            "It follows its benchmark very closely (correlation {corr}, tracking error {te} a "
+            "year), what studies call closet indexing. Ask what its fees buy that an index fund "
+            "does not."
+        ),
+        "fund_bench_worse": (
+            "It takes less of the benchmark's rises ({up}) and more of its falls ({down}). Ask "
+            "in which kind of market the manager expects to do better."
+        ),
+        "fund_bench_clean": (
+            "Ahead of its benchmark over the shared months, without tracking it like an index fund."
+        ),
+        "fund_bench_badge_clean": "Ahead",
+        "fund_bench_nm": "Comparison with the benchmark:",
         "instruments": "Does it work on each instrument?",
         "ins_intro": (
             "When a robot or a signal trades several markets, the total can come from one of "
@@ -3651,12 +3719,107 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     ]
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
+    out += _fund_benchmark_html(fund, locale, labels)
     if fund.get("net_of_fees"):
         out += (
             f"<p class='muted'>{_badge(fund['net_of_fees']['evidence'])} "
             f"{_e(labels['fund_net'])}</p>"
         )
     out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
+    return out
+
+
+def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+    """The fund against the benchmark its file carries or the customer uploaded."""
+    bench = fund.get("benchmark")
+    if not bench:
+        return ""
+    out = f"<h3>{_e(labels['fund_bench'])}</h3>"
+    if bench.get("status") != "MEASURED":
+        return out + (
+            f"<p class='muted'>{_e(labels['fund_bench_nm'])} {_badge('NOT_MEASURED')} "
+            f"{_e(_sentence(localize(bench.get('reason', ''), locale)))}</p>"
+        )
+    intro = labels["fund_bench_upload" if bench.get("source") == "upload" else "fund_bench_file"]
+    out += (
+        "<p class='muted'>"
+        + _e(
+            intro.format(first=bench["first"], last=bench["last"], n=int(bench["months"]["value"]))
+        )
+        + ("" if fund.get("net_of_fees") else f" {_e(labels['fund_bench_gross'])}")
+        + "</p>"
+    )
+    excess = float(bench["excess"]["value"])
+    corr = f"{float(bench['correlation']['value']):.2f}"
+    te = f"{float(bench['tracking_error']['value']):.1%}"
+    up = (bench.get("up_capture") or {}).get("value")
+    down = (bench.get("down_capture") or {}).get("value")
+    findings = list(bench.get("findings") or [])
+    if findings:
+        texts = {
+            "trails": labels["fund_bench_trails"].format(excess=_fund_pct(excess)),
+            "index_like": labels["fund_bench_index_like"].format(corr=corr, te=te),
+            "worse_both_ways": labels["fund_bench_worse"].format(
+                up=f"{float(up or 0):.0%}", down=f"{float(down or 0):.0%}"
+            ),
+        }
+        items = "".join(_behaviour_ask(texts[code]) for code in findings)
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>{items}</ul></div>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['fund_bench_badge_clean'])}</span> {_e(labels['fund_bench_clean'])}</p>"
+        )
+
+    def tile(value: str, text: str, evidence: str, *, neg: bool = False) -> str:
+        return (
+            f"<div class='fact{' neg' if neg else ''}'><b>{_e(value)}</b>"
+            f"<p>{_e(text)} {_badge(evidence)}</p></div>"
+        )
+
+    ir = (bench.get("information_ratio") or {}).get("value")
+    facts = [
+        tile(
+            _fund_pct(excess),
+            labels["fund_bench_excess"].format(
+                fund=_fund_pct(float(bench["fund_cagr"]["value"])),
+                index=_fund_pct(float(bench["index_cagr"]["value"])),
+            ),
+            bench["excess"]["evidence"],
+            neg=excess < 0,
+        ),
+        tile(
+            f"{float(bench['beat_share']['value']):.0%}",
+            labels["fund_bench_beat"],
+            bench["beat_share"]["evidence"],
+        ),
+        tile(
+            te,
+            labels["fund_bench_te"].format(ir=f"{float(ir):.2f}" if ir is not None else "—"),
+            bench["tracking_error"]["evidence"],
+        ),
+        tile(
+            f"{float(bench['beta']['value']):.2f}",
+            labels["fund_bench_beta"].format(corr=corr),
+            bench["beta"]["evidence"],
+        ),
+    ]
+    for key, label in (("up_capture", "fund_bench_up"), ("down_capture", "fund_bench_down")):
+        item = bench.get(key) or {}
+        if item.get("evidence") == "MEASURED" and item.get("value") is not None:
+            facts.append(
+                tile(
+                    f"{float(item['value']):.0%}",
+                    labels[label],
+                    item["evidence"],
+                    neg="worse_both_ways" in findings,
+                )
+            )
+    out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    out += f"<p class='muted'>{_e(_sentence(localize(bench.get('note', ''), locale)))}</p>"
     return out
 
 
