@@ -457,6 +457,47 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("the report does not print it", "el informe no lo imprime"),
     (
+        "deepest fall in money over one year of trades drawn at random from the history, "
+        "at the backtest's sizes",
+        "mayor caída en dinero en un año de operaciones sorteadas al azar del historial, al "
+        "tamaño del backtest",
+    ),
+    (
+        "deepest fall in money of the closed trades in their own order",
+        "mayor caída en dinero de las operaciones cerradas en su propio orden",
+    ),
+    (
+        "the larger of the resampled 95th percentile and the history's own fall",
+        "la mayor entre el percentil 95 remuestreado y la caída del propio historial",
+    ),
+    (
+        "reference fall / loss limit, at the backtest's sizes",
+        "caída de referencia / límite de pérdida, al tamaño del backtest",
+    ),
+    (
+        "loss limit x starting balance / reference fall",
+        "límite de pérdida x balance inicial / caída de referencia",
+    ),
+    ("closed trades per year in the history", "operaciones cerradas por año en el historial"),
+    (
+        "closed trades per year at the history's pace; the history is shorter than a year",
+        "operaciones cerradas por año al ritmo del historial; el historial dura menos de un año",
+    ),
+    ("starting balance of the uploaded file", "balance inicial del archivo subido"),
+    ("the file states no starting balance", "el archivo no indica un balance inicial"),
+    (
+        "needs at least {n} closed trades; {m} supplied",
+        "necesita al menos {n} operaciones cerradas; se aportaron {m}",
+    ),
+    (
+        "needs trades spread over at least {n} days",
+        "necesita operaciones repartidas en al menos {n} días",
+    ),
+    (
+        "the trades show no fall to size against",
+        "las operaciones no muestran una caída con la que dimensionar",
+    ),
+    (
         "the file is a backtest, not an account history",
         "el archivo es un backtest, no el historial de una cuenta",
     ),

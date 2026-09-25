@@ -31,6 +31,7 @@ from quant_trade.audit import account as account_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import live as live_lib
+from quant_trade.audit import sizing as sizing_lib
 from quant_trade.audit import stress as stress_lib
 from quant_trade.audit import testdata as testdata_lib
 from quant_trade.audit import timing as timing_lib
@@ -849,6 +850,17 @@ def run_audit(
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
     stress_tests = _stress(inputs, frame)
+    capital = (
+        sizing_lib.capital_review(
+            inputs.trades.trades,
+            fees=inputs.trades.fees,
+            starting_balance=inputs.initial_balance or inputs.declared.initial_balance,
+            samples=risk_samples,
+            seed=seed,
+        )
+        if inputs.trades is not None
+        else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    )
     timing = (
         timing_lib.timing_breakdown(inputs.trades.trades)
         if inputs.trades is not None
@@ -1026,6 +1038,7 @@ def run_audit(
         challenge=challenge,
         account=account,
         test_data=test_data,
+        capital=capital,
         vendor_questions=questions,
     )
 
