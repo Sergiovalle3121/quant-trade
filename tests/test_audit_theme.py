@@ -452,3 +452,37 @@ def test_declared_midnight_dates_and_seal_rows_read_plainly() -> None:
     assert _fmt("2024-06-02T23:59:59Z") == "2024-06-02T23:59:59Z"
     held = {"status": "NOT_MEASURED", "reason": "no benchmark was uploaded"}
     assert _evidence_rows(held, LABELS["es"], skip=set()) == ""
+
+
+def test_report_ends_with_one_tidy_footer_bar() -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+    from quant_trade.audit.schema import AuditResult
+    from quant_trade.audit.theme import STYLE
+
+    for locale in ("es", "en"):
+        data = sample_result(locale, bootstrap_samples=60).model_dump(mode="json")
+        page = render_html(
+            AuditResult.model_validate(data), watermark=False, locale=locale, legal_links=True
+        )
+        foot = page[page.index("<div class='report-foot'>") :]
+        assert "<p class='rf-sha'><span>" in foot
+        bar = foot[foot.index("<div class='rf-bar'>") :]
+        assert bar.index("<p class='rf-brand'><b>Rigor</b>") < bar.index("<nav class='rf-links'>")
+        assert bar.count("<a ") == 3 and "class='no-print'" in bar
+        assert find_claims(foot) == []
+        bare = render_html(AuditResult.model_validate(data), watermark=False, locale=locale)
+        assert bare[bare.index("<nav class='rf-links'>") :].count("<a ") >= 1
+    assert ".rf-bar{" in STYLE and "@media print{.rf-links{display:block}" in STYLE
+
+
+def test_landing_mockup_ends_sharp() -> None:
+    from quant_trade.audit.theme import STYLE
+
+    # overflow:hidden made the hero the scroll-driven tilt's scroller, which never
+    # scrolls, so the mockup stayed tilted (and soft) forever; clip is not a scroller.
+    assert ".hero{position:relative;overflow:hidden;overflow:clip;" in STYLE
+    # The entrance fade leaves no filter behind on the text or the mockup.
+    rise = STYLE[STYLE.index(".rise{") :]
+    assert "filter" not in rise[: rise.index("}")]
+    assert "@keyframes rise{to{opacity:1;transform:none}}" in STYLE
