@@ -99,6 +99,9 @@ Limits, each written into the report as a reading warning:
   else 10,000 with a warning.
 - A CSV line longer than 32 KB (`MAX_CSV_LINE_BYTES`) is refused: no real
   export has one, and pandas takes minutes on a 5 MB line of fields.
+- An optimisation export cell placed past column 4,096 by `ss:Index`
+  (`MAX_OPTIMIZATION_COLUMNS`) ends its row: a 200-byte crafted index
+  would otherwise pad one row with hundreds of millions of empty cells.
 - XML (the optimisation export and every XLSX member) is refused when it
   declares a document type, in any encoding; a damaged, encrypted or
   size-lying workbook gets a plain "could not be read" message.
@@ -501,7 +504,11 @@ loss limits of 10, 20, 30 and 50 %, the capital needed at the backtest's
 size (reference fall / limit) and the share of the backtest's size that fits
 the file's starting balance (limit x balance / reference fall), all
 MEASURED. When the history is shorter than a year, the trades-per-year note
-says so. It raises no flag and does not change the class. Assumptions
+says so. When the reference fall is under 0.5 % of the starting balance
+(`MIN_FALL_SHARE`) the section is NOT_MEASURED: dividing by an almost-zero
+fall prints capitals near zero and sizes in the millions. A size share above
+10x (`MAX_SIZE_SHARE`) prints as "more than 10x" / "más de 10x".
+It raises no flag and does not change the class. Assumptions
 printed with it: fixed sizes (no compounding), independent trades, the
 uploaded costs, not a forecast. It is in money on closed trades, so it is a
 different measure from the percentage drawdown of the resampled risk

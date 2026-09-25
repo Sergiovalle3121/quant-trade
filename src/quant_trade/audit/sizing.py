@@ -50,6 +50,12 @@ MIN_YEAR_TRADES = 20
 MAX_YEAR_TRADES = 20_000
 MAX_CELLS = 4_000_000
 QUANTILE = 95
+#: A reference fall below this share of the starting balance is too small to
+#: size against: dividing by it prints capitals near zero and sizes in the millions.
+MIN_FALL_SHARE = 0.005
+#: Size multiples above this print as "more than 10x": past it the history
+#: says too little about a bad year for the exact figure to mean anything.
+MAX_SIZE_SHARE = 10.0
 
 RESAMPLED_NOTE = (
     "deepest fall in money over one year of trades drawn at random from the history, "
@@ -63,6 +69,10 @@ REFERENCE_NOTE = (
 PLATFORM_NOTE = "the platform's maximal drawdown in money, open trades included"
 CAPITAL_NOTE = "reference fall / loss limit, at the backtest's sizes"
 SCALE_NOTE = "loss limit x starting balance / reference fall"
+TINY_FALL_REASON = (
+    "the trades show almost no fall to size against: under half a percent of the "
+    "starting balance"
+)
 ASSUMPTIONS: dict[str, list[str]] = {
     "es": [
         "Tamaños fijos: sin interés compuesto ni cambios de tamaño tras ganar o perder.",
@@ -133,6 +143,8 @@ def capital_review(
         return {"status": "NOT_MEASURED", "reason": "the trades show no fall to size against"}
 
     balance = starting_balance if starting_balance and starting_balance > 0 else None
+    if balance is not None and reference < MIN_FALL_SHARE * balance:
+        return {"status": "NOT_MEASURED", "reason": TINY_FALL_REASON}
     rows = []
     for limit in LOSS_LIMITS:
         rows.append(
@@ -176,10 +188,13 @@ def capital_review(
     }
 
 
-def scale_text(share: float) -> str:
-    """A size share as a reader says it: ``0.35x`` or ``2.0x``."""
+def scale_text(share: float, locale: str = "en") -> str:
+    """A size share as a reader says it: ``0.35x``, ``2.0x`` or ``more than 10x``."""
     if not math.isfinite(share):
         return "—"
+    if share > MAX_SIZE_SHARE:
+        prefix = "más de" if locale == "es" else "more than"
+        return f"{prefix} {MAX_SIZE_SHARE:g}x"
     return f"{share:.2f}x" if share < 1 else f"{share:.1f}x"
 
 
@@ -187,6 +202,8 @@ __all__ = [
     "ASSUMPTIONS",
     "FULL_YEAR_DAYS",
     "LOSS_LIMITS",
+    "MAX_SIZE_SHARE",
+    "MIN_FALL_SHARE",
     "MIN_SPAN_DAYS",
     "MIN_TRADES",
     "capital_review",

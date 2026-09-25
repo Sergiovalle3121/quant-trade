@@ -3498,6 +3498,8 @@ _OPTIMIZATION_STANDARD = {
 
 #: Passes kept for the parameter-stability check.
 MAX_OPTIMIZATION_ROWS = 50_000
+#: Columns read per row of an optimisation export; cells placed past it are ignored.
+MAX_OPTIMIZATION_COLUMNS = 4_096
 
 
 def parse_optimization(data: bytes, filename: str | None = None) -> OptimizationSummary:
@@ -3534,7 +3536,12 @@ def parse_optimization(data: bytes, filename: str | None = None) -> Optimization
                     (value for key, value in cell.attrib.items() if _local(key) == "Index"), None
                 )
                 if skip_to is not None and skip_to.isdigit():
-                    while len(cells) < int(skip_to) - 1:
+                    # A crafted ss:Index="200000000" would pad the row with
+                    # millions of empty cells; no export is that wide.
+                    target = int(skip_to) if len(skip_to) <= 6 else MAX_OPTIMIZATION_COLUMNS + 1
+                    if target > MAX_OPTIMIZATION_COLUMNS:
+                        break
+                    while len(cells) < target - 1:
                         cells.append("")
                 cells.append(
                     "".join(

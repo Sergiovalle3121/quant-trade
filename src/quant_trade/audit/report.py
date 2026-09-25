@@ -2616,7 +2616,7 @@ def _capital_html(
 
     def size_text(row: dict[str, Any]) -> str:
         share = row["size_share"]["value"]
-        return sizing_scale_text(float(share)) if share is not None else "—"
+        return sizing_scale_text(float(share), locale) if share is not None else "—"
 
     # One card per loss limit: a reader compares four numbers, not a table.
     tiles = "".join(

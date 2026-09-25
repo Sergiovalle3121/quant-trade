@@ -510,6 +510,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "estirado a un año da cifras de capital demasiado inciertas para decidir con ellas",
     ),
     (
+        "the trades show almost no fall to size against: under half a percent of the "
+        "starting balance",
+        "las operaciones casi no muestran una caída con la que dimensionar: menos de medio "
+        "por ciento del balance inicial",
+    ),
+    (
         "the trades show no fall to size against",
         "las operaciones no muestran una caída con la que dimensionar",
     ),

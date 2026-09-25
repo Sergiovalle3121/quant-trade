@@ -481,3 +481,86 @@ def test_damaged_tester_header_values_are_not_declared() -> None:
             trades=None,
         )
         assert review["mismatched_chart_errors"]["evidence"] == "NOT_MEASURED", raw
+
+
+def _tiny_fall_history(loss: float) -> bytes:
+    start = datetime(2024, 1, 1)
+    rows = [
+        "Time;Type;Volume;Symbol;Price;S/L;T/P;Time;Price;Commission;Swap;Profit",
+        "2023.12.31 08:00:00;Balance;;;;;;;;;;10000",
+    ]
+    for i in range(60):
+        opened = start + timedelta(days=i * 2)
+        closed = opened + timedelta(hours=1)
+        profit = loss if i == 5 else 1.0
+        rows.append(
+            f"{opened:%Y.%m.%d %H:%M:%S};Buy;0.10;EURUSD;1.10000;;;"
+            f"{closed:%Y.%m.%d %H:%M:%S};{1.1 + profit / 10_000:.5f};0;0;{profit:.4f}"
+        )
+    return "\n".join(rows).encode()
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_almost_flat_history_gets_no_capital_figures(locale: str) -> None:
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.i18n import localize
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=_tiny_fall_history(-0.0001),
+        report_filename="history.csv",
+    )
+    result = run_audit(inputs, bootstrap_samples=30, risk_samples=200, challenge_samples=30)
+    data = result.model_dump() if hasattr(result, "model_dump") else result.to_dict()
+    assert data["capital"]["status"] == "NOT_MEASURED"
+    page = render_html(result, watermark=False, locale=locale)
+    assert "000000.0x" not in page
+    assert localize(data["capital"]["reason"], locale) != data["capital"]["reason"] or (
+        locale == "en"
+    )
+
+
+def test_a_size_share_above_ten_prints_as_more_than_ten() -> None:
+    from quant_trade.audit.sizing import scale_text
+
+    assert scale_text(0.35, "es") == "0.35x"
+    assert scale_text(9.96, "es") == "10.0x"
+    assert scale_text(124.2, "es") == "más de 10x"
+    assert scale_text(124.2, "en") == "more than 10x"
+
+
+_OPT_HEAD = (
+    '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
+    'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet '
+    'ss:Name="Tester Optimizator Results"><Table>'
+)
+
+
+def _opt_row(*values: object) -> str:
+    return "<Row>" + "".join(f"<Cell><Data>{value}</Data></Cell>" for value in values) + "</Row>"
+
+
+def test_a_crafted_optimization_cell_index_does_not_pad_millions_of_cells() -> None:
+    import time
+
+    header = _opt_row("Pass", "Result", "Profit", "Trades", "FastMA")
+    rows = "".join(_opt_row(i, 10_000 + i, i, 100, 5 + i) for i in range(12))
+    crafted = '<Row><Cell ss:Index="200000000"><Data>1</Data></Cell></Row>'
+    data = (_OPT_HEAD + header + rows + crafted + "</Table></Worksheet></Workbook>").encode()
+    started = time.perf_counter()
+    summary = importers.parse_optimization(data)
+    assert time.perf_counter() - started < 2
+    assert summary.passes == 12
+
+
+def test_the_best_pass_with_a_blank_parameter_is_not_a_crash() -> None:
+    from quant_trade.audit.plateau import parameter_stability
+
+    table = [{"Profit": float(i), "FastMA": 5.0 + i, "SlowMA": 50.0 + i % 3} for i in range(19)]
+    table.append({"Profit": 999.0, "SlowMA": 51.0})  # the best pass left FastMA blank
+    review, _ = parameter_stability(table, ["FastMA", "SlowMA"], report_inputs=None)
+    assert review["status"] == "MEASURED"
+    assert review["chosen"] == {"SlowMA": 51.0}
