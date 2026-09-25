@@ -237,6 +237,11 @@ LABELS: dict[str, dict[str, str]] = {
             "Solo cuenta operaciones cerradas: las pérdidas de las posiciones mientras seguían "
             "abiertas no entran, así que el capital necesario puede ser mayor."
         ),
+        "capital_missing": (
+            "Para calcular el capital y el tamaño, sube al menos 30 operaciones cerradas "
+            "repartidas en 3 meses o más del mismo sistema; con un año completo las cifras son "
+            "más firmes."
+        ),
         "test_data_intro": (
             "El encabezado del informe dice cómo se simularon los precios, qué parte del "
             "historial tuvo el probador y qué fechas se probaron. Es la parte que más se retoca "
@@ -659,6 +664,10 @@ LABELS: dict[str, dict[str, str]] = {
         "capital_closed_only": (
             "It counts closed trades only: losses of positions while they were still open are "
             "not included, so the capital needed may be larger."
+        ),
+        "capital_missing": (
+            "To work out the capital and the size, upload at least 30 closed trades spread "
+            "over 3 months or more of the same system; a full year makes the figures firmer."
         ),
         "test_data_intro": (
             "The report header says how prices were simulated, how much of the history the "
@@ -1120,6 +1129,8 @@ KEY_LABELS: dict[str, dict[str, str]] = {
 }
 
 #: Amounts in the account currency: always two decimals, like the platforms.
+#: Counts of observations a float only estimates: shown as the next whole one.
+COUNT_UP_KEYS = {"min_track_record_length", "observations_short_by"}
 MONEY_KEYS = {
     "chosen_result",
     "plateau_result",
@@ -1216,6 +1227,8 @@ def _fmt(value: Any, *, key: str = "") -> str:
     if isinstance(value, int):
         return f"{value:,}"
     if isinstance(value, float):
+        if key in COUNT_UP_KEYS and math.isfinite(value):
+            return f"{math.ceil(value):,}"
         if key in PERCENT_KEYS:
             return f"{value:.2%}"
         if key in MONEY_KEYS:
@@ -2465,6 +2478,13 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
     return out
 
 
+def _capital_shown(capital: dict[str, Any] | None) -> bool:
+    """The capital section shows for any file with trades, measured or not."""
+    if not capital:
+        return False
+    return capital.get("status") == "MEASURED" or capital.get("reason") != "no trades uploaded"
+
+
 def _capital_html(
     capital: dict[str, Any] | None,
     locale: str,
@@ -2479,8 +2499,13 @@ def _capital_html(
 
     ``account`` words the sizes as the account's own; ``platform_dd`` (deeper
     than ``closed_dd``) or ``closed_only`` say that open losses are left out."""
-    if not capital or capital.get("status") != "MEASURED":
+    if not capital:
         return ""
+    if capital.get("status") != "MEASURED":
+        # The hint answers "too few trades" or "too short"; not "no fall to size".
+        short = str(capital.get("reason", "")).startswith("needs ")
+        hint = f"<p class='muted'>{_e(labels['capital_missing'])}</p>" if short else ""
+        return _status_line(capital, labels) + hint
 
     def label(key: str) -> str:
         return labels.get(f"{key}_account", labels[key]) if account else labels[key]
@@ -3102,7 +3127,7 @@ def render_html(
                     ),
                 )
             ]
-            if (data.get("capital") or {}).get("status") == "MEASURED"
+            if _capital_shown(data.get("capital"))
             else []
         ),
         (
