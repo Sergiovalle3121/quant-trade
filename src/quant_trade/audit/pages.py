@@ -250,11 +250,11 @@ _COPY: dict[str, dict[str, Any]] = {
             "Si quieres, publica una página de verificación con sello para compartirla.",
         ],
         "prices_title": "Precios",
-        "price_free_title": "Vista previa: gratis",
+        "price_free_title": "Vista previa",
         "price_free": (
             "Clase de A a D, explicación de cada dimensión, gráficas, banderas rojas y hashes."
         ),
-        "price_full_title": "Informe completo: USD {price:.0f}",
+        "price_full_title": "Informe completo",
         "price_full": (
             "Todo el detalle numérico sin marca de agua, simulador de reto, riesgo remuestreado, "
             "preguntas para el vendedor y página de verificación pública con sello."
@@ -511,9 +511,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "If you want, publish a verification page with a badge to share it.",
         ],
         "prices_title": "Pricing",
-        "price_free_title": "Preview: free",
+        "price_free_title": "Preview",
         "price_free": ("A to D class, what each dimension means, charts, red flags and hashes."),
-        "price_full_title": "Full report: USD {price:.0f}",
+        "price_full_title": "Full report",
         "price_full": (
             "Every number without a watermark, challenge simulator, resampled risk, questions "
             "for the vendor and a public verification page with a badge."
@@ -639,6 +639,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_compare": "Comparar",
         "nav_menu": "Menú",
         "cta": "Empezar gratis",
+        "cta_full": "Empieza con la vista previa gratis",
         "cta_short": "Auditar",
         "hero_a": "Sube tu backtest o tu historial.",
         "hero_b": "Te decimos si es evidencia o suerte.",
@@ -668,6 +669,7 @@ _UI: dict[str, dict[str, Any]] = {
         "chip_trials": "Intentos reales desde el XML de MT5",
         "chip_hash": "Cada número con su evidencia",
         "platforms": "Lee el archivo que ya tienes",
+        "platforms_also": "Y reconoce el formato de exportación de",
         "problem_eyebrow": "El problema",
         "problem_title": ("Un backtest bonito", "no es evidencia."),
         "problem_lead": (
@@ -762,6 +764,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Pruebas de estrés: el resultado sin sus mejores operaciones",
             "La cuenta real frente a su backtest",
             "Preguntas para el vendedor del robot o el gestor",
+            "Si funciona en cada mercado o uno carga con el resto",
+            "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse",
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Página de verificación pública con sello",
         ],
@@ -821,6 +825,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_compare": "Compare",
         "nav_menu": "Menu",
         "cta": "Start free",
+        "cta_full": "Start with the free preview",
         "cta_short": "Audit",
         "hero_a": "Upload your backtest or track record.",
         "hero_b": "We tell you whether it is evidence or luck.",
@@ -850,6 +855,7 @@ _UI: dict[str, dict[str, Any]] = {
         "chip_trials": "Real trial count from the MT5 XML",
         "chip_hash": "Every number with its evidence",
         "platforms": "Reads the file you already have",
+        "platforms_also": "It also recognises the export format of",
         "problem_eyebrow": "The problem",
         "problem_title": ("A good-looking backtest", "is not evidence."),
         "problem_lead": (
@@ -943,6 +949,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Stress tests: the result without its best trades",
             "The live account against its backtest",
             "Questions to ask the robot's vendor or the manager",
+            "Whether it works on each market or one carries the rest",
+            "For funds: year-by-month calendar, worst month and time to recover",
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Public verification page with a badge",
         ],
@@ -1299,10 +1307,16 @@ def _specs(locale: str) -> str:
         for i, (value, label) in enumerate(ui["stats"])
     )
     platforms = "".join(f"<li>{_e(name)}</li>" for name in PLATFORMS)
+    recognised = PLATFORMS_ES if locale == "es" else PLATFORMS_EN
+    also = (
+        f"<p class='platforms-also'>{_e(ui['platforms_also'])} "
+        f"<a href='{_e(guide_url('csv-universal', locale))}'>{_e(recognised)}</a>.</p>"
+    )
     return (
         "<section class='dark' style='padding-bottom:clamp(88px,11vw,150px)'><div class='wrap'>"
         f"<div class='specs'>{specs}</div>"
-        f"<div class='platforms' data-reveal><p>{_e(ui['platforms'])}</p><ul>{platforms}</ul></div>"
+        f"<div class='platforms' data-reveal><p>{_e(ui['platforms'])}</p><ul>{platforms}</ul>"
+        f"{also}</div>"
         "</div></section>"
     )
 
@@ -1626,7 +1640,7 @@ def _prices_html(
             + f"<a class='btn btn-ghost' href='#subir'>{_e(ui['cta'])}</a></div>"
             f"<div class='price featured' data-reveal style='--i:1'>"
             f"<span class='ribbon'>{_e(ui['plan_badge'])}</span>"
-            f"<span class='price-name'>{_e(copy['price_full_title'].format(price=price_usd))}"
+            f"<span class='price-name'>{_e(copy['price_full_title'])}"
             f"</span><div class='price-amount'>USD {price_usd:.0f}"
             f"<small>{_e(ui['plan_full_note'])}</small></div>"
             f"<p class='muted'>{_e(copy['price_full'])}</p>"
@@ -1642,7 +1656,7 @@ def _prices_html(
                 else ""
             )
             + _checks(ui["full_items"])
-            + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta'])}</a></div></div>"
+            + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta_full'])}</a></div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
             + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"

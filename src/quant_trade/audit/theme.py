@@ -408,6 +408,9 @@ gap:14px 40px;max-width:880px}
 .platforms li{font-weight:600;font-size:1.1rem;letter-spacing:-.03em;color:var(--text-3);
 transition:color .3s}
 .platforms li:hover{color:var(--text)}
+.platforms .platforms-also{font:400 .92rem/1.6 var(--sans);letter-spacing:0;text-transform:none;
+color:var(--text-3);max-width:760px;margin:26px auto 0}
+.platforms .platforms-also a{color:var(--text-2);text-underline-offset:3px}
 .statement{font-size:clamp(1.6rem,3.2vw,2.6rem);font-weight:560;letter-spacing:-.034em;
 line-height:1.22;max-width:1000px;margin:0 0 clamp(56px,7vw,96px);color:var(--text)}
 @media (max-width:620px){.statement{font-size:1.28rem;line-height:1.35;letter-spacing:-.02em}}
