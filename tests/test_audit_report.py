@@ -164,3 +164,23 @@ def test_stress_tables_mark_scenarios_that_fall_to_zero_or_below() -> None:
         if row["result"]["value"] <= 0
     )
     assert page.count("<td class='val neg' data-l=") == below
+
+
+def test_locked_preview_links_the_full_sample_in_a_new_tab() -> None:
+    result = _result()
+    for locale, href, words in (
+        ("es", "/ejemplo", "Ver cómo es un informe completo"),
+        ("en", "/sample", "See what a full report looks like"),
+    ):
+        unpaid = render_html(
+            result,
+            watermark=True,
+            free_mode=False,
+            price_usd=29,
+            redeem_url="/audits/abc123/redeem",
+            contact_url="https://wa.me/5215550000000",
+            locale=locale,
+        )
+        assert f"<a href='{href}' target='_blank' rel='noopener'>{words}" in unpaid
+        assert "lee mal tu archivo" in unpaid if locale == "es" else "misreads your file" in unpaid
+    assert "class='lock-sample'" not in render_html(result, watermark=False, free_mode=False)
