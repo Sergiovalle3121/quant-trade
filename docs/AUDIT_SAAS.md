@@ -1155,14 +1155,21 @@ run time (`MarketData`, kept in memory for six hours, Python's default
 User-Agent because FRED stalls custom ones), never stored in the repository;
 the service reads them unless `AUDIT_PUBLIC_DATA=false`, the CLI only with
 `--public-data`, and the tests block the download (`tests/conftest.py`).
-The public data can never hold a report back: the service downloads the
-three series in a background thread when it starts (`warm`); a read has a
-total deadline of 5 seconds (`TIMEOUT`, a server that trickles bytes is cut
-off too) and a 4 MB cap; while one audit downloads a series, others use what
-is cached or nothing, without waiting; after a failure (down, slow, rate
-limited, not a CSV) the series is not asked for again for 10 minutes
-(`RETRY_AFTER`). When the closes cannot be read the section says so in one
-NOT_MEASURED line and the audit goes on.
+The public data can never hold a report back: an audit never downloads.
+`MarketData.closes` answers at once from memory (or with nothing) and, when
+the copy is missing or older than six hours, starts one background
+`refresh`; the service also downloads the three series in a background
+thread when it starts (`warm`). A download reads with `read1`, so its total
+deadline of 5 seconds (`TIMEOUT`) is checked after every receive and a server
+that trickles bytes is cut off within about one more socket timeout; replies
+are capped at 4 MB, redirects are refused (the address stays FRED's fixed
+https one), and values that are not finite are dropped. Only one refresh of
+a series runs at a time, and after a failure (down, slow, rate limited, not
+a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`).
+When the closes are not in memory the section says so in one NOT_MEASURED
+line and the audit goes on. The CLI's `--public-data` reads the three series
+first. The result JSON always carries a `holding` key: `null` when the file
+trades none of these markets or public data is off.
 
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section

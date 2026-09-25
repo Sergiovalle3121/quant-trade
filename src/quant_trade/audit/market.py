@@ -23,6 +23,7 @@ import urllib.request
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
@@ -125,22 +126,34 @@ def parse_fred_csv(text: str) -> pd.Series:
     stamps = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
     values = pd.to_numeric(frame.iloc[:, 1], errors="coerce")
     series = pd.Series(values.to_numpy(dtype=float), index=pd.DatetimeIndex(stamps))
-    series = series[series.index.notna() & series.notna() & (series > 0)]
+    series = series[series.index.notna() & np.isfinite(series) & (series > 0)]
     return series.sort_index()
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects, so a read never leaves FRED's fixed https address."""
+
+    def redirect_request(self, *args: object, **kwargs: object) -> None:
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _download(series: str) -> str:
-    """One FRED series as text, within ``TIMEOUT`` seconds in all (a server that
-    trickles bytes is cut off too) and at most ``MAX_BYTES``."""
+    """One FRED series as text, within about ``TIMEOUT`` seconds in all and at
+    most ``MAX_BYTES``. ``read1`` returns whatever one receive brings, so the
+    deadline is checked after every receive and a server that trickles bytes
+    is cut off (each receive is itself bounded by the socket timeout)."""
     url = FRED_CSV.format(series=series)
     deadline = time.monotonic() + TIMEOUT
     chunks: list[bytes] = []
     size = 0
     # Python's default User-Agent: FRED stalls some custom ones until the timeout.
-    with urllib.request.urlopen(url, timeout=TIMEOUT) as response:  # noqa: S310 (fixed https host)
+    with _OPENER.open(url, timeout=TIMEOUT) as response:
         if getattr(response, "status", 200) != 200:
             raise OSError(f"FRED answered {response.status}")
-        while chunk := response.read(64 * 1024):
+        while chunk := response.read1(64 * 1024):
             chunks.append(chunk)
             size += len(chunk)
             if size > MAX_BYTES:
@@ -151,13 +164,15 @@ def _download(series: str) -> str:
 
 
 class MarketData:
-    """Daily closes by asset key, downloaded on first use and kept in memory.
+    """Daily closes by asset key, downloaded in the background and kept in memory.
 
-    Built so the public data can never hold a report back: each read has a
-    total deadline; while one audit downloads a series, others get what is
-    cached (or nothing) at once instead of waiting; after a failure the series
-    is not asked for again for ``retry_after`` seconds; and :meth:`warm`
-    downloads every series in the background when the service starts."""
+    Built so the public data can never hold a report back: :meth:`closes`
+    never downloads; it answers at once with what is in memory (or None) and,
+    when that copy is missing or older than ``max_age``, starts one background
+    :meth:`refresh`. A refresh has a total deadline; only one runs per series
+    at a time; after a failure the series is not asked for again for
+    ``retry_after`` seconds; and :meth:`warm` downloads every series when the
+    service starts."""
 
     def __init__(
         self,
@@ -176,20 +191,31 @@ class MarketData:
         self._locks = {asset.key: threading.Lock() for asset in ASSETS}
 
     def closes(self, key: str) -> pd.Series | None:
-        """The asset's closes, or None when they cannot be read now."""
-        asset = BY_KEY.get(key)
-        if asset is None:
+        """The asset's closes in memory, or None; never waits on the network."""
+        if key not in BY_KEY:
             return None
         cached = self._cache.get(key)
         now = self._clock()
         if cached is not None and now - cached[0] < self._max_age:
             return cached[1]
-        stale = cached[1] if cached is not None else None
-        if now - self._failed.get(key, -math.inf) < self._retry_after:
-            return stale
+        if (
+            now - self._failed.get(key, -math.inf) >= self._retry_after
+            and not self._locks[key].locked()
+        ):
+            threading.Thread(
+                target=self.refresh, args=(key,), name=f"market-data-{key}", daemon=True
+            ).start()
+        return cached[1] if cached is not None else None
+
+    def refresh(self, key: str) -> bool:
+        """Download one series now (in the calling thread); False when another
+        refresh of it is running or the download failed."""
+        asset = BY_KEY.get(key)
+        if asset is None:
+            return False
         lock = self._locks[key]
         if not lock.acquire(blocking=False):
-            return stale  # another audit is downloading it: never wait
+            return False
         try:
             fetch = self._download or _download
             series = parse_fred_csv(fetch(asset.series))
@@ -197,19 +223,19 @@ class MarketData:
                 raise ValueError("FRED series has no closes")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
-            return stale
+            return False
         finally:
             lock.release()
         self._failed.pop(key, None)
         self._cache[key] = (self._clock(), series)
-        return series
+        return True
 
     def warm(self) -> threading.Thread:
         """Download every series in a background thread (at service start)."""
 
         def run() -> None:
             for asset in ASSETS:
-                self.closes(asset.key)
+                self.refresh(asset.key)
 
         thread = threading.Thread(target=run, name="market-data-warm", daemon=True)
         thread.start()

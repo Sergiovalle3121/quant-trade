@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import dataclasses
+import http.server
+import threading
+import time
+import urllib.error
 
 import numpy as np
 import pandas as pd
@@ -70,17 +74,47 @@ def test_market_data_caches_and_keeps_the_last_good_copy() -> None:
         return replies.pop()
 
     data = MarketData(fetch, max_age=100.0, clock=lambda: now[0])
+    assert data.refresh("sp500") is True and calls == ["SP500"]
     first = data.closes("sp500")
-    assert first is not None and len(first) == 2 and calls == ["SP500"]
+    assert first is not None and len(first) == 2
     assert data.closes("sp500") is first and calls == ["SP500"]
     now[0] = 500.0  # stale: FRED is down, the last good copy stays
-    assert data.closes("sp500") is first and calls == ["SP500", "SP500"]
-    assert data.closes("unknown") is None
-    assert MarketData(lambda s: "junk").closes("bitcoin") is None
+    assert data.refresh("sp500") is False and data.closes("sp500") is first
+    assert data.closes("unknown") is None and data.refresh("unknown") is False
+    assert MarketData(lambda s: "junk").refresh("bitcoin") is False
+
+
+def test_fred_csv_drops_values_that_are_not_finite() -> None:
+    series = parse_fred_csv("DATE,V\n2024-01-02,inf\n2024-01-03,10\n2024-01-04,nan\n")
+    assert list(series) == [10.0]
+
+
+def test_closes_never_waits_on_the_network() -> None:
+    """A request answers from memory at once; the download runs in the background."""
+    release = threading.Event()
+    calls: list[str] = []
+
+    def slow(series: str) -> str:
+        calls.append(series)
+        release.wait(5)
+        return "DATE,V\n2024-01-02,10\n2024-01-03,11\n"
+
+    data = MarketData(slow)
+    started = time.monotonic()
+    assert data.closes("nasdaq100") is None
+    assert data.closes("nasdaq100") is None  # the refresh already running is not doubled
+    assert time.monotonic() - started < 0.5
+    release.set()
+    for _ in range(100):
+        if data.closes("nasdaq100") is not None:
+            break
+        time.sleep(0.02)
+    assert data.closes("nasdaq100") is not None and calls == ["NASDAQ100"]
 
 
 def test_the_tests_never_reach_the_network() -> None:
-    assert MarketData().closes("sp500") is None
+    data = MarketData()
+    assert data.refresh("sp500") is False and data.closes("sp500") is None
 
 
 def test_the_service_reads_public_data_unless_turned_off() -> None:
@@ -278,7 +312,7 @@ class _Reply:
     def __exit__(self, *exc: object) -> None:
         return None
 
-    def read(self, size: int = -1) -> bytes:
+    def read1(self, size: int = -1) -> bytes:
         if self.left <= 0:
             return b""
         self.left -= 1
@@ -292,7 +326,11 @@ def _serve(monkeypatch: pytest.MonkeyPatch, reply: _Reply, step: float = 0.0) ->
         clock[0] += step
         return clock[0]
 
-    monkeypatch.setattr(market_lib.urllib.request, "urlopen", lambda url, timeout: reply)
+    class Opener:
+        def open(self, url: str, timeout: float) -> _Reply:
+            return reply
+
+    monkeypatch.setattr(market_lib, "_OPENER", Opener())
     monkeypatch.setattr(market_lib.time, "monotonic", tick)
 
 
@@ -313,7 +351,60 @@ def test_a_huge_or_failed_reply_is_refused(monkeypatch: pytest.MonkeyPatch) -> N
     assert real_download("SP500").startswith("DATE")
 
 
-def test_a_failure_is_not_retried_at_once_and_nobody_waits(monkeypatch: pytest.MonkeyPatch) -> None:
+class _Trickle(http.server.BaseHTTPRequestHandler):
+    """Promises a megabyte and sends 20 bytes every 50 ms; or redirects away."""
+
+    def do_GET(self) -> None:  # noqa: N802 (http.server's name)
+        if "redirect" in self.path:
+            self.send_response(302)
+            self.send_header("Location", "http://example.invalid/closes.csv")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Length", str(1_000_000))
+        self.end_headers()
+        try:
+            for _ in range(200):
+                self.wfile.write(b"x" * 20)
+                self.wfile.flush()
+                time.sleep(0.05)
+        except OSError:
+            pass
+
+    def log_message(self, *args: object) -> None:
+        return None
+
+
+@pytest.fixture
+def local_fred(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """A fake FRED on the loopback address (no network): trickles or redirects."""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Trickle)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(
+        market_lib, "FRED_CSV", f"http://127.0.0.1:{server.server_port}/{{series}}.csv"
+    )
+    monkeypatch.setattr(market_lib, "TIMEOUT", 0.5)
+    yield
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.mark.usefixtures("local_fred")
+def test_a_real_trickling_socket_is_cut_off_at_the_deadline() -> None:
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        real_download("SP500")
+    assert time.monotonic() - started < 2.0
+
+
+@pytest.mark.usefixtures("local_fred")
+def test_a_redirect_away_from_fred_is_refused() -> None:
+    with pytest.raises(urllib.error.HTTPError):
+        real_download("redirect")
+
+
+def test_a_failure_is_not_retried_at_once_and_nobody_waits() -> None:
     calls: list[str] = []
     now = [0.0]
 
@@ -322,16 +413,16 @@ def test_a_failure_is_not_retried_at_once_and_nobody_waits(monkeypatch: pytest.M
         return "<html>rate limited</html>"
 
     data = MarketData(fetch, retry_after=600.0, clock=lambda: now[0])
-    assert data.closes("bitcoin") is None and len(calls) == 1
+    assert data.refresh("bitcoin") is False and len(calls) == 1
     now[0] = 300.0
-    assert data.closes("bitcoin") is None and len(calls) == 1  # inside the back-off
-    now[0] = 700.0
-    assert data.closes("bitcoin") is None and len(calls) == 2
-    # Another audit downloading the series: this one gets nothing at once.
-    busy = MarketData(fetch, clock=lambda: now[0])
-    busy._locks["sp500"].acquire()
-    assert busy.closes("sp500") is None and len(calls) == 2
-    busy._locks["sp500"].release()
+    assert data.closes("bitcoin") is None
+    time.sleep(0.1)
+    assert len(calls) == 1  # inside the back-off: no new download started
+    # Another refresh of the series already running: this one returns at once.
+    data._locks["sp500"].acquire()
+    assert data.refresh("sp500") is False and data.closes("sp500") is None
+    assert len(calls) == 1
+    data._locks["sp500"].release()
 
 
 def test_warm_downloads_every_series_in_the_background() -> None:

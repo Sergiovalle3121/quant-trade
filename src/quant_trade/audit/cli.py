@@ -10,10 +10,12 @@ depends on it.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
+import pandas as pd
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -46,6 +48,13 @@ audit_app.add_typer(codes_app, name="codes")
 
 AUDIT_JSON = "audit.json"
 REPORT_HTML = "report.html"
+
+
+def _public_market() -> Callable[[str], pd.Series | None]:
+    """Public closes for one CLI run: every series read first, within the deadline."""
+    data = MarketData()
+    data.warm().join(timeout=40.0)  # three series, each cut off within about 10 s
+    return data.closes
 
 
 def _read(path: Path | None, *, what: str) -> bytes | None:
@@ -167,7 +176,7 @@ def run(
         seed=seed,
         bootstrap_samples=bootstrap_samples,
         now=datetime.now(UTC),
-        market=MarketData().closes if public_data else None,
+        market=_public_market() if public_data else None,
     )
     html_text, json_text = render(result, watermark=not paid, free_mode=True)
     output_dir.mkdir(parents=True, exist_ok=True)
