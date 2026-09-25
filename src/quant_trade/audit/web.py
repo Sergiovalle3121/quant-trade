@@ -60,6 +60,7 @@ from quant_trade.audit.pages import (
     guides_index_page,
     landing,
     legal_page,
+    method_page,
     sample_meta,
     verification_page,
 )
@@ -1421,6 +1422,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/guias", response_class=HTMLResponse)
     def guides_es(request: Request, lang: str | None = None) -> str:
         return guides_index_page(locale=_locale(lang or "es"), base_url=_site_url(request))
+
+    @app.get("/metodologia", response_class=HTMLResponse)
+    def method_es(request: Request, lang: str | None = None) -> str:
+        return method_page(locale=_locale(lang or "es"), base_url=_site_url(request))
+
+    @app.get("/methodology", response_class=HTMLResponse)
+    def method_en(request: Request, lang: str | None = None) -> str:
+        return method_page(locale=_locale(lang or "en"), base_url=_site_url(request))
 
     @app.get("/guides", response_class=HTMLResponse)
     def guides_en(request: Request, lang: str | None = None) -> str:
