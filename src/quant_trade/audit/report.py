@@ -73,6 +73,9 @@ DISCLAIMER = {
     ),
 }
 
+#: The full sample report, linked from a locked preview.
+SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample"}
+
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
@@ -113,6 +116,11 @@ LABELS: dict[str, dict[str, str]] = {
         "expected_max": "Sharpe máximo esperado sin habilidad",
         "dsr": "Sharpe deflactado (DSR)",
         "multiplier": "Multiplicador",
+        "cost_recomputed": (
+            "Esta tabla recalcula cada operación con sus precios y su tamaño: sin coste "
+            "extra da {table}, {gap} de diferencia con el resultado neto de las operaciones "
+            "({trades}), por el redondeo de precios o la conversión de divisa."
+        ),
         "bps": "pb por lado",
         "gross": "Bruto",
         "cost": "Coste",
@@ -262,7 +270,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_limit": "Si aceptas perder hasta",
         "capital_needed": "Capital necesario al tamaño del backtest",
-        "capital_scale": "Tamaño sobre un balance de {balance}",
+        "capital_scale": "Tamaño sobre el balance inicial del archivo ({balance})",
         "capital_scale_plain": "Tamaño sobre el balance inicial",
         "capital_scale_help": (
             "1x es el tamaño de lote del backtest; 0.50x es la mitad. Por encima de 1x la "
@@ -348,7 +356,10 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_early": "Media por operación antes del {date}",
         "recent_late": "Media por operación desde el {date}",
         "recent_net": "Resultado neto desde el {date} ({n} operaciones)",
-        "recent_z": "Distancia entre ambas medias, en errores estándar",
+        "recent_z": (
+            "Distancia entre ambas medias, en errores estándar (-2 o menos: una caída "
+            "que el azar difícilmente explica)"
+        ),
         "recent_held": (
             "El último tercio del historial no muestra una caída a pérdidas que el azar no "
             "explique."
@@ -367,6 +378,7 @@ LABELS: dict[str, dict[str, str]] = {
             "pequeña. No cambia la clase: son preguntas para hacer."
         ),
         "fund_year": "Año",
+        "fund_total": "Total",
         "fund_months": "Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic",
         "fund_cagr": "Rentabilidad anual compuesta",
         "fund_vol": "Volatilidad anual",
@@ -594,8 +606,8 @@ LABELS: dict[str, dict[str, str]] = {
         "boot_line": "Bootstrap estacionario por bloques, remuestreos:",
         "boot_block": "bloque",
         "point": "Estimación",
-        "engine": "motor",
-        "seed": "semilla",
+        "engine": "versión del motor",
+        "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
         "keep_link": (
             "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
@@ -666,13 +678,16 @@ LABELS: dict[str, dict[str, str]] = {
             "El veredicto, las gráficas y las explicaciones son gratis. El detalle numérico de "
             "estas secciones se entrega en el informe completo"
         ),
+        "sample_full": "Ver cómo es un informe completo (ejemplo con datos sintéticos)",
         "trade_stats": "Estadísticas de las operaciones",
         "long": "Largos",
         "short": "Cortos",
         "risk": "Riesgo remuestreado a un año",
         "risk_dd": "Drawdown máximo a un año",
         "risk_prob": "Probabilidad de una caída de al menos",
-        "risk_underwater": "Periodos seguidos bajo el máximo",
+        "risk_underwater": "Periodos seguidos bajo el máximo, en las simulaciones",
+        "risk_under_median": "mediana",
+        "risk_under_p95": "en 1 de cada 20",
         "challenge": "Simulador de reto de prop firm",
         "challenge_rules": "Reglas simuladas",
         "open_loss_badge": "Pérdidas abiertas",
@@ -703,6 +718,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Banderas rojas detectadas",
         "report_source": "Formato del archivo",
         "platform": "Datos que declara la plataforma",
+        "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
         "trials_used": "Intentos usados en el Sharpe deflactado",
@@ -791,6 +807,11 @@ LABELS: dict[str, dict[str, str]] = {
         "expected_max": "Expected max Sharpe without skill",
         "dsr": "Deflated Sharpe (DSR)",
         "multiplier": "Multiplier",
+        "cost_recomputed": (
+            "This table recomputes each trade from its prices and size: with no extra cost "
+            "it gives {table}, {gap} away from the trades' net result ({trades}), from "
+            "price rounding or currency conversion."
+        ),
         "bps": "bps per side",
         "gross": "Gross",
         "cost": "Cost",
@@ -937,7 +958,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_limit": "If you accept losing up to",
         "capital_needed": "Capital needed at the backtest's size",
-        "capital_scale": "Size on a {balance} balance",
+        "capital_scale": "Size on the file's starting balance ({balance})",
         "capital_scale_plain": "Size on the starting balance",
         "capital_scale_help": (
             "1x is the backtest's lot size; 0.50x is half of it. Above 1x the fall in money "
@@ -1018,7 +1039,10 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_early": "Average per trade before {date}",
         "recent_late": "Average per trade since {date}",
         "recent_net": "Net result since {date} ({n} trades)",
-        "recent_z": "Distance between the two averages, in standard errors",
+        "recent_z": (
+            "Distance between the two averages, in standard errors (-2 or lower: a drop "
+            "chance hardly explains)"
+        ),
         "recent_held": (
             "The last third of the history shows no drop into losses beyond what chance explains."
         ),
@@ -1036,6 +1060,7 @@ LABELS: dict[str, dict[str, str]] = {
             "not change the class: these are questions to ask."
         ),
         "fund_year": "Year",
+        "fund_total": "Full year",
         "fund_months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
         "fund_cagr": "Compound annual return",
         "fund_vol": "Annual volatility",
@@ -1254,8 +1279,8 @@ LABELS: dict[str, dict[str, str]] = {
         "boot_line": "Stationary block bootstrap, resamples:",
         "boot_block": "block",
         "point": "Estimate",
-        "engine": "engine",
-        "seed": "seed",
+        "engine": "engine version",
+        "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
         "keep_link": (
             "Save this page's link: it is the only way back to your report. "
@@ -1322,13 +1347,16 @@ LABELS: dict[str, dict[str, str]] = {
             "The verdict, charts and explanations are free. The numeric detail of these "
             "sections comes with the full report"
         ),
+        "sample_full": "See what a full report looks like (sample built from synthetic data)",
         "trade_stats": "Trade statistics",
         "long": "Long",
         "short": "Short",
         "risk": "Resampled one-year risk",
         "risk_dd": "Maximum drawdown over one year",
         "risk_prob": "Probability of a fall of at least",
-        "risk_underwater": "Consecutive periods below the peak",
+        "risk_underwater": "Consecutive periods below the peak, in the simulations",
+        "risk_under_median": "median",
+        "risk_under_p95": "in 1 of every 20",
         "challenge": "Prop-firm challenge simulator",
         "challenge_rules": "Rules simulated",
         "open_loss_badge": "Open losses",
@@ -1359,6 +1387,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Red flags found",
         "report_source": "File format",
         "platform": "Figures the platform states",
+        "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
         "trials_used": "Trials used in the deflated Sharpe",
@@ -2553,10 +2582,29 @@ def _risk_html(
         )
         under = risk["longest_underwater_periods"]
         html_text += (
-            f"<p>{_e(labels['risk_underwater'])}: p50 {_value_cell(under['p50'], percent=False)}"
-            f", p95 {_value_cell(under['p95'], percent=False)}</p>"
+            f"<p>{_e(labels['risk_underwater'])}: {_e(labels['risk_under_median'])} "
+            f"{_value_cell(under['p50'], percent=False)}, {_e(labels['risk_under_p95'])} "
+            f"{_value_cell(under['p95'], percent=False)}</p>"
         )
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
+
+
+def _cost_gap_note(
+    rows: list[dict[str, Any]], stats: dict[str, Any], labels: dict[str, str]
+) -> str:
+    """Say why the cost table's no-extra-cost row can differ from the trade net."""
+    base = next((row for row in rows if float(row.get("multiplier", -1)) == 0.0), None)
+    trades_net = _ev_value(stats.get("net_pnl"))
+    table_net = _ev_value((base or {}).get("net_pnl"))
+    if trades_net is None or table_net is None or abs(table_net - trades_net) < 0.005:
+        return ""
+    return "<p class='muted'>" + _e(
+        labels["cost_recomputed"].format(
+            table=_fmt(table_net, key="net_pnl"),
+            gap=_fmt(abs(table_net - trades_net), key="net_pnl"),
+            trades=_fmt(trades_net, key="net_pnl"),
+        )
+    ) + "</p>"
 
 
 def _open_loss_note(
@@ -2668,7 +2716,9 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
             f"<p>{_e(labels['optimization'])}: {_fmt(passes['value'])} {_e(labels['passes'])} "
             f"{_badge(passes['evidence'])}</p>"
         )
-    metadata = inputs.get("report_metadata") or {}
+    metadata = dict(inputs.get("report_metadata") or {})
+    out += _column_map_html(metadata, labels)
+    metadata = {k: v for k, v in metadata.items() if not k.startswith("column_")}
     if metadata:
         out += (
             f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
@@ -2680,6 +2730,29 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
             + "</table>"
         )
     return out
+
+
+def _column_map_html(metadata: dict[str, Any], labels: dict[str, str]) -> str:
+    """Which of the customer's columns was read as what, one column per row."""
+    locale = _locale_of(labels)
+    order = [key for key in PLATFORM_LABELS["en"] if key.startswith("column_")]
+    keys = sorted(
+        (key for key in metadata if key.startswith("column_")),
+        key=lambda key: order.index(key) if key in order else len(order),
+    )
+    if not keys:
+        return ""
+    rows = []
+    for key in keys:
+        # "Columna leída como precio de entrada" -> "precio de entrada".
+        field = platform_label(key, locale).rpartition(" como " if locale == "es" else " as ")[2]
+        rows.append(
+            f"<li><code>{_e(metadata[key])}</code>{icon('arrow')}<span>{_e(field)}</span></li>"
+        )
+    return (
+        f"<div class='colmap'><p class='colmap-title'>{_e(labels['colmap'])}</p>"
+        f"<ul class='colmap-list'>{''.join(rows)}</ul></div>"
+    )
 
 
 def _other(locale: str) -> str:
@@ -3644,8 +3717,9 @@ def _fund_calendar(years: list[dict[str, Any]], labels: dict[str, str]) -> str:
         )
     return (
         "<div class='fund-cal-wrap'><table class='fund-cal'>"
-        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}<th>{_e(labels['fund_year'])}</th>"
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}"
+        f"<th class='tot'>{_e(labels['fund_total'])}</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -4208,6 +4282,7 @@ def render_html(
             )
             + "</table></div>"
         )
+        cost_html += _cost_gap_note(cost["rows"], data.get("trade_stats") or {}, labels)
 
     bench_html = _status_line(data["benchmark"], labels) + _evidence_rows(
         data["benchmark"], labels, skip=set()
@@ -4443,12 +4518,16 @@ def render_html(
         (labels["red_flags"], flags_html),
     ]
     if locked:
+        # The sample opens in a new tab: the report's link is the buyer's only way back.
+        sample_href = SAMPLE_PATHS.get(locale, SAMPLE_PATHS["es"])
         detail_html = (
             f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
             + "".join(
                 f"<li>{_e(title)}</li>" for title, body in detail if not _only_unmeasured(body)
             )
-            + f"</ul>{paybox}</div>"
+            + "</ul>"
+            f"<p class='lock-sample'><a href='{sample_href}' target='_blank' rel='noopener'>"
+            f"{_e(labels['sample_full'])}</a></p>{paybox}</div>"
         )
     else:
         detail_html = "".join(
@@ -4495,8 +4574,7 @@ def render_html(
     meta = (
         f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
         f"<span>{_e(labels['generated'])} {_e(_short_time(data['generated_at_utc']))}</span>"
-        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['name'])} "
-        f"{_e(engine['package_version'])}</span>"
+        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['package_version'])}</span>"
         f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
     live_anchor = next(
@@ -4657,9 +4735,7 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
         )
     link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_live_link'])}</a>" if anchor else ""
     tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
-    return (
-        f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
-    )
+    return f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
 
 
 def _next_steps_html(

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -36,11 +37,20 @@ from quant_trade.audit.store import (
     Store,
 )
 
+logger = logging.getLogger("quant_trade.audit.payments")
+
 PLAN_SINGLE = "single"
 PLAN_PACK = "pack"
 PLANS = (PLAN_SINGLE, PLAN_PACK)
-#: Checkout session statuses that mean the money is on its way.
-PAID_STATUSES = ("paid", "no_payment_required")
+#: The only Checkout status that unlocks anything: a 100%-off session reads
+#: ``no_payment_required`` and is refused (access codes cover free reports).
+PAID_STATUSES = ("paid",)
+#: Metadata only Rigor's own sessions and Payment Links carry. Stripe copies a
+#: link's metadata onto its sessions, so a paid session from any other link or
+#: app on the same Stripe account never unlocks a report.
+APP_KEY = "app"
+APP_MARKER = "rigor"
+CURRENCY = "usd"
 #: Stripe Checkout session ids start with this; code-paid audits carry ``code:``.
 SESSION_PREFIX = "cs_"
 
@@ -128,7 +138,7 @@ def checkout_params(
             },
             "quantity": 1,
         }
-    metadata = {"audit_id": audit_id, "plan": plan}
+    metadata = {"audit_id": audit_id, "plan": plan, APP_KEY: APP_MARKER}
     return {
         "mode": "payment",
         "line_items": [line],
@@ -166,6 +176,45 @@ def stripe_session(settings: AuditSettings, session_id: str) -> dict[str, Any]:
     return _plain(session)
 
 
+def refusal(settings: AuditSettings, session: Mapping[str, Any], plan: str) -> str | None:
+    """Why a paid session is not Rigor's own full payment for ``plan``; ``None`` if it is.
+
+    The buyer controls ``client_reference_id`` through the link URL, so the
+    amount, the currency and Rigor's marker are what tie a payment to a plan:
+    a cheaper link, another app's link or a single-report price never unlock
+    a pack or a report.
+    """
+    if plan not in PLANS:
+        return "unknown plan"
+    metadata = session.get("metadata") or {}
+    if metadata.get(APP_KEY) != APP_MARKER:
+        return "no Rigor marker"
+    # Since Stripe API 2025-03-31 a session paid in the buyer's own currency
+    # (Adaptive Pricing) still reads in USD, with the local amount under
+    # ``presentment_details``. Older API versions put the local currency on
+    # the session and the USD amount under ``currency_conversion``.
+    source = session.get("currency_conversion") or session
+    currency = source.get("source_currency") or source.get("currency")
+    if str(currency or "").lower() != CURRENCY:
+        return "not USD"
+    amount = source.get("amount_total")
+    if isinstance(amount, bool) or not isinstance(amount, int):
+        return "no amount"
+    if not amount >= plan_price_cents(settings, plan) > 0:
+        return "below the plan price"
+    return None
+
+
+def paid_in_full(settings: AuditSettings, session: Mapping[str, Any], plan: str) -> bool:
+    """Whether a session is Rigor's own and paid at least the plan's price in USD."""
+    return refusal(settings, session, plan) is None
+
+
+def _safe(value: str) -> str:
+    """An id for a log line: no line breaks or odd characters from a URL."""
+    return "".join(ch for ch in value[:80] if ch.isalnum() or ch in "_-") or "-"
+
+
 def fulfil(
     store: Store, settings: AuditSettings, session: Mapping[str, Any], *, at: datetime
 ) -> str | None:
@@ -182,13 +231,26 @@ def fulfil(
     # metadata; a Payment Link carries it as ``client_reference_id``.
     audit_id = str(metadata.get("audit_id") or session.get("client_reference_id") or "")
     plan = str(metadata.get("plan") or PLAN_SINGLE)
+    reason: str | None
     if not session_id.startswith(SESSION_PREFIX) or not audit_id:
-        return None
+        reason = "no Checkout session or no audit id"
     # Anyone can pay a test-mode checkout with Stripe's public test card, so
     # a test payment unlocks only an audit listed for testing.
-    if session.get("livemode") is not True and audit_id not in settings.stripe_test_audits:
-        return None
-    if store.get_audit(audit_id) is None:
+    elif session.get("livemode") is not True and audit_id not in settings.stripe_test_audits:
+        reason = "test payment for an audit not listed for testing"
+    elif store.get_audit(audit_id) is None:
+        reason = "unknown audit"
+    else:
+        reason = refusal(settings, session, plan)
+    if reason is not None:
+        # A charged buyer who stays locked must leave a trace; ids only, never
+        # an amount, an email or a card detail.
+        logger.warning(
+            "paid Stripe session %s refused for audit %s: %s",
+            _safe(session_id),
+            _safe(audit_id),
+            reason,
+        )
         return None
     store.mark_paid(audit_id, stripe_session_id=session_id, at=at)
     if plan == PLAN_PACK and settings.stripe_webhook_secret:
@@ -215,6 +277,8 @@ def pack_for(store: Store, settings: AuditSettings, session_id: str | None) -> t
 
 
 __all__ = [
+    "APP_KEY",
+    "APP_MARKER",
     "PAID_STATUSES",
     "PLANS",
     "PLAN_PACK",
@@ -227,7 +291,9 @@ __all__ = [
     "fulfil",
     "pack_code",
     "pack_for",
+    "paid_in_full",
     "plan_price_cents",
+    "refusal",
     "stripe_checkout",
     "stripe_session",
 ]

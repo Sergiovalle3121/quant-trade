@@ -354,7 +354,8 @@ def test_workbook_curve_in_the_main_box_is_audited_as_a_curve(tmp_path: Path) ->
 def test_report_over_the_old_5_mb_limit_is_accepted(tmp_path: Path) -> None:
     from quant_trade.audit.schema import MAX_REPORT_BYTES, MAX_UPLOAD_BYTES
 
-    report = synthetic_mt5_report(6_500)  # UTF-16, like the terminal writes it
+    # UTF-16, like the terminal writes it; 6 500 business days end in 2020, not the future.
+    report = synthetic_mt5_report(6_500, start="1995-01-02")
     assert MAX_UPLOAD_BYTES < len(report) < MAX_REPORT_BYTES
     assert len(import_report(report, "ReportTester.html").trades.trades) == 6_500
     response = _app_client(tmp_path).post(

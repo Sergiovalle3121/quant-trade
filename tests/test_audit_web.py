@@ -303,7 +303,9 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
                     "id": "cs_test_1",
                     "payment_status": "paid",
                     "livemode": True,
-                    "metadata": {"audit_id": audit_id},
+                    "currency": "usd",
+                    "amount_total": 4900,
+                    "metadata": {"audit_id": audit_id, "app": "rigor"},
                 }
             },
         }

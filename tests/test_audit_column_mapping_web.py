@@ -72,7 +72,8 @@ def test_a_journal_nobody_knows_is_audited_with_the_customers_mapping(tmp_path: 
     assert posted.status_code == 303, posted.text[:500]
     report = client.get(posted.headers["location"])
     assert report.status_code == 200
-    assert "Columna leída como resultado" in report.text and "Gané" in report.text
+    # The column map shows the customer's own column beside what it was read as.
+    assert "<li><code>Gané</code><svg" in report.text and "<span>resultado</span>" in report.text
 
 
 def test_a_mapped_column_missing_from_the_file_is_named(tmp_path: Path) -> None:
