@@ -122,6 +122,7 @@ ICONS: dict[str, str] = {
     "chat": "<path d='M4 19l1.4-4.2A8 8 0 1112 20a8 8 0 01-3.9-1z'/>",
     "arrow": "<path d='M5 12h14M13 6l6 6-6 6'/>",
     "card": "<rect x='3' y='5.5' width='18' height='13' rx='2.5'/><path d='M3 10h18M7 15h4'/>",
+    "minus": "<path d='M6 12h12'/>",
     "lock": "<rect x='5' y='11' width='14' height='10' rx='2'/><path d='M8 11V8a4 4 0 018 0v3'/>",
     "print": (
         "<path d='M7 9V3h10v6'/><rect x='3' y='9' width='18' height='8' rx='2'/>"
@@ -677,6 +678,32 @@ margin-bottom:34px}
 border-radius:999px;border:0;background:#f4f4f6;color:#000;font:560 .8rem var(--sans);cursor:pointer;
 transition:opacity .2s}
 .print-btn:hover{opacity:.86}
+.mdims{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 0}
+.mdim{background:#fff;border:1px solid var(--border);border-radius:18px;padding:22px;display:flex;flex-direction:column}
+.mdim .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#0a0a0b;color:#fff;margin-bottom:14px}
+.mdim .icon svg{width:19px;height:19px}
+.mdim h3{margin:0 0 6px;font-size:1.05rem;letter-spacing:-.02em}
+.mdim>p{margin:0;color:var(--text-2);font-size:.92rem;line-height:1.55}
+.mdim-rule{margin-top:auto;padding-top:14px}.mdim-rule span{display:block;font:500 .66rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin:6px 0 6px;padding-top:12px;border-top:1px solid var(--border)}
+.mdim-rule p{margin:0;font-size:.9rem;font-weight:500;color:var(--text)}
+.mtags{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:10px}
+.mtags li{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 16px}
+.mtags .badge{flex:none;min-width:128px;justify-content:center}
+.chips{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-wrap:wrap;gap:8px}
+.chips li{background:#fff;border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:.84rem;color:var(--text-2)}
+.checks.nots svg{color:#dc2626}
+.acct-flags{margin:14px 0 18px}.flag-list.acct-flags li{align-items:flex-start;flex-wrap:nowrap}.acct-flags li .badge{flex:none;margin-top:2px}.acct-flags b{display:block;font-weight:600}.acct-flags p{margin:4px 0 0;color:var(--text-2);font-size:.92rem;line-height:1.5}
+@media (max-width:620px){.flag-list.acct-flags li{flex-direction:column;gap:8px}.paper table.metrics.ev{overflow:visible;border:0;background:none;box-shadow:none}.metrics.ev colgroup,.metrics.ev thead{display:none}.metrics.ev tbody{display:grid;gap:8px}.metrics.ev tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px}.metrics.ev td{border:0!important;padding:0!important;width:auto!important;min-width:0!important}.metrics.ev td.val{padding-right:0!important}.metrics.ev td:nth-child(3){grid-column:1/-1}.metrics.ev td:nth-child(4){grid-column:1/-1;color:var(--text-2);font-size:.86rem}.metrics.ev td:nth-child(4):empty{display:none}}
+.investor{margin-top:18px;display:grid;grid-template-columns:1.4fr 1fr;gap:36px;align-items:center;padding:clamp(24px,4vw,44px);border-radius:24px;background:#fff;border:1px solid var(--border);box-shadow:0 20px 50px -35px rgba(0,0,0,.35)}
+.investor h3{font-size:clamp(1.5rem,2.6vw,2rem);letter-spacing:-.04em;line-height:1.1;margin:14px 0 12px}
+.investor p{color:var(--text-2);margin:0 0 22px;line-height:1.6}
+.investor .eyebrow{color:var(--text-3)}
+.investor .checks{margin:0}
+@media (max-width:760px){.investor{grid-template-columns:1fr;gap:22px}}
+ul.mtags,ul.chips,ol.ladder{padding:0!important;margin-left:0!important}.mtags li,.chips li,.ladder li{margin:0!important}
+.refs li{margin:0 0 8px;color:var(--text-2)}
+@media (max-width:760px){.mdims{grid-template-columns:1fr}.mtags li{flex-direction:column;align-items:flex-start;gap:8px}.mtags .badge{min-width:0}}
+.method-link{text-align:center;margin:18px 0 0}.method-link a{display:inline-flex;align-items:center;gap:8px;color:var(--text-2);text-decoration:none;font-size:.92rem}.method-link a:hover{color:#fff}.method-link svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2}
 .ladder{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:10px}
 .rung{display:grid;grid-template-columns:44px 1fr auto;gap:18px;align-items:center;padding:16px 20px;border-radius:16px;background:#fff;border:1px solid rgba(0,0,0,.08);color:#52525b}
 .rung p{margin:0;font-size:.95rem;line-height:1.5}
