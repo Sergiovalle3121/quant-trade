@@ -13,9 +13,10 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
 
-from audit_fixtures import csv_bytes, positive_drift  # noqa: E402
+from audit_fixtures import csv_bytes, positive_drift, signed_in  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from quant_trade.audit import accounts  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.payments import (  # noqa: E402
     PLAN_PACK,
@@ -56,7 +57,7 @@ def _settings(tmp_path: Path, **overrides: Any) -> AuditSettings:
 
 def _client(tmp_path: Path, **overrides: Any) -> TestClient:
     settings = _settings(tmp_path, **overrides)
-    return TestClient(create_app(settings, make_store(settings.database_url)))
+    return signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
 
 
 def _upload(client: TestClient) -> tuple[str, str]:
@@ -163,7 +164,7 @@ def test_pack_code_is_stable_secret_bound_and_well_formed() -> None:
 # -- fulfilment ------------------------------------------------------------------
 def test_fulfil_is_idempotent_and_needs_a_paid_session(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
-    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    client = signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
     audit_id, _ = _upload(client)
     store = client.app.state.store
 
@@ -279,7 +280,11 @@ def test_cancelled_checkout_says_nothing_was_charged(tmp_path: Path) -> None:
     assert "nothing was charged" in page and "class='lockbox'" in page
 
 
-def test_pack_paid_by_card_shows_a_code_that_unlocks_two_more_reports(tmp_path: Path) -> None:
+def test_pack_paid_by_card_shows_a_code_that_unlocks_two_more_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Four uploads: more than a month's free previews, which is not what this checks.
+    monkeypatch.setattr(accounts, "FREE_PREVIEWS_PER_MONTH", 10)
     client = _client(tmp_path)
     audit_id, token = _upload(client)
     session = _session(audit_id, plan=PLAN_PACK, sid="cs_pack_1")
@@ -339,11 +344,11 @@ def test_a_test_mode_key_offers_no_card_and_a_test_payment_unlocks_nothing(
 
 def test_a_listed_test_audit_can_be_paid_in_test_mode(tmp_path: Path) -> None:
     settings = _settings(tmp_path, stripe_secret_key="sk_test_x")
-    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    client = signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
     audit_id, _ = _upload(client)
     other_id, _ = _upload(client)
     listed = _settings(tmp_path, stripe_secret_key="sk_test_x", stripe_test_audits={audit_id})
-    listed_client = TestClient(create_app(listed, make_store(listed.database_url)))
+    listed_client = signed_in(TestClient(create_app(listed, make_store(listed.database_url))))
     assert listed.card_for(audit_id) and not listed.card_for(other_id)
     assert _webhook(listed_client, _session(audit_id, livemode=False)) == 200
     assert _webhook(listed_client, _session(other_id, sid="cs_2", livemode=False)) == 200
@@ -447,7 +452,7 @@ def test_a_session_that_is_not_a_full_rigor_payment_unlocks_nothing(
 
 def test_a_single_report_price_never_grants_a_pack(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
-    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    client = signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
     audit_id, _ = _upload(client)
     store = client.app.state.store
     cheap_pack = _session(audit_id, plan=PLAN_PACK, amount_total=PAID[PLAN_SINGLE])

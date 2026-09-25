@@ -630,7 +630,9 @@ def _nul_client(tmp_path: Path):
         admin_key="k" * 40,
     )
     store = make_store(settings.database_url)
-    return TestClient(create_app(settings, store)), store
+    from audit_fixtures import signed_in
+
+    return signed_in(TestClient(create_app(settings, store))), store
 
 
 def test_a_nul_byte_in_a_report_never_reaches_the_database(tmp_path: Path) -> None:

@@ -20,6 +20,7 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 
+from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
@@ -291,9 +292,20 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             (
                 "Your account",
                 (
-                    "The account is optional: the preview and each report's private link "
-                    "work without it. It shows your reports, credits and purchases in one "
-                    "place.",
+                    (
+                        f"The free preview needs an account: {FREE_PREVIEWS_PER_MONTH} a "
+                        "calendar month per account, also counted per network address. Past "
+                        "that, each file is a paid report. "
+                        + (
+                            "A report paid with an access code works without an account. "
+                            if ctx.access_codes
+                            else ""
+                        )
+                        + "Each report's private link works without an account."
+                        if not ctx.free_mode
+                        else "The account is optional while the service is in free mode."
+                    ),
+                    "The account shows your reports, credits and purchases in one place.",
                     "You are responsible for your password. If you forget it, we send you a "
                     "one-time link after checking that you write from the account's e-mail. "
                     "You can delete the account at any time from its page.",
@@ -402,9 +414,21 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         (
             "Tu cuenta",
             (
-                "La cuenta es opcional: la vista previa y el enlace privado de cada informe "
-                "funcionan sin ella. Sirve para ver en un solo lugar tus informes, tus créditos "
-                "y tus compras.",
+                (
+                    f"La vista previa gratis necesita una cuenta: {FREE_PREVIEWS_PER_MONTH} por "
+                    "mes calendario y por cuenta, contadas también por dirección de red. Pasado "
+                    "ese número, cada archivo es un informe de pago. "
+                    + (
+                        "Un informe pagado con código de acceso funciona sin cuenta. "
+                        if ctx.access_codes
+                        else ""
+                    )
+                    + "El enlace privado de cada informe funciona sin cuenta."
+                    if not ctx.free_mode
+                    else "La cuenta es opcional mientras el servicio está en modo gratuito."
+                ),
+                "La cuenta sirve para ver en un solo lugar tus informes, tus créditos y tus "
+                "compras.",
                 "Eres responsable de tu contraseña. Si la olvidas, te enviamos un enlace de un "
                 "solo uso después de comprobar que nos escribes desde el correo de la cuenta. "
                 "Puedes borrar la cuenta cuando quieras desde su página.",
@@ -532,6 +556,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "password (never the password), which reports and access codes are on it, "
                     "and a hash of each sign-in session. There is no e-mail check yet and we "
                     "send no e-mail.",
+                    "To count free previews: which account used each one, when, and the "
+                    "network address it came from. The address is cleared with the rest "
+                    f"after {days} days.",
                 ),
             ),
             (
@@ -638,6 +665,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Si creas una cuenta: tu correo, un hash scrypt de tu contraseña (nunca la "
                 "contraseña), qué informes y códigos de acceso tiene y un hash de cada sesión "
                 "iniciada. Todavía no comprobamos el correo ni enviamos correos.",
+                "Para contar las vistas previas gratis: qué cuenta usó cada una, cuándo y "
+                f"desde qué dirección de red. La dirección se borra con lo demás a los {days} "
+                "días.",
             ),
         ),
         (

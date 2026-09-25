@@ -355,6 +355,17 @@ class Store:
             sa.Column("expires_at", sa.String(40), nullable=False),
             sa.Column("used_at", sa.String(40)),
         )
+        #: Free previews an account used, to count them per calendar month.
+        #: The address is kept only for the per-network monthly limit and is
+        #: cleared by the retention purge like the audit's own.
+        self.free_previews = sa.Table(
+            "free_previews",
+            self.metadata,
+            sa.Column("audit_id", sa.String(32), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
+            sa.Column("created_at", sa.String(40), nullable=False, index=True),
+        )
         self.metadata.create_all(self.engine)
 
     # -- audits ------------------------------------------------------------
@@ -1210,6 +1221,48 @@ class Store:
         record = self.get_access_code(code)
         return record.id if record else None
 
+    def code_usable(self, code: str, at: datetime) -> bool:
+        """Whether a typed code exists and can still unlock a report."""
+        record = self.get_access_code(code) if code else None
+        return (
+            record is not None
+            and not record.disabled
+            and record.credits_left > 0
+            and (record.expires_at is None or record.expires_at > _iso(at))
+        )
+
+    # -- free previews -----------------------------------------------------
+    def record_free_preview(
+        self, audit_id: str, account_id: str, *, client_ip: str, at: datetime
+    ) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.free_previews.insert().values(
+                    audit_id=audit_id,
+                    account_id=account_id,
+                    client_ip=client_ip[:64],
+                    created_at=_iso(at),
+                )
+            )
+
+    def free_previews_since(
+        self, since: datetime, *, account_id: str = "", client_ip: str = ""
+    ) -> int:
+        """Free previews since ``since``, for one account or one address."""
+        sa = self._sa
+        table = self.free_previews
+        query = (
+            sa.select(sa.func.count()).select_from(table).where(table.c.created_at >= _iso(since))
+        )
+        if account_id:
+            query = query.where(table.c.account_id == account_id)
+        elif client_ip:
+            query = query.where(table.c.client_ip == client_ip)
+        else:
+            return 0
+        with self.engine.connect() as conn:
+            return int(conn.execute(query).scalar() or 0)
+
     def account_audits_list(self, account_id: str) -> list[AccountAudit]:
         """The account's reports, newest first."""
         sa = self._sa
@@ -1395,6 +1448,14 @@ class Store:
             conn.execute(
                 self.audits.update()
                 .where((self.audits.c.created_at < cutoff) & (self.audits.c.client_ip != ""))
+                .values(client_ip="")
+            )
+            conn.execute(
+                self.free_previews.update()
+                .where(
+                    (self.free_previews.c.created_at < cutoff)
+                    & (self.free_previews.c.client_ip != "")
+                )
                 .values(client_ip="")
             )
             if count == 0:

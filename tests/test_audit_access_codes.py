@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift
+from audit_fixtures import csv_bytes, positive_drift, signed_in
 
 pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
@@ -197,7 +197,7 @@ def _selling_client(tmp_path: Path) -> tuple[TestClient, object]:
         contact_url="https://wa.me/000",
     )
     store = make_store(settings.database_url)
-    return TestClient(create_app(settings, store)), store
+    return signed_in(TestClient(create_app(settings, store))), store
 
 
 def _upload(client: TestClient, **data):
@@ -270,6 +270,7 @@ def test_a_code_unlocks_an_existing_preview(tmp_path: Path) -> None:
     )
     assert wrong.headers["location"].endswith("&code=rejected")
     code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    client.cookies.clear()  # a stranger: no account, a wrong token
     stranger = client.post(f"/audits/{audit_id}/redeem?token=bad", data={"code": code})
     assert stranger.status_code == 404
     right = client.post(
@@ -287,7 +288,7 @@ def test_redeem_attempts_count_toward_the_hourly_limit(tmp_path: Path) -> None:
         access_codes=True,
         max_uploads_per_hour_per_ip=3,
     )
-    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    client = signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
     location = _upload(client).headers["location"]
     audit_id = location.split("/audits/")[1].split("?")[0]
     token = location.split("token=")[1]
@@ -302,7 +303,7 @@ def test_redeem_attempts_count_toward_the_hourly_limit(tmp_path: Path) -> None:
 def test_free_mode_ignores_codes_and_spends_nothing(tmp_path: Path) -> None:
     settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", bootstrap_samples=100)
     store = make_store(settings.database_url)
-    client = TestClient(create_app(settings, store))
+    client = signed_in(TestClient(create_app(settings, store)))
     assert "name='access_code'" not in client.get("/").text
     code, _ = store.create_access_code(credits=1, note="", at=NOW)
     response = _upload(client, access_code=code)

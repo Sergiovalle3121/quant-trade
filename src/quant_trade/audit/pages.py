@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.audiences import (
     AUDIENCE_COPY,
     AUDIENCE_PAGES,
@@ -287,8 +288,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "tu plataforma) y no podemos corregirlo, te devolvemos el importe de ese informe."
         ),
         "account_note": (
-            "Cuenta gratis opcional: guarda tus informes y tus créditos en un solo lugar. "
-            "La vista previa no la necesita."
+            f"Cuenta gratis: {_FREE} vistas previas al mes, y tus informes y créditos en un "
+            "solo lugar. La vista previa se ve con tu cuenta."
         ),
         "account_link": "Crear cuenta",
         "faq_title": "Preguntas frecuentes",
@@ -557,8 +558,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "platform) and we cannot fix it, we refund that report."
         ),
         "account_note": (
-            "Optional free account: keep your reports and credits in one place. The preview "
-            "does not need one."
+            f"Free account: {_FREE} previews a month, and your reports and credits in one "
+            "place. The preview is shown with your account."
         ),
         "account_link": "Create an account",
         "faq_title": "Frequently asked questions",
@@ -673,7 +674,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
             ("globe", "Informe en español o inglés"),
-            ("key", "Vista previa gratis; cuenta opcional"),
+            ("key", f"{_FREE} vistas previas gratis al mes con tu cuenta"),
         ],
         "mock_url": "informe · clase B",
         "mock_k": "Veredicto",
@@ -774,6 +775,7 @@ _UI: dict[str, dict[str, Any]] = {
         "pricing_eyebrow": "Precios",
         "plan_free": "Vista previa",
         "plan_free_amount": "Gratis",
+        "plan_free_note": f"{_FREE} al mes con tu cuenta",
         "plan_full": "Informe completo",
         "plan_full_note": "por auditoría",
         "plan_badge": "Completo",
@@ -803,7 +805,7 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "upload_points": [
             "Tu archivo nunca se publica.",
-            "Vista previa sin tarjeta; la cuenta es opcional.",
+            f"Crea tu cuenta gratis: {_FREE} vistas previas al mes, sin tarjeta.",
             "Borrado automático si no desbloqueas el informe.",
         ],
         "drop_title": "Arrastra tu informe aquí",
@@ -862,7 +864,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
             ("globe", "Report in English or Spanish"),
-            ("key", "Free preview; account optional"),
+            ("key", f"{_FREE} free previews a month with your account"),
         ],
         "mock_url": "report · class B",
         "mock_k": "Verdict",
@@ -962,6 +964,7 @@ _UI: dict[str, dict[str, Any]] = {
         "pricing_eyebrow": "Pricing",
         "plan_free": "Preview",
         "plan_free_amount": "Free",
+        "plan_free_note": f"{_FREE} a month with your account",
         "plan_full": "Full report",
         "plan_full_note": "per audit",
         "plan_badge": "Complete",
@@ -991,7 +994,7 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "upload_points": [
             "Your file is never published.",
-            "No card for the preview; an account is optional.",
+            f"Create your free account: {_FREE} previews a month, no card.",
             "Deleted automatically if you do not unlock the report.",
         ],
         "drop_title": "Drop your report here",
@@ -1668,7 +1671,8 @@ def _prices_html(
             "<div class='prices'>"
             f"<div class='price' data-reveal style='--i:0'><span class='price-name'>"
             f"{_e(copy['price_free_title'])}</span>"
-            f"<div class='price-amount'>{_e(ui['plan_free_amount'])}</div>"
+            f"<div class='price-amount'>{_e(ui['plan_free_amount'])}"
+            f"<small>{_e(ui['plan_free_note'])}</small></div>"
             f"<p class='muted'>{_e(copy['price_free'])}</p>"
             + _checks(ui["free_items"])
             + f"<a class='btn btn-ghost' href='#subir'>{_e(ui['cta'])}</a></div>"

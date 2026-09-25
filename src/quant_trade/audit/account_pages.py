@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from quant_trade.audit.accounts import MIN_PASSWORD_CHARS
+from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
@@ -42,8 +42,8 @@ COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Tu cuenta",
         "signup_title": "Crea tu cuenta",
         "signup_lead": (
-            "Guarda en un solo lugar tus informes, tus créditos y tus compras. La vista "
-            "previa sigue siendo gratis y sin cuenta."
+            f"Tu cuenta gratis trae {FREE_PREVIEWS_PER_MONTH} vistas previas al mes y guarda "
+            "en un solo lugar tus informes, tus créditos y tus compras."
         ),
         "signin_title": "Entra a tu cuenta",
         "signin_lead": "Tus informes, créditos y compras te esperan aquí.",
@@ -191,6 +191,35 @@ COPY: dict[str, dict[str, str]] = {
         "credit_left": "Tienes {n} créditos.",
         "credit_left_one": "Tienes 1 crédito.",
         "credit_used": "Crédito usado: este es el informe completo.",
+        "free_left": "Vistas previas gratis este mes",
+        "free_left_value": "{left} de {limit}",
+        "gate_signin_title": "Crea tu cuenta gratis para ver tu vista previa",
+        "gate_signin_lead": (
+            "Con una cuenta tienes {limit} vistas previas gratis cada mes: la clase de A a D, "
+            "las gráficas y las señales de alerta de tu archivo. Si ya tienes un código de "
+            "acceso, escríbelo en el formulario y no necesitas cuenta."
+        ),
+        "gate_code_title": "Ese código no sirve",
+        "gate_code_lead": (
+            "No encontramos ese código o ya no le quedan créditos. Revísalo, o crea una cuenta "
+            "gratis para tener {limit} vistas previas cada mes."
+        ),
+        "gate_quota_title": "Ya usaste tus {limit} vistas previas gratis de este mes",
+        "gate_quota_lead": (
+            "Se renuevan el día 1 de cada mes. Para auditar ahora, añade créditos a tu cuenta: "
+            "con créditos, cada archivo nuevo sale como informe completo."
+        ),
+        "gate_network_title": "Esta red ya usó sus vistas previas gratis de este mes",
+        "gate_network_lead": (
+            "Contamos las vistas previas gratis también por red, para frenar cuentas "
+            "desechables. Puedes auditar con un código o con créditos en tu cuenta, o volver "
+            "el día 1."
+        ),
+        "gate_signup": "Crear cuenta gratis",
+        "gate_signin": "Ya tengo cuenta",
+        "gate_buy": "Ver precios y añadir créditos",
+        "gate_back": "Volver al inicio",
+        "credit_on_upload": "Usamos 1 crédito de tu cuenta: este es el informe completo.",
         "credit_none": "No te quedan créditos en tu cuenta.",
         "saved_notice": "Informe guardado en tu cuenta.",
         "nav_account": "Mi cuenta",
@@ -199,8 +228,8 @@ COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Your account",
         "signup_title": "Create your account",
         "signup_lead": (
-            "Keep your reports, credits and purchases in one place. The preview stays free "
-            "and needs no account."
+            f"Your free account comes with {FREE_PREVIEWS_PER_MONTH} previews a month and "
+            "keeps your reports, credits and purchases in one place."
         ),
         "signin_title": "Sign in to your account",
         "signin_lead": "Your reports, credits and purchases are waiting here.",
@@ -345,6 +374,34 @@ COPY: dict[str, dict[str, str]] = {
         "credit_left": "You have {n} credits.",
         "credit_left_one": "You have 1 credit.",
         "credit_used": "Credit used: this is the full report.",
+        "free_left": "Free previews this month",
+        "free_left_value": "{left} of {limit}",
+        "gate_signin_title": "Create your free account to see your preview",
+        "gate_signin_lead": (
+            "An account gives you {limit} free previews every month: the A to D class, the "
+            "charts and the red flags of your file. If you already have an access code, type "
+            "it in the form and you need no account."
+        ),
+        "gate_code_title": "That code does not work",
+        "gate_code_lead": (
+            "We could not find that code or it has no credits left. Check it, or create a free "
+            "account to get {limit} previews every month."
+        ),
+        "gate_quota_title": "You used your {limit} free previews this month",
+        "gate_quota_lead": (
+            "They renew on the 1st of each month. To audit now, add credits to your account: "
+            "with credits, each new file comes out as a full report."
+        ),
+        "gate_network_title": "This network used its free previews this month",
+        "gate_network_lead": (
+            "We also count free previews per network, to slow down throwaway accounts. You can "
+            "audit with a code or with credits on your account, or come back on the 1st."
+        ),
+        "gate_signup": "Create a free account",
+        "gate_signin": "I have an account",
+        "gate_buy": "See prices and add credits",
+        "gate_back": "Back to the home page",
+        "credit_on_upload": "We used 1 credit from your account: this is the full report.",
         "credit_none": "There are no credits left on your account.",
         "saved_notice": "Report saved to your account.",
         "nav_account": "My account",
@@ -543,6 +600,38 @@ def forgot_page(*, locale: str, contact_url: str) -> str:
         copy["forgot_lead"],
         body,
         switch=_switch("forgot", locale),
+    )
+
+
+def gate_page(*, locale: str, reason: str, limit: int) -> str:
+    """Why an upload did not run: no account, a bad code, or the month's free previews used.
+
+    ``reason`` is ``signin``, ``code``, ``quota`` or ``network``.
+    """
+    locale = _locale(locale)
+    copy = COPY[locale]
+    reason = reason if reason in ("signin", "code", "quota", "network") else "signin"
+    home = "/en" if locale == "en" else "/"
+    if reason in ("signin", "code"):
+        buttons = (
+            f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}'>"
+            f"{_e(copy['gate_signup'])}</a>"
+            f"<a class='btn btn-ghost btn-lg' href='{path('signin', locale)}'>"
+            f"{_e(copy['gate_signin'])}</a>"
+        )
+    else:
+        buttons = (
+            f"<a class='btn btn-primary btn-lg' href='{path('account', locale)}'>"
+            f"{_e(copy['gate_buy'])}</a>"
+            f"<a class='btn btn-ghost btn-lg' href='{home}'>{_e(copy['gate_back'])}</a>"
+        )
+    body = f"<div class='wrap-narrow'><div class='inline-form'>{buttons}</div></div>"
+    return _shell(
+        locale,
+        copy[f"gate_{reason}_title"].format(limit=limit),
+        copy[f"gate_{reason}_lead"].format(limit=limit),
+        body,
+        switch=path("signup", "en" if locale == "es" else "es"),
     )
 
 
@@ -752,6 +841,8 @@ def account_page(
     free_mode: bool = False,
     price_cents: int = 0,
     pack_price_cents: int = 0,
+    free_left: int = 0,
+    free_limit: int = 0,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -768,11 +859,18 @@ def account_page(
         f"<div class='inline-form'><a class='btn btn-primary' href='{home}#subir'>"
         f"{_e(copy['new_audit'])}</a>{signout}</div></div>"
     )
+    free_value = copy["free_left_value"].format(left=free_left, limit=free_limit)
     kpis = (
         "<div class='acct-kpis'>"
         f"<div class='acct-kpi'><b>{credits}</b><span>{_e(copy['credits'])}. "
         f"{_e(copy['credits_help'])}</span></div>"
-        f"<div class='acct-kpi'><b>{len(audits)}</b><span>{_e(copy['reports'])}</span></div>"
+        + (
+            f"<div class='acct-kpi'><b>{_e(free_value)}</b>"
+            f"<span>{_e(copy['free_left'])}</span></div>"
+            if free_limit
+            else ""
+        )
+        + f"<div class='acct-kpi'><b>{len(audits)}</b><span>{_e(copy['reports'])}</span></div>"
         f"<div class='acct-kpi'><b>{sum(1 for a in audits if a.paid)}</b>"
         f"<span>{_e(copy['paid_reports'])}</span></div></div>"
     )
@@ -949,6 +1047,7 @@ __all__ = [
     "comparable",
     "all_texts",
     "forgot_page",
+    "gate_page",
     "path",
     "report_box",
     "report_href",

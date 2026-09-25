@@ -685,8 +685,8 @@ LABELS: dict[str, dict[str, str]] = {
         "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
         "keep_link": (
-            "Guarda el enlace de esta página: es la única forma de volver a tu informe. "
-            "No pedimos correo ni cuenta."
+            "Guarda el enlace de esta página: con él vuelves a tu informe. Si lo subiste con tu "
+            "cuenta, también lo tienes en «Mi cuenta»."
         ),
         "pack": "pack de 3 informes: USD {price:.0f}",
         "buy_includes": (
@@ -726,8 +726,7 @@ LABELS: dict[str, dict[str, str]] = {
             "periodo se eligió."
         ),
         "next_oos": (
-            "Pide un informe del mismo robot, sin cambios, en fechas posteriores a su "
-            "optimización."
+            "Pide un informe del mismo robot, sin cambios, en fechas posteriores a su optimización."
         ),
         "next_flags": (
             "Revisa las banderas rojas: señalan cifras que no se pueden tomar tal cual."
@@ -1371,8 +1370,8 @@ LABELS: dict[str, dict[str, str]] = {
         "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
         "keep_link": (
-            "Save this page's link: it is the only way back to your report. "
-            "We ask for no email and no account."
+            "Save this page's link: it brings you back to your report. If you uploaded it with "
+            "your account, it is also in «My account»."
         ),
         "pack": "pack of 3 reports: USD {price:.0f}",
         "buy_includes": (
@@ -2712,13 +2711,17 @@ def _cost_gap_note(
     table_net = _ev_value((base or {}).get("net_pnl"))
     if trades_net is None or table_net is None or abs(table_net - trades_net) < 0.005:
         return ""
-    return "<p class='muted'>" + _e(
-        labels["cost_recomputed"].format(
-            table=_fmt(table_net, key="net_pnl"),
-            gap=_fmt(abs(table_net - trades_net), key="net_pnl"),
-            trades=_fmt(trades_net, key="net_pnl"),
+    return (
+        "<p class='muted'>"
+        + _e(
+            labels["cost_recomputed"].format(
+                table=_fmt(table_net, key="net_pnl"),
+                gap=_fmt(abs(table_net - trades_net), key="net_pnl"),
+                trades=_fmt(trades_net, key="net_pnl"),
+            )
         )
-    ) + "</p>"
+        + "</p>"
+    )
 
 
 def _open_loss_note(
@@ -4807,9 +4810,7 @@ def render_html(
                 data,
                 verdict,
                 labels,
-                {}
-                if locked
-                else {title: f"r-d{i}" for i, (title, _) in enumerate(detail, 1)},
+                {} if locked else {title: f"r-d{i}" for i, (title, _) in enumerate(detail, 1)},
             ),
             "r-next",
         ),
@@ -4891,7 +4892,7 @@ def _next_steps_html(
     labels: dict[str, str],
     anchors: dict[str, str],
 ) -> str:
-    """"What to do now": the few things a buyer should clear up first, in
+    """ "What to do now": the few things a buyer should clear up first, in
     order, from the dimensions that did not pass and the live comparison.
     The class plan speaks to whoever builds the robot; this speaks to whoever
     runs it. Questions to ask and checks to make, never a trading instruction."""

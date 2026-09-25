@@ -88,10 +88,10 @@ def test_second_files_and_challenge_sit_in_a_closed_extras_box() -> None:
         assert find_claims(extras) == []
 
 
-def test_pricing_offers_the_optional_account_without_touching_the_preview() -> None:
+def test_pricing_offers_the_free_account_that_the_preview_needs() -> None:
     for locale, words, href in (
-        ("es", "Cuenta gratis opcional", "/registro"),
-        ("en", "Optional free account", "/signup"),
+        ("es", "Cuenta gratis: 3 vistas previas al mes", "/registro"),
+        ("en", "Free account: 3 previews a month", "/signup"),
     ):
         page = _paid_landing(locale, card_payments=False)
         note = page.split("class='muted account-note'", 1)[1].split("</p>", 1)[0]

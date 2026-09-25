@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH
+
 
 @dataclass(frozen=True)
 class AudienceText:
@@ -90,7 +92,8 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "limits": "Qué no hace",
         "price": "Precio",
         "price_text": (
-            "La vista previa es gratis y no pide cuenta ni tarjeta: clase de A a D, gráficas, "
+            f"La vista previa es gratis con tu cuenta ({FREE_PREVIEWS_PER_MONTH} al mes) y no "
+            "pide tarjeta: clase de A a D, gráficas, "
             "banderas rojas y qué significa cada dimensión. El informe completo cuesta "
             "USD {price:.0f} (USD {pack:.0f} el paquete de 3). Si el informe lee mal tu archivo "
             "y no podemos corregirlo, te devolvemos el importe."
@@ -110,7 +113,8 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "limits": "What it does not do",
         "price": "Price",
         "price_text": (
-            "The preview is free and needs no account or card: A to D class, charts, red flags "
+            f"The preview is free with your account ({FREE_PREVIEWS_PER_MONTH} a month) and "
+            "needs no card: A to D class, charts, red flags "
             "and what each dimension means. The full report is USD {price:.0f} (USD {pack:.0f} "
             "for a pack of 3). If the report misreads your file and we cannot fix it, we refund "
             "you."

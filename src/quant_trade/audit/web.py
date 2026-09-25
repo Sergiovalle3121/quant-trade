@@ -1377,6 +1377,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     free_mode=cfg.free_mode,
                     price_cents=cfg.price_usd_cents,
                     pack_price_cents=cfg.pack_price_usd_cents,
+                    free_left=max(
+                        0,
+                        acct.FREE_PREVIEWS_PER_MONTH
+                        - db.free_previews_since(acct.month_start(now), account_id=account.id),
+                    ),
+                    free_limit=0 if cfg.free_mode else acct.FREE_PREVIEWS_PER_MONTH,
                 )
             )
 
@@ -1693,6 +1699,36 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             or attempts >= cfg.max_uploads_per_hour_per_ip * UPLOAD_ATTEMPTS_PER_UPLOAD
         ):
             return _html_error(request, 429, message("rate_limited", loc), loc)
+        # The free tier: without a code that still works, an upload needs an
+        # account, and each account gets FREE_PREVIEWS_PER_MONTH previews a
+        # calendar month (also capped per network address). Past it, a
+        # credit on the account turns the upload into a full report.
+        gate_account: Any = None
+        free_preview = False
+        spend_credit = False
+        if not cfg.free_mode:
+            typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+            usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
+            session = _session(request)
+            if usable:
+                pass
+            elif session is None:
+                return _gate(request, loc, "code" if typed else "signin", 401)
+            else:
+                gate_account = session[0]
+                start = acct.month_start(now)
+                used = db.free_previews_since(start, account_id=gate_account.id)
+                network = db.free_previews_since(start, client_ip=ip)
+                if (
+                    used < acct.FREE_PREVIEWS_PER_MONTH
+                    and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
+                ):
+                    free_preview = True
+                elif db.account_credits(gate_account.id, now) > 0:
+                    spend_credit = True
+                else:
+                    reason = "quota" if used >= acct.FREE_PREVIEWS_PER_MONTH else "network"
+                    return _gate(request, loc, reason, 402)
         try:
             uploads = {
                 "equity": await _read_limited(equity, what="equity"),
@@ -1806,13 +1842,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not isinstance(outcome, tuple):
             return outcome
         audit_id, token, paid = outcome
+        credit_used = False
+        if gate_account is not None and not paid:
+            if spend_credit:
+                credit_used = db.redeem_with_account(
+                    audit_id, gate_account.id, at=datetime.now(UTC)
+                )
+                paid = credit_used
+            if free_preview or not credit_used:
+                db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
         if paid or _session(request) is not None:
             linked = db.get_audit(audit_id)
             _link_to_session(
                 request, audit_id, linked.stripe_session_id if linked else None, via=VIA_UPLOAD
             )
         location = f"/audits/{audit_id}?token={token}"
-        if code:
+        if credit_used:
+            location += "&acct=upload_credit"
+        elif code:
             location += "&code=" + ("applied" if paid else "rejected")
         if _wants_json(request):
             body: dict[str, Any] = {"audit_id": audit_id, "token": token, "location": location}
@@ -1823,6 +1870,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # Open the preview at the code field, where the refusal and its fix are shown.
             location += "#canjear"
         return RedirectResponse(location, status_code=303)
+
+    def _gate(request: Request, locale: str, reason: str, status: int) -> Response:
+        """The answer to an upload the free tier does not cover."""
+        if _wants_json(request):
+            return JSONResponse({"error": f"free_tier_{reason}"}, status_code=status)
+        page = account_pages.gate_page(
+            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH
+        )
+        return HTMLResponse(page, status_code=status)
 
     def _owns(request: Request | None, audit_id: str) -> bool:
         """Whether the signed-in account holds this report."""
@@ -1983,6 +2039,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = message("code_applied", locale)
         elif acct_done == "credit" and record.paid:
             notice = account_pages.COPY[locale]["credit_used"]
+        elif acct_done == "upload_credit" and record.paid:
+            notice = account_pages.COPY[locale]["credit_on_upload"]
         elif acct_done == "saved":
             notice = account_pages.COPY[locale]["saved_notice"]
         elif acct_done == "nocredit" and not record.paid:

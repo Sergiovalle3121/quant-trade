@@ -214,3 +214,36 @@ def synthetic_mt5_optimization(passes: int = 250) -> bytes:
         '<Worksheet ss:Name="Tester Optimizator Results"><Table>'
         f"<Row>{head}</Row>" + "".join(rows) + "</Table></Worksheet></Workbook>"
     ).encode("utf-8")
+
+
+def signed_in(client, email: str = "tester@example.com", password: str = "long safe phrase"):
+    """Sign ``client`` up (and so in): a preview in paid mode needs an account.
+
+    A service whose base URL is https sets a ``Secure`` cookie, so the client
+    then talks https too.
+    """
+    import re
+
+    base_url = getattr(client.app.state, "settings", None)
+    if base_url is not None and str(getattr(base_url, "base_url", "")).startswith("https"):
+        client.base_url = "https://testserver"
+    page = client.get("/registro").text
+    match = re.search(r"name='csrf' value='([^']+)'", page)
+    assert match, "the sign-up form has no CSRF field"
+    client.post(
+        "/registro",
+        data={"email": email, "password": password, "csrf": match.group(1)},
+        follow_redirects=False,
+    )
+    if client.get("/cuenta", follow_redirects=False).status_code != 200:
+        # The account already exists in this database: sign in instead.
+        page = client.get("/entrar").text
+        match = re.search(r"name='csrf' value='([^']+)'", page)
+        assert match, "the sign-in form has no CSRF field"
+        client.post(
+            "/entrar",
+            data={"email": email, "password": password, "csrf": match.group(1)},
+            follow_redirects=False,
+        )
+    assert client.get("/cuenta", follow_redirects=False).status_code == 200, "not signed in"
+    return client
