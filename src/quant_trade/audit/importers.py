@@ -3138,7 +3138,11 @@ def _balance_curve(
     breaks = 0
     closing: dict[date, float] = {}
     flows: dict[date, float] = {}
+    # The balance just before and just after each deposit or withdrawal, so a
+    # day's return is chained around the money moved at the time it moved.
+    cuts: dict[date, list[tuple[float, float]]] = {}
     for item in in_range:
+        pre = balance
         balance += item.amount
         if item.reported_balance is not None:
             if abs(item.reported_balance - balance) > 0.011:
@@ -3148,6 +3152,7 @@ def _balance_curve(
         closing[day] = balance
         if item.is_flow:
             flows[day] = flows.get(day, 0.0) + item.amount
+            cuts.setdefault(day, []).append((pre, balance))
     if breaks:
         warnings.append(
             f"{breaks} Balance cell(s) do not equal the previous balance plus the row's "
@@ -3164,35 +3169,51 @@ def _balance_curve(
     rows = [(start, initial)]
     adjusted = bool(flows)
     pointer = 0
+
+    def wiped(day: date) -> ReportFormatError:
+        if assumed:
+            return ReportFormatError(
+                "balance_not_positive",
+                "the reconstructed balance reaches zero or below; state the real starting "
+                "balance so returns can be computed",
+                "el balance reconstruido llega a cero o menos; indica el balance inicial "
+                "real para poder calcular los retornos",
+            )
+        # The starting balance is known: the account itself went to zero.
+        return ReportFormatError(
+            "balance_not_positive",
+            f"the balance reaches zero or below on {day.isoformat()}: the account lost "
+            "all its money, so returns after that day cannot be computed; upload the "
+            "history up to that day to audit it",
+            f"el balance llega a cero o menos el {day.isoformat()}: la cuenta perdió todo "
+            "su dinero, así que después de ese día no se pueden calcular retornos; sube el "
+            "historial hasta ese día para auditarlo",
+        )
+
+    def growth(start: float, end: float, day: date) -> float:
+        """What trading did to the balance between two moments with no money moved."""
+        if start <= 0:
+            # Emptied by a withdrawal: fine while nothing is traded.
+            if abs(end - start) < 0.005:
+                return 1.0
+            raise wiped(day)
+        if end <= 0:
+            raise wiped(day)
+        return end / start
+
     for day in _days(first_entry.date(), last_exit.date(), business):
-        before = level
-        flow = 0.0
+        segment = level
+        factor = 1.0
         # Events on a skipped weekend day land on the next business day.
         while pointer < len(daily) and daily[pointer][0] <= day:
+            for pre, post in cuts.get(daily[pointer][0], []):
+                factor *= growth(segment, pre, day)
+                segment = post
             level = daily[pointer][1]
-            flow += daily[pointer][2]
             pointer += 1
-        if level <= 0 or before <= 0:
-            if assumed:
-                raise ReportFormatError(
-                    "balance_not_positive",
-                    "the reconstructed balance reaches zero or below; state the real starting "
-                    "balance so returns can be computed",
-                    "el balance reconstruido llega a cero o menos; indica el balance inicial "
-                    "real para poder calcular los retornos",
-                )
-            # The starting balance is known: the account itself went to zero.
-            raise ReportFormatError(
-                "balance_not_positive",
-                f"the balance reaches zero or below on {day.isoformat()}: the account lost "
-                "all its money, so returns after that day cannot be computed; upload the "
-                "history up to that day to audit it",
-                f"el balance llega a cero o menos el {day.isoformat()}: la cuenta perdió todo "
-                "su dinero, así que después de ese día no se pueden calcular retornos; sube el "
-                "historial hasta ese día para auditarlo",
-            )
+        factor *= growth(segment, level, day)
         if adjusted:
-            index *= 1.0 + (level - before - flow) / before
+            index *= factor
             rows.append((day, index))
         else:
             rows.append((day, level))

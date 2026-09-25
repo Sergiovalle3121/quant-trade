@@ -690,6 +690,12 @@ each deposit made after trading began with the balance before it and the
 flow-adjusted drawdown on the day before, and the platform's own floating
 result (DECLARED). Nothing is checked with the broker.
 
+The flow-adjusted curve is chained around each deposit and withdrawal at the
+moment it happened (a time-weighted return): trading before the money moved
+is measured on the balance before it, trading after on the balance after it.
+An account emptied by a withdrawal and refilled later is read; trading on a
+zero or negative balance is refused as before.
+
 | Code | WARN | FAIL |
 |---|---|---|
 | `GAIN_INFLATED_BY_FLOWS` | percentage gain ≥ 10 % while the trading result is ≤ 0 or below a third of the gain on the money deposited | — |
