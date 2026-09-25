@@ -301,6 +301,15 @@ each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
 variety to show. The class stays C.
 
+When a live account is uploaded, one line under the verdict gives its
+comparison badge (Coherente, En el borde, No coherente, Revisar) and the
+account's trading result against the money deposited, linked to the
+comparison section: the class grades the backtest, and a buyer should not
+have to scroll to learn the real account lost money. Locked reports keep it
+back. The "Plan para subir de clase" says on which side of each threshold a
+number falls, and no longer asks for the optimisation export when the trial
+count already comes from the files.
+
 The `/ejemplo` report carries a synthetic live account, a Myfxbook CSV
 export built in `audit/sample.py` (0.1 lots, a fifth of the backtest's
 size). It trades the backtest's last 60 business days too, skipping about
@@ -1475,6 +1484,12 @@ Redesign pass 40 styles "How it behaves after losing": each finding reads as
 what the trades show (bold) and, on its own line with a speech mark, the
 question to put to the seller (`report._behaviour_ask`, `.beh-asks`), in the
 screen and in the PDF.
+
+Redesign pass 41 gives "Does it work on each instrument?" the same finding
+layout as the behaviour section (finding in bold, then the question) and lays a
+section's single headline figure out as a row beside its sentence on screens
+(`.facts>.fact:only-child`), so a lone figure no longer fills a full-width
+tile. Print keeps the tile.
 
 ## Security
 
