@@ -165,3 +165,16 @@ def test_fat_tailed_honest_returns_do_not_read_as_missing_losses(seed: int) -> N
     # Peaked, fat-tailed months like a stock index's: no losses were hidden.
     r = 0.008 + 0.03 * np.random.default_rng(seed).standard_t(4, 300) / np.sqrt(2)
     assert "few_small_losses" not in fund_review(_frame(r), 12.0)["findings"]
+
+
+def test_an_excel_factsheet_with_fractions_reads_too() -> None:
+    from test_audit_importers import xlsx
+
+    r = _returns(36, seed=5)
+    rows: list[list[object]] = [["Year", *MONTHS_EN, "YTD"]]
+    for i in range(3):
+        months = [float(v) for v in r[12 * i : 12 * i + 12]]
+        rows.append([2019 + i, *months, float(np.prod([1 + v for v in months]) - 1)])
+    series = parse_equity_csv(xlsx({"Returns": rows}))
+    assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r, abs=1e-9)
+    assert any("values taken as fractions" in w for w in series.warnings)
