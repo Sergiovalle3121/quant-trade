@@ -476,7 +476,13 @@ place-items:center;width:44px;height:44px;border-radius:50%;margin-bottom:26px;
 font:500 .8rem var(--mono);color:var(--btn-fg);background:var(--btn-bg);
 box-shadow:0 0 0 10px var(--bg);position:relative}
 @media (max-width:900px){.steps{grid-template-columns:1fr 1fr;gap:40px 24px}.steps::before{display:none}}
-@media (max-width:560px){.steps{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.steps{grid-template-columns:minmax(0,1fr);gap:26px}.steps::before{display:block;left:22px;right:auto;top:22px;bottom:22px;width:1px;height:auto}.steps li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:18px;align-items:center;padding:0}.steps li::before{margin:0}}
+.more-help{margin-top:6px}.more-help summary{cursor:pointer;color:var(--text);font-weight:560;
+list-style:none;display:inline-flex;align-items:center;gap:6px;min-height:32px}
+.more-help summary::-webkit-details-marker{display:none}
+.more-help summary::after{content:'+';font-weight:400;color:var(--text-3)}
+.more-help[open] summary::after{content:'−'}
+.more-help p{margin:6px 0 0}
 .list-steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px;
 grid-template-columns:minmax(0,1fr)}
 .list-steps li{overflow-wrap:anywhere}
@@ -681,11 +687,8 @@ margin:0 0 16px}
 .foot ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;font-size:.88rem}
 .foot a{text-decoration:none;color:var(--text-2)}.foot a:hover{color:var(--text)}
 .foot .tagline{margin:14px 0 0;max-width:32em;font-size:.88rem}
-.foot .legal{margin:22px 0 0;font-size:.82rem}
 .foot .disclaimer{background:transparent;padding:18px 0 0;border:0;border-top:1px solid var(--border);
 border-radius:0;font-size:.8rem;color:var(--text-3)}
-.foot-base{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:28px;
-padding-top:18px;border-top:1px solid var(--border);font-size:.78rem;color:var(--text-3)}
 .news{margin:36px auto 0;max-width:460px}
 .news .inline-form input{height:46px}
 .news .label{color:var(--text-2);font-weight:450}

@@ -2032,13 +2032,15 @@ def _no_flags_html(labels: dict[str, str]) -> str:
 def _flags_free_html(flags: list[dict[str, Any]], locale: str, labels: dict[str, str]) -> str:
     if not flags:
         return _no_flags_html(labels)
+    # Same card as the full report, without the detail that the payment unlocks.
+    order = {"FAIL": 0, "WARN": 1}
     return (
-        "<ul class='flag-list'>"
+        "<ul class='flag-list acct-flags flag-cards'>"
         + "".join(
-            f"<li>{_severity_badge(flag['severity'], locale)} "
-            f"{_e(flag_title(flag['code'], locale))} "
-            f"<code>{_e(flag['code'])}</code></li>"
-            for flag in flags
+            f"<li>{_severity_badge(flag['severity'], locale)}"
+            f"<div><b>{_e(flag_title(flag['code'], locale))}</b>"
+            f"<p class='flag-code'>{_e(flag['code'])}</p></div></li>"
+            for flag in sorted(flags, key=lambda f: order.get(f["severity"], 2))
         )
         + "</ul>"
     )

@@ -1319,6 +1319,15 @@ shorter; print is unchanged. The recent-period section (#179) was checked in bot
 cases (holds and fades) on a phone, a desktop and the PDF. It reuses the polished
 verdict callout, fact pairs and year table; its closing note now starts with a capital.
 
+Redesign pass 38, before a buyer pays (landing, upload, preview), checked on a
+phone in Spanish and English. The main upload field says in one line what to
+upload ("as your platform saves it: HTML, XLSX or CSV, up to 10 MB"); the full
+list of formats and the export guides open under "Which file do I export?". On a
+phone, "How it works" puts each number beside its text, joined by a line. The
+footer names the tagline and the legal pages once instead of twice. The preview's
+red flags use the same cards as the full report, the gravest first, without the
+detail that the payment unlocks.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
