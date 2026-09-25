@@ -183,3 +183,21 @@ def test_equal_reentry_rates_show_no_line() -> None:
     review = behaviour_review(trades)
     assert review["quick_after_loss"]["value"] == review["quick_after_win"]["value"] == 1.0
     assert "15 minutos" not in _behaviour_html(review, "es", LABELS["es"])
+
+
+def test_dates_without_a_time_of_day_leave_reentry_unmeasured() -> None:
+    from quant_trade.audit.report import _behaviour_html
+
+    # Daily file: after a loss the next trade opens the same day, after a win 5 days later.
+    pnls = _mixed(80, seed=4)
+    trades, day = [], T0
+    for pnl in pnls:
+        trades.append(_trade(day, 24.0, pnl))
+        day = trades[-1].exit_time + timedelta(days=0 if pnl < 0 else 5)
+    review = behaviour_review(trades)
+    assert review["quick_after_loss"]["evidence"] == "NOT_MEASURED"
+    assert "quick_after_loss" not in review["findings"]
+    assert review["hold_ratio"]["evidence"] == "MEASURED"
+    html = _behaviour_html(review, "es", LABELS["es"])
+    assert "15 minutos" not in html and "Vuelve a entrar" not in html
+    assert "Reentrada rápida tras perder:" in html and "El archivo no tiene hora del día" in html
