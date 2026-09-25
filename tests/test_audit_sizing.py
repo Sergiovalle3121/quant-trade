@@ -196,3 +196,16 @@ def test_a_curve_that_misses_the_trades_is_no_floor() -> None:
 def test_a_history_that_loses_gets_no_size() -> None:
     review = capital_review(_trades([-5.0] * 60), fees=None, starting_balance=10_000.0)
     assert review["status"] == "NOT_MEASURED" and "net loss" in review["reason"]
+
+
+@pytest.mark.parametrize("rows", ["ends", "weekly"])
+def test_a_sparse_curve_is_no_floor(rows: str) -> None:
+    curve = positive_drift(400)
+    sparse = pd.concat([curve.head(2), curve.tail(2)]) if rows == "ends" else curve.iloc[::5]
+    inputs = build_inputs(
+        csv_bytes(sparse),
+        DeclaredMetadata(initial_balance=10_000.0),
+        trades_bytes=csv_bytes(_grid_trades(curve)),
+    )
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300)
+    assert result.capital is not None and result.capital["status"] == "NOT_MEASURED"
