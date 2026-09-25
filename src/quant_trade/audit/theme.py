@@ -851,6 +851,12 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .live-verdict{margin:18px 0;padding:16px 20px;border-radius:16px;background:#fff;border:1px solid var(--border);border-left:4px solid #9a9aa2;line-height:1.6}
 .lv-PASS{border-left-color:#16a34a}.lv-WEAK{border-left-color:#d97706}.lv-FAIL{border-left-color:#dc2626}
 .live-verdict .badge{margin-right:6px}
+.beh-asks{list-style:none;margin:14px 0 0;padding:0}
+.beh-asks li{margin-top:12px;padding:14px 0 0;border-top:1px solid var(--border)}
+.beh-asks li:first-child{margin-top:0;padding-top:0;border-top:0}
+.beh-what{margin:0;font-weight:560;letter-spacing:-.01em}
+.beh-ask{display:flex;align-items:flex-start;margin:6px 0 0;color:var(--text-2)}
+.beh-ask svg{width:16px;height:16px;flex:none;margin:4px 10px 0 0;color:var(--warn)}
 .live-verdict.held p{margin:0}.live-verdict.held p+p{margin-top:8px}
 @media (max-width:620px){.paper table.stress,.stress thead,.stress tbody,.stress tr,.stress td{display:block}.paper table.stress{overflow:visible;border:0;background:none;box-shadow:none}.stress colgroup,.stress thead{display:none}.stress tr{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 0 8px}.stress tr.base{background:var(--surface-2,#f4f4f6)}.stress td{border:0!important;padding:3px 0!important;text-align:left!important;display:flex;justify-content:space-between;align-items:center;gap:12px;white-space:normal;width:auto!important}.stress td:first-child{font-weight:600;padding-bottom:6px!important}.stress td[data-l]::before{content:attr(data-l);color:var(--text-3);font-size:.8rem;font-weight:400}.stress td.empty{display:none}
 .paper table.timing{overflow:visible;font-size:.86rem}.timing th,.timing td{padding:10px 8px!important}.timing th:first-child,.timing td:first-child{padding-left:14px!important}.timing th:last-child,.timing td:last-child{padding-right:14px!important}.timing th{white-space:normal;font-size:.62rem;line-height:1.3;vertical-align:bottom}.timing td:first-child{font-weight:600;white-space:nowrap}.timing .tbar b{min-width:0}}
