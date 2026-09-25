@@ -1012,6 +1012,11 @@ The guides index lists backtest guides and live-account guides (the provider's
 account, Myfxbook, MQL5 signals, FX Blue) under two headings. The landing's
 platform strip is capped in width so its names wrap into two even rows.
 
+An error page shows the problem as a card with a red edge and a warning icon.
+The card names the upload field, states the problem in one line and lists the
+expected formats under "Se espera" / "Expected". When the account review or the
+test-data review finds nothing, its closing line is a green-edged callout.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

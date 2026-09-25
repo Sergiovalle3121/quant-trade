@@ -95,6 +95,10 @@ def class_ring(overall: str, *, size: str = "") -> str:
 
 
 ICONS: dict[str, str] = {
+    "alert": (
+        "<path d='M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'/>"
+        "<path d='M12 9v4M12 17h.01'/>"
+    ),
     "check": "<path d='M5 12.5l4.2 4.2L19 7'/>",
     "shield": "<path d='M12 3l7 3v6c0 4.4-3 7.8-7 9-4-1.2-7-4.6-7-9V6z'/>",
     "hash": "<path d='M9 4L7 20M17 4l-2 16M4 9h16M3 15h16'/>",
@@ -636,6 +640,20 @@ font-size:.92rem;border:1px solid;line-height:1.5}
 border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
 .error{color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent);
 border-color:color-mix(in srgb,var(--bad) 32%,transparent)}
+.dot.bad{background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 24%,transparent)}
+.error-card{display:grid;grid-template-columns:44px minmax(0,1fr);gap:18px;align-items:start;
+background:#fff;border:1px solid var(--border);border-left:4px solid var(--bad);border-radius:20px;
+padding:24px 26px;box-shadow:var(--shadow-sm,0 1px 2px rgba(0,0,0,.04))}
+.error-card .err-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.error-card .err-ico svg{width:22px;height:22px}
+.error-card p{margin:0}
+.err-field{font:500 .72rem/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+color:var(--text-3);margin-bottom:6px!important}
+.err-msg{font-size:1.12rem;font-weight:600;letter-spacing:-.02em;color:var(--text);line-height:1.45}
+.err-exp{margin-top:12px!important;color:var(--text-2);font-size:.95rem;line-height:1.6}
+.err-exp b{color:var(--text);font-weight:600}
+@media (max-width:520px){.error-card{grid-template-columns:minmax(0,1fr);gap:14px;padding:20px}}
 .notice{color:var(--info);background:color-mix(in srgb,var(--info) 9%,transparent);
 border-color:color-mix(in srgb,var(--info) 30%,transparent);font-weight:560}
 .banner{color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent);
