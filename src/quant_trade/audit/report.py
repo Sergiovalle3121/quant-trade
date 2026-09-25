@@ -2573,6 +2573,7 @@ def _capital_html(
     closed_dd: float | None = None,
     platform_dd: float | None = None,
     closed_only: bool = False,
+    hidden_note: str = "",
 ) -> str:
     """Capital and size for each loss limit.
 
@@ -2595,9 +2596,18 @@ def _capital_html(
         days = int((capital.get("span_days") or {}).get("value") or 0)
         head, _, rest = labels["capital_short"].format(days=days).partition(". ")
         out += f"<p class='live-verdict lv-WEAK'><b>{_e(head)}.</b> {_e(rest)}</p>"
+    out += hidden_note
     reference = float(capital["fall_reference"]["value"])
     history = float(capital["fall_history"]["value"])
     platform = (capital.get("fall_platform") or {}).get("value")
+    per_year = capital["trades_per_year"]
+    pace_note = localize(per_year.get("note", ""), locale)
+    # The note already says what the number is; the label is the fallback.
+    pace_text = (
+        pace_note[:1].upper() + pace_note[1:]
+        if pace_note
+        else _key_label("trades_per_year", labels)
+    )
     out += (
         "<div class='facts'>"
         f"<div class='fact'><b>{_fmt(reference, key='fall_reference')}</b>"
@@ -2610,13 +2620,9 @@ def _capital_html(
             if platform is not None
             else ""
         )
+        # The pace the year is drawn at, as a card beside the falls it sizes.
+        + f"<div class='fact'><b>{_fmt(per_year['value'])}</b><p>{_e(pace_text)}</p></div>"
         + "</div>"
-    )
-    per_year = capital["trades_per_year"]
-    out += (
-        f"<p class='muted'>{_e(_key_label('trades_per_year', labels))}: "
-        f"{_fmt(per_year['value'])} {_badge(per_year['evidence'])} "
-        f"{_e(localize(per_year.get('note', ''), locale))}</p>"
     )
     balance = capital["starting_balance"]["value"]
     scale_head = (
@@ -3204,7 +3210,10 @@ def render_html(
                         platform_dd=_ev_value(
                             (data.get("performance") or {}).get("platform_equity_drawdown")
                         ),
-                        closed_only=bool((data.get("inputs") or {}).get("balance_only")),
+                        # The red callout already says open losses are left out.
+                        closed_only=bool((data.get("inputs") or {}).get("balance_only"))
+                        and not hidden,
+                        hidden_note=hidden,
                     ),
                 )
             ]

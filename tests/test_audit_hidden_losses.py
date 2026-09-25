@@ -44,7 +44,7 @@ def test_hidden_open_losses_are_called_out(locale: str) -> None:
     flags = [*base["red_flags"], HIDDEN]
     page = _visible(render_html(_result(red_flags=flags), watermark=False, locale=locale))
     text = LABELS[locale]["hidden_loss"]
-    assert page.count(text) == 2  # resampled risk and the prop simulator
+    assert page.count(text) == 3  # resampled risk, capital and the prop simulator
     assert LABELS[locale]["kpi_drawdown_closed"] in page
     assert find_claims(text) == []
     clean = _visible(render_html(_result(), watermark=False, locale=locale))
@@ -96,3 +96,23 @@ def test_large_percentages_carry_thousands_separators() -> None:
     page = _visible(render_html(AuditResult.model_validate(data), watermark=False, locale="es"))
     assert "+191,136.0%" in page
     assert "191136" not in page
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_the_capital_section_carries_the_open_loss_callout(locale: str) -> None:
+    base = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    assert base["capital"]["status"] == "MEASURED"
+    page = render_html(
+        _result(red_flags=[*base["red_flags"], HIDDEN]), watermark=False, locale=locale
+    )
+    capital = page.split(html.escape(LABELS[locale]["capital"], quote=True))[-1]
+    capital = capital.split("</section>")[0]
+    assert html.escape(LABELS[locale]["hidden_loss"], quote=True) in capital
+    # The softer closed-trades note gives way to the red callout.
+    assert html.escape(LABELS[locale]["capital_closed_only"], quote=True) not in capital
+
+
+def test_the_trade_pace_is_a_fact_card() -> None:
+    page = render_html(_result(), watermark=False, locale="es")
+    assert "Operaciones cerradas por año en el historial</p></div>" in page
+    assert "Operaciones por año:" not in _visible(page)
