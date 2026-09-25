@@ -343,6 +343,37 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Se mantiene",
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
+        "behaviour": "Cómo se comporta al perder",
+        "behaviour_intro": (
+            "Lo que te diría un diario de trading: si las pérdidas se aguantan más que las "
+            "ganancias, si se vuelve a entrar deprisa tras perder y cómo salen las operaciones "
+            "tras una racha de pérdidas. No cambia la clase: son preguntas para hacer."
+        ),
+        "beh_hold": (
+            "Lo que dura una perdedora frente a una ganadora (mediana: {loss} frente a {win})"
+        ),
+        "beh_quick": (
+            "De las operaciones tras una pérdida se abren en menos de 15 minutos "
+            "(tras una ganancia: {win})"
+        ),
+        "beh_streak": (
+            "Aciertos tras {k} pérdidas seguidas ({n} operaciones; en todo el historial: {all})"
+        ),
+        "beh_losers_held_longer": (
+            "Las perdedoras siguen abiertas bastante más que las ganadoras. Pregunta dónde va "
+            "el stop y si se mueve."
+        ),
+        "beh_quick_after_loss": (
+            "Vuelve a entrar deprisa tras perder. Pregunta qué regla frena la siguiente "
+            "operación después de una pérdida."
+        ),
+        "beh_worse_after_streak": (
+            "Acierta menos tras una racha de pérdidas. Pregunta si el tamaño o las reglas "
+            "cambian en esas rachas."
+        ),
+        "beh_clean": "Nada destaca en cómo opera después de perder.",
+        "beh_badge_clean": "Sin patrones",
+        "beh_badge_found": "Para preguntar",
         "timing": "Cuándo gana y cuándo pierde",
         "timing_intro": (
             "Tus operaciones agrupadas por el día y la hora de entrada. Si casi todo el "
@@ -834,6 +865,34 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Holds",
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
+        "behaviour": "How it behaves after losing",
+        "behaviour_intro": (
+            "What a trading journal would tell you: whether losses are held longer than gains, "
+            "whether a new trade follows a loss quickly, and how trades do after a losing "
+            "streak. It does not change the class: these are questions to ask."
+        ),
+        "beh_hold": (
+            "How long a losing trade lasts against a winning one (median: {loss} against {win})"
+        ),
+        "beh_quick": (
+            "Of the trades after a loss open within 15 minutes of it (after a win: {win})"
+        ),
+        "beh_streak": "Win rate after {k} losses in a row ({n} trades; whole history: {all})",
+        "beh_losers_held_longer": (
+            "Losing trades stay open much longer than winning ones. Ask where the stop is and "
+            "whether it moves."
+        ),
+        "beh_quick_after_loss": (
+            "A new trade follows a loss quickly. Ask what rule holds back the next trade "
+            "after a loss."
+        ),
+        "beh_worse_after_streak": (
+            "It wins less often after a losing streak. Ask whether size or rules change "
+            "during those streaks."
+        ),
+        "beh_clean": "Nothing stands out in how it trades after losing.",
+        "beh_badge_clean": "No pattern",
+        "beh_badge_found": "To ask",
         "timing": "When it wins and when it loses",
         "timing_intro": (
             "Your trades grouped by entry day and time. If nearly all the result comes from "
@@ -3084,6 +3143,77 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
+def _duration_text(hours: float, locale: str) -> str:
+    """``0.5`` as ``30 min``, ``5.25`` as ``5.3 h``, ``50`` as ``2.1 días``."""
+    if hours < 1:
+        return f"{max(1, round(hours * 60))} min"
+    if hours < 48:
+        return f"{hours:.1f} h"
+    return f"{hours / 24:.1f} " + ("días" if locale == "es" else "days")
+
+
+def _ratio_text(ratio: float) -> str:
+    """``4.5`` as ``4.5``, ``0.036`` as ``0.036``: never a bare ``0.0``."""
+    return f"{ratio:.1f}" if ratio >= 0.1 else f"{ratio:.2g}"
+
+
+def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """Hold times, re-entries and streaks around losses; no class change."""
+    if not behaviour or behaviour.get("status") != "MEASURED":
+        return ""
+    findings = list(behaviour.get("findings") or [])
+    out = f"<p class='muted'>{_e(labels['behaviour_intro'])}</p>"
+    if findings:
+        items = "".join(f"<li>{_e(labels['beh_' + code])}</li>" for code in findings)
+        out += (
+            f"<div class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul>{items}</ul></div>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['beh_badge_clean'])}</span> {_e(labels['beh_clean'])}</p>"
+        )
+    facts: list[str] = []
+    ratio = behaviour.get("hold_ratio")
+    if ratio:
+        tone = " neg" if "losers_held_longer" in findings else ""
+        text = labels["beh_hold"].format(
+            loss=_duration_text(float(behaviour["hold_loss_hours"]["value"]), locale),
+            win=_duration_text(float(behaviour["hold_win_hours"]["value"]), locale),
+        )
+        facts.append(
+            f"<div class='fact{tone}'><b>{_ratio_text(float(ratio['value']))}×</b>"
+            f"<p>{_e(text)} {_badge(ratio['evidence'])}</p></div>"
+        )
+    quick = behaviour.get("quick_after_loss")
+    # Only worth a line when re-entries after a loss outnumber those after a win.
+    if quick and float(quick["value"]) > float(behaviour["quick_after_win"]["value"]):
+        tone = " neg" if "quick_after_loss" in findings else ""
+        text = labels["beh_quick"].format(win=f"{float(behaviour['quick_after_win']['value']):.0%}")
+        facts.append(
+            f"<div class='fact{tone}'><b>{float(quick['value']):.0%}</b>"
+            f"<p>{_e(text)} {_badge(quick['evidence'])}</p></div>"
+        )
+    streak = behaviour.get("hit_rate_after_streak")
+    if streak:
+        tone = " neg" if "worse_after_streak" in findings else ""
+        text = labels["beh_streak"].format(
+            k=2,
+            n=f"{int(behaviour['after_streak_trades']['value']):,}",
+            all=f"{float(behaviour['hit_rate']['value']):.0%}",
+        )
+        facts.append(
+            f"<div class='fact{tone}'><b>{float(streak['value']):.0%}</b>"
+            f"<p>{_e(text)} {_badge(streak['evidence'])}</p></div>"
+        )
+    if facts:
+        grid = " pairs" if len(facts) % 2 == 0 else ""
+        out += f"<div class='facts{grid}'>{''.join(facts)}</div>"
+    out += f"<p class='muted'>{_e(_sentence(localize(behaviour.get('note', ''), locale)))}</p>"
+    return out
+
+
 #: What each class requires, in the words of ``verdict.overall_class``.
 CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
     "es": (
@@ -3578,6 +3708,11 @@ def render_html(
         *(
             [(labels["recent"], _recent_html(data.get("recent"), locale, labels))]
             if (data.get("recent") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
+            [(labels["behaviour"], _behaviour_html(data.get("behaviour"), locale, labels))]
+            if (data.get("behaviour") or {}).get("status") == "MEASURED"
             else []
         ),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),

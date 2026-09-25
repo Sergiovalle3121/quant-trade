@@ -53,8 +53,11 @@ def test_one_changed_byte_is_not_recognised(tmp_path: Path) -> None:
     assert edited != content
     response = _check(client, edited)
     assert "Rigor no tiene registro de este archivo" in response.text
+    # A genuine file whose recording failed is not called edited.
+    assert "no haber llegado a registrarse" in response.text
     english = _check(client, edited, "/check")
     assert "Rigor has no record of this file" in english.text
+    assert "never have been recorded" in english.text
 
 
 def test_a_downloaded_pdf_is_recognised(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

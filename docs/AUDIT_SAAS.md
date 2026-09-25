@@ -602,6 +602,26 @@ has periods of different sizes; trades are treated as independent, which
 understates the noise of a strategy whose trades cluster; it describes the
 history and says nothing about later periods.
 
+### How it behaves after losing (`audit/behaviour.py`)
+
+What traders pay a trading journal to tell them, and what a buyer of a robot
+wants to know about its logic. Needs at least 30 closed trades with at least
+10 winners and 10 losers (net of the fees the file itemises). MEASURED:
+
+- the median time a losing trade stays open against a winning one; a
+  finding when losers last 1.5 times longer or more and a Mann-Whitney test
+  puts the difference beyond chance (p < 0.05): a far, moved or missing stop;
+- the share of trades opened within 15 minutes of a losing exit against a
+  winning one; a finding when it is 20 % or more and twice the share after
+  wins: re-entering to win the money back;
+- the hit rate of trades that follow two losses in a row (at least 15 of
+  them) against the whole history; a finding when it is 15 points lower.
+
+No red flag and no class change: each finding is a question to ask the
+seller. Limitations: trades are ordered by entry time and overlapping trades
+give no pause to measure; the tests treat trades as independent; daily files
+measure hold times in whole days.
+
 ### How much capital it needs, at what size (`audit/sizing.py`)
 
 For anyone about to run or copy a strategy: "with my account, at what size
@@ -1389,7 +1409,8 @@ they were given: the server hashes it as it streams in (up to 20 MB,
 60 checks per address and hour), discards it, and says either that those
 exact bytes came from Rigor on that date for a report of that class (with
 the link to its public page when the owner published one), or that Rigor has no
-record of them (edited, from elsewhere, or issued before 25 September 2026,
+record of them (edited, from elsewhere, never recorded because the database
+failed at download time, or issued before 25 September 2026,
 when recording started; the page never says Rigor did not produce them). The wording says only whether the file changed since Rigor
 produced it, never anything about the strategy, and passes the guard.
 These two paths have their own request body limit (20 MB plus 1 MB of form),
