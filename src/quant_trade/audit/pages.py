@@ -11,6 +11,7 @@ the guard over these pages.
 from __future__ import annotations
 
 import html
+import re
 from datetime import datetime
 from typing import Any
 
@@ -1412,9 +1413,20 @@ def _drop(
 
 
 def _field(label: str, control: str, help_text: str = "") -> str:
+    """A labelled form control; the label and help text are tied to it by id."""
+    match = re.search(r"name='([a-z_]+)'", control)
+    if not match:
+        return (
+            f"<div class='field'><label>{_e(label)}</label>{control}"
+            + (f"<div class='help'>{_e(help_text)}</div>" if help_text else "")
+            + "</div>"
+        )
+    ident = f"f-{match.group(1)}"
+    attrs = f" id='{ident}'" + (f" aria-describedby='{ident}-help'" if help_text else "")
+    control = control.replace(match.group(0), match.group(0) + attrs, 1)
     return (
-        f"<div class='field'><label>{_e(label)}</label>{control}"
-        + (f"<div class='help'>{_e(help_text)}</div>" if help_text else "")
+        f"<div class='field'><label for='{ident}'>{_e(label)}</label>{control}"
+        + (f"<div class='help' id='{ident}-help'>{_e(help_text)}</div>" if help_text else "")
         + "</div>"
     )
 

@@ -303,3 +303,15 @@ def test_held_back_capital_reads_as_a_card() -> None:
     held = _capital_html({"status": "NOT_MEASURED", "reason": reason}, "es", LABELS["es"])
     assert held.startswith("<div class='live-verdict held'>") and "NOT_MEASURED" in held
     assert LABELS["es"]["capital_missing"][:30] in held
+
+
+def test_form_labels_are_tied_to_their_fields_and_greys_meet_contrast() -> None:
+    page = landing(locale="es", free_mode=False, price_usd=29, access_codes=True)
+    for name in ("challenge", "locale", "access_code", "trials", "description"):
+        assert f"<label for='f-{name}'>" in page and f"id='f-{name}'" in page
+    assert "aria-describedby='f-access_code-help'" in page
+    # 4.5:1 on the page and card backgrounds, light and dark.
+    assert "--text-3:#72727a" not in STYLE and "--text-3:#707077" not in STYLE
+    assert "--text-3:#66666e" in STYLE and "--text-3:#84848b" in STYLE
+    assert "--ok:#17742f" in STYLE and "--warn:#9a5200" in STYLE
+    assert ".drop:focus-within{outline" in STYLE and "height:44px;transform" in STYLE
