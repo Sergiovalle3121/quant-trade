@@ -557,6 +557,8 @@ with an empty value):
 1. Open `https://<domain>/health`: `free_mode`, `stripe_enabled` and
    `access_codes` say which mode the variables produced. Selling with codes
    shows `"free_mode": false, "access_codes": true`.
+   `version` is the short commit Railway deployed (`RAILWAY_GIT_COMMIT_SHA`);
+   compare it with the latest commit on `main` to see whether a merge is live.
 2. Open `/ejemplo`: a full report of synthetic data renders with charts.
 3. Upload an MT5 tester report (`Report.html` as the terminal saves it) and,
    if you have it, the optimisation XML. The report shows the class, the
