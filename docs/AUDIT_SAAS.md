@@ -143,6 +143,18 @@ left out. Fees cannot be attributed per trade, so removing trades keeps
 them whole, which errs on the strict side. These rows set no threshold and
 do not change the class.
 
+### When it wins and when it loses
+
+`audit/timing.py` groups the closed trades by the weekday and the four-hour
+block of their entry, as the file states them (platform or server time), and
+reports each group's count, net result before itemised fees and hit rate
+(the JSON's `timing` block, MEASURED). The report names the weekday and the
+block with the largest net result and their share of the total when the
+total is positive. It needs at least `MIN_TRADES` = 20 closed trades
+(NOT_MEASURED below that); the time-of-day table is left out when every
+entry has the same clock time (daily data). It sets no threshold and does
+not change the class.
+
 ### Plan to reach a better class
 
 `audit/plan.py` turns the verdict into one step per dimension that did not

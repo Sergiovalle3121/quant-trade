@@ -29,6 +29,7 @@ import pandas as pd
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import stress as stress_lib
+from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
 from quant_trade.audit.schema import (
@@ -750,6 +751,11 @@ def run_audit(
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
     stress_tests = _stress(inputs, frame)
+    timing = (
+        timing_lib.timing_breakdown(inputs.trades.trades)
+        if inputs.trades is not None
+        else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
+    )
     risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
     challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
 
@@ -902,6 +908,7 @@ def run_audit(
         series=_series(frame, balance_only=inputs.balance_only),
         trade_stats=trade_stats,
         stress=stress_tests,
+        timing=timing,
         risk=risk,
         challenge=challenge,
         vendor_questions=questions,

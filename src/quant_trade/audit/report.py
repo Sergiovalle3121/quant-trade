@@ -138,6 +138,19 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_code": "¿No tienes código? Pídelo aquí",
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
+        "timing": "Cuándo gana y cuándo pierde",
+        "timing_intro": (
+            "Tus operaciones agrupadas por el día y la hora de entrada. Si casi todo el "
+            "resultado sale de un solo día o de una sola franja, un cambio de horario del "
+            "servidor, de festivos o de noticias puede borrarlo."
+        ),
+        "timing_best_day": "El {share:.0%} del resultado neto sale de los {day}.",
+        "timing_best_block": "El {share:.0%} del resultado neto sale de la franja {block}.",
+        "timing_day": "Día de entrada",
+        "timing_block": "Hora de entrada",
+        "timing_trades": "Operaciones",
+        "timing_net": "Resultado neto",
+        "timing_hits": "Aciertos",
         "reading": "Lectura de tu archivo",
         "reading_intro": (
             "Antes de analizar nada, volvimos a contar tus operaciones fila por fila y lo "
@@ -327,6 +340,18 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_code": "No code yet? Ask for one here",
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
+        "timing": "When it wins and when it loses",
+        "timing_intro": (
+            "Your trades grouped by entry day and time. If nearly all the result comes from "
+            "one day or one session, a change of server time, holidays or news can erase it."
+        ),
+        "timing_best_day": "{share:.0%} of the net result comes from {day}s.",
+        "timing_best_block": "{share:.0%} of the net result comes from the {block} session.",
+        "timing_day": "Entry day",
+        "timing_block": "Entry time",
+        "timing_trades": "Trades",
+        "timing_net": "Net result",
+        "timing_hits": "Win rate",
         "reading": "How your file was read",
         "reading_intro": (
             "Before analysing anything, we re-counted your trades row by row and compared "
@@ -1418,6 +1443,70 @@ def _reading_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     )
 
 
+WEEKDAYS: dict[str, tuple[str, ...]] = {
+    "es": ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"),
+    "en": ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+}
+
+
+def _block_name(key: int) -> str:
+    start = key * 4
+    return f"{start:02d}:00–{start + 3:02d}:59"
+
+
+def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict[str, str]) -> str:
+    body = "".join(
+        f"<tr><td>{_e(name(row['key']))}</td><td>{row['trades']['value']:,}</td>"
+        f"<td class='{'neg' if row['net']['value'] < 0 else ''}'>{row['net']['value']:+,.2f}</td>"
+        f"<td>{row['win_rate']['value']:.0%}</td></tr>"
+        for row in rows
+    )
+    return (
+        f"<table><tr><th>{_e(head)}</th><th>{_e(labels['timing_trades'])}</th>"
+        f"<th>{_e(labels['timing_net'])}</th><th>{_e(labels['timing_hits'])}</th></tr>"
+        f"{body}</table>"
+    )
+
+
+def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """Trades by weekday and four-hour block, with the best group's share."""
+    if not timing or timing.get("status") != "MEASURED":
+        reason = (timing or {}).get("reason", "")
+        return (
+            f"<p>{_badge('NOT_MEASURED')} <span class='muted'>"
+            f"{_e(localize(reason, locale))}</span></p>"
+        )
+    days = WEEKDAYS.get(locale, WEEKDAYS["es"])
+    out = f"<p class='muted'>{_e(labels['timing_intro'])}</p>"
+    best_day = timing.get("best_weekday")
+    if best_day:
+        out += (
+            "<p>"
+            + _e(
+                labels["timing_best_day"].format(
+                    share=best_day["share"]["value"], day=days[best_day["key"]]
+                )
+            )
+            + "</p>"
+        )
+    best_block = timing.get("best_block")
+    if best_block:
+        out += (
+            "<p>"
+            + _e(
+                labels["timing_best_block"].format(
+                    share=best_block["share"]["value"], block=_block_name(best_block["key"])
+                )
+            )
+            + "</p>"
+        )
+    out += _timing_table(timing["weekdays"], labels["timing_day"], lambda k: days[k], labels)
+    if timing.get("blocks"):
+        out += _timing_table(timing["blocks"], labels["timing_block"], _block_name, labels)
+    out += f"<p class='muted'>{_e(localize(timing.get('note', ''), locale))}</p>"
+    return out
+
+
 def _only_unmeasured(body: str) -> bool:
     """True when a section has nothing but NOT_MEASURED marks to show."""
     return "badge NOT_MEASURED" in body and not any(
@@ -1759,6 +1848,7 @@ def render_html(
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
+        (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
         (labels["challenge"], _challenge_html(data.get("challenge"), locale, labels)),
