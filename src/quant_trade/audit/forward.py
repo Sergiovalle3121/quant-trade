@@ -59,8 +59,14 @@ UNNAMED_FORWARD = (
 
 
 def is_forward(table: Sequence[dict[str, float]]) -> bool:
-    """True when every row carries both the back and the forward criterion."""
-    return bool(table) and all(BACK in row and FORWARD in row for row in table)
+    """True when the export has both the back and the forward criterion.
+
+    A row whose forward cell is blank or not a number (a pass that never ran
+    in the forward period, a damaged file) lacks the key; it must not turn
+    the whole export into a plain one whose Profit column the plateau check
+    would read as the backtest's.
+    """
+    return any(BACK in row and FORWARD in row for row in table)
 
 
 def unnamed_forward(table: Sequence[dict[str, float]]) -> bool:
@@ -73,7 +79,8 @@ def unnamed_forward(table: Sequence[dict[str, float]]) -> bool:
     """
     if not table or is_forward(table):
         return False
-    names = list(table[0])
+    # The fullest row: a blank cell in the first one would shift its names.
+    names = list(table[max(range(len(table)), key=lambda i: len(table[i]))])
     return len(names) > 3 and names[0] == "Pass" and names[3] == PROFIT and "Result" not in names
 
 
@@ -103,7 +110,11 @@ def forward_review(
         return {"status": "NOT_MEASURED", "reason": UNNAMED_FORWARD}, []
     if not is_forward(table):
         return {"status": "NOT_MEASURED", "reason": NOT_FORWARD}, []
-    rows = [row for row in table if math.isfinite(row[BACK]) and math.isfinite(row[FORWARD])]
+    rows = [
+        row
+        for row in table
+        if math.isfinite(row.get(BACK, math.nan)) and math.isfinite(row.get(FORWARD, math.nan))
+    ]
     if len(rows) < MIN_PASSES:
         return {
             "status": "NOT_MEASURED",
