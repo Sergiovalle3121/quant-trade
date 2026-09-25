@@ -2531,7 +2531,7 @@ def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict
         return (
             f"<td class='val tbar {side}' data-l='{_e(labels['timing_net'])}'>"
             "<span class='tbar-track' aria-hidden='true'>"
-            f"<span style='--w:{width:.0f}%'></span></span><b>{net:+,.2f}</b></td>"
+            f"<span style='--w:{width:.0f}%'></span></span><b>{_signed_amount(net)}</b></td>"
         )
 
     body = "".join(
@@ -2963,6 +2963,25 @@ def _date_text(iso: str, locale: str) -> str:
     return f"{day} {months[month - 1]} {year}"
 
 
+def _signed_amount(value: float) -> str:
+    """A signed money or price amount with two decimals, or four significant
+    digits when it is small (``+0.00027``); never a signed zero."""
+    if not math.isfinite(value) or value == 0:
+        return "0.00"
+    digits = 2 if abs(value) >= 1 else min(10, max(2, 3 - math.floor(math.log10(abs(value)))))
+    text = f"{value:+,.{digits}f}"
+    if digits > 2:
+        text = text.rstrip("0")
+        if len(text.partition(".")[2]) < 2:
+            text = f"{float(text):+,.2f}"
+    return "0.00" if float(text.replace(",", "")) == 0 else text
+
+
+def _signed_z(value: float) -> str:
+    text = f"{value:+.1f}"
+    return "0.0" if text in ("+0.0", "-0.0") else text
+
+
 def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """The last third of the history against the two before it."""
     if not recent or recent.get("status") != "MEASURED":
@@ -2999,7 +3018,11 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
         cells.append((tone, recent["drop_z"], labels["recent_z"], "z"))
     facts = "".join(
         f"<div class='fact{cls}'><b>"
-        + (f"{float(item['value']):+,.2f}" if kind == "money" else f"{float(item['value']):+.1f}")
+        + (
+            _signed_amount(float(item["value"]))
+            if kind == "money"
+            else _signed_z(float(item["value"]))
+        )
         + f"</b><p>{_e(text)} {_badge(item['evidence'])}</p></div>"
         for cls, item, text, kind in cells
     )

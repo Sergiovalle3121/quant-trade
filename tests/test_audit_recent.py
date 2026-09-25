@@ -142,3 +142,16 @@ def test_engine_steady_history_holds() -> None:
     assert "EDGE_FADING" not in {flag["code"] for flag in result.red_flags}
     html, _ = render(result, watermark=False)
     assert "Se mantiene" in html
+
+
+def test_small_amounts_keep_their_digits_and_never_show_a_signed_zero() -> None:
+    from quant_trade.audit.report import LABELS, _recent_html, _signed_amount
+
+    assert _signed_amount(0.00027) == "+0.00027"
+    assert _signed_amount(-0.00014) == "-0.00014"
+    assert _signed_amount(-0.0) == "0.00" and _signed_amount(1e-12) != "+0.00"
+    assert _signed_amount(-1234.5) == "-1,234.50"
+    results = [v / 10_000 for v in _noise(120, 3.0, seed=1)]
+    review, _ = recent_review(_trades(results))
+    html = _recent_html(review, "es", LABELS["es"])
+    assert "-0.00<" not in html and "+0.00<" not in html
