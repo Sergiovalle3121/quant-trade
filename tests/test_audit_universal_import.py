@@ -233,6 +233,21 @@ def test_fees_all_in_another_coin_are_not_also_called_zero_commission() -> None:
     _clean(report)
 
 
+def test_an_overflowing_trade_is_refused_not_audited_as_infinity() -> None:
+    # 9e307 x 2 x 100 overflows to infinity; the audit used to crash on it (HTTP 500).
+    lines = [
+        "Symbol,DateTime,Buy/Sell,Quantity,TradePrice,Multiplier,FifoPnlRealized",
+        "AAPL,20260115;093000,BUY,100,200,1,0",
+        "AAPL,20260116;100000,SELL,-100,205,1,500",
+        "SPY C600,20260120;110000,BUY,2,9e307,100,0",
+        "SPY C600,20260121;110000,SELL,-2,9e307,100,9e307",
+    ]
+    with pytest.raises(ReportFormatError) as caught:
+        import_report(("\n".join(lines) + "\n").encode(), "flex.csv", initial_balance=25_000)
+    assert caught.value.code == "value_too_large"
+    assert "2026-01-21" in str(caught.value)
+
+
 def test_ninjatrader_executions_no_longer_call_the_point_value_an_inference() -> None:
     header = "Instrument;Action;Quantity;Price;Time;ID;E/X;Commission;Account display name"
     rows = [
