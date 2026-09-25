@@ -145,7 +145,7 @@ Solo tú puedes hacer lo que falta:
 
 ## 3. Dónde están los compradores
 
-Cuatro grupos compran este informe:
+Cinco grupos compran este informe:
 
 - **Compradores de EA**: quieren saber si el backtest que les enseña un
   vendedor es sobreajuste antes de pagar el robot.
@@ -153,6 +153,8 @@ Cuatro grupos compran este informe:
   y las reglas de pérdida diaria de su estrategia antes de pagar el reto.
 - **Vendedores de EA**: quieren una evidencia estadística pública que el
   comprador pueda comprobar por hash.
+- **Traders de acciones, futuros o cripto con estrategia propia**: quieren
+  saber si su ventaja es real o la encontraron a fuerza de probar.
 - **Quien va a copiar o invertir con otro trader**: quiere saber si la cuenta
   se parece al backtest y si el porcentaje se infla con depósitos.
 
@@ -227,6 +229,14 @@ una sola venta trae a otros compradores.
    compradores y vendedores de EA en inglés. Comprueba antes, en un
    navegador, si la membresía comercial tiene coste y qué exige.
 
+5. **Traders de acciones, futuros y cripto que programan o prueban sus
+   estrategias** (plantillas F2, F3 y D3). Rigor no depende del mercado, así
+   que el mismo contenido sirve fuera del mundo de los robots de MetaTrader:
+   el foro de la comunidad de QuantConnect, r/algotrading y los subreddits de
+   cripto y futuros, siempre tras leer sus reglas (casi todos retiran enlaces
+   a productos; ahí se aporta método, y la web va en el perfil). En
+   TradingView no se promociona nada, ni por privado.
+
 Después, cuando haya opiniones reales: Forex Peace Army (clasificados),
 Reddit (entradas de método, tras leer las reglas de cada subreddit) y un
 anuncio de pago si los números de la sección 8 lo justifican.
@@ -242,9 +252,9 @@ frases sobre resultados futuros: cada plantilla pasa el guard tal como está.
 #### P1 · ES · A un conocido que opera con robots, retos o cuentas ajenas
 
 ```text
-Hola, <nombre>. Te escribo porque sé que <usas robots / estás con retos de prop firm / copias a otro trader>.
+Hola, <nombre>. Te escribo porque sé que <operas acciones o cripto con tu estrategia / usas robots / estás con retos de prop firm / inviertes con un gestor>.
 
-Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el informe de MetaTrader, TradingView, Myfxbook o tu plataforma tal cual, y te dice con estadística si el resultado se sostiene o si es sobreajuste, costes mal contados o suerte. Da una clase de A a D, y cada número dice si se midió del archivo o si solo lo declaró la plataforma.
+Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el informe de MetaTrader, TradingView, Myfxbook o tu plataforma tal cual, o tu curva de equity de cualquier mercado, y te dice con estadística si el resultado se sostiene o si es sobreajuste, costes mal contados o suerte. Da una clase de A a D, y cada número dice si se midió del archivo o si solo lo declaró la plataforma.
 
 También compara un backtest con la cuenta real donde corre el robot y separa los depósitos del resultado de operar, que es donde más se maquilla un historial.
 
@@ -258,9 +268,9 @@ Si te sirve o conoces a alguien a quien le sirva, me ayudas mucho. Si no, no pas
 #### P1 · EN · To someone you know who trades with robots, challenges or other people's accounts
 
 ```text
-Hi <name>, I am writing because I know you <use trading robots / are doing prop-firm challenges / copy another trader>.
+Hi <name>, I am writing because I know you <trade stocks or crypto with your own strategy / use trading robots / are doing prop-firm challenges / invest with a manager>.
 
-I launched Rigor, a service that audits backtests and account histories: you upload the MetaTrader, TradingView, Myfxbook or other platform report as it is, and it tells you, with statistics, whether the result holds up or is overfitting, miscounted costs or luck. It gives a class from A to D, and every number says whether it was measured from the file or only declared by the platform.
+I launched Rigor, a service that audits backtests and account histories: you upload the MetaTrader, TradingView, Myfxbook or other platform report as it is, or your equity curve from any market, and it tells you, with statistics, whether the result holds up or is overfitting, miscounted costs or luck. It gives a class from A to D, and every number says whether it was measured from the file or only declared by the platform.
 
 It also compares a backtest with the live account the robot runs on, and separates deposits from trading results, which is where a history is most often dressed up.
 
@@ -589,6 +599,32 @@ Ask them for two files: the full history of their account (the MetaTrader report
 Rigor separates deposits and withdrawals from trading results, warns when the percentage is inflated by top-ups or when losses are still open at the end, and compares the account with thousands of resampled histories of its backtest and trade by trade on the same dates. Guide: https://<domain>/guides/provider-account
 
 The preview is free; the full report is USD 29. I never connect to their broker or your money, and I do not tell you whether to invest: I give you the numbers so you can decide.
+```
+
+#### D3 · ES · A un trader de acciones, futuros o cripto que preguntó por Rigor
+
+```text
+Hola, <nombre>. Me preguntaste si Rigor sirve para <acciones / futuros / cripto>.
+
+Sí: Rigor no depende del mercado, mide el historial que subes. Puedes subir la lista de operaciones de TradingView o NinjaTrader, el CSV de QuantConnect, backtesting.py o vectorbt, o tu curva de equity o serie de retornos en CSV o Excel (diaria, semanal o mensual).
+
+Te dice si tu Sharpe se distingue del azar, cuánto queda después de descontar las configuraciones que probaste, qué pasa con el doble de costes, si sigue funcionando en el periodo reciente y qué capital pide. Cada número dice si se midió del archivo o si no se pudo medir.
+
+La vista previa es gratis: https://<dominio>
+El informe completo cuesta USD 29. Ejemplo: https://<dominio>/ejemplo
+```
+
+#### D3 · EN · To a stock, futures or crypto trader who asked about Rigor
+
+```text
+Hi <name>, you asked whether Rigor works for <stocks / futures / crypto>.
+
+Yes: Rigor does not depend on the market, it measures the history you upload. You can upload the TradingView or NinjaTrader list of trades, the QuantConnect, backtesting.py or vectorbt CSV, or your equity curve or return series as CSV or Excel (daily, weekly or monthly).
+
+It tells you whether your Sharpe stands out from chance, how much is left after discounting the configurations you tried, what happens at double costs, whether it still works in the recent period and how much capital it needs. Every number says whether it was measured from the file or could not be measured.
+
+The preview is free: https://<domain>
+The full report is USD 29. Sample: https://<domain>/ejemplo
 ```
 
 ## 6. Propuesta para vendedores de EA
