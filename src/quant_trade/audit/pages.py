@@ -1644,10 +1644,18 @@ def landing(
 
 
 def _evidence_value(item: Any) -> str:
+    """A figure and its evidence tag as HTML: "120" then the DECLARED badge."""
     if isinstance(item, dict) and "value" in item:
         value = item.get("value")
-        return f"{'—' if value is None else value} ({item.get('evidence', '')})"
-    return "-" if item is None else str(item)
+        shown = "—" if value is None else _e(f"{value:,}" if isinstance(value, int) else value)
+        evidence = str(item.get("evidence", ""))
+        tag = (
+            f" <span class='badge {_e(evidence)}'>{_e(evidence)}</span>"
+            if evidence in ("MEASURED", "DECLARED", "NOT_MEASURED")
+            else ""
+        )
+        return f"<span class='vc'>{shown}{tag}</span>"
+    return "—" if item is None else _e(str(item))
 
 
 def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "") -> str:
@@ -1752,13 +1760,19 @@ def verification_page(
             or "-",
         ),
         (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
-        (copy["v_trials_declared"], _evidence_value(declared.get("trials"))),
-        (copy["v_trials_used"], _evidence_value(trials_used)),
-        (copy["v_result_sha"], result_sha256),
     ]
-    detail_rows = "".join(
-        f"<tr><td>{_e(label)}</td><td><code>{_e(value)}</code></td></tr>"
-        for label, value in details
+    # Words read as words, figures carry their evidence badge, and only the
+    # hash keeps the code style.
+    detail_rows = (
+        "".join(f"<tr><td>{_e(label)}</td><td>{_e(value)}</td></tr>" for label, value in details)
+        + "".join(
+            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item)}</td></tr>"
+            for label, item in (
+                (copy["v_trials_declared"], declared.get("trials")),
+                (copy["v_trials_used"], trials_used),
+            )
+        )
+        + f"<tr><td>{_e(copy['v_result_sha'])}</td><td><code>{_e(result_sha256)}</code></td></tr>"
     )
     page_url = f"{base_url}/v/{public_id}"
     badge_url = f"{page_url}/badge.svg?lang={locale}"
@@ -1936,7 +1950,10 @@ _ERROR_TITLES = {
 #: Where an importer's message starts listing the formats it reads.
 _EXPECTED_MARKERS = ("Se espera:", "Expected:")
 #: "...: sube la optimización del mismo robot" reads as the fix, so it gets its own line.
-_ACTION = re.compile(r":\s+(?=(?:sube|vuelve|exporta|pide|upload|export|ask|re-export)\b)", re.I)
+_ACTION = re.compile(
+    r"[:;]\s+(?=(?:sube|vuelve|exp[oó]rta\w*|revisa|pide|upload|export|check|ask|re-export|optimi[sz]e)\b)",
+    re.I,
+)
 _ACTION_LABEL = {"es": "Qué hacer:", "en": "What to do:"}
 
 
@@ -1960,12 +1977,13 @@ def _error_card(message: str, locale: str = "es") -> str:
         if len(parts) == 2 and parts[0].strip() and parts[1].strip():
             rest, action = parts[0].strip(), parts[1].strip()
             rest = rest if rest[-1] in ".!?" else rest + "."
-            action = action[:1].upper() + action[1:]
+            action = action[:1].upper() + action[1:].rstrip(".") + "."
             expected = (
                 f"<p class='err-exp'><b>{_e(_ACTION_LABEL.get(locale, _ACTION_LABEL['es']))}</b> "
                 f"{_e(action)}</p>"
             )
     rest = rest[:1].upper() + rest[1:]
+    rest = rest if rest[-1:] in ".!?" else rest + "."
     return (
         f"<div class='error-card' role='alert'><div class='err-ico'>{icon('alert')}</div><div>"
         + (f"<p class='err-field'>{_e(field)}</p>" if field else "")
@@ -1981,7 +1999,7 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
     body = (
-        _page_hero(ui["error_eyebrow"], title, dot="bad")
+        _page_hero(ui["error_eyebrow"], title, dot="warn")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"{_error_card(message, locale)}<div class='back-row'>"
         f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"

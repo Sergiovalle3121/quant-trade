@@ -641,12 +641,13 @@ font-size:.92rem;border:1px solid;line-height:1.5}
 border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
 .error{color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent);
 border-color:color-mix(in srgb,var(--bad) 32%,transparent)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 24%,transparent)}
 .dot.bad{background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 24%,transparent)}
 .error-card{display:grid;grid-template-columns:44px minmax(0,1fr);gap:18px;align-items:start;
-background:#fff;border:1px solid var(--border);border-left:4px solid var(--bad);border-radius:20px;
+background:#fff;border:1px solid var(--border);border-left:4px solid var(--warn);border-radius:20px;
 padding:24px 26px;box-shadow:var(--shadow-sm,0 1px 2px rgba(0,0,0,.04))}
 .error-card .err-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
-color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .error-card .err-ico svg{width:22px;height:22px}
 .error-card p{margin:0}
 .err-field{font:500 .72rem/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;
@@ -657,6 +658,9 @@ color:var(--text-3);margin-bottom:6px!important}
 @media (max-width:520px){.error-card{grid-template-columns:minmax(0,1fr);gap:14px;padding:20px}}
 .notice{color:var(--info);background:color-mix(in srgb,var(--info) 9%,transparent);
 border-color:color-mix(in srgb,var(--info) 30%,transparent);font-weight:560}
+.notice.ok{display:flex;gap:10px;align-items:flex-start;color:var(--ok);
+background:color-mix(in srgb,var(--ok) 9%,transparent);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.notice.ok svg{width:18px;height:18px;flex:none;margin-top:2px}
 .banner{color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent);
 border-color:color-mix(in srgb,var(--warn) 32%,transparent);font-weight:600;letter-spacing:.01em}
 .disclaimer{border:1px solid var(--border);border-radius:16px;padding:18px 20px;
@@ -910,6 +914,12 @@ background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http:/
 background:rgba(255,255,255,.04)}
 .paybox label{color:#ececf0}
 .paybox .inline-form{margin-top:8px}
+.paybox.redeem{scroll-margin-top:132px}
+.code-error{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;padding:12px 14px;
+border-radius:12px;color:#ffd08a;background:rgba(255,179,64,.1);border:1px solid rgba(255,179,64,.32);
+font-size:.9rem;line-height:1.5}
+.code-error svg{width:16px;height:16px;flex:none;margin-top:3px;color:#ffb340}
+.paybox input[aria-invalid=true]{border-color:rgba(255,179,64,.6)}
 .paybox a{color:#fff;font-weight:560}
 .paybox.buy{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;
 padding:22px 24px;background:rgba(255,255,255,.07);border-color:var(--border-2)}

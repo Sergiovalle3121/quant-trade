@@ -335,7 +335,8 @@ def test_an_importer_crash_is_a_format_message(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setattr(web, "build_inputs", explode)
     response = _post(_client(tmp_path), _equity_upload())
     assert response.status_code == 400
-    assert message("invalid_upload", "es") in response.text
+    assert "No se pudo auditar lo que subiste tal como está." in response.text
+    assert "<b>Qué hacer:</b> Revisa el formato de los archivos." in response.text
 
 
 @pytest.mark.parametrize("path", ["/", "/ejemplo", "/nope", "/health"])
