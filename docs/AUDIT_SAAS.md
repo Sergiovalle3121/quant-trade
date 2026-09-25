@@ -1514,6 +1514,8 @@ apart with a hairline and a dot in the outcome's tone (green holds, amber on the
 edge, red does not hold), keeps its link muted, and prints it black at the
 verdict's size in the PDF.
 
+Redesign pass 43 styles the fund calendar from #202. On a phone the table scrolls inside its own frame and the year column stays fixed, so every row keeps its year. The last column is headed "Total" ("Full year" in English) and sits apart with a rule and a light fill. Missing months are hatched. In the PDF the table drops its screen width and fits the page at a smaller size.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

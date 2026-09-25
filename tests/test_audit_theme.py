@@ -657,3 +657,26 @@ def test_the_live_account_line_sits_apart_under_the_verdict_with_its_tone(tmp_pa
     # In the PDF it keeps the verdict's print size and turns black like it.
     assert ".verdict-text,.verdict-lead,.verdict-live," in STYLE
     assert ".verdict-live{border-top-color:#ddd;font-size:9pt" in STYLE
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_the_fund_calendar_keeps_its_years_in_view_and_fits_the_pdf(locale: str) -> None:
+    from test_audit_fund import _grid_csv, _returns
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.report import LABELS, render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(_grid_csv(_returns(36)), DeclaredMetadata(locale=locale))
+    html = render_html(
+        run_audit(inputs, bootstrap_samples=200, risk_samples=300), watermark=False, locale=locale
+    )
+    # The last column is the year's total, named apart from the year column.
+    assert f"<th class='tot'>{LABELS[locale]['fund_total']}</th>" in html
+    assert LABELS[locale]["fund_total"] != LABELS[locale]["fund_year"]
+    assert find_claims(LABELS[locale]["fund_total"]) == []
+    # On a phone the table scrolls inside its frame and the year column stays put.
+    assert ".fund-cal th[scope=row]{position:sticky;left:0" in STYLE
+    assert ".paper .fund-cal-wrap table.fund-cal{display:table;overflow:visible" in STYLE
+    # In the PDF it drops the screen width and fits the page.
+    assert ".paper .fund-cal-wrap table.fund-cal{min-width:0;width:100%" in STYLE

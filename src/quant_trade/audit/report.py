@@ -356,6 +356,7 @@ LABELS: dict[str, dict[str, str]] = {
             "pequeña. No cambia la clase: son preguntas para hacer."
         ),
         "fund_year": "Año",
+        "fund_total": "Total",
         "fund_months": "Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic",
         "fund_cagr": "Rentabilidad anual compuesta",
         "fund_vol": "Volatilidad anual",
@@ -940,6 +941,7 @@ LABELS: dict[str, dict[str, str]] = {
             "not change the class: these are questions to ask."
         ),
         "fund_year": "Year",
+        "fund_total": "Full year",
         "fund_months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
         "fund_cagr": "Compound annual return",
         "fund_vol": "Annual volatility",
@@ -3473,8 +3475,9 @@ def _fund_calendar(years: list[dict[str, Any]], labels: dict[str, str]) -> str:
         )
     return (
         "<div class='fund-cal-wrap'><table class='fund-cal'>"
-        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}<th>{_e(labels['fund_year'])}</th>"
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}"
+        f"<th class='tot'>{_e(labels['fund_total'])}</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -4334,9 +4337,7 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
         )
     link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_live_link'])}</a>" if anchor else ""
     tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
-    return (
-        f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
-    )
+    return f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
 
 
 def _verdict_html(summary: str) -> str:

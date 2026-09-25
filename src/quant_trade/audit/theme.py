@@ -844,12 +844,18 @@ color:var(--text-3)}
 line-height:1;font-variant-numeric:tabular-nums}
 .fact p{margin:10px 0 0;color:var(--text-2);font-size:.92rem}
 .paper table.timing{table-layout:fixed}
-.fund-cal-wrap{overflow-x:auto;margin:18px 0 8px;-webkit-overflow-scrolling:touch}
-.paper table.fund-cal{min-width:720px;font-size:.78rem;font-variant-numeric:tabular-nums}
-.fund-cal th,.fund-cal td{padding:8px 6px!important;text-align:right;white-space:nowrap}
-.fund-cal th:first-child{text-align:left}
+.fund-cal-wrap{overflow-x:auto;margin:18px 0 8px;-webkit-overflow-scrolling:touch;background:#fff;border:1px solid var(--border);border-radius:16px}
+.paper .fund-cal-wrap table.fund-cal{display:table;overflow:visible;min-width:720px;margin:0;border:0;border-radius:0;font-size:.78rem;font-variant-numeric:tabular-nums}
+.fund-cal th,.fund-cal td{padding:9px 7px!important;text-align:right;vertical-align:middle;white-space:nowrap}
+.fund-cal th:first-child{text-align:left;padding-left:14px!important}
+.fund-cal th[scope=row]{position:sticky;left:0;z-index:1;background:#fafafb;color:var(--text-2);letter-spacing:.04em;box-shadow:inset -1px 0 0 var(--border)}
+.fund-cal thead th:first-child{position:sticky;left:0;z-index:2;box-shadow:inset -1px 0 0 var(--border)}
 .fund-cal td.neg{color:#b42318}.fund-cal td.pos{color:#1a7f4b}
-.fund-cal td.tot{font-weight:650}
+.fund-cal td.empty{background:repeating-linear-gradient(135deg,transparent 0 4px,#f1f1f3 4px 5px)}
+.fund-cal th.tot,.fund-cal td.tot{padding-right:14px!important;border-left:1px solid var(--border)}
+.fund-cal td.tot{font-weight:650;background:#fafafb}
+.paper .fund-cal tr:hover>td{background:#f6f6f8}
+@media print{.fund-cal-wrap{overflow:visible;break-inside:avoid;border-radius:10px}.paper .fund-cal-wrap table.fund-cal{min-width:0;width:100%;table-layout:auto;font-size:7pt}.fund-cal th,.fund-cal td{padding:5px 2px!important}.fund-cal th{font-size:6pt;letter-spacing:0}.fund-cal th:first-child{padding-left:8px!important}.fund-cal th.tot,.fund-cal td.tot{padding-right:8px!important}.fund-cal th[scope=row],.fund-cal thead th:first-child{position:static;box-shadow:none;border-right:1px solid #ddd}}
 .paper table.stress{table-layout:fixed}
 .stress .c-n{width:17%}.stress .c-b{width:190px}
 .stress .val{text-align:right;padding-right:28px;white-space:nowrap}
