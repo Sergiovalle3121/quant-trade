@@ -68,7 +68,7 @@ def instrument_review(
             "status": "NOT_MEASURED",
             "reason": "the file does not name each trade's instrument",
         }
-    if len(set(names)) < 2:
+    if len({name.casefold() for name in names}) < 2:
         return {"status": "NOT_MEASURED", "reason": "every trade is on one instrument"}
     if len(trades) < MIN_TRADES:
         return {"status": "NOT_MEASURED", "reason": f"needs at least {MIN_TRADES} closed trades"}
@@ -77,9 +77,12 @@ def instrument_review(
     if not all(math.isfinite(net) for net in nets):
         return {"status": "NOT_MEASURED", "reason": "a trade result is not a finite number"}
 
+    # Grouped regardless of case; each row shows the name as the file first writes it.
+    shown_as: dict[str, str] = {}
     groups: dict[str, list[float]] = {}
     for name, net in zip(names, nets, strict=True):
-        groups.setdefault(name, []).append(net)
+        label = shown_as.setdefault(name.casefold(), name)
+        groups.setdefault(label, []).append(net)
     ordered = sorted(groups, key=lambda name: (-len(groups[name]), name))
     readable = [name for name in ordered if len(groups[name]) >= MIN_EACH]
     shown = readable[:MAX_ROWS]

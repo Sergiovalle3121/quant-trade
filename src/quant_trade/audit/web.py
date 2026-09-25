@@ -1133,6 +1133,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         challenge: Annotated[str, Form()] = "",
         initial_balance: Annotated[str, Form()] = "",
         access_code: Annotated[str, Form()] = "",
+        net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         loc = _locale(locale)
         if consent.lower() not in ("on", "yes", "true", "1"):
@@ -1185,6 +1186,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 locale=loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,
+                net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
             )
         except (ValidationError, ValueError):
             return _html_error(request, 400, message("invalid_declared", loc), loc)

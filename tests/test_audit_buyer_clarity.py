@@ -59,3 +59,37 @@ def test_no_sentence_reads_as_an_accusation() -> None:
             "most often retouched",
         ):
             assert phrase not in page
+
+
+def test_what_to_do_now_speaks_to_the_buyer_and_links_each_step() -> None:
+    page = _page("es")
+    start = page.index("id='r-next'")
+    box = page[start : page.index("</section>", start)]
+    assert "<h2>Qué hacer ahora</h2>" in box
+    # The sample's open points, in order: live account, costs, trials; then the
+    # questions and a closing step.
+    order = [
+        "tu cuenta real queda fuera",
+        "Compara el spread",
+        "cuántas configuraciones",
+        "Lleva al vendedor las preguntas",
+        "Guarda este informe",
+    ]
+    positions = [box.index(text) for text in order]
+    assert positions == sorted(positions)
+    assert box.count("Ir al apartado") == 4
+    assert "What to do now" in _page("en")
+
+
+def test_the_evidence_tags_are_explained_under_the_verdict() -> None:
+    page = _page("es")
+    hero = page[: page.index("<nav class='report-toc")]
+    assert "MEASURED, calculada de tus archivos" in hero
+    assert "MEASURED, computed from your files" in _page("en")
+
+
+def test_generic_prop_firm_rules_show_no_internal_id_or_missing_date() -> None:
+    page = _page("es")
+    assert "generic-2step" not in page
+    assert "publicadas en la fecha indicada" not in page
+    assert "En las simulaciones del historial" in page
