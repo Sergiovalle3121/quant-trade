@@ -201,6 +201,11 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_badge_clean": "Meseta",
         "plateau_badge_peak": "Pico aislado",
+        "plateau_forward_hint": (
+            "Si en el probador de MT5 activas el periodo forward y subes esa optimización, el "
+            "informe añade «¿Aguanta en el periodo forward?»: compara cada configuración en el "
+            "periodo optimizado y en uno posterior que el optimizador no usó para elegir."
+        ),
         "forward": "¿Aguanta en el periodo forward?",
         "forward_intro": (
             "MetaTrader puede probar las mismas configuraciones en un periodo posterior que el "
@@ -694,6 +699,11 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_badge_clean": "Plateau",
         "plateau_badge_peak": "Lone peak",
+        "plateau_forward_hint": (
+            "If you turn on the forward period in the MT5 tester and upload that optimisation, "
+            "the report adds \u201cDoes it hold in the forward period?\u201d: it compares every "
+            "pass on the optimised period and on a later one the optimiser did not use to choose."
+        ),
         "forward": "Does it hold in the forward period?",
         "forward_intro": (
             "MetaTrader can run the same settings on a later period the optimiser did not use "
@@ -2807,6 +2817,8 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         )
     }
     out += _evidence_rows(rows_data, labels, skip=set())
+    # A normal export: say what a forward one adds, since the plateau steps aside for it.
+    out += f"<p class='muted'>{_e(labels['plateau_forward_hint'])}</p>"
     return out
 
 

@@ -288,7 +288,9 @@ The sample backtest also starts with 60 business days from a random stream
 of their own (from October 2022), so its trades span more than two years
 and "¿Sigue funcionando en el periodo reciente?" is measured: the average
 per trade falls from +15.24 to +3.97 in the last third, a drop within
-chance (-1.0 standard errors) that reads "Se mantiene".
+chance (-1.0 standard errors) that reads "Se mantiene". Its optimisation file is a
+normal export, so the plateau section is shown; that section ends with a
+line saying that a forward export adds "¿Aguanta en el periodo forward?".
 
 ### Plan to reach a better class
 
