@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+from quant_trade.audit.audiences import AUDIENCE_COPY, AUDIENCE_PAGES, Audience, audience_url
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -141,7 +142,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "Curva de equity o serie de retornos (CSV o Excel; obligatoria si no subes un informe)"
         ),
         "equity_help": (
-            "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. Hasta 5 MB."
+            "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. También la "
+            "tabla de rentabilidades mensuales de un fondo (un año por fila, un mes por "
+            "columna). Hasta 5 MB."
         ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
@@ -158,6 +161,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "(vacío = 0)"
         ),
         "oos_start": "Inicio del tramo fuera de muestra (opcional)",
+        "net_of_fees": (
+            "Son rentabilidades de un fondo, ya netas de sus comisiones (solo historial mensual)"
+        ),
         "benchmark_applicable": "¿Aplica un benchmark?",
         "yes": "Sí",
         "no": "No",
@@ -256,7 +262,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "¿Sirve para acciones, cripto, futuros o un fondo?",
                 "Sí. Rigor no depende del mercado: mide el historial que subes. Para una cartera "
                 "de acciones o cripto, o para un fondo o un gestor, sube su curva de equity o su "
-                "serie de retornos (diaria, semanal o mensual) en CSV o Excel. Los informes de "
+                "serie de retornos (diaria, semanal o mensual) en CSV o Excel; de un fondo sirve "
+                "también la tabla de rentabilidades mensuales de su ficha. Los informes de "
                 "TradingView, NinjaTrader, QuantConnect, backtesting.py y vectorbt sirven para "
                 "cualquier activo.",
             ),
@@ -372,7 +379,8 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "equity": "Equity curve or return series (CSV or Excel; required without a report)",
         "equity_help": (
-            "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Up to 5 MB."
+            "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Also a "
+            "fund's monthly returns table (a year per row, a month per column). Up to 5 MB."
         ),
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
@@ -390,6 +398,9 @@ _COPY: dict[str, dict[str, Any]] = {
             "(blank = 0)"
         ),
         "oos_start": "Out-of-sample start (optional)",
+        "net_of_fees": (
+            "These are a fund's returns, already net of its fees (monthly track record only)"
+        ),
         "benchmark_applicable": "Does a benchmark apply?",
         "yes": "Yes",
         "no": "No",
@@ -486,7 +497,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "Does it work for stocks, crypto, futures or a fund?",
                 "Yes. Rigor does not depend on the market: it measures the history you upload. "
                 "For a stock or crypto portfolio, or for a fund or a manager, upload its equity "
-                "curve or return series (daily, weekly or monthly) as CSV or Excel. TradingView, "
+                "curve or return series (daily, weekly or monthly) as CSV or Excel; for a fund, "
+                "the monthly returns table from its factsheet works too. TradingView, "
                 "NinjaTrader, QuantConnect, backtesting.py and vectorbt reports work for any "
                 "asset.",
             ),
@@ -1268,7 +1280,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "Operas acciones, futuros, forex o cripto",
                 "No sabes si tu ventaja es real o si la encontraste a fuerza de probar.",
                 "la lista de operaciones de TradingView o NinjaTrader, el CSV de QuantConnect, "
-                "backtesting.py o vectorbt, o tu curva de equity.",
+                "backtesting.py o vectorbt, el historial en CSV o Excel de cualquier bróker, "
+                "exchange o diario, o tu curva de equity.",
                 "significación, Sharpe deflactado, costes, si sigue funcionando en el periodo "
                 "reciente y qué capital pide.",
                 "tradingview",
@@ -1288,13 +1301,15 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "El porcentaje que te enseñan puede venir de depósitos, de pocos meses buenos o "
                 "de un backtest.",
                 "el historial de su cuenta (MetaTrader, Myfxbook, FX Blue o señal de MQL5) o su "
-                "serie de retornos mensuales en CSV.",
+                "tabla de rentabilidades mensuales en CSV o Excel.",
                 "el resultado separado de depósitos y retiros, si la cuenta se parece a su "
-                "backtest y si el historial es evidencia o suerte.",
+                "backtest, si el historial es evidencia o suerte y, con 24 meses o más, su "
+                "calendario año por mes y su caída más profunda.",
                 "cuenta-proveedor",
             ),
         ],
         "guide": "Qué archivo subir",
+        "more": "Ver qué revisa para tu caso",
         "start": "Empezar",
     },
     "en": {
@@ -1321,7 +1336,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "You trade stocks, futures, forex or crypto",
                 "You do not know whether your edge is real or you found it by trying enough.",
                 "the TradingView or NinjaTrader list of trades, the QuantConnect, backtesting.py "
-                "or vectorbt CSV, or your equity curve.",
+                "or vectorbt CSV, the CSV or Excel history of any broker, exchange or journal, "
+                "or your equity curve.",
                 "significance, deflated Sharpe, costs, whether it still works in the recent "
                 "period and how much capital it needs.",
                 "tradingview",
@@ -1341,13 +1357,15 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "The percentage you are shown may come from deposits, a few good months or a "
                 "backtest.",
                 "their account history (MetaTrader, Myfxbook, FX Blue or an MQL5 signal) or "
-                "their monthly return series as CSV.",
+                "their monthly returns table as CSV or Excel.",
                 "the result kept apart from deposits and withdrawals, whether the account looks "
-                "like its backtest and whether the history is evidence or luck.",
+                "like its backtest, whether the history is evidence or luck and, with 24 "
+                "months or more, its year-by-month calendar and deepest fall.",
                 "cuenta-proveedor",
             ),
         ],
         "guide": "Which file to upload",
+        "more": "See what it checks for your case",
         "start": "Start",
     },
 }
@@ -1356,12 +1374,9 @@ AUDIENCES: dict[str, dict[str, Any]] = {
 def _audiences(locale: str) -> str:
     words = AUDIENCES[locale]
     cards = []
-    for i, (name, title, pain, upload, get, guide) in enumerate(words["items"]):
-        link = (
-            f"<a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>"
-            if guide
-            else f"<a href='#subir'>{_e(words['start'])}</a>"
-        )
+    for i, (name, title, pain, upload, get, _guide) in enumerate(words["items"]):
+        page = AUDIENCE_PAGES[i]
+        link = f"<a href='{_e(audience_url(page.slug, locale))}'>{_e(words['more'])}</a>"
         cards.append(
             f"<div class='card spot audience' data-reveal style='--i:{i % 2}'>"
             f"<div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3><p>{_e(pain)}</p>"
@@ -1691,6 +1706,8 @@ def _upload_form(
             "<input type='number' name='initial_balance' min='0' step='0.01'>",
         )
         + "</div>"
+        + "<label class='check'><input type='checkbox' name='net_of_fees' value='on'>"
+        + f"<span>{_e(copy['net_of_fees'])}</span></label>"
         + _field(
             copy["description"],
             "<textarea name='description' rows='3' maxlength='2000'></textarea>",
@@ -2430,10 +2447,98 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     )
 
 
+def audience_page(
+    audience: Audience,
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    free_mode: bool = False,
+    price_usd: float = 0.0,
+    pack_price_usd: float = 0.0,
+) -> str:
+    """One visitor's case: the problem, what to upload, what Rigor checks."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words = AUDIENCE_COPY[locale]
+    text = audience.text[locale]
+    other = "en" if locale == "es" else "es"
+    title = f"{text.title} · {BRAND}"
+    meta = _public_meta(title, text.summary, locale, audience_url(audience.slug, locale), base_url)
+    sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
+    pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
+    uploads = "".join(
+        f"<li>{icon('file')}<span>{_e(item)}"
+        + (f" <a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>" if guide else "")
+        + "</span></li>"
+        for item, guide in text.uploads
+    )
+    checks = "".join(
+        f"<li>{icon('check')}<span><strong>{_e(name)}.</strong> {_e(body)}</span></li>"
+        for name, body in text.checks
+    )
+    limits = "".join(f"<li>{icon('minus')}<span>{_e(item)}</span></li>" for item in text.limits)
+    price = (
+        copy["price_free_mode"]
+        if free_mode or not price_usd
+        else words["price_text"].format(price=price_usd, pack=pack_price_usd or price_usd * 3)
+    )
+    faq = "".join(
+        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(presets=len(PRESETS)))}</p></details>"
+        for q, a in text.faq
+    )
+    others = "".join(
+        f"<li><a href='{_e(audience_url(page.slug, locale))}'>"
+        f"{_e(page.text[locale].title)}</a></li>"
+        for page in AUDIENCE_PAGES
+        if page.slug != audience.slug
+    )
+    buttons = (
+        "<div class='hero-cta'>"
+        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(words['start'])}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
+        "</div>"
+    )
+    crumbs = (
+        f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a><span>/</span>"
+        f"<a href='{_e(audience_url(audience.slug, other))}' hreflang='{other}'>"
+        f"{_other_name(locale)}</a>"
+    )
+    body = (
+        _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            [
+                (words["pains"], f"<ul class='checks'>{pains}</ul>"),
+                (words["uploads"], f"<ul class='checks'>{uploads}</ul>"),
+                (words["checks"], f"<ul class='checks'>{checks}</ul>"),
+                (words["limits"], f"<ul class='checks'>{limits}</ul>"),
+                (words["price"], f"<p>{_e(price)}</p>{buttons}"),
+                (words["faq"], f"<div class='faq'>{faq}</div>"),
+                (words["others"], f"<ul>{others}</ul>"),
+            ],
+            locale,
+            lead=buttons,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            f"{_e(words['start'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + "</div></div>"
+    )
+    return _page(
+        title,
+        locale,
+        body,
+        meta_html=meta,
+        switch_href=audience_url(audience.slug, other),
+        solid_nav=True,
+    )
+
+
 __all__ = [
     "BADGE_NOTICE",
     "SAMPLE_BANNER",
     "VERIFICATION_NOTICE",
+    "audience_page",
     "badge_svg",
     "error_page",
     "guide_page",

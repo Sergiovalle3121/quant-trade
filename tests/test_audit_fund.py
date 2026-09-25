@@ -178,3 +178,74 @@ def test_an_excel_factsheet_with_fractions_reads_too() -> None:
     series = parse_equity_csv(xlsx({"Returns": rows}))
     assert series.frame["ret"].dropna().to_numpy() == pytest.approx(r, abs=1e-9)
     assert any("values taken as fractions" in w for w in series.warnings)
+
+
+def _codes(result) -> set[str]:  # type: ignore[no-untyped-def]
+    return {flag["code"] for flag in result.red_flags}
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_fund_declared_net_of_fees_skips_the_zero_cost_flag(locale: str) -> None:
+    data = _grid_csv(_returns(120, seed=7))
+    plain = run_audit(build_inputs(data, DeclaredMetadata(locale=locale)), bootstrap_samples=200)
+    net = run_audit(
+        build_inputs(data, DeclaredMetadata(locale=locale, net_of_fees=True)), bootstrap_samples=200
+    )
+    assert "ZERO_DECLARED_COSTS" in _codes(plain)
+    assert "ZERO_DECLARED_COSTS" not in _codes(net)
+    assert net.fund is not None and net.fund["net_of_fees"]["evidence"] == "DECLARED"
+    html, _ = render(net, watermark=False)
+    assert_report_clean(html)
+    title = "Auditoría de historial de fondo" if locale == "es" else "Fund track record audit"
+    assert title in html and ("netas de comisiones" if locale == "es" else "net of fees") in html
+    assert untranslated(net.model_dump(mode="json")) == []
+
+
+def test_a_daily_curve_cannot_use_the_declaration() -> None:
+    from audit_fixtures import csv_bytes, positive_drift
+
+    inputs = build_inputs(
+        csv_bytes(positive_drift(300)), DeclaredMetadata(locale="es", net_of_fees=True)
+    )
+    result = run_audit(inputs, bootstrap_samples=200)
+    assert "ZERO_DECLARED_COSTS" in _codes(result)
+    warnings = result.model_dump(mode="json")["inputs"]["parse_warnings"]
+    assert any("applies only to a monthly fund track record" in w for w in warnings)
+    html, _ = render(result, watermark=False)
+    assert "Auditoría de backtest" in html and "historial de fondo" not in html
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_monthly_curve_with_trades_keeps_the_cost_check() -> None:
+    from audit_fixtures import csv_bytes, trades_following
+
+    r = _returns(60, seed=8)
+    curve = _frame(r).assign(timestamp=lambda f: f["timestamp"].dt.strftime("%Y-%m-%d"))
+    inputs = build_inputs(
+        csv_bytes(curve),
+        DeclaredMetadata(locale="es", net_of_fees=True),
+        trades_bytes=csv_bytes(trades_following(_frame(r), every=2)),
+    )
+    assert "ZERO_DECLARED_COSTS" in _codes(run_audit(inputs, bootstrap_samples=200))
+
+
+def test_the_upload_form_offers_the_declaration(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/a.db", bootstrap_samples=100)
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    assert "name='net_of_fees'" in client.get("/").text
+    files = {"equity": ("fund.csv", _grid_csv(_returns(60, seed=9)), "text/csv")}
+    response = client.post(
+        "/audits",
+        files=files,
+        data={"consent": "on", "net_of_fees": "on"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    page = client.get(response.headers["location"]).text
+    assert "Costes declarados en cero" not in page

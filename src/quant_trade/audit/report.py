@@ -76,6 +76,11 @@ DISCLAIMER = {
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
+        "title_fund": f"{BRAND} · Auditoría de historial de fondo",
+        "fund_net": (
+            "Rentabilidades declaradas netas de comisiones: son las cifras del propio fondo "
+            "tras sus comisiones y Rigor no midió los costes."
+        ),
         "generated": "Generada",
         "audit_id": "Identificador",
         "inputs": "Archivos auditados (sha256)",
@@ -709,6 +714,11 @@ LABELS: dict[str, dict[str, str]] = {
     },
     "en": {
         "title": f"{BRAND} · Backtest audit",
+        "title_fund": f"{BRAND} · Fund track record audit",
+        "fund_net": (
+            "Returns declared net of fees: they are the fund's own figures after its fees, "
+            "and Rigor did not measure costs."
+        ),
         "generated": "Generated",
         "audit_id": "Identifier",
         "inputs": "Audited files (sha256)",
@@ -3636,8 +3646,19 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     ]
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
+    if fund.get("net_of_fees"):
+        out += (
+            f"<p class='muted'>{_badge(fund['net_of_fees']['evidence'])} "
+            f"{_e(labels['fund_net'])}</p>"
+        )
     out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
     return out
+
+
+def _title(data: dict[str, Any], labels: dict[str, str]) -> str:
+    """The report's name: a fund's track record, or a backtest."""
+    fund = data.get("fund") or {}
+    return labels["title_fund" if fund.get("track_record") else "title"]
 
 
 #: What each class requires, in the words of ``verdict.overall_class``.
@@ -4295,7 +4316,7 @@ def render_html(
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
         + _pack_notice(labels, pack_code, pack_credits_left)
-        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(labels['title'])}</div>"
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
         + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
         + "<div class='verdict rise' style='--i:3'>"
@@ -4397,7 +4418,7 @@ def render_html(
         else [(f"r-d{i}", title) for i, (title, _) in enumerate(detail, 1)]
     )
     toc = toc[:-1] + detail_toc + toc[-1:]
-    page_title = f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}"
+    page_title = f"{_title(data, labels)} {verdict['overall']} · {data['audit_id'][:8]}"
     return (
         "<!doctype html><html lang='"
         + _e(locale)
