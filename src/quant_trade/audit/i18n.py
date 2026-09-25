@@ -745,6 +745,38 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("share of trades with a net profit", "parte de las operaciones con resultado neto positivo"),
     ("the file has no time of day", "el archivo no tiene hora del día"),
+    ("the file is not a monthly track record", "el archivo no es un historial mensual"),
+    ("needs at least {n} monthly returns", "hacen falta al menos {n} rentabilidades mensuales"),
+    ("the monthly returns do not vary", "las rentabilidades mensuales no varían"),
+    (
+        "month-end returns as the file states them",
+        "rentabilidades de fin de mes tal como las da el archivo",
+    ),
+    ("annualised standard deviation", "desviación típica anualizada"),
+    (
+        "first-order autocorrelation of monthly returns",
+        "autocorrelación de primer orden de las rentabilidades mensuales",
+    ),
+    (
+        "annualised volatility of the unsmoothed returns",
+        "volatilidad anualizada de las rentabilidades sin suavizar",
+    ),
+    (
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as percentages",
+        "leído como tabla de rentabilidades mensuales (una fila por año, una columna por mes); "
+        "valores tomados como porcentajes",
+    ),
+    (
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as fractions",
+        "leído como tabla de rentabilidades mensuales (una fila por año, una columna por mes); "
+        "valores tomados como fracciones",
+    ),
+    (
+        "the stated year total does not match its months for {years}",
+        "el total anual indicado no cuadra con sus meses en {years}",
+    ),
     (
         "the file does not name each trade's instrument",
         "el archivo no indica el instrumento de cada operación",

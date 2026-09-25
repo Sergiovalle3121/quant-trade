@@ -645,6 +645,42 @@ seller. Limitations: trades are ordered by entry time and overlapping trades
 give no pause to measure; the tests treat trades as independent; daily files
 measure hold times in whole days.
 
+### Fund track records (`audit/factsheet.py`, `audit/fund.py`)
+
+For investors and allocators judging a fund, a managed account or any
+monthly track record. Besides a dated NAV or return series, the equity file
+may be a factsheet's year-by-month table: a year column (values 1900-2199),
+twelve month columns (headers in English, Spanish, Portuguese, French,
+German or Italian, or 1 to 12) and an optional year-total column (`YTD`,
+`Total`, `Año`...). Cells may carry `%`, a decimal comma, parentheses for a
+loss or a Unicode minus; blanks before the first or after the last month
+are skipped. Values are percentages when any cell has `%` or the median
+absolute value is over 0.2, else fractions, and the warning says which. A
+year whose stated total matches neither its months compounded nor summed
+(beyond 0.15 points) is listed in a warning: an edited month usually leaves
+its year total behind.
+
+For a file with 13 or fewer periods a year and at least 24 monthly returns,
+the section "Lo que revisaría quien invierte en un fondo" shows, MEASURED:
+the calendar table with each year compounded, the compound annual return,
+the annual volatility, the share of positive months, the worst and best
+month, the deepest fall and the longest run of months below a previous high
+(marked when not yet recovered). Two findings, as questions:
+
+- `smoothed`: first-order autocorrelation of the monthly returns of 0.2 or
+  more and above 1.96/sqrt(n) (Getmansky, Lo and Makarov, 2004); the
+  volatility is then also shown unsmoothed, from
+  `(r_t - rho r_{t-1}) / (1 - rho)` (Geltner, 1993);
+- `few_small_losses`: months in (0, sd/4] against months in [-sd/4, 0),
+  with at least 10 in the two bins, and a one-sided binomial p-value below
+  0.01 against the split a normal with the fund's own mean and volatility
+  predicts (Bollen and Pool, 2009).
+
+No red flag and no class change. Limitations: the normal is only a
+reference for the two bins; smoothing can also come from a genuinely
+trending strategy; a factsheet may round or restate months; returns are
+taken as the file states them, usually after the fund's fees.
+
 ### Does it work on each instrument (`audit/instruments.py`)
 
 For buyers of a robot or signal that trades several pairs or markets: "is

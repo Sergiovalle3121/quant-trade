@@ -830,6 +830,12 @@ color:var(--text-3)}
 line-height:1;font-variant-numeric:tabular-nums}
 .fact p{margin:10px 0 0;color:var(--text-2);font-size:.92rem}
 .paper table.timing{table-layout:fixed}
+.fund-cal-wrap{overflow-x:auto;margin:18px 0 8px;-webkit-overflow-scrolling:touch}
+.paper table.fund-cal{min-width:720px;font-size:.78rem;font-variant-numeric:tabular-nums}
+.fund-cal th,.fund-cal td{padding:8px 6px!important;text-align:right;white-space:nowrap}
+.fund-cal th:first-child{text-align:left}
+.fund-cal td.neg{color:#b42318}.fund-cal td.pos{color:#1a7f4b}
+.fund-cal td.tot{font-weight:650}
 .paper table.stress{table-layout:fixed}
 .stress .c-n{width:17%}.stress .c-b{width:190px}
 .stress .val{text-align:right;padding-right:28px;white-space:nowrap}

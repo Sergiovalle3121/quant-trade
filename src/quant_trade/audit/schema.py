@@ -353,6 +353,13 @@ def _to_timestamps(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series, utc=True, errors="coerce", format="mixed")
 
 
+def _factsheet_grid(raw: pd.DataFrame) -> Any:
+    # Imported here: ``factsheet`` is a leaf module but keeps this one light.
+    from quant_trade.audit.factsheet import monthly_grid
+
+    return monthly_grid(raw)
+
+
 def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     """Parse an equity-curve or return-series CSV into the canonical frame.
 
@@ -363,6 +370,17 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     raw = _read_csv(data, what=what)
     warnings: list[str] = []
     ts_col = _pick(raw, TIMESTAMP_ALIASES)
+    grid = _factsheet_grid(raw) if ts_col is None else None
+    if grid is not None:
+        # A factsheet's year-by-month table becomes a dated return series.
+        raw = pd.DataFrame(
+            {
+                "timestamp": grid.frame["timestamp"].dt.strftime("%Y-%m-%d"),
+                "return": grid.frame["ret"],
+            }
+        )
+        warnings.extend(grid.warnings)
+        ts_col = "timestamp"
     if ts_col is None:
         raise ParseError(
             f"the {what} file needs a timestamp column (one of: {', '.join(TIMESTAMP_ALIASES)})",
@@ -967,6 +985,8 @@ class AuditResult(BaseModel):
     behaviour: dict[str, Any] | None = None
     #: Count, net result and hit rate per instrument (``audit/instruments.py``).
     instruments: dict[str, Any] | None = None
+    #: Calendar table and fund-investor checks of a monthly track record (``audit/fund.py``).
+    fund: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

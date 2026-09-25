@@ -345,6 +345,38 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Se mantiene",
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
+        "fund": "Lo que revisaría quien invierte en un fondo",
+        "fund_intro": (
+            "Las cifras de una ficha de fondo y dos pruebas que usan los analistas de fondos: "
+            "si las rentabilidades mensuales están suavizadas y si faltan meses con una pérdida "
+            "pequeña. No cambia la clase: son preguntas para hacer."
+        ),
+        "fund_year": "Año",
+        "fund_months": "Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic",
+        "fund_cagr": "Rentabilidad anual compuesta",
+        "fund_vol": "Volatilidad anual",
+        "fund_vol_u": "Volatilidad anual sin suavizar (antes: {vol})",
+        "fund_positive": "Meses en positivo ({n} meses)",
+        "fund_worst": "Peor mes (mejor: {best})",
+        "fund_dd": "Caída máxima",
+        "fund_under": "Meses seguidos por debajo de un máximo anterior",
+        "fund_under_open": "Meses seguidos por debajo de un máximo anterior (aún sin recuperar)",
+        "fund_losing": "Meses seguidos en pérdida, como máximo",
+        "fund_smoothed": (
+            "Cada mes se parece demasiado al anterior (autocorrelación de {rho}). Suele pasar "
+            "con activos poco líquidos o valorados con retraso, y hace que la volatilidad "
+            "parezca menor: sin ese suavizado sería {vol_u} al año en vez de {vol}. Pregunta "
+            "cómo y cada cuánto se valoran las posiciones."
+        ),
+        "fund_few_small_losses": (
+            "Hay muchos meses con una ganancia pequeña y muy pocos con una pérdida pequeña "
+            "({gains} frente a {losses}), menos de lo que su propia volatilidad haría esperar. "
+            "Los estudios sobre fondos relacionan ese patrón con valoraciones que evitan cerrar "
+            "un mes en negativo. Pregunta quién calcula el valor liquidativo y si lo revisa "
+            "un tercero."
+        ),
+        "fund_clean": "Ni suavizado ni falta de meses con pérdida pequeña.",
+        "fund_badge_clean": "Sin patrones",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
@@ -890,6 +922,37 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Holds",
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
+        "fund": "What a fund investor would check",
+        "fund_intro": (
+            "A fund factsheet's figures and two tests fund analysts use: whether the monthly "
+            "returns are smoothed and whether months with a small loss are missing. It does "
+            "not change the class: these are questions to ask."
+        ),
+        "fund_year": "Year",
+        "fund_months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
+        "fund_cagr": "Compound annual return",
+        "fund_vol": "Annual volatility",
+        "fund_vol_u": "Annual volatility unsmoothed (before: {vol})",
+        "fund_positive": "Positive months ({n} months)",
+        "fund_worst": "Worst month (best: {best})",
+        "fund_dd": "Deepest fall",
+        "fund_under": "Months in a row below a previous high",
+        "fund_under_open": "Months in a row below a previous high (not yet recovered)",
+        "fund_losing": "Losing months in a row, at most",
+        "fund_smoothed": (
+            "Each month looks too much like the one before (autocorrelation of {rho}). That "
+            "is typical of illiquid or late-priced holdings, and it makes volatility look "
+            "lower: unsmoothed it would be {vol_u} a year instead of {vol}. Ask how and how "
+            "often the positions are valued."
+        ),
+        "fund_few_small_losses": (
+            "There are many months with a small gain and very few with a small loss ({gains} "
+            "against {losses}), fewer than its own volatility would lead you to expect. Studies "
+            "of funds link that pattern to valuations that avoid closing a month negative. Ask "
+            "who calculates the net asset value and whether a third party checks it."
+        ),
+        "fund_clean": "No smoothing and no shortage of months with a small loss.",
+        "fund_badge_clean": "No pattern",
         "instruments": "Does it work on each instrument?",
         "ins_intro": (
             "When a robot or a signal trades several markets, the total can come from one of "
@@ -3331,6 +3394,116 @@ def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[s
     return out
 
 
+def _fund_pct(value: float, places: int = 1) -> str:
+    """A monthly or annual return as a signed percentage, never ``-0.0%``."""
+    text = f"{value * 100:+.{places}f}%"
+    return text[1:] if float(text[:-1]) == 0 else text
+
+
+def _fund_calendar(years: list[dict[str, Any]], labels: dict[str, str]) -> str:
+    head = "".join(f"<th>{_e(name)}</th>" for name in labels["fund_months"].split(","))
+    rows = []
+    for year in years:
+        months = {int(k): v for k, v in (year.get("months") or {}).items()}
+        cells = []
+        for month in range(1, 13):
+            cell = months.get(month)
+            if cell is None or cell.get("value") is None:
+                cells.append("<td class='empty'></td>")
+                continue
+            value = float(cell["value"])
+            cells.append(f"<td class='{'neg' if value < 0 else 'pos'}'>{_fund_pct(value)}</td>")
+        total = float(year["total"]["value"])
+        rows.append(
+            f"<tr><th scope='row'>{int(year['key'])}</th>{''.join(cells)}"
+            f"<td class='tot {'neg' if total < 0 else 'pos'}'>{_fund_pct(total)}</td></tr>"
+        )
+    return (
+        "<div class='fund-cal-wrap'><table class='fund-cal'>"
+        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}<th>{_e(labels['fund_year'])}</th>"
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """A monthly track record read the way a fund investor reads it."""
+    if not fund or fund.get("status") != "MEASURED":
+        return ""
+    findings = list(fund.get("findings") or [])
+    vol = f"{float(fund['volatility']['value']):.1%}"
+    vol_u = (fund.get("volatility_unsmoothed") or {}).get("value")
+    out = f"<p class='muted'>{_e(labels['fund_intro'])}</p>"
+    if findings:
+        texts = {
+            "smoothed": labels["fund_smoothed"].format(
+                rho=f"{float(fund['autocorrelation']['value']):.2f}",
+                vol_u=f"{float(vol_u):.1%}" if vol_u is not None else vol,
+                vol=vol,
+            ),
+            "few_small_losses": labels["fund_few_small_losses"].format(
+                gains=int(fund["small_gains"]["value"]),
+                losses=int(fund["small_losses"]["value"]),
+            ),
+        }
+        items = "".join(_behaviour_ask(texts[code]) for code in findings)
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>{items}</ul></div>"
+        )
+    else:
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['fund_badge_clean'])}</span> {_e(labels['fund_clean'])}</p>"
+        )
+
+    def tile(value: str, text: str, evidence: str, *, neg: bool = False) -> str:
+        return (
+            f"<div class='fact{' neg' if neg else ''}'><b>{_e(value)}</b>"
+            f"<p>{_e(text)} {_badge(evidence)}</p></div>"
+        )
+
+    cagr = float(fund["cagr"]["value"])
+    recovered = bool(fund["recovered"]["value"])
+    facts = [
+        tile(_fund_pct(cagr), labels["fund_cagr"], fund["cagr"]["evidence"], neg=cagr < 0),
+        (
+            tile(
+                f"{float(vol_u):.1%}",
+                labels["fund_vol_u"].format(vol=vol),
+                fund["volatility_unsmoothed"]["evidence"],
+                neg="smoothed" in findings,
+            )
+            if vol_u is not None
+            else tile(vol, labels["fund_vol"], fund["volatility"]["evidence"])
+        ),
+        tile(
+            f"{float(fund['positive_share']['value']):.0%}",
+            labels["fund_positive"].format(n=int(fund["months"]["value"])),
+            fund["positive_share"]["evidence"],
+        ),
+        tile(
+            _fund_pct(float(fund["worst_month"]["value"])),
+            labels["fund_worst"].format(best=_fund_pct(float(fund["best_month"]["value"]))),
+            fund["worst_month"]["evidence"],
+        ),
+        tile(
+            _fund_pct(float(fund["max_drawdown"]["value"])),
+            labels["fund_dd"],
+            fund["max_drawdown"]["evidence"],
+        ),
+        tile(
+            str(int(fund["longest_under_water"]["value"])),
+            labels["fund_under" if recovered else "fund_under_open"],
+            fund["longest_under_water"]["evidence"],
+            neg=not recovered,
+        ),
+    ]
+    out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    out += _fund_calendar(fund.get("years") or [], labels)
+    out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
+    return out
+
+
 #: What each class requires, in the words of ``verdict.overall_class``.
 CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
     "es": (
@@ -3830,6 +4003,11 @@ def render_html(
         *(
             [(labels["behaviour"], _behaviour_html(data.get("behaviour"), locale, labels))]
             if (data.get("behaviour") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
+            [(labels["fund"], _fund_html(data.get("fund"), locale, labels))]
+            if (data.get("fund") or {}).get("status") == "MEASURED"
             else []
         ),
         *(
