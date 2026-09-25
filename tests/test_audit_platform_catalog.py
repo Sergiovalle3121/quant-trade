@@ -17,6 +17,7 @@ from quant_trade.audit.importers import (
     UNIVERSAL_FILLS_CSV,
     UNIVERSAL_TRADES_CSV,
     ImportedReport,
+    ReportFormatError,
     import_report,
 )
 
@@ -318,6 +319,42 @@ def test_xtb_xlsx_with_account_rows_and_an_empty_first_column() -> None:
     assert report.source_format == UNIVERSAL_TRADES_CSV
     assert _net(report) == [99.0, 19.25, -21.0]
     assert report.trades.trades[0].entry_time == datetime(2026, 3, 2, 15, 30, tzinfo=UTC)
+
+
+def test_bybit_closed_pnl_asks_for_the_executions_instead() -> None:
+    # Bybit's Closed P&L export (column names as open-source journal importers
+    # read it) has one close time per position and no opening time.
+    header = (
+        "Contracts,Closing Direction,Qty,Entry Price,Exit Price,Closed P&L,Exit Type,"
+        "Trade Time(UTC+0)"
+    )
+    rows = [
+        "BTCUSDT,Sell,0.01,60000,60500,4.3,Trade,2025-12-01 15:00:00",
+        "BTCUSDT,Buy,0.01,61000,60800,1.3,Trade,2025-12-02 15:00:00",
+    ]
+    with pytest.raises(ReportFormatError) as info:
+        _read([header, *rows], "bybit-closed-pnl.csv")
+    assert info.value.code == "universal_close_time_only"
+    assert "Trade History" in str(info.value) and "Trade History" in info.value.message_es
+    assert find_claims(str(info.value)) == [] and find_claims(info.value.message_es) == []
+
+
+def test_contracts_names_the_instrument_when_exec_qty_is_the_size() -> None:
+    header = (
+        "Contracts,Direction,Exec Qty,Exec Price,Trading Fee,Order Type,Transaction Time(UTC+0)"
+    )
+    rows = [
+        "BTCUSDT,Buy,0.01,60000,0.33,Market,2025-12-01 10:00:00",
+        "BTCUSDT,Sell,0.01,60500,0.33,Market,2025-12-01 14:00:00",
+        "ETHUSDT,Sell,0.5,3000,0.8,Market,2025-12-02 10:00:00",
+        "ETHUSDT,Buy,0.5,2950,0.8,Market,2025-12-02 12:00:00",
+    ]
+    report = _read([header, *rows], "executions.csv")
+    assert report.source_format == UNIVERSAL_FILLS_CSV
+    assert report.symbols == ["BTCUSDT", "ETHUSDT"]
+    assert report.trades.sides == ["long", "short"]
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [5.0, 25.0]
+    assert report.metadata["column_quantity"] == "Exec Qty"
 
 
 def test_ctrader_history() -> None:
