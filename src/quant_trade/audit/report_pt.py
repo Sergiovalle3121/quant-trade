@@ -936,6 +936,13 @@ REPORT: dict[str, Any] = {
             "benchmark nos meses em comum."
         ),
         "fund_fees_behind": "O fundo já fica abaixo do seu benchmark antes de qualquer taxa.",
+        "crises_market": "Mercado nessas datas",
+        "crises_market_note": (
+            "Mercado: fechamento do mês anterior à janela contra o fechamento do seu último mês, "
+            "dados públicos do FRED consultados em {as_of} ({sources}). São ações dos EUA e "
+            "bitcoin: se a estratégia opera outro mercado (moedas, commodities, outro país), "
+            "considere-os só como contexto do que o mercado vivia, não como ponto de comparação."
+        ),
     },
     "LINK_TEXT": {
         "terms": "Termos de serviço",
