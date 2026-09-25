@@ -872,8 +872,12 @@ GUIDES: tuple[Guide, ...] = (
                     "otras cuentas de ProjectX (Trades), TradeStation, thinkorswim (Account "
                     "Statement), Charles Schwab (Transactions o Realized Gain/Loss), Fidelity, "
                     "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), XTB (xStation 5, "
-                    "historial de posiciones cerradas), cTrader, Sierra "
-                    "Chart (Trade Activity Log), Binance, Kraken y Coinbase.",
+                    "historial de posiciones cerradas), DEGIRO (Transacciones, en cualquier "
+                    "idioma), Trading 212 (historial), cTrader, Sierra Chart (Trade Activity "
+                    "Log), Binance, Kraken, Coinbase y KuCoin (historial de ejecuciones).",
+                    "Los costes de DEGIRO vienen en euros y se restan tal cual, también en "
+                    "acciones que cotizan en otra moneda; el resultado de Trading 212 viene en "
+                    "la moneda de tu cuenta y se usa como tal.",
                     "Con una fila por ejecución, las compras y ventas se emparejan por símbolo "
                     "en orden de llegada (FIFO); las posiciones que siguen abiertas al final "
                     "quedan fuera y el informe lo dice.",
@@ -916,8 +920,12 @@ GUIDES: tuple[Guide, ...] = (
                     "TopstepX and other ProjectX accounts (Trades), TradeStation, thinkorswim "
                     "(Account Statement), Charles Schwab (Transactions or Realized Gain/Loss), "
                     "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), XTB "
-                    "(xStation 5 closed position history), cTrader, "
-                    "Sierra Chart (Trade Activity Log), Binance, Kraken and Coinbase.",
+                    "(xStation 5 closed position history), DEGIRO (Transactions, in any "
+                    "language), Trading 212 (history), cTrader, Sierra Chart (Trade Activity "
+                    "Log), Binance, Kraken, Coinbase and KuCoin (filled orders history).",
+                    "DEGIRO's costs come in euros and are subtracted as they are, also on "
+                    "shares quoted in another currency; Trading 212's result comes in your "
+                    "account currency and is used as such.",
                     "With one row per fill, buys and sells are paired per symbol first in, "
                     "first out; positions still open at the end are left out and the report "
                     "says so.",
