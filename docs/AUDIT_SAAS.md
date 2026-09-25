@@ -129,6 +129,32 @@ takes the customer's own role-to-column mapping. An equity curve
 (`timestamp,equity`) is not a trade list and still gets `unknown_format`.
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
+Platform exports the universal reader is checked against
+(`tests/test_audit_platform_catalog.py`, synthetic rows in each platform's
+public column layout, as the open-source journal tradetally reads real
+files): Tradovate Performance (a buy fill paired with a sell fill per row;
+whichever came first opened the trade) and Orders, TopstepX/ProjectX
+trades, Interactive Brokers Flex Trades and the Activity Statement (its
+`Trades,Header`/`Trades,Data,Order` lines merged by column name; subtotal
+lines dropped), Charles Schwab Realized Gain/Loss and Transactions,
+Webull orders (the fill price, not the limit), thinkorswim's Account Trade
+History section, TradeStation (a clock-only `Exec Time` joined to `T/D`),
+tastytrade (multiplier column), Fidelity ("YOU BOUGHT ..."), E*TRADE, eToro
+closed positions, cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
+Sierra Chart's Trade Activity Log (only `Fills` rows). Time styles read:
+`20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
+abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
+order that no day past 12 settles is taken from a year-first column of the
+same rows (Tradovate's `Trade Date`) or another day/month column of the file;
+otherwise the `ambiguous_dates` error stands. A file listed newest first
+keeps its order reversed among fills with the same time. Without a profit
+or multiplier column, a CME contract code (`ESZ6`, `MNQ DEC26`, `ESZ6.CME`;
+never a bare root, which may be a share ticker) is priced with
+`FUTURES_POINT_VALUE_USD`, with a warning. A profit that fits either net or
+gross reading exactly (one trade per symbol) is read the way that gives a
+round contract size. Fees in another coin than an exchange pair's quote
+currency are left out; fees of shares or futures always count.
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating
