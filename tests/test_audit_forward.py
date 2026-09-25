@@ -170,4 +170,4 @@ def test_forward_section_answers_first_then_a_two_by_two_grid() -> None:
     for forward in (_review(_lost)[0], _review(_held)[0]):
         html = _forward_html(forward, LABELS["es"])
         assert html.index("live-verdict") < html.index("<div class='facts pairs'>")
-        assert html.count("<div class='fact") == 4
+        assert html.count("<div class='fact'>") + html.count("<div class='fact neg'>") == 4
