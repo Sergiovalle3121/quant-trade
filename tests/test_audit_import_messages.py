@@ -207,3 +207,83 @@ def test_rows_with_a_blank_id_are_never_dropped() -> None:
     report = import_report(data.encode(), "xtb.csv", initial_balance=25_000)
     assert len(report.symbols) == 2
     assert not any("repeated" in warning for warning in report.warnings)
+
+
+@pytest.mark.parametrize(
+    ("name", "minutes"),
+    [
+        ("Time(UTC+530)", 330),
+        ("Time (UTC+05:30)", 330),
+        ("Time (GMT-3)", -180),
+        ("Time (UTC+14)", 840),
+        ("Time (UTC+99)", None),
+        ("Time (UTC-13)", None),
+        ("Time (UTC+0575)", None),
+    ],
+)
+def test_a_zone_in_the_column_name_must_be_one_a_clock_uses(name: str, minutes: int | None) -> None:
+    from quant_trade.audit.universal import header_zone
+
+    assert header_zone(name) == minutes
+
+
+def test_an_impossible_zone_in_the_column_name_keeps_the_no_timezone_warning() -> None:
+    data = (
+        b"Time (UTC+99),Symbol,Side,Quantity,Price\n"
+        b"2026-03-02 10:00,ES,Buy,1,5000\n"
+        b"2026-03-02 11:00,ES,Sell,1,5010\n"
+    )
+    report = import_report(data, "fills.csv", initial_balance=25_000)
+    assert report.trades.trades[0].entry_time.hour == 10
+    assert any("no timezone" in warning for warning in report.warnings)
+
+
+def test_a_blank_clock_next_to_its_date_keeps_the_row_at_midnight() -> None:
+    data = (
+        b"Date,Time,Product,Quantity,Price,Order ID\n"
+        b"15-03-2026,,APPLE INC,10,190,a1\n"
+        b"16-03-2026,15:30,APPLE INC,-10,195,b2\n"
+    )
+    report = import_report(data, "Transactions.csv", initial_balance=25_000)
+    assert [t.pnl for t in report.trades.trades] == [50.0]
+    assert report.trades.trades[0].entry_time.hour == 0
+
+
+def test_a_fill_with_an_unreadable_time_names_the_trade_it_breaks() -> None:
+    from quant_trade.audit.i18n import spanish
+
+    data = (
+        b"Time,Symbol,Side,Quantity,Price\n"
+        b"2026-03-02 10:00,ES,Buy,1,5000\n"
+        b"2026-03-02 11:00,ES,Sell,1,4990\n"
+        b"2026-13-45 10:00,NQ,Buy,1,20000\n"
+        b"2026-03-04 11:00,NQ,Sell,1,19500\n"
+    )
+    report = import_report(data, "fills.csv", initial_balance=25_000)
+    line = (
+        "NQ: a fill with an unreadable time (2026-13-45 10:00) was left out; the trade it "
+        "opened or closed is missing from the results"
+    )
+    assert line in report.warnings
+    assert spanish(line) == (
+        "NQ: se dejó fuera una ejecución con hora ilegible (2026-13-45 10:00); la operación "
+        "que abrió o cerró falta en los resultados"
+    )
+
+
+def test_trades_with_unreadable_times_are_named_then_counted() -> None:
+    from quant_trade.audit.i18n import spanish
+
+    bad = b"".join(
+        f"EURUSD,never,2026-02-{day:02d} 12:00,1,1.1,1.101\n".encode() for day in range(1, 8)
+    )
+    report = import_report(_trades(5) + bad, "trades.csv", initial_balance=25_000)
+    named = [w for w in report.warnings if w.startswith("EURUSD: a trade with an unreadable time")]
+    assert len(named) == 5
+    assert "(never)" in named[0]
+    assert "2 more row(s) with an unreadable time were left out" in report.warnings
+    assert spanish("1 more row(s) with an unreadable time were left out") == (
+        "se dejó fuera 1 fila más con hora ilegible"
+    )
+    for warning in report.warnings:
+        assert_report_clean(warning)
