@@ -834,7 +834,7 @@ PLATFORMS: tuple[str, ...] = (
 _DIMENSION_ICONS: dict[str, str] = {
     "statistical_significance": "bell",
     "multiplicity": "layers",
-    "costs": "coins",
+    "costs": "percent",
     "out_of_sample": "split",
     "data_quality": "database",
     "benchmark": "target",

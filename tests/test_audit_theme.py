@@ -113,3 +113,12 @@ def test_the_class_range_never_breaks_across_lines() -> None:
     assert "A a D." in landing(locale="es")
     assert "A to D." in landing(locale="en")
     assert "@media (max-width:620px){.statement{" in STYLE
+
+
+def test_each_dimension_has_its_own_icon() -> None:
+    from quant_trade.audit.pages import _DIMENSION_ICONS
+    from quant_trade.audit.theme import ICONS
+
+    names = list(_DIMENSION_ICONS.values())
+    assert len(set(names)) == len(names)
+    assert len({ICONS[name] for name in names}) == len(names)
