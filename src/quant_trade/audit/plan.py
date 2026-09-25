@@ -20,6 +20,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from quant_trade.audit.account import is_account_history
 from quant_trade.audit.engine import HOLDOUT_MIN_OBSERVATIONS
 from quant_trade.audit.redflags import OBSERVATIONS_WARN, flag_title
 from quant_trade.audit.schema import MIN_OBSERVATIONS, Dimension
@@ -110,6 +111,12 @@ TITLES: dict[str, dict[str, str]] = {
         OUT_OF_SAMPLE: "Add an out-of-sample stretch",
         BENCHMARK: "Compare with a passive alternative",
     },
+}
+
+#: Titles that read differently when the upload is an account history.
+ACCOUNT_TITLES: dict[str, dict[str, str]] = {
+    "es": {OUT_OF_SAMPLE: "Averigua desde cuándo opera sin cambios"},
+    "en": {OUT_OF_SAMPLE: "Find out since when it has run unchanged"},
 }
 
 #: What the audit would need to see for each red flag, in both languages.
@@ -503,6 +510,33 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     return finding, actions
 
 
+def _account_oos(es: bool) -> tuple[str, list[str]]:
+    """The out-of-sample step for an account history, which has no optimisation date."""
+    finding = (
+        "El historial no dice desde qué fecha el robot opera sin cambios de configuración: "
+        "sin esa fecha la mejor clase posible es B."
+        if es
+        else "The history does not say since when the robot has run with unchanged "
+        "settings: without that date the best possible class is B."
+    )
+    actions = (
+        [
+            "Pregunta al proveedor desde qué fecha no cambió la configuración y decláralo como "
+            "inicio fuera de muestra: lo posterior se mide como datos nuevos.",
+            "Pide el backtest del mismo robot y súbelo junto a la cuenta: el informe compara "
+            "las dos operación por operación.",
+        ]
+        if es
+        else [
+            "Ask the provider since when the settings have not changed and declare it as the "
+            "out-of-sample start: what follows is measured as unseen data.",
+            "Ask for the backtest of the same robot and upload it with the account: the "
+            "report compares the two trade by trade.",
+        ]
+    )
+    return finding, actions
+
+
 def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     hold = data.get("holdout") or {}
     es = locale == "es"
@@ -525,6 +559,8 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
                 else f"The declared date lies outside the series "
                 f"({inputs.get('first_timestamp', '')} → {inputs.get('last_timestamp', '')})."
             )
+        elif is_account_history(data):
+            return _account_oos(es)
         else:
             finding = (
                 "No se declaró un tramo fuera de muestra: sin él la mejor clase posible es B."
@@ -687,7 +723,11 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
             PlanStep(
                 dimension=name,
                 status=dimension.status,
-                title=TITLES[locale][name],
+                title=(
+                    ACCOUNT_TITLES[locale].get(name, TITLES[locale][name])
+                    if is_account_history(data)
+                    else TITLES[locale][name]
+                ),
                 finding=finding,
                 actions=actions,
                 class_if_passed=better if better != current else None,

@@ -698,6 +698,11 @@ MEANING: dict[str, dict[str, str]] = {
             "No se indicó un tramo fuera de muestra, así que no hay prueba sobre datos nuevos. "
             "Indica la fecha en la que termina la optimización para medirlo."
         ),
+        f"{OUT_OF_SAMPLE}.NOT_MEASURED.account": (
+            "El historial no dice desde cuándo el robot opera sin cambios, así que no se sabe "
+            "qué parte es prueba sobre datos nuevos. Pregunta esa fecha al proveedor y "
+            "declárala para medirlo."
+        ),
         f"{DATA_QUALITY}.PASS": (
             "No encontramos saltos, huecos ni patrones de riesgo oculto en los archivos. "
             "Eso no descarta errores que los archivos no muestren."
@@ -796,6 +801,11 @@ MEANING: dict[str, dict[str, str]] = {
             "No out-of-sample stretch was given, so there is no test on unseen data. "
             "State the date the optimisation ends to measure it."
         ),
+        f"{OUT_OF_SAMPLE}.NOT_MEASURED.account": (
+            "The history does not say since when the robot has run unchanged, so it is not "
+            "known which part is a test on unseen data. Ask the provider for that date and "
+            "declare it to measure it."
+        ),
         f"{DATA_QUALITY}.PASS": (
             "We found no jumps, gaps or hidden-risk patterns in the files. "
             "That does not rule out errors the files do not show."
@@ -838,9 +848,13 @@ def class_text(overall: str, locale: str = "es") -> str:
     return texts.get(overall, "")
 
 
-def meaning(name: str, status: str, locale: str = "es") -> str:
-    """Two plain sentences on what a dimension's status means for the reader."""
+def meaning(name: str, status: str, locale: str = "es", *, account: bool = False) -> str:
+    """Two plain sentences on what a dimension's status means for the reader.
+
+    ``account`` picks the wording for an account history where one exists."""
     texts = MEANING.get(locale, MEANING["es"])
+    if account and f"{name}.{status}.account" in texts:
+        return texts[f"{name}.{status}.account"]
     return texts.get(f"{name}.{status}", "")
 
 

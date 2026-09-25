@@ -368,7 +368,10 @@ and report wire them in during the integration step):
   investor: whether other accounts of the same strategy were closed or
   restarted, and asking for the backtest of the same robot to compare trade
   by trade. The class sentence then says "account history" instead of
-  "backtest" (C and D).
+  "backtest" (C and D). The out-of-sample explanation and plan step no longer
+  ask an investor for "the date the optimisation ends": they ask the provider
+  since when the robot has run with unchanged settings (declared as the
+  out-of-sample start) and for the matching backtest.
 
 Challenge presets (`quant-trade audit presets` after integration), each a
 transcription of the official page on its `as_of` date with its
@@ -435,6 +438,27 @@ Limitations: broker credit and bonus rows of an MT5 history count as flows;
 the floating result is the platform's figure at print time, not a history
 of floating losses; a history printed after the open losers close shows
 none of it.
+
+### How much capital it needs, at what size (`audit/sizing.py`)
+
+For anyone about to run or copy a strategy: "with my account, at what size
+does a bad year stay within X %?". Needs at least 30 closed trades spread
+over at least 30 days. The net result of each trade (after the costs the
+file itemises), in money and at the backtest's own sizes, is resampled with
+replacement into one year of trades (the history's pace, 20 to 20 000
+trades) `risk_samples` times with the audit's seed. The reference fall is
+the larger of the 95th percentile of the deepest fall in money and the
+history's own deepest fall in trade order, so the resampling (which breaks
+streaks) never understates a real losing streak. The section shows, for
+loss limits of 10, 20, 30 and 50 %, the capital needed at the backtest's
+size (reference fall / limit) and the share of the backtest's size that fits
+the file's starting balance (limit x balance / reference fall), all
+MEASURED. When the history is shorter than a year, the trades-per-year note
+says so. It raises no flag and does not change the class. Assumptions
+printed with it: fixed sizes (no compounding), independent trades, the
+uploaded costs, not a forecast. It is in money on closed trades, so it is a
+different measure from the percentage drawdown of the resampled risk
+section (equity curve, block bootstrap) and does not replace it.
 
 ### What data the test ran on (`audit/testdata.py`)
 

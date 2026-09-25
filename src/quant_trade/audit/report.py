@@ -21,7 +21,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
-from quant_trade.audit.account import ACCOUNT_FORMATS
+from quant_trade.audit.account import is_account_history
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
@@ -33,6 +33,7 @@ from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
+from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -168,6 +169,23 @@ LABELS: dict[str, dict[str, str]] = {
         "unlock_nav": "Desbloquear",
         "account": "El dinero real de la cuenta",
         "test_data": "Con qué datos se hizo la prueba",
+        "capital": "Qué capital necesita y a qué tamaño",
+        "capital_intro": (
+            "Cuánto dinero hace falta para que un año malo no se lleve más de cierto porcentaje "
+            "de la cuenta, con las operaciones de este archivo. Sorteamos {samples:,} años de "
+            "operaciones al azar y tomamos la caída que solo un 5 % de ellos supera, o la del "
+            "propio historial si es mayor."
+        ),
+        "capital_fall": "Caída de referencia en dinero, al tamaño del backtest.",
+        "capital_history": "Mayor caída del historial en su propio orden.",
+        "capital_limit": "Si aceptas perder hasta",
+        "capital_needed": "Capital necesario al tamaño del backtest",
+        "capital_scale": "Tamaño sobre un balance de {balance}",
+        "capital_scale_plain": "Tamaño sobre el balance inicial",
+        "capital_scale_help": (
+            "1x es el tamaño de lote del backtest; 0.50x es la mitad. Por encima de 1x la "
+            "caída en dinero crece en la misma proporción."
+        ),
         "test_data_intro": (
             "El encabezado del informe dice cómo se simularon los precios, qué parte del "
             "historial tuvo el probador y qué fechas se probaron. Es la parte que más se retoca "
@@ -525,6 +543,22 @@ LABELS: dict[str, dict[str, str]] = {
         "unlock_nav": "Unlock",
         "account": "The account's real money",
         "test_data": "What data the test ran on",
+        "capital": "How much capital it needs, at what size",
+        "capital_intro": (
+            "How much money it takes so that a bad year does not take more than a given share "
+            "of the account, with this file's trades. We drew {samples:,} years of trades at "
+            "random and took the fall only 5 % of them exceed, or the history's own if larger."
+        ),
+        "capital_fall": "Reference fall in money, at the backtest's size.",
+        "capital_history": "Deepest fall of the history in its own order.",
+        "capital_limit": "If you accept losing up to",
+        "capital_needed": "Capital needed at the backtest's size",
+        "capital_scale": "Size on a {balance} balance",
+        "capital_scale_plain": "Size on the starting balance",
+        "capital_scale_help": (
+            "1x is the backtest's lot size; 0.50x is half of it. Above 1x the fall in money "
+            "grows in the same proportion."
+        ),
         "test_data_intro": (
             "The report header says how prices were simulated, how much of the history the "
             "tester had and which dates were tested. It is the part most often retouched when "
@@ -852,6 +886,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "floating_pnl": "Resultado flotante al imprimir",
         "floating_share": "Flotante sobre el balance",
         "tick_model": "Modelado de precios",
+        "trades_per_year": "Operaciones por año",
         "data_quality": "Calidad de datos",
         "tested_from": "Prueba desde",
         "tested_to": "Prueba hasta",
@@ -923,6 +958,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "floating_pnl": "Floating result when printed",
         "floating_share": "Floating result / balance",
         "tick_model": "Price modelling",
+        "trades_per_year": "Trades per year",
         "data_quality": "Data quality",
         "tested_from": "Tested from",
         "tested_to": "Tested to",
@@ -970,6 +1006,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
 
 #: Amounts in the account currency: always two decimals, like the platforms.
 MONEY_KEYS = {
+    "fall_reference",
+    "fall_history",
+    "capital",
     "gross_profit",
     "gross_loss",
     "fees_total",
@@ -1306,7 +1345,7 @@ def _dimension_title(name: str, locale: str) -> str:
     return DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]).get(name, name)
 
 
-def _meaning_html(verdict: dict[str, Any], locale: str) -> str:
+def _meaning_html(verdict: dict[str, Any], locale: str, *, account: bool = False) -> str:
     by_name = {d["name"]: d for d in verdict["dimensions"]}
     items = []
     for name in DIMENSION_ORDER:
@@ -1317,7 +1356,7 @@ def _meaning_html(verdict: dict[str, Any], locale: str) -> str:
             f"<div class='item s-{_e(dimension['status'])}'>"
             f"<h3>{_e(_dimension_title(name, locale))} "
             f"{_status_badge(dimension['status'], locale)}</h3>"
-            f"<p>{_e(meaning(name, dimension['status'], locale))}</p></div>"
+            f"<p>{_e(meaning(name, dimension['status'], locale, account=account))}</p></div>"
         )
     return "<div class='meaning'>" + "".join(items) + "</div>"
 
@@ -1837,7 +1876,7 @@ def _summary_in(data: dict[str, Any], locale: str) -> str:
         locale="en" if locale == "en" else "es",
         trials=int(trials.get("value") or 1),
         trials_evidence=str(trials.get("evidence") or "DECLARED"),
-        account=str((data.get("inputs") or {}).get("source_format")) in ACCOUNT_FORMATS,
+        account=is_account_history(data),
     )
 
 
@@ -2221,6 +2260,56 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
         out += f"<p class='live-verdict lv-PASS'>{_e(labels['account_clean'])}</p>"
     out += f"<p class='muted'>{_e(labels['account_scope'])}</p>"
     return out
+
+
+def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """Capital and size for each loss limit."""
+    if not capital or capital.get("status") != "MEASURED":
+        return ""
+    samples = int((capital.get("method") or {}).get("samples") or 0)
+    out = f"<p class='muted'>{_e(labels['capital_intro'].format(samples=samples))}</p>"
+    reference = float(capital["fall_reference"]["value"])
+    history = float(capital["fall_history"]["value"])
+    out += (
+        "<div class='facts'>"
+        f"<div class='fact'><b>{_fmt(reference, key='fall_reference')}</b>"
+        f"<p>{_e(labels['capital_fall'])}</p></div>"
+        f"<div class='fact'><b>{_fmt(history, key='fall_history')}</b>"
+        f"<p>{_e(labels['capital_history'])}</p></div></div>"
+    )
+    per_year = capital["trades_per_year"]
+    out += (
+        f"<p class='muted'>{_e(_key_label('trades_per_year', labels))}: "
+        f"{_fmt(per_year['value'])} {_badge(per_year['evidence'])} "
+        f"{_e(localize(per_year.get('note', ''), locale))}</p>"
+    )
+    balance = capital["starting_balance"]["value"]
+    scale_head = (
+        labels["capital_scale"].format(balance=_fmt(float(balance), key="starting_balance"))
+        if balance
+        else labels["capital_scale_plain"]
+    )
+    rows = "".join(
+        f"<tr><td>{float(row['limit']):.0%}</td>"
+        f"<td class='val'>{_fmt(row['capital']['value'], key='capital')}</td>"
+        f"<td class='val'>"
+        + (
+            _e(sizing_scale_text(float(row["size_share"]["value"])))
+            if row["size_share"]["value"] is not None
+            else "—"
+        )
+        + "</td></tr>"
+        for row in capital["rows"]
+    )
+    out += (
+        "<table class='metrics'><thead><tr>"
+        f"<th>{_e(labels['capital_limit'])}</th>"
+        f"<th class='val'>{_e(labels['capital_needed'])}</th>"
+        f"<th class='val'>{_e(scale_head)}</th>"
+        f"</tr></thead><tbody>{rows}</tbody></table>"
+        f"<p class='muted'>{_e(labels['capital_scale_help'])}</p>"
+    )
+    return out + _assumptions(capital.get("assumptions"), locale, labels)
 
 
 #: The tester's modelling modes as a reader says them.
@@ -2753,6 +2842,11 @@ def render_html(
         (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
+        *(
+            [(labels["capital"], _capital_html(data.get("capital"), locale, labels))]
+            if (data.get("capital") or {}).get("status") == "MEASURED"
+            else []
+        ),
         (
             labels["challenge"],
             _challenge_html(
@@ -2891,7 +2985,11 @@ def render_html(
     sections = [
         section(labels["reading"], reading_html, "r-reading") if reading_html else "",
         section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
-        section(labels["meaning"], _meaning_html(verdict, locale), "r-meaning"),
+        section(
+            labels["meaning"],
+            _meaning_html(verdict, locale, account=is_account_history(data)),
+            "r-meaning",
+        ),
         section(labels["ladder"], _ladder_html(str(verdict["overall"]), labels), "r-ladder"),
         section(labels["charts"], _charts_html(data, locale), "r-charts"),
         section(
