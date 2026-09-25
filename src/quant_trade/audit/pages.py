@@ -222,6 +222,15 @@ _COPY: dict[str, dict[str, Any]] = {
             "Con una fila por ejecución: hora, lado, cantidad y precio. Lo que dejes vacío "
             "se reconoce solo."
         ),
+        "map_groups": (
+            ("Una fila por operación", ("entry_time", "exit_time", "entry_price", "exit_price")),
+            ("Una fila por ejecución", ("time", "price")),
+            (
+                "En los dos casos",
+                ("side", "quantity", "symbol", "profit", "commission", "multiplier"),
+            ),
+        ),
+        "map_found": "Columnas de tu archivo:",
         "map_roles": {
             "entry_time": "Fecha y hora de entrada",
             "exit_time": "Fecha y hora de salida",
@@ -483,6 +492,12 @@ _COPY: dict[str, dict[str, Any]] = {
             "entry, exit, quantity and prices. One row per fill: time, side, quantity and "
             "price. Anything left blank is recognised on its own."
         ),
+        "map_groups": (
+            ("One row per trade", ("entry_time", "exit_time", "entry_price", "exit_price")),
+            ("One row per fill", ("time", "price")),
+            ("Either way", ("side", "quantity", "symbol", "profit", "commission", "multiplier")),
+        ),
+        "map_found": "Columns in your file:",
         "map_roles": {
             "entry_time": "Entry date and time",
             "exit_time": "Exit date and time",
@@ -636,6 +651,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_pricing": "Precios",
         "nav_guides": "Guías",
         "nav_faq": "Preguntas",
+        "nav_account": "Mi cuenta",
         "nav_compare": "Comparar",
         "nav_menu": "Menú",
         "cta": "Empezar gratis",
@@ -824,6 +840,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_pricing": "Pricing",
         "nav_guides": "Guides",
         "nav_faq": "FAQ",
+        "nav_account": "My account",
         "nav_compare": "Compare",
         "nav_menu": "Menu",
         "cta": "Start free",
@@ -1069,6 +1086,7 @@ def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
     ui = _UI[locale]
     home = _home(locale)
     sample = "/ejemplo" if locale == "es" else "/sample"
+    account = "/account" if locale == "en" else "/cuenta"
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
         f"<a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a>"
@@ -1093,13 +1111,15 @@ def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
             if switch_href
             else ""
         )
+        + f"<a href='{account}'>{_e(ui['nav_account'])}</a>"
         + f"<a class='btn btn-primary' href='{home}#subir'>{_e(ui['cta'])}</a></nav></details>"
     )
     return (
         f"<header class='nav{' nav-solid' if solid else ''}'><div class='wrap nav-in'>"
         + logo(home)
         + f"<nav class='nav-links' aria-label='{_e(BRAND)}'>{links}</nav>"
-        + f"<div class='nav-end'>{switch}<a class='btn btn-sm' href='{home}#subir'>"
+        + f"<div class='nav-end'>{switch}<a class='lang' href='{account}'>"
+        f"{_e(ui['nav_account'])}</a><a class='btn btn-sm' href='{home}#subir'>"
         f"{_e(ui['cta_short'])}</a>{menu}</div></div></header>"
     )
 
@@ -1756,16 +1776,23 @@ def _upload_form(
         "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
         "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
         f"<p class='help'>{_e(copy['map_help'])}</p>"
-        "<datalist id='report-columns'></datalist><div class='form-grid'>"
+        "<datalist id='report-columns'></datalist>"
+        "<p class='map-found' id='report-columns-shown' hidden>"
+        f"<span>{_e(copy['map_found'])}</span></p>"
         + "".join(
-            _field(
-                label,
-                f"<input type='text' name='col_{role}' maxlength='100' list='report-columns' "
-                "autocomplete='off' spellcheck='false'>",
+            f"<fieldset class='map-group'><legend>{_e(title)}</legend><div class='form-grid'>"
+            + "".join(
+                _field(
+                    copy["map_roles"][role],
+                    f"<input type='text' name='col_{role}' maxlength='100' list='report-columns' "
+                    "autocomplete='off' spellcheck='false'>",
+                )
+                for role in roles
             )
-            for role, label in copy["map_roles"].items()
+            + "</div></fieldset>"
+            for title, roles in copy["map_groups"]
         )
-        + "</div></div></details>"
+        + "</div></details>"
     )
     optimization_help = (
         f"{_e(copy['optimization_help'])} <a href='{_e(guide_url('mt5-optimization', locale))}'>"

@@ -1084,6 +1084,16 @@ def run_audit(
     )
     mintrl = significance.get("min_track_record_length", {})
     mintrl_value = mintrl.get("value") if mintrl.get("evidence") == MEASURED else None
+    findings = [
+        *(behaviour.get("findings") or []),
+        *(instruments.get("findings") or []),
+        *(["recent_weaker"] if decay_lib.is_weaker(recent) else []),
+        *(
+            ["costs_thin"]
+            if any(d.name == "costs" and d.status in ("WEAK", "FAIL") for d in dimensions)
+            else []
+        ),
+    ]
     questions = analytics.vendor_questions(
         [flag.code for flag in flags],
         has_trades=inputs.trades is not None,
@@ -1095,6 +1105,7 @@ def run_audit(
         min_track_record_months=(
             float(mintrl_value) / ppy * 12.0 if mintrl_value is not None and ppy > 0 else None
         ),
+        findings=findings,
     )
     oos = inputs.declared.oos_start
     report_metadata = {

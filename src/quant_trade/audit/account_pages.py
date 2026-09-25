@@ -1,0 +1,864 @@
+"""The account pages: sign up, sign in, "My reports", password and deletion.
+
+Every page exists in Spanish (default) and English. Forms post back to the
+same paths with a CSRF token; nothing here runs script. The pages reuse the
+site's shell (``pages._page``) so the redesign styles them with the rest.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from quant_trade.audit.accounts import MIN_PASSWORD_CHARS
+from quant_trade.audit.compare import guard_page
+from quant_trade.audit.engine import _safe_text
+from quant_trade.audit.pages import _e, _field, _page, _page_hero
+from quant_trade.audit.seo import BRAND
+from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord
+from quant_trade.audit.theme import CLASS_COLOURS, icon
+
+#: Spanish paths are the default; English paths show the same page in English.
+PATHS: dict[str, dict[str, str]] = {
+    "es": {
+        "signup": "/registro",
+        "signin": "/entrar",
+        "signout": "/salir",
+        "account": "/cuenta",
+        "forgot": "/olvide",
+        "reset": "/restablecer",
+    },
+    "en": {
+        "signup": "/signup",
+        "signin": "/login",
+        "signout": "/logout",
+        "account": "/account",
+        "forgot": "/forgot",
+        "reset": "/reset",
+    },
+}
+
+COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "eyebrow": "Tu cuenta",
+        "signup_title": "Crea tu cuenta",
+        "signup_lead": (
+            "Guarda en un solo lugar tus informes, tus créditos y tus compras. La vista "
+            "previa sigue siendo gratis y sin cuenta."
+        ),
+        "signin_title": "Entra a tu cuenta",
+        "signin_lead": "Tus informes, créditos y compras te esperan aquí.",
+        "email": "Correo electrónico",
+        "password": "Contraseña",
+        "password_new": "Contraseña nueva",
+        "password_current": "Contraseña actual",
+        "password_help": f"Al menos {MIN_PASSWORD_CHARS} caracteres. Una frase larga sirve.",
+        "signup_button": "Crear cuenta",
+        "signin_button": "Entrar",
+        "have_account": "¿Ya tienes cuenta?",
+        "no_account": "¿Aún no tienes cuenta?",
+        "signin_link": "Entra",
+        "signup_link": "Crea una gratis",
+        "forgot_link": "Olvidé mi contraseña",
+        "terms_agree": (
+            "Al crear la cuenta aceptas los términos del servicio y la política de privacidad."
+        ),
+        "benefits": (
+            "Todos tus informes en una lista, con su clase|"
+            "Tus créditos de acceso a la vista, sin buscar el código|"
+            "Desbloquea un informe con un clic usando tus créditos|"
+            "Tus compras con tarjeta o código, con fecha"
+        ),
+        "email_bad": "Ese correo no parece válido.",
+        "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
+        "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
+        "password_bad": "La contraseña tiene un carácter que no se puede usar.",
+        "taken": (
+            "No se pudo crear una cuenta con ese correo. Si ya tienes una, entra con tu contraseña."
+        ),
+        "wrong": "El correo o la contraseña no coinciden.",
+        "too_many": "Demasiados intentos. Espera una hora y vuelve a probar.",
+        "csrf": "El formulario caducó. Recarga la página y vuelve a enviarlo.",
+        "signed_out": "Saliste de tu cuenta.",
+        "welcome": "Cuenta creada. Ya puedes subir un archivo: el informe se guarda aquí.",
+        "account_title": "Mis informes",
+        "account_lead": "Todo lo que auditaste con esta cuenta, en un solo lugar.",
+        "signed_in_as": "Sesión iniciada como",
+        "signout_button": "Salir",
+        "credits": "Créditos disponibles",
+        "credits_help": "Cada crédito desbloquea un informe completo.",
+        "reports": "Informes",
+        "paid_reports": "Informes completos",
+        "new_audit": "Auditar otro archivo",
+        "reports_title": "Tus informes",
+        "reports_none": (
+            "Aún no hay informes en tu cuenta. Sube un archivo con la sesión iniciada, o abre "
+            "un informe que ya tengas y pulsa «Guardar en mi cuenta»."
+        ),
+        "col_date": "Fecha",
+        "col_class": "Clase",
+        "col_status": "Estado",
+        "col_what": "Descripción",
+        "open": "Abrir",
+        "status_full": "Completo",
+        "status_preview": "Vista previa",
+        "status_purged": "Archivos borrados",
+        "status_published": "Página pública",
+        "status_saved": "Guardado desde un enlace",
+        "paid_card": "tarjeta",
+        "paid_code": "código",
+        "no_description": "Sin descripción",
+        "codes_title": "Tus códigos de acceso",
+        "codes_none": "Aún no hay códigos en tu cuenta.",
+        "codes_help": (
+            "Un código que canjeas con la sesión iniciada se guarda aquí solo. También puedes "
+            "añadir uno que ya tengas."
+        ),
+        "code_label": "Código de acceso",
+        "code_add": "Añadir a mi cuenta",
+        "code_linked": "Código añadido a tu cuenta.",
+        "code_already": "Ese código ya está en tu cuenta.",
+        "code_other": "Ese código ya está guardado en otra cuenta.",
+        "code_unknown": "No encontramos ese código. Revisa que esté completo.",
+        "col_code": "Código",
+        "col_added": "Añadido",
+        "col_left": "Quedan",
+        "col_used": "Usados",
+        "col_expires": "Caduca",
+        "code_ref": "n.º",
+        "code_off": "desactivado",
+        "code_expired": "caducado",
+        "code_empty": "agotado",
+        "never": "nunca",
+        "purchases_title": "Tus compras",
+        "purchases_none": "Aún no hay compras en tu cuenta.",
+        "col_paid": "Pagado",
+        "col_method": "Con",
+        "buy_title": "¿Necesitas créditos?",
+        "buy_code": "Pedir un código por WhatsApp",
+        "buy_card": "Paga con tarjeta desde la vista previa de cualquier informe.",
+        "security_title": "Contraseña y datos",
+        "change_password": "Cambiar contraseña",
+        "password_changed": "Contraseña cambiada. Cerramos las demás sesiones.",
+        "delete_title": "Borrar mi cuenta",
+        "delete_help": (
+            "Borra tu correo, tu contraseña, tus sesiones y la lista de tus informes y códigos. "
+            "Los informes siguen abriendo con su enlace privado hasta su plazo de conservación, "
+            "salvo que marques la casilla para borrar también los que subiste con esta cuenta. "
+            "Los que guardaste o pagaste desde el enlace de otra persona solo salen de tu lista."
+        ),
+        "delete_reports": "Borrar también los informes que subí (no se puede deshacer)",
+        "delete_button": "Borrar mi cuenta",
+        "deleted": "Tu cuenta se borró.",
+        "forgot_title": "Recupera tu contraseña",
+        "forgot_lead": (
+            "Todavía no enviamos correos. Escríbenos desde el correo de tu cuenta y te "
+            "mandamos un enlace de un solo uso para poner una contraseña nueva."
+        ),
+        "forgot_contact": "Escribir por WhatsApp",
+        "forgot_message": f"Hola, olvidé la contraseña de mi cuenta de {BRAND}. Mi correo es: ",
+        "reset_title": "Pon una contraseña nueva",
+        "reset_lead": "Este enlace funciona una sola vez y caduca en 24 horas.",
+        "reset_button": "Guardar contraseña",
+        "reset_bad": "Este enlace ya se usó o caducó. Pide uno nuevo.",
+        "reset_done": "Contraseña guardada. Entra con ella.",
+        "saved_box": "Guardado en tu cuenta.",
+        "saved_link": "Ver mis informes",
+        "save_box": "Guarda este informe en tu cuenta para encontrarlo sin el enlace.",
+        "save_button": "Guardar en mi cuenta",
+        "save_other": "Este informe está guardado en otra cuenta.",
+        "anon_box": (
+            "Crea una cuenta gratis para guardar este informe y encontrarlo sin el enlace."
+        ),
+        "anon_signup": "Crear cuenta",
+        "anon_signin": "Entrar",
+        "credit_button": "Desbloquear con 1 crédito de tu cuenta",
+        "credit_left": "Tienes {n} créditos.",
+        "credit_left_one": "Tienes 1 crédito.",
+        "credit_used": "Crédito usado: este es el informe completo.",
+        "credit_none": "No te quedan créditos en tu cuenta.",
+        "saved_notice": "Informe guardado en tu cuenta.",
+        "nav_account": "Mi cuenta",
+    },
+    "en": {
+        "eyebrow": "Your account",
+        "signup_title": "Create your account",
+        "signup_lead": (
+            "Keep your reports, credits and purchases in one place. The preview stays free "
+            "and needs no account."
+        ),
+        "signin_title": "Sign in to your account",
+        "signin_lead": "Your reports, credits and purchases are waiting here.",
+        "email": "E-mail",
+        "password": "Password",
+        "password_new": "New password",
+        "password_current": "Current password",
+        "password_help": f"At least {MIN_PASSWORD_CHARS} characters. A long phrase works.",
+        "signup_button": "Create account",
+        "signin_button": "Sign in",
+        "have_account": "Already have an account?",
+        "no_account": "No account yet?",
+        "signin_link": "Sign in",
+        "signup_link": "Create one for free",
+        "forgot_link": "I forgot my password",
+        "terms_agree": (
+            "By creating the account you accept the terms of service and privacy policy."
+        ),
+        "benefits": (
+            "All your reports in one list, with their class|"
+            "Your access credits in sight, no code to look up|"
+            "Unlock a report in one click with your credits|"
+            "Your card and code purchases, with dates"
+        ),
+        "email_bad": "That e-mail address does not look valid.",
+        "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
+        "password_long": "The password is too long (256 characters at most).",
+        "password_bad": "The password has a character that cannot be used.",
+        "taken": (
+            "An account could not be created with that e-mail. If you already have one, sign "
+            "in with your password."
+        ),
+        "wrong": "The e-mail or the password does not match.",
+        "too_many": "Too many attempts. Wait an hour and try again.",
+        "csrf": "The form expired. Reload the page and submit it again.",
+        "signed_out": "You signed out.",
+        "welcome": "Account created. Upload a file now: the report is saved here.",
+        "account_title": "My reports",
+        "account_lead": "Everything you audited with this account, in one place.",
+        "signed_in_as": "Signed in as",
+        "signout_button": "Sign out",
+        "credits": "Credits available",
+        "credits_help": "Each credit unlocks one full report.",
+        "reports": "Reports",
+        "paid_reports": "Full reports",
+        "new_audit": "Audit another file",
+        "reports_title": "Your reports",
+        "reports_none": (
+            "No reports on your account yet. Upload a file while signed in, or open a report "
+            "you already have and press “Save to my account”."
+        ),
+        "col_date": "Date",
+        "col_class": "Class",
+        "col_status": "Status",
+        "col_what": "Description",
+        "open": "Open",
+        "status_full": "Full",
+        "status_preview": "Preview",
+        "status_purged": "Files deleted",
+        "status_published": "Public page",
+        "status_saved": "Saved from a link",
+        "paid_card": "card",
+        "paid_code": "code",
+        "no_description": "No description",
+        "codes_title": "Your access codes",
+        "codes_none": "No codes on your account yet.",
+        "codes_help": (
+            "A code you redeem while signed in is saved here on its own. You can also add one "
+            "you already have."
+        ),
+        "code_label": "Access code",
+        "code_add": "Add to my account",
+        "code_linked": "Code added to your account.",
+        "code_already": "That code is already on your account.",
+        "code_other": "That code is already saved on another account.",
+        "code_unknown": "We could not find that code. Check that it is complete.",
+        "col_code": "Code",
+        "col_added": "Added",
+        "col_left": "Left",
+        "col_used": "Used",
+        "col_expires": "Expires",
+        "code_ref": "no.",
+        "code_off": "disabled",
+        "code_expired": "expired",
+        "code_empty": "used up",
+        "never": "never",
+        "purchases_title": "Your purchases",
+        "purchases_none": "No purchases on your account yet.",
+        "col_paid": "Paid",
+        "col_method": "With",
+        "buy_title": "Need credits?",
+        "buy_code": "Ask for a code on WhatsApp",
+        "buy_card": "Pay by card from the preview of any report.",
+        "security_title": "Password and data",
+        "change_password": "Change password",
+        "password_changed": "Password changed. Your other sessions were signed out.",
+        "delete_title": "Delete my account",
+        "delete_help": (
+            "Deletes your e-mail, password, sessions and the list of your reports and codes. "
+            "The reports still open with their private link until their retention period "
+            "ends, unless you tick the box to also delete the ones you uploaded with this "
+            "account. Reports saved or paid for from someone else's link only leave your list."
+        ),
+        "delete_reports": "Also delete the reports I uploaded (cannot be undone)",
+        "delete_button": "Delete my account",
+        "deleted": "Your account was deleted.",
+        "forgot_title": "Recover your password",
+        "forgot_lead": (
+            "We do not send e-mails yet. Write to us from your account's e-mail and we send "
+            "you a one-time link to set a new password."
+        ),
+        "forgot_contact": "Write on WhatsApp",
+        "forgot_message": f"Hi, I forgot the password of my {BRAND} account. My e-mail is: ",
+        "reset_title": "Set a new password",
+        "reset_lead": "This link works once and expires in 24 hours.",
+        "reset_button": "Save password",
+        "reset_bad": "This link was already used or has expired. Ask for a new one.",
+        "reset_done": "Password saved. Sign in with it.",
+        "saved_box": "Saved to your account.",
+        "saved_link": "See my reports",
+        "save_box": "Save this report to your account to find it without the link.",
+        "save_button": "Save to my account",
+        "save_other": "This report is saved on another account.",
+        "anon_box": "Create a free account to save this report and find it without the link.",
+        "anon_signup": "Create account",
+        "anon_signin": "Sign in",
+        "credit_button": "Unlock with 1 credit from your account",
+        "credit_left": "You have {n} credits.",
+        "credit_left_one": "You have 1 credit.",
+        "credit_used": "Credit used: this is the full report.",
+        "credit_none": "There are no credits left on your account.",
+        "saved_notice": "Report saved to your account.",
+        "nav_account": "My account",
+    },
+}
+
+ACCOUNT_CSS = """
+.acct-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:36px;
+align-items:start}
+.acct-card{border:1px solid var(--border);border-radius:18px;padding:24px;
+background:var(--surface-2)}
+.acct-card h2{margin-top:0}
+.acct-list{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.acct-list li{display:flex;gap:10px;align-items:flex-start}
+.acct-list svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--ok)}
+.acct-alt{margin-top:18px;font-size:.92rem}
+.acct-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+margin-bottom:8px}
+.acct-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 28px}
+.acct-kpi{border:1px solid var(--border);border-radius:16px;padding:16px 18px;
+background:var(--surface-2)}
+.acct-kpi b{display:block;font-size:1.9rem;line-height:1.1}
+.acct-kpi span{color:var(--text-2);font-size:.86rem}
+.acct-table{width:100%;border-collapse:collapse;font-size:.92rem;margin:8px 0 24px}
+.acct-table th,.acct-table td{text-align:left;padding:10px 8px;
+border-bottom:1px solid var(--border);vertical-align:middle}
+.acct-table th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2)}
+.acct-scroll{overflow-x:auto}
+.acct-cls{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;
+font-weight:700;border:2px solid currentColor}
+.acct-tag{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:999px;
+border:1px solid var(--border);margin:2px 4px 2px 0;color:var(--text-2)}
+.acct-sec{margin-top:40px}
+.acct-sec h2{margin:0 0 10px}
+.acct-card h3{margin:0 0 14px}
+.acct-box{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;
+border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:14px 0;
+font-size:.92rem;background:var(--surface-2)}
+.acct-box form{margin:0}
+.acct-box .btn{margin:0}
+@media (max-width:760px){.acct-grid{grid-template-columns:1fr}.acct-kpis{grid-template-columns:1fr}}
+"""
+
+
+def _locale(locale: str) -> str:
+    return locale if locale in COPY else "es"
+
+
+def path(kind: str, locale: str) -> str:
+    return PATHS[_locale(locale)][kind]
+
+
+def _hidden(name: str, value: str) -> str:
+    return f"<input type='hidden' name='{name}' value='{_e(value)}'>"
+
+
+def _shell(locale: str, title: str, lead: str, body: str, *, switch: str) -> str:
+    content = (
+        _page_hero(COPY[locale]["eyebrow"], title, lead)
+        + f"<div class='paper page-main'><div class='wrap'><style>{ACCOUNT_CSS}</style>"
+        + body
+        + "</div></div>"
+    )
+    # Customer text (an e-mail, a description) is passed through ``_safe_text``
+    # before it gets here; the guard is the last check, as on other pages.
+    return guard_page(_page(title, locale, content, switch_href=switch, solid_nav=True))
+
+
+def _alert(copy: dict[str, str], error: str = "", flash: str = "") -> str:
+    out = ""
+    if flash and flash in copy:
+        out += f"<div class='flash' role='status'>{_e(copy[flash])}</div>"
+    if error and error in copy:
+        out += f"<div class='error' role='alert'>{_e(copy[error])}</div>"
+    return out
+
+
+def _benefits(copy: dict[str, str]) -> str:
+    items = "".join(
+        f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in copy["benefits"].split("|")
+    )
+    return f"<div class='acct-card'><ul class='acct-list'>{items}</ul></div>"
+
+
+def _email_field(copy: dict[str, str], email: str) -> str:
+    return _field(
+        copy["email"],
+        f"<input type='email' name='email' required maxlength='254' autocomplete='email' "
+        f"value='{_e(_safe_text(email))}'>",
+    )
+
+
+def _switch(kind: str, locale: str, next_path: str = "") -> str:
+    other = "en" if locale == "es" else "es"
+    query = f"?next={_e(next_path)}" if next_path else ""
+    return path(kind, other) + query
+
+
+def signup_page(
+    *, locale: str, csrf: str, error: str = "", email: str = "", next_path: str = ""
+) -> str:
+    locale = _locale(locale)
+    copy = COPY[locale]
+    from quant_trade.audit.legal import legal_url
+
+    signin = path("signin", locale) + (f"?next={_e(next_path)}" if next_path else "")
+    form = (
+        _alert(copy, error)
+        + f"<form method='post' action='{path('signup', locale)}'>"
+        + _hidden("csrf", csrf)
+        + _hidden("next", next_path)
+        + _email_field(copy, email)
+        + _field(
+            copy["password"],
+            f"<input type='password' name='password' required minlength='{MIN_PASSWORD_CHARS}' "
+            "maxlength='256' autocomplete='new-password'>",
+            copy["password_help"],
+        )
+        + f"<p class='muted'>{_e(copy['terms_agree'])} "
+        f"<a href='{_e(legal_url('terms', locale))}'>›</a></p>"
+        + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signup_button'])}"
+        "</button></form>" + f"<p class='acct-alt'>{_e(copy['have_account'])} "
+        f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"
+    )
+    body = f"<div class='acct-grid'><div>{form}</div>{_benefits(copy)}</div>"
+    return _shell(
+        locale,
+        copy["signup_title"],
+        copy["signup_lead"],
+        body,
+        switch=_switch("signup", locale, next_path),
+    )
+
+
+def signin_page(
+    *,
+    locale: str,
+    csrf: str,
+    error: str = "",
+    flash: str = "",
+    email: str = "",
+    next_path: str = "",
+) -> str:
+    locale = _locale(locale)
+    copy = COPY[locale]
+    signup = path("signup", locale) + (f"?next={_e(next_path)}" if next_path else "")
+    form = (
+        _alert(copy, error, flash)
+        + f"<form method='post' action='{path('signin', locale)}'>"
+        + _hidden("csrf", csrf)
+        + _hidden("next", next_path)
+        + _email_field(copy, email)
+        + _field(
+            copy["password"],
+            "<input type='password' name='password' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signin_button'])}"
+        "</button></form>"
+        + f"<p class='acct-alt'><a href='{path('forgot', locale)}'>{_e(copy['forgot_link'])}"
+        "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])} "
+        f"<a href='{_e(signup)}'>{_e(copy['signup_link'])}</a></p>"
+    )
+    body = f"<div class='acct-grid'><div>{form}</div>{_benefits(copy)}</div>"
+    return _shell(
+        locale,
+        copy["signin_title"],
+        copy["signin_lead"],
+        body,
+        switch=_switch("signin", locale, next_path),
+    )
+
+
+def forgot_page(*, locale: str, contact_url: str) -> str:
+    locale = _locale(locale)
+    copy = COPY[locale]
+    button = ""
+    if contact_url:
+        from quant_trade.audit.report import _prefilled
+
+        href = _prefilled(contact_url, copy["forgot_message"])
+        button = (
+            f"<p><a class='btn btn-primary btn-lg' href='{_e(href)}' rel='noopener noreferrer' "
+            f"target='_blank'>{icon('chat')}{_e(copy['forgot_contact'])}</a></p>"
+        )
+    body = (
+        "<div class='wrap-narrow'>"
+        + button
+        + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
+        "</p></div>"
+    )
+    return _shell(
+        locale,
+        copy["forgot_title"],
+        copy["forgot_lead"],
+        body,
+        switch=_switch("forgot", locale),
+    )
+
+
+def reset_page(*, locale: str, csrf: str, token: str, error: str = "", valid: bool = True) -> str:
+    locale = _locale(locale)
+    copy = COPY[locale]
+    if not valid:
+        body = (
+            "<div class='wrap-narrow'>"
+            + _alert(copy, "reset_bad")
+            + f"<p><a class='btn btn-dark' href='{path('forgot', locale)}'>"
+            f"{_e(copy['forgot_link'])}</a></p></div>"
+        )
+    else:
+        body = (
+            "<div class='wrap-narrow'>"
+            + _alert(copy, error)
+            + f"<form method='post' action='{path('reset', locale)}'>"
+            + _hidden("csrf", csrf)
+            + _hidden("token", token)
+            + _field(
+                copy["password_new"],
+                f"<input type='password' name='password' required "
+                f"minlength='{MIN_PASSWORD_CHARS}' maxlength='256' autocomplete='new-password'>",
+                copy["password_help"],
+            )
+            + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['reset_button'])}"
+            "</button></form></div>"
+        )
+    return _shell(
+        locale, copy["reset_title"], copy["reset_lead"], body, switch=_switch("reset", locale)
+    )
+
+
+def _date(stamp: str | None) -> str:
+    return (stamp or "")[:10]
+
+
+def _class_badge(overall: str) -> str:
+    colour = CLASS_COLOURS.get(overall, "#64748b")
+    return f"<span class='acct-cls' style='color:{colour}'>{_e(overall)}</span>"
+
+
+def report_href(audit_id: str, locale: str) -> str:
+    return f"/audits/{audit_id}?lang={locale}"
+
+
+def _reports_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAudit]) -> str:
+    if not audits:
+        return f"<p class='muted'>{_e(copy['reports_none'])}</p>"
+    head = "".join(
+        f"<th>{_e(copy[k])}</th>" for k in ("col_date", "col_class", "col_status", "col_what")
+    )
+    rows = []
+    for item in audits:
+        tags = []
+        if item.purged:
+            tags.append(copy["status_purged"])
+        elif item.paid:
+            method = copy["paid_card"] if item.paid_with == "card" else copy["paid_code"]
+            tags.append(f"{copy['status_full']} · {method}")
+        else:
+            tags.append(copy["status_preview"])
+        if item.published:
+            tags.append(copy["status_published"])
+        if not item.own:
+            tags.append(copy["status_saved"])
+        status = "".join(f"<span class='acct-tag'>{_e(t)}</span>" for t in tags)
+        # The description is the customer's text: wording the guard refuses is withheld.
+        what = _safe_text(item.description) if item.description else copy["no_description"]
+        opener = (
+            ""
+            if item.purged
+            else f"<a class='btn btn-ghost btn-sm' href='{_e(report_href(item.audit_id, locale))}'>"
+            f"{_e(copy['open'])}</a>"
+        )
+        rows.append(
+            f"<tr><td>{_e(_date(item.created_at))}</td><td>{_class_badge(item.overall_class)}</td>"
+            f"<td>{status}</td>"
+            f"<td>{_e(what)}</td>"
+            f"<td>{opener}</td></tr>"
+        )
+    return (
+        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}<th></th></tr>"
+        f"</thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _codes_table(copy: dict[str, str], codes: Sequence[AccountCode], now: str) -> str:
+    if not codes:
+        return f"<p class='muted'>{_e(copy['codes_none'])}</p>"
+    head = "".join(
+        f"<th>{_e(copy[k])}</th>"
+        for k in ("col_code", "col_added", "col_left", "col_used", "col_expires")
+    )
+    rows = []
+    for item in codes:
+        record = item.code
+        state = ""
+        if record.disabled:
+            state = copy["code_off"]
+        elif record.expires_at is not None and record.expires_at <= now:
+            state = copy["code_expired"]
+        elif record.credits_left == 0:
+            state = copy["code_empty"]
+        left = str(record.credits_left) + (
+            f" <span class='acct-tag'>{_e(state)}</span>" if state else ""
+        )
+        rows.append(
+            f"<tr><td>{_e(copy['code_ref'])} {_e(record.id)}</td>"
+            f"<td>{_e(_date(item.linked_at))}</td><td>{left}</td>"
+            f"<td>{record.credits_used}/{record.credits_total}</td>"
+            f"<td>{_e(_date(record.expires_at) or copy['never'])}</td></tr>"
+        )
+    return (
+        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _purchases_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAudit]) -> str:
+    paid = sorted((a for a in audits if a.paid), key=lambda a: a.paid_at or "", reverse=True)
+    if not paid:
+        return f"<p class='muted'>{_e(copy['purchases_none'])}</p>"
+    head = "".join(f"<th>{_e(copy[k])}</th>" for k in ("col_paid", "col_method", "col_class"))
+    rows = [
+        f"<tr><td>{_e(_date(a.paid_at))}</td>"
+        f"<td>{_e(copy['paid_card'] if a.paid_with == 'card' else copy['paid_code'])}</td>"
+        f"<td>{_class_badge(a.overall_class)}</td><td>"
+        + (
+            ""
+            if a.purged
+            else f"<a href='{_e(report_href(a.audit_id, locale))}'>{_e(copy['open'])}</a>"
+        )
+        + "</td></tr>"
+        for a in paid
+    ]
+    return (
+        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}<th></th></tr>"
+        f"</thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def account_page(
+    *,
+    locale: str,
+    account: AccountRecord,
+    audits: Sequence[AccountAudit],
+    codes: Sequence[AccountCode],
+    credits: int,
+    csrf: str,
+    now: str,
+    flash: str = "",
+    error: str = "",
+    access_codes: bool = False,
+    card_payments: bool = False,
+    contact_url: str = "",
+) -> str:
+    """ "My reports": the reports, credits, codes and purchases of one account."""
+    locale = _locale(locale)
+    copy = COPY[locale]
+    home = "/en" if locale == "en" else "/"
+    signout = (
+        f"<form method='post' action='{path('signout', locale)}'>{_hidden('csrf', csrf)}"
+        f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['signout_button'])}"
+        "</button></form>"
+    )
+    header = (
+        "<div class='acct-head'>"
+        f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(_safe_text(account.email))}</b></p>"
+        f"<div class='inline-form'><a class='btn btn-primary' href='{home}#subir'>"
+        f"{_e(copy['new_audit'])}</a>{signout}</div></div>"
+    )
+    kpis = (
+        "<div class='acct-kpis'>"
+        f"<div class='acct-kpi'><b>{credits}</b><span>{_e(copy['credits'])}. "
+        f"{_e(copy['credits_help'])}</span></div>"
+        f"<div class='acct-kpi'><b>{len(audits)}</b><span>{_e(copy['reports'])}</span></div>"
+        f"<div class='acct-kpi'><b>{sum(1 for a in audits if a.paid)}</b>"
+        f"<span>{_e(copy['paid_reports'])}</span></div></div>"
+    )
+    reports = (
+        f"<section class='acct-sec'><h2>{_e(copy['reports_title'])}</h2>"
+        + _reports_table(copy, locale, audits)
+        + "</section>"
+    )
+    codes_html = ""
+    if access_codes or codes:
+        add = ""
+        if access_codes:
+            add = (
+                f"<form method='post' action='{path('account', locale)}/codigo'>"
+                + _hidden("csrf", csrf)
+                + f"<label for='acct-code'>{_e(copy['code_label'])}</label>"
+                "<div class='inline-form'><input id='acct-code' type='text' name='code' required "
+                "maxlength='40' autocomplete='off' spellcheck='false' "
+                "placeholder='AUD-XXXX-XXXX-XXXX'>"
+                f"<button class='btn btn-dark' type='submit'>{_e(copy['code_add'])}</button>"
+                "</div></form>"
+            )
+        codes_html = (
+            f"<section class='acct-sec'><h2>{_e(copy['codes_title'])}</h2>"
+            f"<p class='muted'>{_e(copy['codes_help'])}</p>"
+            + _codes_table(copy, codes, now)
+            + add
+            + "</section>"
+        )
+    buy = ""
+    if (access_codes and contact_url) or card_payments:
+        lines = ""
+        if access_codes and contact_url:
+            lines += (
+                f"<p><a class='btn btn-dark' href='{_e(contact_url)}' rel='noopener noreferrer' "
+                f"target='_blank'>{icon('chat')}{_e(copy['buy_code'])}</a></p>"
+            )
+        if card_payments:
+            lines += f"<p class='muted'>{_e(copy['buy_card'])}</p>"
+        buy = f"<section class='acct-sec'><h2>{_e(copy['buy_title'])}</h2>{lines}</section>"
+    purchases = (
+        f"<section class='acct-sec'><h2>{_e(copy['purchases_title'])}</h2>"
+        + _purchases_table(copy, locale, audits)
+        + "</section>"
+    )
+    security = (
+        f"<section class='acct-sec'><h2>{_e(copy['security_title'])}</h2>"
+        "<div class='acct-grid'>"
+        f"<form class='acct-card' method='post' action='{path('account', locale)}/contrasena'>"
+        f"<h3>{_e(copy['change_password'])}</h3>"
+        + _hidden("csrf", csrf)
+        + _field(
+            copy["password_current"],
+            "<input type='password' name='current' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + _field(
+            copy["password_new"],
+            f"<input type='password' name='password' required minlength='{MIN_PASSWORD_CHARS}' "
+            "maxlength='256' autocomplete='new-password'>",
+            copy["password_help"],
+        )
+        + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_password'])}</button>"
+        "</form>"
+        f"<form class='acct-card' method='post' action='{path('account', locale)}/borrar'>"
+        f"<h3>{_e(copy['delete_title'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
+        + _hidden("csrf", csrf)
+        + _field(
+            copy["password_current"],
+            "<input type='password' name='current' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
+        f"<span>{_e(copy['delete_reports'])}</span></label>"
+        f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
+        "</form></div></section>"
+    )
+    body = (
+        _alert(copy, error, flash)
+        + header
+        + kpis
+        + reports
+        + codes_html
+        + buy
+        + purchases
+        + security
+    )
+    return _shell(
+        locale,
+        copy["account_title"],
+        copy["account_lead"],
+        body,
+        switch=path("account", "en" if locale == "es" else "es"),
+    )
+
+
+def report_box(
+    *,
+    locale: str,
+    state: str,
+    audit_id: str,
+    query: str,
+    csrf: str = "",
+    credits: int = 0,
+    locked: bool = False,
+    next_path: str = "",
+) -> str:
+    """The account line on a report page.
+
+    ``state`` is ``anon`` (signed out), ``mine`` (on this account),
+    ``unsaved`` (signed in, not on any account) or ``other`` (on another
+    account). ``query`` is the report's own query string (token and language)
+    for the forms; ``credits`` offers the one-click unlock when ``locked``.
+    """
+    locale = _locale(locale)
+    copy = COPY[locale]
+    base = f"/audits/{audit_id}"
+    parts: list[str] = []
+    if state == "anon":
+        suffix = f"?next={_e(next_path)}" if next_path else ""
+        parts.append(
+            f"<span>{_e(copy['anon_box'])}</span>"
+            f"<a class='btn btn-dark btn-sm' href='{path('signup', locale)}{suffix}'>"
+            f"{_e(copy['anon_signup'])}</a>"
+            f"<a href='{path('signin', locale)}{suffix}'>{_e(copy['anon_signin'])}</a>"
+        )
+    elif state == "mine":
+        parts.append(
+            f"<span>{icon('check')} {_e(copy['saved_box'])}</span>"
+            f"<a href='{path('account', locale)}'>{_e(copy['saved_link'])}</a>"
+        )
+    elif state == "unsaved":
+        parts.append(
+            f"<span>{_e(copy['save_box'])}</span>"
+            f"<form method='post' action='{_e(base)}/save{_e(query)}'>{_hidden('csrf', csrf)}"
+            f"<button class='btn btn-dark btn-sm' type='submit'>{_e(copy['save_button'])}"
+            "</button></form>"
+        )
+    elif state == "other":
+        return ""
+    box = f"<div class='acct-box no-print'><style>{ACCOUNT_CSS}</style>{''.join(parts)}</div>"
+    if locked and state in ("mine", "unsaved") and credits > 0:
+        left = copy["credit_left_one"] if credits == 1 else copy["credit_left"].format(n=credits)
+        box += (
+            "<div class='acct-box no-print'>"
+            f"<form method='post' action='{_e(base)}/credit{_e(query)}'>{_hidden('csrf', csrf)}"
+            f"<button class='btn btn-primary' type='submit'>{icon('key')}"
+            f"{_e(copy['credit_button'])}</button></form><span class='muted'>{_e(left)}</span>"
+            "</div>"
+        )
+    return box
+
+
+def all_texts() -> list[str]:
+    """Every sentence the account pages can show, for the guard test."""
+    return [text for copy in COPY.values() for text in copy.values()]
+
+
+__all__ = [
+    "ACCOUNT_CSS",
+    "COPY",
+    "PATHS",
+    "account_page",
+    "all_texts",
+    "forgot_page",
+    "path",
+    "report_box",
+    "report_href",
+    "reset_page",
+    "signin_page",
+    "signup_page",
+]

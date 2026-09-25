@@ -22,6 +22,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
 from quant_trade.audit.account import is_account_history
+from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
@@ -251,6 +252,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
+        "my_account": "Mi cuenta",
         "yes": "sí",
         "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
@@ -436,6 +438,12 @@ LABELS: dict[str, dict[str, str]] = {
             "que el azar difícilmente explica. Lo verás también en las banderas rojas."
         ),
         "recent_badge_held": "Se mantiene",
+        "recent_badge_weaker": "Más débil",
+        "recent_weaker": (
+            "La media por operación bajó de {early} a {late} ({change}) en el último tercio. "
+            "Sigue sobre cero y la caída cabe en lo que el azar explica, pero conviene "
+            "vigilarla."
+        ),
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
         "fund": "Lo que revisaría quien invierte en un fondo",
@@ -942,6 +950,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
         "pdf_check_link": "How they check",
         "switch": "Español",
+        "my_account": "My account",
         "yes": "yes",
         "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
@@ -1118,6 +1127,12 @@ LABELS: dict[str, dict[str, str]] = {
             "hardly explains. You will also see it in the red flags."
         ),
         "recent_badge_held": "Holds",
+        "recent_badge_weaker": "Weaker",
+        "recent_weaker": (
+            "The average per trade fell from {early} to {late} ({change}) in the last third. "
+            "It stays above zero and the drop is within what chance explains, but it is "
+            "worth watching."
+        ),
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
         "fund": "What a fund investor would check",
@@ -3575,7 +3590,19 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
             f"{_e(localize(reason, locale))}</span></p>"
         )
     out = f"<p class='muted'>{_e(labels['recent_intro'])}</p>"
-    if recent.get("clean"):
+    early_mean = _ev_value(recent["early"].get("mean"))
+    late_mean = _ev_value(recent["recent"].get("mean"))
+    if is_weaker(recent) and early_mean is not None and late_mean is not None:
+        text = labels["recent_weaker"].format(
+            early=_signed_amount(early_mean),
+            late=_signed_amount(late_mean),
+            change=f"{late_mean / early_mean - 1:+.0%}",
+        )
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['recent_badge_weaker'])}</span> {_e(text)}</p>"
+        )
+    elif recent.get("clean"):
         out += (
             f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
             f"{_e(labels['recent_badge_held'])}</span> {_e(labels['recent_held'])}</p>"
@@ -4096,6 +4123,7 @@ def render_html(
     code_error: bool = False,
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
+    account_box: str = "",
 ) -> str:
     """The audit as one HTML document.
 
@@ -4638,8 +4666,10 @@ def render_html(
             "<button type='button' class='print-btn' "
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
+    account_href = "/account" if locale == "en" else "/cuenta"
     toolbar = (
         "<div class='nav-end no-print'>"
+        + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
             f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
@@ -4672,6 +4702,7 @@ def render_html(
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
         + _pack_notice(labels, pack_code, pack_credits_left)
+        + account_box
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
         + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
@@ -4916,6 +4947,7 @@ def render(
     code_error: bool = False,
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
+    account_box: str = "",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -4940,6 +4972,7 @@ def render(
         code_error=code_error,
         pay_links=pay_links,
         notice_ok=notice_ok,
+        account_box=account_box,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
