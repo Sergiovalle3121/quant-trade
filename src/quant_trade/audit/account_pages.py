@@ -1344,7 +1344,8 @@ def strategies_section(
         form = f"<p class='muted'>{_e(copy['no_reports'])}</p>"
     return (
         f"<section class='acct-sec' id='estrategias'><h2>{_e(copy['section_title'])}</h2>"
-        f"<p class='muted'>{_e(copy['section_lead'])}</p>{listing}{form}</section>"
+        f"<p class='muted'>{_e(copy['section_lead'])}</p>{listing}{form}"
+        f"<style>{STRATEGY_CSS}</style></section>"
     )
 
 
