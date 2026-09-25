@@ -808,6 +808,7 @@ color:var(--text-3)}
 .fact.neg b{color:#b91c1c}
 .vc{white-space:nowrap}
 .tscroll{max-width:100%;overflow-x:auto}
+@media print{.chart-scroll{overflow:visible}table.monthly{width:100%;font-size:7pt}table.monthly th,table.monthly td{padding:3px 2px!important;white-space:nowrap}table.monthly th{font-size:6pt;letter-spacing:0}table.monthly td.long{font-size:6pt}}
 @media print{.tscroll{overflow:visible}.tscroll table{display:table!important;table-layout:auto;width:100%;font-size:7.5pt}.tscroll td{white-space:nowrap!important;padding:6px 5px!important}.tscroll th{white-space:normal!important;font-size:6.5pt;letter-spacing:0;padding:6px 5px!important}}
 .read-notes{margin:14px 0;padding:14px 18px;border-radius:14px;background:#fff;border:1px solid var(--border);font-size:.88rem;color:var(--text-2)}.read-notes p{margin:0 0 6px;font-weight:600;color:var(--text)}.read-notes ul{margin:0;padding-left:18px}.read-notes li{margin:3px 0;line-height:1.5}
 .chosen{margin:14px 0 8px}.params{display:flex;flex-wrap:wrap;margin:0 0 12px}
