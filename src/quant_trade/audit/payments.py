@@ -39,8 +39,15 @@ from quant_trade.audit.store import (
 PLAN_SINGLE = "single"
 PLAN_PACK = "pack"
 PLANS = (PLAN_SINGLE, PLAN_PACK)
-#: Checkout session statuses that mean the money is on its way.
-PAID_STATUSES = ("paid", "no_payment_required")
+#: The only Checkout status that unlocks anything: a 100%-off session reads
+#: ``no_payment_required`` and is refused (access codes cover free reports).
+PAID_STATUSES = ("paid",)
+#: Metadata only Rigor's own sessions and Payment Links carry. Stripe copies a
+#: link's metadata onto its sessions, so a paid session from any other link or
+#: app on the same Stripe account never unlocks a report.
+APP_KEY = "app"
+APP_MARKER = "rigor"
+CURRENCY = "usd"
 #: Stripe Checkout session ids start with this; code-paid audits carry ``code:``.
 SESSION_PREFIX = "cs_"
 
@@ -128,7 +135,7 @@ def checkout_params(
             },
             "quantity": 1,
         }
-    metadata = {"audit_id": audit_id, "plan": plan}
+    metadata = {"audit_id": audit_id, "plan": plan, APP_KEY: APP_MARKER}
     return {
         "mode": "payment",
         "line_items": [line],
@@ -166,6 +173,27 @@ def stripe_session(settings: AuditSettings, session_id: str) -> dict[str, Any]:
     return _plain(session)
 
 
+def paid_in_full(settings: AuditSettings, session: Mapping[str, Any], plan: str) -> bool:
+    """Whether a session is Rigor's own and paid at least the plan's price in USD.
+
+    The buyer controls ``client_reference_id`` through the link URL, so the
+    amount, the currency and Rigor's marker are what tie a payment to a plan:
+    a cheaper link, another app's link or a single-report price never unlock
+    a pack or a report.
+    """
+    if plan not in PLANS:
+        return False
+    metadata = session.get("metadata") or {}
+    if metadata.get(APP_KEY) != APP_MARKER:
+        return False
+    if str(session.get("currency") or "").lower() != CURRENCY:
+        return False
+    amount = session.get("amount_total")
+    if isinstance(amount, bool) or not isinstance(amount, int):
+        return False
+    return amount >= plan_price_cents(settings, plan) > 0
+
+
 def fulfil(
     store: Store, settings: AuditSettings, session: Mapping[str, Any], *, at: datetime
 ) -> str | None:
@@ -187,6 +215,8 @@ def fulfil(
     # Anyone can pay a test-mode checkout with Stripe's public test card, so
     # a test payment unlocks only an audit listed for testing.
     if session.get("livemode") is not True and audit_id not in settings.stripe_test_audits:
+        return None
+    if not paid_in_full(settings, session, plan):
         return None
     if store.get_audit(audit_id) is None:
         return None
@@ -215,6 +245,8 @@ def pack_for(store: Store, settings: AuditSettings, session_id: str | None) -> t
 
 
 __all__ = [
+    "APP_KEY",
+    "APP_MARKER",
     "PAID_STATUSES",
     "PLANS",
     "PLAN_PACK",
@@ -227,6 +259,7 @@ __all__ = [
     "fulfil",
     "pack_code",
     "pack_for",
+    "paid_in_full",
     "plan_price_cents",
     "stripe_checkout",
     "stripe_session",

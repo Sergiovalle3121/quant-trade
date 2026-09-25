@@ -1195,8 +1195,9 @@ Stripe reports with `livemode: false` never unlocks any other audit.
 
 #### Without a secret key: Payment Links
 
-1. Create two Payment Links in Stripe: one for a report (USD 29) and one
-   for the pack (USD 69) with metadata `plan=pack`. Leave the confirmation
+1. Create two Payment Links in Stripe: one for a report (USD 29) with
+   metadata `app=rigor` and one for the pack (USD 69) with metadata
+   `app=rigor` and `plan=pack`, card only and no promotion codes. Leave the confirmation
    page as Stripe's own; the buyer comes back to the report tab.
 2. Create the webhook endpoint as above and put its signing secret in
    `STRIPE_WEBHOOK_SECRET`.
@@ -1213,7 +1214,15 @@ The payment is confirmed by the signed webhook and, when the buyer comes
 back, by asking Stripe for the session in the return link; either one is
 enough and both are idempotent (`audit/payments.py`, `fulfil`). A session
 unlocks only the audit named in its own metadata, and only when Stripe
-reports it `paid`. The pack's code is derived with HMAC from the session id
+reports it `paid` (a 100%-off `no_payment_required` session never unlocks;
+free reports go through access codes), in `usd`, for at least the plan's
+price (`AUDIT_PRICE_USD_CENTS`, or `AUDIT_PACK_PRICE_USD_CENTS` for a pack),
+and with metadata `app=rigor`. The buyer controls `client_reference_id`
+through the link URL and the webhook hears every Checkout on the Stripe
+account, so a cheaper link, another app's link on the same account or a
+single-report payment tagged as a pack unlocks nothing. Sessions the service
+creates carry `app=rigor` themselves; Payment Links must carry it in their
+metadata, in test and live mode alike. The pack's code is derived with HMAC from the session id
 and the webhook secret, so only its hash is stored and the paid report can
 still show it, with its credits left, to whoever holds the report token.
 Rotating the webhook secret hides earlier pack codes from their reports
