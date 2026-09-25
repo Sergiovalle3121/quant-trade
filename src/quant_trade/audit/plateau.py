@@ -125,14 +125,14 @@ def parameter_stability(
         "chosen": {name: chosen[name] for name in varied},
         "chosen_result": measured(chosen_value, NOTE),
         "passes": measured(len(table), NOTE),
-        "profitable_passes": measured(sum(value > 0 for value in results) / len(results), NOTE),
+        "passes_in_profit": measured(sum(value > 0 for value in results) / len(results), NOTE),
         "chosen_top_share": measured((rank + 1) / len(results), "rank of the chosen pass / passes"),
         "neighbours_found": measured(len(neighbours), NOTE),
         "neighbour_list": neighbours[:MAX_LISTED],
     }
     if len(neighbours) < MIN_NEIGHBOURS:
         reason = "the optimisation did not try the settings one step away (genetic or sparse)"
-        review["neighbours_profitable"] = not_measured(reason)
+        review["neighbours_in_profit"] = not_measured(reason)
         review["neighbours_keep"] = not_measured(reason)
         review["clean"] = True
         return review, []
@@ -140,7 +140,7 @@ def parameter_stability(
     values = [item["result"] for item in neighbours]
     profitable = sum(value > 0 for value in values) / len(values)
     keep = statistics.median(values) / chosen_value if chosen_value > 0 else None
-    review["neighbours_profitable"] = measured(profitable, NOTE)
+    review["neighbours_in_profit"] = measured(profitable, NOTE)
     review["neighbours_keep"] = (
         measured(keep, "median neighbour profit / chosen profit")
         if keep is not None

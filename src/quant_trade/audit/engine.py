@@ -37,6 +37,7 @@ from quant_trade.audit import stress as stress_lib
 from quant_trade.audit import testdata as testdata_lib
 from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
+from quant_trade.audit.importers import lead_number
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
 from quant_trade.audit.schema import (
     DECLARED,
@@ -662,6 +663,15 @@ def _stress(inputs: AuditInputs, frame: pd.DataFrame) -> dict[str, Any]:
     return {"returns": stress_lib.returns_stress(frame), "trades": trades}
 
 
+def _platform_fall(metadata: dict[str, str]) -> float | None:
+    """The platform's maximal drawdown in money with open trades (MT5, MT4)."""
+    for key in ("declared_equity_drawdown_maximal", "declared_maximal_drawdown"):
+        value = lead_number(metadata.get(key))
+        if value is not None and value > 0:
+            return value
+    return None
+
+
 def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[str, Any]:
     risk = analytics.drawdown_risk(returns, periods_per_year=ppy, samples=samples, seed=seed)
     status = "MEASURED" if risk.get("method") else "NOT_MEASURED"
@@ -862,6 +872,7 @@ def run_audit(
             inputs.trades.trades,
             fees=inputs.trades.fees,
             starting_balance=inputs.initial_balance or inputs.declared.initial_balance,
+            platform_fall=_platform_fall(inputs.report_metadata),
             samples=risk_samples,
             seed=seed,
         )

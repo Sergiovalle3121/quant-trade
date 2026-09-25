@@ -466,13 +466,21 @@ tester report's English "Inputs:" rows are matched.
 
 For anyone about to run or copy a strategy: "with my account, at what size
 does a bad year stay within X %?". Needs at least 30 closed trades spread
-over at least 30 days. The net result of each trade (after the costs the
+over at least 90 days (`MIN_SPAN_DAYS`): a shorter file stretched to a year
+gives capital figures too uncertain to act on, so the section is held back.
+Under a year it opens with a visible warning giving the days covered. The net result of each trade (after the costs the
 file itemises), in money and at the backtest's own sizes, is resampled with
 replacement into one year of trades (the history's pace, 20 to 20 000
 trades) `risk_samples` times with the audit's seed. The reference fall is
 the larger of the 95th percentile of the deepest fall in money and the
 history's own deepest fall in trade order, so the resampling (which breaks
-streaks) never understates a real losing streak. The section shows, for
+streaks) never understates a real losing streak. When a MetaTrader report
+prints its maximal drawdown in money with open trades (MT5 "Equity Drawdown
+Maximal", MT4 "Maximal drawdown"), that DECLARED figure is a floor too,
+since closed trades alone miss open losses. Money figures are at the sizes
+the file used; the relative size is on its starting balance, without later
+deposits (an account topped up many times shows a lower percentage in the
+risk section, which is flow-adjusted). The section shows, for
 loss limits of 10, 20, 30 and 50 %, the capital needed at the backtest's
 size (reference fall / limit) and the share of the backtest's size that fits
 the file's starting balance (limit x balance / reference fall), all

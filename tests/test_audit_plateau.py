@@ -83,7 +83,7 @@ def test_lone_peak_is_flagged() -> None:
     assert review["chosen_by"] == "report"
     assert review["chosen"] == {"FastMA": 12, "SlowMA": 48}
     assert review["neighbours_found"]["value"] == 4
-    assert review["neighbours_profitable"]["value"] == 0
+    assert review["neighbours_in_profit"]["value"] == 0
     assert [(flag.code, flag.severity) for flag in flags] == [("ISOLATED_OPTIMUM", "WARN")]
     assert review["chosen_top_share"]["value"] == pytest.approx(1 / 25)
 
@@ -106,7 +106,7 @@ def test_sparse_optimisation_is_not_judged() -> None:
     review, flags = parameter_stability(
         sparse, summary.parameters, report_inputs="FastMA=12; SlowMA=48"
     )
-    assert review["neighbours_profitable"]["evidence"] == "NOT_MEASURED" and flags == []
+    assert review["neighbours_in_profit"]["evidence"] == "NOT_MEASURED" and flags == []
 
 
 def test_no_export_is_not_measured() -> None:

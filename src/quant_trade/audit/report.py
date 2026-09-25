@@ -182,7 +182,7 @@ LABELS: dict[str, dict[str, str]] = {
             "coincidan con una pasada."
         ),
         "plateau_keep": "Del beneficio elegido que conservan los vecinos (mediana).",
-        "plateau_profitable": "De los vecinos que ganan.",
+        "plateau_in_profit": "De los vecinos que ganan.",
         "plateau_neighbours": "Vecinos a un paso",
         "plateau_parameter": "Parámetro",
         "plateau_value": "Valor",
@@ -196,6 +196,12 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_fall": "Caída de referencia en dinero, al tamaño del backtest.",
         "capital_history": "Mayor caída del historial en su propio orden.",
+        "capital_platform": "Drawdown de la plataforma con operaciones abiertas.",
+        "capital_short": (
+            "Atención: el archivo cubre solo {days} días. Estas cifras estiran ese tramo a un "
+            "año y pueden quedarse cortas o pasarse; tómalas como orden de magnitud y pide un "
+            "historial de al menos un año antes de decidir el capital."
+        ),
         "capital_limit": "Si aceptas perder hasta",
         "capital_needed": "Capital necesario al tamaño del backtest",
         "capital_scale": "Tamaño sobre un balance de {balance}",
@@ -565,10 +571,11 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "plateau_by_report": "Chosen: the pass matching the tester report's inputs.",
         "plateau_by_best": (
-            "Chosen: the most profitable pass, because the report has no inputs matching a pass."
+            "Chosen: the pass with the highest profit, because the report has no inputs "
+            "matching a pass."
         ),
         "plateau_keep": "Of the chosen profit the neighbours keep (median).",
-        "plateau_profitable": "Of the neighbours end with a profit.",
+        "plateau_in_profit": "Of the neighbours end with a profit.",
         "plateau_neighbours": "Neighbours one step away",
         "plateau_parameter": "Parameter",
         "plateau_value": "Value",
@@ -581,6 +588,12 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "capital_fall": "Reference fall in money, at the backtest's size.",
         "capital_history": "Deepest fall of the history in its own order.",
+        "capital_platform": "Platform drawdown with open trades.",
+        "capital_short": (
+            "Warning: the file covers only {days} days. These figures stretch that stretch to a "
+            "year and can fall short or overshoot; read them as an order of magnitude and ask "
+            "for at least a year of history before settling the capital."
+        ),
         "capital_limit": "If you accept losing up to",
         "capital_needed": "Capital needed at the backtest's size",
         "capital_scale": "Size on a {balance} balance",
@@ -914,10 +927,10 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "trades_per_year": "Operaciones por año",
         "chosen_result": "Beneficio de la configuración elegida",
         "passes": "Pasadas de la optimización",
-        "profitable_passes": "Pasadas con beneficio",
+        "passes_in_profit": "Pasadas con beneficio",
         "chosen_top_share": "Posición de la elegida (percentil superior)",
         "neighbours_found": "Vecinos encontrados",
-        "neighbours_profitable": "Vecinos con beneficio",
+        "neighbours_in_profit": "Vecinos con beneficio",
         "neighbours_keep": "Beneficio que conservan los vecinos",
         "data_quality": "Calidad de datos",
         "tested_from": "Prueba desde",
@@ -993,10 +1006,10 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "trades_per_year": "Trades per year",
         "chosen_result": "Profit of the chosen settings",
         "passes": "Optimisation passes",
-        "profitable_passes": "Passes with a profit",
+        "passes_in_profit": "Passes with a profit",
         "chosen_top_share": "Chosen pass position (top share)",
         "neighbours_found": "Neighbours found",
-        "neighbours_profitable": "Neighbours with a profit",
+        "neighbours_in_profit": "Neighbours with a profit",
         "neighbours_keep": "Profit the neighbours keep",
         "data_quality": "Data quality",
         "tested_from": "Tested from",
@@ -1049,6 +1062,7 @@ MONEY_KEYS = {
     "plateau_result",
     "fall_reference",
     "fall_history",
+    "fall_platform",
     "capital",
     "gross_profit",
     "gross_loss",
@@ -1078,9 +1092,9 @@ RATIO_KEYS = {
 }
 
 PERCENT_KEYS = {
-    "profitable_passes",
+    "passes_in_profit",
     "chosen_top_share",
-    "neighbours_profitable",
+    "neighbours_in_profit",
     "neighbours_keep",
     "data_quality",
     "platform_equity_drawdown",
@@ -2318,7 +2332,7 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
     facts = []
     for key, label in (
         ("neighbours_keep", "plateau_keep"),
-        ("neighbours_profitable", "plateau_profitable"),
+        ("neighbours_in_profit", "plateau_in_profit"),
     ):
         value = plateau[key]["value"]
         if value is not None:
@@ -2347,10 +2361,10 @@ def _plateau_html(plateau: dict[str, Any] | None, labels: dict[str, str]) -> str
         for key in (
             "chosen_result",
             "passes",
-            "profitable_passes",
+            "passes_in_profit",
             "chosen_top_share",
             "neighbours_found",
-            "neighbours_profitable",
+            "neighbours_in_profit",
             "neighbours_keep",
         )
     }
@@ -2366,14 +2380,25 @@ def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str,
         return ""
     samples = int((capital.get("method") or {}).get("samples") or 0)
     out = f"<p class='muted'>{_e(labels['capital_intro'].format(samples=samples))}</p>"
+    if capital.get("short_history"):
+        days = int((capital.get("span_days") or {}).get("value") or 0)
+        out += f"<p class='warning'><b>{_e(labels['capital_short'].format(days=days))}</b></p>"
     reference = float(capital["fall_reference"]["value"])
     history = float(capital["fall_history"]["value"])
+    platform = (capital.get("fall_platform") or {}).get("value")
     out += (
         "<div class='facts'>"
         f"<div class='fact'><b>{_fmt(reference, key='fall_reference')}</b>"
         f"<p>{_e(labels['capital_fall'])}</p></div>"
         f"<div class='fact'><b>{_fmt(history, key='fall_history')}</b>"
-        f"<p>{_e(labels['capital_history'])}</p></div></div>"
+        f"<p>{_e(labels['capital_history'])}</p></div>"
+        + (
+            f"<div class='fact'><b>{_fmt(float(platform), key='fall_platform')}</b>"
+            f"<p>{_e(labels['capital_platform'])}</p></div>"
+            if platform is not None
+            else ""
+        )
+        + "</div>"
     )
     per_year = capital["trades_per_year"]
     out += (

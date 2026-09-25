@@ -467,8 +467,22 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "mayor caída en dinero de las operaciones cerradas en su propio orden",
     ),
     (
-        "the larger of the resampled 95th percentile and the history's own fall",
-        "la mayor entre el percentil 95 remuestreado y la caída del propio historial",
+        "the largest of the resampled 95th percentile, the history's own fall and the "
+        "platform's drawdown with open trades",
+        "la mayor entre el percentil 95 remuestreado, la caída del propio historial y el "
+        "drawdown de la plataforma con operaciones abiertas",
+    ),
+    (
+        "the platform's maximal drawdown in money, open trades included",
+        "el drawdown máximo de la plataforma en dinero, con operaciones abiertas",
+    ),
+    (
+        "the file does not print the platform's drawdown in money",
+        "el archivo no imprime el drawdown de la plataforma en dinero",
+    ),
+    (
+        "days from the first entry to the last exit",
+        "días desde la primera entrada hasta la última salida",
     ),
     (
         "reference fall / loss limit, at the backtest's sizes",
@@ -490,8 +504,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "necesita al menos {n} operaciones cerradas; se aportaron {m}",
     ),
     (
-        "needs trades spread over at least {n} days",
-        "necesita operaciones repartidas en al menos {n} días",
+        "needs trades spread over at least {n} days; a shorter history stretched to a year "
+        "gives capital figures too uncertain to act on",
+        "necesita operaciones repartidas en al menos {n} días; un historial más corto "
+        "estirado a un año da cifras de capital demasiado inciertas para decidir con ellas",
     ),
     (
         "the trades show no fall to size against",
