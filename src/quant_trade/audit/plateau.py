@@ -51,6 +51,10 @@ NO_PROFIT = (
     "(by default the final balance), not a profit"
 )
 NOTE = "from the rows of the optimisation export"
+FORWARD_EXPORT = (
+    "a forward export: its Profit column is the forward period's; the forward section "
+    "reads it, and this check needs the main optimisation export"
+)
 
 
 def _metric(table: Sequence[dict[str, float]]) -> str | None:
@@ -86,6 +90,8 @@ def parameter_stability(
     """Neighbours of the chosen pass in an MT5 optimisation export."""
     if not table:
         return {"status": "NOT_MEASURED", "reason": "no optimisation file uploaded"}, []
+    if all("Forward Result" in row and "Back Result" in row for row in table):
+        return {"status": "NOT_MEASURED", "reason": FORWARD_EXPORT}, []
     metric = _metric(table)
     varied = [name for name in parameters if len({row.get(name) for row in table} - {None}) >= 2]
     if metric is None and len(table) >= MIN_PASSES:
