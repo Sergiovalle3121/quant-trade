@@ -14,6 +14,23 @@ title and badge. A new name must pass the
 guard in both languages and must not suggest verification, certification,
 approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
+## Portuguese pages (`audit/portuguese.py`, `/pt`)
+
+The landing, its prices and its questions exist in Portuguese (Brazil and
+Portugal) at `/pt`, and every case page at `/pt/para/<slug>` with its own
+Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
+`/pt/para/` moves there), and every export guide at `/pt/guias` and
+`/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
+fields). The language switch on these pages offers the other two languages.
+Pages not translated yet (the report and its PDF, the account screens, the
+sample, the comparison and check pages, the methodology, the terms and the
+privacy policy) open in English from a Portuguese page, never in Spanish, and
+the report language on the Portuguese upload form starts on English with a line
+saying so. The profit-claim guard reads Portuguese too
+(`guard.PORTUGUESE_CLAIM_PATTERNS`: lucrativo, rentável, garantido, sem risco,
+"vai ganhar", aprovado…, with "não", "nem" and "sem" as negations), and
+`tests/test_audit_portuguese.py` runs it over the page and opens every link on it.
+
 ## What the client uploads
 
 | File | Required | Columns (aliases accepted, case-insensitive) |
@@ -179,7 +196,11 @@ are subtracted as they are even on shares quoted in another currency),
 Trading 212 history (`Market buy`/`Limit sell` in `Action`; deposit and
 dividend rows have no price and are dropped; `Result` is in the account
 currency, so the contract size inferred from it absorbs the exchange rate),
-KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader, Binance
+KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader History
+(`07 Aug 2026 21:50:45.162` dates, a `Net AUD`/`Net EUR`/… result in the
+account currency), Rithmic Completed Orders (`B`/`S`, `Qty Filled`,
+`Avg Fill Price`, `Update Time (EDT)`: a zone abbreviation in brackets in the
+column name applies like an offset), Binance
 (with `Fee Coin`), Kraken, Coinbase and Sierra Chart's Trade Activity Log (only
 `Fills` rows). A zone stated in a time column's name (`Filled Time(UTC+02:00)`,
 `Transaction Time(UTC+10)`, `Date(UTC)`) applies to every cell that carries
@@ -195,7 +216,8 @@ not numbers. A side named by the position (`Open Long`, `Close Long`,
 it) is that trade's direction on a closed-trade row; on a fill, closing a long
 sells and closing a short buys. `Fees Paid` and `Exec Fee` are costs. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
-abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
+abbreviation (`EST`, `CET`) or offset after a day/month date, and a month
+name in English or Spanish (`07 Aug 2026`, `02-Jan-2026`, `15 ene 2026`). Day/month
 order that no day past 12 settles is taken from a year-first column of the
 same rows (Tradovate's `Trade Date`) or another day/month column of the file;
 otherwise the `ambiguous_dates` error stands. A file listed newest first
@@ -1029,7 +1051,16 @@ dot-com bust (2000-09 to 2002-09), the 2008 financial crisis (2007-11 to
 (2020-02 to 2020-03), inflation and rates in 2022 (2022-01 to 2022-09) and
 the 2022 crypto winter (2021-11 to 2022-12). Equity windows follow US
 equities, the crypto one bitcoin; they are fixed in advance and never fitted
-to the file, and only dates are bundled, no market data. For each window the
+to the file. Beside each window the table shows what public indices did over
+the same months, as context only (`crises.MARKET`): the change from the close
+of the month before the window to the close of its last month, computed once
+from FRED's daily closes (S&P 500 from 2016 on, the series' start; Nasdaq
+Composite for every equity window; bitcoin on Coinbase for the crypto one),
+read on `MARKET_AS_OF`. These are a handful of fixed figures with their
+source URLs, not a data file; they never enter the result JSON, a finding or
+the class. A note under the table names the sources and says plainly that for
+a strategy trading another market (currencies, commodities, another country)
+they are context, not its yardstick. For each window the
 record covers in full, MEASURED: the fund's compounded return and, when a
 benchmark is present, the benchmark's. With 24 months or more, the worst and
 best 12-month return and the share of rolling 12-month periods that ended
@@ -1645,9 +1676,20 @@ changes what a report says.
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
   after); 10 failed sign-ins per hour per (address, e-mail) pair, with
   ceilings of 50 per address and 50 per e-mail (a slow-down against guesses
-  spread over many addresses), and 5 sign-ups per hour per
-  address; a password change or reset signs out the other
-  sessions; `next` only returns to `/audits/` or `/cuenta` paths.
+  spread over many addresses; past the e-mail ceiling an address gets
+  `SIGNIN_TRIES_PAST_EMAIL_CEILING = 2` tries on that e-mail, so a stranger
+  who knows it cannot lock the owner out), and 5 sign-ups per hour per
+  address. These counters and the panel's wrong-key limit live in the
+  `attempts` table (keys hashed, rows older than the hour deleted), so a
+  deploy does not reset them. A password change or reset signs out the other
+  sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
+  `/` and `/en` (with an anchor). POST `/audits` answers 403 to a browser
+  post from another site, a second layer beside the `SameSite=Lax` cookie:
+  `Sec-Fetch-Site` decides when present (only `same-origin` and `none` pass;
+  `same-site` is refused, as other apps on the parent domain count as same
+  site); without it, the Origin (else Referer) must be this service. Our
+  pages send `Referrer-Policy: no-referrer`, so a real form post carries
+  `Origin: null`; that, like no header at all (scripts), is no signal.
 - **No e-mail service yet**. Nothing sends e-mail and addresses are not
   confirmed. A customer who forgets the password writes to the owner
   (WhatsApp link on `/olvide`); after checking the request comes from the

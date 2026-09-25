@@ -176,8 +176,8 @@ def test_every_web_error_is_spanish_by_default_and_passes_the_guard(tmp_path: Pa
     assert "no parece válida" in client.get("/?error=email").text
     assert "<b>" not in client.get("/?error=%3Cb%3Ex").text
     for key, texts in MESSAGES.items():
-        assert set(texts) == {"es", "en"}, key
-        for locale in ("es", "en"):
+        assert {"es", "en"} <= set(texts) <= {"es", "en", "pt"}, key
+        for locale in texts:
             assert find_claims(message(key, locale, what="x", limit="1", passes="1")) == [], key
 
 

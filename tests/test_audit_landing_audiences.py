@@ -21,10 +21,10 @@ def _paid_landing(locale: str, *, card_payments: bool) -> str:
     )
 
 
-def test_every_audience_shows_in_both_languages() -> None:
-    assert set(AUDIENCES) == {"es", "en"}
-    assert len(AUDIENCES["es"]["items"]) == len(AUDIENCES["en"]["items"]) == 4
-    for locale in ("es", "en"):
+def test_every_audience_shows_in_every_language() -> None:
+    assert set(AUDIENCES) == {"es", "en", "pt"}
+    assert {len(words["items"]) for words in AUDIENCES.values()} == {4}
+    for locale in ("es", "en", "pt"):
         page = _paid_landing(locale, card_payments=False)
         assert "id='para-quien'" in page
         for _icon, title, *_rest in AUDIENCES[locale]["items"]:

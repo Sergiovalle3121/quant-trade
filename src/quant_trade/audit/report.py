@@ -22,6 +22,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from quant_trade.audit import charts
 from quant_trade.audit.account import is_account_history
+from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
@@ -660,6 +661,14 @@ LABELS: dict[str, dict[str, str]] = {
             "sin operaciones cuenta como plano. Las fechas son fijas: no se ajustan al archivo."
         ),
         "crises_subject": "Estrategia",
+        "crises_market": "Mercado en esas fechas",
+        "crises_market_note": (
+            "Mercado: cierre del mes previo a la ventana contra el cierre de su último mes, "
+            "datos públicos de FRED consultados el {as_of} ({sources}). Son acciones de "
+            "EE. UU. y bitcoin: si la estrategia opera otro mercado (divisas, materias "
+            "primas, otro país), tómelos solo como contexto de lo que vivía el mercado, no "
+            "como su punto de comparación."
+        ),
         "crises_no_trades": "sin operaciones cerradas en la ventana",
         "crises_worse": (
             "En {worse} de {n} crisis cayó más que su índice. Pregunta al vendedor qué la "
@@ -1549,6 +1558,14 @@ LABELS: dict[str, dict[str, str]] = {
             "with no trades counts as flat. The dates are fixed: they are not fitted to the file."
         ),
         "crises_subject": "Strategy",
+        "crises_market": "Market over those months",
+        "crises_market_note": (
+            "Market: the close of the month before the window against the close of its last "
+            "month, public FRED data read on {as_of} ({sources}). These are US equities and "
+            "bitcoin: if the strategy trades another market (currencies, commodities, another "
+            "country), take them only as context for what the market went through, not as its "
+            "yardstick."
+        ),
         "crises_no_trades": "no trades closed in the window",
         "crises_worse": (
             "In {worse} of {n} crises it fell more than its benchmark. Ask the seller what "
@@ -4711,6 +4728,31 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     return out
 
 
+def _market_cell(key: str, label: str) -> str:
+    """What the public indices did over one window, as context."""
+    moves = MARKET.get(key) or ()
+    if not moves:
+        return f"<td class='val muted' data-l='{_e(label)}'>—</td>"
+    lines = "<br>".join(
+        f"<small class='muted'>{_e(move.index)}</small> {_e(_fund_pct(move.change))}"
+        for move in moves
+    )
+    return f"<td class='val' data-l='{_e(label)}'>{lines}</td>"
+
+
+def _market_note(keys: list[str], labels: dict[str, str]) -> str:
+    """Where the market figures come from and when they do not fit."""
+    sources: dict[str, str] = {}
+    for key in keys:
+        for move in MARKET.get(key) or ():
+            sources.setdefault(move.index, move.source_url)
+    if not sources:
+        return ""
+    listed = ", ".join(f"{name}: {url}" for name, url in sources.items())
+    text = labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources=listed)
+    return f"<p class='muted'><small>{_e(text)}</small></p>"
+
+
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
     return bool(stress) and (stress or {}).get("status") == "MEASURED"
 
@@ -4755,6 +4797,7 @@ def _crises_html(
                 else cell(row["fund"], subject)
             )
             + (cell(row.get("benchmark"), labels["fund_stress_index"]) if with_index else "")
+            + _market_cell(row["key"], labels["crises_market"])
             + "</tr>"
             for row in rows
         )
@@ -4762,11 +4805,13 @@ def _crises_html(
             f"<th>{_e(labels['fund_stress_head'])}</th>"
             f"<th class='val'>{_e(subject)}</th>"
             + (f"<th class='val'>{_e(labels['fund_stress_index'])}</th>" if with_index else "")
+            + f"<th class='val'>{_e(labels['crises_market'])}</th>"
         )
         out += (
             f"<table class='timing crises'><thead><tr>{head}</tr></thead>"
             f"<tbody>{body}</tbody></table>"
         )
+        out += _market_note([row["key"] for row in rows], labels)
     else:
         out += f"<p class='muted'>{_e(labels['fund_stress_none'])}</p>"
     if stress.get("worst_12m"):

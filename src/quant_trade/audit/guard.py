@@ -1,4 +1,4 @@
-"""The profit-claim guard, extended to Spanish, applied to every report.
+"""The profit-claim guard, extended to Spanish and Portuguese, applied to every report.
 
 The repository already refuses English profit language in rendered
 documents (``v9/economic_status.PROFIT_CLAIM_PATTERNS``). An audit sold to
@@ -47,6 +47,24 @@ SPANISH_CLAIM_PATTERNS: tuple[str, ...] = (
     r"\bva(?:s|n)?\s+a\s+(?:pasar|superar|aprobar)\b",
 )
 
+#: Portuguese equivalents, for the Portuguese pages. "Rentabilidade" (a
+#: neutral noun) stays out of the match, as "rentabilidad" does in Spanish.
+PORTUGUESE_CLAIM_PATTERNS: tuple[str, ...] = (
+    r"\blucrativ[oa]s?\b",
+    r"\brentáve(?:l|is)\b",
+    r"\bgarantid[oa]s?\b",
+    r"\bgarant(?:e|em|imos)\b",
+    r"\b(?:lucros?|ganhos?|retornos?)\s+(?:assegurad|garantid)",
+    r"\bsem\s+risco\b",
+    r"\blivre\s+de\s+risco\b",
+    r"\bfique\s+rico\b",
+    r"\bdinheiro\s+(?:fácil|seguro)\b",
+    r"\bgera(?:r|rá|rão|m)?\s+(?:dinheiro|lucros?|renda|ganhos)\b",
+    r"\b(?:vai|vão|vais)\s+(?:ganhar|lucrar|passar|aprovar)\b",
+    r"\baprovad[oa]s?\b",
+    r"\bpassará(?:s)?\b",
+)
+
 #: English endorsement and pass-the-challenge wording the V9 list lacks.
 ENGLISH_ENDORSEMENT_PATTERNS: tuple[str, ...] = (
     r"\bverified\s+(?:track\s+record|results?|returns?|profits?|performance)\b",
@@ -66,9 +84,14 @@ NEGATABLE_PATTERNS: frozenset[str] = frozenset(
         r"\baprobad[oa]s?\b",
         r"\bcertified\b",
         r"\bapproved\b",
+        r"\bgarantid[oa]s?\b",
+        r"\bgarant(?:e|em|imos)\b",
+        r"\baprovad[oa]s?\b",
     }
 )
-NEGATIONS: frozenset[str] = frozenset({"no", "not", "never", "nunca", "sin", "ni", "nor"})
+NEGATIONS: frozenset[str] = frozenset(
+    {"no", "not", "never", "nunca", "sin", "ni", "nor", "não", "nem", "sem", "jamais"}
+)
 
 CONTEXT = "in_sample_backtest"
 SOURCE = "audit_report"
@@ -109,7 +132,7 @@ def _pattern_findings(
 
 
 def find_claims(text: str, *, source: str = SOURCE) -> list[dict[str, Any]]:
-    """Every English or Spanish profit claim in ``text``."""
+    """Every English, Spanish or Portuguese profit claim in ``text``."""
     english = [
         finding.to_dict()
         for finding in scan_for_unsupported_claims(text, source=source, context=CONTEXT)
@@ -117,9 +140,11 @@ def find_claims(text: str, *, source: str = SOURCE) -> list[dict[str, Any]]:
     english += _pattern_findings(
         text, ENGLISH_ENDORSEMENT_PATTERNS, source=source, language="English"
     )
-    return english + _pattern_findings(
-        text, SPANISH_CLAIM_PATTERNS, source=source, language="Spanish"
+    spanish = _pattern_findings(text, SPANISH_CLAIM_PATTERNS, source=source, language="Spanish")
+    portuguese = _pattern_findings(
+        text, PORTUGUESE_CLAIM_PATTERNS, source=source, language="Portuguese"
     )
+    return english + spanish + portuguese
 
 
 def assert_report_clean(*texts: str) -> None:
@@ -145,6 +170,7 @@ __all__ = [
     "CONTEXT",
     "ENGLISH_ENDORSEMENT_PATTERNS",
     "NEGATABLE_PATTERNS",
+    "PORTUGUESE_CLAIM_PATTERNS",
     "SPANISH_CLAIM_PATTERNS",
     "AuditReportError",
     "assert_report_clean",
