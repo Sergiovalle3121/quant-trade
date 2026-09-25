@@ -107,6 +107,8 @@ LABELS: dict[str, dict[str, str]] = {
         "detail": "Detalle",
         "warnings": "Avisos de lectura",
         "client_text": "Descripción del cliente",
+        "client_text_none": "No se escribió una descripción de la estrategia.",
+        "chars": "{n} caracteres",
         "client_text_note": (
             "La descripción no se reproduce en este informe; consta en el JSON. Expresiones de "
             "promesa de resultados detectadas en ella"
@@ -278,6 +280,8 @@ LABELS: dict[str, dict[str, str]] = {
         "detail": "Detail",
         "warnings": "Parse warnings",
         "client_text": "Client description",
+        "client_text_none": "No strategy description was written.",
+        "chars": "{n} characters",
         "client_text_note": (
             "The description is not reproduced here; it is in the JSON. Result-promise "
             "expressions detected in it"
@@ -518,6 +522,11 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dsr_at_trials_used": "DSR at the trials used",
         "trials_to_half": "Trials that bring DSR to 0.5",
         "trials_used": "Trials used",
+        "trials": "Trials",
+        "observations": "Observations",
+        "sharpe": "Sharpe",
+        "sortino": "Sortino",
+        "sqn": "SQN",
         "skewness": "Skewness",
         "kurtosis": "Kurtosis",
         "floor": "Sampling-error floor",
@@ -1451,11 +1460,15 @@ def render_html(
     declared_html = _evidence_rows(data["declared"], labels, skip=set())
     description = data["declared"].get("description", "")
     findings = data.get("client_text_findings", [])
-    declared_html += (
-        f"<p class='muted'>{_e(labels['client_text'])}: {len(description)} chars, sha256 "
-        f"<code>{_e(sha256_of_text(description))}</code>. {_e(labels['client_text_note'])}: "
-        f"{len(findings)}.</p>"
-    )
+    if description:
+        declared_html += (
+            f"<p class='muted'>{_e(labels['client_text'])}: "
+            f"{_e(labels['chars'].format(n=len(description)))}, sha256 "
+            f"<code>{_e(sha256_of_text(description))}</code>. {_e(labels['client_text_note'])}: "
+            f"{len(findings)}.</p>"
+        )
+    else:
+        declared_html += f"<p class='muted'>{_e(labels['client_text_none'])}</p>"
 
     sens = data["multiplicity"].get("sensitivity", [])
     sens_html = ""

@@ -349,7 +349,7 @@ def assess_data_quality(flags: list[RedFlag]) -> Dimension:
     }
 
     def named(codes: list[str]) -> list[Reason]:
-        return [(code, flag_title(code, "es")) for code in codes]
+        return [(flag_title(code, "en"), flag_title(code, "es")) for code in codes]
 
     if fails:
         return _dimension(DATA_QUALITY, "FAIL", named(fails), inputs)
