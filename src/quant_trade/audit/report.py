@@ -1737,7 +1737,7 @@ def render_html(
     if locked and checkout_url:
         # Card payment is the main way to pay; the pack is the second button.
         pack_button = (
-            "<button class='btn btn-ghost' type='submit' name='plan' value='pack'>"
+            "<button class='btn btn-ghost btn-lg' type='submit' name='plan' value='pack'>"
             f"{_e(labels['pay_pack'].format(price=pack_price_usd))}</button>"
             if pack_price_usd
             else ""
@@ -1747,8 +1747,9 @@ def render_html(
             + price_html
             + "<div><div class='inline-form'>"
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
-            f"{_e(labels['pay'])}</button>{pack_button}</div>"
-            f"<p class='muted'>{_e(labels['pay_secure'])}</p></div></form>"
+            f"{icon('card')}{_e(labels['pay'])}</button>{pack_button}</div>"
+            f"<p class='muted pay-secure'>{icon('lock')}<span>{_e(labels['pay_secure'])}</span></p>"
+            "</div></form>"
         )
     if locked and redeem_url:
         if contact_url:
@@ -1759,8 +1760,9 @@ def render_html(
             if checkout_url:
                 # With card payment on, WhatsApp is the alternative, not the main button.
                 paybox += (
-                    f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
-                    f"target='_blank'>{_e(labels['buy_code_alt'])}</a></p>"
+                    f"<p class='paybox pay-alt'><a href='{_e(contact_url)}' "
+                    f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
+                    f"<span>{_e(labels['buy_code_alt'])}</span></a></p>"
                 )
             else:
                 paybox += (
