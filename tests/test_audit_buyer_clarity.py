@@ -6,8 +6,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from quant_trade.audit import sample as sample_module
 from quant_trade.audit.report import render_html
 from quant_trade.audit.sample import sample_result
+from quant_trade.audit.schema import AuditResult
 
 
 @lru_cache(maxsize=2)
@@ -18,10 +20,10 @@ def _page(locale: str) -> str:
 def test_the_live_account_shows_under_the_verdict() -> None:
     page = _page("es")
     hero = page[: page.index("<nav class='report-toc")]
-    assert "Cuenta real: En el borde." in hero
+    assert "Cuenta real: No coherente." in hero
     assert "Resultado de operar: -305.20 sobre 1,500.00 depositados." in hero
     assert "href='#r-d2'" in hero
-    assert "Live account: At the edge." in _page("en")
+    assert "Live account: Not consistent." in _page("en")
 
 
 def test_a_locked_report_keeps_the_live_line_back() -> None:
@@ -133,11 +135,11 @@ def test_one_win_rate_after_itemised_fees_across_the_report() -> None:
 
 def test_the_sample_shows_the_net_win_rate_once_in_the_tiles_and_tables() -> None:
     page = _page("es")
-    assert "560 · 54%" in page
+    assert "1,282 · 55%" in page
     assert "Aciertos antes de comisiones" in page
-    # The gross share (55.54%) shows once, on its own labelled row, not
+    # The gross share (56.16%) shows once, on its own labelled row, not
     # again in the annualised table.
-    assert page.count("55.54%") == 1
+    assert page.count("56.16%") == 1
 
 
 def test_figures_carry_their_unit_and_plain_names() -> None:
@@ -153,10 +155,10 @@ def test_figures_carry_their_unit_and_plain_names() -> None:
     # The drop distance says which values matter.
     assert "(-2 o menos: una caída que el azar difícilmente explica)" in page
     # The cost table explains its few cents of difference with the trades' net.
-    assert "sin coste extra da 6,425.50, 0.47 de diferencia" in page
+    assert "sin coste extra da 17,364.00, 5.75 de diferencia" in page
     english = _page("en")
     assert "engine version 0.1.0" in english and "in 1 of every 20" in english
-    assert "with no extra cost it gives 6,425.50" in english
+    assert "with no extra cost it gives 17,364.00" in english
 
 
 def test_long_and_short_results_are_net_after_itemised_fees() -> None:
@@ -166,11 +168,26 @@ def test_long_and_short_results_are_net_after_itemised_fees() -> None:
     assert "antes de comisión y swap" not in page
 
 
+@lru_cache(maxsize=2)
+def _short_sample(locale: str) -> AuditResult:
+    """The sample as it was before it reached back to 2020: two years whose
+    last third trades weaker than the rest."""
+    original = sample_module.SAMPLE_LEAD_DAYS
+    sample_module.SAMPLE_LEAD_DAYS = 60
+    try:
+        return sample_result(locale, bootstrap_samples=60)
+    finally:
+        sample_module.SAMPLE_LEAD_DAYS = original
+
+
 def test_a_weaker_recent_stretch_is_not_called_steady() -> None:
-    page = _page("es")
+    page = render_html(_short_sample("es"), watermark=False)
     assert "Más débil</span> La media por operación bajó de +15.24 a +3.97 (-74%)" in page
     assert ">Se mantiene</span>" not in page
-    assert "Weaker</span> The average per trade fell from +15.24 to +3.97" in _page("en")
+    english = render_html(_short_sample("en"), watermark=False)
+    assert "Weaker</span> The average per trade fell from +15.24 to +3.97" in english
+    # The full sample's last third holds up, and says so.
+    assert ">Se mantiene</span>" in _page("es")
 
 
 def test_seller_questions_follow_the_report_s_findings() -> None:
@@ -200,8 +217,10 @@ def test_seller_questions_follow_the_report_s_findings() -> None:
     assert "costs" in {q["code"] for q in vendor_questions([], **base, findings=["costs_thin"])}
     for q in asked:
         assert_report_clean(q["es"] + " " + q["en"])
-    sample = {q["code"] for q in sample_result("es", bootstrap_samples=60).vendor_questions}
+    sample = {q["code"] for q in _short_sample("es").vendor_questions}
     assert {"one_instrument", "recent_weaker", "costs"} <= sample
+    full = {q["code"] for q in sample_result("es", bootstrap_samples=60).vendor_questions}
+    assert {"costs", "live_record"} <= full
 
 
 def test_trader_terms_in_the_tiles_carry_a_plain_line() -> None:

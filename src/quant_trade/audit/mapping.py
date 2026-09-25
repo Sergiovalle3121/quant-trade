@@ -389,6 +389,28 @@ def _is_date(sample: str) -> bool:
         return bool(_DATE_LIKE.match(sample))
 
 
+def looks_like_results(data: bytes) -> bool:
+    """True when the file's guessed result column changes sign often (at
+    least three times and on 5 % of its rows), as per-day or per-trade
+    results do; a balance that falls below zero once, or a cumulative profit
+    that starts at 0, does not."""
+    body = _read_body(data)
+    if body is None:
+        return False
+    table = Table(body.header, body.rows[:SAMPLE_ROWS])
+    name = results_guess(table).get("profit")
+    if not name:
+        return False
+    at = [cell.strip() for cell in body.header].index(name)
+    figures = [
+        value
+        for value in _figures([row[at] if at < len(row) else "" for row in body.rows], body.decimal)
+        if value is not None and value != 0
+    ]
+    changes = sum(1 for a, b in zip(figures, figures[1:], strict=False) if (a > 0) != (b > 0))
+    return changes >= 3 and changes >= 0.05 * len(figures)
+
+
 def results_guess(table: Table, *, with_result: bool = True) -> dict[str, str]:
     """For a list of results: its first date column, and the first other
     column whose sample is a number, preselected as the date and the result."""

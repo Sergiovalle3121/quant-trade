@@ -444,13 +444,19 @@ fechas, operación por operación" pair 55 of 59 trades with slightly worse
 fills. It then trades 120 business days after the backtest with a thinner
 edge and a losing stretch. It carries a 500 top-up after that stretch
 (DEPOSIT_DURING_DRAWDOWN), a 300 withdrawal and an open position with a
-35.00 floating loss, so "El dinero real de la cuenta" shows every part. It
-comes out "En el borde"; the dates overlap, and the report says so.
-The sample backtest also starts with 60 business days from a random stream
-of their own (from October 2022), so its trades span more than two years
-and "¿Sigue funcionando en el periodo reciente?" is measured: the average
-per trade falls from +15.24 to +3.97 in the last third, a drop within
-chance (-1.0 standard errors) that reads "Se mantiene". Its optimisation file is a
+35.00 floating loss, so "El dinero real de la cuenta" shows every part. Next
+to almost five years of backtest it comes out "No coherente"; the dates
+overlap, and the report says so.
+The sample backtest also starts with 782 business days from a random stream
+of their own (from 2 January 2020, `SAMPLE_LEAD_DAYS`), so its trades span
+almost five years: "¿Cómo le fue en las crisis conocidas?" covers the covid
+fall and both 2022 windows in full, and "¿Sigue funcionando en el periodo
+reciente?" reads "Se mantiene". With 120 passes counted, its Sharpe beats
+the luck of the search without the margin the multiplicity dimension asks
+(DSR 0.91 against 0.95), so the luck section reads "Supera a la suerte, sin
+margen": beating the luck is a DSR of 0.5, passing the dimension is 0.95,
+and a Sharpe between the two gets that third state instead of a plain
+"Supera". Its optimisation file is a
 normal export, so the plateau section is shown; that section ends with a
 line saying that a forward export adds "¿Aguanta en el periodo forward?".
 
@@ -1580,7 +1586,19 @@ changes what a report says.
   on any account, or when the network address reached the monthly cap. The
   `welcome_reports` row outlives the account, so deleting and signing up
   again does not repeat it. The purge clears the address; the device and
-  file hashes stay. "Mi cuenta" shows it as Disponible/Usado.
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
+  a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
+  and returns rounded to 5 decimals), so a trailing newline, other line
+  endings or renamed columns do not make a new file.
+- **Limits under simultaneous uploads** (`free_claims` table). The checks
+  above are a first look that answers at once; after parsing, the upload
+  takes its claims in one transaction, all or nothing: the free report takes
+  `welcome:account:`, `welcome:device:`, `welcome:file:` and one numbered
+  per-network slot of the month; a free preview takes one of the account's
+  3 numbered slots of the month and one of the network's 10. A claim that
+  is taken sends the upload down the next rule (preview, credit, 402 with
+  no audit kept). A failed upload gives its claims back. Network keys hold
+  a hash of the address and the retention purge deletes them.
 
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
@@ -2006,6 +2024,8 @@ Redesign pass 53 checks the screens that landed after pass 51 on a phone first. 
 
 Redesign pass 54 walks the free tier's path on a phone first: upload without an account, sign up, first full report, locked preview, "Mi cuenta". The "create your account" screen puts its two buttons in a card, full width on a phone. On a report saved to the account, the tick beside "Guardado en tu cuenta" is icon sized; before, it filled the box. In "Mi cuenta" the free first report comes first while it is unused, in a green tile across the row on a phone, followed by the month's previews and the credits; the tiles sit two across on a phone and in one row on a desktop. On the price cards a long note under the price (the free card's) drops below it whole instead of splitting beside it.
 
+Redesign pass 55 makes each locked figure in a preview's summary a link to the unlock box (`a.kpi.locked`, `href='#unlock'`, labelled with the figure's name and "Desbloquear"), so tapping what someone wants to see takes them to how to see it. The tile looks the same; on hover or focus its border darkens.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -2107,9 +2127,12 @@ balance).
 
 Columns named on the form are applied before any automatic reader, and a
 file sent with them in the curve field is read as the report. A lone file
-whose "curve" starts at zero or crosses it (`equity_not_positive`) is a list
-of results: it gets this page, with its first date column and first other
-numeric column preselected as the date and the result. A curve-field file
+whose "curve" reaches zero (`equity_not_positive`) and whose figures change
+sign at least three times and on 5 % of the rows (`looks_like_results`) is a
+list of results: it gets this page, with its first date column and first other
+numeric column preselected as the date and the result. A balance that falls below zero
+once, or a cumulative profit that starts at 0, keeps the plain refusal
+asking for the account balance. A curve-field file
 with no value column (`missing_value`) gets the page too, with the date
 preselected. The decimal mark of a named figure column comes from its cells
 (`12.34` in a semicolon file is twelve), not from the delimiter alone.
@@ -2120,3 +2143,7 @@ in about a second instead of rendering a multi-megabyte page. The preview
 shows at most 80 columns (`MAX_COLUMNS`) with a count of the rest. The
 access code the customer typed travels as a hidden field of this page only;
 the page is `no-store` and goes only to the person who typed it.
+
+A sixth audience page, for retail investors (`/para/inversores-particulares`, `/for/retail-investors`), covers people who invest on their own through DEGIRO, Trading 212, Interactive Brokers or XTB. It names only live checks: significance, an optional benchmark CSV, double and triple costs, the result without the best trades and months, the fixed crisis windows and the recent third. It states the reader's limit: a trade history counts only closed positions (open ones and dividends are left out), so a buy-and-hold investor should upload the portfolio's value or return over time. The landing's "Otro caso" line links it too.
+
+The prop-firm audience page (`/para/retos-prop-firm`, `/for/prop-firm-challenges`) now names the firm-fit table as a check ("¿Con qué firma encaja tu historial?"), and it adds a fourth pain: a pass whose payout is held up by the best-day (consistency) rule. The wording says it compares rules and does not recommend buying a challenge.
