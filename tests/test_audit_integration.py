@@ -355,7 +355,7 @@ def test_locked_report_keeps_verdict_charts_and_meaning_but_sends_no_detail() ->
     probability = result.challenge["probability"]["pass"]["value"]  # type: ignore[index]
     assert f"{probability:.2%}" in paid
     assert "Llega al objetivo" in paid and "Llega al objetivo" not in unpaid
-    assert "Estadísticas de las operaciones" in unpaid  # listed as a locked title
+    assert "Tasa de acierto, operación media y rachas" in unpaid  # listed as a locked gain
     assert "/pay" in unpaid
 
 

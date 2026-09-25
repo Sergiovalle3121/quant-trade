@@ -76,6 +76,73 @@ DISCLAIMER = {
 #: The full sample report, linked from a locked preview.
 SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample"}
 
+#: What each locked section tells the buyer, in plain words: the lockbox lists
+#: these instead of the sections' technical titles, which stay in the report.
+LOCKED_GAINS: dict[str, dict[str, str]] = {
+    "es": {
+        "plan": "Qué cambiar para subir de clase, con tus cifras",
+        "reasons_detail": "Por qué recibió cada nota, dimensión por dimensión",
+        "account": "Cuánto es resultado de operar y cuánto son depósitos",
+        "live": "Si la cuenta real se parece a su backtest",
+        "test_data": "Con qué datos y qué calidad de ticks se hizo la prueba",
+        "stress": "Qué queda sin sus mejores operaciones y meses",
+        "timing": "En qué horas y días se concentra el resultado",
+        "recent": "Si sigue funcionando en el periodo más reciente",
+        "behaviour": "Si sube el riesgo después de perder (martingala, promediar)",
+        "fund": "Calendario año por mes, peor mes, caída más profunda y tiempo en recuperarse",
+        "instruments": "Si funciona en cada mercado o uno carga con el resto",
+        "trade_stats": "Tasa de acierto, operación media y rachas",
+        "risk": "Caídas posibles en un año, según miles de historias remuestreadas",
+        "plateau": "Si los parámetros elegidos son un pico aislado o una zona estable",
+        "forward": "Si aguanta en el tramo forward que no se usó para ajustarla",
+        "capital": "Qué capital pide y a qué tamaño de posición",
+        "challenge": "Con qué frecuencia tocaría los límites de un reto de prop firm",
+        "questions": "Qué preguntarle al vendedor o al gestor",
+        "performance": "Rentabilidad anual, volatilidad y caída máxima medidas",
+        "significance": "Si el resultado se distingue de la suerte",
+        "multiplicity": "Cuánto queda al descontar las configuraciones que se probaron",
+        "bootstrap": "El rango de resultados plausibles, con intervalos de confianza",
+        "cscv": "La probabilidad de que la mejor configuración sea sobreajuste",
+        "subperiods": "El resultado año por año",
+        "rolling": "Cómo cambia el resultado a lo largo del tiempo",
+        "red_flags": "Cada bandera roja con sus cifras y qué hacer",
+        "costs": "Qué pasa con costes más altos",
+        "holdout": "El tramo fuera de muestra que declaraste, medido aparte",
+        "benchmark": "La comparación con el benchmark que subiste",
+    },
+    "en": {
+        "plan": "What to change to reach a better class, with your figures",
+        "reasons_detail": "Why each dimension got its grade",
+        "account": "How much is trading result and how much is deposits",
+        "live": "Whether the live account looks like its backtest",
+        "test_data": "What data and tick quality the test ran on",
+        "stress": "What is left without its best trades and months",
+        "timing": "Which hours and days the result comes from",
+        "recent": "Whether it still works in the most recent period",
+        "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
+        "fund": "Year-by-month calendar, worst month, deepest fall and time to recover",
+        "instruments": "Whether it works on each market or one carries the rest",
+        "trade_stats": "Hit rate, average trade and streaks",
+        "risk": "Possible falls within a year, from thousands of resampled histories",
+        "plateau": "Whether the chosen settings are a lone peak or a stable area",
+        "forward": "Whether it holds in the forward period not used for tuning",
+        "capital": "How much capital it needs and at what position size",
+        "challenge": "How often it would hit a prop-firm challenge's limits",
+        "questions": "What to ask the vendor or manager",
+        "performance": "Annual return, volatility and maximum drawdown as measured",
+        "significance": "Whether the result stands out from luck",
+        "multiplicity": "What is left after discounting the configurations tried",
+        "bootstrap": "The range of plausible results, with confidence intervals",
+        "cscv": "The probability that the best configuration is overfit",
+        "subperiods": "The result year by year",
+        "rolling": "How the result changes over time",
+        "red_flags": "Each red flag with its figures and what to do",
+        "costs": "What happens with higher costs",
+        "holdout": "The out-of-sample period you declared, measured separately",
+        "benchmark": "The comparison with the benchmark you uploaded",
+    },
+}
+
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
@@ -632,8 +699,8 @@ LABELS: dict[str, dict[str, str]] = {
         "charts": "Gráficas",
         "detail_heading": "Detalle",
         "locked_intro": (
-            "El veredicto, las gráficas y las explicaciones son gratis. El detalle numérico de "
-            "estas secciones se entrega en el informe completo"
+            "El veredicto, las gráficas y las explicaciones son gratis. El informe completo "
+            "te dice, con las cifras de tu archivo"
         ),
         "sample_full": "Ver cómo es un informe completo (ejemplo con datos sintéticos)",
         "trade_stats": "Estadísticas de las operaciones",
@@ -1258,8 +1325,8 @@ LABELS: dict[str, dict[str, str]] = {
         "charts": "Charts",
         "detail_heading": "Detail",
         "locked_intro": (
-            "The verdict, charts and explanations are free. The numeric detail of these "
-            "sections comes with the full report"
+            "The verdict, charts and explanations are free. The full report tells you, with "
+            "your file's figures"
         ),
         "sample_full": "See what a full report looks like (sample built from synthetic data)",
         "trade_stats": "Trade statistics",
@@ -3760,6 +3827,18 @@ def _ladder_html(current: str, labels: dict[str, str]) -> str:
     )
 
 
+def _locked_gains(titles: list[str], labels: dict[str, str], locale: str) -> list[str]:
+    """Each locked section as what it tells the buyer, in the report's order."""
+    gains = LOCKED_GAINS.get(locale, LOCKED_GAINS["es"])
+    by_title = {labels[key]: text for key, text in gains.items() if key in labels}
+    out: list[str] = []
+    for title in titles:
+        gain = by_title.get(title, title)
+        if gain not in out:
+            out.append(gain)
+    return out
+
+
 def _only_unmeasured(body: str) -> bool:
     """True when a section has nothing but NOT_MEASURED marks to show."""
     return "badge NOT_MEASURED" in body and not any(
@@ -4320,7 +4399,12 @@ def render_html(
         detail_html = (
             f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
             + "".join(
-                f"<li>{_e(title)}</li>" for title, body in detail if not _only_unmeasured(body)
+                f"<li>{_e(gain)}</li>"
+                for gain in _locked_gains(
+                    [title for title, body in detail if not _only_unmeasured(body)],
+                    labels,
+                    locale,
+                )
             )
             + "</ul>"
             f"<p class='lock-sample'><a href='{sample_href}' target='_blank' rel='noopener'>"
