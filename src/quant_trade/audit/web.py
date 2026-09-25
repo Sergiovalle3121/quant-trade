@@ -31,7 +31,7 @@ import secrets
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
@@ -495,6 +495,16 @@ def request_body_limit(max_upload_bytes: int) -> int:
     return max_upload_bytes * UPLOAD_FIELDS + extra + FORM_OVERHEAD_BYTES
 
 
+# The report check takes one file of at most ``check.MAX_CHECK_BYTES``, so its
+# body limit is that plus the form overhead: a bigger upload is refused before
+# it is spooled, not after.
+CHECK_PATHS = {"/comprobar": "es", "/check": "en"}
+
+
+def check_body_limit() -> int:
+    return check_lib.MAX_CHECK_BYTES + FORM_OVERHEAD_BYTES
+
+
 class HeadAsGetMiddleware:
     """Answer ``HEAD`` like ``GET`` with the body left out.
 
@@ -526,21 +536,31 @@ class BodyLimitMiddleware:
     route runs, so the per-file limit in the route comes too late to protect
     the disk. A declared ``Content-Length`` over the limit is refused at
     once; a chunked body is counted as it streams and cut off at the limit.
+    ``path_limits`` gives a path its own, smaller limit.
     """
 
-    def __init__(self, app: Any, *, limit: int, reject: Callable[[Any], Any]) -> None:
+    def __init__(
+        self,
+        app: Any,
+        *,
+        limit: int,
+        reject: Callable[[Any], Any],
+        path_limits: Mapping[str, int] | None = None,
+    ) -> None:
         self.app = app
         self.limit = limit
         self.reject = reject
+        self.path_limits = dict(path_limits or {})
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        limit = self.path_limits.get(scope.get("path", ""), self.limit)
         declared = dict(scope.get("headers") or []).get(b"content-length")
         if declared is not None:
             try:
-                too_big = int(declared) > self.limit
+                too_big = int(declared) > limit
             except ValueError:
                 too_big = True
             if too_big:
@@ -555,7 +575,7 @@ class BodyLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 seen += len(message.get("body", b""))
-                if seen > self.limit:
+                if seen > limit:
                     exceeded = True
                     raise BodyTooLarge
             return message
@@ -792,6 +812,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return match.group(1) if match else "es"
 
     def _too_large_response(scope: Any) -> Any:
+        path = scope.get("path", "")
+        if path in CHECK_PATHS:
+            # The check page keeps its own form and message, in the page's language.
+            check_locale = CHECK_PATHS[path]
+            too_large = check_lib.COPY[check_locale]["too_large"]
+            form = check_lib.check_form(check_locale, error=too_large)
+            request = Request(scope)
+            page = check_page(form, locale=check_locale, base_url=_site_url(request))
+            check_response = HTMLResponse(guard_page(page), status_code=413)
+            check_response.headers["Connection"] = "close"
+            return _secure(check_response, path=path)
         locale = _scope_locale(scope)
         text = message("body_too_large", locale, limit=_megabytes(body_limit))
         accept = dict(scope.get("headers") or []).get(b"accept", b"").decode("latin-1")
@@ -803,7 +834,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         response.headers["Connection"] = "close"
         return _secure(response, path=scope.get("path", ""))
 
-    app.add_middleware(BodyLimitMiddleware, limit=body_limit, reject=_too_large_response)
+    app.add_middleware(
+        BodyLimitMiddleware,
+        limit=body_limit,
+        reject=_too_large_response,
+        path_limits=dict.fromkeys(CHECK_PATHS, check_body_limit()),
+    )
     app.add_middleware(HeadAsGetMiddleware)
 
     @app.middleware("http")

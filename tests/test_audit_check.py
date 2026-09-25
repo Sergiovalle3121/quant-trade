@@ -173,3 +173,56 @@ def test_a_purged_audit_keeps_its_file_hashes(tmp_path: Path) -> None:
         conn.execute(store.audits.update().values(paid=False))  # type: ignore[attr-defined]
     assert store.purge_expired(later, retention_days=30) == 1  # type: ignore[attr-defined]
     assert "Este archivo no se editó" in _check(client, content).text
+
+
+@pytest.mark.parametrize(
+    ("path", "text"), [("/comprobar", "pasa de 20 MB"), ("/check", "over 20 MB")]
+)
+def test_an_oversized_check_is_refused_before_it_is_received(
+    tmp_path: Path, path: str, text: str
+) -> None:
+    from quant_trade.audit.web import check_body_limit, request_body_limit
+
+    client, _ = _client(tmp_path)
+    limit = check_body_limit()
+    # Well under the whole-service limit, so only the check's own limit refuses it.
+    assert limit < request_body_limit(AuditSettings().max_upload_bytes)
+    response = client.post(
+        path,
+        content=b"x",
+        headers={
+            "Content-Length": str(limit + 1),
+            "Content-Type": "multipart/form-data; boundary=b",
+        },
+    )
+    assert response.status_code == 413
+    assert text in response.text
+    assert response.headers["Connection"] == "close"
+    assert find_claims(response.text) == []
+
+
+def test_a_streamed_oversized_check_is_cut_off(tmp_path: Path) -> None:
+    from quant_trade.audit.web import check_body_limit
+
+    client, _ = _client(tmp_path)
+    limit = check_body_limit()
+
+    def chunks():  # type: ignore[no-untyped-def]
+        sent = 0
+        while sent <= limit:
+            yield b"x" * (1 << 20)
+            sent += 1 << 20
+
+    response = client.post(
+        "/comprobar", content=chunks(), headers={"Content-Type": "multipart/form-data; boundary=b"}
+    )
+    assert response.status_code == 413
+    assert "pasa de 20 MB" in response.text
+
+
+def test_a_check_just_under_its_body_limit_still_reaches_the_page(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    content = b"x" * (check_lib.MAX_CHECK_BYTES - 1)
+    response = _check(client, content)
+    assert response.status_code == 200
+    assert "Rigor no tiene registro" in response.text or "no coincide" in response.text
