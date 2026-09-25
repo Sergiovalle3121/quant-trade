@@ -20,6 +20,7 @@ approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 |---|---|---|
 | Platform report | this or the equity file | The file as the platform writes it; see "Importers" below. One file gives both the closed trades and the balance curve. |
 | MT5 optimisation export | no | The XML the MT5 optimiser exports. Its passes become the MEASURED number of trials in the deflated Sharpe. |
+| Live account statement | no | A real or demo account running the robot, in any format a platform report can have. Read for its closed trades only and compared with the backtest (see "Backtest against the live account"); it changes no other figure. |
 | Equity or returns | this or a report | `timestamp` + `equity` (or `return`). `Date`/`NAV`, `%` returns, `;` separators and epoch timestamps are understood. |
 | Closed trades | no | `entry_time, exit_time, quantity, entry_price, exit_price`, optional `side`, optional `pnl`. |
 | Benchmark | no | same shape as the equity file. |
@@ -48,9 +49,11 @@ statements (build 600+ with a Taxes column, older 13-column ones, and the
 numbered layout with a comment column), TradingView "List of trades" CSV and
 XLSX, and the trade exports of NinjaTrader, QuantConnect, backtesting.py and
 vectorbt. MetaTrader 5 summary labels are also read in Russian (from a real
-report), in Spanish (names from the Spanish MetaTrader 5 help, not yet seen
-in a real file) and as build 1940 wrote them ("Net profit", "Trade",
-"Profit Column"). The importers were checked against 23 real public
+report), in Spanish and Italian (checked against 8 real public reports; see
+`docs/research/audit_iteration4/mt_languages_check.md`) and as build 1940
+wrote them ("Net profit", "Trade", "Profit Column"). A figure written with a
+decimal comma (`1 234,56`, `1.234,56`) is read as 1234.56; `1,234` stays a
+thousands separator. The importers were checked against 23 real public
 MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
 Limits, each written into the report as a reading warning:
 
@@ -180,6 +183,39 @@ total is positive. It needs at least `MIN_TRADES` = 20 closed trades
 (NOT_MEASURED below that); the time-of-day table is left out when every
 entry has the same clock time (daily data). It sets no threshold and does
 not change the class.
+
+### Backtest against the live account
+
+`audit/live.py` answers one question when the client also uploads a live
+(or demo) account statement: if the live trades had come from the
+backtest's own trades, how unusual would the live result be? It draws
+`SAMPLES` = 5,000 histories of as many backtest trades as the statement
+holds (with replacement, fixed seed) and places the live net result, hit
+rate and deepest fall among them (the JSON's `live` block, MEASURED; the
+expected range is the 5th to 95th percentile of the draws).
+
+- Outcome: `INCONSISTENT` when the live net result is at or below fewer
+  than `OUT_TAIL` = 1 % of the draws, or its fall is at least as deep in
+  fewer than 1 %; `EDGE` for the same test at `EDGE_TAIL` = 5 %; `ABOVE`
+  when the live net result is at or above fewer than 1 % of the draws (the
+  files may not share a configuration, size or account); otherwise
+  `CONSISTENT`. The outcome does not change the class.
+- Sizes: when the median live volume is outside 0.8 to 1.25 times the
+  backtest's, each live trade is scaled to the backtest's median size and
+  the report says so. Costs itemised per trade are subtracted on both sides.
+- Also reported: trades per month (a line when the live pace is outside 0.5
+  to 2 times the backtest's), live dates inside the backtest period (the
+  backtest may have been fitted on them), and live symbols the backtest
+  lacks.
+- Needs at least `MIN_BACKTEST_TRADES` = 30 backtest trades and
+  `MIN_LIVE_TRADES` = 10 live trades (NOT_MEASURED below that).
+- Limits: trades are drawn independently, so streaks and regime changes are
+  not preserved; the comparison says whether the files are alike, never
+  what the account will do next.
+
+The `/ejemplo` report carries a synthetic live account (120 business days
+after the backtest, a fifth of its size, a thinner edge) so a visitor sees
+the section; it comes out "En el borde".
 
 ### Plan to reach a better class
 
@@ -802,6 +838,14 @@ first; they stay on wide screens and in the PDF.
 "Qué pide cada clase" is a list of four cards, one per class, each with its
 letter in the class colour; the report's own class is filled in and labelled
 "Tu informe". In print the four cards stay on one page.
+
+With card payment on, both unlock buttons share one height, the card button
+carries a card icon, the Stripe note a lock, and the bank-transfer alternative
+is a quiet row with a chat icon under the price card.
+
+Guide steps wrap long code such as
+`pf.trades.records_readable.to_csv('trades.csv')` instead of widening the
+page on phones.
 
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one

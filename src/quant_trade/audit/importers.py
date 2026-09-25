@@ -228,6 +228,21 @@ def decode_text(data: bytes) -> str:
 _NUMBER_NOISE = re.compile(r"[\s  $€£¥%]")
 
 
+def _comma_is_decimal(text: str) -> bool:
+    """Whether a number written for a ``.`` decimal plainly uses a decimal comma.
+
+    Terminals set to Spanish, Portuguese or German may print ``1.234,56`` or
+    ``1 234,56``. A comma after the last dot, or a single comma followed by
+    other than three digits, cannot be a thousands separator. ``1,234`` stays
+    one thousand two hundred thirty-four.
+    """
+    if "," not in text:
+        return False
+    if "." in text:
+        return text.rfind(",") > text.rfind(".")
+    return text.count(",") == 1 and re.search(r",\d{3}$", text) is None
+
+
 def _num(value: Any, *, decimal: str = ".") -> float | None:
     """Read a platform number: spaces as thousands, ``(x)`` as negative, ``$``."""
     if value is None or isinstance(value, bool):
@@ -242,6 +257,8 @@ def _num(value: Any, *, decimal: str = ".") -> float | None:
     if negative:
         text = text[1:-1]
     text = _NUMBER_NOISE.sub("", text)
+    if decimal == "." and _comma_is_decimal(text):
+        decimal = ","
     text = text.replace(".", "").replace(",", ".") if decimal == "," else text.replace(",", "")
     if not re.fullmatch(r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?", text):
         return None
@@ -256,6 +273,11 @@ def _lead_num(value: str | None) -> float | None:
     if value is None:
         return None
     return _num(value.split("(")[0])
+
+
+def lead_number(value: str | None) -> float | None:
+    """Public name of ``_lead_num`` for the report's reading check."""
+    return _lead_num(value)
 
 
 _YMD = re.compile(
@@ -1109,34 +1131,57 @@ def _period_dates(value: str) -> tuple[str, str] | None:
 #: Summary labels by the English name the parsers use. Older builds and other
 #: terminal languages print other words for the same figure: the Russian
 #: names come from a real Russian report, the Spanish ones from the Spanish
-#: MetaTrader 5 help ("Informe de simulación"), matched without case.
+#: MetaTrader 5 help ("Informe de simulación") and from real Spanish and
+#: Italian tester reports (docs/research/audit_iteration4/mt_languages_check.md), matched
+#: without case.
 _MT5_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
-    "Expert": ("Советник", "Asesor", "Asesor Experto"),
-    "Symbol": ("Символ", "Símbolo"),
-    "Period": ("Период", "Período", "Periodo"),
-    "Company": ("Broker", "Брокер", "Компания", "Compañía", "Empresa"),
-    "Currency": ("Валюта", "Divisa", "Moneda"),
-    "Initial Deposit": ("Начальный депозит", "Depósito inicial"),
-    "Leverage": ("Плечо", "Apalancamiento"),
-    "History Quality": ("Качество истории", "Calidad del historial"),
-    "Total Net Profit": ("Net profit", "Чистая прибыль", "Beneficio Neto"),
-    "Total Trades": ("Всего трейдов", "Total de Trades"),
-    "Total Deals": ("Всего сделок", "Total de transacciones"),
+    "Expert": ("Советник", "Asesor", "Asesor Experto", "Experto"),
+    "Symbol": ("Символ", "Símbolo", "Simbolo"),
+    "Period": ("Период", "Período", "Periodo", "Periodo"),
+    "Company": ("Broker", "Брокер", "Компания", "Compañía", "Empresa", "Corredor", "Società"),
+    "Currency": ("Валюта", "Divisa", "Moneda", "Valuta"),
+    "Initial Deposit": ("Начальный депозит", "Depósito inicial", "Deposito Iniziale"),
+    "Leverage": ("Плечо", "Apalancamiento", "Leva"),
+    "History Quality": ("Качество истории", "Calidad del historial", "Qualità dello Storico"),
+    "Total Net Profit": ("Net profit", "Чистая прибыль", "Beneficio Neto", "Profitto Totale Netto"),
+    "Total Trades": (
+        "Всего трейдов",
+        "Total de Trades",
+        "Total de operaciones ejecutadas",
+        "Numero di Operazioni di Trading Totali",
+    ),
+    "Total Deals": ("Всего сделок", "Total de transacciones", "Affari Totali"),
     "Balance Drawdown Maximal": (
         "Максимальная просадка по балансу",
         "Reducción Máxima del Saldo",
+        "Reducción máxima del balance",
+        "Bilancio Drawdown Massimo",
     ),
     "Equity Drawdown Maximal": (
         "Максимальная просадка по средствам",
         "Reducción máxima del capital",
+        "Reducción máxima de la equidad",
+        "Equità Drawdown Massima",
     ),
     "Equity Drawdown Relative": (
         "Relative equity drawdown",
         "Относительная просадка по средствам",
         "Reducción relativa del capital",
+        "Reducción relativa de la equidad",
+        "Equità Drawdown Relativa",
     ),
-    "Sharpe Ratio": ("Коэффициент Шарпа", "Ratio de Sharpe", "El Ratio de Sharpe"),
-    "Profit Factor": ("Прибыльность", "Factor de Rentabilidad"),
+    "Sharpe Ratio": (
+        "Коэффициент Шарпа",
+        "Ratio de Sharpe",
+        "El Ratio de Sharpe",
+        "Indice di Sharpe",
+    ),
+    "Profit Factor": (
+        "Прибыльность",
+        "Factor de Rentabilidad",
+        "Factor de Beneficio",
+        "Fattore di Profitto",
+    ),
 }
 
 

@@ -121,6 +121,7 @@ ICONS: dict[str, str] = {
     ),
     "chat": "<path d='M4 19l1.4-4.2A8 8 0 1112 20a8 8 0 01-3.9-1z'/>",
     "arrow": "<path d='M5 12h14M13 6l6 6-6 6'/>",
+    "card": "<rect x='3' y='5.5' width='18' height='13' rx='2.5'/><path d='M3 10h18M7 15h4'/>",
     "lock": "<rect x='5' y='11' width='14' height='10' rx='2'/><path d='M8 11V8a4 4 0 018 0v3'/>",
     "print": (
         "<path d='M7 9V3h10v6'/><rect x='3' y='9' width='18' height='8' rx='2'/>"
@@ -471,7 +472,9 @@ font:500 .8rem var(--mono);color:var(--btn-fg);background:var(--btn-bg);
 box-shadow:0 0 0 10px var(--bg);position:relative}
 @media (max-width:900px){.steps{grid-template-columns:1fr 1fr;gap:40px 24px}.steps::before{display:none}}
 @media (max-width:560px){.steps{grid-template-columns:minmax(0,1fr)}}
-.list-steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.list-steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px;
+grid-template-columns:minmax(0,1fr)}
+.list-steps li{overflow-wrap:anywhere}
 .list-steps li{position:relative;padding:16px 18px 16px 62px;border:1px solid var(--border);
 border-radius:var(--r);background:var(--surface);color:var(--text-2)}
 .list-steps li::before{counter-increment:s;content:counter(s);position:absolute;left:16px;top:14px;
@@ -777,6 +780,8 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .tbar-track span{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--text)}
 .tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
 @media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
+.live .val{text-align:right;white-space:nowrap}.live td:first-child{font-weight:500}
+@media (max-width:759px){.live td:first-child{min-width:130px}}
 .metrics .c-k{width:30%}.metrics .c-v{width:15%}.metrics .c-e{width:170px}
 .metrics td:first-child{font-weight:500}
 .metrics .val{text-align:right;padding-right:28px}
@@ -848,7 +853,15 @@ color:#fff;font-variant-numeric:tabular-nums}
 .buy-price span{display:block;margin-top:8px;color:var(--text-2);font-size:.9rem}
 .buy-price span::first-letter{text-transform:uppercase}
 .paybox.buy a.btn{color:var(--btn-fg);gap:10px}
-@media (max-width:620px){.paybox.buy{padding:20px}.paybox.buy .btn{width:100%;padding:0 14px;font-size:.93rem;white-space:normal;text-align:center}.paybox.buy a.btn svg{display:none}}
+.paybox.buy .btn{gap:10px}.paybox.buy .btn svg{width:18px;height:18px;flex:none}
+.pay-secure{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;font-size:.85rem}
+.pay-secure svg{width:15px;height:15px;flex:none;margin-top:3px}
+.paybox.pay-alt{padding:14px 18px}
+.pay-alt a{display:inline-flex;align-items:center;gap:10px;color:var(--text-2);font-weight:500;text-decoration:none}
+.pay-alt a:hover{color:#fff}
+.pay-alt svg{width:18px;height:18px;flex:none}
+.pay-alt span{text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.3)}
+@media (max-width:620px){.paybox.buy{padding:20px}.paybox.buy .btn{width:100%;padding:0 14px;font-size:.93rem;white-space:normal;text-align:center}.paybox.buy a.btn svg{display:none}.paybox.buy .inline-form{width:100%}.paybox.buy .inline-form .btn{flex:1 1 100%}.paybox.buy .btn-ghost{font-size:.85rem;padding:0 10px;white-space:nowrap}.pay-alt a{align-items:flex-start}.pay-alt svg{margin-top:3px}}
 .publish{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;
 padding:26px 28px;border-radius:var(--r-lg);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04);
 margin:0 0 40px}

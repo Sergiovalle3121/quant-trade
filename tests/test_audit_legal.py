@@ -89,7 +89,9 @@ def test_unconfigured_operator_shows_a_placeholder_and_a_warning() -> None:
 
 
 def test_privacy_describes_what_the_store_keeps() -> None:
-    ctx = LegalContext(**OPERATOR, retention_days=21, max_uploads_per_hour_per_ip=7)
+    ctx = LegalContext(
+        **OPERATOR, retention_days=21, max_uploads_per_hour_per_ip=7, card_payments=True
+    )
     es = legal_page(privacy_text(ctx, "es"), locale="es")
     en = legal_page(privacy_text(ctx, "en"), locale="en")
     for needle in ("21 días", "IP", "7 subidas", "Stripe", "hash", "verificación", "bróker"):
@@ -321,3 +323,31 @@ def test_cli_unpublish(tmp_path: Path, monkeypatch) -> None:
     assert runner.invoke(app, ["audit", "unpublish", "a1"]).exit_code == 0
     assert store.publication_for_audit("a1") is None
     assert runner.invoke(app, ["audit", "unpublish", "a1"]).exit_code == 1
+
+
+def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
+    off = LegalContext(**OPERATOR, free_mode=False, price_usd=29, access_codes=True)
+    on = LegalContext(
+        **OPERATOR,
+        free_mode=False,
+        price_usd=29,
+        access_codes=True,
+        card_payments=True,
+        pack_price_usd=69,
+    )
+    for locale in ("es", "en"):
+        for text in (terms_text(off, locale), privacy_text(off, locale)):
+            page = legal_page(text, locale=locale)
+            assert "Stripe" not in page and find_claims(page) == []
+    terms_es = legal_page(terms_text(on, "es"), locale="es")
+    assert "misma tarjeta a través de Stripe" in terms_es and "USD 23.00" in terms_es
+    assert "dólares estadounidenses" in terms_es
+    terms_en = legal_page(terms_text(on, "en"), locale="en")
+    assert "same card through Stripe" in terms_en and "USD 23.00" in terms_en
+    privacy_es = legal_page(privacy_text(on, "es"), locale="es")
+    assert "correo que escribes en su página de pago" in privacy_es
+    assert "hash de su código de acceso" in privacy_es
+    privacy_en = legal_page(privacy_text(on, "en"), locale="en")
+    assert "e-mail address you type on its checkout" in privacy_en
+    for page in (terms_es, terms_en, privacy_es, privacy_en):
+        assert find_claims(page) == []
