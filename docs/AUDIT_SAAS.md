@@ -731,10 +731,24 @@ monthly track record. Besides a dated NAV or return series, the equity file
 may be a factsheet's year-by-month table: a year column (values 1900-2199),
 twelve month columns (headers in English, Spanish, Portuguese, French,
 German or Italian, or 1 to 12) and an optional year-total column (`YTD`,
-`Total`, `Año`...). Cells may carry `%`, a decimal comma, parentheses for a
-loss or a Unicode minus; blanks before the first or after the last month
-are skipped. Values are percentages when any cell has `%` or the median
-absolute value is over 0.2, else fractions, and the warning says which. A
+`YTD %`, `Total`, `Full Year`, `Yearly`, `Año`..., matched on its letters,
+even when it repeats the year column's header). Cells may carry `%`, a
+decimal comma, parentheses for a loss or a Unicode minus. Rows with no
+readable month (a footnote such as "Source: fund administrator", an empty
+separator, a year not yet started) are skipped; a month cell that cannot be
+read (`abc`, `inf`) is left out and named in a warning (`2017-03`). A grid
+whose rows with returns lack a year, or that lists a year twice, is refused
+with a message about the table, not about a date column.
+
+The scale: values are percentages when any cell has `%` (an Excel cell
+formatted as a percentage counts: Excel stores 1.23 % as 0.0123, and the
+reader keeps its `%`). Otherwise the year totals decide: the reading whose
+months, compounded, miss the stated totals by less than half the other's
+miss wins (summing cannot tell the two apart). Without totals, or when
+neither reading clearly wins, the grid is read as percentages, as
+factsheets publish, and the warning asks the customer to check one month
+against the factsheet. A money-market fund's `0.03` is therefore 0.03 %,
+not 3 % (the old median rule read it as a fraction, a 100x misread). A
 year whose stated total matches neither its months compounded nor summed
 (beyond 0.15 points) is listed in a warning: an edited month usually leaves
 its year total behind.

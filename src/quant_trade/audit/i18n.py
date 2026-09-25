@@ -815,6 +815,29 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "valores tomados como fracciones",
     ),
     (
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as fractions, as the year totals confirm",
+        "leído como tabla de rentabilidades mensuales (una fila por año, una columna por mes); "
+        "valores tomados como fracciones, como confirman los totales anuales",
+    ),
+    (
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as percentages, as the year totals confirm",
+        "leído como tabla de rentabilidades mensuales (una fila por año, una columna por mes); "
+        "valores tomados como porcentajes, como confirman los totales anuales",
+    ),
+    (
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as percentages (the file shows no % sign: check one month against the factsheet)",
+        "leído como tabla de rentabilidades mensuales (una fila por año, una columna por mes); "
+        "valores tomados como porcentajes (el archivo no muestra el signo %: compara un mes con "
+        "la ficha del fondo)",
+    ),
+    (
+        "{count} unreadable month(s) left out of the table: {cells}",
+        "{count} mes(es) ilegibles fuera de la tabla: {cells}",
+    ),
+    (
         "the stated year total does not match its months for {years}",
         "el total anual indicado no cuadra con sus meses en {years}",
     ),
