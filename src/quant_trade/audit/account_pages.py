@@ -59,9 +59,9 @@ COPY: dict[str, dict[str, str]] = {
         "signin_link": "Entra",
         "signup_link": "Crea una gratis",
         "forgot_link": "Olvidé mi contraseña",
-        "terms_agree": (
-            "Al crear la cuenta aceptas los términos del servicio y la política de privacidad."
-        ),
+        "terms_agree": "Al crear la cuenta aceptas los {terms} y la {privacy}.",
+        "terms_link": "términos del servicio",
+        "privacy_link": "política de privacidad",
         "benefits": (
             "Todos tus informes en una lista, con su clase|"
             "Tus créditos de acceso a la vista, sin buscar el código|"
@@ -200,9 +200,9 @@ COPY: dict[str, dict[str, str]] = {
         "signin_link": "Sign in",
         "signup_link": "Create one for free",
         "forgot_link": "I forgot my password",
-        "terms_agree": (
-            "By creating the account you accept the terms of service and privacy policy."
-        ),
+        "terms_agree": "By creating the account you accept the {terms} and {privacy}.",
+        "terms_link": "terms of service",
+        "privacy_link": "privacy policy",
         "benefits": (
             "All your reports in one list, with their class|"
             "Your access credits in sight, no code to look up|"
@@ -338,6 +338,7 @@ box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .acct-list li{display:flex;gap:10px;align-items:flex-start}
 .acct-list svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--ok)}
 .acct-alt{margin-top:18px;font-size:.92rem}
+.acct-terms a{color:var(--text);text-underline-offset:3px}
 .acct-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
 margin-bottom:8px}
 .acct-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 28px}
@@ -454,8 +455,12 @@ def signup_page(
             "maxlength='256' autocomplete='new-password'>",
             copy["password_help"],
         )
-        + f"<p class='muted'>{_e(copy['terms_agree'])} "
-        f"<a href='{_e(legal_url('terms', locale))}'>›</a></p>"
+        + "<p class='muted acct-terms'>"
+        + _e(copy["terms_agree"]).format(
+            terms=f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a>",
+            privacy=f"<a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a>",
+        )
+        + "</p>"
         + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signup_button'])}"
         "</button></form>" + f"<p class='acct-alt'>{_e(copy['have_account'])} "
         f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"

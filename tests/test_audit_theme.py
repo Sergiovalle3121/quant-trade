@@ -788,3 +788,17 @@ def test_account_screens_read_as_cards_on_a_phone_and_deleting_looks_like_it() -
     )
     # Deleting the account is set apart in red.
     assert ".acct-danger h3{color:#b42318}" in ACCOUNT_CSS
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_sign_up_links_the_terms_and_privacy_words_themselves(tmp_path: Path, locale: str) -> None:
+    from quant_trade.audit.account_pages import COPY, path
+
+    page = _client(tmp_path).get(path("signup", locale)).text
+    copy = COPY[locale]
+    for kind in ("terms", "privacy"):
+        assert f"'>{copy[f'{kind}_link']}</a>" in page
+        assert f"href='{legal_url(kind, locale)}'" in page
+    assert ">›</a>" not in page
+    text = copy["terms_agree"].format(terms=copy["terms_link"], privacy=copy["privacy_link"])
+    assert find_claims(text) == []
