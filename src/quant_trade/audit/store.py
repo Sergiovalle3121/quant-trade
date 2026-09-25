@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -380,6 +381,19 @@ class Store:
             sa.Column("device_sha256", sa.String(64), nullable=False, default="", index=True),
             sa.Column("file_sha256", sa.String(64), nullable=False, default="", index=True),
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
+            sa.Column("created_at", sa.String(40), nullable=False, index=True),
+        )
+        #: Claims that make the free tier's limits hold under simultaneous
+        #: uploads: each free full report or free preview takes its keys (the
+        #: account, the browser, the file, a numbered slot of the month) in one
+        #: transaction before the audit runs, so two uploads can never both
+        #: take the last one. Keys that carry a network address hold only its
+        #: hash, and the retention purge deletes them.
+        self.free_claims = sa.Table(
+            "free_claims",
+            self.metadata,
+            sa.Column("claim_key", sa.String(200), primary_key=True),
+            sa.Column("reservation", sa.String(64), nullable=False, index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
         self.metadata.create_all(self.engine)
@@ -1346,6 +1360,63 @@ class Store:
         except sa.exc.IntegrityError:
             return
 
+    # -- free-tier claims --------------------------------------------------
+    def claim_free(
+        self,
+        reservation: str,
+        *,
+        keys: Sequence[str],
+        slots: Mapping[str, Sequence[str]],
+        at: datetime,
+    ) -> str:
+        """Take every key in ``keys`` and one key from each group in ``slots``,
+        all or nothing, in one transaction.
+
+        Returns ``""`` when everything was taken, ``"key"`` when a key was
+        already taken, else the name of the first slot group that is full.
+        """
+        sa = self._sa
+        table = self.free_claims
+        created = _iso(at)
+        failed = ""
+        try:
+            with self.engine.begin() as conn:
+                for key in keys:
+                    conn.execute(
+                        table.insert().values(
+                            claim_key=key[:200], reservation=reservation, created_at=created
+                        )
+                    )
+                for name, group in slots.items():
+                    for key in group:
+                        try:
+                            with conn.begin_nested():
+                                conn.execute(
+                                    table.insert().values(
+                                        claim_key=key[:200],
+                                        reservation=reservation,
+                                        created_at=created,
+                                    )
+                                )
+                        except sa.exc.IntegrityError:
+                            continue
+                        break
+                    else:
+                        failed = name
+                        raise LookupError(name)
+        except sa.exc.IntegrityError:
+            return "key"
+        except LookupError:
+            return failed
+        return ""
+
+    def release_free(self, reservation: str) -> None:
+        """Give back what :meth:`claim_free` took for an upload that failed."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.free_claims.delete().where(self.free_claims.c.reservation == reservation)
+            )
+
     # -- free previews -----------------------------------------------------
     def record_free_preview(
         self, audit_id: str, account_id: str, *, client_ip: str, at: datetime
@@ -1577,6 +1648,12 @@ class Store:
                     & (self.welcome_reports.c.client_ip != "")
                 )
                 .values(client_ip="")
+            )
+            conn.execute(
+                self.free_claims.delete().where(
+                    (self.free_claims.c.created_at < cutoff)
+                    & self.free_claims.c.claim_key.like("%:ip:%")
+                )
             )
             conn.execute(
                 self.free_previews.update()
