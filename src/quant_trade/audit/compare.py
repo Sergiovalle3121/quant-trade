@@ -111,6 +111,9 @@ COPY: dict[str, dict[str, Any]] = {
 
 COMPARE_CSS = (
     ".cmp-form{display:grid;gap:14px;max-width:720px}"
+    ".cmp-mine{margin:0 0 22px;padding:14px 18px;border:1px solid var(--border);"
+    "border-radius:16px;background:#fff}"
+    ".cmp-mine p{margin:0;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}"
     ".cmp-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;"
     "align-items:start}"
     ".cmp-grid .cmp-form{background:#fff;border:1px solid var(--border);border-radius:24px;"
