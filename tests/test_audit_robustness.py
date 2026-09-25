@@ -426,3 +426,58 @@ def test_thousands_of_trades_in_one_hour_pair_quickly() -> None:
     # took ~80 s for 12,000 trades.
     result = compare_live(parsed(12_000), parsed(12_000), samples=200)
     assert result["pairing"]["matched"]["value"] == 12_000
+
+
+def test_an_mql5_signal_header_without_a_closing_price_is_not_a_crash() -> None:
+    from quant_trade.audit.importers import ReportFormatError, import_report
+
+    data = (
+        b"Time;Type;Volume;Symbol;Price;S/L;T/P;Time;Close;Commission;Swap;Profit\n"
+        b"2024.03.04 09:00:00;Buy;0.10;EURUSD;1.08000;;;2024.03.04 15:00:00;1.08150;0;0;15.00\n"
+    )
+    with pytest.raises(ReportFormatError) as caught:
+        import_report(data, "history.csv")
+    assert caught.value.code == "unknown_format"
+
+
+def test_a_trade_that_closes_before_it_opens_is_dropped() -> None:
+    from quant_trade.audit.importers import import_report
+
+    data = (
+        b"Time;Type;Volume;Symbol;Price;S/L;T/P;Time;Price;Commission;Swap;Profit\n"
+        b"2024.03.01 08:00:00;Balance;;;;;;;;;;1000.00\n"
+        b"2024.03.04 09:00:00;Buy;0.10;EURUSD;1.08000;;;2020.03.04 15:00:00;1.08150;0;0;15.00\n"
+        b"2024.03.05 09:00:00;Sell;0.10;EURUSD;1.08500;;;2024.03.05 11:00:00;1.08400;0;0;10.00\n"
+        b"2024.03.06 09:00:00;Buy;0.10;EURUSD;1.08000;;;2024.03.06 15:00:00;1.08100;0;0;10.00\n"
+    )
+    report = import_report(data, "history.csv")
+    assert all(t.exit_time >= t.entry_time for t in report.trades.trades)
+    assert len(report.trades.trades) == 2
+    assert any("1 row(s)" in warning for warning in report.warnings)
+
+
+def test_a_trades_csv_row_that_closes_before_it_opens_is_dropped() -> None:
+    from quant_trade.audit.schema import parse_trades_csv
+
+    data = (
+        b"entry_time,exit_time,quantity,entry_price,exit_price\n"
+        b"2024-01-02,2024-01-03,1,100,101\n"
+        b"2024-01-05,2024-01-04,1,100,99\n"
+        b"2024-01-06,2024-01-08,1,100,102\n"
+    )
+    parsed = parse_trades_csv(data)
+    assert len(parsed.trades) == 2
+    assert parsed.invalid_rows == 1
+
+
+def test_damaged_tester_header_values_are_not_declared() -> None:
+    from quant_trade.audit.testdata import data_quality, review_test_data
+
+    assert data_quality("-5%") is None
+    for raw in ("-7", "1e300"):
+        review, _ = review_test_data(
+            source_format=importers.MT4_TESTER_HTML,
+            metadata={"mismatched_chart_errors": raw},
+            trades=None,
+        )
+        assert review["mismatched_chart_errors"]["evidence"] == "NOT_MEASURED", raw

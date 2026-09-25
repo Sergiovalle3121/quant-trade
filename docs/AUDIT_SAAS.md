@@ -445,7 +445,9 @@ quality (MT4 "Modelling quality", MT5 "History Quality"), MT4's mismatched
 chart errors and spread, and the requested dates: all shown as DECLARED. The
 audit counts, as MEASURED, the trades that open or close outside those dates
 (one day of slack each side). Model names are recognised in English,
-Russian, Portuguese and Spanish; an unknown one stays NOT_MEASURED.
+Russian, Portuguese and Spanish; an unknown one stays NOT_MEASURED. A damaged
+header value stays NOT_MEASURED too: a negative data quality, or a mismatched
+chart error count below 0 or above one billion (`MAX_CHART_ERRORS`).
 
 | Code | WARN | FAIL |
 |---|---|---|

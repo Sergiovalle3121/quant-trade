@@ -2918,6 +2918,9 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     if drifting:
         warnings.append(f"{CONVERSION_DRIFT_WARNING}: {', '.join(sorted(drifting))}")
     for trip in trips:
+        if trip.exit_time < trip.entry_time:
+            invalid += 1  # a trade cannot close before it opens: a damaged row
+            continue
         quantity = trip.volume * sizes[trip.symbol]
         if trip.symbol in drifting:
             quantity = trip.volume * _trip_size(trip, sizes[trip.symbol])
@@ -2949,7 +2952,12 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     if invalid:
         warnings.append(f"{invalid} row(s) with unreadable or non-positive fields dropped")
     kept = [
-        trip for trip in trips if trip.volume > 0 and trip.entry_price > 0 and trip.exit_price > 0
+        trip
+        for trip in trips
+        if trip.volume > 0
+        and trip.entry_price > 0
+        and trip.exit_price > 0
+        and trip.exit_time >= trip.entry_time
     ]
     equity_csv, initial, curve_warnings = _balance_curve(draft, kept or trips, fallback_initial)
     warnings.extend(curve_warnings)
@@ -3107,6 +3115,8 @@ def _is_mql5_signal_header(header: list[str]) -> bool:
         bool(names)
         and names[0] == "time"
         and names.count("time") == 2
+        # The closing price follows the second Time; without it there is no exit.
+        and "price" in names[names.index("time", 1) :]
         and {"type", "volume", "symbol", "price", "commission", "swap", "profit"} <= set(names)
     )
 

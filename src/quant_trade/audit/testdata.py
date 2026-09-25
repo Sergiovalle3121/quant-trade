@@ -41,6 +41,8 @@ QUALITY_FAIL = 0.50
 COARSE_MAX_QUALITY = 0.90
 #: Days of slack around the tested window (time zones, the last bar's close).
 WINDOW_SLACK_DAYS = 1
+#: Above this a "Mismatched charts errors" count is read as damaged, not declared.
+MAX_CHART_ERRORS = 1_000_000_000
 
 EVERY_TICK = "every tick"
 CONTROL_POINTS = "control points"
@@ -70,7 +72,7 @@ ERRORS_NOTE = "as printed in the report header"
 SPREAD_NOTE = "as printed in the report header; 'Current' is the spread when the test ran"
 WINDOW_NOTE = "trades that open or close outside the dates the header says were tested"
 
-_PERCENT = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
+_PERCENT = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*%")
 _DATE = re.compile(r"(\d{4})\.(\d{2})\.(\d{2})")
 
 
@@ -131,6 +133,8 @@ def review_test_data(
     model = tick_model(metadata.get("model")) if mt4 else None
     real_ticks = not mt4 and "real ticks" in (raw_quality or "").lower()
     errors = _lead_num(metadata.get("mismatched_chart_errors")) if mt4 else None
+    if errors is not None and not 0 <= errors <= MAX_CHART_ERRORS:
+        errors = None  # a count cannot be negative; an absurd one is a damaged header
     window = stated_window(metadata.get("period"))
     outside = _outside(trades, window) if window is not None and trades and trades.trades else None
 
