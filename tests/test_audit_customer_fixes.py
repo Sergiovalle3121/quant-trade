@@ -227,3 +227,17 @@ def test_undeclared_trials_read_as_the_most_favourable_case() -> None:
         )
         assert phrase in text and "supuesto" not in text and "assumed" not in text
         assert find_claims(text) == []
+
+
+def test_trial_counts_read_as_plain_singular_or_plural() -> None:
+    from quant_trade.audit.verdict import trials_phrase
+
+    assert trials_phrase(1, "DECLARED", "es") == "1 intento declarado"
+    assert trials_phrase(120, "MEASURED", "es") == "120 intentos contados en los archivos"
+    assert trials_phrase(1, "DECLARED", "en") == "1 declared trial"
+    assert trials_phrase(30, "MEASURED", "en") == "30 trials counted in the files"
+    from quant_trade.audit.sample import sample_result
+
+    for locale in ("es", "en"):
+        text = sample_result(locale, bootstrap_samples=100).verdict.summary
+        assert "(s)" not in text

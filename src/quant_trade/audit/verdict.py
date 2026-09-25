@@ -147,8 +147,8 @@ def assess_statistical(
 
 TRIAL_SOURCE: dict[str, dict[str, str]] = {
     "es": {
-        "DECLARED": "declarado(s)",
-        "MEASURED": "contado(s) en los archivos",
+        "DECLARED": "declarados",
+        "MEASURED": "contados en los archivos",
         "NOT_MEASURED": "sin declarar (el caso más favorable)",
     },
     "en": {
@@ -157,6 +157,24 @@ TRIAL_SOURCE: dict[str, dict[str, str]] = {
         "NOT_MEASURED": "not declared (the most favourable case)",
     },
 }
+
+
+def trials_phrase(trials: int, evidence: str, locale: str) -> str:
+    """``120 intentos declarados`` / ``1 declared trial``: the count with its
+    source, singular or plural as the number asks."""
+    one = trials == 1
+    if locale == "es":
+        noun = "intento" if one else "intentos"
+        source = {
+            "DECLARED": "declarado" if one else "declarados",
+            "MEASURED": "contado en los archivos" if one else "contados en los archivos",
+        }.get(evidence, TRIAL_SOURCE["es"]["NOT_MEASURED"])
+        return f"{trials} {noun} {source}"
+    noun = "trial" if one else "trials"
+    if evidence == "DECLARED":
+        return f"{trials} declared {noun}"
+    source = TRIAL_SOURCE["en"].get(evidence, "declared")
+    return f"{trials} {noun} {source}"
 
 
 def assess_multiplicity(
@@ -182,13 +200,10 @@ def assess_multiplicity(
             [_reason("statistical significance not measured")],
             inputs,
         )
-    source_en = TRIAL_SOURCE["en"].get(trials_evidence, "declared")
-    source_es = TRIAL_SOURCE["es"].get(trials_evidence, "declarado(s)")
-
     def dsr_reason(relation: str) -> Reason:
         return (
-            f"DSR at {trials} {source_en} trial(s) {dsr:.3f} {relation}",
-            f"DSR con {trials} intento(s) {source_es} {dsr:.3f} {relation}",
+            f"DSR at {trials_phrase(trials, trials_evidence, 'en')} {dsr:.3f} {relation}",
+            f"DSR con {trials_phrase(trials, trials_evidence, 'es')} {dsr:.3f} {relation}",
         )
 
     pbo_bad = pbo is not None and pbo >= thresholds.pbo_max
@@ -470,15 +485,15 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{STATISTICAL}.FAIL": "El Sharpe observado no se distingue de cero.",
         f"{STATISTICAL}.NOT_MEASURED": "Significación no medida: {reason}.",
         f"{MULTIPLICITY}.PASS": (
-            "Con {trials} intento(s) {trials_source}, el resultado sigue por encima de lo que "
+            "Con {trials_phrase}, el resultado sigue por encima de lo que "
             "produciría el mejor intento sin habilidad."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "Con {trials} intento(s) {trials_source}, el Sharpe deflactado no llega al umbral: "
+            "Con {trials_phrase}, el Sharpe deflactado no llega al umbral: "
             "si se probaron más configuraciones, el resultado puede venir de elegir la mejor."
         ),
         f"{MULTIPLICITY}.FAIL": (
-            "Con {trials} intento(s) {trials_source}, el resultado no supera lo que produciría "
+            "Con {trials_phrase}, el resultado no supera lo que produciría "
             "el mejor de esos intentos sin habilidad."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicidad no medida: {reason}.",
@@ -543,15 +558,15 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{STATISTICAL}.FAIL": "The observed Sharpe ratio is not distinguishable from zero.",
         f"{STATISTICAL}.NOT_MEASURED": "Significance not measured: {reason}.",
         f"{MULTIPLICITY}.PASS": (
-            "With {trials} trial(s) {trials_source}, the result stays above what the best "
+            "With {trials_phrase}, the result stays above what the best "
             "unskilled trial would produce."
         ),
         f"{MULTIPLICITY}.WEAK": (
-            "With {trials} trial(s) {trials_source}, the deflated Sharpe misses the bar: if "
+            "With {trials_phrase}, the deflated Sharpe misses the bar: if "
             "more configurations were tried, the result may come from picking the best one."
         ),
         f"{MULTIPLICITY}.FAIL": (
-            "With {trials} trial(s) {trials_source}, the result does not exceed what the best "
+            "With {trials_phrase}, the result does not exceed what the best "
             "of those trials would produce without skill."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicity not measured: {reason}.",
@@ -833,6 +848,7 @@ def summary(
                 reason=reasons[0] if reasons else "",
                 trials=trials,
                 trials_source=source,
+                trials_phrase=trials_phrase(trials, trials_evidence, locale),
                 codes=", ".join(reasons),
             )
         )

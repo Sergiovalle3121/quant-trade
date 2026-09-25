@@ -46,6 +46,7 @@ table{page-break-inside:auto}tr{page-break-inside:avoid}
 svg{max-width:100%}
 table.live{table-layout:fixed;width:100%;font-size:8.5pt}
 table.live .val{white-space:normal}table.live td:first-child{width:22%}
+table.pair{width:100%;font-size:8.5pt}table.pair td:first-child{width:55%}
 """
 
 

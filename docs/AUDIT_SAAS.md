@@ -194,7 +194,21 @@ expected range is the 5th to 95th percentile of the draws).
 - Also reported: trades per month (a line when the live pace is outside 0.5
   to 2 times the backtest's), live dates inside the backtest period (the
   backtest may have been fitted on them), and live symbols the backtest
-  lacks.
+  lacks (a broker suffix such as `EURUSD.m` counts as the same symbol).
+- Same dates, trade by trade (the JSON's `live.pairing`, `null` when the
+  files share no dates): each live trade on the shared dates is paired with
+  the unused backtest trade of the same side and symbol whose entry is
+  nearest and at most `MATCH_WINDOW` = 60 minutes away. Reported: live
+  trades found in the backtest and their share, backtest trades without
+  their live trade, the median entry and exit price difference in basis
+  points (positive when worse for the account), and the result difference
+  of the paired trades with each live trade scaled to its backtest trade's
+  size (total and per trade). The price and result figures need
+  `MIN_MATCHED` = 5 paired trades (NOT_MEASURED below that). When at least
+  5 live trades fall on the shared dates and fewer than `MATCH_LOW` = 50 %
+  are found, the report says it is probably not the same configuration.
+  Times are compared as the files state them: two servers in different time
+  zones pair poorly.
 - Needs at least `MIN_BACKTEST_TRADES` = 30 backtest trades and
   `MIN_LIVE_TRADES` = 10 live trades (NOT_MEASURED below that).
 - Limits: trades are drawn independently, so streaks and regime changes are
