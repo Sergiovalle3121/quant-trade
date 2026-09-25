@@ -1735,8 +1735,11 @@ def _live_html(live: dict[str, Any] | None, locale: str, labels: dict[str, str])
         f"<th class='val'>{_e(labels['live_col_expected'])}</th>"
         f"<th class='val'>{_e(labels['live_col_backtest'])}</th></tr></thead><tbody>"
         + "".join(
-            f"<tr><td>{_e(name)}</td><td class='val'><strong>{_e(b)}</strong></td>"
-            f"<td class='val'>{_e(c)}</td><td class='val'>{_e(a)}</td></tr>"
+            f"<tr><td>{_e(name)}</td>"
+            f"<td class='val' data-l='{_e(labels[live_head])}'><strong>{_e(b)}</strong></td>"
+            f"<td class='val{'' if c else ' empty'}' data-l='{_e(labels['live_col_expected'])}'>"
+            f"{_e(c)}</td>"
+            f"<td class='val' data-l='{_e(labels['live_col_backtest'])}'>{_e(a)}</td></tr>"
             for name, a, b, c in rows
         )
         + "</tbody></table>"
@@ -1752,15 +1755,19 @@ def _live_html(live: dict[str, Any] | None, locale: str, labels: dict[str, str])
         notes.append(labels["live_overlap"])
     if live.get("new_symbols"):
         notes.append(labels["live_symbols"].format(symbols=", ".join(live["new_symbols"])))
-    tails = "".join(
-        f"<p>{_e(labels[label])}: <strong>{pct(live[key]['value'])}</strong> "
-        f"{_badge(live[key]['evidence'])}</p>"
-        for label, key in (("live_below", "net_below"), ("live_fall_above", "fall_above"))
+    tails = (
+        "<div class='facts'>"
+        + "".join(
+            f"<div class='fact'><b>{pct(live[key]['value'])}</b>"
+            f"<p>{_e(labels[label])} {_badge(live[key]['evidence'])}</p></div>"
+            for label, key in (("live_below", "net_below"), ("live_fall_above", "fall_above"))
+        )
+        + "</div>"
     )
     return (
         f"<p class='muted'>{_e(labels['live_intro'].format(samples=live['samples']))}</p>"
-        f"<p><span class='badge {LIVE_TONE[outcome]}'>{_e(labels['live_badge_' + outcome])}"
-        f"</span> {_e(labels['live_' + outcome])}</p>"
+        f"<p class='live-verdict lv-{LIVE_TONE[outcome]}'><span class='badge {LIVE_TONE[outcome]}'>"
+        f"{_e(labels['live_badge_' + outcome])}</span> {_e(labels['live_' + outcome])}</p>"
         + table
         + tails
         + "".join(f"<p class='muted'>{_e(note)}</p>" for note in notes)
