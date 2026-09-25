@@ -521,7 +521,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_stress_none": (
             "El historial no cubre completa ninguna de las caídas de la lista (puntocom, 2008, "
-            "euro 2011, 2015-16, final de 2018, covid, 2022)."
+            "euro 2011, 2015-16, final de 2018, covid, 2022, cripto 2022)."
         ),
         "fund_stress_head": "Crisis",
         "fund_stress_fund": "Fondo",
@@ -1241,7 +1241,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_stress_none": (
             "The history does not cover any fall on the list in full (dot-com, 2008, euro 2011, "
-            "2015-16, late 2018, covid, 2022)."
+            "2015-16, late 2018, covid, 2022, crypto 2022)."
         ),
         "fund_stress_head": "Crisis",
         "fund_stress_fund": "Fund",

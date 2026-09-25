@@ -87,3 +87,19 @@ def test_the_section_shows_the_crises(locale: str) -> None:
     assert_report_clean(html)
     assert LABELS[locale]["fund_stress"] in html and LABELS[locale]["fund_stress_covid"] in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_record_that_covers_no_crisis_says_so(locale: str) -> None:
+    # 2023 onwards: after every dated window, so none is estimated from part of it.
+    values = np.random.default_rng(3).normal(0.006, 0.03, 36)
+    result = run_audit(
+        build_inputs(_grid(values, 2023), DeclaredMetadata(locale=locale)), bootstrap_samples=200
+    )
+    assert result.fund is not None
+    crises = result.fund["crises"]
+    assert crises["windows"] == [] and crises["findings"] == []
+    assert "worst_12m" in crises
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    assert LABELS[locale]["fund_stress_none"].replace("'", "&#x27;") in html
