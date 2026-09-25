@@ -89,8 +89,8 @@ Every change below has an offline, deterministic test in
   so an address's registration can be learnt (5 sign-ups per hour per
   address). Without e-mail verification this is the accepted trade-off; it
   goes away once confirmation by e-mail exists. Fixed in the same review: a
-  report saved from someone else's link is only unlinked when that account
-  is deleted, never deleted (only reports uploaded or paid while signed in
+  report saved or paid for from someone else's link is only unlinked when
+  that account is deleted, never deleted (only reports the account uploaded
   are); the customer's description is withheld on `/cuenta` when the guard
   refuses it; failed sign-ins are limited per (address, e-mail) pair with
   higher per-address and per-e-mail ceilings, so nobody can lock the real

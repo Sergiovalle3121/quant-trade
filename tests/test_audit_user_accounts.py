@@ -581,6 +581,35 @@ def test_paying_for_someone_elses_report_never_allows_deleting_it(tmp_path: Path
     assert client.get(location).status_code == 200
 
 
+@pytest.mark.parametrize("path", ["redeem", "credit"])
+def test_unlocking_someone_elses_report_without_saving_never_allows_deleting_it(
+    tmp_path: Path, path: str
+) -> None:
+    client, store, _ = _client(tmp_path)
+    location = _upload(client).headers["location"]  # A uploads, never signs up
+    audit_id = _audit_id(location)
+    buyer = TestClient(client.app)
+    _signup(buyer, "w@example.com")
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    query = location[location.index("?") :]
+    if path == "redeem":
+        buyer.post(f"/audits/{audit_id}/redeem{query}", data={"code": code})
+    else:
+        buyer.post("/cuenta/codigo", data={"code": code, "csrf": _csrf(buyer.get("/cuenta").text)})
+        buyer.post(
+            f"/audits/{audit_id}/credit{query}", data={"csrf": _csrf(buyer.get("/cuenta").text)}
+        )
+    assert store.get_audit(audit_id).paid  # type: ignore[attr-defined]
+    listing = buyer.get("/cuenta").text
+    assert audit_id in listing
+    buyer.post(
+        "/cuenta/borrar",
+        data={"current": PASSWORD, "csrf": _csrf(listing), "with_reports": "yes"},
+    )
+    assert store.get_audit(audit_id) is not None  # type: ignore[attr-defined]
+    assert client.get(location).status_code == 200
+
+
 def test_a_promotional_description_is_withheld_on_the_account_page(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     _signup(client, "u@example.com")
