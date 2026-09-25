@@ -1,6 +1,6 @@
 """Environment-driven settings for the audit web service. No secret has a default.
 
-Free mode is the safe default: without every Stripe variable the service
+Free mode is the safe default: without both Stripe secrets the service
 serves watermarked reports and never creates a checkout session, so a
 misconfigured deployment degrades to "free preview", never to "charged but
 not delivered". The one other way out of free mode is an explicit opt-in to
@@ -48,6 +48,15 @@ def normalise_database_url(url: str) -> str:
     if url.startswith("postgresql://"):
         return "postgresql+psycopg://" + url[len("postgresql://") :]
     return url
+
+
+def stripe_keys_valid(secret_key: str, webhook_secret: str) -> bool:
+    """A secret (``sk_``) or restricted (``rk_``) key plus a ``whsec_`` secret.
+
+    A publishable key (``pk_``) pasted by mistake leaves card payments off
+    instead of failing at the first checkout.
+    """
+    return secret_key.startswith(("sk_", "rk_")) and webhook_secret.startswith("whsec_")
 
 
 def _safe_url(value: str) -> str:
@@ -110,7 +119,9 @@ class AuditSettings:
 
     @property
     def stripe_configured(self) -> bool:
-        return bool(self.stripe_secret_key and self.stripe_webhook_secret and self.stripe_price_id)
+        """A secret key and a webhook secret of the right kind. The price id is
+        optional: without it Checkout is priced from ``price_usd_cents``."""
+        return stripe_keys_valid(self.stripe_secret_key, self.stripe_webhook_secret)
 
     @property
     def stripe_enabled(self) -> bool:
@@ -143,9 +154,8 @@ class AuditSettings:
     def pack_price_usd(self) -> float:
         """The pack's price when it is on sale, else 0."""
         on_sale = (
-            self.access_codes_enabled
-            and 0 < self.pack_price_usd_cents < PACK_CREDITS * self.price_usd_cents
-        )
+            self.access_codes_enabled or self.stripe_enabled
+        ) and 0 < self.pack_price_usd_cents < PACK_CREDITS * self.price_usd_cents
         return self.pack_price_usd_cents / 100.0 if on_sale else 0.0
 
     @property
@@ -158,7 +168,7 @@ class AuditSettings:
         stripe_secret_key = env.get("STRIPE_SECRET_KEY", "").strip()
         stripe_webhook_secret = env.get("STRIPE_WEBHOOK_SECRET", "").strip()
         stripe_price_id = env.get("STRIPE_PRICE_ID", "").strip()
-        configured = bool(stripe_secret_key and stripe_webhook_secret and stripe_price_id)
+        configured = stripe_keys_valid(stripe_secret_key, stripe_webhook_secret)
         requested_free = env.get("AUDIT_FREE_MODE", "true").strip().lower() in TRUE_VALUES
         access_codes = env.get("AUDIT_ACCESS_CODES", "").strip().lower() in TRUE_VALUES
         return cls(

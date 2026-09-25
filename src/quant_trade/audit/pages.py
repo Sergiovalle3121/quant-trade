@@ -200,7 +200,10 @@ _COPY: dict[str, dict[str, Any]] = {
             "Ahora mismo el servicio está en modo gratuito: el informe completo se entrega con "
             "marca de agua y sin coste."
         ),
-        "pay_card": "Pago con tarjeta desde el propio informe.",
+        "pay_card": (
+            "Pago con tarjeta desde el propio informe, procesado por Stripe: lo ves completo "
+            "al momento, sin esperar un código."
+        ),
         "pay_code": (
             "Pago por transferencia, Mercado Pago o WhatsApp: recibes un código de acceso y lo "
             "escribes en el formulario o en el informe."
@@ -391,7 +394,10 @@ _COPY: dict[str, dict[str, Any]] = {
             "The service is in free mode right now: the full report is delivered with a "
             "watermark at no cost."
         ),
-        "pay_card": "Card payment from the report itself.",
+        "pay_card": (
+            "Card payment from the report itself, processed by Stripe: you see it in full at "
+            "once, without waiting for a code."
+        ),
         "pay_code": (
             "Pay by bank transfer, Mercado Pago or WhatsApp: you receive an access code and "
             "enter it in the form or in the report."
@@ -488,7 +494,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
             ("globe", "Informe en español o inglés"),
-            ("key", "Pago sin tarjeta con código"),
+            ("key", "Pago seguro, sin crear cuenta"),
         ],
         "mock_url": "informe · clase B",
         "mock_k": "Veredicto",
@@ -663,7 +669,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
             ("globe", "Report in English or Spanish"),
-            ("key", "Pay without a card using a code"),
+            ("key", "Secure payment, no account needed"),
         ],
         "mock_url": "report · class B",
         "mock_k": "Verdict",

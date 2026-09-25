@@ -35,6 +35,7 @@ from typing import Annotated, Any
 
 from pydantic import ValidationError
 
+from quant_trade.audit import payments
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
@@ -62,6 +63,7 @@ from quant_trade.audit.pages import (
     sample_meta,
     verification_page,
 )
+from quant_trade.audit.payments import stripe_checkout
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
@@ -78,11 +80,17 @@ from quant_trade.audit.store import REQUIRE_WEB, Store, make_store
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps
 
-CheckoutFactory = Callable[[AuditSettings, str, str], str]
+#: ``(settings, audit_id, token, *, plan, locale) -> Stripe Checkout URL``.
+CheckoutFactory = Callable[..., str]
+#: ``(settings, session_id) -> the Checkout session as Stripe returns it``.
+SessionLookup = Callable[[AuditSettings, str], dict[str, Any]]
 
 logger = logging.getLogger("quant_trade.audit.web")
 
 STRIPE_TOLERANCE_SECONDS = 300
+#: Webhook events that can mean a Checkout session was paid; ``fulfil``
+#: still checks ``payment_status`` (a delayed method completes unpaid).
+PAID_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_succeeded")
 #: The page languages; Spanish is the default everywhere.
 LOCALES = ("es", "en")
 _EMAIL_MAX = 254
@@ -157,6 +165,24 @@ MESSAGES: dict[str, dict[str, str]] = {
     "payments_disabled": {
         "es": "Los pagos no están activados en este servicio.",
         "en": "Payments are not enabled on this service.",
+    },
+    "card_paid": {
+        "es": "Pago recibido: este es el informe completo. Stripe te envía el recibo por correo.",
+        "en": "Payment received: this is the full report. Stripe emails you the receipt.",
+    },
+    "card_pending": {
+        "es": (
+            "Estamos confirmando tu pago con Stripe. Recarga esta página en unos segundos; "
+            "no vuelvas a pagar."
+        ),
+        "en": (
+            "We are confirming your payment with Stripe. Reload this page in a few seconds; "
+            "do not pay again."
+        ),
+    },
+    "card_cancelled": {
+        "es": "Pago cancelado: no se hizo ningún cargo. Esta es la vista previa.",
+        "en": "Payment cancelled: nothing was charged. This is the preview.",
     },
     "code_applied": {
         "es": "Código de acceso aplicado: este es el informe completo.",
@@ -533,23 +559,6 @@ def sign_stripe_payload(payload: bytes, secret: str, *, timestamp: int) -> str:
     return f"t={timestamp},v1={digest}"
 
 
-def stripe_checkout(settings: AuditSettings, audit_id: str, token: str) -> str:
-    """Create a Stripe Checkout session and return its URL (needs the SDK)."""
-    import stripe
-
-    stripe.api_key = settings.stripe_secret_key
-    base = settings.base_url
-    session = stripe.checkout.Session.create(
-        mode="payment",
-        line_items=[{"price": settings.stripe_price_id, "quantity": 1}],
-        success_url=f"{base}/audits/{audit_id}?token={token}&paid=1",
-        cancel_url=f"{base}/audits/{audit_id}?token={token}",
-        metadata={"audit_id": audit_id},
-        client_reference_id=audit_id,
-    )
-    return str(session.url)
-
-
 def client_ip(
     forwarded_for: str | None, socket_host: str | None, *, trusted_proxy_hops: int
 ) -> str:
@@ -656,7 +665,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.settings = cfg
     app.state.store = db
     app.state.retention = retention
-    app.state.checkout_factory = stripe_checkout
+    app.state.checkout_factory = payments.stripe_checkout
+    app.state.session_lookup = payments.stripe_session
     upload_attempts = AttemptLog()
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
@@ -789,6 +799,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "status": "ok",
             "free_mode": cfg.free_mode,
             "stripe_enabled": cfg.stripe_enabled,
+            "card_mode": payments.card_mode(cfg),
             "access_codes": cfg.access_codes_enabled,
             "database": cfg.database_kind,
             "legal_configured": cfg.legal_configured,
@@ -1099,6 +1110,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         unlockable = not record.paid and cfg.stripe_enabled
         redeemable = not record.paid and cfg.access_codes_enabled
         publishable = record.paid or cfg.free_mode
+        pack_code, pack_left = (
+            payments.pack_for(db, cfg, record.stripe_session_id) if record.paid else ("", 0)
+        )
         base = f"/audits/{record.id}"
         query = f"?token={token}&lang={locale}"
         other = "en" if locale == "es" else "es"
@@ -1112,7 +1126,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             publish_url=f"{base}/publish{query}" if publishable else None,
             notice=notice,
             contact_url=cfg.contact_url if redeemable else None,
-            pack_price_usd=cfg.pack_price_usd if redeemable else 0.0,
+            pack_price_usd=cfg.pack_price_usd if (redeemable or unlockable) else 0.0,
+            pack_code=pack_code,
+            pack_credits_left=pack_left,
             legal_links=True,
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
@@ -1164,17 +1180,48 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/audits/{audit_id}", response_class=HTMLResponse)
     def audit_page(
-        audit_id: str, token: str | None = None, code: str | None = None, lang: str | None = None
+        audit_id: str,
+        token: str | None = None,
+        code: str | None = None,
+        lang: str | None = None,
+        session_id: str | None = None,
+        pay: str | None = None,
     ) -> str:
         record = _load(audit_id, token)
         locale = _view_locale(record, lang)
-        # Only the two known values are shown, so the query cannot inject text.
+        # Only known values are shown, so the query cannot inject text.
         notice = None
-        if code == "applied" and record.paid:
+        if session_id and cfg.stripe_enabled:
+            if not record.paid:
+                record = _confirm_card_payment(record, session_id)
+            notice = message("card_paid" if record.paid else "card_pending", locale)
+        elif pay == "cancelled" and not record.paid:
+            notice = message("card_cancelled", locale)
+        elif code == "applied" and record.paid:
             notice = message("code_applied", locale)
         elif code == "rejected" and not record.paid:
             notice = message("code_rejected", locale)
         return _report_html(record, token or "", locale, notice=notice)
+
+    def _confirm_card_payment(record: Any, session_id: str) -> Any:
+        """Back from Stripe: ask Stripe about that session and unlock what it paid.
+
+        Only a session Stripe reports as paid, for this very audit, unlocks
+        anything; a Stripe outage leaves the page locked and the webhook
+        finishes the job.
+        """
+        if not session_id.startswith(payments.SESSION_PREFIX) or len(session_id) > 255:
+            return record
+        lookup: SessionLookup = app.state.session_lookup
+        try:
+            session = lookup(cfg, session_id)
+        except Exception:  # noqa: BLE001 - any SDK or network failure: stay locked
+            logger.warning("checkout session lookup failed for audit %s", record.id)
+            return record
+        if str((session.get("metadata") or {}).get("audit_id") or "") != record.id:
+            return record
+        payments.fulfil(db, cfg, session, at=datetime.now(UTC))
+        return db.get_audit(record.id) or record
 
     def _record_locale(record: Any) -> str:
         try:
@@ -1490,14 +1537,25 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return _privacy(request, _locale(lang or "en"))
 
     @app.post("/audits/{audit_id}/checkout")
-    def checkout(audit_id: str, token: str | None = None) -> Response:
+    def checkout(
+        audit_id: str,
+        token: str | None = None,
+        lang: str | None = None,
+        plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
+    ) -> Response:
         record = _load(audit_id, token)
         if not cfg.stripe_enabled:
             raise HTTPException(status_code=503, detail="payments_disabled")
+        locale = _view_locale(record, lang)
         if record.paid:
-            return RedirectResponse(f"/audits/{audit_id}?token={token}", status_code=303)
+            return RedirectResponse(
+                f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
+            )
+        # The pack is sold only while it is on sale; anything else is one audit.
+        if plan != payments.PLAN_PACK or not cfg.pack_price_usd:
+            plan = payments.PLAN_SINGLE
         factory: CheckoutFactory = app.state.checkout_factory
-        url = factory(cfg, audit_id, token or "")
+        url = factory(cfg, audit_id, token or "", plan=plan, locale=locale)
         return RedirectResponse(url, status_code=303)
 
     @app.post("/webhooks/stripe")
@@ -1512,16 +1570,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             event = json.loads(payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="invalid payload") from exc
-        if event.get("type") == "checkout.session.completed":
+        if event.get("type") in PAID_EVENTS:
             session = event.get("data", {}).get("object", {})
-            audit_id = str((session.get("metadata") or {}).get("audit_id") or "")
-            if audit_id:
-                await run_in_threadpool(
-                    db.mark_paid,
-                    audit_id,
-                    stripe_session_id=str(session.get("id", "")),
-                    at=datetime.now(UTC),
-                )
+            if isinstance(session, dict):
+                await run_in_threadpool(payments.fulfil, db, cfg, session, at=datetime.now(UTC))
         return JSONResponse({"received": True})
 
     return app

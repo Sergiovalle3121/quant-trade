@@ -429,6 +429,65 @@ class Store:
         )
         return code, record
 
+    def ensure_access_code(self, code: str, *, credits: int, note: str, at: datetime) -> bool:
+        """Store the hash of a code made elsewhere (a card-paid pack) once.
+
+        ``True`` when it was added, ``False`` when it already existed.
+        """
+        if credits < 1:
+            raise ValueError("credits must be at least 1")
+        digest = hash_access_code(code)
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                exists = conn.execute(
+                    sa.select(self.access_codes.c.id).where(
+                        self.access_codes.c.code_sha256 == digest
+                    )
+                ).first()
+                if exists is not None:
+                    return False
+                conn.execute(
+                    self.access_codes.insert().values(
+                        id=secrets.token_hex(6),
+                        code_sha256=digest,
+                        credits_total=credits,
+                        credits_used=0,
+                        note=note,
+                        created_at=_iso(at),
+                        expires_at=None,
+                        disabled=False,
+                    )
+                )
+                return True
+        except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same insert
+            return False
+
+    def get_access_code(self, code: str) -> AccessCodeRecord | None:
+        """The record for ``code`` (looked up by hash), or ``None``."""
+        if not normalise_access_code(code):
+            return None
+        table = self.access_codes
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    self._sa.select(table).where(table.c.code_sha256 == hash_access_code(code))
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        return AccessCodeRecord(
+            id=row["id"],
+            note=row["note"],
+            credits_total=int(row["credits_total"]),
+            credits_used=int(row["credits_used"]),
+            created_at=row["created_at"],
+            expires_at=row["expires_at"],
+            disabled=bool(row["disabled"]),
+        )
+
     def list_access_codes(self) -> list[AccessCodeRecord]:
         with self.engine.connect() as conn:
             rows = (

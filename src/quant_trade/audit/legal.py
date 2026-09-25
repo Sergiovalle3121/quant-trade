@@ -135,11 +135,19 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
             "que acordemos) y recibir un código de acceso. Cada crédito del código desbloquea "
             "una auditoría. El código se entrega una sola vez: guárdalo."
         )
-        if ctx.pack_price_usd:
-            lines.append(
-                f"También vendemos códigos de {PACK_CREDITS} créditos por "
-                f"USD {ctx.pack_price_usd:.2f}; cada crédito desbloquea una auditoría."
-            )
+    if ctx.pack_price_usd and ctx.card_payments:
+        lines.append(
+            f"El paquete de {PACK_CREDITS} informes cuesta USD {ctx.pack_price_usd:.2f}. Si lo "
+            "pagas con tarjeta desde un informe, ese informe queda desbloqueado y recibes un "
+            f"código con {PACK_CREDITS - 1} créditos para los siguientes; el código aparece en "
+            "ese informe cada vez que lo abres."
+        )
+    elif ctx.pack_price_usd and ctx.access_codes:
+        lines.append(
+            f"También vendemos códigos de {PACK_CREDITS} créditos por "
+            f"USD {ctx.pack_price_usd:.2f}; cada crédito desbloquea una auditoría."
+        )
+    if ctx.card_payments or ctx.access_codes:
         lines.append(
             "Si el informe completo lee mal tu archivo (operaciones, saldo o fechas que no "
             "coinciden con lo que muestra tu plataforma) y no podemos corregirlo, escríbenos con "
@@ -173,11 +181,19 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
             "we agree on) and receive an access code. Each credit on the code unlocks one "
             "audit. The code is handed over once: keep it."
         )
-        if ctx.pack_price_usd:
-            lines.append(
-                f"We also sell codes with {PACK_CREDITS} credits for USD {ctx.pack_price_usd:.2f}; "
-                "each credit unlocks one audit."
-            )
+    if ctx.pack_price_usd and ctx.card_payments:
+        lines.append(
+            f"The pack of {PACK_CREDITS} reports costs USD {ctx.pack_price_usd:.2f}. If you pay "
+            "for it by card from a report, that report is unlocked and you get a code with "
+            f"{PACK_CREDITS - 1} credits for the next ones; the code shows on that report every "
+            "time you open it."
+        )
+    elif ctx.pack_price_usd and ctx.access_codes:
+        lines.append(
+            f"We also sell codes with {PACK_CREDITS} credits for USD {ctx.pack_price_usd:.2f}; "
+            "each credit unlocks one audit."
+        )
+    if ctx.card_payments or ctx.access_codes:
         lines.append(
             "If the full report misreads your file (trades, balance or dates that do not match "
             "what your platform shows) and we cannot fix it, write to us with the report's "
