@@ -73,7 +73,7 @@ def _all_guide_texts() -> list[str]:
     return texts
 
 
-def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
+def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
     slugs = {guide.slug for guide in GUIDES}
     assert slugs == {
         "mt5",
@@ -91,7 +91,7 @@ def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
         "csv-universal",
     }
     for guide in GUIDES:
-        assert set(guide.text) == {"es", "en"}
+        assert set(guide.text) == {"es", "en", "pt"}
         assert guide.field in {"report", "optimization"}
         for text in guide.text.values():
             assert text.steps and text.tips
@@ -169,7 +169,7 @@ def test_public_pages_have_title_description_canonical_and_open_graph(tmp_path: 
             assert _meta(text, "og:url") == BASE + path, path
             assert _meta(text, "og:title"), path
             assert _meta(text, "og:description") == description, path
-            assert _meta(text, "og:locale") == {"es": "es_ES", "en": "en_US"}[locale]
+            assert _meta(text, "og:locale") == {"es": "es_ES", "en": "en_US", "pt": "pt_BR"}[locale]
             assert "hreflang='x-default'" in text, path
             assert find_claims(text) == [], path
 
@@ -194,7 +194,7 @@ def test_robots_txt_blocks_private_paths_and_points_to_the_sitemap(tmp_path: Pat
     assert "Disallow: /v/" not in lines  # link previews must reach /v pages
 
 
-def test_sitemap_lists_only_the_public_pages_in_both_languages(tmp_path: Path) -> None:
+def test_sitemap_lists_only_the_public_pages_in_each_language(tmp_path: Path) -> None:
     client = _client(tmp_path)
     audit_id, token = _upload(client)
     client.post(f"/audits/{audit_id}/publish?token={token}")
@@ -203,7 +203,9 @@ def test_sitemap_lists_only_the_public_pages_in_both_languages(tmp_path: Path) -
     assert response.headers["content-type"].startswith("application/xml")
     root = ElementTree.fromstring(response.content)
     locs = [loc.text for loc in root.findall("s:url/s:loc", SITEMAP_NS)]
-    expected = [BASE + pair[lang] for pair in PUBLIC_PAGES for lang in ("es", "en")]
+    expected = [
+        BASE + pair[lang] for pair in PUBLIC_PAGES for lang in ("es", "en", "pt") if lang in pair
+    ]
     assert locs == expected
     assert len(locs) == len(set(locs))
     for required in ("/", "/en", "/ejemplo", "/sample", "/guias", "/guides", "/terminos"):
@@ -297,7 +299,11 @@ def test_provider_guide_has_an_english_path_and_the_old_one_redirects(tmp_path: 
 
     assert guide_url("cuenta-proveedor", "es") == "/guias/cuenta-proveedor"
     assert guide_url("cuenta-proveedor", "en") == "/guides/provider-account"
-    assert {"es": "/guias/cuenta-proveedor", "en": "/guides/provider-account"} in PUBLIC_PAGES
+    assert {
+        "es": "/guias/cuenta-proveedor",
+        "en": "/guides/provider-account",
+        "pt": "/pt/guias/conta-de-fornecedor",
+    } in PUBLIC_PAGES
     client = _client(tmp_path)
     english = client.get("/guides/provider-account")
     assert english.status_code == 200

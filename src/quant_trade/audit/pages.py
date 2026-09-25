@@ -21,6 +21,7 @@ from quant_trade.audit.audiences import (
     AUDIENCE_PAGES,
     PLATFORMS_EN,
     PLATFORMS_ES,
+    PLATFORMS_PT,
     Audience,
     audience_url,
 )
@@ -35,6 +36,20 @@ from quant_trade.audit.guides import (
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import REFERENCES, dimension_rows, method_url
+from quant_trade.audit.portuguese import (
+    AUDIENCES_PT,
+    CLASS_B_PT,
+    COPY_PT,
+    DIMENSION_TITLES_PT,
+    DISCLAIMER_PT,
+    INVESTOR_PT,
+    LANGUAGE_NAMES,
+    METHOD_LINK_PT,
+    MONTHS_PT,
+    STATUS_TEXT_PT,
+    UI_PT,
+    link_locale,
+)
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.report import (
@@ -1056,6 +1071,10 @@ _UI: dict[str, dict[str, Any]] = {
     },
 }
 
+# Portuguese: the landing and its shell (``portuguese``); other pages link to English.
+_COPY["pt"] = COPY_PT
+_UI["pt"] = UI_PT
+
 #: Platforms the importers read, for the landing's scrolling strip.
 PLATFORMS: tuple[str, ...] = (
     "MetaTrader 5",
@@ -1100,11 +1119,59 @@ def _locale(locale: str) -> str:
 
 
 def _home(locale: str) -> str:
-    return "/en" if locale == "en" else "/"
+    return {"en": "/en", "pt": "/pt"}.get(locale, "/")
 
 
 def _other_name(locale: str) -> str:
     return "English" if locale == "es" else "Español"
+
+
+def _dimension_titles(locale: str) -> dict[str, str]:
+    return DIMENSION_TITLES_PT if locale == "pt" else DIMENSION_TITLES[locale]
+
+
+def _class_text(overall: str, locale: str) -> str:
+    return CLASS_B_PT if locale == "pt" and overall == "B" else class_text(overall, locale)
+
+
+def _disclaimer(locale: str) -> str:
+    return DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale]
+
+
+def _method_title(locale: str) -> str:
+    return METHOD_LINK_PT if locale == "pt" else str(METHOD_COPY[locale]["title"])
+
+
+def _sample_url(locale: str) -> str:
+    """The sample report, in English from a Portuguese page."""
+    return "/ejemplo?lang=es" if locale == "es" else "/sample?lang=en"
+
+
+def _switch_links(
+    locale: str, switch_href: str, alternates: dict[str, str] | None, *, menu: bool = False
+) -> str:
+    """The language links: every other language the page exists in.
+
+    ``alternates`` maps each language to this page's address in it; without
+    it, ``switch_href`` is the one other language (Spanish or English). With
+    two others the bar shows short codes (EN, PT) and the phone menu the names.
+    """
+    if alternates:
+        others = [(lang, href) for lang, href in alternates.items() if lang != locale]
+    elif switch_href:
+        others = [("en" if locale == "es" else "es", switch_href)]
+    else:
+        others = []
+    cls = "" if menu else " class='lang'"
+    return "".join(
+        f"<a{cls} href='{_e(href)}' hreflang='{lang}' lang='{lang}'"
+        + (
+            f" title='{_e(LANGUAGE_NAMES[lang])}'>{lang.upper()}</a>"
+            if len(others) > 1 and not menu
+            else f">{_e(LANGUAGE_NAMES[lang])}</a>"
+        )
+        for lang, href in others
+    )
 
 
 def _preset_options(locale: str) -> str:
@@ -1121,35 +1188,32 @@ def _compare_url(locale: str) -> str:
     return "/comparar" if locale == "es" else "/compare"
 
 
-def _nav(locale: str, switch_href: str, *, solid: bool = False) -> str:
+def _nav(
+    locale: str,
+    switch_href: str,
+    *,
+    solid: bool = False,
+    alternates: dict[str, str] | None = None,
+) -> str:
     ui = _UI[locale]
     home = _home(locale)
-    sample = "/ejemplo" if locale == "es" else "/sample"
-    account = "/account" if locale == "en" else "/cuenta"
+    linked = link_locale(locale)
+    account = "/account" if linked == "en" else "/cuenta"
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
-        f"<a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a>"
+        f"<a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a>"
         f"<a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a>"
         f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
-        f"<a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a>"
+        f"<a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a>"
         f"<a href='{home}#faq'>{_e(ui['nav_faq'])}</a>"
     )
-    other = "en" if locale == "es" else "es"
-    switch = (
-        f"<a class='lang' href='{_e(switch_href)}' hreflang='{other}'>{_other_name(locale)}</a>"
-        if switch_href
-        else ""
-    )
+    switch = _switch_links(locale, switch_href, alternates)
     # Phones: the same links in a menu that opens without script (<details>).
     menu = (
         f"<details class='menu'><summary aria-label='{_e(ui['nav_menu'])}'>"
         "<span class='burger' aria-hidden='true'><i></i><i></i><i></i></span></summary>"
         f"<nav class='menu-panel' aria-label='{_e(ui['nav_menu'])}'>{links}"
-        + (
-            f"<a href='{_e(switch_href)}' hreflang='{other}'>{_other_name(locale)}</a>"
-            if switch_href
-            else ""
-        )
+        + _switch_links(locale, switch_href, alternates, menu=True)
         + f"<a href='{account}'>{_e(ui['nav_account'])}</a>"
         + f"<a class='btn btn-primary' href='{home}#subir'>{_e(ui['cta'])}</a></nav></details>"
     )
@@ -1183,13 +1247,17 @@ def _page(
     meta_html: str = "",
     switch_href: str = "",
     solid_nav: bool = False,
+    alternates: dict[str, str] | None = None,
 ) -> str:
-    """A whole page: head, navigation, ``body`` (the ``main`` content) and footer."""
+    """A whole page: head, navigation, ``body`` (the ``main`` content) and footer.
+
+    ``alternates`` (language to address) lists every language the page exists
+    in; without it the switch offers ``switch_href`` only."""
     ui = _UI[locale]
     return (
         _head(title, locale, meta_html)
         + f"<body><a class='skip' href='#main'>{_e(ui['skip'])}</a>"
-        + _nav(locale, switch_href, solid=solid_nav)
+        + _nav(locale, switch_href, solid=solid_nav, alternates=alternates)
         + f"<main id='main'>{body}</main>"
         + _footer(locale)
         + "</body></html>"
@@ -1228,20 +1296,21 @@ def _footer(locale: str) -> str:
     copy = _COPY[locale]
     ui = _UI[locale]
     home = _home(locale)
-    sample = "/ejemplo" if locale == "es" else "/sample"
+    linked = link_locale(locale)
+    sample = "/ejemplo" if linked == "es" else "/sample"
     product = (
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
-        f"<li><a href='{sample}?lang={locale}'>{_e(ui['nav_sample'])}</a></li>"
+        f"<li><a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
-        f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
-        f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
-        f"<li><a href='{_e(method_url(locale))}'>{_e(METHOD_COPY[locale]['title'])}</a></li>"
+        f"<li><a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a></li>"
+        f"<li><a href='{_check_url(linked)}'>{_e(ui['footer_check'])}</a></li>"
+        f"<li><a href='{_e(method_url(linked))}'>{_e(_method_title(locale))}</a></li>"
     )
     legal = (
-        f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
-        f"<li><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></li>"
+        f"<li><a href='{_e(legal_url('terms', linked))}'>{_e(copy['terms_link'])}</a></li>"
+        f"<li><a href='{_e(legal_url('privacy', linked))}'>{_e(copy['privacy_link'])}</a></li>"
     )
     return (
         "<footer class='foot'><div class='wrap'><div class='foot-grid'>"
@@ -1249,7 +1318,7 @@ def _footer(locale: str) -> str:
         f"</div><div><h4>{_e(ui['footer_product'])}</h4><ul>{product}</ul></div>"
         f"<div><h4>{_e(ui['footer_legal'])}</h4><ul>{legal}</ul></div></div>"
         f"<div class='disclaimer'><strong>{_e(copy['disclaimer'])}.</strong> "
-        f"{_e(DISCLAIMER[locale])}</div></div></footer>"
+        f"{_e(_disclaimer(locale))}</div></div></footer>"
     )
 
 
@@ -1290,7 +1359,7 @@ _SPARK_SPLIT = 316
 def _mock(locale: str) -> str:
     """The landing's illustration of a report, built from synthetic values."""
     ui = _UI[locale]
-    titles = DIMENSION_TITLES[locale]
+    titles = _dimension_titles(locale)
     rows = "".join(
         f"<li style='--i:{i}'><span>{_e(titles[name].split(' (')[0])}</span>"
         f"{_status_chip(status, locale)}</li>"
@@ -1312,7 +1381,7 @@ def _mock(locale: str) -> str:
         "<div class='mock-body'><div class='mock-col'><div class='mock-head'>"
         + class_ring("B")
         + f"<div><div class='mock-k'>{_e(ui['mock_k'])}</div>"
-        f"<div class='mock-t'>{_e(class_text('B', locale))}</div></div></div>"
+        f"<div class='mock-t'>{_e(_class_text('B', locale))}</div></div></div>"
         f"<ul class='mock-dims'>{rows}</ul></div>"
         "<div class='mock-col'>"
         "<svg class='spark' viewBox='0 0 440 140' aria-hidden='true'><defs>"
@@ -1334,7 +1403,7 @@ def _mock(locale: str) -> str:
 
 
 def _status_chip(status: str, locale: str) -> str:
-    text = STATUS_TEXT[locale].get(status, status)
+    text = (STATUS_TEXT_PT if locale == "pt" else STATUS_TEXT[locale]).get(status, status)
     return f"<span class='badge {_e(status)}'>{_e(text)}</span>"
 
 
@@ -1370,7 +1439,7 @@ def _specs(locale: str) -> str:
         for i, (value, label) in enumerate(ui["stats"])
     )
     platforms = "".join(f"<li>{_e(name)}</li>" for name in PLATFORMS)
-    recognised = PLATFORMS_ES if locale == "es" else PLATFORMS_EN
+    recognised = {"es": PLATFORMS_ES, "pt": PLATFORMS_PT}.get(locale, PLATFORMS_EN)
     also = (
         f"<p class='platforms-also'>{_e(ui['platforms_also'])} "
         f"<a href='{_e(guide_url('csv-universal', locale))}'>{_e(recognised)}</a>.</p>"
@@ -1506,6 +1575,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
     },
 }
 
+AUDIENCES["pt"] = AUDIENCES_PT
+
 
 def _audiences(locale: str) -> str:
     words = AUDIENCES[locale]
@@ -1549,7 +1620,7 @@ def _problems(locale: str) -> str:
 
 def _dimensions(locale: str, copy: dict[str, Any]) -> str:
     ui = _UI[locale]
-    titles = DIMENSION_TITLES[locale]
+    titles = _dimension_titles(locale)
     cards = "".join(
         f"<div class='card spot' data-reveal style='--i:{i % 3}'>"
         f"<div class='icon'>{icon(_DIMENSION_ICONS[name])}</div>"
@@ -1630,6 +1701,8 @@ INVESTOR_COPY: dict[str, dict[str, Any]] = {
     },
 }
 
+INVESTOR_COPY["pt"] = INVESTOR_PT
+
 
 def _investor_card(locale: str) -> str:
     words = INVESTOR_COPY[locale]
@@ -1655,8 +1728,8 @@ def _how_html(copy: dict[str, Any], locale: str) -> str:
         + f"<ol class='steps'>{steps}</ol>"
         + f"<div class='section-tight' data-reveal style='padding-bottom:0'><p class='muted'>"
         f"{_e(copy['guides_text'])} "
-        f"<a href='{_e(guides_index_url(locale))}'>{_e(copy['guides_link'])}</a></p></div>"
-        + "</div></section>"
+        f"<a href='{_e(guides_index_url(locale))}'>{_e(copy['guides_link'])}</a>"
+        "</p></div>" + "</div></section>"
     )
 
 
@@ -1732,10 +1805,10 @@ def _prices_html(
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
             + f"<p class='muted account-note' data-reveal>{_e(copy['account_note'])} "
-            f"<a href='{'/signup' if locale == 'en' else '/registro'}'>"
+            f"<a href='{'/registro' if locale == 'es' else '/signup'}'>"
             f"{_e(copy['account_link'])}</a></p>"
-            + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
-            f"{_e(METHOD_COPY[locale]['title'])}{icon('arrow')}</a></p>"
+            + f"<p class='method-link' data-reveal><a href='{_e(method_url(link_locale(locale)))}'>"
+            f"{_e(_method_title(locale))}{icon('arrow')}</a></p>"
         )
     return (
         f"<section class='section dark' id='pricing'><div class='wrap'>{head}{body}</div></section>"
@@ -1795,7 +1868,7 @@ def _field(label: str, control: str, help_text: str = "") -> str:
 
 def _signin_first(copy: dict[str, Any], locale: str) -> str:
     """Before the file: the upload needs an account (or a bought code)."""
-    signup, signin = ("/signup", "/login") if locale == "en" else ("/registro", "/entrar")
+    signup, signin = ("/registro", "/entrar") if locale == "es" else ("/signup", "/login")
     return (
         f"<div class='signin-first'><p>{_e(copy['signin_first'])}</p>"
         "<div class='inline-form'>"
@@ -1818,8 +1891,10 @@ def _upload_form(
     signin_first: bool = False,
 ) -> str:
     ui = _UI[locale]
+    linked = link_locale(locale)
+    # The report exists in Spanish and English; a Portuguese page asks for English.
     selected = {"es": "", "en": ""}
-    selected[locale] = " selected"
+    selected[linked] = " selected"
     code_field = ""
     if access_codes:
         code_field = _field(
@@ -1943,7 +2018,7 @@ def _upload_form(
         + "</div>"
         + _field(
             copy["challenge"],
-            f"<select name='challenge'>{_preset_options(locale)}</select>",
+            f"<select name='challenge'>{_preset_options(linked)}</select>",
             copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
         )
         + "</div></details>"
@@ -1952,6 +2027,7 @@ def _upload_form(
             copy["locale"],
             f"<select name='locale'><option value='es'{selected['es']}>Español</option>"
             f"<option value='en'{selected['en']}>English</option></select>",
+            copy.get("locale_note", ""),
         )
         + code_field
         + "</div>"
@@ -1959,8 +2035,8 @@ def _upload_form(
         + "<label class='check'><input type='checkbox' name='consent' value='on' required>"
         f"<span>{_e(copy['consent'].format(retention=retention_days))} "
         f"{_e(copy['consent_read'])} "
-        f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a> · "
-        f"<a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></span>"
+        f"<a href='{_e(legal_url('terms', linked))}'>{_e(copy['terms_link'])}</a> · "
+        f"<a href='{_e(legal_url('privacy', linked))}'>{_e(copy['privacy_link'])}</a></span>"
         "</label>" + "<div class='submit-row'><button class='btn btn-primary btn-lg btn-block' "
         f"type='submit'>{_e(copy['submit'])}<span class='go'>{icon('arrow')}</span></button></div>"
         + "</form></div></div>"
@@ -2005,6 +2081,10 @@ def _final_cta(copy: dict[str, Any], locale: str, sample: str, *, joined: bool) 
     )
 
 
+#: The landing in each language, for its language switch.
+LANDING_PATHS: dict[str, str] = {"es": "/", "en": "/en", "pt": "/pt"}
+
+
 def landing(
     *,
     locale: str = "es",
@@ -2024,12 +2104,9 @@ def landing(
     """``signed_in=False`` says, above the file fields, that an upload needs an account."""
     locale = _locale(locale)
     copy = _COPY[locale]
-    other = "en" if locale == "es" else "es"
-    meta = _public_meta(
-        copy["title"], copy["meta_description"], locale, "/" if locale == "es" else "/en", base_url
-    )
+    meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
-    sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
+    sample = _sample_url(link_locale(locale))
     flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
     body = (
@@ -2065,7 +2142,7 @@ def landing(
         + _faq_html(copy, locale, retention_days=retention_days)
         + _final_cta(copy, locale, sample, joined=joined)
     )
-    return _page(copy["title"], locale, body, meta_html=meta, switch_href=f"/?lang={other}")
+    return _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
 
 
 def _evidence_value(item: Any) -> str:
@@ -2101,6 +2178,7 @@ def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, do
 _MONTHS = {
     "es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"),
     "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+    "pt": MONTHS_PT,
 }
 
 
@@ -2111,7 +2189,7 @@ def _plain_date(stamp: str, locale: str) -> str:
     except ValueError:
         return stamp
     month = _MONTHS[locale][when.month - 1]
-    if locale == "es":
+    if locale in ("es", "pt"):
         return f"{when.day} {month} {when.year}"
     return f"{month} {when.day}, {when.year}"
 
@@ -2297,7 +2375,7 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
     )
 
 
-_TOC_LABEL = {"es": "En esta página", "en": "On this page"}
+_TOC_LABEL = {"es": "En esta página", "en": "On this page", "pt": "Nesta página"}
 
 
 def _doc(sections: list[tuple[str, str]], locale: str, *, lead: str = "", aside: str = "") -> str:
@@ -2527,7 +2605,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
             ],
             locale,
-            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
             f"{_e(GUIDES_COPY[locale]['form'])}<span class='go'>{icon('arrow')}</span></a>",
         )
         + "</div></div>"
@@ -2549,7 +2627,29 @@ _GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
         ("Backtests", "Strategy tester reports and trade lists."),
         ("Live accounts", "An account's history, yours or that of someone you plan to copy."),
     ),
+    "pt": (
+        ("Backtests", "Relatórios do testador de estratégias e listas de operações."),
+        (
+            "Contas reais",
+            "O histórico de uma conta, a sua ou a de alguém que você pretende copiar.",
+        ),
+    ),
 }
+
+
+def _form_url(locale: str) -> str:
+    """The landing's upload form in ``locale``."""
+    return "/pt#subir" if locale == "pt" else f"/?lang={locale}#subir"
+
+
+def _language_crumbs(alternates: dict[str, str], locale: str) -> str:
+    """Breadcrumb links to the page in every other language."""
+    return "".join(
+        f"<span>/</span><a href='{_e(href)}' hreflang='{lang}' lang='{lang}'>"
+        f"{_e(LANGUAGE_NAMES[lang])}</a>"
+        for lang, href in alternates.items()
+        if lang != locale
+    )
 
 
 def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
@@ -2558,7 +2658,7 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     copy = _COPY[locale]
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
-    other = "en" if locale == "es" else "es"
+    alternates = {lang: guides_index_url(lang) for lang in ("es", "en", "pt")}
     meta = _public_meta(
         f"{words['title']} · {copy['title']}",
         words["summary"],
@@ -2582,15 +2682,14 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
             f"<section class='guide-group'><h2>{_e(title)}</h2><p>{_e(lead)}</p>"
             f"<ul class='guide-list guides'>{items}</ul></section>"
         )
-    crumbs = (
-        f"<a href='/?lang={_e(locale)}'>{_e(words['back'])}</a><span>/</span>"
-        f"<a href='{_e(guides_index_url(other))}' hreflang='{other}'>{_other_name(locale)}</a>"
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['back'])}</a>" + _language_crumbs(
+        alternates, locale
     )
     body = (
         _page_hero(ui["guides_eyebrow"], words["title"], words["intro"], crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
         f"{groups}<div class='back-row'>"
-        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(words['form'])}"
+        f"<a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['form'])}"
         f"<span class='go'>{icon('arrow')}</span></a></div></div></div>"
     )
     return _page(
@@ -2598,7 +2697,7 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
         locale,
         body,
         meta_html=meta,
-        switch_href=guides_index_url(other),
+        alternates=alternates,
         solid_nav=True,
     )
 
@@ -2610,15 +2709,13 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
     text = guide.text[locale]
-    other = "en" if locale == "es" else "es"
+    alternates = {lang: guide_url(guide.slug, lang) for lang in ("es", "en", "pt")}
     title = f"{text.title} · {copy['title']}"
     meta = _public_meta(title, text.summary, locale, guide_url(guide.slug, locale), base_url)
     steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
-    crumbs = (
-        f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a><span>/</span>"
-        f"<a href='{_e(guide_url(guide.slug, other))}' hreflang='{other}'>"
-        f"{_other_name(locale)}</a>"
+    crumbs = f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a>" + (
+        _language_crumbs(alternates, locale)
     )
     body = (
         _page_hero(ui["guides_eyebrow"], text.title, text.summary, crumbs)
@@ -2631,10 +2728,10 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
                 (words["tips"], f"<ul class='checks'>{tips}</ul>"),
             ],
             locale,
-            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
             f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a>",
         )
-        + f"<div class='back-row'><a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>"
+        + f"<div class='back-row'><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
         f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a></div></div></div>"
     )
     return _page(
@@ -2642,7 +2739,7 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
         locale,
         body,
         meta_html=meta,
-        switch_href=guide_url(guide.slug, other),
+        alternates=alternates,
         solid_nav=True,
     )
 
@@ -2661,10 +2758,10 @@ def audience_page(
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
     text = audience.text[locale]
-    other = "en" if locale == "es" else "es"
+    linked = link_locale(locale)
     title = f"{text.title} · {BRAND}"
     meta = _public_meta(title, text.summary, locale, audience_url(audience.slug, locale), base_url)
-    sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
+    sample = _sample_url(linked)
     pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
     uploads = "".join(
         f"<li>{icon('file')}<span>{_e(item)}"
@@ -2694,7 +2791,10 @@ def audience_page(
         if page.slug != audience.slug
     )
     # Robot buyers land on the form with the live-account box already open.
-    start = f"/?lang={locale}" + ("&extras=1" if audience.open_extras else "") + "#subir"
+    if locale == "pt":
+        start = "/pt" + ("?extras=1" if audience.open_extras else "") + "#subir"
+    else:
+        start = f"/?lang={locale}" + ("&extras=1" if audience.open_extras else "") + "#subir"
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(words['start'])}"
@@ -2702,10 +2802,9 @@ def audience_page(
         f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
         "</div>"
     )
-    crumbs = (
-        f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a><span>/</span>"
-        f"<a href='{_e(audience_url(audience.slug, other))}' hreflang='{other}'>"
-        f"{_other_name(locale)}</a>"
+    alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
+        alternates, locale
     )
     body = (
         _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
@@ -2732,7 +2831,7 @@ def audience_page(
         locale,
         body,
         meta_html=meta,
-        switch_href=audience_url(audience.slug, other),
+        alternates=alternates,
         solid_nav=True,
     )
 

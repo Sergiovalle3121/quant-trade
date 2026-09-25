@@ -407,6 +407,16 @@ class Store:
             sa.Column("reservation", sa.String(64), nullable=False, index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
+        #: Failed sign-ins, sign-ups and panel keys in the last hour, so a
+        #: deploy does not reset the limits. Keys are hashed (they hold an
+        #: address or an e-mail) and rows older than the window are deleted.
+        self.attempts = sa.Table(
+            "attempts",
+            self.metadata,
+            sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+            sa.Column("key_sha256", sa.String(64), nullable=False, index=True),
+            sa.Column("at", sa.String(40), nullable=False, index=True),
+        )
         self.metadata.create_all(self.engine)
 
     # -- column maps -------------------------------------------------------
@@ -1403,6 +1413,39 @@ class Store:
                 )
         except sa.exc.IntegrityError:
             return
+
+    # -- rate limits that survive a deploy ----------------------------------
+    def attempt_hit(self, key: str, now: datetime, *, since: datetime) -> int:
+        """Record an attempt for ``key``; return how many came before it since ``since``."""
+        sa = self._sa
+        table = self.attempts
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        with self.engine.begin() as conn:
+            conn.execute(table.delete().where(table.c.at < _iso(since)))
+            before = int(
+                conn.execute(
+                    sa.select(sa.func.count())
+                    .select_from(table)
+                    .where((table.c.key_sha256 == digest) & (table.c.at >= _iso(since)))
+                ).scalar()
+                or 0
+            )
+            conn.execute(table.insert().values(key_sha256=digest, at=_iso(now)))
+        return before
+
+    def attempt_count(self, key: str, *, since: datetime) -> int:
+        sa = self._sa
+        table = self.attempts
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        with self.engine.connect() as conn:
+            return int(
+                conn.execute(
+                    sa.select(sa.func.count())
+                    .select_from(table)
+                    .where((table.c.key_sha256 == digest) & (table.c.at >= _iso(since)))
+                ).scalar()
+                or 0
+            )
 
     # -- free-tier claims --------------------------------------------------
     def claim_free(

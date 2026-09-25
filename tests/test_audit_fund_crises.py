@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant_trade.audit.crises import WINDOWS, crisis_review, curve_months
+from quant_trade.audit.crises import MARKET, MARKET_AS_OF, WINDOWS, crisis_review, curve_months
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
@@ -145,6 +145,11 @@ def test_a_daily_backtest_shows_the_crises_it_covers(locale: str) -> None:
     assert LABELS[locale]["crises_subject"] in html
     assert LABELS[locale]["fund_stress_gfc"] in html
     assert untranslated(result.model_dump(mode="json")) == []
+    # The market beside each window: Nasdaq for 2008, with its source and date.
+    assert LABELS[locale]["crises_market"] in html
+    assert "Nasdaq Composite</small> -51.8%" in html
+    assert "fred.stlouisfed.org/series/NASDAQCOM" in html and MARKET_AS_OF in html
+    assert "SP500" not in html  # no S&P figure before FRED's series starts
 
 
 def test_a_curve_that_covers_no_crisis_shows_no_section() -> None:
@@ -243,3 +248,25 @@ def test_a_window_with_no_closed_trades_says_so(locale: str = "es") -> None:
     assert gfc.get("no_trades") is True and "no_trades" not in euro
     html = _crises_html(review, LABELS[locale])
     assert LABELS[locale]["crises_no_trades"] in html
+
+
+def test_every_window_has_a_sourced_market_move() -> None:
+    assert set(MARKET) == {window.key for window in WINDOWS}
+    for moves in MARKET.values():
+        assert moves
+        for move in moves:
+            assert move.source_url.startswith("https://fred.stlouisfed.org/series/")
+            assert -1.0 < move.change < 0.0
+    # Never part of the result: the figures are context, not measured from a file.
+    values = np.random.default_rng(2).normal(0.006, 0.03, 180)
+    result = run_audit(
+        build_inputs(_grid(values, 2010), DeclaredMetadata(locale="es")), bootstrap_samples=200
+    )
+    assert "Nasdaq" not in str(result.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_the_market_note_passes_the_guard_and_says_when_it_does_not_fit(locale: str) -> None:
+    text = LABELS[locale]["crises_market_note"]
+    assert find_claims(text) == [] and find_claims(LABELS[locale]["crises_market"]) == []
+    assert ("otro mercado" if locale == "es" else "another market") in text

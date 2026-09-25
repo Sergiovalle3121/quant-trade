@@ -19,7 +19,7 @@ from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 
-LOCALES: tuple[str, ...] = ("es", "en")
+LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
 #: The product name. It shows on every page, report and badge, so it must pass
 #: the profit-claim guard and never suggest verification, certification,
@@ -28,20 +28,24 @@ BRAND = "Rigor"
 TAGLINE: dict[str, str] = {
     "es": "Auditoría estadística independiente de backtests e historiales",
     "en": "Independent statistical audit of backtests and track records",
+    "pt": "Auditoria estatística independente de backtests e históricos",
 }
 SITE_NAME: dict[str, str] = {locale: f"{BRAND} · {TAGLINE[locale]}" for locale in TAGLINE}
-OG_LOCALE: dict[str, str] = {"es": "es_ES", "en": "en_US"}
+OG_LOCALE: dict[str, str] = {"es": "es_ES", "en": "en_US", "pt": "pt_BR"}
+#: The share picture per language; Portuguese uses the English one for now.
+OG_IMAGE_LOCALE: dict[str, str] = {"es": "es", "en": "en", "pt": "en"}
 
 NOINDEX = "noindex, nofollow"
 
 #: Each public page as its path per language. The sitemap lists exactly these.
+#: Spanish and English exist for every page; Portuguese only where translated.
 PUBLIC_PAGES: tuple[dict[str, str], ...] = (
-    {"es": "/", "en": "/en"},
+    {"es": "/", "en": "/en", "pt": "/pt"},
     {"es": "/ejemplo", "en": "/sample"},
-    {"es": guides_index_url("es"), "en": guides_index_url("en")},
-    *({"es": guide_url(g.slug, "es"), "en": guide_url(g.slug, "en")} for g in GUIDES),
+    {lang: guides_index_url(lang) for lang in ("es", "en", "pt")},
+    *({lang: guide_url(g.slug, lang) for lang in ("es", "en", "pt")} for g in GUIDES),
     dict(METHOD_PATH),
-    *({"es": audience_url(a.slug, "es"), "en": audience_url(a.slug, "en")} for a in AUDIENCE_PAGES),
+    *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     {"es": "/comprobar", "en": "/check"},
     {"es": "/terminos", "en": "/terms"},
     {"es": "/privacidad", "en": "/privacy"},
@@ -106,7 +110,7 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
     base = base_url.rstrip("/")
     if base:
         # Messaging apps need an absolute URL to show a picture with the link.
-        image = f"{base}/static/og-{locale}.png"
+        image = f"{base}/static/og-{OG_IMAGE_LOCALE[locale]}.png"
         tags += [
             f"<meta property='og:image' content='{_e(image)}'>",
             "<meta property='og:image:type' content='image/png'>",
@@ -141,15 +145,16 @@ def robots_txt(base_url: str) -> str:
 
 
 def sitemap_xml(base_url: str) -> str:
-    """Every public page in both languages, each with its alternates."""
+    """Every public page in each of its languages, each with its alternates."""
     base = _e(base_url.rstrip("/"))
     urls = []
     for pair in PUBLIC_PAGES:
+        langs = [lang for lang in LOCALES if lang in pair]
         alternates = "".join(
             f"<xhtml:link rel='alternate' hreflang='{lang}' href='{base}{_e(pair[lang])}'/>"
-            for lang in LOCALES
+            for lang in langs
         )
-        for lang in LOCALES:
+        for lang in langs:
             urls.append(f"<url><loc>{base}{_e(pair[lang])}</loc>{alternates}</url>")
     return (
         "<?xml version='1.0' encoding='UTF-8'?>"
@@ -162,6 +167,7 @@ __all__ = [
     "BRAND",
     "DISALLOWED_PATHS",
     "NOINDEX",
+    "OG_IMAGE_LOCALE",
     "OG_LOCALE",
     "PUBLIC_PAGES",
     "SITE_NAME",

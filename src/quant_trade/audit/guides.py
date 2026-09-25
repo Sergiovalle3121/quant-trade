@@ -1,7 +1,7 @@
 """Export guides: how to get, from each supported platform, the file the
 audit reads.
 
-One guide per platform, in Spanish and English, written from the format
+One guide per platform, in Spanish, English and Portuguese, written from the format
 research in ``docs/research/audit_iteration4/formats_*.json``. Each guide
 names the menu path or code, the file it produces, the upload field it goes
 in and the gaps the audit will report. The pages are public and indexable;
@@ -37,16 +37,23 @@ class Guide:
     slug_en: str | None = None
     #: The English platform name when it differs from ``platform``.
     platform_en: str | None = None
+    #: The Portuguese path segment and platform name, when they differ.
+    slug_pt: str | None = None
+    platform_pt: str | None = None
 
     def slug_for(self, locale: str) -> str:
+        if locale == "pt":
+            return self.slug_pt or self.slug
         return self.slug_en if locale == "en" and self.slug_en else self.slug
 
     def platform_for(self, locale: str) -> str:
+        if locale == "pt":
+            return self.platform_pt or self.platform
         return self.platform_en if locale == "en" and self.platform_en else self.platform
 
 
 #: Index and page paths per language. A guide lives at ``<index>/<slug>``.
-GUIDES_PATH: dict[str, str] = {"es": "/guias", "en": "/guides"}
+GUIDES_PATH: dict[str, str] = {"es": "/guias", "en": "/guides", "pt": "/pt/guias"}
 
 GUIDES_COPY: dict[str, dict[str, str]] = {
     "es": {
@@ -84,6 +91,24 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Go to the form",
         "back": "Back to the home page",
     },
+    "pt": {
+        "title": "Guias para exportar o seu arquivo",
+        "summary": (
+            "Como exportar do MetaTrader 5 e 4, TradingView, NinjaTrader, QuantConnect, "
+            "backtesting.py e vectorbt o arquivo que a auditoria de backtests lê, sem converter "
+            "nada."
+        ),
+        "intro": (
+            "Envie o arquivo do jeito que a sua plataforma o salva. Escolha a sua e siga os passos."
+        ),
+        "file": "Que arquivo você obtém",
+        "steps": "Passos",
+        "upload": "Onde enviar",
+        "tips": "Antes de enviar",
+        "all": "Todos os guias",
+        "form": "Ir ao formulário",
+        "back": "Voltar ao início",
+    },
 }
 
 _BALANCE_ES = (
@@ -94,6 +119,10 @@ _BALANCE_EN = (
     "This file does not say how much capital you started with: type it in 'Starting balance'. "
     "Without it the audit assumes 10,000 and says so in the report."
 )
+_BALANCE_PT = (
+    "Este arquivo não diz com quanto capital você começou: escreva-o em 'Saldo inicial'. Sem "
+    "ele a auditoria supõe 10 000 e avisa no relatório."
+)
 _FLOATING_ES = (
     "El archivo solo trae operaciones cerradas: el drawdown flotante dentro de cada operación "
     "queda como NOT_MEASURED."
@@ -102,6 +131,10 @@ _FLOATING_EN = (
     "The file only holds closed trades: the floating drawdown inside each trade is reported "
     "as NOT_MEASURED."
 )
+_FLOATING_PT = (
+    "O arquivo só traz operações fechadas: o drawdown flutuante dentro de cada operação fica "
+    "como NOT_MEASURED."
+)
 _OPT_ES = (
     "Si optimizaste parámetros, sube también el XML de optimización de MT5: el número de "
     "intentos deja de ser una declaración y pasa a ser MEASURED."
@@ -109,6 +142,11 @@ _OPT_ES = (
 _OPT_EN = (
     "If you optimised parameters, also upload the MT5 optimisation XML: the number of trials "
     "stops being a declaration and becomes MEASURED."
+)
+
+_OPT_PT = (
+    "Se você otimizou parâmetros, envie também o XML de otimização do MT5: o número de "
+    "tentativas deixa de ser uma declaração e passa a ser MEASURED."
 )
 
 GUIDES: tuple[Guide, ...] = (
@@ -175,6 +213,36 @@ GUIDES: tuple[Guide, ...] = (
                     "The tester report carries the initial deposit and each trade's commission; "
                     "the audit uses them as MEASURED.",
                     _OPT_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar o relatório do MetaTrader 5",
+                summary=(
+                    "Salve o relatório HTML do Strategy Tester ou do histórico da conta do "
+                    "MT5 e envie para a auditoria como está."
+                ),
+                file=(
+                    "Um arquivo .html: ReportTester-<login>.html (testador) ou "
+                    "ReportHistory-<login>.html (histórico da conta). O MT5 o salva em "
+                    "UTF-16; não é preciso convertê-lo."
+                ),
+                steps=(
+                    "Testador: abra o Strategy Tester (Ctrl+R) e rode o teste com a "
+                    "configuração que você quer auditar.",
+                    "Na aba Backtest, clique com o botão direito no relatório e escolha Report "
+                    "> HTML (versões antigas: 'Save as Report').",
+                    "Histórico da conta: abra a Toolbox (Ctrl+T), aba History, escolha o "
+                    "período todo e depois botão direito > Report > HTML.",
+                    "Salve o arquivo. As imagens PNG que o MT5 grava ao lado não são necessárias.",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Escolha HTML, não 'Open XML (MS Office Excel 2007)': a auditoria lê o HTML.",
+                    "Se o relatório estiver em outro idioma, envie mesmo assim: as tabelas são "
+                    "reconhecidas pela estrutura.",
+                    "O relatório do testador traz o depósito inicial e a comissão de cada "
+                    "operação; a auditoria os usa como MEASURED.",
+                    _OPT_PT,
                 ),
             ),
         },
@@ -253,7 +321,46 @@ GUIDES: tuple[Guide, ...] = (
                     "signal, the CSV history those sites export works too.",
                 ),
             ),
+            "pt": GuideText(
+                title="Como revisar a conta de alguém antes de copiar ou investir",
+                summary=(
+                    "Peça ao fornecedor do sinal, do robô ou da conta gerida o histórico "
+                    "completo da conta de MetaTrader e veja o dinheiro real por trás da "
+                    "porcentagem de ganho."
+                ),
+                file=(
+                    "O histórico da conta do MetaTrader 5 (ReportHistory-<login>.html) ou o "
+                    "extrato detalhado do MetaTrader 4 (DetailedStatement.htm), do período "
+                    "todo, com depósitos e saques incluídos."
+                ),
+                steps=(
+                    "Peça ao fornecedor o histórico completo desde o primeiro depósito, não só "
+                    "os últimos meses nem um print.",
+                    "No MetaTrader 5: Toolbox (Ctrl+T) > History > 'All history' > botão "
+                    "direito > Report > HTML.",
+                    "No MetaTrader 4: Terminal > Account History > botão direito > 'All "
+                    "History', e depois 'Save as Detailed Report'.",
+                    "Envie o arquivo e abra a seção do relatório 'The account's real money' (o "
+                    "relatório sai em inglês).",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "A porcentagem que os sites de histórico mostram tira os depósitos: o "
+                    "relatório a coloca ao lado do dinheiro que a conta ganhou ou perdeu "
+                    "operando.",
+                    "Um depósito grande logo depois de uma queda, ou posições abertas no "
+                    "prejuízo quando o histórico foi impresso, aparecem como bandeiras "
+                    "vermelhas.",
+                    "Peça que o histórico seja impresso no dia em que você o recebe: um "
+                    "impresso há meses não mostra o que aconteceu depois.",
+                    "O relatório lê o arquivo como chega; não o confere com a corretora.",
+                    "Se o fornecedor só publica a conta no Myfxbook, FX Blue ou num sinal da "
+                    "MQL5, o histórico em CSV que esses sites exportam também serve.",
+                ),
+            ),
         },
+        slug_pt="conta-de-fornecedor",
+        platform_pt="Conta de um fornecedor",
     ),
     Guide(
         slug="mt5-optimization",
@@ -321,7 +428,40 @@ GUIDES: tuple[Guide, ...] = (
                     "the report.",
                 ),
             ),
+            "pt": GuideText(
+                title="Como exportar o XML de otimização do MetaTrader 5",
+                summary=(
+                    "Exporte os resultados da otimização do MT5 em XML para que a "
+                    "auditoria conte quantas configurações você testou."
+                ),
+                file=(
+                    "Um arquivo .xml do Excel 2003: ReportOptimizer-<login>.xml, com uma "
+                    "linha por passada da otimização."
+                ),
+                steps=(
+                    "Deixe a otimização terminar no Strategy Tester.",
+                    "Abra a aba Optimization Results.",
+                    "Clique com o botão direito na tabela e escolha Export to XML (MS Office "
+                    "Excel).",
+                    "Depois rode um único teste com a configuração escolhida e exporte o "
+                    "relatório HTML dele (veja o guia do MetaTrader 5).",
+                ),
+                upload=(
+                    "No campo 'Exportação de otimização do MT5' (em 'Adicionar mais "
+                    "arquivos'), junto com o relatório HTML da configuração escolhida em "
+                    "'Relatório da sua plataforma'."
+                ),
+                tips=(
+                    "Cada linha é uma tentativa. O Sharpe deflacionado usa esse número real, "
+                    "informado como MEASURED.",
+                    "Exporte a tabela inteira sem filtrar passadas: tirar linhas esconde "
+                    "tentativas e o resultado deixa de ser comparável.",
+                    "O XML só tem um resumo por passada, sem operações: não substitui o relatório.",
+                ),
+            ),
         },
+        slug_pt="mt5-otimizacao",
+        platform_pt="MetaTrader 5 (otimização)",
     ),
     Guide(
         slug="mt4",
@@ -381,6 +521,34 @@ GUIDES: tuple[Guide, ...] = (
                     "The MT4 tester already deducts commission and swap from each profit but "
                     "does not itemise them, so the audit cannot measure them separately.",
                     _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar o relatório do MetaTrader 4",
+                summary=(
+                    "Salve o relatório do Strategy Tester do MT4 ou o extrato detalhado da "
+                    "conta e envie para a auditoria como está."
+                ),
+                file=(
+                    "Um arquivo .htm: StrategyTester.htm (testador) ou DetailedStatement.htm "
+                    "(extrato detalhado da conta)."
+                ),
+                steps=(
+                    "Testador: rode o teste no Strategy Tester.",
+                    "Na aba Results ou Report, clique com o botão direito e escolha 'Save as "
+                    "Report'.",
+                    "Extrato da conta: na janela Terminal, aba Account History, botão direito "
+                    "> All History (ou um período personalizado).",
+                    "Botão direito de novo > 'Save as Detailed Report'.",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "A imagem .gif salva ao lado não é necessária.",
+                    "Se você exportar só parte do extrato, o saldo inicial vem do resumo e é "
+                    "informado como DECLARED.",
+                    "O testador do MT4 já desconta comissão e swap de cada lucro, mas não os "
+                    "detalha, então a auditoria não pode medi-los em separado.",
+                    _FLOATING_PT,
                 ),
             ),
         },
@@ -443,6 +611,32 @@ GUIDES: tuple[Guide, ...] = (
                     _FLOATING_EN,
                 ),
             ),
+            "pt": GuideText(
+                title="Como exportar a lista de operações do TradingView",
+                summary=(
+                    "Baixe a lista de operações do Strategy Tester do TradingView em CSV "
+                    "ou o relatório completo em XLSX e envie para a auditoria."
+                ),
+                file=(
+                    "Um .csv com a lista de operações, ou um .xlsx com todas as abas do relatório."
+                ),
+                steps=(
+                    "Abra a sua estratégia no gráfico e o painel do Strategy Tester.",
+                    "Vá à aba List of trades e aperte o botão de exportar ou baixar: você "
+                    "obtém o CSV.",
+                    "Ou, no menu do relatório (nome da estratégia ou '...'), escolha Download "
+                    "data as XLSX: você obtém o relatório completo.",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Só a aba List of trades tem operações; as outras abas sozinhas não servem.",
+                    "O XLSX inclui as propriedades da estratégia (capital inicial e comissão), "
+                    "então dá mais dados MEASURED que o CSV.",
+                    "Com o CSV, escreva o seu capital inicial em 'Saldo inicial' se a "
+                    "auditoria não conseguir deduzi-lo.",
+                    _FLOATING_PT,
+                ),
+            ),
         },
     ),
     Guide(
@@ -498,6 +692,30 @@ GUIDES: tuple[Guide, ...] = (
                     _FLOATING_EN,
                 ),
             ),
+            "pt": GuideText(
+                title="Como exportar as operações do NinjaTrader 8",
+                summary=(
+                    "Exporte a grade de operações do Strategy Analyzer do NinjaTrader 8 em "
+                    "CSV e envie para a auditoria."
+                ),
+                file="Um .csv com uma linha por operação (Trade number, Instrument, Market pos.).",
+                steps=(
+                    "Abra o Strategy Analyzer e selecione o backtest.",
+                    "Na exibição, escolha Trades.",
+                    "Botão direito na grade > Export... e salve como CSV.",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Não importa se o Windows usa vírgula ou ponto como separador decimal: a "
+                    "auditoria detecta o separador.",
+                    "Para uma conta (Account Performance), a aba Trades é a melhor. A aba "
+                    "Executions dos futuros da CME (ES, NQ, CL, GC e os seus micros) também é "
+                    "lida: cada operação é valorizada com o valor do ponto do contrato.",
+                    "Um terminal em francês também serve: os nomes das colunas são lidos.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
+                ),
+            ),
         },
     ),
     Guide(
@@ -541,6 +759,25 @@ GUIDES: tuple[Guide, ...] = (
                     "Use Download Trades, not Download Orders: the audit reads closed trades.",
                     _BALANCE_EN,
                     _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar as operações do QuantConnect",
+                summary=(
+                    "Baixe o CSV de operações de um backtest do QuantConnect e envie para "
+                    "a auditoria."
+                ),
+                file="Um .csv chamado <nome do backtest>_trades.csv, com horários em UTC.",
+                steps=(
+                    "Abra a página de resultados do backtest no QuantConnect.",
+                    "Vá à aba Trades.",
+                    "Aperte Download Trades.",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Use Download Trades, não Download Orders: a auditoria lê operações fechadas.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
                 ),
             ),
         },
@@ -593,6 +830,26 @@ GUIDES: tuple[Guide, ...] = (
                     "MEASURED cost.",
                     _BALANCE_EN,
                     _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar as operações do backtesting.py",
+                summary=(
+                    "Salve a tabela de operações do backtesting.py em CSV com o pandas e "
+                    "envie para a auditoria."
+                ),
+                file="Um .csv com as colunas Size, EntryBar, ExitBar, EntryPrice, ExitPrice e PnL.",
+                steps=(
+                    "Rode o backtest: stats = Backtest(...).run()",
+                    "Salve as operações: stats._trades.to_csv('trades.csv')",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Não renomeie as colunas: é assim que o formato é reconhecido.",
+                    "Se a sua versão incluir a coluna Commission, a auditoria a usa como custo "
+                    "MEASURED.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
                 ),
             ),
         },
@@ -650,6 +907,31 @@ GUIDES: tuple[Guide, ...] = (
                     "variants matrix.",
                     _BALANCE_EN,
                     _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar as operações do vectorbt",
+                summary=(
+                    "Salve a tabela legível de operações de um Portfolio do vectorbt em "
+                    "CSV e envie para a auditoria."
+                ),
+                file=(
+                    "Um .csv com as colunas Column, Size, Avg Entry Price, Avg Exit Price, "
+                    "PnL, Direction e Status."
+                ),
+                steps=(
+                    "Monte o Portfolio: pf = vbt.Portfolio.from_signals(...)",
+                    "Salve as operações: pf.trades.records_readable.to_csv('trades.csv')",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Se o Portfolio tiver várias colunas (variantes de parâmetros), só a "
+                    "primeira é importada. Exporte a que você quer auditar, por exemplo "
+                    "pf[column].trades.records_readable.",
+                    "Para que cada variante conte, declare o número de tentativas ou envie a "
+                    "matriz de variantes.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
                 ),
             ),
         },
@@ -717,6 +999,36 @@ GUIDES: tuple[Guide, ...] = (
                     _FLOATING_EN,
                 ),
             ),
+            "pt": GuideText(
+                title="Como exportar o histórico de uma conta do Myfxbook",
+                summary=(
+                    "Baixe o histórico de uma conta do Myfxbook em CSV e envie para ver as "
+                    "operações, depósitos e saques dela sob os mesmos testes de um "
+                    "backtest."
+                ),
+                file=(
+                    "Um .csv com as colunas Open Date, Close Date, Symbol, Action, "
+                    "Units/Lots, Open Price, Close Price, Commission, Swap, Pips e Profit."
+                ),
+                steps=(
+                    "Abra a conta no Myfxbook e vá à aba do histórico de operações.",
+                    "Use a opção de exportar o histórico e escolha CSV.",
+                    "Se a conta não for sua, peça esse CSV ao titular: o Myfxbook permite que "
+                    "o titular da conta o exporte.",
+                ),
+                upload=(
+                    "Em 'Relatório da sua plataforma' para revisar a conta sozinha, ou em "
+                    "'Extrato da conta real ou demo' (em 'Adicionar mais arquivos') ao lado "
+                    "do backtest do robô."
+                ),
+                tips=(
+                    "Os depósitos e saques do arquivo são lidos como movimentos de dinheiro: o "
+                    "relatório separa o que as operações fizeram do que entrou ou saiu.",
+                    "Operações ainda abertas no final do arquivo não são contadas.",
+                    "O arquivo não informa fuso horário: os horários são lidos como estão.",
+                    _FLOATING_PT,
+                ),
+            ),
         },
     ),
     Guide(
@@ -776,7 +1088,35 @@ GUIDES: tuple[Guide, ...] = (
                     _FLOATING_EN,
                 ),
             ),
+            "pt": GuideText(
+                title="Como exportar o histórico de um sinal da MQL5",
+                summary=(
+                    "Baixe o histórico de um sinal do MQL5.com em CSV e envie para revisar "
+                    "a conta antes de copiá-la."
+                ),
+                file=(
+                    "Um .csv separado por ponto e vírgula com as colunas Time, Type, Volume, "
+                    "Symbol, Price, Time, Price, Commission, Swap e Profit."
+                ),
+                steps=(
+                    "Abra a página do sinal no mql5.com e entre com a sua conta.",
+                    "Na aba do histórico de operações, use a opção de exportar para CSV.",
+                ),
+                upload=(
+                    "Em 'Relatório da sua plataforma' para revisar o sinal sozinho, ou em "
+                    "'Extrato da conta real ou demo' (em 'Adicionar mais arquivos') ao lado "
+                    "do backtest do robô."
+                ),
+                tips=(
+                    "As linhas de saldo (depósitos, saques e ajustes) são lidas como "
+                    "movimentos de dinheiro, não como operações.",
+                    "Ordens pendentes canceladas não são contadas.",
+                    _FLOATING_PT,
+                ),
+            ),
         },
+        slug_pt="sinal-mql5",
+        platform_pt="Sinais da MQL5",
     ),
     Guide(
         slug="fxblue",
@@ -837,6 +1177,34 @@ GUIDES: tuple[Guide, ...] = (
                     _FLOATING_EN,
                 ),
             ),
+            "pt": GuideText(
+                title="Como exportar as operações de uma conta do FX Blue",
+                summary=(
+                    "Baixe as ordens de uma conta do FX Blue em CSV e envie para revisar "
+                    "as operações e os depósitos."
+                ),
+                file=(
+                    "Um .csv com as colunas Type, Ticket, Symbol, Lots, Buy/sell, Open price, "
+                    "Close price, Open time, Close time, Profit, Swap, Commission e Net "
+                    "profit."
+                ),
+                steps=(
+                    "Abra o extrato da conta no FX Blue.",
+                    "Use a opção de exportar as ordens para CSV.",
+                ),
+                upload=(
+                    "Em 'Relatório da sua plataforma' para revisar a conta sozinha, ou em "
+                    "'Extrato da conta real ou demo' (em 'Adicionar mais arquivos') ao lado "
+                    "do backtest do robô."
+                ),
+                tips=(
+                    "São lidas as linhas de posições fechadas; posições abertas e ordens "
+                    "pendentes não são contadas.",
+                    "Se o arquivo tiver várias contas, é lida a que tem mais operações "
+                    "fechadas e o relatório diz isso. Exporte uma conta por arquivo.",
+                    _FLOATING_PT,
+                ),
+            ),
         },
     ),
     Guide(
@@ -874,8 +1242,9 @@ GUIDES: tuple[Guide, ...] = (
                     "Statement), Charles Schwab (Transactions o Realized Gain/Loss), Fidelity, "
                     "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), XTB (xStation 5, "
                     "historial de posiciones cerradas), DEGIRO (Transacciones, en cualquier "
-                    "idioma), Trading 212 (historial), cTrader, Sierra Chart (Trade Activity "
-                    "Log), Binance, Kraken, Coinbase y KuCoin (historial de ejecuciones).",
+                    "idioma), Trading 212 (historial), cTrader (History), Rithmic (Completed "
+                    "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase y "
+                    "KuCoin (historial de ejecuciones).",
                     "Los costes de DEGIRO vienen en euros y se restan tal cual, también en "
                     "acciones que cotizan en otra moneda; el resultado de Trading 212 viene en "
                     "la moneda de tu cuenta y se usa como tal.",
@@ -923,8 +1292,9 @@ GUIDES: tuple[Guide, ...] = (
                     "(Account Statement), Charles Schwab (Transactions or Realized Gain/Loss), "
                     "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), XTB "
                     "(xStation 5 closed position history), DEGIRO (Transactions, in any "
-                    "language), Trading 212 (history), cTrader, Sierra Chart (Trade Activity "
-                    "Log), Binance, Kraken, Coinbase and KuCoin (filled orders history).",
+                    "language), Trading 212 (history), cTrader (History), Rithmic (Completed "
+                    "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase and "
+                    "KuCoin (filled orders history).",
                     "DEGIRO's costs come in euros and are subtracted as they are, also on "
                     "shares quoted in another currency; Trading 212's result comes in your "
                     "account currency and is used as such.",
@@ -944,14 +1314,65 @@ GUIDES: tuple[Guide, ...] = (
                     _FLOATING_EN,
                 ),
             ),
+            "pt": GuideText(
+                title="Como enviar as operações de qualquer plataforma",
+                summary=(
+                    "Interactive Brokers, DEGIRO, Trading 212, XTB, eToro, Binance, KuCoin "
+                    "ou qualquer outra corretora, exchange ou diário de trading: exporte o "
+                    "histórico de operações em CSV ou Excel e envie; as colunas são "
+                    "reconhecidas pelo nome."
+                ),
+                file=(
+                    "Um .csv ou .xlsx com uma linha por operação fechada (hora de entrada e "
+                    "de saída, quantidade, preço de entrada e de saída) ou uma linha por "
+                    "execução (hora, compra ou venda, quantidade e preço)."
+                ),
+                steps=(
+                    "Na sua plataforma, procure o histórico de operações, de ordens executadas "
+                    "ou de transações (Trade history, Order history, Fills ou Executions).",
+                    "Escolha o período completo que você quer revisar e exporte em CSV ou Excel.",
+                    "Envie como está: não é preciso mudar nada quando as colunas têm nomes "
+                    "comuns em português, inglês, espanhol, francês, alemão ou italiano.",
+                ),
+                upload="No campo 'Relatório da sua plataforma'.",
+                tips=(
+                    "Reconhece as colunas de: Interactive Brokers (uma Flex Query de Trades ou "
+                    "o Activity Statement em CSV), Tradovate (Performance ou Orders), TopstepX "
+                    "e outras contas ProjectX (Trades), TradeStation, thinkorswim (Account "
+                    "Statement), Charles Schwab (Transactions ou Realized Gain/Loss), "
+                    "Fidelity, E*TRADE, Webull, tastytrade, eToro (posições fechadas), XTB "
+                    "(histórico de posições fechadas do xStation 5), DEGIRO (Transações, em "
+                    "qualquer idioma), Trading 212 (histórico), cTrader, Sierra Chart (Trade "
+                    "Activity Log), Binance, Kraken, Coinbase e KuCoin (histórico de ordens "
+                    "executadas).",
+                    "Os custos da DEGIRO vêm em euros e são descontados como estão, também em "
+                    "ações cotadas em outra moeda; o resultado da Trading 212 vem na moeda da "
+                    "sua conta e é usado assim.",
+                    "Com uma linha por execução, compras e vendas são pareadas por símbolo na "
+                    "ordem de chegada (primeiro a entrar, primeiro a sair); as posições ainda "
+                    "abertas no final ficam de fora e o relatório diz isso.",
+                    "Uma coluna de lucro, quando existe, dá o valor por ponto de cada "
+                    "contrato. Sem ela, os futuros da CME com código de contrato (ESZ6, MNQ "
+                    "DEC26) usam o valor oficial do ponto; outros futuros ou opções precisam "
+                    "de uma coluna Multiplier.",
+                    "Taxas cobradas em outra moeda (BNB num par em USDT, por exemplo) ficam "
+                    "fora dos custos e o relatório diz isso.",
+                    "O relatório mostra qual coluna foi lida como o quê. Se uma não for "
+                    "reconhecida, indique-a em 'A sua plataforma não aparece ou o arquivo dá "
+                    "erro? Indique as colunas', logo abaixo do campo do relatório.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
+                ),
+            ),
         },
+        platform_pt="Outra plataforma (CSV ou Excel)",
     ),
 )
 
 GUIDES_BY_SLUG: dict[str, Guide] = {guide.slug: guide for guide in GUIDES}
 #: Guides by their path segment in each language.
 GUIDES_BY_PATH: dict[str, dict[str, Guide]] = {
-    locale: {guide.slug_for(locale): guide for guide in GUIDES} for locale in ("es", "en")
+    locale: {guide.slug_for(locale): guide for guide in GUIDES} for locale in ("es", "en", "pt")
 }
 
 #: Guides for the upload form's platform-report field, in display order.

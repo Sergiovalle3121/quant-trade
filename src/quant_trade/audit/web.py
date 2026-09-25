@@ -35,7 +35,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from pydantic import ValidationError
 
@@ -124,6 +124,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Tienes que aceptar las condiciones para enviar la auditoría.",
         "en": "You must accept the terms to submit the audit.",
     },
+    "cross_site": {
+        "es": "Esta subida no viene del formulario de este sitio. Abre la página y súbela ahí.",
+        "en": "This upload does not come from this site's form. Open the page and upload there.",
+    },
     "rate_limited": {
         "es": "Demasiadas auditorías desde esta dirección en la última hora; inténtalo más tarde.",
         "en": "Too many audits from this address in the last hour; try again later.",
@@ -187,6 +191,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "invalid_email": {
         "es": "Esa dirección de correo no parece válida.",
         "en": "That e-mail address does not look valid.",
+        "pt": "Esse endereço de e-mail não parece válido.",
     },
     "page_missing": {
         "es": "Esta página no existe. Revisa la dirección o vuelve al inicio.",
@@ -478,6 +483,25 @@ class AttemptLog:
     def __len__(self) -> int:
         with self._lock:
             return len(self._log)
+
+
+class StoredAttemptLog:
+    """:class:`AttemptLog` kept in the database, so a deploy does not reset it.
+
+    Used for the limits that guard passwords (sign-in, sign-up, the owner
+    panel); ``name`` keeps each limit's keys apart.
+    """
+
+    def __init__(self, store: Any, name: str, window: timedelta = timedelta(hours=1)) -> None:
+        self.store = store
+        self.name = name
+        self.window = window
+
+    def hit(self, key: str, now: datetime) -> int:
+        return int(self.store.attempt_hit(f"{self.name}|{key}", now, since=now - self.window))
+
+    def count(self, key: str, now: datetime) -> int:
+        return int(self.store.attempt_count(f"{self.name}|{key}", since=now - self.window))
 
 
 async def _take_slot(slots: Any, wait_seconds: float) -> bool:
@@ -798,7 +822,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     upload_attempts = AttemptLog()
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
-    panel_failures = AttemptLog()
+    panel_failures = StoredAttemptLog(db, "panel")
     check_attempts = AttemptLog()
     card_lookups = AttemptLog()
     failed_card_sessions = AttemptLog()
@@ -1071,7 +1095,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         error: str | None = None,
         extras: int = 0,
     ) -> str:
-        locale = _locale(lang)
+        return _landing(request, _locale(lang), joined=joined, error=error, extras=extras)
+
+    def _landing(
+        request: Request, locale: str, *, joined: int = 0, error: str | None = None, extras: int = 0
+    ) -> str:
         # Only known codes are shown, so the query string cannot inject text.
         shown = message("invalid_email", locale) if error == "email" else None
         return landing(
@@ -1095,25 +1123,35 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """A short address to share with English-speaking traders."""
         return index(request, lang="en")
 
+    @app.get("/pt", response_class=HTMLResponse)
+    def index_pt(
+        request: Request, joined: int = 0, error: str | None = None, extras: int = 0
+    ) -> str:
+        """The landing in Portuguese; the pages it links to that are not
+        translated yet (report, account, sample, terms) open in English."""
+        return _landing(request, "pt", joined=joined, error=error, extras=extras)
+
     @app.post("/waitlist")
     def waitlist(
         request: Request, email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es"
     ) -> Response:
-        locale = _locale(lang)
+        # The Portuguese landing comes back to itself; its error page is in English.
+        home = "/pt?" if lang == "pt" else f"/?lang={_locale(lang)}&"
+        locale = "en" if lang == "pt" else _locale(lang)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         if waitlist_attempts.hit(ip, datetime.now(UTC)) >= WAITLIST_PER_HOUR_PER_IP:
             return _html_error(request, 429, message("rate_limited", locale), locale)
         if not _valid_email(email):
-            return RedirectResponse(f"/?lang={locale}&error=email", status_code=303)
+            return RedirectResponse(f"{home}error=email", status_code=303)
         db.add_waitlist(email, at=datetime.now(UTC))
-        return RedirectResponse(f"/?lang={locale}&joined=1#news", status_code=303)
+        return RedirectResponse(f"{home}joined=1#news", status_code=303)
 
     # -- customer accounts -------------------------------------------------
     secure_cookies = cfg.base_url.startswith("https://")
-    signin_failures = AttemptLog()
-    signin_email_failures = AttemptLog()
-    signin_ip_failures = AttemptLog()
-    signup_attempts = AttemptLog()
+    signin_failures = StoredAttemptLog(db, "signin")
+    signin_email_failures = StoredAttemptLog(db, "signin_email")
+    signin_ip_failures = StoredAttemptLog(db, "signin_ip")
+    signup_attempts = StoredAttemptLog(db, "signup")
     account_actions = AttemptLog()
 
     def _session(request: Request) -> tuple[Any, str, str] | None:
@@ -1306,12 +1344,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             now = datetime.now(UTC)
             # Keyed on (address, e-mail) so that failures from elsewhere never
             # lock the real owner out; the per-address and per-e-mail ceilings
-            # are higher and only slow wide guessing.
+            # are higher and only slow wide guessing. The per-e-mail ceiling
+            # stops only an address that has already failed on this e-mail
+            # (SIGNIN_TRIES_PAST_EMAIL_CEILING), so someone who knows a customer's
+            # e-mail cannot lock the customer out from another network.
             pair = f"{ip}|{clean}"
+            own_failures = signin_failures.count(pair, now)
             if (
-                signin_failures.count(pair, now) >= acct.MAX_FAILED_SIGNINS_PER_HOUR
+                own_failures >= acct.MAX_FAILED_SIGNINS_PER_HOUR
                 or signin_ip_failures.count(ip, now) >= acct.MAX_FAILED_SIGNINS_PER_IP
-                or signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_EMAIL
+                or (
+                    own_failures >= acct.SIGNIN_TRIES_PAST_EMAIL_CEILING
+                    and signin_email_failures.count(clean, now) >= acct.MAX_FAILED_SIGNINS_PER_EMAIL
+                )
             ):
                 return again("too_many", 429)
             found = db.account_with_hash(clean) if acct.valid_email(clean) else None
@@ -1675,6 +1720,31 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return result.audit_id, token, paid
 
+    def _cross_site(request: Request) -> bool:
+        """True when the browser says the upload was posted from another site.
+
+        A second layer beside the SameSite cookie (the service's domain sits
+        on the Public Suffix List). ``Sec-Fetch-Site`` decides when present
+        (every current browser sends it, whatever the referrer policy):
+        only ``same-origin`` and ``none`` pass; ``same-site`` is refused too,
+        since other apps on the same parent domain would count as same site.
+        Without it, the Origin (else the Referer) must be this service. Our
+        pages send ``Referrer-Policy: no-referrer``, so a genuine form post
+        carries ``Origin: null``: that, like no header at all (a script,
+        curl), is no signal and goes through.
+        """
+        fetch_site = request.headers.get("sec-fetch-site", "").strip().lower()
+        if fetch_site:
+            return fetch_site not in ("same-origin", "none")
+        source = request.headers.get("origin") or request.headers.get("referer") or ""
+        if not source or source == "null":
+            return False
+        host = urlsplit(source).netloc.lower()
+        allowed = {request.headers.get("host", "").lower()}
+        if cfg.base_url:
+            allowed.add(urlsplit(cfg.base_url).netloc.lower())
+        return host not in allowed
+
     @app.post("/audits")
     async def create_audit(
         request: Request,
@@ -1698,6 +1768,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         loc = _locale(locale)
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", loc), loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
             return _html_error(request, 400, message("consent_required", loc), loc)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
@@ -2685,8 +2757,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _guide(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         guide = GUIDES_BY_PATH[path_locale].get(slug)
         if guide is None:
-            # A guide's slug in the other language moves to this language's own.
-            other = GUIDES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            # A guide's slug in another language moves to this language's own.
+            other = next(
+                (
+                    found
+                    for lang, guides in GUIDES_BY_PATH.items()
+                    if lang != path_locale and (found := guides.get(slug)) is not None
+                ),
+                None,
+            )
             if other is None:
                 raise _not_found()
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
@@ -2695,7 +2774,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _audience(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         page = AUDIENCES_BY_PATH[path_locale].get(slug)
         if page is None:
-            other = AUDIENCES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            # A page's slug in another language moves to this language's own.
+            other = next(
+                (
+                    found
+                    for lang, pages in AUDIENCES_BY_PATH.items()
+                    if lang != path_locale and (found := pages.get(slug)) is not None
+                ),
+                None,
+            )
             if other is None:
                 raise _not_found()
             return RedirectResponse(audience_url(other.slug, path_locale), status_code=301)
@@ -2717,6 +2804,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/for/{slug}", response_class=HTMLResponse)
     def audience_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _audience(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/pt/guias", response_class=HTMLResponse)
+    def guides_pt(request: Request) -> str:
+        return guides_index_page(locale="pt", base_url=_site_url(request))
+
+    @app.get("/pt/guias/{slug}", response_class=HTMLResponse)
+    def guide_pt(request: Request, slug: str) -> Response:
+        return _guide(request, slug, "pt", "pt")
+
+    @app.get("/pt/para/{slug}", response_class=HTMLResponse)
+    def audience_pt(request: Request, slug: str) -> Response:
+        return _audience(request, slug, "pt", "pt")
 
     @app.get("/guias/{slug}", response_class=HTMLResponse)
     def guide_es(request: Request, slug: str, lang: str | None = None) -> Response:
