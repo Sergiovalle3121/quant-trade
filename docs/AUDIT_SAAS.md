@@ -431,15 +431,20 @@ Trade-pattern red flags (`redflags.scan_trade_patterns`, on closed trades):
 | `HIDDEN_FLOATING_DRAWDOWN` | a balance-only curve while positions overlapped | — |
 | `NEGATIVE_PAYOFF_HIGH_WINRATE` | ≥ 20 trades, win rate > 85 % and average loss ≥ 3x average win | — |
 | `NO_STOP_EVIDENCE` | ≥ 10 losses and the largest loss (or adverse excursion) ≥ 8x the average loss | — |
-| `PROFIT_CONCENTRATION` | ≥ 30 trades with a net gain after fees, and the best trade ≥ 33 % of the winning trades' total, or the best 5 ≥ 80 % | the best trade ≥ 50 % of the winning trades' total |
+| `PROFIT_CONCENTRATION` | ≥ 10 trades with a net gain after fees; the best 1, 2, 3 or 5 trades carry ≥ 33, 50, 65 or 80 % of the winning trades' total and removing them with as many worst losses takes ≥ 50 % of the net result | ≥ 20 trades; the best 1, 2 or 3 carry ≥ 50, 65 or 80 % and removing them with as many worst losses takes ≥ 80 % of the net result |
 
-`PROFIT_CONCENTRATION` is measured on the winning trades' total, not the net
-result, so a thin net over many noisy trades is not mistaken for concentration
-(on simulated normal trades it never fails; on very heavy-tailed ones with 30
-trades it fails about 5 % of the time). A history whose gains rest on one trade
-says nothing about the rest of the system, and one outsized trade is what a data
-error looks like, so it fails the data dimension (class D). Found by the bug hunt:
-an MQL5-signal file with one trade of 1e9 on a 10,000 deposit was class B.
+`PROFIT_CONCENTRATION` needs both conditions. The share of the winning trades'
+total keeps a thin net over many noisy trades from reading as concentration (on
+simulated normal trades it fails in about 0.1 % of 20-trade histories and never
+from 30 on; on very heavy-tailed ones about 9 % at 20 trades, 4 % at 30 and
+1 % at 60). The net-result condition keeps a big winner cancelled by a big
+loser (the net then comes from the other trades) from failing. Splitting the
+big trade in two or three does not escape it, and shares print rounded down
+to one decimal, so 49.8 % never reads as 50 %. A history whose result rests on
+a few trades says little about the rest of the system, and one outsized trade
+is what a data error looks like, so it fails the data dimension (class D).
+Found by the bug hunt: an MQL5-signal file with one trade of 1e9 on a 10,000
+deposit was class B.
 
 When `HIDDEN_FLOATING_DRAWDOWN` fires, the resampled risk, the prop simulator
 (and the capital section, when it still shows figures)
@@ -563,8 +568,9 @@ available as a floor: the platform's open-trade drawdown, or an uploaded
 equity curve (not rebuilt from closed trades) that starts within 10 % of the
 stated balance, whose deepest fall in money is shown as `fall_curve`
 (MEASURED), and only when that curve covers the trades from the first entry to
-the last exit (one day of slack), so a curve of the first few days cannot stand
-in for the whole history. The reason tells the client what to upload. A history
+the last exit (one day of slack) with no gap over 4 days between its points
+while the trades run, so a curve of the first few days, its two ends, or a
+weekly sample cannot stand in for the whole history. The reason tells the client what to upload. A history
 whose closed trades end with a net loss after fees gets no capital figures
 (NOT_MEASURED): a size at which a losing history may be run is not given.
 

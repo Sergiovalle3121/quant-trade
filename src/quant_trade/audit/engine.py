@@ -678,6 +678,9 @@ HIDDEN_LOSS_FLAGS = frozenset({"GRID_AVERAGING", "HIDDEN_FLOATING_DRAWDOWN"})
 CURVE_MONEY_TOLERANCE = 0.10
 #: Days of slack when checking that the curve covers the trades' dates.
 CURVE_COVER_SLACK_DAYS = 1
+#: Longest gap between curve points while trades run: a weekend plus a holiday.
+#: A weekly or sparser curve misses the deepest open loss between its points.
+CURVE_MAX_GAP_DAYS = 4
 
 
 def _curve_fall(inputs: AuditInputs) -> float | None:
@@ -686,7 +689,8 @@ def _curve_fall(inputs: AuditInputs) -> float | None:
     Only a curve the client uploaded (not one rebuilt from closed trades),
     only when it starts at the stated balance, so an index curve is not read
     as money, and only when it covers the trades from the first entry to the
-    last exit, so a short curve cannot stand in for the whole history."""
+    last exit with no gap over ``CURVE_MAX_GAP_DAYS``, so a short or sparse
+    curve cannot stand in for the whole history."""
     balance = inputs.initial_balance or inputs.declared.initial_balance
     frame = inputs.equity.frame
     equity = frame["equity"].to_numpy(dtype=float)
@@ -698,6 +702,12 @@ def _curve_fall(inputs: AuditInputs) -> float | None:
     first = pd.Timestamp(min(trade.entry_time for trade in trades))
     last = pd.Timestamp(max(trade.exit_time for trade in trades))
     if stamps.iloc[0] > first + slack or stamps.iloc[-1] < last - slack:
+        return None
+    # Every gap between two curve points that overlaps the trades' window.
+    starts = stamps.iloc[:-1].reset_index(drop=True)
+    ends = stamps.iloc[1:].reset_index(drop=True)
+    overlapping = (ends > first) & (starts < last)
+    if ((ends - starts)[overlapping] > pd.Timedelta(days=CURVE_MAX_GAP_DAYS)).any():
         return None
     if abs(equity[0] / balance - 1) > CURVE_MONEY_TOLERANCE:
         return None

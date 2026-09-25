@@ -135,9 +135,35 @@ def _with_best(best: float, n: int = 40, each: float = 1.0) -> list[Trade]:
 
 def test_one_trade_carrying_the_result_fails() -> None:
     assert _codes(_with_best(1e9))["PROFIT_CONCENTRATION"] == "FAIL"
-    assert _codes(_with_best(25.0))["PROFIT_CONCENTRATION"] == "WARN"
+    assert _codes(_with_best(60.0))["PROFIT_CONCENTRATION"] == "WARN"
     assert "PROFIT_CONCENTRATION" not in _codes(_with_best(5.0))
-    assert "PROFIT_CONCENTRATION" not in _codes(_with_best(1e9, n=20))
+    assert "PROFIT_CONCENTRATION" not in _codes(_with_best(1e9, n=9))
+    # Under 20 trades it only warns; from 20 on a lone trade fails.
+    assert _codes(_with_best(1e9, n=12))["PROFIT_CONCENTRATION"] == "WARN"
+    assert _codes(_with_best(1000.0, n=29, each=0.1))["PROFIT_CONCENTRATION"] == "FAIL"
+
+
+def _sequence(pnl: list[float]) -> list[Trade]:
+    return [_trade(10 * i, 10 * i + 5, 1.0, 100.0, value) for i, value in enumerate(pnl)]
+
+
+def test_a_split_big_trade_still_fails() -> None:
+    assert _codes(_sequence([500.0, 500.0] + [1.0] * 58))["PROFIT_CONCENTRATION"] == "FAIL"
+
+
+def test_a_winner_cancelled_by_a_loser_is_not_concentration() -> None:
+    assert "PROFIT_CONCENTRATION" not in _codes(_sequence([1000.0, -1000.0] + [1.0] * 58))
+
+
+def test_shares_round_down_so_a_border_case_never_prints_the_threshold() -> None:
+    flags = scan_trade_patterns(_parsed(_sequence([998.0] + [1.0] * 1002)))
+    assert flags == [] or "50.0%" not in flags[0].detail
+    detail = next(
+        f.detail
+        for f in scan_trade_patterns(_parsed(_sequence([60.0] + [1.0] * 39)))
+        if f.code == "PROFIT_CONCENTRATION"
+    )
+    assert "60.6%" in detail and "39.3%" in detail
 
 
 def test_five_trades_carrying_all_of_it_warn() -> None:
