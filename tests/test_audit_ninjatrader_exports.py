@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from quant_trade.audit.guard import find_claims
+from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import (
     FUTURES_POINT_VALUE_USD,
     NINJATRADER_CSV,
@@ -62,7 +63,8 @@ def test_a_position_still_open_is_left_out_and_said() -> None:
     extra = [_fill("MES JUN26", "Buy", 1, "7210,00", "29/04/2026 6:00:00", "Entry")]
     report = import_report(_executions(extra), "NinjaTrader Executions.csv")
     assert len(report.trades.trades) == 3
-    assert any("still open" in warning for warning in report.warnings)
+    assert any("1 position(s) still open" in warning for warning in report.warnings)
+    assert untranslated({"inputs": {"parse_warnings": report.warnings}}) == []
 
 
 def test_an_unknown_contract_asks_for_the_trades_tab() -> None:
@@ -116,3 +118,48 @@ def test_english_trades_rows_with_a_dollar_suffix_and_day_first_times_are_read()
     assert len(trades) == 1
     assert trades[0].pnl == pytest.approx(90.0)
     assert trades[0].entry_time.day == 13 and trades[0].entry_time.month == 4
+
+
+def _copy_trades() -> bytes:
+    # Columns and contract code as in a copy-trading executions export (Tradeify):
+    # the same trades repeated on every account, compact month code MNQZ6.
+    header = "Instrument,Action,Time,Price,E/X,Connection,Quantity,Account display name"
+    rows = []
+    for account, size in (("ACCOUNT-1", 3), ("ACCOUNT-2", 3), ("ACCOUNT-3", 2)):
+        rows += [
+            f"MNQZ6,Buy,9/15/2026 9:30,29413.25,Entry,TRADEIFY,{size},{account}",
+            f"MNQZ6,Sell,9/15/2026 9:39,29441.25,Exit,TRADEIFY,{size},{account}",
+        ]
+    rows.append("MNQZ6,Buy,9/16/2026 9:30,29400.00,Entry,TRADEIFY,1,ACCOUNT-3")
+    rows.append("MNQZ6,Sell,9/16/2026 9:31,29390.00,Exit,TRADEIFY,1,ACCOUNT-3")
+    return ("\n".join([header, *rows]) + "\n").encode()
+
+
+def test_a_copy_trading_export_reads_one_account_and_compact_contract_codes() -> None:
+    report = import_report(_copy_trades(), "Executions.csv")
+    trades = report.trades.trades
+    # ACCOUNT-3 closed two trades; the others one each, so only ACCOUNT-3 is read.
+    assert [round(trade.pnl, 2) for trade in trades] == [112.0, -20.0]
+    assert any("holds 3 accounts" in warning for warning in report.warnings)
+    assert untranslated({"inputs": {"parse_warnings": report.warnings}}) == []
+
+
+def test_an_account_performance_trades_export_without_trade_number_is_read() -> None:
+    header = (
+        "Account,Instrument,Market pos.,Qty,Entry name,Entry price,Entry time,Exit name,"
+        "Exit price,Exit time,Profit,Commission"
+    )
+    rows = [
+        "Sim101,MES 03-25,Long,2,EN1,5125.25,03/10/2025 9:35:12 AM,EX1,5130.50,"
+        "03/10/2025 9:42:15 AM,50.10,2.40",
+        "Sim101,MNQ 03-25,Short,1,EN2,18550.00,03/13/2025 10:15:05 AM,EX2,18535.25,"
+        "03/13/2025 10:28:40 AM,(1.20),1.20",
+        "Sim102,MNQ 03-25,Short,1,EN3,18550.00,03/13/2025 11:15:05 AM,EX3,18545.25,"
+        "03/13/2025 11:28:40 AM,8.30,1.20",
+    ]
+    data = ("\n".join([header, *rows]) + "\n").encode()
+    assert detect_format(data) == NINJATRADER_CSV
+    report = import_report(data, "Account Performance.csv")
+    assert [round(trade.pnl, 2) for trade in report.trades.trades] == [52.5, 0.0]
+    assert report.trades.trades[0].entry_time.hour == 9
+    assert any("holds 2 accounts" in warning for warning in report.warnings)
