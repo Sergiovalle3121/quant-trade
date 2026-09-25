@@ -519,6 +519,8 @@ box-shadow:0 60px 120px -60px rgba(255,255,255,.18)}
 .price-amount{font-size:clamp(3rem,5.4vw,4.4rem);font-weight:600;line-height:1;margin:16px 0 8px;
 letter-spacing:-.055em}
 .price-amount small{font-size:1rem;font-weight:450;color:var(--text-3);margin-left:8px;letter-spacing:-.01em}
+/* A long note (the free card's) drops under the price whole instead of splitting beside it. */
+@media screen{.price-amount{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:8px}.price-amount small{margin-left:0;line-height:1.4;flex:0 1 auto;min-width:0}}
 .price .checks{margin:26px 0 30px;flex:1;align-content:start}
 .price-pack{margin:6px 0 0;padding:12px 14px;border-radius:14px;background:var(--surface-2);
 color:var(--text);font-size:.92rem}

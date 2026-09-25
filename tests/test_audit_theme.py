@@ -846,3 +846,24 @@ def test_print_lets_a_block_of_figures_split_across_pages() -> None:
     assert "h2,.detail h3{break-after:avoid;page-break-after:avoid}.facts{orphans:1;widows:1}" in (
         STYLE
     )
+
+
+def test_the_free_first_report_leads_the_account_figures() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    css = ACCOUNT_CSS.replace("\n", "")
+    assert ".acct-gift.is-on{border-color:color-mix(in srgb,var(--ok) 45%" in css
+    assert ".acct-gift.is-on{grid-column:1/-1}" in css
+    # The saved-to-account tick on a report stays icon sized.
+    assert ".acct-box svg{width:16px;height:16px;flex:none}" in css
+
+
+def test_the_gate_buttons_sit_in_a_card() -> None:
+    from quant_trade.audit.account_pages import gate_page
+
+    page = gate_page(locale="es", reason="signin", limit=3)
+    assert "<div class='acct-card acct-gate'><div class='inline-form'>" in page
+
+
+def test_a_long_price_note_drops_under_the_price() -> None:
+    assert "@media screen{.price-amount{display:flex;flex-wrap:wrap;align-items:baseline" in STYLE
