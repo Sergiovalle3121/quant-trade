@@ -1376,6 +1376,11 @@ without one, and an account never changes what a report says.
   1 crédito de tu cuenta" when their codes have credits left. The code that
   expires first is spent first; the credit and the unlock share one
   transaction, as with a typed code.
+- **Comparing**: with two or more full reports, "Mis informes" lets the
+  customer tick two and open `/cuenta/comparar` (`/account/comparar`), the
+  same side-by-side view as `/comparar` without pasting private links. It is
+  a read-only GET; both reports must be on the signed-in account's list, not
+  purged and unlocked (or free mode); anything else goes back to the list.
 - **Opening a report**: the owner opens `/audits/{id}` without the token; any
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);

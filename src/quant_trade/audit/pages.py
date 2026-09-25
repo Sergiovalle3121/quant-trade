@@ -673,7 +673,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
             ("globe", "Informe en español o inglés"),
-            ("key", "Vista previa gratis, sin crear cuenta"),
+            ("key", "Vista previa gratis; cuenta opcional"),
         ],
         "mock_url": "informe · clase B",
         "mock_k": "Veredicto",
@@ -803,7 +803,7 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "upload_points": [
             "Tu archivo nunca se publica.",
-            "Sin cuenta, sin tarjeta para la vista previa.",
+            "Vista previa sin tarjeta; la cuenta es opcional.",
             "Borrado automático si no desbloqueas el informe.",
         ],
         "drop_title": "Arrastra tu informe aquí",
@@ -862,7 +862,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
             ("globe", "Report in English or Spanish"),
-            ("key", "Free preview, no account needed"),
+            ("key", "Free preview; account optional"),
         ],
         "mock_url": "report · class B",
         "mock_k": "Verdict",
@@ -991,7 +991,7 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "upload_points": [
             "Your file is never published.",
-            "No account and no card for the preview.",
+            "No card for the preview; an account is optional.",
             "Deleted automatically if you do not unlock the report.",
         ],
         "drop_title": "Drop your report here",
@@ -2295,16 +2295,16 @@ def legal_page(
     )
 
 
-def compare_page(content: str, *, locale: str = "es") -> str:
+def compare_page(content: str, *, locale: str = "es", lead: str = "", switch_href: str = "") -> str:
     """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
     from quant_trade.audit.compare import COMPARE_CSS, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
     other = "en" if locale == "es" else "es"
-    other_path = "/compare" if other == "en" else "/comparar"
+    other_path = switch_href or ("/compare" if other == "en" else "/comparar")
     body = (
-        _page_hero(copy["eyebrow"], copy["title"], copy["lead"])
+        _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
