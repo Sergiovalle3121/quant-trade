@@ -401,3 +401,40 @@ def test_a_curve_file_without_a_known_value_column_preselects_the_balance(
     )
     assert answer.status_code == 422
     assert re.search(r"name='col_balance'>.*?<option value='Saldo'[^>]* selected", answer.text)
+
+
+def test_a_list_without_a_header_row_is_offered_with_numbered_columns(tmp_path: Path) -> None:
+    rows = _daily().decode().splitlines()[1:]
+    headerless = ("\n".join(rows) + "\n").encode()
+    client = _client(tmp_path)
+    for field in ("report", "equity"):
+        answer = client.post(
+            "/audits", files={field: ("pnl.csv", headerless, "text/csv")}, data={"consent": "on"}
+        )
+        assert answer.status_code == 422, (field, answer.text[:300])
+        assert "<th>Col. 1</th>" in answer.text and "<th>Col. 2</th>" in answer.text
+    posted = client.post(
+        "/audits",
+        files={"report": ("pnl.csv", headerless, "text/csv")},
+        data={"consent": "on", "col_date": "Col. 1", "col_profit": "Col. 2"},
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303, posted.text[:400]
+
+
+def test_the_report_field_preselects_a_date_and_a_balance(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for data, balance in ((_results("balance"), "Saldo"), (_daily("date;equity"), "equity")):
+        answer = client.post(
+            "/audits", files={"report": ("x.csv", data, "text/csv")}, data={"consent": "on"}
+        )
+        assert answer.status_code == 422
+        assert re.search(
+            rf"name='col_balance'>.*?<option value='{balance}'[^>]* selected", answer.text
+        ), balance
+        assert re.search(r"name='col_date'>.*?<option value='[^']+'[^>]* selected", answer.text)
+
+
+@pytest.mark.parametrize("cell", ["1.2.3", "1,,2", "1.234.56", "12.3.4.5"])
+def test_a_malformed_number_is_unreadable_not_guessed(cell: str) -> None:
+    assert mapping._figures([cell, "5,5"], ",") == [None, 5.5]

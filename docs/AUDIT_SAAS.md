@@ -2194,7 +2194,17 @@ with no date or value column the curve reader knows (`missing_timestamp`,
 `Equity` column preselected. A cell with both marks, a repeated mark or a lone
 mark not followed by three digits is read with the mark it settles; only
 `1.234`-like cells follow the column's vote, so a hand-typed column mixing
-`12.34` and `-5,60` is never read a hundred times too large. The decimal mark of a named figure column comes from its cells
+`12.34` and `-5,60` is never read a hundred times too large. A repeated mark
+is a thousands separator only when groups of exactly three digits follow it
+(`1.234.567`); `1.2.3`, `1,,2` or `1.234.56` are unreadable and counted with
+the rows left out.
+
+A list with no header row whose first row holds a date (an exported P&L list
+often has none) is shown with numbered columns (`Col. 1`, `Col. 2`...), in
+the report and in the curve field, and read with a date and a result or a
+balance chosen among them; a row with a date in it is never taken for the
+header. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
+column in the report field too. The decimal mark of a named figure column comes from its cells
 (`12.34` in a semicolon file is twelve), not from the delimiter alone.
 
 A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched
