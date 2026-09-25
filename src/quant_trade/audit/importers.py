@@ -2832,6 +2832,7 @@ def _balance_curve(
     opening = [item for item in cash if item.is_flow and item.time <= first_entry]
     later = [item for item in cash if not (item.is_flow and item.time <= first_entry)]
     initial: float
+    assumed = False
     if opening:
         initial = sum(item.amount for item in opening)
         if draft.initial_balance is not None and abs(draft.initial_balance - initial) > 0.011:
@@ -2847,6 +2848,7 @@ def _balance_curve(
         initial = fallback_initial
     else:
         initial = DEFAULT_INITIAL_BALANCE
+        assumed = True
         warnings.append(
             f"the file does not state a starting balance; {DEFAULT_INITIAL_BALANCE:,.0f} "
             "was assumed, which scales every return and drawdown"
@@ -2895,12 +2897,23 @@ def _balance_curve(
             flow += daily[pointer][2]
             pointer += 1
         if level <= 0 or before <= 0:
+            if assumed:
+                raise ReportFormatError(
+                    "balance_not_positive",
+                    "the reconstructed balance reaches zero or below; state the real starting "
+                    "balance so returns can be computed",
+                    "el balance reconstruido llega a cero o menos; indica el balance inicial "
+                    "real para poder calcular los retornos",
+                )
+            # The starting balance is known: the account itself went to zero.
             raise ReportFormatError(
                 "balance_not_positive",
-                "the reconstructed balance reaches zero or below; state the real starting "
-                "balance so returns can be computed",
-                "el balance reconstruido llega a cero o menos; indica el balance inicial "
-                "real para poder calcular los retornos",
+                f"the balance reaches zero or below on {day.isoformat()}: the account lost "
+                "all its money, so returns after that day cannot be computed; upload the "
+                "history up to that day to audit it",
+                f"el balance llega a cero o menos el {day.isoformat()}: la cuenta perdió todo "
+                "su dinero, así que después de ese día no se pueden calcular retornos; sube el "
+                "historial hasta ese día para auditarlo",
             )
         if adjusted:
             index *= 1.0 + (level - before - flow) / before
