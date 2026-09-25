@@ -495,6 +495,7 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_pf": "Profit factor",
         "kpi_trades": "Operaciones · % de aciertos",
         "kpi_breakeven": "Coste extra que lo lleva a cero",
+        "kpi_breakeven_negative": "ya pierde sin coste extra",
         "kpi_stress": "Sin las 5 mejores operaciones",
         "kpi_stress_curve": "Sin los 5 mejores periodos",
         "bps_side": "pb por lado",
@@ -931,6 +932,7 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_pf": "Profit factor",
         "kpi_trades": "Trades · win rate",
         "kpi_breakeven": "Extra cost that takes it to zero",
+        "kpi_breakeven_negative": "already negative before any extra cost",
         "kpi_stress": "Without the best 5 trades",
         "kpi_stress_curve": "Without the best 5 periods",
         "bps_side": "bps per side",
@@ -1256,7 +1258,7 @@ def _fmt(value: Any, *, key: str = "") -> str:
         if key in COUNT_UP_KEYS and math.isfinite(value):
             return f"{math.ceil(value):,}"
         if key in PERCENT_KEYS:
-            return f"{value:.2%}"
+            return f"{value:,.2%}"
         if key in MONEY_KEYS:
             return f"{value:,.2f}"
         if key in RATIO_KEYS:
@@ -1671,7 +1673,7 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
             out.append((labels[label], shown, tone))
 
     total = _ev_value(perf.get("total_return"))
-    add("kpi_return", total, f"{total:+.1%}" if total is not None else "")
+    add("kpi_return", total, f"{total:+,.1%}" if total is not None else "")
     # A balance rebuilt from closed trades cannot see open losses; the tiles say so,
     # and turn red when the red flags found losses the balance hides.
     closed = bool((data.get("inputs") or {}).get("balance_only"))
@@ -1701,7 +1703,11 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
         out.append((labels["kpi_trades"], f"{count:,.0f} · {rate:.0%}", ""))
     breakeven = _ev_value(costs.get("break_even_bps"))
     reference = _ev_value(costs.get("reference_bps")) or 0.0
-    if breakeven is not None:
+    if breakeven is not None and breakeven <= 0:
+        # Negative already before any extra cost: "-0.56 bp" would read as a cost.
+        label = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
+        out.append((label, "0", "bad"))
+    elif breakeven is not None:
         tone = "bad" if breakeven < 3 * reference else "good"
         label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
         pips = _ev_value(costs.get("break_even_pips"))
@@ -1716,7 +1722,7 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
         row = next((r for r in block.get("rows", []) if r.get("scenario") == scenario), None)
         value = _ev_value(row["result"]) if row else None
         if value is not None:
-            shown = f"{value:+.1%}" if percent else f"{value:+,.2f}"
+            shown = f"{value:+,.1%}" if percent else f"{value:+,.2f}"
             out.append((labels[label], shown, "good" if value > 0 else "bad"))
     return out
 
@@ -1762,7 +1768,7 @@ def _stress_value(value: Any, *, percent: bool, signed: bool = False) -> str:
     if not isinstance(value, (int, float)):
         return "—"
     if percent:
-        return f"{value:+.1%}" if signed else f"{value:.1%}"
+        return f"{value:+,.1%}" if signed else f"{value:,.1%}"
     return f"{value:+,.2f}" if signed else f"{value:,.2f}"
 
 
@@ -2411,7 +2417,7 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
     gain = account["percent_gain"]["value"]
     if gain is not None:
         facts.append(
-            f"<div class='fact{' neg' if gain < 0 else ''}'><b>{gain:.0%}</b>"
+            f"<div class='fact{' neg' if gain < 0 else ''}'><b>{gain:,.0%}</b>"
             f"<p>{_e(labels['account_gain'])}</p></div>"
         )
     money = account["trading_result"]["value"]

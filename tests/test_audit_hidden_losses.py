@@ -77,3 +77,22 @@ def test_a_clean_account_without_a_floating_figure_does_not_vouch_for_it(locale:
     seen = _account_html(account, labels)
     assert html.escape(labels["account_clean"], quote=True) in seen
     assert find_claims(labels["account_clean_unseen"]) == []
+
+
+def test_a_losing_file_does_not_show_a_negative_extra_cost() -> None:
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    data["costs"]["break_even_bps"] = {"evidence": "MEASURED", "value": -0.56, "note": ""}
+    for locale in ("es", "en"):
+        page = _visible(
+            render_html(AuditResult.model_validate(data), watermark=False, locale=locale)
+        )
+        assert LABELS[locale]["kpi_breakeven_negative"] in page
+        assert "-0.56" not in page.split(LABELS[locale]["kpi_breakeven_negative"])[0][-300:]
+
+
+def test_large_percentages_carry_thousands_separators() -> None:
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    data["performance"]["total_return"]["value"] = 1911.36
+    page = _visible(render_html(AuditResult.model_validate(data), watermark=False, locale="es"))
+    assert "+191,136.0%" in page
+    assert "191136" not in page
