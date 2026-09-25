@@ -970,6 +970,10 @@ already passes the challenge's total loss limit, that warning is a red-edged
 callout above the table. The break-even cost tile shows one number (basis points
 per side) and puts the pips in its label, so the figure does not wrap.
 
+The guides index lists backtest guides and live-account guides (the provider's
+account, Myfxbook, MQL5 signals, FX Blue) under two headings. The landing's
+platform strip is capped in width so its names wrap into two even rows.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
