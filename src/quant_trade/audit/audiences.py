@@ -802,6 +802,171 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
         },
     ),
+    # Last, so the landing's four cards keep pointing at the first four pages.
+    Audience(
+        slug="copiar-senales",
+        slug_en="signal-copiers",
+        icon="copy",
+        text={
+            "es": AudienceText(
+                title="Antes de copiar una señal, mira el riesgo que no enseña",
+                summary=(
+                    "Sube el historial de la cuenta que vas a copiar y mira lo que su "
+                    "porcentaje no dice: martingala, rejilla, operaciones sin stop, pérdidas "
+                    "abiertas y depósitos."
+                ),
+                pains=(
+                    "La señal enseña un porcentaje de acierto altísimo, y no ves si detrás hay "
+                    "martingala, rejilla u operaciones sin stop.",
+                    "Una cuenta puede subir durante meses de forma suave y perder casi todo en "
+                    "una sola racha; la curva de saldo no enseña las pérdidas abiertas.",
+                    "El porcentaje de ganancia puede venir de depósitos, y una captura de "
+                    "pantalla no deja ver nada de esto.",
+                ),
+                uploads=(
+                    (
+                        "El historial de la cuenta que copias: el informe de MetaTrader o el CSV "
+                        "que exporta Myfxbook, FX Blue o su señal de MQL5.",
+                        "cuenta-proveedor",
+                    ),
+                    (
+                        "O el historial de operaciones de su bróker en CSV o Excel, por ejemplo "
+                        "el de eToro.",
+                        "csv-universal",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Martingala y rejilla",
+                        "Si el tamaño crece después de perder, o si se abren más posiciones "
+                        "para promediar una pérdida.",
+                    ),
+                    (
+                        "Sin stop de pérdida",
+                        "Si las pérdidas más grandes son muchas veces la pérdida típica, una "
+                        "señal de operaciones sin stop.",
+                    ),
+                    (
+                        "Muchos aciertos pequeños y pérdidas grandes",
+                        "Un porcentaje de acierto alto con pérdidas que se comen muchas "
+                        "ganancias de golpe.",
+                    ),
+                    (
+                        "Pérdidas abiertas que no se ven",
+                        "Aviso cuando hay muchas posiciones abiertas a la vez, cuando la curva "
+                        "no muestra su pérdida flotante y cuando al final quedan posiciones sin "
+                        "cerrar.",
+                    ),
+                    (
+                        "El dinero real de la cuenta",
+                        "Depósitos y retiros separados del resultado de operar; aviso si el "
+                        "porcentaje se infla con recargas o si se deposita en plena pérdida.",
+                    ),
+                    (
+                        "Preguntas para el proveedor",
+                        "Qué pedirle antes de copiar, a partir de lo que su historial no "
+                        "responde.",
+                    ),
+                ),
+                limits=(
+                    "No se conecta a la cuenta del proveedor ni copia operaciones: audita el "
+                    "archivo que subes.",
+                    "No te dice si copiar o no, y no predice resultados.",
+                ),
+                faq=(
+                    (
+                        "¿Y si la señal solo enseña capturas en Telegram?",
+                        "Una captura no se puede auditar. Pide el historial exportado de la "
+                        "cuenta (MetaTrader, Myfxbook, FX Blue o señal de MQL5); quien no puede "
+                        "darlo ya te está dando una respuesta.",
+                    ),
+                    (
+                        "¿Un historial sin banderas rojas es seguro de copiar?",
+                        "No. El informe dice qué riesgos se ven en el pasado de esa cuenta. El "
+                        "futuro depende del mercado, del tamaño que uses y de cómo lo copies.",
+                    ),
+                ),
+            ),
+            "en": AudienceText(
+                title="Before you copy a signal, see the risk it does not show",
+                summary=(
+                    "Upload the history of the account you want to copy and see what its "
+                    "percentage does not say: martingale, grids, trades without a stop, open "
+                    "losses and deposits."
+                ),
+                pains=(
+                    "The signal shows a very high win rate, and you cannot see whether "
+                    "martingale, a grid or trades without a stop sit behind it.",
+                    "An account can rise smoothly for months and lose almost everything in "
+                    "one run; the balance curve does not show open losses.",
+                    "The percentage gain can come from deposits, and a screenshot shows none "
+                    "of this.",
+                ),
+                uploads=(
+                    (
+                        "The history of the account you copy: the MetaTrader report or the CSV "
+                        "that Myfxbook, FX Blue or its MQL5 signal exports.",
+                        "cuenta-proveedor",
+                    ),
+                    (
+                        "Or the broker's trade history in CSV or Excel, for example eToro's.",
+                        "csv-universal",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Martingale and grids",
+                        "Whether the size grows after a loss, or more positions are opened to "
+                        "average a loss down.",
+                    ),
+                    (
+                        "No stop loss",
+                        "Whether the largest losses are many times the typical loss, a sign of "
+                        "trades without a stop.",
+                    ),
+                    (
+                        "Many small wins and large losses",
+                        "A high win rate with losses that wipe out many wins at once.",
+                    ),
+                    (
+                        "Open losses you cannot see",
+                        "A warning when many positions are open at once, when the curve does "
+                        "not show their floating loss and when positions are still open at the "
+                        "end.",
+                    ),
+                    (
+                        "The real money in the account",
+                        "Deposits and withdrawals separated from the trading result; a warning "
+                        "if top-ups inflate the percentage or money is deposited in a deep "
+                        "drawdown.",
+                    ),
+                    (
+                        "Questions for the provider",
+                        "What to ask before copying, drawn from what the history does not "
+                        "answer.",
+                    ),
+                ),
+                limits=(
+                    "It does not connect to the provider's account or copy trades: it audits "
+                    "the file you upload.",
+                    "It does not tell you whether to copy, and it does not predict results.",
+                ),
+                faq=(
+                    (
+                        "What if the signal only shows screenshots on Telegram?",
+                        "A screenshot cannot be audited. Ask for the account's exported history "
+                        "(MetaTrader, Myfxbook, FX Blue or MQL5 signal); a provider who cannot "
+                        "give it is already giving you an answer.",
+                    ),
+                    (
+                        "Is a history without red flags safe to copy?",
+                        "No. The report says which risks show in that account's past. The "
+                        "future depends on the market, the size you use and how you copy it.",
+                    ),
+                ),
+            ),
+        },
+    ),
 )
 
 AUDIENCES_BY_PATH: dict[str, dict[str, Audience]] = {

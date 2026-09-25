@@ -184,3 +184,26 @@ def test_a_named_format_drops_repeated_rows_too() -> None:
     twice = import_report("\n".join([header, *rows, *rows]).encode(), "ninjatrader.csv")
     assert len(twice.trades.trades) == len(once.trades.trades)
     assert any("counted once" in warning for warning in twice.warnings)
+
+
+@pytest.mark.parametrize("order_column", ["Order ID", "Order", "Orden", "ID"])
+def test_two_identical_partial_fills_of_one_order_are_both_kept(order_column: str) -> None:
+    data = (
+        f"Time,Symbol,Side,Quantity,Price,{order_column}\n"
+        "2026-03-02 10:00:00,ES,Buy,1,5000,A1\n"
+        "2026-03-02 10:00:00,ES,Buy,1,5000,A1\n"
+        "2026-03-02 11:00:00,ES,Sell,2,5010,B7\n"
+    ).encode()
+    report = import_report(data, "fills.csv", initial_balance=25_000)
+    assert sum(t.quantity for t in report.trades.trades) == 2
+    assert not any("repeated" in w or "still open" in w for w in report.warnings)
+
+
+def test_rows_with_a_blank_id_are_never_dropped() -> None:
+    from test_audit_platform_catalog import XTB_HEADER, XTB_ROWS
+
+    line = ",".join(str(cell) for cell in ["", *XTB_ROWS[2][1:]])
+    data = "\n".join([XTB_HEADER, line, line]) + "\n"
+    report = import_report(data.encode(), "xtb.csv", initial_balance=25_000)
+    assert len(report.symbols) == 2
+    assert not any("repeated" in warning for warning in report.warnings)

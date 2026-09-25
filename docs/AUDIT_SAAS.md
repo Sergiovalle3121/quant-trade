@@ -149,7 +149,9 @@ entry timing cannot be measured, so it asks for the executions export (Bybit
 Trade History) instead. A `Contracts` column names the instrument when no
 symbol column exists and `Exec Qty` is the size.
 Rows repeated in every column are counted once when the table has an id
-column (Position, Ticket, Order, ID, Trade number...), as when two exports
+column (Position, Ticket, Deal, Transaction ID, Trade number...; never an
+order id, which an order's partial fills share, nor a bare ID) and the row's
+id is filled in, as when two exports
 are pasted together (`universal.drop_repeated_rows`, for the universal reader
 and every delimited named format); the report says how many. Rows that share
 an id but differ (partial closes) are all kept, and a table without an id
@@ -1935,3 +1937,5 @@ keep secret and no Railway variable, and the buyer checks on the site in two
 clicks instead of with a tool. The records survive the retention purge like
 the audit's other hashes and go with `audit delete ID --yes`. A PDF printed
 again, a screenshot or any re-save never matches.
+
+A fifth audience page, for signal copiers (`/para/copiar-senales`, `/for/signal-copiers`), names the risks a copy-trading percentage hides and points each at a live check: martingale sizing, grid averaging, no sign of a stop loss, many small wins with large losses, many positions open at once, hidden floating drawdown, positions still open at the end, and gains inflated by deposits. It asks for the account's exported history, because a screenshot cannot be audited. The landing keeps its four cards and links the fifth page in a line under them, so `AUDIENCE_PAGES` keeps the four card pages first.
