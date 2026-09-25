@@ -2496,11 +2496,34 @@ FUTURES_POINT_VALUE_USD: dict[str, float] = {
 }  # fmt: skip
 
 
+#: What a NinjaTrader Trades export needs; the Account Performance export has no
+#: "Trade number" column, so it is not required.
+_NINJATRADER_TRADES_COLUMNS = frozenset(
+    {"instrument", "market pos.", "entry price", "exit price", "entry time", "exit time", "profit"}
+)
+
+
+def _busiest_account(
+    rows: list[list[str]], accounts: list[str], closed: dict[str, int], warnings: list[str]
+) -> list[list[str]]:
+    """The rows of the account with the most closed trades, when a file holds
+    several (a copy-trading export repeats each trade on every account, and
+    adding them up would mix balances), with a warning."""
+    if len(closed) < 2:
+        return rows
+    chosen = max(closed, key=lambda name: (closed[name], name))
+    warnings.append(
+        f"the file holds {len(closed)} accounts; only the one with the most closed "
+        f"trades ({closed[chosen]}) was read"
+    )
+    return [row for row, account in zip(rows, accounts, strict=True) if account == chosen]
+
+
 def _table_format(header: list[str]) -> str | None:
     names = set(_index(header))
     if _is_tradingview_header(header):
         return TRADINGVIEW_CSV
-    if {"trade number", "instrument", "market pos."} <= set(_ninjatrader_index(header)):
+    if set(_ninjatrader_index(header)) >= _NINJATRADER_TRADES_COLUMNS:
         return NINJATRADER_CSV
     if {"instrument", "action", "quantity", "price", "time", "e/x"} <= names:
         return NINJATRADER_EXECUTIONS_CSV
@@ -2529,6 +2552,11 @@ def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str)
     decimal = "," if delimiter == ";" else "."
     draft = _Draft(NINJATRADER_CSV, [])
     draft.itemised = {"commission"}
+    accounts = [_cells(row, columns, "account").strip() for row in rows]
+    closed: dict[str, int] = {}
+    for account in accounts:
+        closed[account] = closed.get(account, 0) + 1
+    rows = _busiest_account(rows, accounts, closed, draft.warnings)
     entry_times = _parse_times([_cells(row, columns, "entry time") for row in rows])
     exit_times = _parse_times([_cells(row, columns, "exit time") for row in rows])
     fee_columns = [
@@ -2593,8 +2621,14 @@ def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str)
 
 
 def _futures_root(instrument: str) -> str:
-    """``MES JUN26`` or ``MES 03-25`` -> ``MES``."""
-    return instrument.strip().split(" ")[0].upper()
+    """``MES JUN26``, ``MES 03-25`` or the compact ``MNQZ6`` / ``ESH25`` -> the root."""
+    first = instrument.strip().split(" ")[0].upper()
+    if first in FUTURES_POINT_VALUE_USD:
+        return first
+    compact = re.fullmatch(r"([A-Z0-9]+?)[FGHJKMNQUVXZ](?:\d{1,2}|\d{4})", first)
+    if compact and compact.group(1) in FUTURES_POINT_VALUE_USD:
+        return compact.group(1)
+    return first
 
 
 def _parse_ninjatrader_executions(
@@ -2638,6 +2672,7 @@ def _parse_ninjatrader_executions(
             "Trades (Account Performance o Strategy Analyzer > Trades), que sí lo trae",
         )
     open_lots: dict[tuple[str, str], list[list[Any]]] = {}
+    trips: dict[str, list[_Trip]] = {}
     for moment, _, account, instrument, signed, price, fee in sorted(fills):
         lots = open_lots.setdefault((account, instrument), [])
         left = abs(signed)
@@ -2648,7 +2683,7 @@ def _parse_ninjatrader_executions(
             side = "long" if lot[0] > 0 else "short"
             point_value = FUTURES_POINT_VALUE_USD[_futures_root(instrument)]
             move = (price - lot[1]) if side == "long" else (lot[1] - price)
-            draft.trips.append(
+            trips.setdefault(account, []).append(
                 _Trip(
                     symbol=instrument,
                     side=side,
@@ -2667,10 +2702,19 @@ def _parse_ninjatrader_executions(
                 lots.pop(0)
         if left > 0:
             lots.append([left if signed > 0 else -left, price, moment, fee_per_unit])
-    still_open = sum(abs(lot[0]) for lots in open_lots.values() for lot in lots)
+    closed_by_account = {account: len(listed) for account, listed in trips.items()}
+    chosen = _busiest_account(
+        [[account] for account in trips], list(trips), closed_by_account, draft.warnings
+    )
+    kept = {row[0] for row in chosen}
+    draft.trips = [trip for account in kept for trip in trips[account]]
+    still_open = sum(
+        1 for (account, _), lots in open_lots.items() if account in kept and lots
+    )
     if still_open:
         draft.warnings.append(
-            f"{still_open:g} contracts still open at the end of the export are left out"
+            f"{still_open} position(s) still open at the end of the report; excluded "
+            "from the closed trades"
         )
     draft.trips.sort(key=lambda trip: (trip.exit_time, trip.entry_time))
     if draft.trips and all(trip.commission == 0 for trip in draft.trips):

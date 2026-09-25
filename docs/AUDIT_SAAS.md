@@ -75,9 +75,16 @@ cmegroup.com, as of 2026-09-25: ES 50, MES 5, NQ 20, MNQ 2, CL 1000, GC 100
 and the rest listed in the code); the commission of each fill is spread over
 its contracts. A contract missing from that table is refused
 (`ninjatrader_executions_symbol`) with a request for the Trades tab, and
-contracts still open at the end are left out with a warning. Layouts were
-taken from public importers of real NinjaTrader files; tests use synthetic
-rows (`tests/test_audit_ninjatrader_exports.py`).
+positions still open at the end are left out with a warning. Compact contract
+codes (`MNQZ6`, `ESH25`) resolve to their root. The Account Performance
+Trades export, which has no "Trade number" column, is read like the
+Strategy Analyzer one (`Profit` is net of the itemised commission). A file
+that holds several accounts (a copy-trading export repeats each trade on
+every account) is read for the account with the most closed trades, with
+the same warning as FX Blue, since adding the accounts up would mix
+balances. Layouts were taken from public importers of NinjaTrader files
+(tradetally, deltalytix, LuxAlgo trade-journal's copy-trading fixture);
+tests use synthetic rows (`tests/test_audit_ninjatrader_exports.py`).
 
 Account histories from tracking sites are read too, so an investor can
 review a trader from the export alone: Myfxbook's history CSV (`Profit` is
