@@ -697,6 +697,34 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "optimización",
     ),
     (
+        "the {n} trades since {d} (the last third of the history) average {a} per trade, "
+        "against {b} for the {m} earlier ones; the drop is {z} standard errors",
+        "las {n} operaciones desde el {d} (el último tercio del historial) promedian {a} por "
+        "operación, frente a {b} de las {m} anteriores; la caída es de {z} errores estándar",
+    ),
+    ("needs at least {n} closed trades", "hacen falta al menos {n} operaciones cerradas"),
+    (
+        "the trades span less than two years, too short to compare periods",
+        "las operaciones abarcan menos de dos años, demasiado poco para comparar periodos",
+    ),
+    (
+        "needs at least {n} closed trades in the recent third of the history and in the "
+        "earlier two thirds",
+        "hacen falta al menos {n} operaciones cerradas en el último tercio del historial y en "
+        "los dos tercios anteriores",
+    ),
+    ("a trade result is not a finite number", "un resultado de operación no es un número finito"),
+    (
+        "closed trades by exit date; net result after the fees the file itemises",
+        "operaciones cerradas por fecha de cierre; resultado neto tras los costes que detalla "
+        "el archivo",
+    ),
+    ("average net result per trade", "resultado neto medio por operación"),
+    (
+        "distance of the recent average from the earlier one, in standard errors",
+        "distancia de la media reciente respecto de la anterior, en errores estándar",
+    ),
+    (
         "the best trade makes {share} of the total of the winning trades; without it and the "
         "worst loss the rest keep {keep} of the net result ({n} trades)",
         "la mejor operación aporta el {share} del total de las operaciones ganadoras; sin ella "

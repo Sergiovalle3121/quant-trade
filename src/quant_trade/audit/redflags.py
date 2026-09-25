@@ -810,6 +810,10 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
         "es": "La optimización no aguanta en el periodo forward",
         "en": "The optimisation does not hold in the forward period",
     },
+    "EDGE_FADING": {
+        "es": "El resultado se apaga en el periodo reciente",
+        "en": "The result fades in the recent period",
+    },
     "REPORT_HEADER_MISMATCH": {
         "es": "El encabezado del informe no cuadra",
         "en": "The report header does not add up",
