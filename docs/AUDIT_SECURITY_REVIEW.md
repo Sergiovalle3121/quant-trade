@@ -95,6 +95,13 @@ Every change below has an offline, deterministic test in
   refuses it; failed sign-ins are limited per (address, e-mail) pair with
   higher per-address and per-e-mail ceilings, so nobody can lock the real
   owner out from elsewhere.
+- Live abuse pass on accounts (bug hunt, two throwaway accounts, deleted
+  afterwards): cookie flags, a new session at each sign-in, sign-out ending
+  the server session, cross-account 404s and equal sign-in answers all held.
+  Fixed after it: the sign-up and account-action limits let one attempt past
+  the stated number; the per-e-mail ceiling on failed sign-ins went from 200
+  to 50 an hour, because guesses spread over a pool of addresses only met
+  that ceiling. Counters live in memory and restart with each deploy.
 
 ## What the operator sets on Railway
 
