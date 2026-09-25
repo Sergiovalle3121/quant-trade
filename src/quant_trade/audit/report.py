@@ -198,6 +198,8 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_none": "Todas las dimensiones pasan: no queda ningún paso abierto.",
         "plan_locked": "pasos concretos, con las cifras de tu archivo, en el informe completo",
         "kpis": "Resumen ejecutivo",
+        "toc": "Secciones del informe",
+        "toc_unlock": "Informe completo",
         "kpis_locked": "Las cifras clave de tu archivo se muestran en el informe completo.",
         "kpi_return": "Retorno total",
         "kpi_drawdown": "Drawdown máximo",
@@ -369,6 +371,8 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_none": "Every dimension passes: no step is left open.",
         "plan_locked": "concrete steps, with your file's figures, in the full report",
         "kpis": "Executive summary",
+        "toc": "Report sections",
+        "toc_unlock": "Full report",
         "kpis_locked": "Your file's key figures are shown in the full report.",
         "kpi_return": "Total return",
         "kpi_drawdown": "Maximum drawdown",
@@ -1678,8 +1682,8 @@ def render_html(
         )
     else:
         detail_html = "".join(
-            f"<section class='detail'><h2>{_e(title)}</h2>{body}</section>"
-            for title, body in detail
+            f"<section class='detail' id='r-d{i}'><h2>{_e(title)}</h2>{body}</section>"
+            for i, (title, body) in enumerate(detail, 1)
         )
 
     watermark_html = ""
@@ -1732,7 +1736,8 @@ def render_html(
         + "<div class='verdict rise' style='--i:3'>"
         + class_ring(str(verdict["overall"]), size="lg")
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
-        f"<p class='verdict-text'>{_e(verdict['summary'])}</p></div></div>"
+        + _verdict_html(str(verdict["summary"]))
+        + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
             f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
@@ -1749,8 +1754,13 @@ def render_html(
         + "</div></section>"
     )
 
-    def section(title: str, content: str) -> str:
-        return f"<section class='rsec'><h2>{_e(title)}</h2>{content}</section>"
+    toc: list[tuple[str, str]] = []
+
+    def section(title: str, content: str, key: str = "") -> str:
+        if key:
+            toc.append((key, title))
+        anchor = f" id='{_e(key)}'" if key else ""
+        return f"<section class='rsec'{anchor}><h2>{_e(title)}</h2>{content}</section>"
 
     footer = (
         "<div class='report-foot'>"
@@ -1762,20 +1772,31 @@ def render_html(
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     sections = [
-        section(labels["kpis"], kpis_html) if kpis_html else "",
-        section(labels["meaning"], _meaning_html(verdict, locale)),
-        section(labels["charts"], _charts_html(data, locale)),
-        section(labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels)),
-        section(labels["plan"], _plan_html(data, locale, labels, locked=True)) if locked else "",
+        section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
+        section(labels["meaning"], _meaning_html(verdict, locale), "r-meaning"),
+        section(labels["charts"], _charts_html(data, locale), "r-charts"),
+        section(
+            labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels), "r-flags"
+        ),
+        section(labels["plan"], _plan_html(data, locale, labels, locked=True), "r-plan")
+        if locked
+        else "",
         detail_html,
         publish_html,
         compare_html,
-        section(labels["inputs"], inputs_html + _source_html(data, labels)),
+        section(labels["inputs"], inputs_html + _source_html(data, labels), "r-inputs"),
         section(labels["declared"], declared_html),
         section(labels["not_measured"], nm_html),
         section(labels["seal"], seal_html),
         footer,
     ]
+    # The detail sections (or the lock box) sit between the plan and the inputs.
+    detail_toc = (
+        [("unlock", labels["toc_unlock"])]
+        if locked
+        else [(f"r-d{i}", title) for i, (title, _) in enumerate(detail, 1)]
+    )
+    toc = toc[:-1] + detail_toc + toc[-1:]
     page_title = f"{labels['title']} {verdict['overall']} · {data['audit_id'][:8]}"
     return (
         "<!doctype html><html lang='"
@@ -1795,9 +1816,27 @@ def render_html(
         + "</head><body>"
         + header
         + hero
+        + _report_toc(toc, labels["toc"])
         + "<main id='main' class='paper report-main'><div class='wrap wrap-mid'>"
         + "".join(sections)
         + "</div></main></body></html>"
+    )
+
+
+def _verdict_html(summary: str) -> str:
+    """The verdict: its first sentence as the headline, the rest as detail."""
+    lead, sep, rest = summary.partition(". ")
+    if not sep:
+        return f"<p class='verdict-text'>{_e(summary)}</p>"
+    return f"<p class='verdict-text'><span class='verdict-lead'>{_e(lead)}.</span> {_e(rest)}</p>"
+
+
+def _report_toc(entries: list[tuple[str, str]], label: str) -> str:
+    """A sticky row of links to the report's sections (hidden in print)."""
+    links = "".join(f"<li><a href='#{_e(key)}'>{_e(title)}</a></li>" for key, title in entries)
+    return (
+        f"<nav class='report-toc no-print' aria-label='{_e(label)}'><div class='wrap wrap-mid'>"
+        f"<ol data-toc>{links}</ol></div></nav>"
     )
 
 

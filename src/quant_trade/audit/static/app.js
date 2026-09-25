@@ -118,7 +118,13 @@
           if (!entry.isIntersecting) return;
           Object.keys(links).forEach(function (id) { links[id].classList.remove("on"); });
           var link = links[entry.target.id];
-          if (link) link.classList.add("on");
+          if (!link) return;
+          link.classList.add("on");
+          // A row that scrolls sideways (the report's) keeps the active link in view.
+          var row = link.closest("ol");
+          if (row && row.scrollWidth > row.clientWidth) {
+            row.scrollTo({ left: link.offsetLeft - 24, behavior: still ? "auto" : "smooth" });
+          }
         });
       }, { rootMargin: "-90px 0px -65% 0px" });
       Object.keys(links).forEach(function (id) {
