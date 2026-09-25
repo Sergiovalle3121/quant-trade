@@ -652,6 +652,24 @@ def looks_like_trades(header: Sequence[str]) -> bool:
     return _shape(guess_columns(header)) is not None
 
 
+def _refuse_shared_columns(header: Sequence[str], taken: Mapping[str, int]) -> None:
+    """One column chosen for two fields (entry and exit time, say) would make
+    every trade last zero seconds or move zero points: refused, naming both."""
+    seen: dict[int, str] = {}
+    for role, index in taken.items():
+        if index in seen:
+            first, second = seen[index], role
+            name = imp._clip(str(header[index]), 60)
+            raise imp.ReportFormatError(
+                "universal_column_twice",
+                f"the column '{name}' was chosen for two fields ({_ROLE_TEXT['en'][first]} "
+                f"and {_ROLE_TEXT['en'][second]}); choose a different column for each",
+                f"la columna «{name}» se eligió para dos campos ({_ROLE_TEXT['es'][first]} "
+                f"y {_ROLE_TEXT['es'][second]}); elige una columna distinta para cada uno",
+            )
+        seen[index] = role
+
+
 def resolve(header: Sequence[str], chosen: Mapping[str, str] | None = None) -> ColumnMap:
     """The mapping for ``header``: the customer's ``chosen`` role -> column
     name first, each role not chosen guessed from the names.
@@ -676,6 +694,7 @@ def resolve(header: Sequence[str], chosen: Mapping[str, str] | None = None) -> C
                 f"la columna «{imp._clip(str(name), 60)}» no está en el archivo",
             )
         taken[role] = found_at
+    _refuse_shared_columns(header, taken)
     if taken:
         # A column the customer assigned is no longer free for a guessed role.
         columns = {role: index for role, index in columns.items() if index not in taken.values()}
@@ -707,12 +726,16 @@ _ROLE_TEXT = {
     "en": {
         "entry_time": "entry time", "exit_time": "exit time", "quantity": "quantity",
         "entry_price": "entry price", "exit_price": "exit price", "time": "time",
-        "price": "price",
+        "price": "price", "symbol": "symbol", "side": "side", "profit": "profit",
+        "commission": "commission", "swap": "swap", "multiplier": "multiplier",
+        "account": "account",
     },
     "es": {
         "entry_time": "hora de entrada", "exit_time": "hora de salida", "quantity": "cantidad",
         "entry_price": "precio de entrada", "exit_price": "precio de salida", "time": "hora",
-        "price": "precio",
+        "price": "precio", "symbol": "símbolo", "side": "lado", "profit": "resultado",
+        "commission": "comisión", "swap": "swap", "multiplier": "multiplicador",
+        "account": "cuenta",
     },
 }  # fmt: skip
 
