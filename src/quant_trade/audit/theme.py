@@ -116,6 +116,7 @@ ICONS: dict[str, str] = {
         "<rect x='4' y='4' width='16' height='16' rx='3'/><circle cx='9' cy='9' r='1'/>"
         "<circle cx='15' cy='15' r='1'/><circle cx='15' cy='9' r='1'/><circle cx='9' cy='15' r='1'/>"
     ),
+    "chat": "<path d='M4 19l1.4-4.2A8 8 0 1112 20a8 8 0 01-3.9-1z'/>",
     "arrow": "<path d='M5 12h14M13 6l6 6-6 6'/>",
     "lock": "<rect x='5' y='11' width='14' height='10' rx='2'/><path d='M8 11V8a4 4 0 018 0v3'/>",
     "print": (
@@ -816,6 +817,14 @@ background:rgba(255,255,255,.04)}
 .paybox label{color:#ececf0}
 .paybox .inline-form{margin-top:8px}
 .paybox a{color:#fff;font-weight:560}
+.paybox.buy{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;
+padding:22px 24px;background:rgba(255,255,255,.07);border-color:var(--border-2)}
+.buy-price b{display:block;font-size:2.4rem;font-weight:650;letter-spacing:-.05em;line-height:1;
+color:#fff;font-variant-numeric:tabular-nums}
+.buy-price span{display:block;margin-top:8px;color:var(--text-2);font-size:.9rem}
+.buy-price span::first-letter{text-transform:uppercase}
+.paybox.buy a.btn{color:var(--btn-fg);gap:10px}
+@media (max-width:620px){.paybox.buy{padding:20px}.paybox.buy a.btn{width:100%;padding:0 14px;font-size:.93rem}.paybox.buy a.btn svg{display:none}}
 .publish{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;
 padding:26px 28px;border-radius:var(--r-lg);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04);
 margin:0 0 40px}
