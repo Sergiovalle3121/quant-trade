@@ -361,6 +361,53 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "{a} de {n} operaciones ({p}) se abrieron contra una posición abierta a peor precio",
     ),
     (
+        "the time-weighted gain is {g} while trading made {m} on {d} deposited; deposits "
+        "and withdrawals shape the percentage",
+        "la ganancia ponderada en el tiempo es {g} mientras que operar dejó {m} sobre {d} "
+        "depositados; los depósitos y retiros dan forma al porcentaje",
+    ),
+    (
+        "{n} deposit(s) arrived while the account was at least {p} below its peak",
+        "{n} depósito(s) llegaron cuando la cuenta estaba al menos un {p} por debajo de su máximo",
+    ),
+    (
+        "open positions carried a floating loss of {p} of the balance when the statement "
+        "was printed; the balance does not show it",
+        "las posiciones abiertas tenían una pérdida flotante del {p} del balance al imprimir "
+        "el historial; el balance no la muestra",
+    ),
+    (
+        "the file is a backtest, not an account history",
+        "el archivo es un backtest, no el historial de una cuenta",
+    ),
+    (
+        "time-weighted: deposits and withdrawals are taken out, as track-record sites compute gain",
+        "ponderada en el tiempo: se quitan depósitos y retiros, como calculan la ganancia "
+        "los sitios de historiales",
+    ),
+    (
+        "closed trades after commission and swap, in the account currency",
+        "operaciones cerradas después de comisiones y swap, en la divisa de la cuenta",
+    ),
+    ("trading result / money deposited", "resultado de operar / dinero depositado"),
+    ("withdrawn / deposited", "retirado / depositado"),
+    ("the file lists no deposit", "el archivo no incluye ningún depósito"),
+    (
+        "the platform's own summary at the time of the statement",
+        "resumen de la propia plataforma al momento del historial",
+    ),
+    ("floating result / balance", "resultado flotante / balance"),
+    (
+        "the file does not state the floating result",
+        "el archivo no indica el resultado flotante",
+    ),
+    (
+        "earlier deposits and withdrawals plus trades closed before it",
+        "depósitos y retiros anteriores más las operaciones cerradas antes",
+    ),
+    ("flow-adjusted drawdown on the day before", "drawdown ajustado por depósitos el día anterior"),
+    ("no curve point before the deposit", "no hay un punto de la curva antes del depósito"),
+    (
         "up to {n} positions were open at once on one symbol",
         "hubo hasta {n} posiciones abiertas a la vez en un mismo símbolo",
     ),

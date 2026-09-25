@@ -303,3 +303,17 @@ def test_the_pairing_is_shown_in_both_languages(locale: str) -> None:
         assert find_claims(page) == []
         if locale == "es":
             assert "Paired by" not in page and "fewer than" not in page
+
+
+def test_live_section_reads_as_cards_on_small_screens() -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+
+    html = render_html(sample_result("es", bootstrap_samples=50), watermark=False)
+    section = html.split("Backtest frente a cuenta real", 2)[2].split("</section>", 1)[0]
+    # The verdict is a callout, the two tail shares are big-figure cards and every
+    # value cell names its column so a phone can stack rows as cards.
+    assert "class='live-verdict lv-" in section
+    assert section.count("<div class='fact'>") == 2
+    assert "data-l='Rango esperado (90 %)'" in section
+    assert "@media (max-width:900px){.paper table.live" in html

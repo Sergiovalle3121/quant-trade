@@ -170,6 +170,77 @@ GUIDES: tuple[Guide, ...] = (
         },
     ),
     Guide(
+        slug="cuenta-proveedor",
+        platform="Cuenta de un proveedor / Provider's account",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo revisar la cuenta de alguien antes de copiarlo o invertir",
+                summary=(
+                    "Pide al proveedor de la señal, del robot o de la gestión el historial "
+                    "completo de su cuenta de MetaTrader y mira el dinero real detrás de su "
+                    "porcentaje de ganancia."
+                ),
+                file=(
+                    "El historial de la cuenta de MetaTrader 5 (ReportHistory-<cuenta>.html) o el "
+                    "estado de cuenta detallado de MetaTrader 4 (DetailedStatement.htm), con "
+                    "todo el periodo, incluidos depósitos y retiros."
+                ),
+                steps=(
+                    "Pide al proveedor el historial completo desde el primer depósito, no solo "
+                    "los últimos meses ni una captura de pantalla.",
+                    "En MetaTrader 5: Caja de herramientas (Ctrl+T) > Historial > «Todo el "
+                    "historial» > clic derecho > Informe > HTML.",
+                    "En MetaTrader 4: Terminal > Historial de cuenta > clic derecho > «Todo el "
+                    "historial» y luego «Guardar como informe detallado».",
+                    "Sube el archivo y abre la sección «El dinero real de la cuenta» del informe.",
+                ),
+                upload="En el campo «Informe de tu plataforma».",
+                tips=(
+                    "El porcentaje que muestran los sitios de historiales quita los depósitos: "
+                    "el informe lo pone junto al dinero que la cuenta ganó o perdió operando.",
+                    "Un depósito grande justo después de una caída, o posiciones abiertas con "
+                    "pérdida al imprimir el historial, salen como banderas rojas.",
+                    "Pide que el historial se imprima el día que lo recibes: uno impreso hace "
+                    "meses no muestra lo que pasó después.",
+                    "El informe lee el archivo tal como llega; no lo comprueba con el bróker.",
+                ),
+            ),
+            "en": GuideText(
+                title="How to review someone's account before you copy them or invest",
+                summary=(
+                    "Ask the signal, robot or managed-account provider for the full MetaTrader "
+                    "account history and see the real money behind their percentage gain."
+                ),
+                file=(
+                    "The MetaTrader 5 account history (ReportHistory-<login>.html) or the "
+                    "MetaTrader 4 detailed statement (DetailedStatement.htm), for the whole "
+                    "period, deposits and withdrawals included."
+                ),
+                steps=(
+                    "Ask the provider for the full history since the first deposit, not only the "
+                    "last few months or a screenshot.",
+                    "In MetaTrader 5: Toolbox (Ctrl+T) > History > 'All history' > right-click > "
+                    "Report > HTML.",
+                    "In MetaTrader 4: Terminal > Account History > right-click > 'All History', "
+                    "then 'Save as Detailed Report'.",
+                    "Upload the file and open the report's section 'The account's real money'.",
+                ),
+                upload="In the field 'Your platform report'.",
+                tips=(
+                    "The percentage track-record sites show takes deposits out: the report puts "
+                    "it next to the money the account made or lost by trading.",
+                    "A large deposit right after a fall, or positions open at a loss when the "
+                    "history was printed, show up as red flags.",
+                    "Ask for the history to be printed the day you receive it: one printed months "
+                    "ago does not show what happened since.",
+                    "The report reads the file as it arrives; it does not check it with the "
+                    "broker.",
+                ),
+            ),
+        },
+    ),
+    Guide(
         slug="mt5-optimization",
         platform="MetaTrader 5 (optimización / optimisation)",
         field="optimization",

@@ -16,6 +16,7 @@ import html
 from dataclasses import dataclass, field
 
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
+from quant_trade.audit.method import METHOD_PATH
 
 LOCALES: tuple[str, ...] = ("es", "en")
 
@@ -38,6 +39,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/ejemplo", "en": "/sample"},
     {"es": guides_index_url("es"), "en": guides_index_url("en")},
     *({"es": guide_url(g.slug, "es"), "en": guide_url(g.slug, "en")} for g in GUIDES),
+    dict(METHOD_PATH),
     {"es": "/terminos", "en": "/terms"},
     {"es": "/privacidad", "en": "/privacy"},
 )

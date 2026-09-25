@@ -780,9 +780,13 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .tbar-track span{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--text)}
 .tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
 @media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
-.live .val{text-align:right;white-space:nowrap}.live td:first-child{font-weight:500}
+.live .val{text-align:right;white-space:nowrap}.live th{white-space:normal}.live td:first-child{font-weight:500}
+.live-verdict{margin:18px 0;padding:16px 20px;border-radius:16px;background:#fff;border:1px solid var(--border);border-left:4px solid #9a9aa2;line-height:1.6}
+.lv-PASS{border-left-color:#16a34a}.lv-WEAK{border-left-color:#d97706}.lv-FAIL{border-left-color:#dc2626}
+.live-verdict .badge{margin-right:6px}
+@media (max-width:900px){.paper table.live,.live thead,.live tbody,.live tr,.live td{display:block}.paper table.live{overflow:visible;border:0;background:none;box-shadow:none}.live thead{display:none}.live tr{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 0 8px}.live td{border:0!important;padding:3px 0!important;text-align:left!important;display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;white-space:normal}.live td strong{white-space:normal}.live td:first-child{min-width:0;font-weight:600;padding-bottom:6px!important}.live td[data-l]::before{content:attr(data-l);color:var(--text-3);font-size:.8rem}.live td.empty{display:none}}
 .pair .val{text-align:right}.pair td:first-child{font-weight:500;width:55%}
-@media (max-width:759px){.live td:first-child{min-width:130px}}
+@media (max-width:620px){.pair tr{display:block;padding:10px 0}.pair td{display:block;width:auto!important;text-align:left!important;border:0!important;padding:2px 14px!important}.pair tr+tr{border-top:1px solid var(--border)}}
 .metrics .c-k{width:30%}.metrics .c-v{width:15%}.metrics .c-e{width:170px}
 .metrics td:first-child{font-weight:500}
 .metrics .val{text-align:right;padding-right:28px}
