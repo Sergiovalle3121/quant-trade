@@ -75,6 +75,7 @@ RECOGNISED_PLATFORMS: tuple[str, ...] = (
     "Trading 212",
     "cTrader",
     "Sierra Chart",
+    "Rithmic",
     "Binance",
     "Kraken",
     "Coinbase",
@@ -691,7 +692,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Tu CSV de NinjaTrader 8 (futuros).", "ninjatrader"),
                     (
                         "O el historial de operaciones de tu plataforma en CSV o Excel: Rigor "
-                        "reconoce el formato de Tradovate, TopstepX y Sierra Chart, entre otros.",
+                        "reconoce el formato de Tradovate, TopstepX, Rithmic, cTrader y Sierra "
+                        "Chart, entre otros.",
                         "csv-universal",
                     ),
                     (
@@ -775,7 +777,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Your NinjaTrader 8 CSV (futures).", "ninjatrader"),
                     (
                         "Or your platform's trade history as CSV or Excel: Rigor recognises the "
-                        "format of Tradovate, TopstepX and Sierra Chart, among others.",
+                        "format of Tradovate, TopstepX, Rithmic, cTrader and Sierra Chart, among "
+                        "others.",
                         "csv-universal",
                     ),
                     (
