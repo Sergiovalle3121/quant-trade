@@ -1152,6 +1152,9 @@ File drop zones show a visible keyboard focus ring.
 The phone menu button and the report header buttons have 44 px tap areas.
 On a slow phone (150 ms latency, 1.6 Mbps, 4x CPU) the landing's first screen paints in about 0.7 s and /ejemplo in about 1.5 s; production serves pages gzipped.
 
+The resampled risk shows its p50, p95 and p99 one-year drawdowns as three fact cards; on phones a value and its evidence tag stay on one line in the small tables.
+"No large open loss" keeps its green tone only when the file states the open result; otherwise the note is grey.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
