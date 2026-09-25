@@ -674,6 +674,10 @@ margin-bottom:34px}
 border-radius:999px;border:0;background:#f4f4f6;color:#000;font:560 .8rem var(--sans);cursor:pointer;
 transition:opacity .2s}
 .print-btn:hover{opacity:.86}
+a.print-btn{text-decoration:none}
+.report-hero .verdict+p{margin-top:28px}
+.print-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2}
+@media (max-width:620px){.meta-line .meta-x{display:none}.meta-line span{font-size:.66rem}}
 .lang-switch{font-size:.8rem;font-weight:500;text-decoration:none;color:#a3a3aa;padding:8px 12px;
 border-radius:999px}
 .lang-switch:hover{color:#fff}

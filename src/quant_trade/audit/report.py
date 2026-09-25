@@ -150,6 +150,7 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_code": "¿No tienes código? Pídelo aquí",
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
+        "unlock_nav": "Desbloquear",
         "timing": "Cuándo gana y cuándo pierde",
         "timing_intro": (
             "Tus operaciones agrupadas por el día y la hora de entrada. Si casi todo el "
@@ -372,6 +373,7 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_code": "No code yet? Ask for one here",
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
+        "unlock_nav": "Unlock",
         "timing": "When it wins and when it loses",
         "timing_intro": (
             "Your trades grouped by entry day and time. If nearly all the result comes from "
@@ -2060,7 +2062,12 @@ def render_html(
             f"<div class='watermark'>{_e(text)}</div><div class='banner'>{_e(text)}</div>"
         )
 
-    if pdf_url and not locked:
+    if locked and (redeem_url or checkout_url):
+        # A watermarked preview is not worth printing: the header offers the unlock instead.
+        print_html = (
+            f"<a class='print-btn' href='#unlock'>{icon('lock')}{_e(labels['unlock_nav'])}</a>"
+        )
+    elif pdf_url and not locked:
         print_html = f"<a class='print-btn' href='{_e(pdf_url)}' download>{_e(labels['pdf'])}</a>"
     else:
         print_html = (
@@ -2087,8 +2094,9 @@ def render_html(
     meta = (
         f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
         f"<span>{_e(labels['generated'])} {_e(_short_time(data['generated_at_utc']))}</span>"
-        f"<span>{_e(labels['engine'])} {_e(engine['name'])} {_e(engine['package_version'])}</span>"
-        f"<span>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
+        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['name'])} "
+        f"{_e(engine['package_version'])}</span>"
+        f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
     hero = (
         "<section class='report-hero'>"
