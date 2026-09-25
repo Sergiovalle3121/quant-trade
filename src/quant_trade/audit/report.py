@@ -370,6 +370,7 @@ LABELS: dict[str, dict[str, str]] = {
             "pequeña. No cambia la clase: son preguntas para hacer."
         ),
         "fund_year": "Año",
+        "fund_total": "Total",
         "fund_months": "Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic",
         "fund_cagr": "Rentabilidad anual compuesta",
         "fund_vol": "Volatilidad anual",
@@ -672,6 +673,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Banderas rojas detectadas",
         "report_source": "Formato del archivo",
         "platform": "Datos que declara la plataforma",
+        "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
         "trials_used": "Intentos usados en el Sharpe deflactado",
@@ -1005,6 +1007,7 @@ LABELS: dict[str, dict[str, str]] = {
             "not change the class: these are questions to ask."
         ),
         "fund_year": "Year",
+        "fund_total": "Full year",
         "fund_months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
         "fund_cagr": "Compound annual return",
         "fund_vol": "Annual volatility",
@@ -1296,6 +1299,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Red flags found",
         "report_source": "File format",
         "platform": "Figures the platform states",
+        "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
         "trials_used": "Trials used in the deflated Sharpe",
@@ -2605,7 +2609,9 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
             f"<p>{_e(labels['optimization'])}: {_fmt(passes['value'])} {_e(labels['passes'])} "
             f"{_badge(passes['evidence'])}</p>"
         )
-    metadata = inputs.get("report_metadata") or {}
+    metadata = dict(inputs.get("report_metadata") or {})
+    out += _column_map_html(metadata, labels)
+    metadata = {k: v for k, v in metadata.items() if not k.startswith("column_")}
     if metadata:
         out += (
             f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
@@ -2617,6 +2623,29 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
             + "</table>"
         )
     return out
+
+
+def _column_map_html(metadata: dict[str, Any], labels: dict[str, str]) -> str:
+    """Which of the customer's columns was read as what, one column per row."""
+    locale = _locale_of(labels)
+    order = [key for key in PLATFORM_LABELS["en"] if key.startswith("column_")]
+    keys = sorted(
+        (key for key in metadata if key.startswith("column_")),
+        key=lambda key: order.index(key) if key in order else len(order),
+    )
+    if not keys:
+        return ""
+    rows = []
+    for key in keys:
+        # "Columna leída como precio de entrada" -> "precio de entrada".
+        field = platform_label(key, locale).rpartition(" como " if locale == "es" else " as ")[2]
+        rows.append(
+            f"<li><code>{_e(metadata[key])}</code>{icon('arrow')}<span>{_e(field)}</span></li>"
+        )
+    return (
+        f"<div class='colmap'><p class='colmap-title'>{_e(labels['colmap'])}</p>"
+        f"<ul class='colmap-list'>{''.join(rows)}</ul></div>"
+    )
 
 
 def _other(locale: str) -> str:
@@ -3581,8 +3610,9 @@ def _fund_calendar(years: list[dict[str, Any]], labels: dict[str, str]) -> str:
         )
     return (
         "<div class='fund-cal-wrap'><table class='fund-cal'>"
-        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}<th>{_e(labels['fund_year'])}</th>"
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        f"<thead><tr><th>{_e(labels['fund_year'])}</th>{head}"
+        f"<th class='tot'>{_e(labels['fund_total'])}</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -4503,9 +4533,7 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
         )
     link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_live_link'])}</a>" if anchor else ""
     tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
-    return (
-        f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
-    )
+    return f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
 
 
 def _next_steps_html(

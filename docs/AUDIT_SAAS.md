@@ -1615,6 +1615,14 @@ apart with a hairline and a dot in the outcome's tone (green holds, amber on the
 edge, red does not hold), keeps its link muted, and prints it black at the
 verdict's size in the PDF.
 
+Redesign pass 43 styles the fund calendar from #202. On a phone the table scrolls inside its own frame and the year column stays fixed, so every row keeps its year. The last column is headed "Total" ("Full year" in English) and sits apart with a rule and a light fill. Missing months are hatched. In the PDF the table drops its screen width and fits the page at a smaller size.
+
+Redesign pass 44 turns the column lines from #203 into a column map. For a CSV or Excel file from any platform, the report used to repeat "Column read as …" once per column inside the platform table. It now shows one block, "How each column of your file was read", with each of the customer's column names beside what Rigor read it as, in a trader's order (symbol, side, size, times, prices, result, costs). Three columns on a desktop, one on a phone, two in the PDF.
+
+The same pass styles the buyer's "What to do now" box from #207. Each step is a card with its number in a dark disc and the link to its section in bold with an arrow. The last step (keep the report and its id) is dashed and quieter. The MEASURED/DECLARED/NOT_MEASURED legend under the verdict sits in smaller print. The PDF keeps the cards at 9 pt.
+
+Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…) more shape without changing their words or order. The problems are cards with an amber warning icon. "What Rigor checks" is a grid of cards, two per row on a desktop, each with its name in bold. The price sits in a panel with its buttons. "Other cases" are link cards with an arrow. A check whose name is a question no longer gets an extra full stop ("¿Pico aislado o meseta?.").
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
