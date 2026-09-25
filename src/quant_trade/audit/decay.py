@@ -44,6 +44,9 @@ MIN_SPAN_DAYS = 730
 RECENT_SHARE = 1 / 3
 #: Standard errors the recent average must fall below the earlier one.
 DROP_Z = 2.0
+#: A recent average per trade below this share of the earlier one reads
+#: "weaker" in the report, even when the drop is within chance (no flag).
+WEAKER_SHARE = 0.5
 
 NOTE = "closed trades by exit date; net result after the fees the file itemises"
 
@@ -163,11 +166,25 @@ def recent_review(
     return review, flags
 
 
+def is_weaker(review: dict[str, Any]) -> bool:
+    """A clean review whose recent average per trade is under half the earlier one."""
+    if review.get("status") != "MEASURED" or not review.get("clean"):
+        return False
+    early = (review.get("early") or {}).get("mean") or {}
+    recent = (review.get("recent") or {}).get("mean") or {}
+    before, after = early.get("value"), recent.get("value")
+    if not isinstance(before, (int, float)) or not isinstance(after, (int, float)):
+        return False
+    return before > 0 and after < before * WEAKER_SHARE
+
+
 __all__ = [
     "DROP_Z",
     "MIN_EACH",
     "MIN_SPAN_DAYS",
     "MIN_TRADES",
+    "WEAKER_SHARE",
+    "is_weaker",
     "recent_review",
     "signed_amount",
 ]

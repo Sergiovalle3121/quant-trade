@@ -164,3 +164,41 @@ def test_long_and_short_results_are_net_after_itemised_fees() -> None:
     # Long plus short now add up to the trades' net result.
     assert "después de los costes que el archivo detalla por operación" in page
     assert "antes de comisión y swap" not in page
+
+
+def test_a_weaker_recent_stretch_is_not_called_steady() -> None:
+    page = _page("es")
+    assert "Más débil</span> La media por operación bajó de +15.24 a +3.97 (-74%)" in page
+    assert ">Se mantiene</span>" not in page
+    assert "Weaker</span> The average per trade fell from +15.24 to +3.97" in _page("en")
+
+
+def test_seller_questions_follow_the_report_s_findings() -> None:
+    from quant_trade.audit.analytics import vendor_questions
+    from quant_trade.audit.guard import assert_report_clean
+
+    base = {
+        "has_trades": True,
+        "trials_measured": True,
+        "has_out_of_sample": True,
+        "has_costs": True,
+        "balance_only": False,
+    }
+    plain = {q["code"] for q in vendor_questions([], **base)}
+    asked = vendor_questions(
+        [],
+        **base,
+        findings=["one_carries", "losers_held_longer", "worse_after_streak", "recent_weaker"],
+    )
+    codes = [q["code"] for q in asked]
+    assert {"one_instrument", "exit_losses", "after_losses", "recent_weaker"} <= set(codes)
+    assert not {"one_instrument", "exit_losses", "after_losses", "recent_weaker"} & plain
+    # A faded edge already asks what changed; the weaker question is not repeated.
+    faded = vendor_questions(["EDGE_FADING"], **base, findings=["recent_weaker"])
+    assert "recent_weaker" not in {q["code"] for q in faded}
+    # A thin cost margin asks about costs even when the file lists them.
+    assert "costs" in {q["code"] for q in vendor_questions([], **base, findings=["costs_thin"])}
+    for q in asked:
+        assert_report_clean(q["es"] + " " + q["en"])
+    sample = {q["code"] for q in sample_result("es", bootstrap_samples=60).vendor_questions}
+    assert {"one_instrument", "recent_weaker", "costs"} <= sample
