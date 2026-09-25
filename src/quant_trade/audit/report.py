@@ -3331,7 +3331,7 @@ def _firm_fit_html(
         for row in fit["firms"]
     )
     return out + (
-        f"<table class='timing'><thead><tr><th>{_e(labels['ff_program'])}</th>"
+        f"<table class='timing firms'><thead><tr><th>{_e(labels['ff_program'])}</th>"
         f"<th class='val'>{_e(labels['ff_pass'])}</th>"
         f"<th class='val'>{_e(labels['ff_clean'])}</th>"
         f"<th>{_e(labels['ff_risk'])}</th></tr></thead><tbody>{body}</tbody></table>"

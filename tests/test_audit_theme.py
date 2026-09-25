@@ -934,3 +934,12 @@ def test_an_unknown_share_card_falls_back_to_the_site_card() -> None:
     # Portuguese has no cards yet: a Brazilian link previews the English one, not Spanish.
     assert og_image_name("sample", "pt") == "og-sample-en.png"
     assert set(OG_IMAGES) <= set(STATIC_FILES)
+
+
+def test_the_prop_firm_table_reads_as_cards_on_a_phone(tmp_path: Path) -> None:
+    page = _client(tmp_path).get("/ejemplo").text
+    firms = page.split("<table class='timing firms'>", 1)[1].split("</table>", 1)[0]
+    assert firms.count("<td class='val' data-l=") + firms.count("<td class='val muted' data-l=")
+    # Four columns do not fit 390 px: each challenge becomes a card, its figures labelled.
+    assert "@media screen and (max-width:620px){.paper table.firms," in STYLE
+    assert ".firms td[data-l]::before{content:attr(data-l);" in STYLE

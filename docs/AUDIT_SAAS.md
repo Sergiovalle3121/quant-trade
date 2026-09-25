@@ -2038,6 +2038,8 @@ Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py
 
 Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
 
+Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
