@@ -122,6 +122,7 @@ def scan(
     recomputed_pnl: list[float] | None = None,
     variants_columns: int = 0,
     real_fills: bool = False,
+    net_of_fees: bool = False,
 ) -> list[RedFlag]:
     flags: list[RedFlag] = []
     frame = series.frame
@@ -276,9 +277,12 @@ def scan(
     # A report that itemises commission and fees has measured costs even
     # when the client declares none, and so has an account history: its
     # prices are the broker's real fills.
+    # A fund's own track record declared net of its fees has no costs left
+    # to declare (``net_of_fees`` is only ever true for one).
     if (
         declared.cost_bps_per_side == 0
         and not real_fills
+        and not net_of_fees
         and not (trades is not None and trades.reports_fees)
     ):
         flags.append(

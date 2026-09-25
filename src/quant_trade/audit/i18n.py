@@ -188,6 +188,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # --- Parse warnings: any trade or fill list (universal.py) ---
     (
+        "futures results computed with each contract's point value: {listed}",
+        "resultados de futuros calculados con el valor por punto de cada contrato: {listed}",
+    ),
+    (
         "the profit column already subtracts commission (it matches the price move after "
         "costs), so it was read as net",
         "la columna de resultado ya descuenta la comisión (cuadra con el movimiento del "
@@ -773,6 +777,16 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("share of trades with a net profit", "parte de las operaciones con resultado neto positivo"),
     ("the file has no time of day", "el archivo no tiene hora del día"),
     ("the file is not a monthly track record", "el archivo no es un historial mensual"),
+    (
+        "the fund's own returns after its fees; costs were not measured",
+        "rentabilidades del propio fondo tras sus comisiones; los costes no se midieron",
+    ),
+    (
+        "the net-of-fees declaration applies only to a monthly fund track record; costs are "
+        "checked as usual",
+        "la declaración de rentabilidades netas de comisiones solo vale para el historial "
+        "mensual de un fondo; los costes se revisan como siempre",
+    ),
     ("needs at least {n} monthly returns", "hacen falta al menos {n} rentabilidades mensuales"),
     ("the monthly returns do not vary", "las rentabilidades mensuales no varían"),
     (

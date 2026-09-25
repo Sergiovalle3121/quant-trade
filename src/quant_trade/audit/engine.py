@@ -76,6 +76,11 @@ from quant_trade.research.robustness import rolling_metrics, subperiod_analysis
 from quant_trade.research.splits import date_based_split
 
 ENGINE_NAME = "quant_trade.audit"
+NET_OF_FEES_NOTE = "the fund's own returns after its fees; costs were not measured"
+NET_OF_FEES_IGNORED = (
+    "the net-of-fees declaration applies only to a monthly fund track record; "
+    "costs are checked as usual"
+)
 DSR_SENSITIVITY_TRIALS = (1, 5, 20, 100)
 TRIALS_TO_HALF_CAP = 1_000_000
 CSCV_PARTITIONS = 8
@@ -574,6 +579,21 @@ def _cscv(variants: np.ndarray | None) -> tuple[dict[str, Any], float | None]:
     }, float(evidence.pbo)
 
 
+def fund_record(inputs: AuditInputs) -> bool:
+    """A fund's track record: a hand-made monthly (or slower) return or NAV
+    series with no trades, no platform report and no live history."""
+    return (
+        inputs.trades is None
+        and inputs.source_format == "csv"
+        and inputs.periods_per_year <= fund_lib.MAX_PERIODS_PER_YEAR
+    )
+
+
+def net_of_fees(inputs: AuditInputs) -> bool:
+    """The client's net-of-fees declaration, honoured only on a fund record."""
+    return inputs.declared.net_of_fees and fund_record(inputs)
+
+
 def _real_fills(inputs: AuditInputs) -> bool:
     """True when the upload is an account history, whose prices are real fills."""
     return inputs.source_format in account_lib.ACCOUNT_FORMATS
@@ -866,6 +886,7 @@ def run_audit(
         recomputed_pnl=gross,
         variants_columns=measured_trials,
         real_fills=_real_fills(inputs),
+        net_of_fees=net_of_fees(inputs),
     )
     if inputs.trades is not None:
         flags.extend(
@@ -951,6 +972,11 @@ def run_audit(
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
     fund = fund_lib.fund_review(inputs.equity.frame, inputs.periods_per_year)
+    if fund.get("status") == "MEASURED":
+        # Titles the report as a fund's track record rather than a backtest.
+        fund["track_record"] = fund_record(inputs)
+    if fund.get("status") == "MEASURED" and net_of_fees(inputs):
+        fund["net_of_fees"] = declared(True, NET_OF_FEES_NOTE)
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1078,7 +1104,12 @@ def run_audit(
             "last_timestamp": _iso(frame["timestamp"].iloc[-1]),
             "periods_per_year": measured(ppy, "inferred from the timestamps"),
             "frequency_label": inputs.frequency_label,
-            "parse_warnings": [_safe_text(w) for w in inputs.warnings],
+            "parse_warnings": [_safe_text(w) for w in inputs.warnings]
+            + (
+                [NET_OF_FEES_IGNORED]
+                if inputs.declared.net_of_fees and not fund_record(inputs)
+                else []
+            ),
             "initial_balance": (
                 declared(inputs.initial_balance, "starting balance of the imported report")
                 if inputs.initial_balance is not None

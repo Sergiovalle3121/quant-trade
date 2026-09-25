@@ -860,13 +860,19 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload="En el campo «Informe de tu plataforma».",
                 tips=(
+                    "Reconoce las columnas de: Interactive Brokers (Flex Query de Trades o el "
+                    "Activity Statement en CSV), Tradovate (Performance u Orders), TopstepX y "
+                    "otras cuentas de ProjectX (Trades), TradeStation, thinkorswim (Account "
+                    "Statement), Charles Schwab (Transactions o Realized Gain/Loss), Fidelity, "
+                    "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), cTrader, Sierra "
+                    "Chart (Trade Activity Log), Binance, Kraken y Coinbase.",
                     "Con una fila por ejecución, las compras y ventas se emparejan por símbolo "
                     "en orden de llegada (FIFO); las posiciones que siguen abiertas al final "
                     "quedan fuera y el informe lo dice.",
                     "Si hay columna de resultado, se usa para el valor por punto de cada "
-                    "contrato. Sin ella, el resultado es el movimiento del precio por la "
-                    "cantidad, y conviene añadir una columna Multiplicador para futuros u "
-                    "opciones.",
+                    "contrato. Sin ella, los futuros de CME con código de contrato (ESZ6, "
+                    "MNQ DEC26) usan su valor por punto oficial; para otros futuros u opciones "
+                    "conviene una columna Multiplicador.",
                     "Las comisiones cobradas en otra moneda (por ejemplo BNB en un par USDT) "
                     "quedan fuera de los costes y el informe lo avisa.",
                     "En el informe verás qué columna se leyó como qué. Si falta alguna, el "
@@ -896,12 +902,19 @@ GUIDES: tuple[Guide, ...] = (
                 ),
                 upload="In the field 'Your platform report'.",
                 tips=(
+                    "It recognises the columns of: Interactive Brokers (a Trades Flex Query or "
+                    "the Activity Statement as CSV), Tradovate (Performance or Orders), "
+                    "TopstepX and other ProjectX accounts (Trades), TradeStation, thinkorswim "
+                    "(Account Statement), Charles Schwab (Transactions or Realized Gain/Loss), "
+                    "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), cTrader, "
+                    "Sierra Chart (Trade Activity Log), Binance, Kraken and Coinbase.",
                     "With one row per fill, buys and sells are paired per symbol first in, "
                     "first out; positions still open at the end are left out and the report "
                     "says so.",
                     "A profit column, when there is one, gives each contract's value per "
-                    "point. Without it the result is the price move times the quantity, so add "
-                    "a Multiplier column for futures or options.",
+                    "point. Without it, CME futures with a contract code (ESZ6, MNQ DEC26) use "
+                    "their official point value; other futures or options need a Multiplier "
+                    "column.",
                     "Fees charged in another coin (BNB on a USDT pair, for example) are left "
                     "out of the costs and the report says so.",
                     "The report shows which column was read as what. If one is missing, the "

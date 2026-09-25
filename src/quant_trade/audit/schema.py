@@ -160,6 +160,10 @@ class DeclaredMetadata(BaseModel):
     locale: Literal["es", "en"] = "es"
     #: Starting balance, used only when an imported report does not state one.
     initial_balance: float | None = Field(None, gt=0.0, le=1e12)
+    #: The returns are a fund's own figures after its fees (a monthly track
+    #: record only; ``engine.fund_record`` decides, and anything else keeps
+    #: the cost check).
+    net_of_fees: bool = False
     #: Prop-firm challenge preset to simulate; ``None`` means the default preset.
     challenge: str | None = Field(None, max_length=64)
 

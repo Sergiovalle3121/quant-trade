@@ -21,7 +21,7 @@ import statistics
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from quant_trade.audit import importers as imp
@@ -66,7 +66,7 @@ def normalise(name: str) -> str:
 
 
 def _names(*names: str) -> tuple[str, ...]:
-    return tuple(normalise(name) for name in names)
+    return tuple(dict.fromkeys(normalise(name) for name in names))
 
 
 #: Column names per role, most specific first. The first role whose list
@@ -110,6 +110,12 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "data di apertura",
         "ora di apertura",
         "apertura ora",
+        "opened date",
+        "open date/time",
+        "opening time",
+        "open datetime utc",
+        "entry date/time",
+        "bought timestamp",
     ),
     "exit_time": _names(
         "exit time",
@@ -149,6 +155,11 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "data di chiusura",
         "ora di chiusura",
         "chiusura",
+        "closed date",
+        "close date/time",
+        "closing time",
+        "exit date/time",
+        "sold timestamp",
     ),
     "entry_price": _names(
         "entry price",
@@ -175,6 +186,11 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "eroffnungspreis",
         "prezzo di apertura",
         "prezzo di entrata",
+        "cost per share",
+        "open rate",
+        "opening price",
+        "buy price",
+        "avg. buy",
     ),
     "exit_price": _names(
         "exit price",
@@ -200,8 +216,30 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "schlusskurs",
         "prezzo di chiusura",
         "prezzo di uscita",
+        "proceeds per share",
+        "close rate",
+        "closing price",
+        "sell price",
+        "avg. sell",
     ),
     "time": _names(
+        "fill time",
+        "filled time",
+        "exec time",
+        "execution time",
+        "trade time",
+        "transaction date",
+        "transactiondate",
+        "activity/trade date",
+        "run date",
+        "date/time",
+        "datetime",
+        "trade time utc",
+        "tradecreatedat",
+        "created at",
+        "timestamp",
+        "time",
+        "date",
         "time",
         "date",
         "datetime",
@@ -232,8 +270,25 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "datum/zeit",
         "ora",
         "data e ora",
+        "t/d",
     ),
     "price": _names(
+        "fill price",
+        "avg fill price",
+        "filled avg price",
+        "average fill price",
+        "avg. fill price",
+        "filled average price",
+        "average filled price",
+        "avg price",
+        "average price",
+        "execution price",
+        "exec price",
+        "trade price",
+        "t. price",
+        "tradeprice",
+        "price at transaction",
+        "filled price",
         "price",
         "fill price",
         "trade price",
@@ -289,6 +344,12 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "titolo",
     ),
     "side": _names(
+        "opening direction",
+        "side",
+        "buy/sell",
+        "b/s",
+        "buy sell",
+        "action",
         "side",
         "direction",
         "type",
@@ -319,6 +380,13 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "segno",
     ),
     "quantity": _names(
+        "filled quantity",
+        "fill qty",
+        "filled qty",
+        "paired qty",
+        "closing quantity",
+        "quantity #",
+        "no. of shares",
         "quantity",
         "qty",
         "size",
@@ -398,6 +466,13 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "profitto",
         "utile",
         "risultato",
+        "gain/loss",
+        "realized profit",
+        "realized p/l",
+        "net usd",
+        "net profit usd",
+        "closed p&l",
+        "gain/loss ($)",
     ),
     "commission": _names(
         "commission",
@@ -427,6 +502,17 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "provision",
         "commissione",
         "commissioni",
+        "fees & comm",
+        "commissions & fees",
+        "commission amount",
+        "comm/fee",
+        "comm/fee/tax",
+        "ib commission",
+        "commission ($)",
+        "fees ($)",
+        "opening fee",
+        "closing fee",
+        "platform fee",
     ),
     "swap": _names(
         "swap",
@@ -455,6 +541,15 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "multiplikator",
         "moltiplicatore",
     ),
+    "fee_currency": _names(
+        "fee coin",
+        "fee currency",
+        "fee asset",
+        "commission asset",
+        "commission currency",
+        "ib commission currency",
+        "moneda de la comision",
+    ),
     "account": _names(
         "account", "account name", "account id", "cuenta", "conta", "compte", "konto", "conto"
     ),  # fmt: skip
@@ -462,11 +557,12 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
 
 LONG_WORDS = frozenset(
     {"long", "buy", "b", "l", "bought", "bot", "compra", "largo", "comprar", "achat",
-     "acheter", "kauf", "kaufen", "acquisto", "buytoopen", "buytoclose", "bto", "btc"}
+     "acheter", "kauf", "kaufen", "acquisto", "buytoopen", "buytoclose", "bto", "btc", "bc"}
 )  # fmt: skip
 SHORT_WORDS = frozenset(
     {"short", "sell", "s", "sold", "sld", "venta", "corto", "vender", "vente", "vendre",
-     "verkauf", "verkaufen", "vendita", "venda", "selltoopen", "selltoclose", "sto", "stc"}
+     "verkauf", "verkaufen", "vendita", "venda", "selltoopen", "selltoclose", "sto", "stc", "ss",
+     "sshrt"}
 )  # fmt: skip
 
 
@@ -479,6 +575,8 @@ class ColumnMap:
     names: dict[str, str] = field(default_factory=dict)
     #: Every cost column added up into the commission (``commission`` first).
     fees: tuple[int, ...] = ()
+    #: Another date column, for a fill time that holds only the clock.
+    date_column: int | None = None
 
 
 def _role_of(name: str) -> tuple[str, int] | None:
@@ -512,12 +610,22 @@ def guess_columns(header: Sequence[str]) -> dict[str, int]:
     """
     ranked = _ranked(header)
     columns = {role: options[0][1] for role, options in ranked.items()}
-    times = sorted(position for _, position in ranked.get("time", []))
+    repeated: dict[str, list[int]] = {}
+    for _, position in ranked.get("time", []):
+        repeated.setdefault(normalise(str(header[position])), []).append(position)
+    times: list[int] = []
+    for positions in repeated.values():
+        if len(positions) > len(times):
+            times = sorted(positions)
     if len(times) >= 2:
         del columns["time"]
         columns.setdefault("entry_time", times[0])
         columns.setdefault("exit_time", times[1])
-        prices = sorted(position for _, position in ranked.get("price", []))
+        prices = sorted(
+            position
+            for _, position in ranked.get("price", [])
+            if normalise(str(header[position])) == normalise(str(header[ranked["price"][0][1]]))
+        )
         columns.pop("price", None)
         if len(prices) >= 2:
             columns.setdefault("entry_price", prices[0])
@@ -581,7 +689,12 @@ def resolve(header: Sequence[str], chosen: Mapping[str, str] | None = None) -> C
     )
     columns = {role: index for role, index in columns.items() if role not in dropped}
     names = {role: str(header[index]).strip() for role, index in columns.items()}
-    return ColumnMap(shape, columns, names, tuple(fees))
+    others = [
+        position
+        for _, position in _ranked(header).get("time", [])
+        if position != columns.get("time")
+    ]
+    return ColumnMap(shape, columns, names, tuple(fees), others[0] if others else None)
 
 
 _ROLE_TEXT = {
@@ -618,8 +731,61 @@ def missing_columns(header: Sequence[str], columns: Mapping[str, int]) -> imp.Re
     )
 
 
+def statement_section(table: list[list[str]]) -> tuple[list[str], list[list[str]]] | None:
+    """The trades section of a multi-section statement, as one table.
+
+    Interactive Brokers' Activity Statement prefixes every line with its
+    section (``Trades,Header,...`` then ``Trades,Data,Order,...``; one header
+    per asset class, merged here by column name, subtotal lines dropped).
+    thinkorswim's Account Statement puts a title line (``Account Trade
+    History``) above the section's header. ``None`` when neither is there.
+    """
+    headers = [row for row in table if len(row) > 2 and row[0] == "Trades" and row[1] == "Header"]
+    if headers:
+        names: list[str] = []
+        for header in headers:
+            names += [name for name in header[2:] if name not in names]
+        merged: list[list[str]] = []
+        current: list[str] = []
+        for row in table:
+            if len(row) < 3 or row[0] != "Trades":
+                continue
+            if row[1] == "Header":
+                current = row[2:]
+                continue
+            if row[1] != "Data" or (
+                current
+                and current[0] == "DataDiscriminator"
+                and row[2] not in {"Order", "Trade", "Execution"}
+            ):
+                continue  # fmt: skip
+            cells = dict(zip(current, row[2:], strict=False))
+            merged.append([cells.get(name, "") for name in names])
+        return names, merged
+    for index, row in enumerate(table[:-1]):
+        title = [cell for cell in row if cell.strip()]
+        if len(title) == 1 and normalise(title[0]) == "accounttradehistory":
+            body: list[list[str]] = []
+            for line in table[index + 2 :]:
+                if sum(1 for cell in line if cell.strip()) <= 1:
+                    break
+                body.append(line)
+            return table[index + 1], body
+    return None
+
+
+def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
+    """Sierra Chart's Trade Activity Log mixes order events with fills; keep
+    the fills when an activity column says which is which."""
+    kinds = [i for i, name in enumerate(header) if normalise(str(name)) == "activitytype"]
+    if not kinds:
+        return rows
+    return [row for row in rows if "fill" in (row[kinds[0]] if kinds[0] < len(row) else "").lower()]
+
+
 def _amount(value: str, decimal: str) -> float | None:
     """A number, also when a unit follows it (``0.0015 BTC``, ``12.5USDT``)."""
+    value = re.sub(r"^([-+]?)\s*[$€£¥]\s*", r"\1", (value or "").strip())
     number = imp._num(value, decimal=decimal)
     if number is not None:
         return number
@@ -627,8 +793,97 @@ def _amount(value: str, decimal: str) -> float | None:
     return imp._num(match.group(1), decimal=decimal) if match else None
 
 
-def _times(values: list[str], serial: bool) -> imp._TimeColumn:
-    """A time column; whole-number Unix times (seconds or milliseconds) too."""
+#: Zone abbreviations platforms print after a time, in hours from UTC.
+_ZONES = {
+    "UTC": 0, "GMT": 0, "Z": 0, "ET": -5, "EST": -5, "EDT": -4, "CT": -6, "CST": -6,
+    "CDT": -5, "MT": -7, "MST": -7, "MDT": -6, "PT": -8, "PST": -8, "PDT": -7,
+    "CET": 1, "CEST": 2, "BST": 1, "EET": 2, "EEST": 3, "JST": 9, "HKT": 8, "SGT": 8,
+    "AEST": 10, "AEDT": 11,
+}  # fmt: skip
+_COMPACT = re.compile(r"^(\d{4})(\d{2})(\d{2})(?:[;,T ]+(\d{2}):?(\d{2}):?(\d{2})?)?$")
+_SHORT_YEAR = re.compile(r"^(\d{1,2})([/.\-])(\d{1,2})\2(\d{2})(?=\s|$)")
+_TAIL_OFFSET = re.compile(r"\s*(?:(?:UTC|GMT)?([+-])(\d{1,2}):?(\d{2})?)$")
+_CLOCK = re.compile(r"^\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?(\s*[AaPp][Mm])?$")
+_ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+_DAY_MONTH = re.compile(r"^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})")
+
+
+def _clean_time(text: str) -> tuple[str, int | None]:
+    """A platform time rewritten for ``importers._parse_times``, and the
+    offset from UTC in minutes it carried (``None`` when it carried none).
+
+    Handles ``20260115;093000`` (Interactive Brokers), ``2026-01-15, 09:30:00``,
+    ``1/15/26 09:30`` (two-digit years), ``01/15/2026 09:30:00 EST`` and
+    ``10/01/2025 21:13:23 +02:00`` (a zone after a day-first date).
+    """
+    value = text.strip()
+    if not value:
+        return value, None
+    compact = _COMPACT.match(value)
+    if compact:
+        year, month, day, hour, minute, second = compact.groups()
+        clock = f" {hour}:{minute}:{second or '00'}" if hour else ""
+        return f"{year}-{month}-{day}{clock}", None
+    value = re.sub(r"^(\S+?)[,;]\s*(?=\d)", r"\1 ", value)
+    offset: int | None = None
+    words = value.rsplit(" ", 1)
+    if len(words) == 2 and words[1].upper() in _ZONES:
+        offset = _ZONES[words[1].upper()] * 60
+        value = words[0]
+    elif not _ISO_DAY.match(value) and " " in value:
+        tail = _TAIL_OFFSET.search(value)
+        if tail:
+            sign = 1 if tail.group(1) == "+" else -1
+            offset = sign * (int(tail.group(2)) * 60 + int(tail.group(3) or 0))
+            value = value[: tail.start()]
+    short = _SHORT_YEAR.match(value)
+    if short:
+        value = f"{short.group(1)}/{short.group(3)}/20{short.group(4)}{value[short.end() :]}"
+    return value, offset
+
+
+def _dayfirst_hint(times: list[str], rows: list[list[str]], skip: int | None) -> bool | None:
+    """Whether day/month dates are day first, read from another column of
+    the same rows written year first (Tradovate's ``Trade Date``,
+    TopstepX's ``TradeDay``)."""
+    for column in range(max((len(row) for row in rows), default=0)):
+        if column == skip:
+            continue
+        votes: set[bool] = set()
+        for row, text in zip(rows, times, strict=False):
+            iso = _ISO_DAY.match(row[column].strip()) if column < len(row) else None
+            dmy = _DAY_MONTH.match(text.strip())
+            if not iso or not dmy:
+                continue
+            day, month = int(iso.group(3)), int(iso.group(2))
+            first, second = int(dmy.group(1)), int(dmy.group(2))
+            if (first, second) == (day, month) and first != second:
+                votes.add(True)
+            elif (first, second) == (month, day) and first != second:
+                votes.add(False)
+        if len(votes) == 1:
+            return votes.pop()
+    # Another day/month column of the file with a day past 12 settles it
+    # (Schwab's Closed Date next to its Opened Date).
+    for column in range(max((len(row) for row in rows), default=0)):
+        for row in rows:
+            dmy = _DAY_MONTH.match(row[column].strip()) if column < len(row) else None
+            if dmy and int(dmy.group(1)) > 12:
+                return True
+            if dmy and int(dmy.group(2)) > 12:
+                return False
+    return None
+
+
+def _times(
+    values: list[str],
+    serial: bool,
+    rows: list[list[str]] | None = None,
+    column: int | None = None,
+    date_column: int | None = None,
+) -> imp._TimeColumn:
+    """A time column; whole-number Unix times (seconds or milliseconds),
+    zone suffixes and a clock-only column joined to ``date_column`` too."""
     filled = [value for value in values if value]
     if filled and all(re.fullmatch(r"\d{10}(\d{3})?", value) for value in filled):
         parsed: list[datetime | None] = [
@@ -638,7 +893,31 @@ def _times(values: list[str], serial: bool) -> imp._TimeColumn:
             for value in values
         ]
         return imp._TimeColumn(parsed, False)
-    return imp._parse_times(values, serial_numbers=serial)
+    if (
+        rows is not None
+        and date_column is not None
+        and filled
+        and all(_CLOCK.match(value.strip()) for value in filled)
+    ):
+        values = [
+            f"{row[date_column].strip() if date_column < len(row) else ''} {value}".strip()
+            if value
+            else value
+            for row, value in zip(rows, values, strict=True)
+        ]
+    cleaned = [_clean_time(value) for value in values]
+    texts = [text for text, _ in cleaned]
+    hint = _dayfirst_hint(texts, rows, column) if rows is not None else None
+    column_times = imp._parse_times(texts, serial_numbers=serial, dayfirst_hint=hint)
+    shifted: list[datetime | None] = []
+    zoned = 0
+    for moment, (_, offset) in zip(column_times.values, cleaned, strict=True):
+        if moment is not None and offset is not None:
+            moment -= timedelta(minutes=offset)
+            zoned += 1
+        shifted.append(moment)
+    naive = column_times.naive and zoned < sum(1 for moment in shifted if moment is not None)
+    return imp._TimeColumn(shifted, naive)
 
 
 def _side(text: str) -> str | None:
@@ -652,17 +931,22 @@ def _side(text: str) -> str | None:
         return "long"
     if word in SHORT_WORDS:
         return "short"
-    if word.startswith("buy") or word.startswith("compra"):
+    if word.startswith(("buy", "compra", "youbought", "bought", "cover")):
         return "long"
-    if word.startswith("sell") or word.startswith("vend"):
+    if word.startswith(("sell", "vend", "yousold", "sold", "shortsell")):
         return "short"
     return None
 
 
+#: Quote currencies of exchange pairs (``BTCUSDT``, ``ETH-EUR``), longest first.
+_QUOTES = ("FDUSD", "USDT", "USDC", "BUSD", "USD", "EUR", "GBP", "JPY", "TRY", "BRL", "BTC",
+           "ETH", "BNB")  # fmt: skip
 _UNIT = re.compile(r"[\d.,)\s]([A-Za-z]{2,10})\s*$")
 
 
-def _paid(row: Sequence[str], fees: Sequence[int], decimal: str, symbol: str) -> tuple[float, int]:
+def _paid(
+    row: Sequence[str], fees: Sequence[int], decimal: str, symbol: str, coin: str = ""
+) -> tuple[float, int]:
     """Costs of one row: every fee column, whatever its sign, as a positive
     sum, and how many fee cells were left out because they are charged in
     another coin than the price (``0.001 BNB`` on ``BTCUSDT``)."""
@@ -672,9 +956,11 @@ def _paid(row: Sequence[str], fees: Sequence[int], decimal: str, symbol: str) ->
     for index in fees:
         if index >= len(row) or not row[index].strip():
             continue
-        unit = _UNIT.search(row[index])
+        found = _UNIT.search(row[index])
+        unit = found.group(1).upper() if found else coin.strip().upper()
         amount = abs(_amount(row[index], decimal) or 0.0)
-        if unit and amount and not (plain and plain.endswith(unit.group(1).upper())):
+        quote = next((q for q in _QUOTES if plain.endswith(q) and len(plain) > len(q)), "")
+        if unit and amount and quote and unit != quote:
             other += 1
             continue
         paid += amount
@@ -686,6 +972,9 @@ def _cell(row: Sequence[str], columns: Mapping[str, int], role: str) -> str:
     return row[index] if index is not None and index < len(row) else ""
 
 
+#: An entry-time column that is really the buy fill's time (Tradovate).
+PAIRED_ENTRY_NAMES = frozenset({"boughttimestamp"})
+
 NET_PROFIT_WARNING = (
     "the profit column already subtracts commission (it matches the price move after "
     "costs), so it was read as net"
@@ -696,6 +985,7 @@ NO_PROFIT_WARNING = (
 )
 SIGNED_SIDE_WARNING = "no side column; the side was taken from the sign of the quantity"
 PROFIT_SIDE_WARNING = "no side column; the side was taken from the sign of the profit"
+FUTURES_WARNING = "futures results computed with each contract's point value: {listed}"
 OTHER_COIN_WARNING = (
     "{n} fee(s) charged in another coin than the price were left out of the costs, so "
     "costs are understated"
@@ -726,6 +1016,7 @@ def parse(
         for account in accounts:
             closed[account] = closed.get(account, 0) + 1
         rows = imp._busiest_account(rows, accounts, closed, draft.warnings)
+    rows = only_fills(header, rows)
     if mapping.shape == UNIVERSAL_TRADES_CSV:
         _trades(draft, mapping, rows, decimal, serial_dates)
     else:
@@ -759,12 +1050,18 @@ def _trades(
     draft: imp._Draft, mapping: ColumnMap, rows: list[list[str]], decimal: str, serial: bool
 ) -> None:
     columns = mapping.columns
-    entry_times = _times([_cell(row, columns, "entry_time") for row in rows], serial)
-    exit_times = _times([_cell(row, columns, "exit_time") for row in rows], serial)
+    entry_times = _times(
+        [_cell(row, columns, "entry_time") for row in rows], serial, rows, columns["entry_time"]
+    )
+    exit_times = _times(
+        [_cell(row, columns, "exit_time") for row in rows], serial, rows, columns["exit_time"]
+    )
     draft.naive_times = entry_times.naive or exit_times.naive
     parsed: list[_Row] = []
     signed = False
     other_coin = 0
+    paired = normalise(mapping.names.get("entry_time", "")) in PAIRED_ENTRY_NAMES
+    multipliers: list[float] = []
     for position, row in enumerate(rows):
         volume = _amount(_cell(row, columns, "quantity"), decimal)
         entry_price = _amount(_cell(row, columns, "entry_price"), decimal)
@@ -774,7 +1071,7 @@ def _trades(
         exit_time = exit_times.values[position]
         side = _side(_cell(row, columns, "side")) if "side" in columns else None
         symbol = " ".join(_cell(row, columns, "symbol").split()).upper()
-        paid, other = _paid(row, mapping.fees, decimal, symbol)
+        paid, other = _paid(row, mapping.fees, decimal, symbol, _cell(row, columns, "fee_currency"))
         other_coin += other
         if (
             volume is None
@@ -788,6 +1085,13 @@ def _trades(
         ):
             draft.invalid_rows += 1
             continue
+        if paired:
+            # Tradovate pairs a buy fill with a sell fill: whichever came
+            # first opened the trade.
+            side = "short" if exit_time < entry_time else "long"
+            if side == "short":
+                entry_time, exit_time = exit_time, entry_time
+                entry_price, exit_price = exit_price, entry_price
         if side is None and volume < 0:
             signed = True
         parsed.append(
@@ -804,9 +1108,10 @@ def _trades(
                 symbol=symbol,
             )
         )
+        multipliers.append(_amount(_cell(row, columns, "multiplier"), decimal) or 1.0)
     if other_coin:
         draft.warnings.append(OTHER_COIN_WARNING.format(n=other_coin))
-    if "side" not in columns:
+    if "side" not in columns and not paired:
         if signed:
             draft.warnings.append(SIGNED_SIDE_WARNING)
             for item in parsed:
@@ -828,7 +1133,7 @@ def _trades(
                 * (item.exit_price - item.entry_price)
                 * abs(item.volume),
                 item.profit,
-                item.paid,
+                item.paid - item.swap,
             )
             for item in parsed
         ],
@@ -836,12 +1141,10 @@ def _trades(
     )
     if net:
         draft.warnings.append(NET_PROFIT_WARNING)
-    if "profit" not in columns:
-        draft.warnings.append(NO_PROFIT_WARNING)
     for item in parsed:
         direction = 1.0 if item.side == "long" else -1.0
         gross = (
-            item.profit + (item.paid if net else 0.0)
+            item.profit + (item.paid - item.swap if net else 0.0)
             if item.profit is not None
             else direction * (item.exit_price - item.entry_price) * abs(item.volume)
         )
@@ -859,12 +1162,23 @@ def _trades(
                 swap=item.swap,
             )
         )
+    if "profit" in columns:
+        return
+    if "multiplier" in columns:
+        for trip, factor in zip(draft.trips, multipliers, strict=True):
+            trip.gross *= factor
+        draft.sized = True
+    elif _price_futures(draft, draft.trips):
+        draft.sized = True
+    else:
+        draft.warnings.append(NO_PROFIT_WARNING)
 
 
 def _profit_is_net(items: list[tuple[str, float, float | None, float]], column_name: str) -> bool:
     """Whether a profit column already subtracts commission.
 
-    ``items`` are (symbol, price move x quantity, profit, commission paid).
+    ``items`` are (symbol, price move x quantity, profit, costs: commission
+    paid less swap earned).
     Each hypothesis fits one money-per-point size per symbol; the one whose
     profits the price moves explain more closely wins. With no commission
     to tell them apart, a column named "net" is net and any other is gross.
@@ -886,9 +1200,61 @@ def _profit_is_net(items: list[tuple[str, float, float | None, float]], column_n
         return total
 
     as_gross, as_net = miss(False), miss(True)
-    if abs(as_gross - as_net) <= 1e-9 * max(1.0, as_gross):
-        return named_net
-    return as_net < as_gross
+    if abs(as_gross - as_net) > 1e-9 * max(1.0, as_gross):
+        return as_net < as_gross
+
+    def roundness(add_back: bool) -> float:
+        """How far each symbol's size is from a round contract size."""
+        total = 0.0
+        for symbol in {item[0] for item in usable}:
+            ratios = [
+                ((profit or 0.0) + (paid if add_back else 0.0)) / raw
+                for name, raw, profit, paid in usable
+                if name == symbol
+            ]
+            size = abs(statistics.median(ratios))
+            if size > 0:
+                total += abs(size - imp._snap(size)) / size
+        return total
+
+    # One trade per symbol fits either reading exactly: the one giving a
+    # round size (1, 50, 100 000) wins, else the column's name decides.
+    as_gross, as_net = roundness(False), roundness(True)
+    if abs(as_gross - as_net) > 1e-6:
+        return as_net < as_gross
+    return named_net
+
+
+def _point_value(symbol: str) -> float | None:
+    """The CME value per point of a futures contract code (``MNQZ6``,
+    ``ES DEC26``); a bare root is not enough, since ``CL`` or ``GC`` alone may
+    be a share ticker."""
+    code = symbol.strip().upper().split(".")[0]
+    root = imp._futures_root(code)
+    if root not in imp.FUTURES_POINT_VALUE_USD or code == root:
+        return None
+    return imp.FUTURES_POINT_VALUE_USD[root]
+
+
+def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
+    """Scale each futures trip's price move by its point value; True when
+    every trip was a known contract (so no size is inferred)."""
+    priced: dict[str, float] = {}
+    for trip in trips:
+        value = _point_value(trip.symbol)
+        if value is not None:
+            trip.gross *= value
+            priced[imp._futures_root(trip.symbol.strip().upper().split(".")[0])] = value
+    if priced:
+        listed = ", ".join(
+            f"{root} x{imp._size_text(value)}" for root, value in sorted(priced.items())
+        )
+        draft.warnings.append(FUTURES_WARNING.format(listed=listed))
+    return (
+        bool(priced)
+        and len(priced) >= 1
+        and all(_point_value(trip.symbol) is not None for trip in trips)
+    )
 
 
 def _fills(
@@ -901,7 +1267,13 @@ def _fills(
     price move times quantity times the multiplier column (1 without one).
     """
     columns = mapping.columns
-    times = _times([_cell(row, columns, "time") for row in rows], serial)
+    times = _times(
+        [_cell(row, columns, "time") for row in rows],
+        serial,
+        rows,
+        columns["time"],
+        mapping.date_column,
+    )
     draft.naive_times = times.naive
     fills: list[tuple[datetime, int, str, str, float, float, float, float | None, float]] = []
     signed = False
@@ -927,7 +1299,7 @@ def _fills(
         )
         profit = _amount(_cell(row, columns, "profit"), decimal) if "profit" in columns else None
         symbol = " ".join(_cell(row, columns, "symbol").split()).upper()
-        paid, other = _paid(row, mapping.fees, decimal, symbol)
+        paid, other = _paid(row, mapping.fees, decimal, symbol, _cell(row, columns, "fee_currency"))
         other_coin += other
         fills.append(
             (
@@ -948,6 +1320,11 @@ def _fills(
         draft.warnings.append(OTHER_COIN_WARNING.format(n=other_coin))
     open_lots: dict[tuple[str, str], list[list[Any]]] = {}
     trips: dict[str, list[tuple[imp._Trip, float | None]]] = {}
+    # A file listed newest first (brokers' activity exports) keeps that order
+    # reversed among fills stamped with the same time (a date with no clock).
+    newest_first = len(fills) > 1 and fills[0][0] > fills[-1][0]
+    if newest_first:
+        fills = [(f[0], -f[1], *f[2:]) for f in fills]
     for moment, _, account, symbol, signed_qty, price, fee, profit, multiplier in sorted(fills):
         lots = open_lots.setdefault((account, symbol), [])
         left = abs(signed_qty)
@@ -1000,10 +1377,10 @@ def _fills(
         for trip, share in pairs:
             if share is not None:
                 trip.gross = share - (trip.commission if net else 0.0)
-    elif "multiplier" not in columns:
-        draft.warnings.append(NO_PROFIT_WARNING)
-    else:
+    elif "multiplier" in columns or _price_futures(draft, [pair[0] for pair in pairs]):
         draft.sized = True
+    else:
+        draft.warnings.append(NO_PROFIT_WARNING)
     draft.trips = sorted((pair[0] for pair in pairs), key=lambda t: (t.exit_time, t.entry_time))
 
 
