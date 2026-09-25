@@ -73,7 +73,7 @@ def _all_guide_texts() -> list[str]:
     return texts
 
 
-def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
+def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
     slugs = {guide.slug for guide in GUIDES}
     assert slugs == {
         "mt5",
@@ -91,7 +91,7 @@ def test_every_guide_exists_in_both_languages_and_passes_the_guard() -> None:
         "csv-universal",
     }
     for guide in GUIDES:
-        assert set(guide.text) == {"es", "en"}
+        assert set(guide.text) == {"es", "en", "pt"}
         assert guide.field in {"report", "optimization"}
         for text in guide.text.values():
             assert text.steps and text.tips
@@ -297,7 +297,11 @@ def test_provider_guide_has_an_english_path_and_the_old_one_redirects(tmp_path: 
 
     assert guide_url("cuenta-proveedor", "es") == "/guias/cuenta-proveedor"
     assert guide_url("cuenta-proveedor", "en") == "/guides/provider-account"
-    assert {"es": "/guias/cuenta-proveedor", "en": "/guides/provider-account"} in PUBLIC_PAGES
+    assert {
+        "es": "/guias/cuenta-proveedor",
+        "en": "/guides/provider-account",
+        "pt": "/pt/guias/conta-de-fornecedor",
+    } in PUBLIC_PAGES
     client = _client(tmp_path)
     english = client.get("/guides/provider-account")
     assert english.status_code == 200

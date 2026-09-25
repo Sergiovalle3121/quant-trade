@@ -19,9 +19,11 @@ approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 The landing, its prices and its questions exist in Portuguese (Brazil and
 Portugal) at `/pt`, and every case page at `/pt/para/<slug>` with its own
 Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
-`/pt/para/` moves there). The language switch on the landing and the case
-pages offers the other two languages. Pages not translated yet (the report and
-its PDF, the account screens, the sample, the guides, the terms and the
+`/pt/para/` moves there), and every export guide at `/pt/guias` and
+`/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
+fields). The language switch on these pages offers the other two languages.
+Pages not translated yet (the report and its PDF, the account screens, the
+sample, the comparison and check pages, the methodology, the terms and the
 privacy policy) open in English from a Portuguese page, never in Spanish, and
 the report language on the Portuguese upload form starts on English with a line
 saying so. The profit-claim guard reads Portuguese too

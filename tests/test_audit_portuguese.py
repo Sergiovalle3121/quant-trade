@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url  # noqa: E402
 from quant_trade.audit.pages import _COPY, _UI, landing  # noqa: E402
 from quant_trade.audit.portuguese import AUDIENCES_PT, INVESTOR_PT, link_locale  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -185,3 +186,64 @@ def test_the_portuguese_landing_cards_open_the_portuguese_case_pages() -> None:
     page = _paid("pt")
     for case in AUDIENCE_PAGES:
         assert f"href='{audience_url(case.slug, 'pt')}'" in page
+
+
+def _opens_every_link(client: TestClient, page: str) -> None:
+    links = {
+        href.split("#", 1)[0]
+        for href in HREF.findall(page)
+        if href.startswith("/") and not href.startswith("//")
+    }
+    for href in sorted(links - {""}):
+        assert client.get(href, follow_redirects=False).status_code < 400, href
+
+
+def test_the_guides_index_exists_in_portuguese(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    assert guides_index_url("pt") == "/pt/guias"
+    response = client.get("/pt/guias")
+    assert response.status_code == 200
+    assert "<html lang='pt'>" in response.text
+    assert find_claims(_text(response.text)) == []
+    for guide in GUIDES:
+        assert f"href='{guide_url(guide.slug, 'pt')}'" in response.text
+    _opens_every_link(client, response.text)
+
+
+@pytest.mark.parametrize("guide", GUIDES, ids=lambda guide: guide.slug)
+def test_every_export_guide_exists_in_portuguese(tmp_path: Path, guide) -> None:
+    client = _client(tmp_path)
+    path = guide_url(guide.slug, "pt")
+    assert path.startswith("/pt/guias/")
+    response = client.get(path)
+    assert response.status_code == 200
+    text = _text(response.text)
+    assert find_claims(text) == []
+    assert guide.text["pt"].title in text
+    for spanish in ("Pasos", "Dónde subirlo", "Antes de subirlo", "archivo", "Tu informe"):
+        assert spanish not in text, spanish
+    for lang in ("es", "en"):
+        assert f"href='{guide_url(guide.slug, lang)}' hreflang='{lang}'" in response.text
+    assert "href='/pt#subir'" in response.text
+    _opens_every_link(client, response.text)
+
+
+def test_portuguese_guides_name_the_portuguese_form_fields() -> None:
+    labels = (_COPY["pt"]["report"], "Saldo inicial", "Adicionar mais arquivos")
+    uploads = " ".join(
+        guide.text["pt"].upload + " ".join(guide.text["pt"].tips) for guide in GUIDES
+    )
+    assert "Relatório da sua plataforma" in _COPY["pt"]["report"]
+    assert "'Relatório da sua plataforma'" in uploads
+    for label in labels[1:]:
+        assert label in uploads
+    for english in ("Your platform report", "Starting balance", "Add more files"):
+        assert english not in uploads
+
+
+def test_a_guide_slug_in_another_language_moves_to_the_portuguese_one(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    moved = client.get("/pt/guias/provider-account", follow_redirects=False)
+    assert moved.status_code == 301
+    assert moved.headers["location"] == "/pt/guias/conta-de-fornecedor"
+    assert client.get("/pt/guias/nothing-here").status_code == 404

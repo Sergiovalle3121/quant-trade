@@ -2467,8 +2467,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _guide(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         guide = GUIDES_BY_PATH[path_locale].get(slug)
         if guide is None:
-            # A guide's slug in the other language moves to this language's own.
-            other = GUIDES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            # A guide's slug in another language moves to this language's own.
+            other = next(
+                (
+                    found
+                    for lang, guides in GUIDES_BY_PATH.items()
+                    if lang != path_locale and (found := guides.get(slug)) is not None
+                ),
+                None,
+            )
             if other is None:
                 raise _not_found()
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
@@ -2507,6 +2514,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/for/{slug}", response_class=HTMLResponse)
     def audience_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _audience(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/pt/guias", response_class=HTMLResponse)
+    def guides_pt(request: Request) -> str:
+        return guides_index_page(locale="pt", base_url=_site_url(request))
+
+    @app.get("/pt/guias/{slug}", response_class=HTMLResponse)
+    def guide_pt(request: Request, slug: str) -> Response:
+        return _guide(request, slug, "pt", "pt")
 
     @app.get("/pt/para/{slug}", response_class=HTMLResponse)
     def audience_pt(request: Request, slug: str) -> Response:

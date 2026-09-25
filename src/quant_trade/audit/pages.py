@@ -1203,7 +1203,7 @@ def _nav(
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
         f"<a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a>"
         f"<a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a>"
-        f"<a href='{_e(guides_index_url(linked))}'>{_e(ui['nav_guides'])}</a>"
+        f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
         f"<a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a>"
         f"<a href='{home}#faq'>{_e(ui['nav_faq'])}</a>"
     )
@@ -1303,7 +1303,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
-        f"<li><a href='{_e(guides_index_url(linked))}'>{_e(ui['nav_guides'])}</a></li>"
+        f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
         f"<li><a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a></li>"
         f"<li><a href='{_check_url(linked)}'>{_e(ui['footer_check'])}</a></li>"
         f"<li><a href='{_e(method_url(linked))}'>{_e(_method_title(locale))}</a></li>"
@@ -1442,7 +1442,7 @@ def _specs(locale: str) -> str:
     recognised = {"es": PLATFORMS_ES, "pt": PLATFORMS_PT}.get(locale, PLATFORMS_EN)
     also = (
         f"<p class='platforms-also'>{_e(ui['platforms_also'])} "
-        f"<a href='{_e(guide_url('csv-universal', link_locale(locale)))}'>{_e(recognised)}</a>.</p>"
+        f"<a href='{_e(guide_url('csv-universal', locale))}'>{_e(recognised)}</a>.</p>"
     )
     return (
         "<section class='dark' style='padding-bottom:clamp(88px,11vw,150px)'><div class='wrap'>"
@@ -1711,7 +1711,7 @@ def _investor_card(locale: str) -> str:
         "<div class='investor' data-reveal>"
         f"<div><span class='eyebrow'><span class='dot'></span>{_e(words['eyebrow'])}</span>"
         f"<h3>{_e(words['title'])}</h3><p>{_e(words['text'])}</p>"
-        f"<a class='btn btn-dark' href='{_e(guide_url('cuenta-proveedor', link_locale(locale)))}'>"
+        f"<a class='btn btn-dark' href='{_e(guide_url('cuenta-proveedor', locale))}'>"
         f"{_e(words['cta'])}<span class='go'>{icon('arrow')}</span></a></div>"
         f"<ul class='checks'>{points}</ul></div>"
     )
@@ -1728,7 +1728,7 @@ def _how_html(copy: dict[str, Any], locale: str) -> str:
         + f"<ol class='steps'>{steps}</ol>"
         + f"<div class='section-tight' data-reveal style='padding-bottom:0'><p class='muted'>"
         f"{_e(copy['guides_text'])} "
-        f"<a href='{_e(guides_index_url(link_locale(locale)))}'>{_e(copy['guides_link'])}</a>"
+        f"<a href='{_e(guides_index_url(locale))}'>{_e(copy['guides_link'])}</a>"
         "</p></div>" + "</div></section>"
     )
 
@@ -1908,7 +1908,7 @@ def _upload_form(
         f"{_e(copy['report_short'])}<details class='more-help'><summary>"
         f"{_e(copy['guide_q'])}</summary>"
         f"<p>{_e(copy['report_help'])}</p>"
-        f"<p>{_e(copy['guide_list'])}: {_guide_links(linked)}</p></details>"
+        f"<p>{_e(copy['guide_list'])}: {_guide_links(locale)}</p></details>"
     )
     mapping = (
         "<details class='adv map-columns'><summary><span>"
@@ -1935,7 +1935,7 @@ def _upload_form(
         + "</div></details>"
     )
     optimization_help = (
-        f"{_e(copy['optimization_help'])} <a href='{_e(guide_url('mt5-optimization', linked))}'>"
+        f"{_e(copy['optimization_help'])} <a href='{_e(guide_url('mt5-optimization', locale))}'>"
         f"{_e(copy['optimization_guide'])}</a>"
     )
     advanced = (
@@ -2605,7 +2605,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
             ],
             locale,
-            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
             f"{_e(GUIDES_COPY[locale]['form'])}<span class='go'>{icon('arrow')}</span></a>",
         )
         + "</div></div>"
@@ -2627,7 +2627,29 @@ _GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
         ("Backtests", "Strategy tester reports and trade lists."),
         ("Live accounts", "An account's history, yours or that of someone you plan to copy."),
     ),
+    "pt": (
+        ("Backtests", "Relatórios do testador de estratégias e listas de operações."),
+        (
+            "Contas reais",
+            "O histórico de uma conta, a sua ou a de alguém que você pretende copiar.",
+        ),
+    ),
 }
+
+
+def _form_url(locale: str) -> str:
+    """The landing's upload form in ``locale``."""
+    return "/pt#subir" if locale == "pt" else f"/?lang={locale}#subir"
+
+
+def _language_crumbs(alternates: dict[str, str], locale: str) -> str:
+    """Breadcrumb links to the page in every other language."""
+    return "".join(
+        f"<span>/</span><a href='{_e(href)}' hreflang='{lang}' lang='{lang}'>"
+        f"{_e(LANGUAGE_NAMES[lang])}</a>"
+        for lang, href in alternates.items()
+        if lang != locale
+    )
 
 
 def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
@@ -2636,7 +2658,7 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     copy = _COPY[locale]
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
-    other = "en" if locale == "es" else "es"
+    alternates = {lang: guides_index_url(lang) for lang in ("es", "en", "pt")}
     meta = _public_meta(
         f"{words['title']} · {copy['title']}",
         words["summary"],
@@ -2660,15 +2682,14 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
             f"<section class='guide-group'><h2>{_e(title)}</h2><p>{_e(lead)}</p>"
             f"<ul class='guide-list guides'>{items}</ul></section>"
         )
-    crumbs = (
-        f"<a href='/?lang={_e(locale)}'>{_e(words['back'])}</a><span>/</span>"
-        f"<a href='{_e(guides_index_url(other))}' hreflang='{other}'>{_other_name(locale)}</a>"
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['back'])}</a>" + _language_crumbs(
+        alternates, locale
     )
     body = (
         _page_hero(ui["guides_eyebrow"], words["title"], words["intro"], crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
         f"{groups}<div class='back-row'>"
-        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(words['form'])}"
+        f"<a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['form'])}"
         f"<span class='go'>{icon('arrow')}</span></a></div></div></div>"
     )
     return _page(
@@ -2676,7 +2697,7 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
         locale,
         body,
         meta_html=meta,
-        switch_href=guides_index_url(other),
+        alternates=alternates,
         solid_nav=True,
     )
 
@@ -2688,15 +2709,13 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
     text = guide.text[locale]
-    other = "en" if locale == "es" else "es"
+    alternates = {lang: guide_url(guide.slug, lang) for lang in ("es", "en", "pt")}
     title = f"{text.title} · {copy['title']}"
     meta = _public_meta(title, text.summary, locale, guide_url(guide.slug, locale), base_url)
     steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
-    crumbs = (
-        f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a><span>/</span>"
-        f"<a href='{_e(guide_url(guide.slug, other))}' hreflang='{other}'>"
-        f"{_other_name(locale)}</a>"
+    crumbs = f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a>" + (
+        _language_crumbs(alternates, locale)
     )
     body = (
         _page_hero(ui["guides_eyebrow"], text.title, text.summary, crumbs)
@@ -2709,10 +2728,10 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
                 (words["tips"], f"<ul class='checks'>{tips}</ul>"),
             ],
             locale,
-            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
             f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a>",
         )
-        + f"<div class='back-row'><a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>"
+        + f"<div class='back-row'><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
         f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a></div></div></div>"
     )
     return _page(
@@ -2720,7 +2739,7 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
         locale,
         body,
         meta_html=meta,
-        switch_href=guide_url(guide.slug, other),
+        alternates=alternates,
         solid_nav=True,
     )
 
@@ -2746,7 +2765,7 @@ def audience_page(
     pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
     uploads = "".join(
         f"<li>{icon('file')}<span>{_e(item)}"
-        + (f" <a href='{_e(guide_url(guide, linked))}'>{_e(words['guide'])}</a>" if guide else "")
+        + (f" <a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>" if guide else "")
         + "</span></li>"
         for item, guide in text.uploads
     )
@@ -2784,11 +2803,8 @@ def audience_page(
         "</div>"
     )
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
-    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + "".join(
-        f"<span>/</span><a href='{_e(href)}' hreflang='{lang}' lang='{lang}'>"
-        f"{_e(LANGUAGE_NAMES[lang])}</a>"
-        for lang, href in alternates.items()
-        if lang != locale
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
+        alternates, locale
     )
     body = (
         _page_hero(words["eyebrow"], text.title, text.summary, crumbs)

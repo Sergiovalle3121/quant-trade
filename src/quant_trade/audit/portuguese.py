@@ -148,7 +148,7 @@ COPY_PT: dict[str, Any] = {
     "guides_title": "Qual arquivo enviar",
     "guides_text": (
         "Envie o arquivo que a sua plataforma já salva. Se não souber qual exportar, há um guia "
-        "curto para cada uma (em inglês)."
+        "curto para cada uma."
     ),
     "guides_link": "Ver os guias de exportação",
     "guide_q": "Qual arquivo eu exporto?",
@@ -585,7 +585,7 @@ INVESTOR_PT: dict[str, Any] = {
         "A conta real frente a milhares de histórias do seu backtest",
         "Sem conexão com a corretora dela nem com o seu dinheiro",
     ),
-    "cta": "Como revisar a conta (em inglês)",
+    "cta": "Como revisar a conta",
 }
 
 #: Report words the landing shows (the illustration, the dimension cards).

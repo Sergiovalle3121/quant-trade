@@ -154,7 +154,7 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "faq": "Perguntas",
         "start": "Começar grátis",
         "sample": "Ver um relatório de exemplo (em inglês)",
-        "guide": "Como exportar (em inglês)",
+        "guide": "Como exportar",
         "others": "Outros casos",
         "home": "Início",
     },
@@ -1184,7 +1184,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     (
                         "Como peço o histórico?",
                         "O guia da conta do fornecedor explica o que pedir no MetaTrader, "
-                        "Myfxbook, FX Blue e sinais da MQL5 (em inglês).",
+                        "Myfxbook, FX Blue e sinais da MQL5.",
                     ),
                 ),
             ),
