@@ -854,6 +854,48 @@ def without_totals(rows: list[list[str]]) -> list[list[str]]:
     return [row for row in rows if normalise(first(row)) not in TOTAL_WORDS]
 
 
+#: Column names that identify one row: a position, ticket, deal, fill or
+#: execution. An order id is not one (an order's partial fills share it), nor
+#: a bare "ID" or "Trade" whose meaning varies by platform.
+ID_COLUMNS = frozenset(
+    {
+        "position", "positionid", "positionnumber", "ticket", "ticketid", "ticketnumber",
+        "deal", "dealid", "dealnumber", "fillid", "execid", "executionid", "transactionid",
+        "tradeid", "tradeno", "tradenumber", "idoperacion",
+    }
+)  # fmt: skip
+
+REPEATED_ROWS_WARNING = "{n} repeated row(s) (the same position listed twice) counted once"
+
+
+def drop_repeated_rows(header: Sequence[str], rows: list[list[str]]) -> tuple[list[list[str]], int]:
+    """The rows with exact repeats removed, and how many were removed.
+
+    Only when the table has a per-row id column (Position, Ticket, Deal,
+    Transaction ID...), and only rows whose id is filled in: there a row
+    repeated in every column is the same position listed twice (two exports
+    pasted together). Rows that share an id but differ (partial closes) are
+    all kept, and so are rows with a blank id. An order id is never used:
+    two partial fills of one order can match in every column and both be
+    real.
+    """
+    ids = [i for i, name in enumerate(header) if normalise(str(name)) in ID_COLUMNS]
+    if not ids:
+        return rows, 0
+    seen: set[tuple[str, ...]] = set()
+    kept: list[list[str]] = []
+    for row in rows:
+        if not any(i < len(row) and row[i].strip() for i in ids):
+            kept.append(row)
+            continue
+        key = tuple(cell.strip() for cell in row)
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(row)
+    return kept, len(rows) - len(kept)
+
+
 def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
     """Sierra Chart's Trade Activity Log mixes order events with fills; keep
     the fills when an activity column says which is which."""
@@ -1096,7 +1138,10 @@ def parse(
         for account in accounts:
             closed[account] = closed.get(account, 0) + 1
         rows = imp._busiest_account(rows, accounts, closed, draft.warnings)
-    rows = only_fills(header, without_totals(rows))
+    rows, repeated = drop_repeated_rows(header, without_totals(rows))
+    if repeated:
+        draft.warnings.append(REPEATED_ROWS_WARNING.format(n=repeated))
+    rows = only_fills(header, rows)
     if mapping.shape == UNIVERSAL_TRADES_CSV:
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:

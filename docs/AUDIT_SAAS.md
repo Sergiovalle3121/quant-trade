@@ -148,6 +148,14 @@ gets `universal_close_time_only`: without opening times holding time and
 entry timing cannot be measured, so it asks for the executions export (Bybit
 Trade History) instead. A `Contracts` column names the instrument when no
 symbol column exists and `Exec Qty` is the size.
+Rows repeated in every column are counted once when the table has an id
+column (Position, Ticket, Deal, Transaction ID, Trade number...; never an
+order id, which an order's partial fills share, nor a bare ID) and the row's
+id is filled in, as when two exports
+are pasted together (`universal.drop_repeated_rows`, for the universal reader
+and every delimited named format); the report says how many. Rows that share
+an id but differ (partial closes) are all kept, and a table without an id
+keeps identical rows, since two identical fills can be real.
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
 Platform exports the universal reader is checked against
@@ -756,6 +764,44 @@ Limitations: the thirds are cut by time, so a history whose pace changed
 has periods of different sizes; trades are treated as independent, which
 understates the noise of a strategy whose trades cluster; it describes the
 history and says nothing about later periods.
+
+### What is left once luck is discounted (`audit/luck.py`)
+
+The deflated Sharpe gives a probability; this section restates the same
+evidence in three numbers a buyer can read. It uses the trial count and the
+Sharpe spread of the multiplicity dimension, so it never disagrees with it:
+
+- **Sharpe from luck**: E[max Sharpe] of the counted configurations with no
+  skill (Bailey & López de Prado), annualised. It is the deflated Sharpe's
+  threshold, so "beats luck" holds exactly when DSR ≥ 0.5.
+- **Years of history needed**: `span × (luck / observed)²`, the minimum
+  backtest length of Bailey, Borwein, López de Prado and Zhu (2014): the
+  unskilled spread shrinks as 1 / years.
+- **Sharpe after the haircut**: Harvey & Liu (2015) with Bonferroni: the
+  one-sided p-value times the trial count, turned back into a Sharpe with
+  the same standard error. It is zero whenever the Sharpe does not beat the
+  luck.
+
+When the files count no configurations (nothing declared, no optimisation
+export or variants), the section shows a table for 10, 100 and 1,000
+configurations instead and asks the buyer to put that question to the
+vendor. Needs a positive Sharpe, 20 returns and 28 days of history; under a
+year it adds a line that annualised Sharpe ratios move a lot. Above 100
+years the page prints "más de 100 años". Informational: the class comes from
+the multiplicity dimension as before. Real-file check (40 files): classes
+unchanged; values from under 1 month to over 100 years, both shown in words.
+
+### What living through the history was like (`audit/ride.py`)
+
+From the equity curve in calendar days: the longest stretch below a previous
+high (to the day it is regained, or open at the file's end), the deepest
+fall's days from high to low and back, the worst day (only when the curve
+has a point on most days, median gap ≤ 4 days), the worst calendar month,
+the share of months that end up and the longest run of losing months. Needs
+20 points; months need 3. A curve rebuilt from closed trades carries a note
+that open losses do not show. Hidden on fund records, whose own section
+already shows months and time under water. The depth itself is not repeated:
+the summary tiles show it.
 
 ### How it behaves after losing (`audit/behaviour.py`)
 
@@ -1864,6 +1910,8 @@ Redesign pass 49 checks the upload form after #230 (report first, extras in a cl
 
 Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, two reports picked from "My reports"). On a phone the dimension and figure tables now use tighter cells and smaller badges, so a "Fails" badge in the second report no longer spills past the card. It also checks the fund benchmark block and the plain lines under the headline figures on /ejemplo; both read well and needed nothing.
 
+Redesign pass 51 styles the PDF link while the PDF is made ("Generando tu PDF… (unos segundos)"): the button keeps its full colour, shows a small spinning ring like the upload loader, and keeps a progress cursor; on a phone the report's PDF button spans the width so the longer label fits on one line.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -1918,3 +1966,5 @@ keep secret and no Railway variable, and the buyer checks on the site in two
 clicks instead of with a tool. The records survive the retention purge like
 the audit's other hashes and go with `audit delete ID --yes`. A PDF printed
 again, a screenshot or any re-save never matches.
+
+A fifth audience page, for signal copiers (`/para/copiar-senales`, `/for/signal-copiers`), names the risks a copy-trading percentage hides and points each at a live check: martingale sizing, grid averaging, no sign of a stop loss, many small wins with large losses, many positions open at once, hidden floating drawdown, positions still open at the end, and gains inflated by deposits. It asks for the account's exported history, because a screenshot cannot be audited. The landing keeps its four cards and links the fifth page in a line under them, so `AUDIENCE_PAGES` keeps the four card pages first.

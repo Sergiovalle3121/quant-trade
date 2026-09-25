@@ -1178,6 +1178,10 @@ class AuditResult(BaseModel):
     instruments: dict[str, Any] | None = None
     #: Calendar table and fund-investor checks of a monthly track record (``audit/fund.py``).
     fund: dict[str, Any] | None = None
+    #: The Sharpe next to the luck of the configurations tried (``audit/luck.py``).
+    luck: dict[str, Any] | None = None
+    #: Time under water, worst day and month, monthly hit rate (``audit/ride.py``).
+    ride: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 
