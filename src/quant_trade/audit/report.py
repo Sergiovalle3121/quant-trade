@@ -230,6 +230,30 @@ LABELS: dict[str, dict[str, str]] = {
             "usarse para ajustar el backtest, así que la comparación es menos exigente."
         ),
         "live_symbols": "La cuenta real opera símbolos que el backtest no tiene: {symbols}.",
+        "live_pair": "Mismas fechas, operación por operación",
+        "live_pair_intro": (
+            "Del {start} al {end} los dos archivos cubren los mismos días. Buscamos cada "
+            "operación real en el backtest: mismo lado, mismo símbolo y entrada a menos de "
+            "60 minutos."
+        ),
+        "live_pair_found": "Operaciones reales encontradas en el backtest",
+        "live_pair_of": "{matched} de {total} ({share})",
+        "live_pair_missing": "Operaciones del backtest sin su operación real",
+        "live_pair_entry": "Diferencia mediana de precio al entrar",
+        "live_pair_exit": "Diferencia mediana de precio al salir",
+        "live_pair_gap": "Diferencia de resultado en las emparejadas",
+        "live_pair_gap_value": "{total} ({each} por operación)",
+        "live_pair_bps": "{bps} pb",
+        "live_pair_low": (
+            "Menos de la mitad de las operaciones reales aparecen en el backtest en esas "
+            "fechas: probablemente no es la misma configuración. Pide al vendedor el backtest "
+            "exacto de esa cuenta."
+        ),
+        "live_pair_help": (
+            "pb = puntos básicos (0,01 % del precio); positivo es peor para la cuenta. La "
+            "diferencia de resultado está al tamaño del backtest; negativa es lo que la cuenta "
+            "real hizo por debajo del backtest en las mismas operaciones."
+        ),
         "reading": "Lectura de tu archivo",
         "reading_intro": (
             "Antes de analizar nada, volvimos a contar tus operaciones fila por fila y lo "
@@ -508,6 +532,30 @@ LABELS: dict[str, dict[str, str]] = {
             "have been used to fit the backtest, so the comparison is less demanding."
         ),
         "live_symbols": "The live account trades symbols the backtest lacks: {symbols}.",
+        "live_pair": "Same dates, trade by trade",
+        "live_pair_intro": (
+            "From {start} to {end} both files cover the same days. Each live trade was "
+            "looked up in the backtest: same side, same symbol and an entry less than 60 "
+            "minutes apart."
+        ),
+        "live_pair_found": "Live trades found in the backtest",
+        "live_pair_of": "{matched} of {total} ({share})",
+        "live_pair_missing": "Backtest trades without their live trade",
+        "live_pair_entry": "Median price difference at entry",
+        "live_pair_exit": "Median price difference at exit",
+        "live_pair_gap": "Result difference on the paired trades",
+        "live_pair_gap_value": "{total} ({each} per trade)",
+        "live_pair_bps": "{bps} bp",
+        "live_pair_low": (
+            "Fewer than half the live trades appear in the backtest on those dates: it is "
+            "probably not the same configuration. Ask the seller for that account's exact "
+            "backtest."
+        ),
+        "live_pair_help": (
+            "bp = basis points (0.01 % of the price); positive is worse for the account. The "
+            "result difference is at the backtest's size; negative is what the live account "
+            "made below the backtest on the same trades."
+        ),
         "reading": "How your file was read",
         "reading_intro": (
             "Before analysing anything, we re-counted your trades row by row and compared "
@@ -1765,6 +1813,66 @@ def _live_html(live: dict[str, Any] | None, locale: str, labels: dict[str, str])
         + tails
         + "".join(f"<p class='muted'>{_e(note)}</p>" for note in notes)
         + f"<p class='muted'>{_e(localize(live.get('note', ''), locale))}</p>"
+        + _pairing_html(live.get("pairing"), locale, labels)
+    )
+
+
+def _pairing_html(pairing: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """Live trades paired with the backtest's on the dates both files cover."""
+    if not pairing or pairing.get("status") != "MEASURED":
+        return ""
+
+    def number(value: float, digits: int = 2) -> str:
+        return f"{value:,.{digits}f}"
+
+    def value(item: dict[str, Any], fmt: Any) -> str:
+        if item.get("evidence") != "MEASURED":
+            reason = _localized_reason(item.get("note", ""), locale)
+            return f"{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span>"
+        return f"{_e(fmt(item['value']))} {_badge('MEASURED')}"
+
+    share = pairing["matched_share"]
+    found = labels["live_pair_of"].format(
+        matched=pairing["matched"]["value"],
+        total=pairing["live_trades"]["value"],
+        share=f"{share['value']:.0%}" if share.get("value") is not None else "—",
+    )
+    rows = [
+        (labels["live_pair_found"], f"{_e(found)} {_badge('MEASURED')}"),
+        (
+            labels["live_pair_missing"],
+            f"{pairing['missing_live']['value']:,} {_badge('MEASURED')}",
+        ),
+        (
+            labels["live_pair_entry"],
+            value(pairing["entry_bps"], lambda v: labels["live_pair_bps"].format(bps=number(v, 1))),
+        ),
+        (
+            labels["live_pair_exit"],
+            value(pairing["exit_bps"], lambda v: labels["live_pair_bps"].format(bps=number(v, 1))),
+        ),
+    ]
+    gap = pairing["result_gap"]
+    if gap.get("evidence") == "MEASURED":
+        each = pairing["result_gap_per_trade"]["value"]
+        text = labels["live_pair_gap_value"].format(total=number(gap["value"]), each=number(each))
+        rows.append((labels["live_pair_gap"], f"{_e(text)} {_badge('MEASURED')}"))
+    else:
+        rows.append((labels["live_pair_gap"], value(gap, str)))
+    intro = labels["live_pair_intro"].format(start=pairing["start"], end=pairing["end"])
+    low = (
+        f"<p><span class='badge WEAK'>{_e(labels['live_badge_ABOVE'])}</span> "
+        f"{_e(labels['live_pair_low'])}</p>"
+        if pairing.get("low_match")
+        else ""
+    )
+    return (
+        f"<h3>{_e(labels['live_pair'])}</h3><p class='muted'>{_e(intro)}</p>"
+        + low
+        + "<table class='pair'><tbody>"
+        + "".join(f"<tr><td>{_e(name)}</td><td class='val'>{cell}</td></tr>" for name, cell in rows)
+        + "</tbody></table>"
+        + f"<p class='muted'>{_e(labels['live_pair_help'])}</p>"
     )
 
 
