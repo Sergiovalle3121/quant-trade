@@ -825,6 +825,12 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_breakeven_negative": "ya pierde sin coste extra",
         "kpi_stress": "Sin las 5 mejores operaciones",
         "kpi_stress_curve": "Sin los 5 mejores periodos",
+        "kpi_hint_return": "cuánto cambió la cuenta en todo el historial",
+        "kpi_hint_drawdown": "la peor caída desde un máximo",
+        "kpi_hint_dd_p95": "caída que se supera en 1 de cada 20 años simulados",
+        "kpi_hint_sharpe": "rendimiento frente a sus altibajos; más alto, más estable",
+        "kpi_hint_pf": "lo ganado por cada 1 perdido",
+        "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
         "bps_side": "pb por lado",
         "stress": "Pruebas de estrés: sin los mejores resultados",
         "stress_intro": (
@@ -1500,6 +1506,12 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_breakeven_negative": "already negative before any extra cost",
         "kpi_stress": "Without the best 5 trades",
         "kpi_stress_curve": "Without the best 5 periods",
+        "kpi_hint_return": "how much the account changed over the whole history",
+        "kpi_hint_drawdown": "the worst fall from a peak",
+        "kpi_hint_dd_p95": "a fall exceeded in 1 of every 20 simulated years",
+        "kpi_hint_sharpe": "return against its ups and downs; higher is steadier",
+        "kpi_hint_pf": "what was won for every 1 lost",
+        "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
         "bps_side": "bps per side",
         "stress": "Stress tests: without the best outcomes",
         "stress_intro": (
@@ -2316,6 +2328,8 @@ KPI_CSS = (
     ".kpi.xlong b{font-size:clamp(.85rem,1.5vw,1.2rem)}"
     ".kpi b{overflow-wrap:anywhere}"
     ".kpi span{display:block;margin-top:6px;color:var(--text-2);font-size:.82rem}"
+    ".kpi small{display:block;margin-top:3px;color:var(--text-2);font-size:.72rem;"
+    "line-height:1.35;opacity:.85}"
     ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
     ".kpi.locked b{display:flex;align-items:center;gap:10px;height:1.1em;color:var(--text-3)}"
     ".kpi.locked svg{width:.62em;height:.62em;flex:none}"
@@ -2432,6 +2446,24 @@ def _kpi_size(shown: str) -> str:
     return " xlong" if length >= 12 else " long" if length >= 9 else ""
 
 
+#: Tiles whose name is a trader's term get a plain line under it.
+_KPI_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("kpi_return",), "kpi_hint_return"),
+    (("kpi_drawdown", "kpi_drawdown_closed"), "kpi_hint_drawdown"),
+    (("kpi_dd_p95", "kpi_dd_p95_closed"), "kpi_hint_dd_p95"),
+    (("kpi_sharpe",), "kpi_hint_sharpe"),
+    (("kpi_pf",), "kpi_hint_pf"),
+    (("kpi_breakeven",), "kpi_hint_breakeven"),
+)
+
+
+def _kpi_hint(label: str, labels: dict[str, str]) -> str:
+    for keys, hint in _KPI_HINTS:
+        if any(label == labels[key] or label.startswith(labels[key] + " (") for key in keys):
+            return f"<small>{_e(labels[hint])}</small>"
+    return ""
+
+
 def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) -> str:
     kpis = _kpi_list(data, labels)
     if not kpis:
@@ -2441,7 +2473,7 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         f"<span>{_e(label)}</span></div>"
         if locked
         else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
-        f"<span>{_e(label)}</span></div>"
+        f"<span>{_e(label)}</span>{_kpi_hint(label, labels)}</div>"
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""

@@ -266,6 +266,10 @@ side that takes the trades to zero (red below 3x the reference, the costs
 bar) and the result without the best 5 trades and the best 5 periods (red
 at zero or below). An unpaid report in paid mode shows the tiles' names
 with no values.
+Tiles named with a trader's term (total return, drawdown, drawdown p95,
+Sharpe, profit factor, break-even cost) carry one plain line under the name,
+for example "lo ganado por cada 1 perdido" under the profit factor; locked
+tiles show the name only.
 
 ### Comparing two reports
 
