@@ -3051,7 +3051,7 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
     grid = " pairs" if len(cells) % 2 == 0 else ""
     out += f"<div class='facts{grid}'>{facts}</div>"
     out += _timing_table(recent["years"], labels["recent_year"], str, labels)
-    out += f"<p class='muted'>{_e(localize(recent.get('note', ''), locale))}</p>"
+    out += f"<p class='muted'>{_e(_sentence(localize(recent.get('note', ''), locale)))}</p>"
     return out
 
 

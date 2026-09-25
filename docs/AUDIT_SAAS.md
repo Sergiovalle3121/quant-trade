@@ -1315,7 +1315,9 @@ empty red-flag list reads "No red flags in the audited files." with a check
 instead of a bare "none". The out-of-sample keys `sharpe_annualised` and `gap`
 have readable names, reason and note text starts with a capital, and the fan
 chart legend no longer overlaps. The sample report on a phone is about 3,000 px
-shorter; print is unchanged.
+shorter; print is unchanged. The recent-period section (#179) was checked in both
+cases (holds and fades) on a phone, a desktop and the PDF. It reuses the polished
+verdict callout, fact pairs and year table; its closing note now starts with a capital.
 
 ## Security
 

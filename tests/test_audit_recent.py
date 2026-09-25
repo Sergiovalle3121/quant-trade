@@ -142,6 +142,8 @@ def test_engine_steady_history_holds() -> None:
     assert "EDGE_FADING" not in {flag["code"] for flag in result.red_flags}
     html, _ = render(result, watermark=False)
     assert "Se mantiene" in html
+    # The closing note reads as a sentence, like the rest of the report.
+    assert "<p class='muted'>Operaciones cerradas por fecha de cierre" in html
 
 
 def test_small_amounts_keep_their_digits_and_never_show_a_signed_zero() -> None:
