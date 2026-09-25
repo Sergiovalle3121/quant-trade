@@ -784,6 +784,8 @@ _UI: dict[str, dict[str, Any]] = {
         "drop_sub": "o haz clic para elegirlo · hasta 10 MB",
         "drop_small": "Arrastra o haz clic",
         "no_report": "¿No tienes informe? Sube tu curva de equity",
+        "extras": "Añadir más archivos",
+        "extras_note": "Opcional: XML de optimización, cuenta real o demo, reto de prop firm",
         "advanced": "Opciones avanzadas",
         "advanced_note": "Todo tiene un valor por defecto",
         "busy_title": "Auditando tu archivo",
@@ -969,6 +971,8 @@ _UI: dict[str, dict[str, Any]] = {
         "drop_sub": "or click to choose it · up to 10 MB",
         "drop_small": "Drop or click",
         "no_report": "No report? Upload your equity curve",
+        "extras": "Add more files",
+        "extras_note": "Optional: optimisation XML, live or demo account, prop-firm challenge",
         "advanced": "Advanced options",
         "advanced_note": "Everything has a default",
         "busy_title": "Auditing your file",
@@ -1827,9 +1831,6 @@ def _upload_form(
             main=True,
         )
         + mapping
-        + "<div class='form-grid'>"
-        + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
-        + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
         + _drop(
             "equity",
             copy["equity"],
@@ -1837,11 +1838,22 @@ def _upload_form(
             _e(copy["equity_help"]),
             locale,
         )
+        # The one-file case stays short; the second files and the challenge open on demand.
+        + "<details class='adv extras'><summary><span>"
+        f"{_e(ui['extras'])} <small>· {_e(ui['extras_note'])}</small></span>"
+        "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
+        "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
+        "<div class='form-grid'>"
+        + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
+        + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
+        + "</div>"
         + _field(
             copy["challenge"],
             f"<select name='challenge'>{_preset_options(locale)}</select>",
             copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
         )
+        + "</div></details>"
+        + "<div class='form-grid'>"
         + _field(
             copy["locale"],
             f"<select name='locale'><option value='es'{selected['es']}>Español</option>"

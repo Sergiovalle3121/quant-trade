@@ -485,7 +485,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "reconoce el formato de Tradovate, TopstepX y Sierra Chart, entre otros.",
                         "csv-universal",
                     ),
-                    ("Y en el formulario eliges el reto que quieres simular.", ""),
+                    (
+                        "Y en el formulario, en «Añadir más archivos», eliges el reto que "
+                        "quieres simular.",
+                        "",
+                    ),
                 ),
                 checks=(
                     (
@@ -557,7 +561,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "format of Tradovate, TopstepX and Sierra Chart, among others.",
                         "csv-universal",
                     ),
-                    ("Then pick the challenge to simulate on the form.", ""),
+                    (
+                        "Then, on the form, open 'Add more files' and pick the challenge to "
+                        "simulate.",
+                        "",
+                    ),
                 ),
                 checks=(
                     (

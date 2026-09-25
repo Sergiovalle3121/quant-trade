@@ -72,3 +72,17 @@ def test_paid_price_card_explains_the_flow_and_lists_fund_checks() -> None:
         pricing = page.split("id='pricing'", 1)[1]
         assert cta in pricing and fund in pricing
         assert find_claims(pricing) == []
+
+
+def test_second_files_and_challenge_sit_in_a_closed_extras_box() -> None:
+    for locale, summary in (("es", "Añadir más archivos"), ("en", "Add more files")):
+        page = _paid_landing(locale, card_payments=False)
+        form = page.split("id='subir'", 1)[1].split("</form>", 1)[0]
+        before, extras = form.split("<details class='adv extras'>", 1)
+        # One file is enough: the main report and the curve come first, open.
+        assert "name='report'" in before and "name='equity'" in before
+        extras = extras.split("</details>", 1)[0]
+        assert summary in extras
+        for name in ("optimization", "live", "challenge"):
+            assert f"name='{name}'" in extras and f"name='{name}'" not in before
+        assert find_claims(extras) == []
