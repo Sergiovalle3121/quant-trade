@@ -257,7 +257,7 @@ def test_capital_limits_read_as_four_cards() -> None:
     assert "@media print{ol.caps{display:block}" in STYLE
 
 
-def test_stress_and_timing_tables_become_cards_on_phones(tmp_path: Path) -> None:
+def test_stress_becomes_cards_and_timing_a_compact_table_on_phones(tmp_path: Path) -> None:
     from quant_trade.audit.report import KPI_CSS
 
     page = _client(tmp_path).get("/ejemplo").text
@@ -266,7 +266,10 @@ def test_stress_and_timing_tables_become_cards_on_phones(tmp_path: Path) -> None
     assert "data-l='Queda'" in stress and "data-l='¿Sigue sobre cero?'" in stress
     assert "<td class='empty'></td>" in stress
     assert "data-l='Operaciones'" in timing and "data-l='Aciertos'" in timing
-    assert ".stress td[data-l]::before,.timing td[data-l]::before" in STYLE
+    assert ".stress td[data-l]::before{" in STYLE
+    # Eleven day and hour rows read better as one short table than as tall cards.
+    assert ".timing td[data-l]::before" not in STYLE
+    assert ".timing td:first-child::first-letter{text-transform:uppercase}" in STYLE
     # A lone last key figure spans the row on phones instead of leaving a gap.
     assert ".kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}" in KPI_CSS
     assert find_claims(page) == []
@@ -532,3 +535,25 @@ def test_verification_details_show_figures_with_their_evidence_badge() -> None:
         assert "<span class='vc'>120 <span class='badge DECLARED'>DECLARED</span></span>" in page
         assert f"<code>{sha}</code>" in page
         assert find_claims(page) == []
+
+
+def test_phone_report_is_compact_and_reads_in_words() -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+
+    for locale, none_text, gap in (
+        ("es", "Sin banderas rojas en los archivos auditados.", "Diferencia de Sharpe"),
+        ("en", "No red flags in the audited files.", "Sharpe gap"),
+    ):
+        html_text = render_html(
+            sample_result(locale, bootstrap_samples=60), watermark=False, locale=locale
+        )
+        # Reasons per dimension become cards on a phone; the evidence badge
+        # shares the label's line; timing stays a compact table.
+        assert "<table class='reasons'>" in html_text
+        assert ".metrics.ev td:nth-child(3){grid-area:1/2" in html_text
+        assert ".paper table.timing{overflow:visible;font-size:.86rem}" in html_text
+        # An empty flag list is a calm line, and raw engine keys read as words.
+        assert "<p class='no-flags'>" in html_text and none_text in html_text
+        assert "<td>sharpe_annualised</td>" not in html_text and "<td>gap</td>" not in html_text
+        assert gap in html_text

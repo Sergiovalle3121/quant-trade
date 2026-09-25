@@ -578,7 +578,7 @@ def fan_chart(
             f'<text x="{x + 16}" y="{frame.top + 11}" font-size="11" fill="{INK}">'
             f"{_e(label)}</text>"
         )
-        x += 24 + 7 * len(label)
+        x += 36 + 7 * len(label)
     x_end = horizon_label or f"{n - 1} {texts['steps']}"
     body = (
         _y_axis(frame, ticks, _fmt_number)
