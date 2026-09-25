@@ -784,6 +784,10 @@ With card payment on, both unlock buttons share one height, the card button
 carries a card icon, the Stripe note a lock, and the bank-transfer alternative
 is a quiet row with a chat icon under the price card.
 
+Guide steps wrap long code such as
+`pf.trades.records_readable.to_csv('trades.csv')` instead of widening the
+page on phones.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and

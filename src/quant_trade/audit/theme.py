@@ -472,7 +472,9 @@ font:500 .8rem var(--mono);color:var(--btn-fg);background:var(--btn-bg);
 box-shadow:0 0 0 10px var(--bg);position:relative}
 @media (max-width:900px){.steps{grid-template-columns:1fr 1fr;gap:40px 24px}.steps::before{display:none}}
 @media (max-width:560px){.steps{grid-template-columns:minmax(0,1fr)}}
-.list-steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.list-steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px;
+grid-template-columns:minmax(0,1fr)}
+.list-steps li{overflow-wrap:anywhere}
 .list-steps li{position:relative;padding:16px 18px 16px 62px;border:1px solid var(--border);
 border-radius:var(--r);background:var(--surface);color:var(--text-2)}
 .list-steps li::before{counter-increment:s;content:counter(s);position:absolute;left:16px;top:14px;
