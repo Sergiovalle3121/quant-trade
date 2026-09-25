@@ -54,6 +54,10 @@ PAID_STATUSES = ("paid",)
 APP_KEY = "app"
 APP_MARKER = "rigor"
 CURRENCY = "usd"
+#: Stripe lookups from the return page, per address and per audit per hour.
+#: The signed webhook unlocks a report without any lookup, so a limit here
+#: only protects the account's API rate from a script looping the return URL.
+CARD_LOOKUPS_PER_HOUR = 10
 #: Stripe Checkout session ids start with this; code-paid audits carry ``code:``.
 SESSION_PREFIX = "cs_"
 
@@ -256,7 +260,14 @@ def fulfil(
         )
         # Live ones also go to /panel, where the owner looks. Test payments
         # stay in the log: anyone can pay a test link with the public card.
-        if session.get("livemode") is True and session_id.startswith(SESSION_PREFIX):
+        # Only sessions that are about Rigor: a sale from another app on the
+        # same Stripe account names no audit and carries no marker.
+        about_rigor = bool(audit_id) or metadata.get(APP_KEY) == APP_MARKER
+        if (
+            session.get("livemode") is True
+            and session_id.startswith(SESSION_PREFIX)
+            and about_rigor
+        ):
             store.record_refused_payment(
                 session_id=_safe(session_id), audit_id=_safe(audit_id), reason=reason, at=at
             )
@@ -293,6 +304,7 @@ def pack_for(store: Store, settings: AuditSettings, session_id: str | None) -> t
 
 __all__ = [
     "APP_KEY",
+    "CARD_LOOKUPS_PER_HOUR",
     "APP_MARKER",
     "PAID_STATUSES",
     "PLANS",
