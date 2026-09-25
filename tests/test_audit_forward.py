@@ -191,9 +191,9 @@ def test_a_pass_without_a_forward_result_keeps_the_export_a_forward_one(cell: st
 
 
 def test_unnamed_forward_columns_are_found_past_a_blank_first_row() -> None:
-    header = ["Pass", "Resultado forward", "Resultado back", *HEADER[3:]]
+    header = ["Pass", "Columna 1", "Columna 2", *HEADER[3:]]
     table = [dict(values) for values in parse_optimization(_export(_lost, header)).table]
-    del table[0]["Resultado forward"]
+    del table[0]["Columna 1"]
     assert unnamed_forward(table)
 
 
@@ -231,3 +231,12 @@ def test_an_optimisation_over_the_limit_says_what_to_do(
     assert response.status_code == 413
     assert hint in response.text
     assert find_claims(response.text) == []
+
+
+def test_forward_section_answers_first_then_a_two_by_two_grid() -> None:
+    from quant_trade.audit.report import LABELS, _forward_html
+
+    for forward in (_review(_lost)[0], _review(_held)[0]):
+        html = _forward_html(forward, LABELS["es"])
+        assert html.index("live-verdict") < html.index("<div class='facts pairs'>")
+        assert html.count("<div class='fact'>") + html.count("<div class='fact neg'>") == 4

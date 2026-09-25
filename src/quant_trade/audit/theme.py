@@ -804,6 +804,7 @@ color:var(--text-3)}
 .paper tr:hover>td{background:#fafafb}
 .paper table.metrics{table-layout:fixed}
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:18px 0 8px}
+@media (min-width:621px){.facts.pairs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .fact{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px 22px}
 .fact.neg b{color:#b91c1c}
 .vc{white-space:nowrap}
@@ -1040,7 +1041,7 @@ PRINT = """
 @media print{
 .recon-row{padding:12px 18px;gap:16px;break-inside:avoid;box-shadow:none!important}
 .recon-v span{min-width:0}
-.metrics .val{padding-right:14px}.tbar-track{width:calc(100% - 100px)}.facts{display:block}.fact{break-inside:avoid;display:inline-block;vertical-align:top;width:31.5%;margin:0 1.5% 8px 0;padding:12px 14px}.fact b{font-size:20pt!important}.fact p{font-size:9pt;margin-top:4px}.metrics .c-v{width:17%}
+.metrics .val{padding-right:14px}.tbar-track{width:calc(100% - 100px)}.facts{display:block}.fact{break-inside:avoid;display:inline-block;vertical-align:top;width:31.5%;margin:0 1.5% 8px 0;padding:12px 14px}.fact b{font-size:20pt!important}.fact p{font-size:9pt;margin-top:4px}.facts.pairs .fact{width:48%;margin-right:2%}.metrics .c-v{width:17%}
 .recon-v i{margin:0 16px}.recon-row .badge{margin-left:18px}
 :root,.hero,.page-hero,.report-hero,.lockbox,.verdict{--bg:#fff;--surface:#fff;--surface-2:#f4f4f6;
 --surface-solid:#fff;--text:#000;--text-2:#333;--text-3:#555;--border:#ddd;--border-2:#ccc;
