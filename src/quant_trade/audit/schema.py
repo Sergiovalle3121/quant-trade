@@ -758,6 +758,7 @@ def build_inputs(
     optimization_bytes: bytes | None = None,
     live_bytes: bytes | None = None,
     live_filename: str | None = None,
+    report_columns: dict[str, str] | None = None,
 ) -> AuditInputs:
     """Parse and hash every upload.
 
@@ -768,6 +769,8 @@ def build_inputs(
     count when it exceeds the declared one. A live account statement
     (``live_bytes``, any format a report can have) is read for its closed
     trades only and compared with the backtest; it changes no other figure.
+    ``report_columns`` is the customer's own mapping of the report's columns
+    (``universal.ROLES`` to column names), for a platform no importer knows.
     """
     # Imported here: the importers build on this module's types.
     from quant_trade.audit.importers import (
@@ -791,7 +794,10 @@ def build_inputs(
                 code="trades_and_report",
             )
         imported = import_report(
-            report_bytes, report_filename, initial_balance=declared.initial_balance
+            report_bytes,
+            report_filename,
+            initial_balance=declared.initial_balance,
+            columns=report_columns or None,
         )
         digests[report_digest_name(report_filename)] = sha256_of_bytes(report_bytes)
         trades = imported.trades

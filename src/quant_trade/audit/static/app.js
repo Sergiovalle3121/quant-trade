@@ -147,4 +147,33 @@
       });
     });
   });
+  // Suggest the report's own column names for "name its columns".
+  ready(function () {
+    var input = d.querySelector("input[type=file][name=report]");
+    var list = d.getElementById("report-columns");
+    if (!input || !list || !window.FileReader) return;
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      while (list.firstChild) list.removeChild(list.firstChild);
+      if (!file || !/\.(csv|txt|tsv)$/i.test(file.name)) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var lines = String(reader.result).split(/\r?\n/).filter(function (l) { return l.trim(); }).slice(0, 15);
+        var best = "", sep = ",";
+        lines.forEach(function (line) {
+          [",", ";", "\t"].forEach(function (c) {
+            if (line.split(c).length > best.split(sep).length) { best = line; sep = c; }
+          });
+        });
+        best.split(sep).forEach(function (name) {
+          name = name.replace(/^\ufeff/, "").replace(/^"|"$/g, "").trim();
+          if (!name) return;
+          var option = d.createElement("option");
+          option.value = name;
+          list.appendChild(option);
+        });
+      };
+      reader.readAsText(file.slice(0, 65536));
+    });
+  });
 })();

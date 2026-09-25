@@ -721,13 +721,15 @@ def missing_columns(header: Sequence[str], columns: Mapping[str, int]) -> imp.Re
     es = ", ".join(_ROLE_TEXT["es"][role] for role in gap)
     return imp.ReportFormatError(
         "universal_columns_missing",
-        f"the file has no column we recognise as {en}. Columns found: {listed}. Rename "
-        "those columns in the file (for example Entry time, Exit time, Quantity, Entry price, "
-        "Exit price, Profit) and upload it again",
+        f"the file has no column we recognise as {en}. Columns found: {listed}. Name "
+        "them under 'Platform not listed, or its file fails? Name its columns' on the form, "
+        "or rename those columns in the file (for example Entry time, Exit time, Quantity, "
+        "Entry price, Exit price) and upload it again",
         f"el archivo no tiene una columna que reconozcamos como {es}. Columnas encontradas: "
-        f"{listed}. Cambia el nombre de esas columnas en el archivo (por ejemplo Fecha de "
-        "entrada, Fecha de salida, Cantidad, Precio de entrada, Precio de salida, Resultado) "
-        "y vuelve a subirlo",
+        f"{listed}. Indícalas en «¿Tu plataforma no aparece o su archivo da error? Indica "
+        "sus columnas» del formulario, o cambia el nombre de esas columnas en el archivo (por "
+        "ejemplo Fecha de entrada, Fecha de salida, Cantidad, Precio de entrada, Precio de "
+        "salida) y vuelve a subirlo",
     )
 
 
@@ -1070,7 +1072,7 @@ def _trades(
         entry_time = entry_times.values[position]
         exit_time = exit_times.values[position]
         side = _side(_cell(row, columns, "side")) if "side" in columns else None
-        symbol = " ".join(_cell(row, columns, "symbol").split()).upper()
+        symbol = " ".join(_cell(row, columns, "symbol").split())
         paid, other = _paid(row, mapping.fees, decimal, symbol, _cell(row, columns, "fee_currency"))
         other_coin += other
         if (
@@ -1298,7 +1300,7 @@ def _fills(
             _amount(_cell(row, columns, "multiplier"), decimal) if "multiplier" in columns else None
         )
         profit = _amount(_cell(row, columns, "profit"), decimal) if "profit" in columns else None
-        symbol = " ".join(_cell(row, columns, "symbol").split()).upper()
+        symbol = " ".join(_cell(row, columns, "symbol").split())
         paid, other = _paid(row, mapping.fees, decimal, symbol, _cell(row, columns, "fee_currency"))
         other_coin += other
         fills.append(

@@ -200,6 +200,28 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "guides_link": "Ver las guías de exportación",
         "guide_q": "¿Qué archivo exporto?",
+        "map_title": "¿Tu plataforma no aparece o su archivo da error? Indica sus columnas",
+        "map_help": (
+            "Solo para una lista en CSV o Excel. Escribe el nombre exacto de cada columna tal "
+            "como aparece en la primera fila del archivo; al elegir el archivo te sugerimos "
+            "sus nombres. Con una fila por operación: entrada, salida, cantidad y precios. "
+            "Con una fila por ejecución: hora, lado, cantidad y precio. Lo que dejes vacío "
+            "se reconoce solo."
+        ),
+        "map_roles": {
+            "entry_time": "Fecha y hora de entrada",
+            "exit_time": "Fecha y hora de salida",
+            "entry_price": "Precio de entrada",
+            "exit_price": "Precio de salida",
+            "time": "Fecha y hora de la ejecución",
+            "price": "Precio de la ejecución",
+            "side": "Lado (compra o venta)",
+            "quantity": "Cantidad",
+            "symbol": "Símbolo",
+            "profit": "Resultado de la operación",
+            "commission": "Comisión",
+            "multiplier": "Multiplicador del contrato",
+        },
         "guide_list": "Guía para",
         "optimization_guide": "Cómo exportar el XML de optimización",
         "v_description": "{cls_label} {overall} · auditada el {date} · {notice}.",
@@ -432,6 +454,27 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "guides_link": "See the export guides",
         "guide_q": "Which file do I export?",
+        "map_title": "Platform not listed, or its file fails? Name its columns",
+        "map_help": (
+            "Only for a CSV or Excel list. Type each column's exact name as it appears in the "
+            "file's first row; once you pick the file we suggest its names. One row per trade: "
+            "entry, exit, quantity and prices. One row per fill: time, side, quantity and "
+            "price. Anything left blank is recognised on its own."
+        ),
+        "map_roles": {
+            "entry_time": "Entry date and time",
+            "exit_time": "Exit date and time",
+            "entry_price": "Entry price",
+            "exit_price": "Exit price",
+            "time": "Fill date and time",
+            "price": "Fill price",
+            "side": "Side (buy or sell)",
+            "quantity": "Quantity",
+            "symbol": "Symbol",
+            "profit": "Trade result",
+            "commission": "Commission",
+            "multiplier": "Contract multiplier",
+        },
         "guide_list": "Guide for",
         "optimization_guide": "How to export the optimisation XML",
         "v_description": "{cls_label} {overall} · audited on {date} · {notice}.",
@@ -1660,6 +1703,23 @@ def _upload_form(
         f"<p>{_e(copy['report_help'])}</p>"
         f"<p>{_e(copy['guide_list'])}: {_guide_links(locale)}</p></details>"
     )
+    mapping = (
+        "<details class='adv map-columns'><summary><span>"
+        f"{_e(copy['map_title'])}</span>"
+        "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
+        "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
+        f"<p class='help'>{_e(copy['map_help'])}</p>"
+        "<datalist id='report-columns'></datalist><div class='form-grid'>"
+        + "".join(
+            _field(
+                label,
+                f"<input type='text' name='col_{role}' maxlength='100' list='report-columns' "
+                "autocomplete='off' spellcheck='false'>",
+            )
+            for role, label in copy["map_roles"].items()
+        )
+        + "</div></div></details>"
+    )
     optimization_help = (
         f"{_e(copy['optimization_help'])} <a href='{_e(guide_url('mt5-optimization', locale))}'>"
         f"{_e(copy['optimization_guide'])}</a>"
@@ -1721,6 +1781,7 @@ def _upload_form(
             locale,
             main=True,
         )
+        + mapping
         + "<div class='form-grid'>"
         + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
         + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
