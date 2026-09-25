@@ -1201,7 +1201,14 @@ KPI_CSS = (
     "font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.1;letter-spacing:-.01em}"
     ".kpi span{display:block;margin-top:6px;color:var(--text-2);font-size:.82rem}"
     ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
-    ".kpi.locked b{color:var(--text-3);letter-spacing:.2em}"
+    ".kpi.locked b{display:flex;align-items:center;gap:10px;height:1.1em;color:var(--text-3)}"
+    ".kpi.locked svg{width:.62em;height:.62em;flex:none}"
+    ".kpi.locked i{display:block;height:.5em;width:62%;border-radius:999px;"
+    "background:linear-gradient(90deg,#ececef 0%,#f6f6f8 50%,#ececef 100%);"
+    "background-size:200% 100%;"
+    "animation:kpi-sk 2.4s ease-in-out infinite}"
+    "@keyframes kpi-sk{from{background-position:100% 0}to{background-position:-100% 0}}"
+    "@media (prefers-reduced-motion:reduce){.kpi.locked i{animation:none}}"
 )
 
 
@@ -1263,7 +1270,8 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
     if not kpis:
         return ""
     tiles = "".join(
-        f"<div class='kpi locked'><b>•••</b><span>{_e(label)}</span></div>"
+        f"<div class='kpi locked'><b aria-hidden='true'>{icon('lock')}<i></i></b>"
+        f"<span>{_e(label)}</span></div>"
         if locked
         else f"<div class='kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
         for label, shown, tone in kpis
