@@ -79,13 +79,14 @@ RECOGNISED_PLATFORMS: tuple[str, ...] = (
 
 
 def platform_list(locale: str) -> str:
-    """The recognised platforms as one phrase ("A, B y C" / "A, B and C")."""
-    joiner = " y " if locale == "es" else " and "
+    """The recognised platforms as one phrase ("A, B y C" / "A, B and C" / "A, B e C")."""
+    joiner = {"es": " y ", "pt": " e "}.get(locale, " and ")
     return ", ".join(RECOGNISED_PLATFORMS[:-1]) + joiner + RECOGNISED_PLATFORMS[-1]
 
 
 PLATFORMS_ES = platform_list("es")
 PLATFORMS_EN = platform_list("en")
+PLATFORMS_PT = platform_list("pt")
 
 AUDIENCE_COPY: dict[str, dict[str, str]] = {
     "es": {
@@ -1185,6 +1186,7 @@ __all__ = [
     "AUDIENCE_PAGES",
     "PLATFORMS_EN",
     "PLATFORMS_ES",
+    "PLATFORMS_PT",
     "RECOGNISED_PLATFORMS",
     "Audience",
     "AudienceText",
