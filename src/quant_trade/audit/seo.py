@@ -69,10 +69,31 @@ class PageMeta:
     paths: dict[str, str] = field(default_factory=dict)
     index: bool = True
     og_type: str = "website"
+    #: Which share card to show (see ``OG_KINDS``); "" is the site card.
+    image: str = ""
+    image_alt: str = ""
 
 
-#: Pixel size of the share images in ``static/`` (og-es.png, og-en.png).
+#: Pixel size of the share images in ``static/`` (tools/make_og_images.py).
 OG_IMAGE_SIZE = (1200, 630)
+#: The share cards: the site card, the sample, one per class for a published
+#: verification page and one per audience page. Each card shows fixed texts only,
+#: never a figure from a client's file.
+OG_KINDS: tuple[str, ...] = (
+    "",
+    "sample",
+    *(f"class-{overall}" for overall in "ABCD"),
+    *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES),
+)
+
+
+def og_image_name(kind: str, locale: str) -> str:
+    """The file under ``static/`` of the share card ``kind`` in ``locale``."""
+    kind = kind if kind in OG_KINDS else ""
+    return f"og-{kind}-{locale}.png" if kind else f"og-{locale}.png"
+
+
+OG_IMAGES: tuple[str, ...] = tuple(og_image_name(k, lang) for k in OG_KINDS for lang in LOCALES)
 
 
 def _e(value: object) -> str:
@@ -106,13 +127,13 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
     base = base_url.rstrip("/")
     if base:
         # Messaging apps need an absolute URL to show a picture with the link.
-        image = f"{base}/static/og-{locale}.png"
+        image = f"{base}/static/{og_image_name(meta.image, locale)}"
         tags += [
             f"<meta property='og:image' content='{_e(image)}'>",
             "<meta property='og:image:type' content='image/png'>",
             f"<meta property='og:image:width' content='{OG_IMAGE_SIZE[0]}'>",
             f"<meta property='og:image:height' content='{OG_IMAGE_SIZE[1]}'>",
-            f"<meta property='og:image:alt' content='{_e(SITE_NAME[locale])}'>",
+            f"<meta property='og:image:alt' content='{_e(meta.image_alt or SITE_NAME[locale])}'>",
             f"<meta name='twitter:image' content='{_e(image)}'>",
         ]
     own = meta.paths.get(locale)

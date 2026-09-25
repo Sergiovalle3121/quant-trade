@@ -15,6 +15,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from quant_trade.audit.audiences import AUDIENCE_PAGES  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import (  # noqa: E402
     GUIDES,
@@ -233,8 +234,13 @@ def test_verification_page_previews_class_and_date_and_nothing_private(tmp_path:
     head = text.split("</head>")[0]
     for secret in (SECRET_DESCRIPTION, token, audit_id):
         assert secret not in head
+    # The picture is the fixed card for its class: no figure from the file is on it.
+    card = f"og-class-{overall.group(1)}-es.png"
+    assert _meta(text, "og:image") == f"{BASE.rstrip('/')}/static/{card}"
+    assert _meta(text, "og:image:alt") == f"Rigor · Clase {overall.group(1)}"
     english = client.get(f"/v/{public_id}?lang=en").text
     assert f"Class {overall.group(1)}" in (_meta(english, "og:title") or "")
+    assert (_meta(english, "og:image") or "").endswith(f"og-class-{overall.group(1)}-en.png")
     assert find_claims(text) == [] and find_claims(english) == []
 
 
@@ -268,13 +274,24 @@ def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path)
     from quant_trade.audit.seo import OG_IMAGE_SIZE
 
     client = _client(tmp_path)
-    for path, locale in (("/", "es"), ("/en", "en"), ("/ejemplo", "es"), ("/guias", "es")):
+    for path, name in (
+        ("/", "og-es.png"),
+        ("/en", "og-en.png"),
+        ("/ejemplo", "og-sample-es.png"),
+        ("/sample", "og-sample-en.png"),
+        ("/guias", "og-es.png"),
+        ("/para/retos-prop-firm", "og-for-retos-prop-firm-es.png"),
+        ("/for/prop-firm-challenges", "og-for-retos-prop-firm-en.png"),
+    ):
         page = client.get(path).text
-        image = f"{BASE.rstrip('/')}/static/og-{locale}.png"
+        image = f"{BASE.rstrip('/')}/static/{name}"
         assert f"<meta property='og:image' content='{image}'>" in page, path
         assert "content='summary_large_image'" in page
-    for locale in ("es", "en"):
-        response = client.get(f"/static/og-{locale}.png")
+    from quant_trade.audit.seo import OG_IMAGES
+
+    assert len(OG_IMAGES) == 2 * (2 + 4 + len(AUDIENCE_PAGES))
+    for name in OG_IMAGES:
+        response = client.get(f"/static/{name}")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
         body = response.content

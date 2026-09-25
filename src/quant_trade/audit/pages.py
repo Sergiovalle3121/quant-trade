@@ -1196,9 +1196,18 @@ def _page(
     )
 
 
-def _public_meta(title: str, description: str, locale: str, path: str, base_url: str) -> str:
+def _public_meta(
+    title: str, description: str, locale: str, path: str, base_url: str, image: str = ""
+) -> str:
     return head_meta(
-        PageMeta(title=title, description=description, locale=locale, paths=page_paths(path)),
+        PageMeta(
+            title=title,
+            description=description,
+            locale=locale,
+            paths=page_paths(path),
+            image=image,
+            image_alt=title,
+        ),
         base_url=base_url,
     )
 
@@ -1209,7 +1218,7 @@ def sample_meta(locale: str, base_url: str) -> str:
     copy = _COPY[locale]
     title = f"{copy['sample_link']} · {copy['title']}"
     path = "/ejemplo" if locale == "es" else "/sample"
-    return _public_meta(title, copy["sample_description"], locale, path, base_url)
+    return _public_meta(title, copy["sample_description"], locale, path, base_url, "sample")
 
 
 def _guide_links(locale: str) -> str:
@@ -2220,6 +2229,9 @@ def verification_page(
             locale=locale,
             paths={"es": f"/v/{public_id}", "en": f"/v/{public_id}?lang=en"},
             index=False,
+            # The class card: class, its fixed sentence and the fixed notice, nothing else.
+            image=f"class-{overall}",
+            image_alt=f"{BRAND} · {cls_label} {overall}",
         ),
         base_url=base_url,
     )
@@ -2663,7 +2675,14 @@ def audience_page(
     text = audience.text[locale]
     other = "en" if locale == "es" else "es"
     title = f"{text.title} · {BRAND}"
-    meta = _public_meta(title, text.summary, locale, audience_url(audience.slug, locale), base_url)
+    meta = _public_meta(
+        title,
+        text.summary,
+        locale,
+        audience_url(audience.slug, locale),
+        base_url,
+        f"for-{audience.slug}",
+    )
     sample = f"/ejemplo?lang={locale}" if locale == "es" else "/sample?lang=en"
     pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
     uploads = "".join(

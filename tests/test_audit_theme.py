@@ -923,3 +923,12 @@ def test_the_class_ring_has_an_svg_copy_for_print() -> None:
     ring = class_ring("B", size="lg")
     assert "<svg class='ring-svg'" in ring and "stroke-dasharray=" in ring
     assert ".ring-lg .ring-svg{width:136px;height:136px}" in STYLE
+
+
+def test_an_unknown_share_card_falls_back_to_the_site_card() -> None:
+    from quant_trade.audit.seo import OG_IMAGES, og_image_name
+
+    assert og_image_name("class-C", "en") == "og-class-C-en.png"
+    assert og_image_name("class-Z", "es") == "og-es.png"
+    assert og_image_name("../secret", "es") == "og-es.png"
+    assert set(OG_IMAGES) <= set(STATIC_FILES)
