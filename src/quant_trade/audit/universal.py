@@ -1025,20 +1025,26 @@ def _dayfirst_hint(times: list[str], rows: list[list[str]], skip: int | None) ->
     return None
 
 
-_HEADER_ZONE = re.compile(r"(?:UTC|GMT)\s*(?:([+-])\s*(\d{1,2})(?::?(\d{2}))?)?", re.IGNORECASE)
+_HEADER_ZONE = re.compile(r"(?:UTC|GMT)\s*(?:([+-])\s*(\d{1,4})(?::(\d{2}))?)?", re.IGNORECASE)
 
 
 def header_zone(name: str) -> int | None:
     """The offset from UTC in minutes a column name states (KuCoin's
-    ``Filled Time(UTC+02:00)``, Bybit's ``Transaction Time(UTC+10)``), or
-    ``None`` when the name states none."""
+    ``Filled Time(UTC+02:00)``, Bybit's ``Transaction Time(UTC+10)``,
+    ``UTC+0530``), or ``None`` when the name states none or an offset no
+    clock uses (outside -12 to +14 hours)."""
     found = _HEADER_ZONE.search(name)
     if found is None:
         return None
-    sign, hours, minutes = found.groups()
+    sign, digits, minutes = found.groups()
     if sign is None:
         return 0
-    return (1 if sign == "+" else -1) * (int(hours) * 60 + int(minutes or 0))
+    if minutes is None and len(digits) > 2:
+        digits, minutes = digits[:-2], digits[-2:]
+    offset = int(digits) * 60 + int(minutes or 0)
+    if int(minutes or 0) >= 60 or offset > (14 if sign == "+" else 12) * 60:
+        return None
+    return offset if sign == "+" else -offset
 
 
 def _times(
@@ -1082,10 +1088,9 @@ def _times(
         and filled
         and all(_CLOCK.match(value.strip()) for value in filled)
     ):
+        # A blank clock keeps its date, read as midnight.
         values = [
             f"{row[date_column].strip() if date_column < len(row) else ''} {value}".strip()
-            if value
-            else value
             for row, value in zip(rows, values, strict=True)
         ]
     cleaned = [_clean_time(value) for value in values]
@@ -1173,6 +1178,34 @@ NO_PROFIT_WARNING = (
 SIGNED_SIDE_WARNING = "no side column; the side was taken from the sign of the quantity"
 PROFIT_SIDE_WARNING = "no side column; the side was taken from the sign of the profit"
 FUTURES_WARNING = "futures results computed with each contract's point value: {listed}"
+UNREADABLE_FILL_WARNING = (
+    "{symbol}: a fill with an unreadable time ({time}) was left out; the trade it opened or "
+    "closed is missing from the results"
+)
+UNREADABLE_TRADE_WARNING = (
+    "{symbol}: a trade with an unreadable time ({time}) was left out; it is missing from the "
+    "results"
+)
+UNREADABLE_MORE_WARNING = "{n} more row(s) with an unreadable time were left out"
+#: Rows named one by one before the rest are only counted.
+UNREADABLE_NAMED = 5
+
+
+def _unreadable_time_warnings(template: str, dropped: list[tuple[str, str]]) -> list[str]:
+    """Name each row a bad time left out, so a buyer sees which trade is
+    missing instead of a closed loss turning silently into an open position."""
+    lines = [
+        template.format(
+            symbol=imp._clip(symbol, 30) or "—",
+            time=imp._clip(re.sub(r"[^0-9A-Za-z:/.\-+ ]", "", text).strip(), 30) or "—",
+        )
+        for symbol, text in dropped[:UNREADABLE_NAMED]
+    ]
+    if len(dropped) > UNREADABLE_NAMED:
+        lines.append(UNREADABLE_MORE_WARNING.format(n=len(dropped) - UNREADABLE_NAMED))
+    return lines
+
+
 OTHER_COIN_WARNING = (
     "{n} fee(s) charged in another coin than the price were left out of the costs, so "
     "costs are understated"
@@ -1337,6 +1370,7 @@ def _trades(
     other_coin = 0
     paired = normalise(mapping.names.get("entry_time", "")) in PAIRED_ENTRY_NAMES
     multipliers: list[float] = []
+    unreadable: list[tuple[str, str]] = []
     for position, row in enumerate(rows):
         volume = _amount(_cell(row, columns, "quantity"), decimal)
         entry_price = _amount(_cell(row, columns, "entry_price"), decimal)
@@ -1359,6 +1393,9 @@ def _trades(
             or ("profit" in columns and profit is None)
         ):
             draft.invalid_rows += 1
+            if (entry_time is None or exit_time is None) and volume and entry_price and exit_price:
+                bad = "entry_time" if entry_time is None else "exit_time"
+                unreadable.append((symbol, _cell(row, columns, bad)))
             continue
         if paired:
             # Tradovate pairs a buy fill with a sell fill: whichever came
@@ -1384,6 +1421,7 @@ def _trades(
             )
         )
         multipliers.append(_amount(_cell(row, columns, "multiplier"), decimal) or 1.0)
+    draft.warnings.extend(_unreadable_time_warnings(UNREADABLE_TRADE_WARNING, unreadable))
     if other_coin:
         draft.warnings.append(OTHER_COIN_WARNING.format(n=other_coin))
     if "side" not in columns and not paired:
@@ -1556,6 +1594,7 @@ def _fills(
     fills: list[tuple[datetime, int, str, str, float, float, float, float | None, float]] = []
     signed = False
     other_coin = 0
+    unreadable: list[tuple[str, str]] = []
     for position, row in enumerate(rows):
         quantity = _amount(_cell(row, columns, "quantity"), decimal)
         price = _amount(_cell(row, columns, "price"), decimal)
@@ -1563,6 +1602,9 @@ def _fills(
         side = _side(_cell(row, columns, "side")) if "side" in columns else None
         if quantity is None or quantity == 0 or price is None or price <= 0 or moment is None:
             draft.invalid_rows += 1
+            if moment is None and quantity and price and price > 0:
+                symbol = " ".join(_cell(row, columns, "symbol").split())
+                unreadable.append((symbol, _cell(row, columns, "time")))
             continue
         if side is None:
             if "side" in columns:
@@ -1594,6 +1636,7 @@ def _fills(
         )
     if signed:
         draft.warnings.append(SIGNED_SIDE_WARNING)
+    draft.warnings.extend(_unreadable_time_warnings(UNREADABLE_FILL_WARNING, unreadable))
     if other_coin:
         draft.warnings.append(OTHER_COIN_WARNING.format(n=other_coin))
     open_lots: dict[tuple[str, str], list[list[Any]]] = {}

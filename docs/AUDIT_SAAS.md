@@ -183,7 +183,12 @@ KuCoin filled orders (`Avg. Filled Price`, `Filled Amount`), cTrader, Binance
 (with `Fee Coin`), Kraken, Coinbase and Sierra Chart's Trade Activity Log (only
 `Fills` rows). A zone stated in a time column's name (`Filled Time(UTC+02:00)`,
 `Transaction Time(UTC+10)`, `Date(UTC)`) applies to every cell that carries
-none, so those times are no longer reported as naive. A `Contracts` column is
+none, so those times are no longer reported as naive; `+0530` reads as five and a
+half hours, and an offset no clock uses (outside -12 to +14 hours) is ignored and
+the times stay naive. A blank clock next to its date reads as midnight. A row
+left out for an unreadable time, with a readable price and quantity, is named
+in the warnings (its symbol and the time as written, five rows at most, then a
+count), because the trade it opened or closed is missing from the results. A `Contracts` column is
 taken as the instrument only when there is no symbol column and its cells are
 not numbers. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
