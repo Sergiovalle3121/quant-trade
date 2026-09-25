@@ -492,7 +492,11 @@ loss limits of 10, 20, 30 and 50 %, the capital needed at the backtest's
 size (reference fall / limit) and the share of the backtest's size that fits
 the file's starting balance (limit x balance / reference fall), all
 MEASURED. When the history is shorter than a year, the trades-per-year note
-says so. It raises no flag and does not change the class. Assumptions
+says so. When the reference fall is under 0.5 % of the starting balance
+(`MIN_FALL_SHARE`) the section is NOT_MEASURED: dividing by an almost-zero
+fall prints capitals near zero and sizes in the millions. A size share above
+10x (`MAX_SIZE_SHARE`) prints as "more than 10x" / "más de 10x".
+It raises no flag and does not change the class. Assumptions
 printed with it: fixed sizes (no compounding), independent trades, the
 uploaded costs, not a forecast. It is in money on closed trades, so it is a
 different measure from the percentage drawdown of the resampled risk

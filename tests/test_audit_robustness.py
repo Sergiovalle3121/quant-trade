@@ -481,3 +481,52 @@ def test_damaged_tester_header_values_are_not_declared() -> None:
             trades=None,
         )
         assert review["mismatched_chart_errors"]["evidence"] == "NOT_MEASURED", raw
+
+
+def _tiny_fall_history(loss: float) -> bytes:
+    start = datetime(2024, 1, 1)
+    rows = [
+        "Time;Type;Volume;Symbol;Price;S/L;T/P;Time;Price;Commission;Swap;Profit",
+        "2023.12.31 08:00:00;Balance;;;;;;;;;;10000",
+    ]
+    for i in range(60):
+        opened = start + timedelta(days=i * 2)
+        closed = opened + timedelta(hours=1)
+        profit = loss if i == 5 else 1.0
+        rows.append(
+            f"{opened:%Y.%m.%d %H:%M:%S};Buy;0.10;EURUSD;1.10000;;;"
+            f"{closed:%Y.%m.%d %H:%M:%S};{1.1 + profit / 10_000:.5f};0;0;{profit:.4f}"
+        )
+    return "\n".join(rows).encode()
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_almost_flat_history_gets_no_capital_figures(locale: str) -> None:
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.i18n import localize
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=_tiny_fall_history(-0.0001),
+        report_filename="history.csv",
+    )
+    result = run_audit(inputs, bootstrap_samples=30, risk_samples=200, challenge_samples=30)
+    data = result.model_dump() if hasattr(result, "model_dump") else result.to_dict()
+    assert data["capital"]["status"] == "NOT_MEASURED"
+    page = render_html(result, watermark=False, locale=locale)
+    assert "000000.0x" not in page
+    assert localize(data["capital"]["reason"], locale) != data["capital"]["reason"] or (
+        locale == "en"
+    )
+
+
+def test_a_size_share_above_ten_prints_as_more_than_ten() -> None:
+    from quant_trade.audit.sizing import scale_text
+
+    assert scale_text(0.35, "es") == "0.35x"
+    assert scale_text(9.96, "es") == "10.0x"
+    assert scale_text(124.2, "es") == "más de 10x"
+    assert scale_text(124.2, "en") == "more than 10x"
