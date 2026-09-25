@@ -1702,6 +1702,8 @@ Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…
 
 Redesign pass 46 tidies the "Name its columns" step from #212 on the upload form. The twelve fields sit in three labelled groups: one row per trade, one row per fill, and either way. On a phone they sit two per row. Once a CSV is picked, the file's own column names show as chips above the fields (read in the browser by `app.js`, the same header row that feeds the suggestions), so the customer can copy them without opening the file.
 
+Redesign pass 47 polishes the screens from the first-sales rewrite (#223). In the locked preview, each padlock sits beside the first line of its item instead of floating between two lines. On a phone the WhatsApp button wraps to two roomy lines, and "Redeem code" fills its row. On the landing, the "And it reads the export format of…" line keeps a quiet underline that brightens on hover. The price cards needed nothing.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

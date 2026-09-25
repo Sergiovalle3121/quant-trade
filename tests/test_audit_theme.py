@@ -763,3 +763,14 @@ def test_the_name_its_columns_step_groups_fields_by_file_shape(tmp_path: Path, l
     # The file's own column names show as chips once a file is picked (filled by app.js).
     assert "id='report-columns-shown' hidden>" in page
     assert ".map-found code{display:inline-block" in STYLE
+
+
+def test_locked_preview_lines_keep_their_lock_on_the_first_line_and_buttons_fit_a_phone() -> None:
+    # A two-line item keeps its lock beside the first line, not centred between both.
+    assert ".lockbox li{display:flex;gap:10px;align-items:flex-start" in STYLE
+    assert "flex:none;margin-top:4px;opacity:.7;" in STYLE
+    # On a phone the WhatsApp button may wrap to two lines without cramping; redeem fills the row.
+    assert ".paybox.buy .btn{width:100%;height:auto;min-height:48px;padding:12px 18px" in STYLE
+    assert ".paybox.redeem .inline-form .btn{flex:1 1 100%}" in STYLE
+    # The "also reads" line under the platform names keeps a quiet underline.
+    assert ".platforms .platforms-also a:hover{color:var(--text)" in STYLE
