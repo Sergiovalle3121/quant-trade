@@ -696,6 +696,24 @@ font-weight:500;color:#6e6e76;text-decoration:none;transition:color .2s,backgrou
 .report-toc a.on{background:#111113;color:#f4f4f6}
 .report-main .rsec,.report-main .detail,#unlock{scroll-margin-top:130px}
 .paper td{font-variant-numeric:tabular-nums}
+.recon{display:grid;gap:10px;margin:18px 0 0}
+.recon-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:24px;
+padding:18px 22px;background:#fff;border:1px solid var(--border);border-radius:18px}
+.recon-k{font-weight:600;letter-spacing:-.01em}
+.recon-v{display:flex;align-items:center;gap:18px}
+.recon-v span{display:grid;gap:2px;text-align:right;min-width:92px}
+.recon-v small{white-space:nowrap;font:500 .62rem var(--mono);letter-spacing:.12em;text-transform:uppercase;
+color:var(--text-3)}
+.recon-v b{font-size:1.35rem;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.recon-v i{font-style:normal;font-size:1.2rem;color:var(--text-3)}
+.recon-row.bad{border-color:rgba(220,38,38,.35);box-shadow:0 0 0 3px rgba(220,38,38,.06)}
+.recon-row.bad .recon-v i{color:#dc2626}
+.recon-foot{margin:14px 0 0;font-size:.92rem;color:var(--text-2)}
+.recon-foot.ok::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;
+background:#16a34a;margin-right:9px;vertical-align:2px}
+@media (max-width:620px){.recon-row{grid-template-columns:minmax(0,1fr) auto;gap:12px 16px;padding:16px}
+.recon-v{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+.recon-v span{text-align:left;min-width:0}}
 @media (max-width:620px){.verdict{flex-direction:column;align-items:flex-start;gap:22px}}
 .report-main{padding:clamp(48px,7vw,88px) 0 clamp(64px,9vw,112px)}
 .rsec{margin:0 0 clamp(48px,6vw,72px)}
@@ -854,6 +872,9 @@ background:none}}
 
 PRINT = """
 @media print{
+.recon-row{padding:12px 18px;gap:16px;break-inside:avoid;box-shadow:none!important}
+.recon-v span{min-width:0}
+.recon-v i{margin:0 16px}.recon-row .badge{margin-left:18px}
 :root,.hero,.page-hero,.report-hero,.lockbox,.verdict{--bg:#fff;--surface:#fff;--surface-2:#f4f4f6;
 --surface-solid:#fff;--text:#000;--text-2:#333;--text-3:#555;--border:#ddd;--border-2:#ccc;
 --ok:#1a7f37;--warn:#a85a00;--bad:#c42b21;color-scheme:light}

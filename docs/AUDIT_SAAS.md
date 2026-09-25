@@ -671,6 +671,9 @@ rest as detail, and a sticky row of section links sits under the hero
 inputs). The active link follows the reader; the row scrolls sideways on
 phones and is left out of print and the PDF.
 
+"Lectura de tu archivo" shows each platform total beside the one re-counted
+from the rows as a card per figure (`=` when they match, a red `≠` and border
+when they do not), in the section row as its own link and in the PDF.
 
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
