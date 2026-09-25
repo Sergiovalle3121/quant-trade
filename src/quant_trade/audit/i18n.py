@@ -86,6 +86,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "se descartaron {n} fila(s) con fecha o valor ilegible",
     ),
     (
+        "{n} future period(s) with no change dropped (they have not happened yet)",
+        "se descartaron {n} periodo(s) futuros sin cambio (todavía no han ocurrido)",
+    ),
+    (
         "no side column; every trade treated as long",
         "no hay columna de lado; cada operación se trata como larga",
     ),
@@ -775,6 +779,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "parte de las operaciones tras una ganancia abiertas en menos de 15 minutos",
     ),
     (
+        "after the fees the file itemises per trade",
+        "después de los costes que el archivo detalla por operación",
+    ),
+    (
         "share of trades with a net profit after the fees the file itemises",
         "parte de las operaciones con resultado neto positivo, después de los costes que "
         "detalla el archivo",
@@ -1287,6 +1295,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
 #: (English singular, Spanish singular). The result JSON keeps the ``(s)``
 #: form; a page shows the singular for one item and the plural otherwise.
 _SINGULAR: dict[str, tuple[str, str]] = {
+    "{n} future period(s) with no change dropped (they have not happened yet)": (
+        "{n} future period with no change dropped (it has not happened yet)",
+        "se descartó {n} periodo futuro sin cambio (todavía no ha ocurrido)",
+    ),
     "{n} row(s) with an unreadable timestamp or value dropped": (
         "{n} row with an unreadable timestamp or value dropped",
         "se descartó {n} fila con fecha o valor ilegible",
