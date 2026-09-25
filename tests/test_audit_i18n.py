@@ -28,7 +28,14 @@ from audit_fixtures import (
 
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.i18n import _PLACEHOLDER, _RULES_SOURCE, localize, spanish, untranslated
+from quant_trade.audit.i18n import (
+    _PLACEHOLDER,
+    _RULES_SOURCE,
+    _SINGULAR,
+    localize,
+    spanish,
+    untranslated,
+)
 from quant_trade.audit.report import _summary_in, render_html
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
@@ -57,17 +64,57 @@ def test_spanish_text_passes_the_guard() -> None:
         assert find_claims(_filled(english)) == [], english
 
 
+def _one(template: str) -> str:
+    return _PLACEHOLDER.sub(lambda m: "1" if m.group(1) == "n" else "7", template)
+
+
+def test_every_counted_sentence_has_a_singular() -> None:
+    counted = [e for e, s in _RULES_SOURCE if "{n}" in e and ("(s)" in e or "(s)" in s)]
+    assert sorted(counted) == sorted(_SINGULAR)
+    for english, (one_en, one_es) in _SINGULAR.items():
+        assert "(s)" not in one_en and "(es)" not in one_es and "(s)" not in one_es
+        assert localize(_one(english), "en") == _one(one_en)
+        assert localize(_one(english), "es") == _one(one_es)
+        assert find_claims(_one(one_en)) == [] and find_claims(_one(one_es)) == []
+
+
+def test_a_count_reads_as_one_or_many() -> None:
+    many = "3 deposit(s) arrived while the account was at least 20% below its peak"
+    one = "1 deposit(s) arrived while the account was at least 20% below its peak"
+    assert localize(many, "en").startswith("3 deposits arrived")
+    assert localize(many, "es").startswith("3 depósitos llegaron")
+    assert localize(one, "en").startswith("1 deposit arrived")
+    assert localize(one, "es").startswith("1 depósito llegó")
+    assert localize("report: 4 position(s) never closed; excluded", "es") == (
+        "informe: 4 posiciones nunca se cerraron; quedan fuera"
+    )
+    assert localize("report: 1 position(s) never closed; excluded", "en") == (
+        "report: 1 position never closed; excluded"
+    )
+    # A sentence no rule knows still loses its "(s)".
+    assert localize("the trades file is missing column(s): a, b", "en") == (
+        "the trades file is missing columns: a, b"
+    )
+
+
+def test_the_sample_report_never_shows_a_plural_mark() -> None:
+    for locale in ("es", "en"):
+        result = sample_result(locale, bootstrap_samples=60)
+        page = _visible(render_html(result, watermark=False, locale=locale))
+        assert "(s)" not in page and "(es)" not in page, locale
+
+
 def test_prefixes_and_fixed_phrases_are_translated() -> None:
     assert (
         localize("report: 3 open trade(s) excluded", "es")
-        == "informe: se excluyeron 3 operación(es) abiertas"
+        == "informe: se excluyeron 3 operaciones abiertas"
     )
-    assert localize("report: 3 open trade(s) excluded", "en") == "report: 3 open trade(s) excluded"
+    assert localize("report: 3 open trade(s) excluded", "en") == "report: 3 open trades excluded"
     assert localize(
         "report: net profit: the report states 1,000.00 but the rows add up to 990.00", "es"
     ) == ("informe: resultado neto: el informe indica 1,000.00 pero las filas suman 990.00")
     assert localize("PSR against E[max Sharpe] of 4 trial(s), declared by the client", "es") == (
-        "PSR frente a E[Sharpe máximo] de 4 intento(s), declarado por el cliente"
+        "PSR frente a E[Sharpe máximo] de 4 intentos, declarado por el cliente"
     )
     # A sentence no rule knows stays readable, in English.
     assert localize("something new", "es") == "something new"
