@@ -822,6 +822,28 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("needs at least {n} monthly returns", "hacen falta al menos {n} rentabilidades mensuales"),
     ("the monthly returns do not vary", "las rentabilidades mensuales no varían"),
     (
+        "every published preset simulated on the same resampled daily paths, rules as each "
+        "firm's page stated them on its as_of date; a program's phases are taken as fresh "
+        "starts, so the chance of passing them all is the product of each phase's",
+        "cada reto publicado simulado sobre los mismos recorridos diarios remuestreados, con "
+        "las reglas que la página de cada firma indicaba en su fecha; las fases de un "
+        "programa se toman como comienzos nuevos, así que la probabilidad de pasarlas todas "
+        "es el producto de la de cada fase",
+    ),
+    (
+        "share of the resampled passes whose best day breaks the firm's best-day rule, "
+        "checked at the pass on daily closes",
+        "proporción de los pases remuestreados cuyo mejor día rompe la regla del mejor día "
+        "de la firma, comprobada al pasar con cierres diarios",
+    ),
+    (
+        "share of all resampled paths that reach the target with the best day inside the "
+        "firm's best-day rule; the rule is checked at the pass, on daily closes",
+        "proporción de todos los recorridos remuestreados que llegan al objetivo con el mejor "
+        "día dentro de la regla del mejor día de la firma; la regla se comprueba al pasar, con "
+        "cierres diarios",
+    ),
+    (
         "the curve covers none of the dated market falls in full",
         "la curva no cubre completa ninguna de las caídas de mercado con fecha",
     ),
@@ -1280,10 +1302,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "dice si deja de moverse, así que el simulador lo deja moverse (más estricto).",
     ),
     (
-        "Best Day Rule: the best day may not exceed 50 % of the positive days' profit; not "
-        "simulated.",
+        "Best Day Rule: the best day may not exceed 50 % of the positive days' profit; "
+        "checked when a path reaches the target, on daily closes.",
         "Regla del mejor día: el mejor día no puede superar el 50 % del beneficio de los días "
-        "positivos; no se simula.",
+        "positivos; se comprueba cuando un recorrido llega al objetivo, con cierres diarios.",
     ),
     (
         "No minimum trading days; no time limit ({url}).",
@@ -1371,9 +1393,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "Consistency target: the best day must stay at or below 55 % of the profit target, "
-        "otherwise the target rises; not simulated.",
+        "otherwise the target rises; checked when a path reaches the target, on daily closes.",
         "Objetivo de consistencia: el mejor día debe quedar en el 55 % del objetivo de "
-        "beneficio o menos; si no, el objetivo sube; no se simula.",
+        "beneficio o menos; si no, el objetivo sube; se comprueba cuando un recorrido llega "
+        "al objetivo, con cierres diarios.",
     ),
     ("No time limit stated on the pages read.", "Las páginas leídas no indican límite de tiempo."),
     (
