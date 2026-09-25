@@ -191,6 +191,11 @@ def account_review(
             else not_measured("the file does not state the floating result")
         ),
         "deposit_list": sorted(later, key=lambda item: -item["amount"]["value"])[:MAX_LISTED],
+        # A history that opens with trades, not with the deposit that funded
+        # the account, may have been cut at the start (an export from a date,
+        # a later account); the percentage then starts from a mid-way balance.
+        "starts_with_deposit": any(when <= first_entry for when, _ in deposits),
+        "first_trade": first_entry.isoformat(),
     }
 
     flags: list[RedFlag] = []

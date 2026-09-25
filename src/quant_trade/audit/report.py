@@ -434,6 +434,12 @@ LABELS: dict[str, dict[str, str]] = {
         "account_before": "Balance antes",
         "account_drawdown": "Drawdown entonces",
         "account_scope": ("Leído del archivo tal como lo subiste; nada se comprobó con el bróker."),
+        "account_trimmed_badge": "Para preguntar",
+        "account_trimmed": (
+            "El archivo empieza con operaciones el {date}, sin el depósito que abrió la cuenta: "
+            "puede faltar el principio del historial. La ganancia en % se mide desde el primer "
+            "saldo del archivo. Pide la exportación completa desde la apertura de la cuenta."
+        ),
         "luck": "¿Cuánto queda al descontar la suerte?",
         "luck_intro": (
             "Cuantas más configuraciones se prueban, más alto sale la mejor aunque ninguna tenga "
@@ -1239,6 +1245,12 @@ LABELS: dict[str, dict[str, str]] = {
         "account_before": "Balance before",
         "account_drawdown": "Drawdown then",
         "account_scope": "Read from the file as uploaded; nothing was checked with the broker.",
+        "account_trimmed_badge": "To ask",
+        "account_trimmed": (
+            "The file opens with trades on {date}, without the deposit that funded the account: "
+            "the start of the history may be missing. The % gain is measured from the file's "
+            "first balance. Ask for the full export from the day the account opened."
+        ),
         "luck": "What is left once luck is discounted?",
         "luck_intro": (
             "The more configurations are tried, the higher the best one comes out even when "
@@ -3463,6 +3475,13 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
             f"{_badge(account['floating_share']['evidence'])}</p></div>"
         )
     out += f"<div class='facts'>{''.join(facts)}</div>"
+    if account.get("starts_with_deposit") is False:
+        opened = _date_text(str(account["first_trade"]), _locale_of(labels))
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['account_trimmed_badge'])}</span> "
+            f"{_e(labels['account_trimmed'].format(date=opened))}</p>"
+        )
     flat = {
         "deposits_count": account["deposits"]["count"],
         "deposits_total": account["deposits"]["total"],
