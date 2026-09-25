@@ -268,3 +268,115 @@ def test_head_is_answered_like_get_without_a_body(tmp_path: Path) -> None:
         assert head.content == b""
         assert head.headers["content-length"] == get.headers["content-length"]
         assert "content-security-policy" in head.headers
+
+
+# --- curves as Excel saves them ---------------------------------------------
+
+
+HEADER_CELLS = (
+    "<row><c t='inlineStr'><is><t>{0}</t></is></c><c t='inlineStr'><is><t>{1}</t></is></c></row>"
+)
+
+
+def _daily(n: int = 120) -> pd.DataFrame:
+    return positive_drift(n)
+
+
+def test_curve_saved_by_excel_as_unicode_text_is_read() -> None:
+    frame = _daily()
+    text = frame.to_csv(sep="\t", index=False)
+    reference = parse_equity_csv(csv_bytes(frame))
+    for data in (b"\xff\xfe" + text.encode("utf-16-le"), text.encode("utf-16")):
+        series = parse_equity_csv(data)
+        assert len(series.frame) == len(reference.frame)
+        assert series.frame["equity"].iloc[-1] == pytest.approx(reference.frame["equity"].iloc[-1])
+
+
+def test_curve_in_a_windows_code_page_is_read() -> None:
+    data = "fecha;equity\n" + "\n".join(f"2021-01-{d:02d};{100 + d}" for d in range(1, 29))
+    series = parse_equity_csv(data.replace("equity", "capital").encode("cp1252"))
+    assert len(series.frame) == 28
+
+
+def test_curve_uploaded_as_a_workbook_is_read_with_excel_dates() -> None:
+    days = pd.bdate_range("2022-01-03", periods=60)
+    serial = [(d - pd.Timestamp("1899-12-30")).days for d in days]
+    cells = HEADER_CELLS.format("Date", "Equity")
+    cells += "".join(
+        f"<row><c><v>{s}</v></c><c><v>{10000 + 7 * i}</v></c></row>" for i, s in enumerate(serial)
+    )
+    series = parse_equity_csv(_workbook(cells))
+    assert len(series.frame) == 60
+    assert series.frame["timestamp"].iloc[0] == pd.Timestamp("2022-01-03", tz="UTC")
+    assert series.frame["equity"].iloc[-1] == 10000 + 7 * 59
+
+
+def test_empty_workbook_is_an_empty_file() -> None:
+    with pytest.raises(ParseError) as info:
+        parse_equity_csv(_workbook(""))
+    assert info.value.code == "empty"
+
+
+def _app_client(tmp_path: Path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/a.db", bootstrap_samples=100)
+    return TestClient(create_app(settings, make_store(settings.database_url)))
+
+
+def test_workbook_curve_in_the_main_box_is_audited_as_a_curve(tmp_path: Path) -> None:
+    from quant_trade.audit.web import looks_like_platform_report
+
+    days = pd.bdate_range("2022-01-03", periods=300)
+    rng = np.random.default_rng(4)
+    equity = 10_000 * np.cumprod(1 + rng.normal(0.0005, 0.01, 300))
+    cells = HEADER_CELLS.format("date", "equity")
+    cells += "".join(
+        f"<row><c><v>{(d - pd.Timestamp('1899-12-30')).days}</v></c><c><v>{e}</v></c></row>"
+        for d, e in zip(days, equity, strict=True)
+    )
+    book = _workbook(cells)
+    assert not looks_like_platform_report("curva.xlsx", book)
+    response = _app_client(tmp_path).post(
+        "/audits",
+        files={"equity": ("curva.xlsx", book, "application/octet-stream")},
+        data={"consent": "on"},
+        headers={"accept": "application/json"},
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_report_over_the_old_5_mb_limit_is_accepted(tmp_path: Path) -> None:
+    from quant_trade.audit.schema import MAX_REPORT_BYTES, MAX_UPLOAD_BYTES
+
+    report = synthetic_mt5_report(6_500)  # UTF-16, like the terminal writes it
+    assert MAX_UPLOAD_BYTES < len(report) < MAX_REPORT_BYTES
+    assert len(import_report(report, "ReportTester.html").trades.trades) == 6_500
+    response = _app_client(tmp_path).post(
+        "/audits",
+        files={"report": ("ReportTester.html", report, "text/html")},
+        data={"consent": "on"},
+        headers={"accept": "application/json"},
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_report_past_the_new_limit_is_refused(tmp_path: Path) -> None:
+    from quant_trade.audit.schema import MAX_REPORT_BYTES
+
+    too_big = b"\xff\xfe" + b"<\x00" * (MAX_REPORT_BYTES // 2 + 10)
+    with pytest.raises(ReportFormatError) as info:
+        import_report(too_big, "r.html")
+    assert info.value.code == "file_too_large"
+    response = _app_client(tmp_path).post(
+        "/audits",
+        files={"report": ("r.html", too_big, "text/html")},
+        data={"consent": "on"},
+        headers={"accept": "application/json"},
+    )
+    assert response.status_code == 413

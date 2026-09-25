@@ -122,7 +122,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4 "
             "(o el XLSX que exporta MetaTrader 5), "
             "lista de operaciones de TradingView (CSV o XLSX), o el CSV de operaciones de "
-            "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 5 MB."
+            "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 10 MB."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -133,8 +133,12 @@ _COPY: dict[str, dict[str, Any]] = {
         "optimization_help": (
             "Cuenta las configuraciones que probaste: el Sharpe deflactado usa ese número real."
         ),
-        "equity": "Curva de equity o serie de retornos (CSV; obligatoria si no subes un informe)",
-        "equity_help": "Columnas: timestamp y equity (o return). Hasta 5 MB.",
+        "equity": (
+            "Curva de equity o serie de retornos (CSV o Excel; obligatoria si no subes un informe)"
+        ),
+        "equity_help": (
+            "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. Hasta 5 MB."
+        ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
         "challenge_help": "Reglas leídas en la web oficial de cada firma el {as_of}. "
@@ -325,7 +329,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "The file as it is: a MetaTrader 5 or 4 tester or history HTML report (or the "
             "XLSX MetaTrader 5 exports), a "
             "TradingView list of trades (CSV or XLSX), or the trades CSV of NinjaTrader, "
-            "QuantConnect, backtesting.py or vectorbt. Up to 5 MB."
+            "QuantConnect, backtesting.py or vectorbt. Up to 10 MB."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -336,8 +340,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "optimization_help": (
             "Counts the configurations you tried: the deflated Sharpe uses that real number."
         ),
-        "equity": "Equity curve or return series (CSV; required without a report)",
-        "equity_help": "Columns: timestamp and equity (or return). Up to 5 MB.",
+        "equity": "Equity curve or return series (CSV or Excel; required without a report)",
+        "equity_help": (
+            "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Up to 5 MB."
+        ),
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
         "challenge_help": "Rules read on each firm's official site on {as_of}. "
@@ -645,7 +651,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Borrado automático si no desbloqueas el informe.",
         ],
         "drop_title": "Arrastra tu informe aquí",
-        "drop_sub": "o haz clic para elegirlo · hasta 5 MB",
+        "drop_sub": "o haz clic para elegirlo · hasta 10 MB",
         "drop_small": "Arrastra o haz clic",
         "no_report": "¿No tienes informe? Sube tu curva de equity",
         "advanced": "Opciones avanzadas",
@@ -820,7 +826,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Deleted automatically if you do not unlock the report.",
         ],
         "drop_title": "Drop your report here",
-        "drop_sub": "or click to choose it · up to 5 MB",
+        "drop_sub": "or click to choose it · up to 10 MB",
         "drop_small": "Drop or click",
         "no_report": "No report? Upload your equity curve",
         "advanced": "Advanced options",
@@ -1441,7 +1447,13 @@ def _upload_form(
         + "<div class='form-grid'>"
         + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
         + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
-        + _drop("equity", copy["equity"], ".csv,text/csv", _e(copy["equity_help"]), locale)
+        + _drop(
+            "equity",
+            copy["equity"],
+            ".csv,.txt,.tsv,.xlsx,text/csv",
+            _e(copy["equity_help"]),
+            locale,
+        )
         + _field(
             copy["challenge"],
             f"<select name='challenge'>{_preset_options(locale)}</select>",

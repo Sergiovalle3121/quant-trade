@@ -136,7 +136,8 @@ def test_bad_uploads_are_refused_plainly(tmp_path: Path) -> None:
     assert "timestamp column" in bad_en.text
     big = client.post(
         "/audits",
-        files={"equity": ("e.csv", b"x" * 20_000, "text/csv")},
+        # The equity field takes a report, so its limit is twice the setting.
+        files={"equity": ("e.csv", b"x" * 25_000, "text/csv")},
         data={"consent": "on"},
         headers={"accept": "application/json"},
     )
@@ -387,7 +388,9 @@ def test_a_report_dropped_in_the_equity_field_is_read_as_the_report(tmp_path: Pa
     audit_id, token = _id_and_token(response.headers["location"])
     body = client.get(f"/audits/{audit_id}.json?token={token}").json()
     assert body["inputs"]["source_format"] == "mt5_tester_html"
-    assert looks_like_platform_report("r.xlsx", b"PK\x03\x04")
+    # A workbook is a report only when an importer recognises it; any other
+    # (a curve, or a damaged file) is read as the equity curve it was sent as.
+    assert not looks_like_platform_report("r.xlsx", b"PK\x03\x04")
     assert not looks_like_platform_report("e.csv", csv_bytes(positive_drift(50)))
 
 
