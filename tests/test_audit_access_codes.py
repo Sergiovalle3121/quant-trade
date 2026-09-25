@@ -313,3 +313,19 @@ def test_free_mode_ignores_codes_and_spends_nothing(tmp_path: Path) -> None:
     token = location.split("token=")[1]
     redeem = client.post(f"/audits/{audit_id}/redeem?token={token}", data={"code": code})
     assert redeem.status_code == 404
+
+
+def test_every_buy_box_lists_what_the_payment_unlocks(tmp_path: Path) -> None:
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.report import LABELS
+
+    client, _ = _selling_client(tmp_path)
+    page = client.get(_upload(client).headers["location"]).text
+    box = page.split("<div class='paybox buy'>", 1)[1].split("</div>", 2)
+    included = page.split("<ul class='buy-incl'>", 1)[1].split("</ul>", 1)[0]
+    assert "https://wa.me/000" in box[0] + box[1]
+    items = LABELS["es"]["buy_includes"].split("|")
+    assert len(items) == 4 and all(item in included for item in items)
+    assert "Reembolso" in included
+    assert find_claims(included) == []
+    assert find_claims(LABELS["en"]["buy_includes"]) == []

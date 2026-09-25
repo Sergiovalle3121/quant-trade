@@ -230,3 +230,28 @@ def test_error_page_shows_the_field_problem_and_expected_formats_apart() -> None
     plain = error_page("No encontramos esa página. Revisa el enlace.", locale="es")
     assert "<p class='err-field'>" not in plain and "Revisa el enlace." in plain
     assert find_claims(page) == [] and find_claims(plain) == []
+
+
+def test_capital_limits_read_as_four_cards() -> None:
+    from html import escape
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.report import LABELS, render_html
+    from quant_trade.audit.sample import synthetic_mt5_report
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=synthetic_mt5_report(200),
+        report_filename="ReportTester.html",
+    )
+    result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, challenge_samples=200)
+    for locale in ("es", "en"):
+        page = render_html(result, watermark=False, locale=locale)
+        tiles = page.split("<ol class='caps'>", 1)[1].split("</ol>", 1)[0]
+        assert tiles.count("<li class='cap'>") == 4
+        assert tiles.count(escape(LABELS[locale]["capital_needed"])) == 4
+        assert "<b>10%</b>" in tiles and "<b>50%</b>" in tiles
+        assert find_claims(page) == []
+    assert "@media print{ol.caps{display:block}" in STYLE
