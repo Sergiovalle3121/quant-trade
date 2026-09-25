@@ -1416,6 +1416,7 @@ AUDIENCES: dict[str, dict[str, Any]] = {
         ],
         "guide": "Qué archivo subir",
         "more": "Ver qué revisa para tu caso",
+        "also": "Otro caso:",
         "start": "Empezar",
     },
     "en": {
@@ -1473,6 +1474,7 @@ AUDIENCES: dict[str, dict[str, Any]] = {
         ],
         "guide": "Which file to upload",
         "more": "See what it checks for your case",
+        "also": "Another case:",
         "start": "Start",
     },
 }
@@ -1491,10 +1493,16 @@ def _audiences(locale: str) -> str:
             f"<p><strong>{_e(words['get'])}:</strong> "
             f"{_e(get.format(presets=len(PRESETS)))}</p><p>{link}</p></div>"
         )
+    # Pages beyond the four cards get a plain link under them.
+    extra = "".join(
+        f"<p class='muted audience-also'>{_e(words['also'])} "
+        f"<a href='{_e(audience_url(page.slug, locale))}'>{_e(page.text[locale].title)}</a></p>"
+        for page in AUDIENCE_PAGES[len(words["items"]) :]
+    )
     return (
         "<section class='section light' id='para-quien'><div class='wrap'>"
         + _section_head(words["eyebrow"], _title_pair(words["title"]), words["lead"])
-        + f"<div class='cards cards-2'>{''.join(cards)}</div></div></section>"
+        + f"<div class='cards cards-2'>{''.join(cards)}</div>{extra}</div></section>"
     )
 
 

@@ -132,3 +132,29 @@ def test_robot_buyers_land_on_the_form_with_the_extra_files_open(tmp_path: Path)
         assert "extras=1" not in client.get(path).text
     assert "<details class='adv extras' open>" in client.get("/?lang=es&extras=1").text
     assert "<details class='adv extras'>" in client.get("/").text
+
+
+@pytest.mark.parametrize(
+    ("locale", "path", "words"),
+    [
+        ("es", "/para/copiar-senales", ("Martingala y rejilla", "Sin stop de pérdida", "captura")),
+        ("en", "/for/signal-copiers", ("Martingale and grids", "No stop loss", "screenshot")),
+    ],
+)
+def test_signal_copiers_have_their_own_page(
+    tmp_path: Path, locale: str, path: str, words: tuple[str, ...]
+) -> None:
+    client = _client(tmp_path, free_mode=False, access_codes=True, price_usd_cents=2900)
+    text = client.get(path).text
+    for word in words:
+        assert word in text
+    # The upload line links the export guide for the provider's account.
+    assert "cuenta-proveedor" in text or "provider-account" in text
+    assert find_claims(text) == []
+    # The landing keeps four cards and links the fifth page under them.
+    landing = client.get("/" if locale == "es" else "/en").text
+    assert landing.count("class='card spot audience'") == 4
+    assert "class='muted audience-also'" in landing and f"href='{path}'" in landing
+    # The other case pages link to it too.
+    other = client.get(audience_url("compradores-de-robots", locale)).text
+    assert f"href='{path}'" in other
