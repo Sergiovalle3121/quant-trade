@@ -733,7 +733,13 @@ def build_inputs(
     trades only and compared with the backtest; it changes no other figure.
     """
     # Imported here: the importers build on this module's types.
-    from quant_trade.audit.importers import import_report, parse_optimization
+    from quant_trade.audit.importers import (
+        MT5_TESTER_HTML,
+        MT5_TESTER_XLSX,
+        import_report,
+        optimization_mismatch,
+        parse_optimization,
+    )
 
     digests: dict[str, str] = {}
     warnings: list[str] = []
@@ -798,6 +804,25 @@ def build_inputs(
         digests["variants.csv"] = sha256_of_bytes(variants_bytes)
     if optimization_bytes:
         summary = parse_optimization(optimization_bytes)
+        # Checked against an MT5 tester report only: that is the file the
+        # export comes from, and the one whose inputs the plateau matches.
+        mismatch = (
+            optimization_mismatch(summary, imported.metadata)
+            if imported is not None and imported.source_format in {MT5_TESTER_HTML, MT5_TESTER_XLSX}
+            else None
+        )
+        if mismatch is not None:
+            what, theirs, ours = mismatch
+            what_es = {"robot": "robot", "symbol": "símbolo", "timeframe": "marco temporal",
+                       "inputs": "parámetros"}[what]  # fmt: skip
+            raise ParseError(
+                f"the optimisation file is for another test ({what} {theirs}; the report says "
+                f"{ours}): upload the optimisation of the same robot, symbol and timeframe",
+                message_es=f"El archivo de optimización es de otra prueba ({what_es} {theirs}; "
+                f"el informe dice {ours}): sube la optimización del mismo robot, símbolo y "
+                "marco temporal.",
+                code="optimization_mismatch",
+            )
         digests["optimization.xml"] = sha256_of_bytes(optimization_bytes)
         warnings.extend(f"optimization: {w}" for w in summary.warnings)
         extra["optimization_passes"] = summary.passes
