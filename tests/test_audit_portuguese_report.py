@@ -165,3 +165,51 @@ def test_the_plan_reads_in_portuguese() -> None:
         texts = [step.title, step.finding, *step.actions]
         assert find_claims(" ".join(texts)) == []
         assert step.title in plan.TITLES["pt"].values()
+
+
+def _web_client(tmp_path: Any) -> Any:
+    pytest.importorskip("fastapi")
+    pytest.importorskip("sqlalchemy")
+    from audit_fixtures import signed_in
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", bootstrap_samples=100)
+    return signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
+
+
+def test_an_upload_in_portuguese_opens_a_portuguese_report(tmp_path: Any) -> None:
+    from audit_fixtures import csv_bytes, positive_drift
+
+    client = _web_client(tmp_path)
+    files = {"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")}
+    posted = client.post(
+        "/audits", files=files, data={"consent": "on", "locale": "pt"}, follow_redirects=False
+    )
+    assert posted.status_code == 303
+    location = posted.headers["location"]
+    page = client.get(location).text
+    assert page.startswith("<!doctype html><html lang='pt'>")
+    assert report.LABELS["pt"]["verdict"] in page
+    assert find_claims(page) == []
+    # The same report opens in Spanish and English on request, and back in Portuguese.
+    assert "<html lang='es'>" in client.get(f"{location}&lang=es").text
+    assert "<html lang='pt'>" in client.get(f"{location}&lang=pt").text
+    # A language no report has falls back to the one chosen at upload.
+    assert "<html lang='pt'>" in client.get(f"{location}&lang=fr").text
+
+
+def test_the_sample_report_has_a_portuguese_address(tmp_path: Any) -> None:
+    client = _web_client(tmp_path)
+    page = client.get("/pt/exemplo")
+    assert page.status_code == 200
+    assert page.text.startswith("<!doctype html><html lang='pt'>")
+    assert "dados sintéticos" in page.text
+    assert "href='/pt/exemplo.pdf'" in page.text or "pdf" not in page.text.lower()
+    assert find_claims(page.text) == []
+    # The Portuguese landing links it, and search engines see all three languages.
+    assert "href='/pt/exemplo'" in client.get("/pt").text
+    assert "/pt/exemplo" in client.get("/sitemap.xml").text

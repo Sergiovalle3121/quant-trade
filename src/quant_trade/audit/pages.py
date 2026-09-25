@@ -105,6 +105,9 @@ VERIFICATION_NOTICE: dict[str, str] = {
     ),
 }
 
+#: The sample report's address in each language.
+SAMPLE_PAGE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"}
+
 SAMPLE_BANNER: dict[str, str] = {
     "es": (
         "Informe de ejemplo con datos sintéticos generados por ordenador: no es la cuenta ni "
@@ -113,6 +116,10 @@ SAMPLE_BANNER: dict[str, str] = {
     "en": (
         "Sample report built from computer-generated synthetic data: it is nobody's account "
         "or strategy. This is what a full report looks like."
+    ),
+    "pt": (
+        "Relatório de exemplo feito com dados sintéticos gerados por computador: não é a conta "
+        "nem a estratégia de ninguém. Assim fica um relatório completo."
     ),
 }
 
@@ -1143,8 +1150,8 @@ def _method_title(locale: str) -> str:
 
 
 def _sample_url(locale: str) -> str:
-    """The sample report, in English from a Portuguese page."""
-    return "/ejemplo?lang=es" if locale == "es" else "/sample?lang=en"
+    """The sample report in the page's language."""
+    return {"es": "/ejemplo?lang=es", "pt": "/pt/exemplo"}.get(locale, "/sample?lang=en")
 
 
 def _switch_links(
@@ -1201,7 +1208,7 @@ def _nav(
     account = "/account" if linked == "en" else "/cuenta"
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
-        f"<a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a>"
+        f"<a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a>"
         f"<a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a>"
         f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
         f"<a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a>"
@@ -1276,7 +1283,7 @@ def sample_meta(locale: str, base_url: str) -> str:
     locale = _locale(locale)
     copy = _COPY[locale]
     title = f"{copy['sample_link']} · {copy['title']}"
-    path = "/ejemplo" if locale == "es" else "/sample"
+    path = SAMPLE_PAGE_PATHS.get(locale, "/sample")
     return _public_meta(title, copy["sample_description"], locale, path, base_url)
 
 
@@ -1297,10 +1304,10 @@ def _footer(locale: str) -> str:
     ui = _UI[locale]
     home = _home(locale)
     linked = link_locale(locale)
-    sample = "/ejemplo" if linked == "es" else "/sample"
+    sample = SAMPLE_PAGE_PATHS.get(locale, SAMPLE_PAGE_PATHS[linked])
     product = (
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
-        f"<li><a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a></li>"
+        f"<li><a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
@@ -1892,9 +1899,9 @@ def _upload_form(
 ) -> str:
     ui = _UI[locale]
     linked = link_locale(locale)
-    # The report exists in Spanish and English; a Portuguese page asks for English.
-    selected = {"es": "", "en": ""}
-    selected[linked] = " selected"
+    # The report exists in Spanish, English and Portuguese: the page's own language.
+    selected = {"es": "", "en": "", "pt": ""}
+    selected[locale if locale in selected else linked] = " selected"
     code_field = ""
     if access_codes:
         code_field = _field(
@@ -2026,7 +2033,8 @@ def _upload_form(
         + _field(
             copy["locale"],
             f"<select name='locale'><option value='es'{selected['es']}>Español</option>"
-            f"<option value='en'{selected['en']}>English</option></select>",
+            f"<option value='en'{selected['en']}>English</option>"
+            f"<option value='pt'{selected['pt']}>Português</option></select>",
             copy.get("locale_note", ""),
         )
         + code_field
@@ -2106,7 +2114,7 @@ def landing(
     copy = _COPY[locale]
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
-    sample = _sample_url(link_locale(locale))
+    sample = _sample_url(locale)
     flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
     body = (
@@ -2758,10 +2766,9 @@ def audience_page(
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
     text = audience.text[locale]
-    linked = link_locale(locale)
     title = f"{text.title} · {BRAND}"
     meta = _public_meta(title, text.summary, locale, audience_url(audience.slug, locale), base_url)
-    sample = _sample_url(linked)
+    sample = _sample_url(locale)
     pains = "".join(f"<li>{icon('alert')}<span>{_e(item)}</span></li>" for item in text.pains)
     uploads = "".join(
         f"<li>{icon('file')}<span>{_e(item)}"

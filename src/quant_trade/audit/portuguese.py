@@ -104,7 +104,7 @@ COPY_PT: dict[str, Any] = {
     "yes": "Sim",
     "no": "Não",
     "locale": "Idioma do relatório",
-    "locale_note": "O relatório sai em inglês ou espanhol; em português, em breve.",
+    "locale_note": "O relatório sai em português, espanhol ou inglês.",
     "description": "Descrição (opcional, não aparece no relatório)",
     "consent": (
         "Entendo que isto é uma ferramenta de pesquisa estatística, não uma recomendação de "

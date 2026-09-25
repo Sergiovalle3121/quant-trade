@@ -1017,7 +1017,7 @@ REPORT: dict[str, Any] = {
         "cliente e não pôde ser conferido, NOT_MEASURED não pôde ser calculado com o que foi "
         "fornecido."
     ),
-    "SAMPLE_PATHS": "/sample",
+    "SAMPLE_PATHS": "/pt/exemplo",
     "LOCKED_GAINS": {
         "plan": "O que mudar para subir de classe, com os seus números",
         "reasons_detail": "Por que cada dimensão recebeu a sua nota",

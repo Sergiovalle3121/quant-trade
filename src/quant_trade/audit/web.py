@@ -75,6 +75,7 @@ from quant_trade.audit.pages import (
     verification_page,
 )
 from quant_trade.audit.payments import stripe_checkout
+from quant_trade.audit.portuguese import link_locale
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
@@ -113,6 +114,9 @@ STRIPE_TOLERANCE_SECONDS = 300
 PAID_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_succeeded")
 #: The page languages; Spanish is the default everywhere.
 LOCALES = ("es", "en")
+#: The report's languages: its pages, its PDF and the sample. Screens with no
+#: Portuguese yet (accounts, payments, messages) show a Portuguese reader English.
+REPORT_LOCALES = ("es", "en", "pt")
 _EMAIL_MAX = 254
 #: Control characters, dropped from the column names a customer types.
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -370,7 +374,8 @@ def _megabytes(size: int) -> str:
 def message(key: str, locale: str, **values: Any) -> str:
     """The service's own message ``key`` in ``locale`` (Spanish by default)."""
     texts = MESSAGES[key]
-    return texts.get(locale, texts["es"]).format(**values)
+    text = texts.get(locale) or texts.get(link_locale(locale)) or texts["es"]
+    return text.format(**values)
 
 
 def redact_secrets(text: str) -> str:
@@ -772,7 +777,9 @@ def _sentence(text: str) -> str:
 
 
 #: Where the sample report's PDF is served, per language.
-SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf"}
+SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf", "pt": "/pt/exemplo.pdf"}
+#: The sample PDF's name inside the file and on download.
+SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
 
 
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
@@ -849,7 +856,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _scope_locale(scope: Any) -> str:
         query = scope.get("query_string", b"").decode("latin-1")
-        match = re.search(r"(?:^|&)lang=(es|en)(?:&|$)", query)
+        match = re.search(r"(?:^|&)lang=(es|en|pt)(?:&|$)", query)
         return match.group(1) if match else "es"
 
     def _too_large_response(scope: Any) -> Any:
@@ -1767,7 +1774,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         access_code: Annotated[str, Form()] = "",
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
-        loc = _locale(locale)
+        # The report's language; the upload's own screens show Portuguese readers English.
+        report_loc = _report_locale(locale)
+        loc = link_locale(report_loc)
         if _cross_site(request):
             return _html_error(request, 403, message("cross_site", loc), loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
@@ -1941,7 +1950,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 oos_start=oos_start.strip() or None,
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
-                locale=loc,
+                locale=report_loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
@@ -1985,7 +1994,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         signed_in = _session(request)
         mapper = signed_in[0].id if signed_in is not None else ""
         carried = {
-            "locale": loc,
+            "locale": report_loc,
             "consent": consent,
             "trials": trials,
             "cost_bps": cost_bps,
@@ -2375,6 +2384,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> str:
         record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
+        ui = link_locale(locale)
         # Only known values are shown, so the query cannot inject text.
         notice = None
         if session_id and cfg.stripe_enabled:
@@ -2389,19 +2399,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         elif code == "applied" and record.paid:
             notice = message("code_applied", locale)
         elif acct_done == "credit" and record.paid:
-            notice = account_pages.COPY[locale]["credit_used"]
+            notice = account_pages.COPY[ui]["credit_used"]
         elif acct_done == "upload_credit" and record.paid:
-            notice = account_pages.COPY[locale]["credit_on_upload"]
+            notice = account_pages.COPY[ui]["credit_on_upload"]
         elif acct_done == "welcome" and record.paid:
-            notice = account_pages.COPY[locale]["welcome_notice"].format(
+            notice = account_pages.COPY[ui]["welcome_notice"].format(
                 limit=acct.FREE_PREVIEWS_PER_MONTH,
                 price=f"USD {cfg.price_usd:.0f}",
                 pack=f"USD {cfg.pack_price_usd:.0f}",
             )
         elif acct_done == "saved":
-            notice = account_pages.COPY[locale]["saved_notice"]
+            notice = account_pages.COPY[ui]["saved_notice"]
         elif acct_done == "nocredit" and not record.paid:
-            notice = account_pages.COPY[locale]["credit_none"]
+            notice = account_pages.COPY[ui]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.
         code_error = code == "rejected" and not record.paid
         valid_token = token if token_matches(record.token_hash, token) else ""
@@ -2425,7 +2435,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not token:
                 return ""
             return account_pages.report_box(
-                locale=locale,
+                locale=link_locale(locale),
                 state="anon",
                 audit_id=record.id,
                 query=query,
@@ -2435,7 +2445,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
         credits = db.account_credits(account.id, datetime.now(UTC)) if locked else 0
         return account_pages.report_box(
-            locale=locale,
+            locale=link_locale(locale),
             state=state,
             audit_id=record.id,
             query=query,
@@ -2543,15 +2553,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             failed_card_sessions.hit(session_id, now)
         return paid
 
+    def _report_locale(value: str | None) -> str:
+        return value if value in REPORT_LOCALES else "es"
+
     def _record_locale(record: Any) -> str:
         try:
-            return _locale(json.loads(record.declared_json or "{}").get("locale"))
+            return _report_locale(json.loads(record.declared_json or "{}").get("locale"))
         except ValueError:
             return "es"
 
     def _view_locale(record: Any, lang: str | None) -> str:
-        """The page language: ``lang`` when given, else the one chosen at upload."""
-        return _locale(lang) if lang in LOCALES else _record_locale(record)
+        """The report's language: ``lang`` when given, else the one chosen at upload."""
+        return _report_locale(lang) if lang in REPORT_LOCALES else _record_locale(record)
 
     @app.post("/audits/{audit_id}/redeem")
     def redeem(
@@ -2678,6 +2691,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     notice=SAMPLE_BANNER[locale],
                     legal_links=True,
                     switch_url="/sample?lang=en" if locale == "es" else "/ejemplo?lang=es",
+                    locale=locale,
                     head_meta=sample_meta(locale, base_url),
                     pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
                 )
@@ -2701,7 +2715,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 try:
                     sample_pdfs[locale] = pdf_lib.report_pdf(
                         page,
-                        audit_id="ejemplo" if locale == "es" else "sample",
+                        audit_id=SAMPLE_PDF_NAMES[locale],
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
@@ -2712,7 +2726,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     return HTMLResponse(
                         error_page(message("pdf_busy", locale), locale=locale), status_code=503
                     )
-        name = "rigor-ejemplo.pdf" if locale == "es" else "rigor-sample.pdf"
+        name = f"rigor-{SAMPLE_PDF_NAMES[locale]}.pdf"
         return Response(
             content=sample_pdfs[locale],
             media_type="application/pdf",
@@ -2729,6 +2743,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/sample.pdf")
     async def sample_pdf_en() -> Response:
         return await run_in_threadpool(_sample_pdf, "en")
+
+    @app.get("/pt/exemplo.pdf")
+    async def sample_pdf_pt() -> Response:
+        return await run_in_threadpool(_sample_pdf, "pt")
+
+    @app.get("/pt/exemplo", response_class=HTMLResponse)
+    async def sample_pt(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "pt", _site_url(request))
 
     @app.get("/ejemplo", response_class=HTMLResponse)
     async def sample_es(request: Request, lang: str | None = None) -> str:

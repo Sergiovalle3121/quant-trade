@@ -293,7 +293,7 @@ def sample_result(locale: str = "es", *, bootstrap_samples: int = SAMPLE_BOOTSTR
         oos_start="2024-06-03",
         description="",
         benchmark_applicable=False,
-        locale=locale if locale in ("es", "en") else "es",
+        locale=locale if locale in ("es", "en", "pt") else "es",
         challenge=None,
     )
     inputs = build_inputs(
