@@ -162,7 +162,9 @@ def test_every_footer_and_the_landing_link_the_methodology(tmp_path: Path) -> No
     for locale, path in (("es", "/"), ("en", "/en")):
         page = client.get(path).text
         assert "class='investor'" in page and INVESTOR_COPY[locale]["title"] in page
-        assert "/cuenta-proveedor'" in page
+        assert (
+            "/guias/cuenta-proveedor'" if locale == "es" else "/guides/provider-account'"
+        ) in page
         assert find_claims(page) == []
 
 
@@ -193,3 +195,20 @@ def test_prop_simulator_ranges_are_cards_and_open_losses_a_callout() -> None:
         # The break-even tile keeps one short number; the pips go in its label.
         assert re.search(r"<b>[\d.,]+</b><span>[^<]*pips\)</span>", page)
         assert find_claims(page) == []
+
+
+def test_guides_index_lists_backtests_and_live_accounts_apart(tmp_path: Path) -> None:
+    from quant_trade.audit.guides import GUIDES
+    from quant_trade.audit.pages import ACCOUNT_GUIDES
+
+    assert {guide.slug for guide in GUIDES} >= ACCOUNT_GUIDES
+    client = _client(tmp_path)
+    for path, heading in (("/guias", "Cuentas reales"), ("/guides", "Live accounts")):
+        page = client.get(path).text
+        assert page.count("<section class='guide-group'>") == 2
+        backtests, accounts = page.split(f"<h2>{heading}</h2>", 1)
+        assert "/myfxbook'" in accounts and "/myfxbook'" not in backtests.split("<main", 1)[-1]
+        assert "/mt5'" in backtests
+        assert find_claims(page) == []
+    # Ten or more platforms sit in two even rows on a wide screen.
+    assert "gap:14px 40px;max-width:880px}" in STYLE

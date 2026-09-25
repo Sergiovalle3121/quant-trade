@@ -274,6 +274,36 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
             "the real result."
         ),
     },
+    "COARSE_TICK_MODEL": {
+        "es": (
+            "Pide el mismo backtest con cada tick (o ticks reales en MT5); solo los robots "
+            "que operan al abrir la vela se pueden juzgar con precios de apertura."
+        ),
+        "en": (
+            "Ask for the same backtest on every tick (or real ticks in MT5); only robots that "
+            "trade at the bar's open can be judged on open prices."
+        ),
+    },
+    "TEST_DATA_QUALITY_LOW": {
+        "es": (
+            "Pide el backtest repetido con un historial completo, idealmente con ticks reales, "
+            "y compara el resultado."
+        ),
+        "en": (
+            "Ask for the backtest rerun on a complete history, ideally real ticks, and compare "
+            "the result."
+        ),
+    },
+    "REPORT_HEADER_MISMATCH": {
+        "es": (
+            "Pide el archivo original que exporta MetaTrader, no una captura, y vuelve a "
+            "subirlo tal cual."
+        ),
+        "en": (
+            "Ask for the original file MetaTrader exports, not a screenshot, and upload it "
+            "as it is."
+        ),
+    },
 }
 
 GENERIC_FLAG_HINT = {

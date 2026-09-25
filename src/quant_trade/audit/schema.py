@@ -902,6 +902,9 @@ class AuditResult(BaseModel):
     #: Deposits, withdrawals and open positions of an account history
     #: (``audit/account.py``); None on older results.
     account: dict[str, Any] | None = None
+    #: Tick model, data quality and test window of a MetaTrader tester
+    #: report (``audit/testdata.py``); None on older results.
+    test_data: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 

@@ -41,7 +41,7 @@ from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
-from quant_trade.audit.guides import GUIDES_BY_SLUG
+from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
 from quant_trade.audit.owner import (
@@ -1500,19 +1500,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def guides_en(request: Request, lang: str | None = None) -> str:
         return guides_index_page(locale=_locale(lang or "en"), base_url=_site_url(request))
 
-    def _guide(request: Request, slug: str, locale: str) -> str:
-        guide = GUIDES_BY_SLUG.get(slug)
+    def _guide(request: Request, slug: str, path_locale: str, locale: str) -> Response:
+        guide = GUIDES_BY_PATH[path_locale].get(slug)
         if guide is None:
-            raise _not_found()
-        return guide_page(guide, locale=locale, base_url=_site_url(request))
+            # A guide's slug in the other language moves to this language's own.
+            other = GUIDES_BY_PATH["en" if path_locale == "es" else "es"].get(slug)
+            if other is None:
+                raise _not_found()
+            return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
+        return HTMLResponse(guide_page(guide, locale=locale, base_url=_site_url(request)))
 
     @app.get("/guias/{slug}", response_class=HTMLResponse)
-    def guide_es(request: Request, slug: str, lang: str | None = None) -> str:
-        return _guide(request, slug, _locale(lang or "es"))
+    def guide_es(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _guide(request, slug, "es", _locale(lang or "es"))
 
     @app.get("/guides/{slug}", response_class=HTMLResponse)
-    def guide_en(request: Request, slug: str, lang: str | None = None) -> str:
-        return _guide(request, slug, _locale(lang or "en"))
+    def guide_en(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _guide(request, slug, "en", _locale(lang or "en"))
 
     def _legal_context() -> LegalContext:
         return LegalContext(
