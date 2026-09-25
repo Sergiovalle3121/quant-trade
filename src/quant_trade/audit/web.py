@@ -1825,6 +1825,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             for role in mapping.FORM_ROLES
             if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
         }
+        # Named columns belong to the report: a file sent with them in the
+        # curve field is read with them, before any automatic reader.
+        if report_columns and uploads["equity"] and not uploads["report"]:
+            uploads["report"], uploads["equity"] = uploads["equity"], None
+            report_filename = equity_name
+            report_name = report_digest_name(report_filename)
 
         # A signed-in customer's column choice is remembered per header.
         signed_in = _session(request)
@@ -1894,6 +1900,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             try:
                 inputs = attempt(report_columns)
             except ParseError as exc:
+                # A "curve" that starts at 0 or crosses it is a list of
+                # results, and a curve file with no value column may be one:
+                # both are offered to name, a result list preselected as such.
+                lone = bool(uploads["report"]) != bool(uploads["equity"])
+                curve_like = exc.code == "equity_not_positive" or (
+                    exc.code == "missing_value" and not uploads["report"]
+                )
+                if curve_like and lone and not report_columns:
+                    sheet = uploads["report"] or uploads["equity"]
+                    results = mapping.read_table(sheet) if sheet else None
+                    if results is not None:
+                        guess = mapping.results_guess(
+                            results, with_result=exc.code == "equity_not_positive"
+                        )
+                        return _mapping_answer(request, results, exc, loc, carried, guess)
                 table = (
                     mapping.read_table(uploads["report"])
                     if uploads["report"] and exc.code in mapping.MAPPABLE_CODES
@@ -2019,6 +2040,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if chosen
                 else mapping.COPY[locale]["unknown"]
             )
+        elif exc.code == "equity_not_positive":
+            text = mapping.COPY[locale]["results"]
+        elif exc.code == "missing_value":
+            text = mapping.COPY[locale]["unknown"]
         else:
             text = _sentence(exc.localized(locale))
         if _wants_json(request):

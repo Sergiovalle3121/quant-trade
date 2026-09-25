@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -130,6 +131,11 @@ COPY: dict[str, dict[str, str]] = {
         "what_fill": "una fila por ejecución",
         "what_profit": "fecha y resultado",
         "what_balance": "fecha y saldo",
+        "results": (
+            "Tu archivo parece una lista de resultados (lo que ganó o perdió cada día u "
+            "operación), no el saldo de la cuenta. Confirma la fecha y la columna de "
+            "resultado y lo auditamos."
+        ),
         "few_rows": (
             "Tu archivo: con esas columnas quedan menos de dos filas con fecha y cifra "
             "legibles. Revisa que la fecha y la cifra sean las columnas correctas."
@@ -185,6 +191,10 @@ COPY: dict[str, dict[str, str]] = {
         "what_fill": "one row per fill",
         "what_profit": "date and result",
         "what_balance": "date and balance",
+        "results": (
+            "Your file looks like a list of results (what each day or trade made or lost), "
+            "not the account balance. Confirm the date and the result column and we audit it."
+        ),
         "few_rows": (
             "Your file: with those columns fewer than two rows have a readable date and "
             "figure. Check that the date and the figure are the right columns."
@@ -341,14 +351,55 @@ def curve_kind(columns: Mapping[str, str]) -> str | None:
     return None
 
 
+def _decimal_mark(values: Sequence[str], default: str) -> str:
+    """The column's decimal mark from its cells: the later of ``.`` and
+    ``,`` when both appear, else a lone mark not followed by three digits
+    (``12.34`` in a semicolon file is twelve, not 1,234)."""
+    votes = {".": 0, ",": 0}
+    for value in values:
+        text = value.strip()
+        marks = [(text.rfind(mark), mark) for mark in ".," if mark in text]
+        if len(marks) == 2:
+            votes[max(marks)[1]] += 1
+        elif len(marks) == 1:
+            at, mark = marks[0]
+            digits = len(text) - at - 1 - len(text[at + 1 :].lstrip("0123456789"))
+            if digits != 3:
+                votes[mark] += 1
+    if votes["."] != votes[","]:
+        return "." if votes["."] > votes[","] else ","
+    return default
+
+
 def _figures(values: list[str], decimal: str) -> list[float | None]:
-    read = [universal._amount(value, decimal) for value in values]
-    other = "." if decimal == "," else ","
-    swapped = [universal._amount(value, other) for value in values]
-    # A comma-decimal column in a comma-free export, or the reverse.
-    if sum(x is not None for x in swapped) > sum(x is not None for x in read):
-        return swapped
-    return read
+    mark = _decimal_mark(values, decimal)
+    return [universal._amount(value, mark) for value in values]
+
+
+_DATE_LIKE = re.compile(r"^\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")
+
+
+def _is_date(sample: str) -> bool:
+    if not sample or _is_number(sample):
+        return False
+    try:
+        return universal._times([sample], False).values[0] is not None
+    except imp.ParseError:
+        # One cell cannot settle day/month order, but it is a date.
+        return bool(_DATE_LIKE.match(sample))
+
+
+def results_guess(table: Table, *, with_result: bool = True) -> dict[str, str]:
+    """For a list of results: its first date column, and the first other
+    column whose sample is a number, preselected as the date and the result."""
+    date = next((name for name in table.names if _is_date(_example(table, name))), "")
+    figure = next(
+        (name for name in table.names if name != date and _is_number(_example(table, name) or "x")),
+        "",
+    )
+    if not with_result:
+        figure = ""
+    return {role: name for role, name in (("date", date), ("profit", figure)) if name}
 
 
 def curve_from_columns(

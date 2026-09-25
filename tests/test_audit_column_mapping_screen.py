@@ -315,3 +315,67 @@ def test_results_that_empty_the_account_ask_for_the_starting_balance(tmp_path: P
     assert "declara el balance inicial de la cuenta" in answer.text
     assert "ganancia acumulada" not in answer.text
     assert find_claims(answer.text) == []
+
+
+def _daily(header: str = "Fecha;Resultado") -> bytes:
+    """A daily P&L sheet: semicolons with dot decimals, around +-60 a day."""
+    lines = [header]
+    for day in range(1, 29):
+        move = 61.37 if day % 2 else -48.9
+        lines.append(f"{day:02d}/02/2023;{move:.2f}")
+    return ("\n".join(lines) + "\n").encode()
+
+
+def test_a_daily_sheet_with_dot_decimals_reads_with_named_columns(tmp_path: Path) -> None:
+    curve, _ = mapping.curve_from_columns(
+        _daily(), {"date": "Fecha", "profit": "Resultado"}, initial_balance=5000
+    )
+    # 61.37 is sixty-one, not 6,137, even in a semicolon file.
+    assert curve.decode().splitlines()[2] == "2023-02-01 00:00:00,5061.37"
+    client = _client(tmp_path)
+    for field in ("report", "equity"):
+        posted = client.post(
+            "/audits",
+            files={field: ("pnl.csv", _daily(), "text/csv")},
+            data={"consent": "on", "col_date": "Fecha", "col_profit": "Resultado"},
+            follow_redirects=False,
+        )
+        assert posted.status_code == 303, (field, posted.text[:400])
+
+
+def test_a_results_sheet_in_the_curve_field_is_offered_as_results(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for header in ("date;value", "Fecha;Resultado"):
+        answer = client.post(
+            "/audits",
+            files={"equity": ("pnl.csv", _daily(header), "text/csv")},
+            data={"consent": "on"},
+        )
+        assert answer.status_code == 422, (header, answer.text[:300])
+        assert "type='file' name='report' required" in answer.text
+        assert find_claims(answer.text) == []
+    assert (
+        "parece una lista de resultados"
+        in client.post(
+            "/audits",
+            files={"equity": ("pnl.csv", _daily("date;value"), "text/csv")},
+            data={"consent": "on"},
+        ).text
+    )
+    table = mapping.read_table(_daily("date;value"))
+    assert table is not None
+    assert mapping.results_guess(table) == {"date": "date", "profit": "value"}
+
+
+@pytest.mark.parametrize(
+    ("cells", "default", "mark"),
+    [
+        (["12.34", "-5.10"], ",", "."),
+        (["12,34", "-5,10"], ".", ","),
+        (["1.234,50"], ".", ","),
+        (["1,234.50"], ",", "."),
+        (["1.234"], ",", ","),
+    ],
+)
+def test_the_decimal_mark_comes_from_the_cells(cells: list[str], default: str, mark: str) -> None:
+    assert mapping._decimal_mark(cells, default) == mark

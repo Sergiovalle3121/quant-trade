@@ -2105,6 +2105,15 @@ is answered on the page itself, naming the missing fields for the way the
 choice points to (one row per trade, per fill, date and result, or date and
 balance).
 
+Columns named on the form are applied before any automatic reader, and a
+file sent with them in the curve field is read as the report. A lone file
+whose "curve" starts at zero or crosses it (`equity_not_positive`) is a list
+of results: it gets this page, with its first date column and first other
+numeric column preselected as the date and the result. A curve-field file
+with no value column (`missing_value`) gets the page too, with the date
+preselected. The decimal mark of a named figure column comes from its cells
+(`12.34` in a semicolon file is twelve), not from the delimiter alone.
+
 A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched
 for roles and gets the plain refusal, so a 200,000-column file is turned down
 in about a second instead of rendering a multi-megabyte page. The preview
