@@ -849,9 +849,10 @@ GUIDES: tuple[Guide, ...] = (
             "es": GuideText(
                 title="Cómo subir las operaciones de cualquier plataforma",
                 summary=(
-                    "Si tu bróker, exchange o diario de trading no está en la lista, exporta su "
-                    "historial de operaciones en CSV o Excel y súbelo: las columnas se "
-                    "reconocen por su nombre."
+                    "Interactive Brokers, DEGIRO, Trading 212, XTB, eToro, Binance, KuCoin o "
+                    "cualquier otro bróker, exchange o diario de trading: exporta su historial "
+                    "de operaciones en CSV o Excel y súbelo; las columnas se reconocen por su "
+                    "nombre."
                 ),
                 file=(
                     "Un .csv o .xlsx con una fila por operación cerrada (fecha de entrada y de "
@@ -897,9 +898,10 @@ GUIDES: tuple[Guide, ...] = (
             "en": GuideText(
                 title="How to upload the trades of any platform",
                 summary=(
-                    "If your broker, exchange or trading journal is not listed, export its "
-                    "trade history as CSV or Excel and upload it: the columns are recognised "
-                    "by their names."
+                    "Interactive Brokers, DEGIRO, Trading 212, XTB, eToro, Binance, KuCoin or "
+                    "any other broker, exchange or trading journal: export its trade history "
+                    "as CSV or Excel and upload it; the columns are recognised by their "
+                    "names."
                 ),
                 file=(
                     "A .csv or .xlsx with one row per closed trade (entry and exit time, "

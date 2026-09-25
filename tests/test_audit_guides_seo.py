@@ -306,3 +306,12 @@ def test_provider_guide_has_an_english_path_and_the_old_one_redirects(tmp_path: 
     assert swapped.status_code == 301 and swapped.headers["location"] == "/guias/cuenta-proveedor"
     assert client.get("/guides/nope").status_code == 404
     assert client.get("/guides/mt5").status_code == 200
+
+
+def test_the_guides_index_names_the_platforms_the_universal_reader_knows() -> None:
+    from quant_trade.audit.pages import guides_index_page
+
+    for locale in ("es", "en"):
+        page = guides_index_page(locale=locale)
+        for name in ("DEGIRO", "Trading 212", "KuCoin"):
+            assert name in page
