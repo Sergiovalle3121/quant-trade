@@ -680,3 +680,28 @@ def test_the_fund_calendar_keeps_its_years_in_view_and_fits_the_pdf(locale: str)
     assert ".paper .fund-cal-wrap table.fund-cal{display:table;overflow:visible" in STYLE
     # In the PDF it drops the screen width and fits the page.
     assert ".paper .fund-cal-wrap table.fund-cal{min-width:0;width:100%" in STYLE
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_universal_file_shows_each_column_and_what_it_was_read_as(locale: str) -> None:
+    from test_audit_universal_import import _trades_csv
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.report import LABELS, render_html
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    declared = DeclaredMetadata(locale=locale, initial_balance=5_000)
+    inputs = build_inputs(None, declared, report_bytes=_trades_csv(), report_filename="x.csv")
+    html = render_html(
+        run_audit(inputs, bootstrap_samples=200, risk_samples=300), watermark=False, locale=locale
+    )
+    assert LABELS[locale]["colmap"] in html and find_claims(LABELS[locale]["colmap"]) == []
+    entry = "hora de entrada" if locale == "es" else "entry time"
+    assert "<li><code>Open Time</code><svg" in html and f"<span>{entry}</span></li>" in html
+    # The columns leave the platform table instead of repeating "Column read as" ten times.
+    assert ("Columna leída como" if locale == "es" else "Column read as") not in html
+    # Symbol comes first, as a trader reads a row.
+    assert html.index("<code>Symbol</code>") < html.index("<code>Open Time</code>")
+    assert (
+        ".colmap-list{list-style:none" in STYLE and ".colmap-list li{display:inline-block" in STYLE
+    )
