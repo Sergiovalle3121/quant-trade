@@ -660,7 +660,7 @@ MEANING: dict[str, dict[str, str]] = {
         ),
         f"{MULTIPLICITY}.FAIL": (
             "Probando tantas configuraciones, un resultado así aparece aunque ninguna tenga "
-            "ventaja real. Es la señal clásica de un backtest sobreajustado."
+            "ventaja real. Este patrón aparece a menudo cuando se ajustan demasiados parámetros."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": (
             "No se pudo descontar el número de intentos porque la significación no se midió. "
@@ -763,7 +763,7 @@ MEANING: dict[str, dict[str, str]] = {
         ),
         f"{MULTIPLICITY}.FAIL": (
             "Trying this many configurations produces a result like this even when none has "
-            "a real edge. It is the classic sign of an overfitted backtest."
+            "a real edge. This pattern often appears when too many parameters are tuned."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": (
             "The number of trials could not be discounted because significance was not "

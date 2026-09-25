@@ -282,8 +282,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "test_data_intro": (
             "El encabezado del informe dice cómo se simularon los precios, qué parte del "
-            "historial tuvo el probador y qué fechas se probaron. Es la parte que más se retoca "
-            "al vender un robot, así que aquí la comparamos con sus propias operaciones."
+            "historial tuvo el probador y qué fechas se probaron. Conviene verificarlo, así que "
+            "aquí lo comparamos con sus propias operaciones."
         ),
         "test_data_clean": (
             "El modelado, la calidad de datos y las fechas declaradas no levantan ninguna bandera."
@@ -436,6 +436,9 @@ LABELS: dict[str, dict[str, str]] = {
             "resultado así suele indicar que los dos archivos no son de la misma "
             "configuración, tamaño o cuenta: pregúntalo."
         ),
+        "hero_live": "Cuenta real: {badge}.",
+        "hero_live_money": "Resultado de operar: {result} sobre {deposits} depositados.",
+        "hero_live_link": "Ver la comparación con el backtest",
         "live_badge_CONSISTENT": "Coherente",
         "live_badge_EDGE": "En el borde",
         "live_badge_INCONSISTENT": "No coherente",
@@ -476,7 +479,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "live_pair_found": "Operaciones reales encontradas en el backtest",
         "live_pair_of": "{matched} de {total} ({share})",
-        "live_pair_missing": "Operaciones del backtest sin su operación real",
+        "live_pair_missing": "Operaciones del backtest que la cuenta real no hizo",
         "live_pair_entry": "Diferencia mediana de precio al entrar",
         "live_pair_exit": "Diferencia mediana de precio al salir",
         "live_pair_gap": "Diferencia de resultado en las emparejadas",
@@ -831,8 +834,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "test_data_intro": (
             "The report header says how prices were simulated, how much of the history the "
-            "tester had and which dates were tested. It is the part most often retouched when "
-            "a robot is sold, so here it is checked against its own trades."
+            "tester had and which dates were tested. It is worth verifying, so here it is "
+            "checked against its own trades."
         ),
         "test_data_clean": ("The modelling mode, data quality and stated dates raise no flag."),
         "test_data_scope": (
@@ -975,6 +978,9 @@ LABELS: dict[str, dict[str, str]] = {
             "this usually means the two files do not share the same configuration, size or "
             "account: ask."
         ),
+        "hero_live": "Live account: {badge}.",
+        "hero_live_money": "Trading result: {result} on {deposits} deposited.",
+        "hero_live_link": "See the comparison with the backtest",
         "live_badge_CONSISTENT": "Consistent",
         "live_badge_EDGE": "At the edge",
         "live_badge_INCONSISTENT": "Not consistent",
@@ -1015,7 +1021,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "live_pair_found": "Live trades found in the backtest",
         "live_pair_of": "{matched} of {total} ({share})",
-        "live_pair_missing": "Backtest trades without their live trade",
+        "live_pair_missing": "Backtest trades the live account did not take",
         "live_pair_entry": "Median price difference at entry",
         "live_pair_exit": "Median price difference at exit",
         "live_pair_gap": "Result difference on the paired trades",
@@ -2656,7 +2662,16 @@ def _pairing_html(pairing: dict[str, Any] | None, locale: str, labels: dict[str,
         (labels["live_pair_found"], f"{_e(found)} {_badge('MEASURED')}"),
         (
             labels["live_pair_missing"],
-            f"{pairing['missing_live']['value']:,} {_badge('MEASURED')}",
+            _e(
+                labels["live_pair_of"].format(
+                    matched=pairing["missing_live"]["value"],
+                    total=pairing["backtest_trades"]["value"],
+                    share=f"{pairing['missing_live']['value'] / backtest_total:.0%}",
+                )
+            )
+            + f" {_badge('MEASURED')}"
+            if (backtest_total := pairing["backtest_trades"]["value"])
+            else f"{pairing['missing_live']['value']:,} {_badge('MEASURED')}",
         ),
         (
             labels["live_pair_entry"],
@@ -3956,6 +3971,9 @@ def render_html(
         f"{_e(engine['package_version'])}</span>"
         f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
     )
+    live_anchor = next(
+        (f"r-d{i}" for i, (title, _) in enumerate(detail, 1) if title == labels["live"]), ""
+    )
     hero = (
         "<section class='report-hero'>"
         + aurora()
@@ -3971,6 +3989,7 @@ def render_html(
         + class_ring(str(verdict["overall"]), size="lg")
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         + _verdict_html(str(verdict["summary"]))
+        + ("" if locked else _hero_live(data, labels, live_anchor))
         + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
@@ -4075,6 +4094,30 @@ def render_html(
         + "<main id='main' class='paper report-main'><div class='wrap wrap-mid'>"
         + "".join(sections)
         + "</div></main></body></html>"
+    )
+
+
+def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str:
+    """One line under the verdict when a live account was uploaded: the class
+    grades the backtest, and a buyer must not have to scroll to learn how the
+    real account compares with it and what it made or lost."""
+    live = data.get("live") or {}
+    if live.get("status") != "MEASURED":
+        return ""
+    outcome = str(live["outcome"])
+    text = labels["hero_live"].format(badge=labels[f"live_badge_{outcome}"])
+    account = data.get("account") or {}
+    result = (account.get("trading_result") or {}).get("value")
+    deposits = ((account.get("deposits") or {}).get("total") or {}).get("value")
+    money = ""
+    if account.get("status") == "MEASURED" and result is not None and deposits:
+        money = " " + labels["hero_live_money"].format(
+            result=_signed_amount(float(result)), deposits=f"{float(deposits):,.2f}"
+        )
+    link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_live_link'])}</a>" if anchor else ""
+    tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
+    return (
+        f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
     )
 
 

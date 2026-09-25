@@ -301,6 +301,15 @@ each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
 variety to show. The class stays C.
 
+When a live account is uploaded, one line under the verdict gives its
+comparison badge (Coherente, En el borde, No coherente, Revisar) and the
+account's trading result against the money deposited, linked to the
+comparison section: the class grades the backtest, and a buyer should not
+have to scroll to learn the real account lost money. Locked reports keep it
+back. The "Plan para subir de clase" says on which side of each threshold a
+number falls, and no longer asks for the optimisation export when the trial
+count already comes from the files.
+
 The `/ejemplo` report carries a synthetic live account, a Myfxbook CSV
 export built in `audit/sample.py` (0.1 lots, a fifth of the backtest's
 size). It trades the backtest's last 60 business days too, skipping about
