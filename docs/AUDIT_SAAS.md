@@ -935,6 +935,16 @@ the verdict's colour, shows the two shares of resampled histories as
 big-figure cards, and below 900px turns its table into one card per row, each
 value named by its column.
 
+Every footer links the public methodology ("Cómo auditamos", `/metodologia`,
+`/methodology` in English), as do the pricing section and the report footer.
+The methodology page shows the six questions as cards with their pass rule,
+the A-D ladder as coloured class cards, the evidence labels as real badges,
+the red flags as chips and the limits with a red dash. The landing's
+"¿Vas a copiar o invertir con alguien?" card sends people about to copy or
+fund a trader to the provider-account guide. On phones, each row of an
+evidence table (`table.metrics.ev`) becomes a card with its name and value,
+then its label and note; the account section's flags are cards too.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and

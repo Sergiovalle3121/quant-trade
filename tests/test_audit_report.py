@@ -141,8 +141,10 @@ def test_metric_tables_share_columns_so_values_line_up() -> None:
     from quant_trade.audit.sample import sample_result
 
     page = render_html(sample_result("es", bootstrap_samples=60), watermark=False, locale="es")
-    tables = page.count("<table class='metrics'>")
+    tables = page.count("<table class='metrics ev'>")
     assert tables >= 3
+    # On phones each evidence row becomes a card: name and value, then label and note.
+    assert ".metrics.ev tr{display:grid;" in page
     assert page.count("<col class='c-v'>") == tables
     assert page.count("<td class='val'>") >= 3 * tables
 
