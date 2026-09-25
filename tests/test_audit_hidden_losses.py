@@ -208,10 +208,29 @@ def test_a_history_in_tiny_units_prints_no_signed_zero_percent() -> None:
     frame = pd.DataFrame(
         {"date": pd.date_range("2021-01-04", periods=900, freq="D").date, "equity": equity}
     )
-    inputs = build_inputs(frame.to_csv(index=False).encode(), DeclaredMetadata(trials=1))
+    days = pd.date_range("2021-01-04", periods=120, freq="7D")
+    move = rng.normal(0.0001, 0.0004, len(days))
+    trades = pd.DataFrame(
+        {
+            "entry_time": days,
+            "exit_time": days + pd.Timedelta(days=1),
+            "quantity": 10.0,
+            "entry_price": 100.0,
+            "exit_price": 100.0 + move,
+            "side": "long",
+        }
+    )
+    inputs = build_inputs(
+        frame.to_csv(index=False).encode(),
+        DeclaredMetadata(trials=1),
+        trades_bytes=trades.to_csv(index=False).encode(),
+    )
     result = run_audit(inputs, now=datetime(2026, 1, 1, tzinfo=UTC), bootstrap_samples=100)
+    stats = result.model_dump(mode="json")["trade_stats"]
+    assert abs(stats["average_loss"]["value"]) < 0.005
     for locale in ("es", "en"):
         page = render_html(result, watermark=False, locale=locale)
         page = html.unescape(re.sub(r"<[^>]+>", " ", page))
         assert "-0.00%" not in page
         assert "-0.0%" not in page
+        assert re.search(r"-0\.00(?![0-9])", page) is None
