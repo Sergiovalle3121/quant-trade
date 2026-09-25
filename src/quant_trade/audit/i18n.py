@@ -412,6 +412,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("best five trades / net result", "cinco mejores operaciones / resultado neto"),
     ("the curve is too short or not positive", "la curva es muy corta o no es positiva"),
     ("fewer than two closed trades", "menos de dos operaciones cerradas"),
+    ("fewer than {n} closed trades", "menos de {n} operaciones cerradas"),
+    (
+        "entry times as the file states them (platform or server time); net before itemised fees",
+        "horas de entrada tal como las da el archivo (hora de la plataforma o del servidor); "
+        "resultado neto antes de los costes que detalla el informe",
+    ),
     (
         "average net result per trade, account currency",
         "resultado neto medio por operación, en la divisa de la cuenta",

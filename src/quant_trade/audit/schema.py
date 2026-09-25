@@ -783,6 +783,8 @@ class AuditResult(BaseModel):
     trade_stats: dict[str, Any] | None = None
     #: Robustness stress tests (``audit/stress.py``); None on older results.
     stress: dict[str, Any] | None = None
+    #: Trades by entry weekday and time of day (``audit/timing.py``).
+    timing: dict[str, Any] | None = None
     risk: dict[str, Any] | None = None
     challenge: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
