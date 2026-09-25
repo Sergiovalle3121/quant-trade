@@ -1,26 +1,46 @@
-# Plan de lanzamiento de la auditoría de backtests
+# Plan de lanzamiento de Rigor: las primeras 10 ventas
 
-Guía práctica para las primeras semanas de venta de la auditoría
-(`src/quant_trade/audit/`) sin Stripe: el cliente paga por transferencia o
-Mercado Pago y recibe un código de acceso por WhatsApp. Escrita el
-2026-09-24.
+Guía práctica para vender a mano los primeros informes de Rigor
+(https://rigor.up.railway.app, código en `src/quant_trade/audit/`). Hoy el
+cliente paga por transferencia, Mercado Pago o el medio que acuerdes por
+WhatsApp y recibe un código de acceso; el pago con tarjeta se enciende solo
+cuando las claves de Stripe estén en Railway. Primera versión: 2026-09-24.
+Puesta al día: 2026-09-25.
+
+Qué cambió respecto a la primera versión:
+
+- El servicio se llama Rigor y tiene más secciones (lista en "Qué vendes").
+- **No hay auditorías gratis.** El dueño lo pidió así ("antes de dar pruebas
+  gratis necesito vender algo bien"). Lo gratis es la vista previa que
+  cualquiera ve al subir su archivo; el informe completo se paga desde el
+  primer cliente.
+- La razón de regalar las primeras auditorías era que los importadores no se
+  habían probado con archivos reales. Ya se probaron con 39 archivos reales
+  públicos (MetaTrader en 7 idiomas, Myfxbook, señales de MQL5, FX Blue y
+  TradingView): ver `docs/research/audit_iteration4/real_reports_check.md`,
+  `mt_languages_check.md` y `tracking_exports_check.md`. Y si un informe lee
+  mal el archivo, se devuelve el importe.
+- Los códigos se crean desde el navegador en `/panel`; ya no hace falta
+  `railway ssh`.
+- Se añaden un canal (tus propios contactos) y dos plantillas: P1 y D2.
 
 Qué contiene:
 
-1. Qué tener listo antes del primer mensaje.
-2. Dónde están los compradores y qué permite cada comunidad.
-3. Los tres canales con los que empezar.
-4. Plantillas de mensajes en español e inglés, listas para copiar.
-5. La propuesta para vendedores de robots (EA): página de verificación y sello.
-6. Cómo atender a un cliente desde el primer mensaje hasta el informe entregado.
-7. Plan semanal y qué medir.
+1. Qué vendes y a qué precio.
+2. Qué tener listo antes del primer mensaje.
+3. Dónde están los compradores y qué permite cada comunidad.
+4. Los canales, en el orden en que conviene usarlos.
+5. Plantillas de mensajes en español e inglés, listas para copiar.
+6. La propuesta para vendedores de robots (EA): página de verificación y sello.
+7. Cómo atender a un cliente desde el primer mensaje hasta el informe entregado.
+8. Plan de las primeras semanas y qué medir.
 
 ## Regla que manda sobre todo lo demás
 
-La auditoría mide la evidencia estadística de un archivo. No predice
-resultados, no recomienda comprar ni vender un robot y no dice que alguien
-vaya a superar un reto de prop firm. Esa regla vale igual para cada mensaje
-que envíes (AGENTS.md, sección Phase 16):
+Rigor mide la evidencia estadística de un archivo. No predice resultados, no
+recomienda comprar ni vender un robot y no dice que alguien vaya a superar un
+reto de prop firm. Esa regla vale igual para cada mensaje que envíes
+(AGENTS.md, sección Phase 16):
 
 - Ningún mensaje promete dinero, resultados ni retos superados. Las palabras
   que bloquea `audit/guard.py` (en español e inglés) tampoco van en un
@@ -32,60 +52,100 @@ que envíes (AGENTS.md, sección Phase 16):
 - Nunca pidas claves de bróker, contraseñas de cuenta ni acceso a MetaTrader.
 - La clase no se negocia: el resultado sale del motor y es reproducible por
   hash, pague quien pague.
+- Nunca te hagas pasar por cliente ni pidas a otros que lo hagan. Forex
+  Factory y Forex Peace Army expulsan por eso, y basta un caso para perder la
+  confianza que vende este servicio.
 
 `tests/test_audit_launch_playbook.py` pasa el guard sobre este documento y
-sobre cada plantilla. Si editas una plantilla, ejecuta
+sobre cada plantilla, y comprueba que ninguna plantilla ofrece auditorías
+gratis. Si editas una plantilla, ejecuta
 `python -m pytest tests/test_audit_launch_playbook.py -q` antes de usarla.
 
-## 1. Antes del primer mensaje
+## 1. Qué vendes y a qué precio
 
-Solo tú puedes hacer estos pasos (despliegue, variables y cuentas):
+Un informe que responde, con el archivo que el cliente ya tiene, a la
+pregunta que se hace antes de arriesgar dinero en un robot o en una cuenta
+ajena: ¿este resultado es evidencia o es suerte, sobreajuste y costes mal
+contados? Cada número dice si se midió del archivo (MEASURED), si lo declaró
+el cliente o su plataforma (DECLARED) o si no se pudo medir (NOT_MEASURED).
 
-- [ ] Servicio desplegado en Railway siguiendo `docs/AUDIT_SAAS.md`
-      ("Deploying on Railway" y "Testing a deployment on Railway").
-- [ ] Variables: `AUDIT_BASE_URL` con tu dominio, `AUDIT_TRUSTED_PROXY_HOPS=1`,
-      `AUDIT_ACCESS_CODES=true`, `AUDIT_FREE_MODE=false`,
-      `AUDIT_PRICE_USD_CENTS=2900` y `AUDIT_CONTACT_URL=https://wa.me/<tu número>`.
-- [ ] Datos del operador para términos y privacidad
-      (`AUDIT_OPERATOR_NAME`, `AUDIT_OPERATOR_CONTACT`,
-      `AUDIT_OPERATOR_ADDRESS`, `AUDIT_JURISDICTION`), y los dos textos
-      revisados por un abogado antes de cobrar.
-- [ ] `/health`, `/ejemplo` y la landing se abren en el móvil.
-- [ ] Una prueba con un informe real de MT5 tuyo (el `Report.html` tal como
-      lo guarda el probador). Hasta hoy los importadores solo se probaron con
-      informes sintéticos, así que los primeros archivos reales de clientes
-      también son una prueba: por eso las primeras auditorías son gratis
-      (ver "Precios de lanzamiento").
-- [ ] Un código de prueba creado y canjeado
-      (`quant-trade audit codes create --credits 1 --note prueba` desde
-      `railway ssh`).
-- [ ] WhatsApp Business con mensaje de bienvenida, horario y un catálogo con
-      un único producto: "Auditoría de backtest, informe completo".
-- [ ] Un enlace de cobro de Mercado Pago (o tus datos de transferencia) y una
-      hoja de cálculo de ventas (ver sección 6).
-- [ ] Pregunta a un contador cómo facturar este servicio en tu país.
+Lo que ve gratis, al subir el archivo: la clase de A a D, las gráficas, las
+banderas rojas, la lectura de su archivo (operaciones y resultado recontados
+frente a lo que dice la plataforma) y qué significa cada dimensión.
 
-### Precios de lanzamiento
+Lo que desbloquea el informe completo (casi todo se ve en `/ejemplo`):
 
-Recomendación del hilo de QA (G), frente a los competidores de
-`docs/research/audit_iteration4/market_competitors.json` (EA Verdict USD 19,
-EA X-Ray gratis y EUR 29, AntiOverfit EUR 97):
+- Resumen ejecutivo, qué pide cada clase y plan para subir de clase.
+- Sharpe deflactado con el número real de intentos (del XML de optimización
+  de MT5) y "¿Pico aislado o meseta?" con las pasadas vecinas.
+- Pruebas de estrés: el resultado sin sus mejores operaciones y meses.
+- "Con qué datos se hizo la prueba": modelo de ticks y calidad del historial
+  del probador de MT4 y MT5.
+- "¿Sigue funcionando en el periodo reciente?" y "¿Aguanta en el periodo
+  forward?".
+- "Cuándo gana y cuándo pierde" (día y hora) y "Cómo se comporta al perder".
+- Riesgo remuestreado a un año y "Qué capital necesita y a qué tamaño".
+- Simulador de 16 retos de prop firm (FTMO, FundedNext, The5ers, Topstep),
+  con las reglas leídas en la web de cada firma y su fecha.
+- Para quien va a copiar o invertir: "Backtest frente a cuenta real"
+  (la cuenta frente a miles de historias remuestreadas de su backtest y
+  operación por operación en las mismas fechas) y "El dinero real de la
+  cuenta" (depósitos y retiros separados del resultado de operar).
+- Preguntas para hacerle al vendedor, PDF del informe, comparación de
+  informes (`/comparar`), página de verificación pública con sello y
+  `/comprobar`, donde cualquiera confirma por SHA-256 que un PDF salió de
+  Rigor.
+
+Lee 11 formatos tal cual: MetaTrader 5 y 4 (en 7 idiomas), TradingView,
+NinjaTrader, QuantConnect, backtesting.py, vectorbt, Myfxbook, FX Blue, señales
+de MQL5 y CSV.
+
+### Precios
+
+Comparación con competidores (`docs/research/audit_iteration4/market_competitors.json`
+y fuentes públicas del 2026-09-25): EA Verdict USD 19, EA X-Ray EUR 29,
+AntiOverfit EUR 97, ErgodicLabs Edge Matrix USD 29 por 25 análisis (sin
+comprobar).
 
 | Oferta | Precio | Cuándo |
 |---|---|---|
-| Vista previa | Gratis | Siempre: clase, gráficas, banderas rojas y explicación de cada dimensión. |
-| Primeras 10 auditorías completas | Gratis a cambio de opinión | Semanas 1 y 2. Pide el archivo real y una opinión sobre la claridad del informe. |
-| Informe completo | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Desde la primera venta. |
-| Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`, código con `--credits 3`) | Para quien compara varios robots o varias versiones. |
-| Informe completo | USD 49 | Cuando tengas opiniones publicables de clientes reales. |
+| Vista previa | Gratis, siempre | Clase, gráficas, banderas rojas, lectura del archivo y explicación de cada dimensión. |
+| Informe completo | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Desde el primer cliente. |
+| Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`, código con 3 créditos) | Para quien compara varios robots, versiones o un backtest y su cuenta. |
+| Devolución | El importe de ese informe | Si el informe lee mal el archivo (operaciones, saldo o fechas) y no se puede corregir. |
+| Informe completo | USD 49 | Solo cuando haya opiniones publicables de clientes reales. |
 
-La vista previa gratuita es el anzuelo: el trader ve la clase y las gráficas
-de su propio archivo antes de pagar. Mándalo siempre a subir primero y a
-pagar después.
+La vista previa es el anzuelo: el cliente ve la clase y las gráficas de su
+propio archivo antes de pagar. Mándalo siempre a subir primero y a pagar
+después. No regales el informe completo para conseguir una opinión: la
+devolución por archivo mal leído ya quita el riesgo al primer comprador.
 
-## 2. Dónde están los compradores
+## 2. Antes del primer mensaje
 
-Tres grupos compran este informe:
+Hecho (comprobado en `/health` el 2026-09-25): servicio en Railway con
+Postgres, `AUDIT_ACCESS_CODES=true`, `AUDIT_FREE_MODE=false`, precio USD 29,
+borrado automático, datos del operador en `/terminos` y enlace de WhatsApp en
+el botón "Pedir un código".
+
+Solo tú puedes hacer lo que falta:
+
+- [ ] Crear un código de 1 crédito en `https://rigor.up.railway.app/panel`
+      (con tu `AUDIT_ADMIN_KEY`, que está en Railway > Variables), canjearlo
+      en un informe tuyo y desactivarlo. Así sabes hacerlo antes de que pague
+      nadie.
+- [ ] Tener a mano cómo cobrar: un enlace de Mercado Pago, tus datos de
+      transferencia o PayPal. Escríbelos en la plantilla W3.
+- [ ] WhatsApp Business con mensaje de bienvenida, horario y un catálogo con
+      un producto: "Informe completo de Rigor, USD 29".
+- [ ] Una hoja de cálculo de ventas (columnas en la sección 7).
+- [ ] Preguntar a un contador cómo facturar este servicio en México, y que un
+      abogado lea `/terminos` y `/privacidad` cuando puedas.
+- [ ] Opcional: las claves de Stripe en Railway, para que se pueda pagar con
+      tarjeta sin escribirte. Hasta entonces, todo pasa por WhatsApp.
+
+## 3. Dónde están los compradores
+
+Cuatro grupos compran este informe:
 
 - **Compradores de EA**: quieren saber si el backtest que les enseña un
   vendedor es sobreajuste antes de pagar el robot.
@@ -93,6 +153,8 @@ Tres grupos compran este informe:
   y las reglas de pérdida diaria de su estrategia antes de pagar el reto.
 - **Vendedores de EA**: quieren una evidencia estadística pública que el
   comprador pueda comprobar por hash.
+- **Quien va a copiar o invertir con otro trader**: quiere saber si la cuenta
+  se parece al backtest y si el porcentaje se infla con depósitos.
 
 Casi todas las comunidades prohíben la autopromoción gratuita. Lo que sí
 funciona sin romper reglas es contestar con contenido útil, sin enlaces, en
@@ -137,32 +199,77 @@ Lo que esto significa:
   Discord latinoamericana con reglas públicas. Esa es la ventaja: casi nadie
   ofrece esto en español.
 
-## 3. Los tres canales con los que empezar
+## 4. Los canales, en orden
 
-1. **Contenido en español en el blog de tu perfil de MQL5, más respuestas
-   útiles en el foro español de MQL5.** Es donde están los compradores y
-   vendedores de EA que hablan español, y los moderadores mandan la
-   promoción al blog del perfil. Publica una entrada por semana (plantilla
-   F3) y contesta en el foro sin enlaces (plantilla F2). Coste cero.
-2. **Hilo en "Commercial Content" de Forex Factory, como Commercial Member
-   con identidad pública.** Es el mayor punto de encuentro de compradores y
-   vendedores de EA en inglés. Ofrece auditar gratis backtests públicos de
-   robots cuyo vendedor dé su permiso y publica el informe completo (plantilla
-   F1). Comprueba antes si la membresía comercial tiene coste.
-3. **Contacto directo con vendedores de EA de habla hispana** a través del
-   correo o formulario comercial que publican en su propia web, uno a uno y
-   personalizado (plantillas V1 y V2). Un vendedor que publica su sello trae
-   a sus compradores a `/v/{id}` y a la landing.
+Meta: 10 ventas pagadas. Empieza por donde ya te conocen y sigue por donde
+una sola venta trae a otros compradores.
+
+1. **Tus propios contactos y los grupos de trading donde ya participas.**
+   Es lo más rápido y no cuesta nada. Escribe uno a uno a quien sabes que usa
+   robots, opera retos de prop firm o copia a otro trader (plantilla P1), y
+   publica el mismo texto en tu estado de WhatsApp. En un grupo, publica solo
+   si sus reglas permiten ofrecer servicios; si no, pregunta antes al
+   administrador. Nunca a desconocidos por privado.
+2. **Vendedores de EA de habla hispana**, a través del correo o formulario
+   comercial que publican en su propia web, uno a uno y personalizado
+   (plantillas V1 y V2). El vendedor paga su informe como cualquier cliente;
+   lo que gana a cambio es una página de verificación y un sello que sus
+   compradores pueden comprobar. Cada vendedor que publica su sello trae a
+   sus compradores a `/v/{id}` y a la portada. Un mensaje y un seguimiento
+   como máximo.
+3. **Contenido en español en el blog de tu perfil de MQL5, más respuestas
+   útiles en el foro español de MQL5 y en Rankia.** Los moderadores de MQL5
+   mandan la promoción al blog del perfil. Publica una entrada por semana
+   (plantilla F3) y contesta en los foros sin enlaces (plantilla F2). Es lento
+   pero acumula: la gente mira tu perfil y ahí está la web.
+4. **Hilo en "Commercial Content" de Forex Factory**, como Commercial Member
+   con identidad pública (plantilla F1). Es el mayor punto de encuentro de
+   compradores y vendedores de EA en inglés. Comprueba antes, en un
+   navegador, si la membresía comercial tiene coste y qué exige.
 
 Después, cuando haya opiniones reales: Forex Peace Army (clasificados),
 Reddit (entradas de método, tras leer las reglas de cada subreddit) y un
-anuncio de pago si los números de la sección 7 lo justifican.
+anuncio de pago si los números de la sección 8 lo justifican.
 
-## 4. Plantillas
+## 5. Plantillas
 
-Cambia lo que va entre `<…>` antes de enviar. `<dominio>` es el valor de
-`AUDIT_BASE_URL`. No añadas frases sobre resultados futuros: cada plantilla
-pasa el guard tal como está.
+Cambia lo que va entre `<…>` antes de enviar. `<dominio>` es
+`rigor.up.railway.app` (o el valor de `AUDIT_BASE_URL` si cambia). No añadas
+frases sobre resultados futuros: cada plantilla pasa el guard tal como está.
+
+### Tus contactos
+
+#### P1 · ES · A un conocido que opera con robots, retos o cuentas ajenas
+
+```text
+Hola, <nombre>. Te escribo porque sé que <usas robots / estás con retos de prop firm / copias a otro trader>.
+
+Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el informe de MetaTrader, TradingView, Myfxbook o tu plataforma tal cual, y te dice con estadística si el resultado se sostiene o si es sobreajuste, costes mal contados o suerte. Da una clase de A a D, y cada número dice si se midió del archivo o si solo lo declaró la plataforma.
+
+También compara un backtest con la cuenta real donde corre el robot y separa los depósitos del resultado de operar, que es donde más se maquilla un historial.
+
+La vista previa es gratis: https://<dominio>
+El informe completo cuesta USD 29, o USD 69 el paquete de 3. Si lee mal tu archivo, te devuelvo el importe.
+
+Ejemplo completo: https://<dominio>/ejemplo
+Si te sirve o conoces a alguien a quien le sirva, me ayudas mucho. Si no, no pasa nada.
+```
+
+#### P1 · EN · To someone you know who trades with robots, challenges or other people's accounts
+
+```text
+Hi <name>, I am writing because I know you <use trading robots / are doing prop-firm challenges / copy another trader>.
+
+I launched Rigor, a service that audits backtests and account histories: you upload the MetaTrader, TradingView, Myfxbook or other platform report as it is, and it tells you, with statistics, whether the result holds up or is overfitting, miscounted costs or luck. It gives a class from A to D, and every number says whether it was measured from the file or only declared by the platform.
+
+It also compares a backtest with the live account the robot runs on, and separates deposits from trading results, which is where a history is most often dressed up.
+
+The preview is free: https://<domain>
+The full report is USD 29, or USD 69 for a pack of 3. If it misreads your file, I refund you.
+
+Full sample: https://<domain>/ejemplo
+If it is useful to you or someone you know, that helps me a lot. If not, no problem.
+```
 
 ### WhatsApp
 
@@ -171,12 +278,12 @@ pasa el guard tal como está.
 ```text
 ¡Hola, <nombre>! Gracias por escribir.
 
-La auditoría analiza el backtest o historial que ya tienes y te da una clase de A a D en seis dimensiones: significación estadística, número de intentos (Sharpe deflactado), costes, fuera de muestra, calidad de datos y comparación con un benchmark.
+Rigor analiza el backtest o el historial de cuenta que ya tienes y le da una clase de A a D en seis dimensiones: significación estadística, número de intentos (Sharpe deflactado), costes, fuera de muestra, calidad de datos y benchmark. Además revisa con qué datos se hizo la prueba, si el resultado depende de pocas operaciones, si sigue funcionando en el periodo reciente y qué capital pide.
 
 Cómo empezar:
-1. Sube tu archivo en https://<dominio> tal cual sale de tu plataforma (MT5, MT4, TradingView, NinjaTrader, QuantConnect, backtesting.py o vectorbt).
-2. La vista previa es gratis: ves la clase, las gráficas y qué significa cada dimensión.
-3. Si quieres el informe completo, cuesta USD 29 y te mando un código de acceso.
+1. Sube tu archivo en https://<dominio> tal cual sale de tu plataforma (MT5, MT4, TradingView, NinjaTrader, Myfxbook, FX Blue, señales de MQL5, QuantConnect, backtesting.py o vectorbt).
+2. La vista previa es gratis: ves la clase, las gráficas, las banderas rojas y qué significa cada dimensión.
+3. Si quieres el informe completo, cuesta USD 29 (o USD 69 el paquete de 3) y te mando un código de acceso.
 
 Aquí tienes un informe de ejemplo con datos sintéticos: https://<dominio>/ejemplo
 
@@ -188,19 +295,19 @@ Es un análisis estadístico de los datos que subes; no predice resultados ni re
 ```text
 Hi <name>, thanks for getting in touch.
 
-The audit analyses the backtest or history you already have and gives it a class from A to D across six dimensions: statistical significance, number of trials (deflated Sharpe), costs, out-of-sample, data quality and a benchmark comparison.
+Rigor analyses the backtest or account history you already have and gives it a class from A to D across six dimensions: statistical significance, number of trials (deflated Sharpe), costs, out-of-sample, data quality and a benchmark. It also checks what data the test used, whether the result rests on a few trades, whether it still works in the recent period and how much capital it needs.
 
 How to start:
-1. Upload your file at https://<domain> exactly as your platform exports it (MT5, MT4, TradingView, NinjaTrader, QuantConnect, backtesting.py or vectorbt).
-2. The preview is free: you see the class, the charts and what each dimension means.
-3. If you want the full report, it is USD 29 and I send you an access code.
+1. Upload your file at https://<domain> exactly as your platform exports it (MT5, MT4, TradingView, NinjaTrader, Myfxbook, FX Blue, MQL5 signals, QuantConnect, backtesting.py or vectorbt).
+2. The preview is free: you see the class, the charts, the red flags and what each dimension means.
+3. If you want the full report, it is USD 29 (or USD 69 for a pack of 3) and I send you an access code.
 
 Here is a sample report built from synthetic data: https://<domain>/ejemplo
 
 It is a statistical analysis of the data you upload; it does not predict results or recommend trading.
 ```
 
-#### W2 · ES · Cómo exportar el informe de MetaTrader 5
+#### W2 · ES · Cómo exportar el informe
 
 ```text
 Para MetaTrader 5:
@@ -208,12 +315,15 @@ Para MetaTrader 5:
 2. Clic derecho > "Guardar como informe" y elige HTML. Sube ese archivo tal cual, sin abrirlo ni convertirlo.
 3. Si optimizaste parámetros, en la pestaña "Optimización" haz clic derecho > "Exportar a XML" y súbelo también. Con ese archivo contamos las configuraciones que probaste y el Sharpe deflactado usa el número real.
 
+Para la cuenta donde corre el robot: en MetaTrader, pestaña "Historial" > clic derecho > "Informe" (HTML), o el CSV que exporta Myfxbook, FX Blue o la señal de MQL5. Súbelo en "Estado de cuenta real o demo".
+
 Para TradingView: en el Probador de estrategias, "Lista de operaciones" > exportar (CSV o XLSX).
 
+Hay una guía corta para cada plataforma en https://<dominio>/guias
 No necesito ninguna contraseña ni acceso a tu cuenta.
 ```
 
-#### W2 · EN · How to export the MetaTrader 5 report
+#### W2 · EN · How to export the report
 
 ```text
 For MetaTrader 5:
@@ -221,8 +331,11 @@ For MetaTrader 5:
 2. Right-click > "Save as Report" and choose HTML. Upload that file as it is, without opening or converting it.
 3. If you optimised parameters, right-click in the "Optimization" tab > "Export to XML" and upload it too. That file counts the configurations you tried, so the deflated Sharpe uses the real number.
 
+For the account the robot runs on: in MetaTrader, "History" tab > right-click > "Report" (HTML), or the CSV that Myfxbook, FX Blue or the MQL5 signal exports. Upload it under "Live or demo account statement".
+
 For TradingView: in the Strategy Tester, "List of trades" > export (CSV or XLSX).
 
+There is a short guide for each platform at https://<domain>/guides
 I never need a password or access to your account.
 ```
 
@@ -232,11 +345,12 @@ I never need a password or access to your account.
 Perfecto. El informe completo cuesta USD 29 (o el paquete de 3 por USD 69).
 
 Puedes pagar por:
-- Mercado Pago: <enlace de cobro>
-- Transferencia: <datos bancarios>
+- <Mercado Pago: enlace de cobro>
+- <Transferencia: datos bancarios>
 
-Cuando vea el pago te mando un código de acceso. Lo escribes en tu informe, en el recuadro "¿Tienes un código de acceso?", y se desbloquea completo, con el simulador de reto, el riesgo remuestreado y la lista de preguntas para el vendedor.
+Cuando vea el pago te mando un código de acceso. Lo escribes en tu informe, en el recuadro "¿Tienes un código de acceso?", y se desbloquea completo: pruebas de estrés, riesgo y capital, simulador de reto, cuenta real frente al backtest si la subiste, preguntas para el vendedor y el PDF.
 
+Si el informe lee mal tu archivo y no se puede corregir, te devuelvo el importe.
 Términos del servicio: https://<dominio>/terminos
 ```
 
@@ -246,11 +360,12 @@ Términos del servicio: https://<dominio>/terminos
 Great. The full report is USD 29 (or a pack of 3 for USD 69).
 
 You can pay by:
-- Mercado Pago: <payment link>
-- Bank transfer: <bank details>
+- <Mercado Pago: payment link>
+- <Bank transfer: bank details>
 
-Once I see the payment I send you an access code. Type it in your report, in the "Have an access code?" box, and the full report unlocks, including the challenge simulator, the resampled risk and the list of questions for the vendor.
+Once I see the payment I send you an access code. Type it in your report, in the "Have an access code?" box, and the full report unlocks: stress tests, risk and capital, the challenge simulator, the live account against the backtest if you uploaded it, questions for the vendor and the PDF.
 
+If the report misreads your file and it cannot be fixed, I refund you.
 Terms of service: https://<domain>/terms
 ```
 
@@ -260,9 +375,9 @@ Terms of service: https://<domain>/terms
 Pago recibido, gracias.
 
 Tu código de acceso: <código>
-Sirve para <N> informe(s) y caduca el <fecha>.
+Sirve para <N> informe(s).
 
-Abre el enlace de tu informe (el que guardaste al subir el archivo), escribe el código en "¿Tienes un código de acceso?" y pulsa "Canjear código". Con el botón "Imprimir / guardar PDF" te lo quedas en PDF.
+Abre el enlace de tu informe (el que guardaste al subir el archivo), escribe el código en "¿Tienes un código de acceso?" y pulsa "Canjear código". Con el botón del PDF te lo quedas en tu equipo, y en https://<dominio>/comprobar cualquiera puede confirmar que ese PDF salió de Rigor.
 
 Guarda el código en privado: quien lo tenga puede usarlo. Si algo no carga, respóndeme aquí.
 ```
@@ -273,9 +388,9 @@ Guarda el código en privado: quien lo tenga puede usarlo. Si algo no carga, res
 Payment received, thank you.
 
 Your access code: <code>
-It covers <N> report(s) and expires on <date>.
+It covers <N> report(s).
 
-Open your report link (the one you saved when uploading), type the code in the "Have an access code?" box and press "Redeem code". The "Print / save PDF" button gives you a PDF copy.
+Open your report link (the one you saved when uploading), type the code in the "Have an access code?" box and press "Redeem code". The PDF button gives you a copy, and anyone can confirm at https://<domain>/check that the PDF came from Rigor.
 
 Keep the code private: anyone who has it can use it. If anything does not load, reply here.
 ```
@@ -289,7 +404,7 @@ Me ayudaría mucho saber dos cosas:
 1. ¿Qué parte te resultó más clara y cuál menos?
 2. ¿Te parece bien que cite tu opinión en la web con tu nombre o de forma anónima?
 
-La opinión es sobre el informe, no sobre los resultados del robot. Gracias.
+La opinión es sobre el informe, no sobre los resultados del robot. Y si conoces a alguien que esté por comprar un robot o copiar una cuenta, pásale el enlace. Gracias.
 ```
 
 #### W5 · EN · Follow-up after three days
@@ -301,7 +416,7 @@ Two answers would help me a lot:
 1. Which part was clearest, and which was least clear?
 2. May I quote your opinion on the website, with your name or anonymously?
 
-The opinion is about the report, not about how the robot performs. Thank you.
+The opinion is about the report, not about how the robot performs. And if you know someone about to buy a robot or copy an account, please pass on the link. Thank you.
 ```
 
 #### W6 · ES · Cuando el archivo no se puede leer
@@ -329,33 +444,39 @@ If it cannot be fixed, I will refund you.
 #### F1 · ES · Hilo en una sección comercial (Forex Factory, clasificados de FPA)
 
 ```text
-Título: Auditoría estadística de backtests de EA: gratis para los primeros 10 robots públicos
+Título: Rigor: auditoría estadística de backtests e historiales de EA (MT4, MT5, Myfxbook)
 
-Soy <nombre>, autor de una herramienta que audita backtests (miembro comercial, declaro mi interés).
+Soy <nombre>, autor de Rigor (miembro comercial, declaro mi interés).
 
-Qué hace: lees el informe de MT5 o MT4 tal cual, o la lista de operaciones de TradingView, y das una clase de A a D en seis dimensiones: significación estadística, Sharpe deflactado con el número real de intentos (sale del XML de optimización), costes, fuera de muestra, calidad de datos y benchmark. Cada número dice si se midió del archivo, si lo declaró el usuario o si no se pudo medir.
+Qué hace: lee el informe de MT5 o MT4 tal cual (en 7 idiomas), el XML de optimización, la lista de operaciones de TradingView o el CSV de Myfxbook, FX Blue o una señal de MQL5, y da una clase de A a D en seis dimensiones: significación estadística, Sharpe deflactado con el número real de intentos, costes, fuera de muestra, calidad de datos y benchmark. Cada número dice si se midió del archivo, si lo declaró la plataforma o si no se pudo medir.
 
-Qué no hace: no se conecta a ningún bróker, no comprueba la cuenta real, no predice resultados y no recomienda comprar ningún robot.
+También: el resultado sin sus mejores operaciones, el modelo de ticks del probador, si la mejor pasada es un pico aislado o una meseta, si el periodo reciente se parece al resto, y una cuenta real frente a miles de historias remuestreadas de su propio backtest, con los depósitos separados del resultado de operar.
 
-Oferta de lanzamiento: audito gratis el backtest público de 10 robots si el vendedor da su permiso, y publico aquí el informe completo, sea cual sea la clase. Los hashes del archivo permiten que cualquiera repita el cálculo.
+Qué no hace: no se conecta a ningún bróker, no predice resultados y no recomienda comprar ningún robot.
+
+La vista previa es gratis; el informe completo cuesta USD 29 y se devuelve si lee mal el archivo. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
 
 Informe de ejemplo con datos sintéticos: https://<dominio>/ejemplo
+Cómo audita, con cada umbral: https://<dominio>/metodologia
 ```
 
 #### F1 · EN · Thread in a commercial section (Forex Factory, FPA classifieds)
 
 ```text
-Title: Statistical audit of EA backtests: free for the first 10 public robots
+Title: Rigor: statistical audit of EA backtests and account histories (MT4, MT5, Myfxbook)
 
-I am <name>, the author of a backtest audit tool (commercial member, interest declared).
+I am <name>, the author of Rigor (commercial member, interest declared).
 
-What it does: it reads the MT5 or MT4 report as exported, or the TradingView list of trades, and gives a class from A to D across six dimensions: statistical significance, deflated Sharpe using the real number of trials (taken from the optimisation XML), costs, out-of-sample, data quality and a benchmark. Every number says whether it was measured from the file, declared by the user, or could not be measured.
+What it does: it reads the MT5 or MT4 report as exported (in 7 languages), the optimisation XML, the TradingView list of trades or the Myfxbook, FX Blue or MQL5 signal CSV, and gives a class from A to D across six dimensions: statistical significance, deflated Sharpe using the real number of trials, costs, out-of-sample, data quality and a benchmark. Every number says whether it was measured from the file, declared by the platform, or could not be measured.
 
-What it does not do: it never connects to a broker, it does not check the live account, it does not predict results and it does not recommend buying any robot.
+Also: the result without its best trades, the tester's tick model, whether the best pass is an isolated peak or a plateau, whether the recent period looks like the rest, and a live account compared with thousands of resampled histories of its own backtest, with deposits separated from trading results.
 
-Launch offer: I will audit the public backtest of 10 robots for free if the vendor agrees, and post the full report here, whatever the class. The file hashes let anyone repeat the calculation.
+What it does not do: it never connects to a broker, it does not predict results and it does not recommend buying any robot.
+
+The preview is free; the full report is USD 29, refunded if it misreads the file. Vendors can publish a verification page with the hashes of the audited file.
 
 Sample report built from synthetic data: https://<domain>/ejemplo
+How it audits, with every threshold: https://<domain>/methodology
 ```
 
 #### F2 · ES · Respuesta útil en un foro, sin enlace
@@ -393,6 +514,7 @@ Ejemplo con datos sintéticos: 120 configuraciones de ruido puro. La mejor muest
 
 Qué hacer:
 - Exporta el XML de la pestaña Optimización y guarda cuántas pasadas hiciste.
+- Mira si las pasadas vecinas a la elegida también salen bien (meseta) o si la tuya está sola (pico aislado).
 - Reserva un tramo de fechas que no uses para optimizar.
 - Repite la prueba con el doble de costes.
 
@@ -410,6 +532,7 @@ Example with synthetic data: 120 configurations of pure noise. The best one show
 
 What to do:
 - Export the XML from the Optimization tab and keep count of how many passes you ran.
+- Check whether the passes next to the chosen one also do well (a plateau) or whether yours stands alone (an isolated peak).
 - Hold back a date range you never use for optimising.
 - Rerun the test with double costs.
 
@@ -422,34 +545,63 @@ Solo a quien te pidió información (en un hilo, un comentario o tu WhatsApp).
 Nunca en foros que prohíben mensajes comerciales privados (Elite Trader,
 Trade2Win, TradingView, MQL5 Freelance).
 
-#### D1 · ES · A un trader de retos que preguntó por la auditoría
+#### D1 · ES · A un trader de retos que preguntó por Rigor
 
 ```text
-Hola, <nombre>. Me preguntaste por la auditoría en <sitio>.
+Hola, <nombre>. Me preguntaste por Rigor en <sitio>.
 
-Para retos de prop firm, el informe completo incluye un simulador con los presets de FTMO, FundedNext, The5ers y Topstep: estima, remuestreando tu propio historial, con qué frecuencia se tocaría la pérdida diaria o la total, y con qué frecuencia no se llegaría al objetivo a tiempo. Son estimaciones con sus supuestos escritos, no una predicción del reto.
+Para retos de prop firm, el informe completo incluye un simulador con 16 retos de FTMO, FundedNext, The5ers y Topstep, con las reglas leídas en la web de cada firma: estima, remuestreando tu propio historial, con qué frecuencia se tocaría la pérdida diaria o la total, y con qué frecuencia no se llegaría al objetivo a tiempo. También te dice qué capital pide tu estrategia para cada límite de pérdida. Son estimaciones con sus supuestos escritos, no una predicción del reto.
 
 Puedes probar la vista previa gratis con tu lista de operaciones de TradingView o tu informe de MT5: https://<dominio>
+El informe completo cuesta USD 29.
 ```
 
-#### D1 · EN · To a challenge trader who asked about the audit
+#### D1 · EN · To a challenge trader who asked about Rigor
 
 ```text
-Hi <name>, you asked about the audit on <site>.
+Hi <name>, you asked about Rigor on <site>.
 
-For prop-firm challenges, the full report includes a simulator with FTMO, FundedNext, The5ers and Topstep presets: by resampling your own history it estimates how often the daily or total loss limit would be hit, and how often the target would not be reached in time. These are estimates with their assumptions written out, not a forecast of the challenge.
+For prop-firm challenges, the full report includes a simulator with 16 FTMO, FundedNext, The5ers and Topstep challenges, with the rules read on each firm's website: by resampling your own history it estimates how often the daily or total loss limit would be hit, and how often the target would not be reached in time. It also tells you how much capital your strategy needs for each loss limit. These are estimates with their assumptions written out, not a forecast of the challenge.
 
 You can try the free preview with your TradingView list of trades or your MT5 report: https://<domain>
+The full report is USD 29.
 ```
 
-## 5. Propuesta para vendedores de EA
+#### D2 · ES · A quien va a copiar o invertir con otro trader y preguntó por Rigor
+
+```text
+Hola, <nombre>. Me preguntaste cómo revisar la cuenta de <trader o señal> antes de copiarla o invertir.
+
+Pídele dos archivos: el historial completo de su cuenta (el informe de MetaTrader, o el CSV de Myfxbook, FX Blue o su señal de MQL5) y, si lo tiene, el backtest de su robot. Súbelos juntos en https://<dominio>
+
+Rigor separa los depósitos y retiros del resultado de operar, avisa si el porcentaje se infla con recargas o si quedan pérdidas abiertas al final, y compara la cuenta con miles de historias remuestreadas de su backtest y operación por operación en las mismas fechas. Guía: https://<dominio>/guias/cuenta-proveedor
+
+La vista previa es gratis; el informe completo cuesta USD 29. No me conecto a su bróker ni a tu dinero, y no te digo si invertir o no: te doy los números para que decidas.
+```
+
+#### D2 · EN · To someone about to copy or invest with another trader who asked about Rigor
+
+```text
+Hi <name>, you asked how to check <trader or signal>'s account before copying it or investing.
+
+Ask them for two files: the full history of their account (the MetaTrader report, or the Myfxbook, FX Blue or MQL5 signal CSV) and, if they have it, their robot's backtest. Upload both together at https://<domain>
+
+Rigor separates deposits and withdrawals from trading results, warns when the percentage is inflated by top-ups or when losses are still open at the end, and compares the account with thousands of resampled histories of its backtest and trade by trade on the same dates. Guide: https://<domain>/guides/provider-account
+
+The preview is free; the full report is USD 29. I never connect to their broker or your money, and I do not tell you whether to invest: I give you the numbers so you can decide.
+```
+
+## 6. Propuesta para vendedores de EA
 
 El argumento para un vendedor no es "tu robot sale bien", porque puede salir
 C o D. Es este: **los compradores ya desconfían de los backtests, y la página
 de verificación les deja comprobar por su cuenta qué archivo se auditó y con
-qué resultado, sin que el vendedor enseñe sus operaciones.**
+qué resultado, sin que el vendedor enseñe sus operaciones.** Y antes de
+publicar, el informe privado le dice qué preguntarán los compradores
+(sobreajuste, costes, periodo reciente, cuenta real frente al backtest).
 
-Qué recibe el vendedor:
+Qué recibe el vendedor por USD 29 (o USD 69 si audita tres versiones o un
+backtest y su cuenta):
 
 - El informe completo privado, para mejorar el robot antes de publicarlo.
 - Si decide publicarlo, `https://<dominio>/v/{id}`: clase, fecha, las seis
@@ -482,11 +634,11 @@ Asunto: Una página pública para que tus compradores comprueben tu backtest
 
 Hola, <nombre>. Vi <nombre del robot> en <sitio>.
 
-Tengo una herramienta que audita backtests de EA a partir del informe de MT5 y del XML de optimización, y da una clase de A a D en seis dimensiones (significación, número de intentos, costes, fuera de muestra, calidad de datos y benchmark).
+Soy el autor de Rigor, un servicio que audita backtests de EA a partir del informe de MT5 y del XML de optimización, y da una clase de A a D en seis dimensiones (significación, número de intentos, costes, fuera de muestra, calidad de datos y benchmark). Si tienes una cuenta real o demo con el robot, también la compara con el backtest.
 
 Si quieres, el resultado se publica en una página de verificación con los hashes del archivo auditado y un sello para tu web o tu Telegram. El sello dice textualmente: "Auditoría estadística de datos aportados – no verificados con el bróker – no garantiza resultados". Así tus compradores comprueban qué archivo se auditó sin que enseñes tus operaciones.
 
-La primera auditoría es gratis; la publicación es opcional y la decides tú después de ver el informe. Ejemplo con datos sintéticos: https://<dominio>/ejemplo
+La vista previa es gratis y la ves tú solo. El informe completo cuesta USD 29, y la publicación es opcional: la decides después de leerlo. Ejemplo con datos sintéticos: https://<dominio>/ejemplo
 
 Si no te interesa, dímelo y no vuelvo a escribirte.
 <tu nombre>
@@ -499,11 +651,11 @@ Subject: A public page where your buyers can check your backtest
 
 Hi <name>, I saw <robot name> on <site>.
 
-I run a tool that audits EA backtests from the MT5 report and the optimisation XML, and gives a class from A to D across six dimensions (significance, number of trials, costs, out-of-sample, data quality and benchmark).
+I am the author of Rigor, a service that audits EA backtests from the MT5 report and the optimisation XML, and gives a class from A to D across six dimensions (significance, number of trials, costs, out-of-sample, data quality and benchmark). If you have a live or demo account running the robot, it also compares it with the backtest.
 
 If you want, the result is published on a verification page with the hashes of the audited file and a badge for your website or Telegram. The badge says, word for word: "Statistical audit of supplied data – not verified with a broker – not a performance guarantee". Your buyers can then check which file was audited without you showing your trades.
 
-The first audit is free; publishing is optional and you decide after reading the report. Sample built from synthetic data: https://<domain>/ejemplo
+The preview is free and only you see it. The full report is USD 29, and publishing is optional: you decide after reading it. Sample built from synthetic data: https://<domain>/ejemplo
 
 If this is not for you, just say so and I will not write again.
 <your name>
@@ -537,23 +689,23 @@ The badge says "Statistical audit of supplied data – not verified with a broke
 You can unpublish at any time from the same report.
 ```
 
-## 6. De primer mensaje a informe entregado
+## 7. De primer mensaje a informe entregado
 
 Objetivo: contestar el mismo día y que el cliente vea su vista previa antes
 de pagar.
 
-| Paso | Qué haces | Plantilla o comando |
+| Paso | Qué haces | Plantilla o dónde |
 |---|---|---|
 | 1. Primer mensaje | Saluda, explica en tres líneas y manda a subir el archivo y a ver `/ejemplo`. | W1 |
 | 2. No sabe exportar | Instrucciones de su plataforma. | W2 |
-| 3. Sube el archivo | El cliente ve la vista previa gratis y guarda el enlace de su informe (lleva el token). | — |
+| 3. Sube el archivo | El cliente ve la vista previa gratis y guarda el enlace de su informe (lleva el token). El botón "Pedir un código" te escribe por WhatsApp con el id de su auditoría. | — |
 | 4. Quiere el completo | Datos de pago y enlace a los términos. | W3 |
-| 5. Paga | Confirma el pago en tu banco o Mercado Pago antes de nada. Luego, en `railway ssh`: `quant-trade audit codes create --credits 1 --note "<nombre> MP <referencia> <fecha>" --expires-days 90`. El código se muestra una sola vez. | — |
-| 6. Entrega | Envía el código por WhatsApp y nada más por ningún otro canal. | W4 |
+| 5. Paga | Confirma el pago en tu banco o Mercado Pago antes de nada. Luego, en `https://<dominio>/panel`, crea un código con 1 crédito (3 para el paquete) y en la nota pon nombre de pila y referencia del pago. El código se muestra una sola vez. | `/panel` |
+| 6. Entrega | Envía el código por WhatsApp y por ningún otro canal. | W4 |
 | 7. Canje | El cliente escribe el código en su informe y lo desbloquea; puede guardarlo en PDF. | — |
-| 8. Si falla | Si el archivo no se lee, no se crea auditoría y el código queda intacto. Si hace falta, desactiva el código (`quant-trade audit codes disable <id>`) y devuelve el pago. | W6 |
+| 8. Si falla | Si el archivo no se lee, no se crea auditoría y el código queda intacto. Si el informe lee mal el archivo, desactiva el código en `/panel`, devuelve el pago y avisa en el proyecto para corregir el importador. | W6 |
 | 9. Vendedor | Si es vendedor, explica cómo publicar la verificación. | V2 |
-| 10. Seguimiento | A los tres días, pide opinión sobre el informe. | W5 |
+| 10. Seguimiento | A los tres días, pide opinión sobre el informe y que lo recomiende. | W5 |
 
 Reglas de trato:
 
@@ -568,23 +720,22 @@ Reglas de trato:
   reproducible por hash y lo decide el motor.
 - Las opiniones que publiques hablan del informe (claridad, rapidez), nunca
   de resultados de trading.
-- Retención: pon `AUDIT_AUTO_PURGE=true` en Railway y el servicio borra solo
-  los archivos no pagados a diario (a mano: `quant-trade audit purge --days
-  30 --yes`). Las páginas de verificación publicadas y sus sellos siguen
-  funcionando después.
+- Retención: `AUDIT_AUTO_PURGE=true` ya está puesto, así que el servicio borra
+  solo los archivos no pagados. Las páginas de verificación publicadas y sus
+  sellos siguen funcionando después.
 
 Hoja de ventas (una fila por venta, sin datos sensibles): fecha, nombre de
 pila, canal por el que llegó, importe, medio de pago, referencia, id del
 código, id de la auditoría, clase, ¿publicó verificación?, opinión.
 
-## 7. Plan semanal y qué medir
+## 8. Plan de las primeras semanas y qué medir
 
 | Semana | Qué hacer | Meta |
 |---|---|---|
-| 1 | Checklist de la sección 1. Perfil de MQL5 completo, primera entrada de blog (F3). Cinco respuestas útiles (F2) en el foro español de MQL5 y en Rankia, sin enlaces. | 10 conversaciones de WhatsApp; 10 auditorías gratis con archivo real. |
-| 2 | Hilo en Commercial Content de Forex Factory (F1) si la membresía comercial encaja. 10 vendedores de EA contactados uno a uno (V1). | 3 vendedores con informe; 1 verificación publicada. |
-| 3 | Pasa a USD 29. Segunda entrada de blog con lo aprendido en las auditorías gratis (sin nombrar robots sin permiso). Revisa las reglas de Reddit y publica una entrada de método si lo permiten. | Primeras 3 ventas. |
-| 4 | Revisa los números y decide: más contenido, clasificados de FPA o un anuncio de pago pequeño. Paquete de 3 para quien compare robots. | 5 ventas; 3 opiniones publicables. |
+| 1 | Checklist de la sección 2. P1 a 20 contactos y en tu estado de WhatsApp. Perfil de MQL5 completo y primera entrada de blog (F3). | 10 vistas previas con archivo real; primeras 2 ventas. |
+| 2 | 10 vendedores de EA de habla hispana contactados uno a uno (V1). Cinco respuestas útiles (F2) en el foro español de MQL5 y en Rankia, sin enlaces. | 5 ventas acumuladas; 1 verificación publicada. |
+| 3 | Hilo en Commercial Content de Forex Factory (F1) si la membresía comercial encaja. Segunda entrada de blog con lo aprendido (sin nombrar robots sin permiso). | 8 ventas acumuladas; 3 opiniones. |
+| 4 | Revisa los números y decide: más contenido, clasificados de FPA o un anuncio de pago pequeño. Paquete de 3 para quien compare robots o revise una cuenta. | 10 ventas acumuladas. |
 
 Qué medir cada semana, en la hoja de ventas:
 
@@ -595,18 +746,25 @@ Qué medir cada semana, en la hoja de ventas:
   corregir en `audit/importers.py`).
 - Verificaciones publicadas y visitas que llegan desde un sello.
 
-Si en cuatro semanas casi nadie sube un archivo, el problema está en el
-mensaje o en el canal; si suben pero no pagan, en el precio o en lo que
-enseña la vista previa. Vuelve a esta guía y cambia una sola cosa cada vez.
+Si casi nadie sube un archivo, el problema está en el mensaje o en el canal;
+si suben pero no pagan, en el precio o en lo que enseña la vista previa. Vuelve
+a esta guía y cambia una sola cosa cada vez. Solo cuando haya ventas y
+opiniones reales tiene sentido pensar en pruebas gratis o en subir el precio.
 
 ## Límites de esta guía
 
+- Todavía no hay ninguna venta: las metas de la sección 8 son objetivos, no
+  estimaciones de demanda.
 - Las reglas de las comunidades cambian. Las marcadas como "fragmento" o
   "sin comprobar" deben leerse en un navegador antes de publicar.
 - No se publicó, registró ni envió nada al preparar esta guía.
-- Los precios salen de la comparación con competidores del 2026-09-24 y de la
-  recomendación del hilo de QA; no hay todavía datos de ventas reales.
-- Los importadores no se han probado con informes reales de clientes.
+- Los precios salen de la comparación con competidores públicos; no hay datos
+  de ventas reales.
+- Los importadores se probaron con 39 archivos reales públicos y con los
+  informes de MT5 del dueño. NinjaTrader, QuantConnect, backtesting.py y
+  vectorbt solo se probaron con archivos de ejemplo públicos, porque no hay
+  exportaciones reales publicadas; el primer cliente de esas plataformas es
+  también una prueba, cubierta por la devolución.
 - La normativa sobre publicidad de servicios financieros y correos
   comerciales varía por país; consulta a un abogado antes de escribir en
   frío a vendedores fuera de tu país.

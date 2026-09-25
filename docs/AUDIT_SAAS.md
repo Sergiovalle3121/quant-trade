@@ -295,6 +295,12 @@ expected range is the 5th to 95th percentile of the draws).
   not preserved; the comparison says whether the files are alike, never
   what the account will do next.
 
+The `/ejemplo` backtest trades two pairs, EURUSD and AUDUSD (`SAMPLE_SYMBOLS`,
+the pair drawn from its own random stream, so no result changes), and holds
+each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
+so the per-instrument and "Cómo se comporta al perder" sections have real
+variety to show. The class stays C.
+
 The `/ejemplo` report carries a synthetic live account, a Myfxbook CSV
 export built in `audit/sample.py` (0.1 lots, a fifth of the backtest's
 size). It trades the backtest's last 60 business days too, skipping about
@@ -933,7 +939,7 @@ with an empty value):
 | `AUDIT_QUEUE_SECONDS` | `30` | How long an upload waits for a free slot before it gets a 503 "busy, try again in a minute" page. |
 | `AUDIT_RETENTION_DAYS` | `30` | Shown on the form and the privacy page; the automatic purge uses it. A manual `audit purge --days` should use the same number. |
 | `AUDIT_AUTO_PURGE` | `false` | `true` runs the retention purge inside the service at startup and every 24 hours. Turning it on is the explicit confirmation the retention delete needs. |
-| `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. Above 10 million cells (samples x returns, `BOOTSTRAP_MAX_CELLS`) the samples are reduced to fit, never below 50; the report records both counts. |
+| `AUDIT_BOOTSTRAP_SAMPLES` | `1000` | Fewer samples make the service faster and the bands coarser. Above 10 million cells (samples x returns, `BOOTSTRAP_MAX_CELLS`) the samples are reduced to fit, never below 50; the report records both counts. The per-path statistics are summarised a million cells at a time (`_SUMMARY_CHUNK_CELLS` in `research/bootstrap.py`), with the same numbers: the largest report accepted (10 MB, 12,500 trades) peaks at about 290 MB instead of 520 MB. |
 | `AUDIT_OPERATOR_NAME` | empty | Legal name of whoever runs the service, shown on the terms and privacy pages. |
 | `AUDIT_OPERATOR_CONTACT` | empty | Contact for privacy and deletion requests (an e-mail address). |
 | `AUDIT_OPERATOR_ADDRESS` | empty | Postal address of the operator. |

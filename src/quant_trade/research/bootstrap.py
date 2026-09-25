@@ -100,6 +100,26 @@ def _summary_matrix(paths: np.ndarray) -> pd.DataFrame:
     )
 
 
+#: Resampled cells summarised at a time. Each statistic is per path, so
+#: summarising the paths in row blocks gives the same numbers while the
+#: gathered returns, equity and drawdown never exist for every path at once.
+_SUMMARY_CHUNK_CELLS = 1_000_000
+
+
+def _summary_of(values: np.ndarray, idx: np.ndarray) -> pd.DataFrame:
+    """``_summary_matrix(values[idx])``, computed a block of paths at a time."""
+    samples, length = idx.shape
+    rows = max(1, _SUMMARY_CHUNK_CELLS // max(length, 1))
+    if rows >= samples:
+        return _summary_matrix(values[idx])
+    parts = [
+        _summary_matrix(values[idx[start : start + rows]]) for start in range(0, samples, rows)
+    ]
+    frame = pd.concat(parts, ignore_index=True)
+    frame["sample"] = np.arange(samples)
+    return frame
+
+
 def observed_statistics(
     returns: pd.Series | np.ndarray, nan_policy: NanPolicy = "raise"
 ) -> dict[str, float]:
@@ -182,7 +202,7 @@ def iid_bootstrap(
     samples = _validate_samples(samples)
     rng = np.random.default_rng(seed)
     idx = _iid_indices(values.size, samples, rng)
-    return _summary_matrix(values[idx])
+    return _summary_of(values, idx)
 
 
 def moving_block_bootstrap(
@@ -217,7 +237,7 @@ def moving_block_bootstrap(
         )
     rng = np.random.default_rng(seed)
     idx = _moving_block_indices(n, samples, block_size, wrap, rng)
-    return _summary_matrix(values[idx])
+    return _summary_of(values, idx)
 
 
 def stationary_bootstrap(
@@ -243,7 +263,7 @@ def stationary_bootstrap(
     p = 1.0 / float(expected_block_size)
     rng = np.random.default_rng(seed)
     idx = _stationary_indices(n, samples, p, rng)
-    return _summary_matrix(values[idx])
+    return _summary_of(values, idx)
 
 
 _METHODS = {
