@@ -1633,7 +1633,8 @@ def landing(
 
 def _evidence_value(item: Any) -> str:
     if isinstance(item, dict) and "value" in item:
-        return f"{item.get('value')} ({item.get('evidence', '')})"
+        value = item.get("value")
+        return f"{'—' if value is None else value} ({item.get('evidence', '')})"
     return "-" if item is None else str(item)
 
 
@@ -1711,10 +1712,12 @@ def verification_page(
     verdict = result["verdict"]
     overall = str(verdict["overall"])
     titles = DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"])
-    rows = "".join(
-        f"<tr><td>{_e(titles.get(d['name'], d['name']))}</td>"
-        f"<td>{_status_chip(str(d['status']), locale)}</td>"
-        f"<td>{_e(meaning(d['name'], d['status'], locale))}</td></tr>"
+    # The same cards as the report's "what it means for you", so a buyer
+    # reads one dimension at a time on a phone.
+    cards = "".join(
+        f"<div class='item s-{_e(str(d['status']))}'>"
+        f"<h3>{_e(titles.get(d['name'], d['name']))} {_status_chip(str(d['status']), locale)}</h3>"
+        f"<p>{_e(meaning(d['name'], d['status'], locale))}</p></div>"
         for d in verdict["dimensions"]
     )
     inputs = result.get("inputs", {})
@@ -1787,12 +1790,12 @@ def verification_page(
         "<div class='paper page-main'><div class='wrap wrap-mid'>"
         f"<div class='disclaimer' style='margin-bottom:40px'><strong>{_e(copy['v_notice'])}."
         f"</strong> {_e(VERIFICATION_NOTICE[locale])}</div>"
-        f"<section class='rsec'><h2>{_e(copy['v_dimensions'])}</h2><table><tr>"
-        f"<th>{_e(copy['v_dimension'])}</th><th>{_e(copy['v_status'])}</th>"
-        f"<th>{_e(copy['v_meaning'])}</th></tr>{rows}</table></section>"
-        f"<section class='rsec'><h2>{_e(copy['v_inputs'])}</h2><table>{digest_rows}</table>"
-        "</section>"
-        f"<section class='rsec'><h2>{_e(copy['v_details'])}</h2><table>{detail_rows}</table>"
+        f"<section class='rsec'><h2>{_e(copy['v_dimensions'])}</h2>"
+        f"<div class='meaning'>{cards}</div></section>"
+        f"<section class='rsec'><h2>{_e(copy['v_inputs'])}</h2>"
+        f"<table class='kv'>{digest_rows}</table></section>"
+        f"<section class='rsec'><h2>{_e(copy['v_details'])}</h2>"
+        f"<table class='kv'>{detail_rows}</table>"
         "</section>"
         f"<section class='rsec'><h2>{_e(copy['v_badge'])}</h2><div class='badge-preview'>"
         f"<img src='/v/{_e(public_id)}/badge.svg?lang={_e(locale)}' "

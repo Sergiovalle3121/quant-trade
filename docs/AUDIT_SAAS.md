@@ -692,7 +692,10 @@ and file-reading warnings in English, which is what the JSON keeps as the
 evidence record; a Spanish page translates them with the fixed rules in
 `audit/i18n.py`. A sentence with no rule stays in English rather than
 disappearing, and `tests/test_audit_i18n.py` fails when any importer fixture
-or test scenario produces one, so a new warning needs its Spanish rule.
+or test scenario produces one, so a new warning needs its Spanish rule. A sentence that
+carries a count `{n}` with an `item(s)` word also needs its singular in
+`_SINGULAR` (English and Spanish), so a page reads "1 deposit arrived" and
+"3 deposits arrived", never "deposit(s)"; the JSON keeps the `(s)` form.
 
 Every private URL carries a per-audit secret token; a wrong token is a 404.
 Every response is `Cache-Control: no-store` except the two `/v/` routes,
@@ -1106,6 +1109,13 @@ the PDF.
 On phones the stress tables and the day and hour tables read as one card per
 row, with each figure labelled, instead of scrolling sideways. A lone last key
 figure spans the row.
+
+The public /v page shows each dimension as the same card the report uses. On
+phones, its hash and audit-detail tables stack the label above the value. An
+undeclared trial count reads "—" and not "None".
+
+On phones the deposit list in "El dinero real de la cuenta" also reads as cards.
+In the PDF, fact cards sit three to a row.
 
 ## Security
 
