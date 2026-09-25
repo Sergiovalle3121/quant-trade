@@ -705,3 +705,20 @@ def test_a_universal_file_shows_each_column_and_what_it_was_read_as(locale: str)
     assert (
         ".colmap-list{list-style:none" in STYLE and ".colmap-list li{display:inline-block" in STYLE
     )
+
+
+def test_what_to_do_now_reads_as_numbered_steps_with_a_link_to_each_section(
+    tmp_path: Path,
+) -> None:
+    page = _client(tmp_path).get("/ejemplo").text
+    assert "<ol class='next-steps'>" in page and "class='muted evidence-legend'" in page
+    # Each step is a card with its number in a disc; the last one (keep the report) is quieter.
+    assert ".next-steps li::before{content:counter(ns)" in STYLE
+    assert (
+        ".next-steps li:last-child{margin-bottom:0;background:transparent;border-style:dashed"
+        in STYLE
+    )
+    # The link to the section ends in an arrow (a CSS escape, not a stray control character).
+    assert ".next-steps a::after{content:' \\2192'}" in STYLE
+    # Margins, not flex gap, so the PDF keeps the spacing.
+    assert ".next-steps li{break-inside:avoid;font-size:9pt" in STYLE
