@@ -65,6 +65,27 @@ decimal comma (`1 234,56`, `1.234,56`) is read as 1234.56; `1,234` stays a
 thousands separator. The importers were checked against 23 real public
 MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
 
+NinjaTrader's Trades export is read with English or French headers ("Pos.
+marché.", "Prix d'entrée", "Longue"/"Courte") and with the `90.00 $` amount
+suffix. Its Executions export (`Instrument;Action;Quantity;Price;Time;...;E/X`,
+European decimals) has no profit per trade, so fills are paired first in,
+first out per account and instrument and priced with the contract's point
+value from `FUTURES_POINT_VALUE_USD` (CME contract specifications,
+cmegroup.com, as of 2026-09-25: ES 50, MES 5, NQ 20, MNQ 2, CL 1000, GC 100
+and the rest listed in the code); the commission of each fill is spread over
+its contracts. A contract missing from that table is refused
+(`ninjatrader_executions_symbol`) with a request for the Trades tab, and
+positions still open at the end are left out with a warning. Compact contract
+codes (`MNQZ6`, `ESH25`) resolve to their root. The Account Performance
+Trades export, which has no "Trade number" column, is read like the
+Strategy Analyzer one (`Profit` is net of the itemised commission). A file
+that holds several accounts (a copy-trading export repeats each trade on
+every account) is read for the account with the most closed trades, with
+the same warning as FX Blue, since adding the accounts up would mix
+balances. Layouts were taken from public importers of NinjaTrader files
+(tradetally, deltalytix, LuxAlgo trade-journal's copy-trading fixture);
+tests use synthetic rows (`tests/test_audit_ninjatrader_exports.py`).
+
 Account histories from tracking sites are read too, so an investor can
 review a trader from the export alone: Myfxbook's history CSV (`Profit` is
 net, so the gross adds commission and swap back; `Deposit`/`Withdrawal`
@@ -1367,6 +1388,11 @@ record, since an unmatched file may simply predate the recording). The page
 is linked from every footer's Product column, from a note on the public /v
 page ("Were you sent this report's PDF or JSON?") and from a line under the
 report's PDF download.
+
+Redesign pass 40 styles "How it behaves after losing": each finding reads as
+what the trades show (bold) and, on its own line with a speech mark, the
+question to put to the seller (`report._behaviour_ask`, `.beh-asks`), in the
+screen and in the PDF.
 
 ## Security
 

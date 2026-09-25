@@ -78,6 +78,7 @@ MT4_STATEMENT_HTML = "mt4_statement_html"
 TRADINGVIEW_CSV = "tradingview_csv"
 TRADINGVIEW_XLSX = "tradingview_xlsx"
 NINJATRADER_CSV = "ninjatrader_csv"
+NINJATRADER_EXECUTIONS_CSV = "ninjatrader_executions_csv"
 QUANTCONNECT_TRADES_CSV = "quantconnect_trades_csv"
 BACKTESTINGPY_CSV = "backtestingpy_csv"
 VECTORBT_CSV = "vectorbt_csv"
@@ -99,6 +100,7 @@ REPORT_FORMATS: tuple[str, ...] = (
     TRADINGVIEW_CSV,
     TRADINGVIEW_XLSX,
     NINJATRADER_CSV,
+    NINJATRADER_EXECUTIONS_CSV,
     QUANTCONNECT_TRADES_CSV,
     BACKTESTINGPY_CSV,
     VECTORBT_CSV,
@@ -2450,12 +2452,81 @@ def _index(header: list[str]) -> dict[str, int]:
     return {cell.strip().lower(): position for position, cell in enumerate(header)}
 
 
+#: NinjaTrader's Trades tab from a terminal set to French, as users' exports
+#: name the columns (github.com/hugodemenez/deltalytix, NinjaTrader importer).
+_NINJATRADER_FRENCH = {
+    "numéro d'ordre": "trade number",
+    "compte": "account",
+    "stratégie": "strategy",
+    "pos. marché.": "market pos.",
+    "qté": "qty",
+    "prix d'entrée": "entry price",
+    "prix de sortie": "exit price",
+    "heure d'entrée": "entry time",
+    "heure de sortie": "exit time",
+    "nom d'entrée": "entry name",
+    "nom de la sortie": "exit name",
+}
+_NINJATRADER_SIDES = {"long": "long", "short": "short", "longue": "long", "court": "short",
+                      "courte": "short"}  # fmt: skip
+
+
+def _ninjatrader_index(header: list[str]) -> dict[str, int]:
+    """Column positions under NinjaTrader's English names, French ones mapped."""
+    columns: dict[str, int] = {}
+    for position, cell in enumerate(header):
+        name = re.sub(r"[\u2019\u2018`\u2032]", "'", cell.strip().lower())
+        columns.setdefault(_NINJATRADER_FRENCH.get(name, name), position)
+    return columns
+
+
+#: US dollars per point of a CME Group futures contract, by root symbol, from
+#: the exchange's contract specifications (https://www.cmegroup.com, as_of
+#: 2026-09-25). An executions export has no profit column, so the result of a
+#: round trip is the price move times this value.
+FUTURES_POINT_VALUE_USD: dict[str, float] = {
+    "ES": 50.0, "MES": 5.0, "NQ": 20.0, "MNQ": 2.0, "YM": 5.0, "MYM": 0.5,
+    "RTY": 50.0, "M2K": 5.0,
+    "CL": 1_000.0, "MCL": 100.0, "NG": 10_000.0,
+    "GC": 100.0, "MGC": 10.0, "SI": 5_000.0, "HG": 25_000.0,
+    "ZB": 1_000.0, "UB": 1_000.0, "ZN": 1_000.0, "ZF": 1_000.0, "ZT": 2_000.0,
+    "6E": 125_000.0, "M6E": 12_500.0, "6B": 62_500.0, "6J": 12_500_000.0,
+    "6A": 100_000.0, "6C": 100_000.0,
+    "ZC": 50.0, "ZS": 50.0, "ZW": 50.0,
+}  # fmt: skip
+
+
+#: What a NinjaTrader Trades export needs; the Account Performance export has no
+#: "Trade number" column, so it is not required.
+_NINJATRADER_TRADES_COLUMNS = frozenset(
+    {"instrument", "market pos.", "entry price", "exit price", "entry time", "exit time", "profit"}
+)
+
+
+def _busiest_account(
+    rows: list[list[str]], accounts: list[str], closed: dict[str, int], warnings: list[str]
+) -> list[list[str]]:
+    """The rows of the account with the most closed trades, when a file holds
+    several (a copy-trading export repeats each trade on every account, and
+    adding them up would mix balances), with a warning."""
+    if len(closed) < 2:
+        return rows
+    chosen = max(closed, key=lambda name: (closed[name], name))
+    warnings.append(
+        f"the file holds {len(closed)} accounts; only the one with the most closed "
+        f"trades ({closed[chosen]}) was read"
+    )
+    return [row for row, account in zip(rows, accounts, strict=True) if account == chosen]
+
+
 def _table_format(header: list[str]) -> str | None:
     names = set(_index(header))
     if _is_tradingview_header(header):
         return TRADINGVIEW_CSV
-    if {"trade number", "instrument", "market pos."} <= names:
+    if set(_ninjatrader_index(header)) >= _NINJATRADER_TRADES_COLUMNS:
         return NINJATRADER_CSV
+    if {"instrument", "action", "quantity", "price", "time", "e/x"} <= names:
+        return NINJATRADER_EXECUTIONS_CSV
     if {"entry time", "symbols", "exit time", "direction", "p&l"} <= names:
         return QUANTCONNECT_TRADES_CSV
     if {"size", "entrybar", "exitbar", "entryprice", "exitprice", "pnl"} <= names:
@@ -2477,10 +2548,15 @@ def _cells(row: list[str], columns: dict[str, int], name: str) -> str:
 
 
 def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str) -> _Draft:
-    columns = _index(header)
+    columns = _ninjatrader_index(header)
     decimal = "," if delimiter == ";" else "."
     draft = _Draft(NINJATRADER_CSV, [])
     draft.itemised = {"commission"}
+    accounts = [_cells(row, columns, "account").strip() for row in rows]
+    closed: dict[str, int] = {}
+    for account in accounts:
+        closed[account] = closed.get(account, 0) + 1
+    rows = _busiest_account(rows, accounts, closed, draft.warnings)
     entry_times = _parse_times([_cells(row, columns, "entry time") for row in rows])
     exit_times = _parse_times([_cells(row, columns, "exit time") for row in rows])
     fee_columns = [
@@ -2490,7 +2566,7 @@ def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str)
     ]
     last_cum: float | None = None
     for position, row in enumerate(rows):
-        side = _cells(row, columns, "market pos.").lower()
+        side = _NINJATRADER_SIDES.get(_cells(row, columns, "market pos.").strip().lower(), "")
         volume = _num(_cells(row, columns, "qty"), decimal=decimal)
         entry_price = _num(_cells(row, columns, "entry price"), decimal=decimal)
         exit_price = _num(_cells(row, columns, "exit price"), decimal=decimal)
@@ -2541,6 +2617,108 @@ def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str)
             sum(trip.net for trip in draft.trips),
             0.011 * max(1, len(draft.trips)),
         )
+    return draft
+
+
+def _futures_root(instrument: str) -> str:
+    """``MES JUN26``, ``MES 03-25`` or the compact ``MNQZ6`` / ``ESH25`` -> the root."""
+    first = instrument.strip().split(" ")[0].upper()
+    if first in FUTURES_POINT_VALUE_USD:
+        return first
+    compact = re.fullmatch(r"([A-Z0-9]+?)[FGHJKMNQUVXZ](?:\d{1,2}|\d{4})", first)
+    if compact and compact.group(1) in FUTURES_POINT_VALUE_USD:
+        return compact.group(1)
+    return first
+
+
+def _parse_ninjatrader_executions(
+    header: list[str], rows: list[list[str]], delimiter: str
+) -> _Draft:
+    """NinjaTrader's Executions tab: fills, paired first in, first out per
+    account and instrument into round trips priced with the contract's point
+    value. Fills of a position still open at the end are left out."""
+    columns = _index(header)
+    decimal = "," if delimiter == ";" else "."
+    draft = _Draft(NINJATRADER_EXECUTIONS_CSV, [])
+    draft.itemised = {"commission"}
+    draft.naive_times = True
+    times = _parse_times([_cells(row, columns, "time") for row in rows])
+    fills: list[tuple[datetime, int, str, str, float, float, float]] = []
+    for position, row in enumerate(rows):
+        action = _cells(row, columns, "action").strip().lower()
+        sign = 1 if action.startswith("buy") else -1 if action.startswith("sell") else 0
+        quantity = _num(_cells(row, columns, "quantity"), decimal=decimal)
+        price = _num(_cells(row, columns, "price"), decimal=decimal)
+        moment = times.values[position]
+        instrument = _cells(row, columns, "instrument").strip()
+        if not sign or not quantity or price is None or moment is None or not instrument:
+            draft.invalid_rows += 1
+            continue
+        fee = abs(_num(_cells(row, columns, "commission"), decimal=decimal) or 0.0)
+        account = _cells(row, columns, "account display name") or _cells(
+            row, columns, "account"
+        )
+        fills.append((moment, position, account, instrument, sign * abs(quantity), price, fee))
+    unknown = sorted({_futures_root(fill[3]) for fill in fills} - set(FUTURES_POINT_VALUE_USD))
+    if unknown:
+        listed = ", ".join(unknown[:5])
+        raise ReportFormatError(
+            "ninjatrader_executions_symbol",
+            f"this NinjaTrader executions export has no profit per trade, and the point value "
+            f"of {listed} is not in our table; export the Trades tab instead (Account "
+            "Performance or Strategy Analyzer > Trades), which carries each trade's profit",
+            f"esta exportación de ejecuciones de NinjaTrader no trae el resultado de cada "
+            f"operación y no tenemos el valor por punto de {listed}; exporta mejor la pestaña "
+            "Trades (Account Performance o Strategy Analyzer > Trades), que sí lo trae",
+        )
+    open_lots: dict[tuple[str, str], list[list[Any]]] = {}
+    trips: dict[str, list[_Trip]] = {}
+    for moment, _, account, instrument, signed, price, fee in sorted(fills):
+        lots = open_lots.setdefault((account, instrument), [])
+        left = abs(signed)
+        fee_per_unit = fee / left
+        while left > 0 and lots and (lots[0][0] > 0) != (signed > 0):
+            lot = lots[0]
+            closed = min(left, abs(lot[0]))
+            side = "long" if lot[0] > 0 else "short"
+            point_value = FUTURES_POINT_VALUE_USD[_futures_root(instrument)]
+            move = (price - lot[1]) if side == "long" else (lot[1] - price)
+            trips.setdefault(account, []).append(
+                _Trip(
+                    symbol=instrument,
+                    side=side,
+                    volume=closed,
+                    entry_time=lot[2],
+                    exit_time=moment,
+                    entry_price=lot[1],
+                    exit_price=price,
+                    gross=move * closed * point_value,
+                    commission=-(lot[3] + fee_per_unit) * closed,
+                )
+            )
+            lot[0] -= closed if lot[0] > 0 else -closed
+            left -= closed
+            if lot[0] == 0:
+                lots.pop(0)
+        if left > 0:
+            lots.append([left if signed > 0 else -left, price, moment, fee_per_unit])
+    closed_by_account = {account: len(listed) for account, listed in trips.items()}
+    chosen = _busiest_account(
+        [[account] for account in trips], list(trips), closed_by_account, draft.warnings
+    )
+    kept = {row[0] for row in chosen}
+    draft.trips = [trip for account in kept for trip in trips[account]]
+    still_open = sum(
+        1 for (account, _), lots in open_lots.items() if account in kept and lots
+    )
+    if still_open:
+        draft.warnings.append(
+            f"{still_open} position(s) still open at the end of the report; excluded "
+            "from the closed trades"
+        )
+    draft.trips.sort(key=lambda trip: (trip.exit_time, trip.entry_time))
+    if draft.trips and all(trip.commission == 0 for trip in draft.trips):
+        draft.warnings.append("every trade has zero commission and fees")
     return draft
 
 
@@ -3388,12 +3566,14 @@ def _unknown_format() -> ReportFormatError:
         "unknown_format",
         "the file is not a supported report. Expected: a MetaTrader 5 or 4 report or "
         "statement (HTML, or XLSX for MetaTrader 5), a TradingView list of trades "
-        "(CSV or XLSX), a trades CSV from NinjaTrader, QuantConnect, backtesting.py "
+        "(CSV or XLSX), a trades or executions CSV from NinjaTrader, a trades CSV from "
+        "QuantConnect, backtesting.py "
         "or vectorbt, or an account history CSV from Myfxbook, FX Blue or an MQL5 signal",
         "el archivo no es un informe compatible. Se espera: un informe o estado de cuenta "
         "de MetaTrader 5 o 4 (HTML, o XLSX de MetaTrader 5), una lista de operaciones de "
         "TradingView (CSV o XLSX), "
-        "un CSV de operaciones de NinjaTrader, QuantConnect, backtesting.py o vectorbt, "
+        "un CSV de operaciones o de ejecuciones de NinjaTrader, uno de operaciones de "
+        "QuantConnect, backtesting.py o vectorbt, "
         "o el historial en CSV de Myfxbook, FX Blue o una señal de MQL5",
     )
 
@@ -3497,6 +3677,8 @@ def import_report(
                                        serial_dates=False)  # fmt: skip
         elif source_format == NINJATRADER_CSV:
             draft = _parse_ninjatrader(header, rows, delimiter)
+        elif source_format == NINJATRADER_EXECUTIONS_CSV:
+            draft = _parse_ninjatrader_executions(header, rows, delimiter)
         elif source_format == QUANTCONNECT_TRADES_CSV:
             draft = _parse_quantconnect(header, rows)
         elif source_format == BACKTESTINGPY_CSV:
@@ -3848,6 +4030,7 @@ __all__ = [
     "MYFXBOOK_CSV",
     "FXBLUE_CSV",
     "NINJATRADER_CSV",
+    "NINJATRADER_EXECUTIONS_CSV",
     "QUANTCONNECT_TRADES_CSV",
     "REPORT_FORMATS",
     "optimization_mismatch",

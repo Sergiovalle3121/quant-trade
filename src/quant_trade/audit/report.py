@@ -1630,6 +1630,7 @@ SOURCE_NAMES: dict[str, str] = {
     "tradingview_csv": "TradingView (CSV)",
     "tradingview_xlsx": "TradingView (Excel)",
     "ninjatrader_csv": "NinjaTrader (CSV)",
+    "ninjatrader_executions_csv": "NinjaTrader executions (CSV)",
     "quantconnect_trades_csv": "QuantConnect (CSV)",
     "backtestingpy_csv": "backtesting.py (CSV)",
     "vectorbt_csv": "vectorbt (CSV)",
@@ -3152,6 +3153,19 @@ def _duration_text(hours: float, locale: str) -> str:
     return f"{hours / 24:.1f} " + ("días" if locale == "es" else "days")
 
 
+def _behaviour_ask(text: str) -> str:
+    """One finding: what the trades show, then the question to put to the seller."""
+    for lead in (" Pregunta ", " Ask "):
+        what, sep, ask = text.partition("." + lead)
+        if sep:
+            return (
+                f"<li><p class='beh-what'>{_e(what)}.</p>"
+                f"<p class='beh-ask'>{icon('chat')}<span>{_e(lead.strip())} {_e(ask)}</span>"
+                "</p></li>"
+            )
+    return f"<li><p class='beh-what'>{_e(text)}</p></li>"
+
+
 def _ratio_text(ratio: float) -> str:
     """``4.5`` as ``4.5``, ``0.036`` as ``0.036``: never a bare ``0.0``."""
     return f"{ratio:.1f}" if ratio >= 0.1 else f"{ratio:.2g}"
@@ -3164,10 +3178,10 @@ def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[
     findings = list(behaviour.get("findings") or [])
     out = f"<p class='muted'>{_e(labels['behaviour_intro'])}</p>"
     if findings:
-        items = "".join(f"<li>{_e(labels['beh_' + code])}</li>" for code in findings)
+        items = "".join(_behaviour_ask(labels["beh_" + code]) for code in findings)
         out += (
-            f"<div class='live-verdict lv-WEAK'><span class='badge WEAK'>"
-            f"{_e(labels['beh_badge_found'])}</span><ul>{items}</ul></div>"
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>{items}</ul></div>"
         )
     else:
         out += (
