@@ -943,6 +943,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "la ficha del fondo)",
     ),
     (
+        "read as a monthly returns table (one row per year, one column per month); values taken "
+        "as fractions (four or more decimals and none reaching 1, with no % sign: check one "
+        "month against the factsheet)",
+        "leído como tabla de rentabilidades mensuales (una fila por año, una columna por mes); "
+        "valores tomados como fracciones (cuatro o más decimales y ninguno llega a 1, sin signo "
+        "%: compara un mes con la ficha del fondo)",
+    ),
+    (
         "{count} unreadable month(s) left out of the table: {cells}",
         "{count} mes(es) ilegibles fuera de la tabla: {cells}",
     ),

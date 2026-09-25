@@ -625,7 +625,7 @@ LABELS: dict[str, dict[str, str]] = {
             "debajo de su índice en los meses en común."
         ),
         "fund_fees_behind": (
-            "El fondo ya queda por debajo de su índice antes de cualquier comisión."
+            "El fondo ya queda igual o por debajo de su índice antes de cualquier comisión."
         ),
         "fund_bench_excess": "Diferencia anual frente al índice (fondo {fund}, índice {index})",
         "fund_bench_beat": "Meses en que superó al índice",
@@ -1523,7 +1523,9 @@ LABELS: dict[str, dict[str, str]] = {
             "At a fee of {rate} a year or more, the fund would have ended level with or below "
             "its benchmark over the months they share."
         ),
-        "fund_fees_behind": "The fund already trails its benchmark before any fee.",
+        "fund_fees_behind": (
+            "The fund already ends level with or below its benchmark before any fee."
+        ),
         "fund_bench_excess": "Annual difference against the benchmark (fund {fund}, index {index})",
         "fund_bench_beat": "Months it beat the benchmark",
         "fund_bench_te": "Annual tracking error (information ratio {ir})",
@@ -4746,9 +4748,11 @@ def _market_note(keys: list[str], labels: dict[str, str]) -> str:
             sources.setdefault(move.index, move.source_url)
     if not sources:
         return ""
-    listed = ", ".join(f"{name}: {url}" for name, url in sources.items())
-    text = labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources=listed)
-    return f"<p class='muted'><small>{_e(text)}</small></p>"
+    listed = ", ".join(
+        f"<a href='{_e(url)}' rel='noopener'>{_e(name)}</a>" for name, url in sources.items()
+    )
+    text = _e(labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources="\x00"))
+    return f"<p class='muted'><small>{text.replace(chr(0), listed)}</small></p>"
 
 
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
@@ -4857,8 +4861,10 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
     if break_even:
         rate = float(break_even["value"])
         text = (
-            labels["fund_fees_break_even"].format(rate=f"{rate * 100:.1f} %")
-            if rate > 0
+            labels["fund_fees_break_even"].format(
+                rate=f"{rate * 100:.2f} %" if rate < 0.001 else f"{rate * 100:.1f} %"
+            )
+            if rate >= 0.00005
             else labels["fund_fees_behind"]
         )
         out += f"<p>{_e(text)} {_badge('MEASURED')}</p>"

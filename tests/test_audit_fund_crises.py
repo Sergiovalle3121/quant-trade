@@ -148,7 +148,8 @@ def test_a_daily_backtest_shows_the_crises_it_covers(locale: str) -> None:
     # The market beside each window: Nasdaq for 2008, with its source and date.
     assert LABELS[locale]["crises_market"] in html
     assert "Nasdaq Composite</small> -51.8%" in html
-    assert "fred.stlouisfed.org/series/NASDAQCOM" in html and MARKET_AS_OF in html
+    assert "href='https://fred.stlouisfed.org/series/NASDAQCOM'" in html and MARKET_AS_OF in html
+    assert ": https://fred" not in html  # names linked, no bare addresses
     assert "SP500" not in html  # no S&P figure before FRED's series starts
 
 
