@@ -4748,9 +4748,11 @@ def _market_note(keys: list[str], labels: dict[str, str]) -> str:
             sources.setdefault(move.index, move.source_url)
     if not sources:
         return ""
-    listed = ", ".join(f"{name}: {url}" for name, url in sources.items())
-    text = labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources=listed)
-    return f"<p class='muted'><small>{_e(text)}</small></p>"
+    listed = ", ".join(
+        f"<a href='{_e(url)}' rel='noopener'>{_e(name)}</a>" for name, url in sources.items()
+    )
+    text = _e(labels["crises_market_note"].format(as_of=MARKET_AS_OF, sources="\x00"))
+    return f"<p class='muted'><small>{text.replace(chr(0), listed)}</small></p>"
 
 
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
