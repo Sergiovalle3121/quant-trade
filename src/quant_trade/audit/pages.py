@@ -183,9 +183,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "disclaimer": "Aviso",
         "sample_link": "Ver un informe de ejemplo completo (datos sintéticos)",
         "meta_description": (
-            "Sube el informe de MetaTrader, TradingView, NinjaTrader o Python y recibe un "
-            "veredicto de A a D sobre sobreajuste, costes, fuera de muestra y calidad de datos, "
-            "con cada número etiquetado según su evidencia."
+            "Auditoría estadística de backtests e historiales de trading para forex, acciones, "
+            "futuros y cripto. Sube el informe de MetaTrader, TradingView, NinjaTrader, Python o "
+            "tu curva de equity y recibe un veredicto de A a D, con cada número etiquetado "
+            "según su evidencia."
         ),
         "sample_description": (
             "Informe completo de ejemplo de la auditoría de backtests, hecho con datos "
@@ -203,10 +204,12 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_description": "{cls_label} {overall} · auditada el {date} · {notice}.",
         "how_title": "Cómo funciona",
         "how": [
-            "Sube el informe de tu plataforma tal cual y, si lo tienes, el XML de optimización.",
-            "Recibe al momento la clase de A a D, las gráficas y qué significa cada dimensión "
-            "en lenguaje llano.",
-            "Si quieres todos los números, desbloquea el informe completo.",
+            "Sube el archivo de tu plataforma tal cual: un backtest, el historial de una cuenta o "
+            "una serie de retornos.",
+            "En segundos ves gratis la clase de A a D, las gráficas, las banderas rojas y qué "
+            "significa cada dimensión en lenguaje llano.",
+            "Si quieres todos los números, desbloqueas el informe completo en la misma página "
+            "y lo guardas en PDF.",
             "Si quieres, publica una página de verificación con sello para compartirla.",
         ],
         "prices_title": "Precios",
@@ -228,8 +231,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "al momento, sin esperar un código."
         ),
         "pay_code": (
-            "Pago por transferencia, Mercado Pago o WhatsApp: recibes un código de acceso y lo "
-            "escribes en el formulario o en el informe."
+            "Pago por transferencia u otro medio que acordamos por WhatsApp: al confirmarse el "
+            "pago te enviamos un código de acceso y lo escribes en el formulario o en el informe."
         ),
         "contact": "Pedir un código",
         "price_pack": "Pack de {n} informes: USD {price:.0f} (USD {each:.0f} cada uno).",
@@ -245,6 +248,22 @@ _COPY: dict[str, dict[str, Any]] = {
                 "(CSV o XLSX), NinjaTrader, QuantConnect, backtesting.py o vectorbt. Para "
                 "revisar la cuenta de otro trader, el historial en CSV que exporta Myfxbook, "
                 "FX Blue o una señal de MQL5. También sirve una curva de equity en CSV.",
+            ),
+            (
+                "¿Sirve para acciones, cripto, futuros o un fondo?",
+                "Sí. Rigor no depende del mercado: mide el historial que subes. Para una cartera "
+                "de acciones o cripto, o para un fondo o un gestor, sube su curva de equity o su "
+                "serie de retornos (diaria, semanal o mensual) en CSV o Excel. Los informes de "
+                "TradingView, NinjaTrader, QuantConnect, backtesting.py y vectorbt sirven para "
+                "cualquier activo.",
+            ),
+            (
+                "¿Qué recibo y cuánto tarda?",
+                "En segundos, la vista previa gratuita: clase de A a D, gráficas, banderas rojas "
+                "y qué significa cada dimensión. El informe completo añade cada cifra, pruebas "
+                "de estrés, riesgo y capital, simulador de retos, la cuenta real frente al "
+                "backtest si la subes, preguntas para el vendedor y el PDF. Mira el ejemplo "
+                "completo antes de pagar.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -393,9 +412,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "disclaimer": "Notice",
         "sample_link": "See a full sample report (synthetic data)",
         "meta_description": (
-            "Upload your MetaTrader, TradingView, NinjaTrader or Python report and get an A to "
-            "D verdict on overfitting, costs, out-of-sample and data quality, with every number "
-            "tagged by its evidence."
+            "Statistical audit of trading backtests and track records for forex, stocks, futures "
+            "and crypto. Upload your MetaTrader, TradingView, NinjaTrader or Python report or "
+            "your equity curve and get an A to D verdict, with every number tagged by its "
+            "evidence."
         ),
         "sample_description": (
             "A full sample report of the backtest audit, built from synthetic data: verdict, "
@@ -413,10 +433,12 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_description": "{cls_label} {overall} · audited on {date} · {notice}.",
         "how_title": "How it works",
         "how": [
-            "Upload your platform report as it is and, if you have it, the optimisation XML.",
-            "Get the A to D class, the charts and what each dimension means in plain language "
-            "right away.",
-            "If you want every number, unlock the full report.",
+            "Upload your platform's file as it is: a backtest, an account history or a return "
+            "series.",
+            "In seconds you see, free, the A to D class, the charts, the red flags and what "
+            "each dimension means in plain language.",
+            "If you want every number, you unlock the full report on the same page and keep "
+            "it as a PDF.",
             "If you want, publish a verification page with a badge to share it.",
         ],
         "prices_title": "Pricing",
@@ -436,8 +458,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "once, without waiting for a code."
         ),
         "pay_code": (
-            "Pay by bank transfer, Mercado Pago or WhatsApp: you receive an access code and "
-            "enter it in the form or in the report."
+            "Pay by bank transfer or another method we agree on WhatsApp: once the payment is "
+            "confirmed you receive an access code and enter it in the form or in the report."
         ),
         "contact": "Ask for a code",
         "price_pack": "Pack of {n} reports: USD {price:.0f} (USD {each:.0f} each).",
@@ -453,6 +475,22 @@ _COPY: dict[str, dict[str, Any]] = {
                 "XLSX), NinjaTrader, QuantConnect, backtesting.py or vectorbt. To review another "
                 "trader's account, the CSV history exported by Myfxbook, FX Blue or an MQL5 "
                 "signal. An equity curve in CSV works too.",
+            ),
+            (
+                "Does it work for stocks, crypto, futures or a fund?",
+                "Yes. Rigor does not depend on the market: it measures the history you upload. "
+                "For a stock or crypto portfolio, or for a fund or a manager, upload its equity "
+                "curve or return series (daily, weekly or monthly) as CSV or Excel. TradingView, "
+                "NinjaTrader, QuantConnect, backtesting.py and vectorbt reports work for any "
+                "asset.",
+            ),
+            (
+                "What do I get and how long does it take?",
+                "In seconds, the free preview: A to D class, charts, red flags and what each "
+                "dimension means. The full report adds every figure, stress tests, risk and "
+                "capital, the challenge simulator, the live account against the backtest if you "
+                "upload it, questions for the vendor and the PDF. See the full sample before you "
+                "pay.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -527,23 +565,24 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_faq": "Preguntas",
         "nav_compare": "Comparar",
         "nav_menu": "Menú",
-        "cta": "Auditar mi backtest",
+        "cta": "Empezar gratis",
         "cta_short": "Auditar",
-        "hero_a": "Sube tu backtest.",
-        "hero_b": "Te decimos si es estadísticamente real.",
+        "hero_a": "Sube tu backtest o tu historial.",
+        "hero_b": "Te decimos si es evidencia o suerte.",
         "trust": [
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
             ("globe", "Informe en español o inglés"),
-            ("key", "Pago seguro, sin crear cuenta"),
+            ("key", "Vista previa gratis, sin crear cuenta"),
         ],
         "mock_url": "informe · clase B",
         "mock_k": "Veredicto",
         "cta_sample": "Ver un informe de ejemplo",
         "hero_lead": (
-            "Sube el informe de MetaTrader, TradingView o Python tal cual. Recibe un veredicto "
-            "de A a D sobre sobreajuste, costes, fuera de muestra y calidad de datos, con cada "
-            "número etiquetado según su evidencia."
+            "Para traders de cualquier mercado, quien compra un robot, quien va a un reto de "
+            "prop firm y quien invierte con un gestor. Sube el archivo que ya tienes y recibe "
+            "en segundos un veredicto de A a D sobre sobreajuste, costes, fuera de muestra y "
+            "calidad de datos, con cada número etiquetado según su evidencia."
         ),
         "mock_cap": "Ilustración con datos sintéticos",
         "mock_is": "Dentro de muestra",
@@ -646,8 +685,10 @@ _UI: dict[str, dict[str, Any]] = {
         "full_items": [
             "Todo el detalle numérico, sin marca de agua",
             "Simulador de reto de prop firm",
-            "Riesgo remuestreado a un año",
-            "Preguntas para el vendedor del robot",
+            "Riesgo remuestreado a un año y el capital que pide",
+            "Pruebas de estrés: el resultado sin sus mejores operaciones",
+            "La cuenta real frente a su backtest",
+            "Preguntas para el vendedor del robot o el gestor",
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Página de verificación pública con sello",
         ],
@@ -668,7 +709,7 @@ _UI: dict[str, dict[str, Any]] = {
         "no_report": "¿No tienes informe? Sube tu curva de equity",
         "advanced": "Opciones avanzadas",
         "advanced_note": "Todo tiene un valor por defecto",
-        "busy_title": "Auditando tu backtest",
+        "busy_title": "Auditando tu archivo",
         "busy_sub": "No cierres esta página.",
         "busy_steps": [
             "Leyendo el archivo",
@@ -677,7 +718,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Redactando el veredicto",
         ],
         "faq_eyebrow": "Preguntas",
-        "final_title": ("Antes de confiar en un robot,", "míralo con lupa."),
+        "final_title": ("Antes de arriesgar dinero en una estrategia,", "mírala con lupa."),
         "final_lead": "Sube el informe y recibe la clase, las gráficas y su explicación sin coste.",
         "footer_product": "Producto",
         "footer_legal": "Legal",
@@ -706,23 +747,24 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_faq": "FAQ",
         "nav_compare": "Compare",
         "nav_menu": "Menu",
-        "cta": "Audit my backtest",
+        "cta": "Start free",
         "cta_short": "Audit",
-        "hero_a": "Upload your backtest.",
-        "hero_b": "We tell you whether it is statistically real.",
+        "hero_a": "Upload your backtest or track record.",
+        "hero_b": "We tell you whether it is evidence or luck.",
         "trust": [
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
             ("globe", "Report in English or Spanish"),
-            ("key", "Secure payment, no account needed"),
+            ("key", "Free preview, no account needed"),
         ],
         "mock_url": "report · class B",
         "mock_k": "Verdict",
         "cta_sample": "See a sample report",
         "hero_lead": (
-            "Upload your MetaTrader, TradingView or Python report as it is. Get a verdict from "
-            "A to D on overfitting, costs, out-of-sample and data quality, with every number "
-            "labelled by its evidence."
+            "For traders in any market, robot buyers, prop-firm traders and anyone investing "
+            "with a manager. Upload the file you already have and get, in seconds, a verdict "
+            "from A to D on overfitting, costs, out-of-sample and data quality, with every "
+            "number labelled by its evidence."
         ),
         "mock_cap": "Illustration with synthetic data",
         "mock_is": "In sample",
@@ -824,8 +866,10 @@ _UI: dict[str, dict[str, Any]] = {
         "full_items": [
             "Every number in detail, no watermark",
             "Prop-firm challenge simulator",
-            "Resampled one-year risk",
-            "Questions to ask the robot's vendor",
+            "Resampled one-year risk and the capital it needs",
+            "Stress tests: the result without its best trades",
+            "The live account against its backtest",
+            "Questions to ask the robot's vendor or the manager",
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Public verification page with a badge",
         ],
@@ -846,7 +890,7 @@ _UI: dict[str, dict[str, Any]] = {
         "no_report": "No report? Upload your equity curve",
         "advanced": "Advanced options",
         "advanced_note": "Everything has a default",
-        "busy_title": "Auditing your backtest",
+        "busy_title": "Auditing your file",
         "busy_sub": "Keep this page open.",
         "busy_steps": [
             "Reading the file",
@@ -855,7 +899,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Writing the verdict",
         ],
         "faq_eyebrow": "Questions",
-        "final_title": ("Before you trust a robot,", "take a close look."),
+        "final_title": ("Before you put money on a strategy,", "take a close look."),
         "final_lead": "Upload the report and get the class, the charts and their explanation free.",
         "footer_product": "Product",
         "footer_legal": "Legal",
@@ -1186,6 +1230,142 @@ def _specs(locale: str) -> str:
         f"<div class='specs'>{specs}</div>"
         f"<div class='platforms' data-reveal><p>{_e(ui['platforms'])}</p><ul>{platforms}</ul></div>"
         "</div></section>"
+    )
+
+
+#: Who Rigor is for: each visitor finds their case, what they upload and what
+#: they get, before reading how the audit works.
+AUDIENCES: dict[str, dict[str, Any]] = {
+    "es": {
+        "eyebrow": "Para quién es",
+        "title": ("Un mismo rigor,", "sea cual sea tu mercado."),
+        "lead": (
+            "Forex, acciones, futuros o cripto; tu estrategia, un robot comprado, un reto o el "
+            "dinero que confías a otro. Busca tu caso."
+        ),
+        "upload": "Subes",
+        "get": "Recibes",
+        "items": [
+            (
+                "layers",
+                "Compras o usas un robot (EA)",
+                "El backtest del vendedor se ve perfecto y no sabes si es sobreajuste.",
+                "el informe del probador de MetaTrader 4 o 5 y, si lo tienes, el XML de "
+                "optimización.",
+                "si el resultado aguanta el número de intentos, costes más altos y quitarle sus "
+                "mejores operaciones, y qué preguntarle al vendedor.",
+                "mt5",
+            ),
+            (
+                "chart",
+                "Operas acciones, futuros, forex o cripto",
+                "No sabes si tu ventaja es real o si la encontraste a fuerza de probar.",
+                "la lista de operaciones de TradingView o NinjaTrader, el CSV de QuantConnect, "
+                "backtesting.py o vectorbt, o tu curva de equity.",
+                "significación, Sharpe deflactado, costes, si sigue funcionando en el periodo "
+                "reciente y qué capital pide.",
+                "tradingview",
+            ),
+            (
+                "target",
+                "Vas a pagar un reto de prop firm",
+                "Una mala racha puede tumbar la cuenta aunque la estrategia funcione.",
+                "tu backtest o tu historial y el reto que quieres simular.",
+                "con qué frecuencia tocarías la pérdida diaria o la total en {presets} retos de "
+                "FTMO, FundedNext, The5ers y Topstep, remuestreando tu propio historial.",
+                "",
+            ),
+            (
+                "eye",
+                "Inviertes con un gestor, una señal o un fondo",
+                "El porcentaje que te enseñan puede venir de depósitos, de pocos meses buenos o "
+                "de un backtest.",
+                "el historial de su cuenta (MetaTrader, Myfxbook, FX Blue o señal de MQL5) o su "
+                "serie de retornos mensuales en CSV.",
+                "el resultado separado de depósitos y retiros, si la cuenta se parece a su "
+                "backtest y si el historial es evidencia o suerte.",
+                "cuenta-proveedor",
+            ),
+        ],
+        "guide": "Qué archivo subir",
+        "start": "Empezar",
+    },
+    "en": {
+        "eyebrow": "Who it is for",
+        "title": ("The same rigour,", "whatever your market."),
+        "lead": (
+            "Forex, stocks, futures or crypto; your own strategy, a robot you bought, a "
+            "challenge or money you hand to someone else. Find your case."
+        ),
+        "upload": "You upload",
+        "get": "You get",
+        "items": [
+            (
+                "layers",
+                "You buy or run a robot (EA)",
+                "The vendor's backtest looks perfect and you cannot tell whether it is overfit.",
+                "the MetaTrader 4 or 5 tester report and, if you have it, the optimisation XML.",
+                "whether the result survives the number of trials, higher costs and losing its "
+                "best trades, and what to ask the vendor.",
+                "mt5",
+            ),
+            (
+                "chart",
+                "You trade stocks, futures, forex or crypto",
+                "You do not know whether your edge is real or you found it by trying enough.",
+                "the TradingView or NinjaTrader list of trades, the QuantConnect, backtesting.py "
+                "or vectorbt CSV, or your equity curve.",
+                "significance, deflated Sharpe, costs, whether it still works in the recent "
+                "period and how much capital it needs.",
+                "tradingview",
+            ),
+            (
+                "target",
+                "You are about to pay for a prop-firm challenge",
+                "One bad streak can end the account even when the strategy works.",
+                "your backtest or history and the challenge you want to simulate.",
+                "how often you would hit the daily or total loss limit in {presets} FTMO, "
+                "FundedNext, The5ers and Topstep challenges, resampling your own history.",
+                "",
+            ),
+            (
+                "eye",
+                "You invest with a manager, a signal or a fund",
+                "The percentage you are shown may come from deposits, a few good months or a "
+                "backtest.",
+                "their account history (MetaTrader, Myfxbook, FX Blue or an MQL5 signal) or "
+                "their monthly return series as CSV.",
+                "the result kept apart from deposits and withdrawals, whether the account looks "
+                "like its backtest and whether the history is evidence or luck.",
+                "cuenta-proveedor",
+            ),
+        ],
+        "guide": "Which file to upload",
+        "start": "Start",
+    },
+}
+
+
+def _audiences(locale: str) -> str:
+    words = AUDIENCES[locale]
+    cards = []
+    for i, (name, title, pain, upload, get, guide) in enumerate(words["items"]):
+        link = (
+            f"<a href='{_e(guide_url(guide, locale))}'>{_e(words['guide'])}</a>"
+            if guide
+            else f"<a href='#subir'>{_e(words['start'])}</a>"
+        )
+        cards.append(
+            f"<div class='card spot audience' data-reveal style='--i:{i % 2}'>"
+            f"<div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3><p>{_e(pain)}</p>"
+            f"<p><strong>{_e(words['upload'])}:</strong> {_e(upload)}</p>"
+            f"<p><strong>{_e(words['get'])}:</strong> "
+            f"{_e(get.format(presets=len(PRESETS)))}</p><p>{link}</p></div>"
+        )
+    return (
+        "<section class='section light' id='para-quien'><div class='wrap'>"
+        + _section_head(words["eyebrow"], _title_pair(words["title"]), words["lead"])
+        + f"<div class='cards cards-2'>{''.join(cards)}</div></div></section>"
     )
 
 
@@ -1633,6 +1813,7 @@ def landing(
     body = (
         _hero(locale, sample)
         + _specs(locale)
+        + _audiences(locale)
         + _problems(locale)
         + _dimensions(locale, copy)
         + _evidence(locale, copy)

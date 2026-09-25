@@ -174,7 +174,11 @@ LABELS: dict[str, dict[str, str]] = {
             "Cópialo tal como te llegó y vuelve a canjearlo."
         ),
         "code_error_contact": "Si sigue sin funcionar, escríbenos por el botón de arriba.",
-        "buy_code": "¿No tienes código? Pídelo aquí",
+        "buy_code": "¿No tienes código? Pídelo por WhatsApp",
+        "buy_code_how": (
+            "Te respondemos con los datos de pago y, al confirmarse, te enviamos el código. "
+            "Lo escribes aquí abajo y el informe se abre completo."
+        ),
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
         "unlock_nav": "Desbloquear",
@@ -728,7 +732,11 @@ LABELS: dict[str, dict[str, str]] = {
             "or has expired. Copy it exactly as you received it and redeem it again."
         ),
         "code_error_contact": "If it still does not work, message us with the button above.",
-        "buy_code": "No code yet? Ask for one here",
+        "buy_code": "No code yet? Ask for one on WhatsApp",
+        "buy_code_how": (
+            "We reply with the payment details and, once it is confirmed, send you the code. "
+            "Enter it below and the full report opens."
+        ),
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
         "unlock_nav": "Unlock",
@@ -3519,7 +3527,9 @@ def render_html(
                     + price_html
                     + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
-                    f"{_e(labels['buy_code'])}</a>{includes_html}</div>"
+                    f"{_e(labels['buy_code'])}</a>"
+                    f"<p class='muted pay-secure'>{_e(labels['buy_code_how'])}</p>"
+                    f"{includes_html}</div>"
                 )
         main_button = contact_url or checkout_url
         error_html, invalid = "", ""

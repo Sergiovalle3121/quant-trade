@@ -228,7 +228,7 @@ def test_an_upload_with_a_code_is_born_paid(tmp_path: Path) -> None:
     assert find_claims(preview.text) == []
     # A client without a working code is told where to buy one, and the price.
     buy = preview.text.split("<div class='paybox buy'>", 1)[1].split("</div></div>", 1)[0]
-    assert "<b>USD 49</b>" in buy and "¿No tienes código? Pídelo aquí" in buy
+    assert "<b>USD 49</b>" in buy and "¿No tienes código? Pídelo por WhatsApp" in buy
     # The way to buy comes before the field for a code already bought.
     assert preview.text.index("paybox buy") < preview.text.index("id='redeem-code'")
     assert "href='https://wa.me/000?text=" in preview.text
