@@ -850,6 +850,10 @@ with an empty value):
 1. Create a service from this repository. `railway.json` selects
    `Dockerfile.web` and the `/health` check; the container listens on
    `$PORT`.
+   Every merge redeploys, so `railway.json` also gives the old deployment
+   120 s between SIGTERM and SIGKILL (`drainingSeconds`; Railway's default
+   is 0) and the image `exec`s the server so it receives the SIGTERM: an
+   audit or a PDF in flight during a deploy finishes instead of failing.
 2. Storage: either add the Railway Postgres plugin and reference its
    variable from the service (`DATABASE_URL=${{Postgres.DATABASE_URL}}`), or
    mount a volume at `/data` and set `DATABASE_URL=sqlite:////data/audit.db`.

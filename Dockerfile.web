@@ -17,4 +17,6 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && mkdir -p /app/state/audit && chown -R quant:quant /app/state
 USER quant
 EXPOSE 8000
-CMD ["sh", "-c", "quant-trade audit serve --host 0.0.0.0 --port ${PORT:-8000}"]
+# exec: the server itself gets Railway's SIGTERM and finishes the audits and
+# PDFs in flight (railway.json drainingSeconds) instead of a shell ignoring it.
+CMD ["sh", "-c", "exec quant-trade audit serve --host 0.0.0.0 --port ${PORT:-8000}"]
