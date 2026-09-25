@@ -1222,7 +1222,10 @@ through the link URL and the webhook hears every Checkout on the Stripe
 account, so a cheaper link, another app's link on the same account or a
 single-report payment tagged as a pack unlocks nothing. Sessions the service
 creates carry `app=rigor` themselves; Payment Links must carry it in their
-metadata, in test and live mode alike. The pack's code is derived with HMAC from the session id
+metadata, in test and live mode alike. A buyer who pays in their own currency
+through Stripe's Adaptive Pricing still unlocks: since API 2025-03-31 the
+session stays in USD (the local amount is under `presentment_details`), and
+on older API versions the USD amount is read from `currency_conversion`. The pack's code is derived with HMAC from the session id
 and the webhook secret, so only its hash is stored and the paid report can
 still show it, with its credits left, to whoever holds the report token.
 Rotating the webhook secret hides earlier pack codes from their reports

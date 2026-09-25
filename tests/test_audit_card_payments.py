@@ -455,3 +455,32 @@ def test_a_single_report_price_never_grants_a_pack(tmp_path: Path) -> None:
     assert not store.get_audit(audit_id).paid and store.list_access_codes() == []
     assert fulfil(store, settings, _session(audit_id, plan=PLAN_PACK), at=NOW) == audit_id
     assert len(store.list_access_codes()) == 1
+
+
+def test_a_payment_in_the_buyers_currency_unlocks_by_its_usd_amount(tmp_path: Path) -> None:
+    """Adaptive Pricing: a buyer in Mexico pays in MXN for a USD price."""
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    presented = {"presentment_amount": 52900, "presentment_currency": "mxn"}
+    assert _webhook(client, _session(audit_id, presentment_details=presented)) == 200
+    assert "class='lockbox'" not in client.get(f"/audits/{audit_id}?token={token}").text
+
+    legacy_id, legacy_token = _upload(client)
+    converted = {"source_currency": "usd", "amount_total": 2900}
+    legacy = _session(
+        legacy_id,
+        sid="cs_legacy",
+        currency="mxn",
+        amount_total=52900,
+        currency_conversion=converted,
+    )
+    assert _webhook(client, legacy) == 200
+    assert "class='lockbox'" not in client.get(f"/audits/{legacy_id}?token={legacy_token}").text
+
+    short_id, short_token = _upload(client)
+    short = {**converted, "amount_total": 100}
+    cheap = _session(
+        short_id, sid="cs_short", currency="mxn", amount_total=52900, currency_conversion=short
+    )
+    assert _webhook(client, cheap) == 200
+    assert "class='lockbox'" in client.get(f"/audits/{short_id}?token={short_token}").text

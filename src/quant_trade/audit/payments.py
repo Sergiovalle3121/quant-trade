@@ -186,9 +186,15 @@ def paid_in_full(settings: AuditSettings, session: Mapping[str, Any], plan: str)
     metadata = session.get("metadata") or {}
     if metadata.get(APP_KEY) != APP_MARKER:
         return False
-    if str(session.get("currency") or "").lower() != CURRENCY:
+    # Since Stripe API 2025-03-31 a session paid in the buyer's own currency
+    # (Adaptive Pricing) still reads in USD, with the local amount under
+    # ``presentment_details``. Older API versions put the local currency on
+    # the session and the USD amount under ``currency_conversion``.
+    source = session.get("currency_conversion") or session
+    currency = source.get("source_currency") or source.get("currency")
+    if str(currency or "").lower() != CURRENCY:
         return False
-    amount = session.get("amount_total")
+    amount = source.get("amount_total")
     if isinstance(amount, bool) or not isinstance(amount, int):
         return False
     return amount >= plan_price_cents(settings, plan) > 0
