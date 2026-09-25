@@ -220,3 +220,18 @@ def test_zero_percent_tick_has_no_minus_sign() -> None:
     times, equity = _series(200)
     figure = charts.drawdown_chart(times, equity)
     assert ">0%<" in figure and ">-0%<" not in figure
+
+
+def test_a_narrow_range_never_repeats_an_axis_label() -> None:
+    # A 10k account that moved a few dollars used to read 10k, 10k, 10k.
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    times = [start + timedelta(days=i) for i in range(6)]
+    equity = [10000.0, 10012.0, 10006.0, 10030.0, 10041.0, 10025.0]
+    for svg in (
+        charts.equity_chart(times, equity, locale="es"),
+        charts.drawdown_chart(times, equity, locale="es"),
+    ):
+        labels = re.findall(r'text-anchor="end" font-size="11"[^>]*>([^<]*)<', svg)
+        assert len(labels) >= 3
+        assert len(set(labels)) == len(labels), labels
+    assert "10k" not in charts.equity_chart(times, equity, locale="es")

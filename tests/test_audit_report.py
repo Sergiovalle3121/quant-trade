@@ -101,3 +101,17 @@ def test_guard_refuses_an_injected_claim() -> None:
     result = _result()
     with pytest.raises(AuditReportError):
         guard_texts(result, "<p>this backtest is profitable</p>")
+
+
+def test_platform_fields_and_flag_severities_read_in_the_report_language() -> None:
+    from quant_trade.audit.report import platform_label
+
+    assert platform_label("declared_total_deals", "es") == "Transacciones totales"
+    assert platform_label("history_quality", "en") == "History quality"
+    assert platform_label("some_new_field", "es") == "Some new field"
+    inputs = build_inputs(csv_bytes(positive_drift(30)), DeclaredMetadata(trials=1))
+    result = run_audit(inputs, bootstrap_samples=100)
+    page = render_html(result, watermark=False, locale="es")
+    assert {flag["severity"] for flag in result.red_flags} == {"FAIL", "WARN"}
+    assert ">FAIL<" not in page and ">WARN<" not in page
+    assert "Grave" in page and "Aviso" in page

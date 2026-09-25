@@ -138,6 +138,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Esa dirección de correo no parece válida.",
         "en": "That e-mail address does not look valid.",
     },
+    "page_missing": {
+        "es": "Esta página no existe. Revisa la dirección o vuelve al inicio.",
+        "en": "This page does not exist. Check the address or go back to the home page.",
+    },
     "not_found": {
         "es": "No encontramos esa auditoría. Revisa que el enlace esté completo.",
         "en": "We could not find that audit. Check that the link is complete.",
@@ -312,6 +316,26 @@ class RedactSecretsFilter(logging.Filter):
             record.args = tuple(args)
         record.msg = redact_secrets(str(record.msg))
         return True
+
+
+def looks_like_platform_report(filename: str | None, data: bytes) -> bool:
+    """True for an HTML or XLSX platform report (not an equity CSV).
+
+    MetaTrader saves its HTML reports as UTF-16, so the head is decoded by
+    its byte-order mark before looking for the HTML tag.
+    """
+    name = (filename or "").lower()
+    if name.endswith((".htm", ".html", ".xlsx")):
+        return True
+    head = data[:4096]
+    if head.startswith(b"PK\x03\x04"):
+        return True
+    if head[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        text = head.decode("utf-16", errors="ignore")
+    else:
+        text = head.decode("utf-8", errors="ignore")
+    text = text.lstrip("\ufeff \r\n\t").lower()
+    return text.startswith(("<!doctype html", "<html")) or "<html" in text[:512]
 
 
 def uvicorn_log_config() -> dict[str, Any]:
@@ -707,10 +731,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _locale(value: str | None) -> str:
         return value if value in LOCALES else "es"
 
-    def _html_error(request: Request, status: int, message: str, locale: str) -> Response:
+    def _html_error(
+        request: Request, status: int, message: str, locale: str, *, kind: str = "audit"
+    ) -> Response:
         if _wants_json(request):
             return JSONResponse({"error": message}, status_code=status)
-        return HTMLResponse(error_page(message, locale=locale), status_code=status)
+        return HTMLResponse(error_page(message, locale=locale, kind=kind), status_code=status)
 
     def _not_found() -> HTTPException:
         return HTTPException(status_code=404, detail="not_found")
@@ -726,19 +752,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         logger.exception("unhandled error on %s %s", request.method, request.url.path)
         locale = _locale(request.query_params.get("lang"))
         return _secure(
-            _html_error(request, 500, message("server_error", locale), locale),
+            _html_error(request, 500, message("server_error", locale), locale, kind="server"),
             path=request.url.path,
         )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException) -> Response:
         # Route errors carry a MESSAGES key as detail; anything else (a
-        # FastAPI-generated 404 or 405) is shown as the generic not-found.
-        key = str(exc.detail) if str(exc.detail) in MESSAGES else "not_found"
+        # FastAPI-generated 404 or 405) is shown as a missing page.
+        key = str(exc.detail) if str(exc.detail) in MESSAGES else "page_missing"
         if exc.status_code == 400 and request.url.path.startswith("/webhooks/"):
             return JSONResponse({"error": str(exc.detail)}, status_code=400)
         locale = _locale(request.query_params.get("lang"))
-        return _html_error(request, exc.status_code, message(key, locale), locale)
+        kind = "page" if key == "page_missing" else "audit"
+        return _html_error(request, exc.status_code, message(key, locale), locale, kind=kind)
 
     async def _read_limited(upload: UploadFile | None, *, what: str) -> bytes | None:
         if upload is None or not upload.filename:
@@ -995,6 +1022,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         except (ValidationError, ValueError):
             return _html_error(request, 400, message("invalid_declared", loc), loc)
         report_filename = report.filename if report is not None and uploads["report"] else None
+        # A platform report dropped in the equity-curve field is read as the
+        # report, instead of failing as a malformed CSV.
+        equity_name = equity.filename if equity is not None else None
+        if (
+            uploads["equity"]
+            and not uploads["report"]
+            and looks_like_platform_report(equity_name, uploads["equity"])
+        ):
+            uploads["report"], uploads["equity"] = uploads["equity"], None
+            report_filename = equity_name
         report_name = report_digest_name(report_filename) if uploads["report"] else None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.

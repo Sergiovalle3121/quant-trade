@@ -26,7 +26,7 @@ _ID = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
 _TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 MAX_LINK_CHARS = 600
 
-COPY: dict[str, dict[str, str]] = {
+COPY: dict[str, dict[str, Any]] = {
     "es": {
         "eyebrow": "Comparar informes",
         "title": "Dos informes, lado a lado",
@@ -61,6 +61,12 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "from_report": "Comparar con otro informe tuyo",
         "from_report_help": "Pega el enlace de otro informe tuyo para verlos lado a lado.",
+        "shows_title": "Qué vas a ver",
+        "shows": (
+            ("La clase de cada informe", "A, B, C o D, una junto a la otra."),
+            ("Las dimensiones que cambiaron", "Qué pruebas cambiaron de resultado."),
+            ("Las cifras clave", "Cada cifra con su etiqueta de evidencia, lado a lado."),
+        ),
     },
     "en": {
         "eyebrow": "Compare reports",
@@ -94,11 +100,32 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "from_report": "Compare with another of your reports",
         "from_report_help": "Paste the link of another of your reports to see them side by side.",
+        "shows_title": "What you will see",
+        "shows": (
+            ("Each report's class", "A, B, C or D, next to each other."),
+            ("The dimensions that changed", "Which tests changed result from one to the other."),
+            ("The key figures", "Every figure with its evidence tag, side by side."),
+        ),
     },
 }
 
 COMPARE_CSS = (
     ".cmp-form{display:grid;gap:14px;max-width:720px}"
+    ".cmp-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;"
+    "align-items:start}"
+    ".cmp-grid .cmp-form{background:#fff;border:1px solid var(--border);border-radius:24px;"
+    "padding:clamp(22px,3vw,36px);box-shadow:0 30px 60px -40px rgba(0,0,0,.25)}"
+    ".cmp-aside h2{font-size:.72rem;font-family:var(--mono);text-transform:uppercase;"
+    "letter-spacing:.16em;color:var(--text-3);font-weight:500;margin:6px 0 18px}"
+    ".cmp-aside ol{list-style:none;margin:0;padding:0;counter-reset:s}"
+    ".cmp-aside li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:2px 12px;"
+    "padding:16px 0;border-top:1px solid var(--border)}"
+    ".cmp-aside li::before{content:counter(s,decimal-leading-zero);grid-row:span 2;"
+    "font-family:var(--mono);font-size:.78rem;color:var(--text-3);padding-top:2px}"
+    ".cmp-aside b{font-weight:600;letter-spacing:-.01em}"
+    ".cmp-aside span{color:var(--text-2);font-size:.9rem}"
+    ".cmp-aside p{font-size:.84rem;color:var(--text-3);margin:18px 0 0}"
+    "@media (max-width:860px){.cmp-grid{grid-template-columns:minmax(0,1fr)}}"
     ".cmp-head{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;"
     "margin:0 0 22px}"
     ".cmp-card{border:1px solid var(--border);border-radius:18px;padding:18px;display:flex;"
@@ -206,7 +233,7 @@ def compare_form(locale: str, *, link_a: str = "", error: str = "") -> str:
     copy = COPY[locale]
     action = "/comparar" if locale == "es" else "/compare"
     error_html = f"<div class='error'>{_e(error)}</div>" if error else ""
-    return (
+    form = (
         f"<form class='cmp-form' method='post' action='{action}'>{error_html}"
         f"<input type='hidden' name='lang' value='{locale}'>"
         f"<div class='field'><label for='link_a'>{_e(copy['link_a'])}</label>"
@@ -219,6 +246,12 @@ def compare_form(locale: str, *, link_a: str = "", error: str = "") -> str:
         f"<div><button class='btn btn-primary' type='submit'>{_e(copy['submit'])}</button></div>"
         "</form>"
     )
+    shows = "".join(f"<li><b>{_e(k)}</b><span>{_e(v)}</span></li>" for k, v in copy["shows"])
+    aside = (
+        f"<aside class='cmp-aside'><h2>{_e(copy['shows_title'])}</h2><ol>{shows}</ol>"
+        f"<p>{_e(copy['note'])}</p></aside>"
+    )
+    return f"<div class='cmp-grid'>{form}{aside}</div>"
 
 
 def guard_page(page: str) -> str:

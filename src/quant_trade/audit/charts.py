@@ -296,6 +296,26 @@ def _fmt_percent(value: float, digits: int = 0) -> str:
     return text[1:] if text.startswith("-") and not text.strip("-0.%") else text
 
 
+def _distinct_labels(values: Sequence[float], fmt: Any) -> list[str]:
+    """Labels for ``values`` with just enough precision to tell them apart.
+
+    The short form (10k, 0%) is kept when it already separates every value;
+    a narrow range (10,020 to 10,080) falls back to full numbers or more
+    decimals, so an axis never shows the same label twice.
+    """
+    labels = [fmt(v) for v in values]
+    if len(set(labels)) == len(set(values)):
+        return labels
+    scale = 100.0 if fmt is _fmt_percent else 1.0
+    for digits in (0, 1, 2, 3):
+        # The fewest decimals that write every value exactly (ticks are round).
+        if all(abs(round(v * scale, digits) - v * scale) < 1e-9 for v in values):
+            break
+    if fmt is _fmt_percent:
+        return [_fmt_percent(v, digits) for v in values]
+    return [f"{v:,.{digits}f}" for v in values]
+
+
 def _fmt_signed_percent(value: float) -> str:
     return f"{value * 100:+.1f}%"
 
@@ -326,13 +346,13 @@ def _path(points: Sequence[tuple[float, float]]) -> str:
 
 def _y_axis(frame: _Frame, ticks: Sequence[float], fmt: Any) -> str:
     parts = []
-    for tick in ticks:
+    for tick, label in zip(ticks, _distinct_labels(ticks, fmt), strict=True):
         y = frame.y(tick)
         parts.append(
             f'<line x1="{frame.left}" x2="{frame.right}" y1="{y:.1f}" y2="{y:.1f}" '
             f'stroke="{GRID}" stroke-width="1"/>'
             f'<text x="{frame.left - 6}" y="{y + 4:.1f}" text-anchor="end" '
-            f'font-size="11" fill="{INK_SECONDARY}">{_e(fmt(tick))}</text>'
+            f'font-size="11" fill="{INK_SECONDARY}">{_e(label)}</text>'
         )
     return "".join(parts)
 
@@ -425,9 +445,10 @@ def equity_chart(
         + f'<path d="{line}" fill="none" stroke="{SERIES}" stroke-width="2" '
         'stroke-linejoin="round" stroke-linecap="round"/>'
     )
+    low, high = _distinct_labels([min(values), max(values)], _fmt_number)
     caption = (
         f"{texts['equity_title']}: {len(values):,} {texts['points']}, "
-        f"{texts['min']} {_fmt_number(min(values))}, {texts['max']} {_fmt_number(max(values))}."
+        f"{texts['min']} {low}, {texts['max']} {high}."
     )
     if note:
         caption += f" {note}"

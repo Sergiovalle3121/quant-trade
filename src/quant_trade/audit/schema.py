@@ -271,7 +271,12 @@ def _read_csv(data: bytes, *, what: str) -> pd.DataFrame:
     except (pd.errors.ParserError, pd.errors.EmptyDataError, ValueError) as exc:
         raise ParseError(
             f"the {what} file could not be read as CSV: {exc}",
-            message_es=f"El archivo {_file_es(what)} no se pudo leer como CSV: {exc}",
+            # The parser's own words are English; the Spanish message says
+            # what to check instead of repeating them.
+            message_es=(
+                f"El archivo {_file_es(what)} no se pudo leer como CSV: revisa que tenga una "
+                "fila de encabezado y el mismo número de columnas en cada fila."
+            ),
             code="not_csv",
         ) from exc
     if len(frame) > MAX_ROWS:
