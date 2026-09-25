@@ -46,3 +46,29 @@ def test_landing_names_no_payment_method_it_cannot_show() -> None:
         assert "Pago seguro" not in page and "Secure payment" not in page
     # With cards on, the Stripe line appears.
     assert "Stripe" in _paid_landing("es", card_payments=True)
+
+
+def test_landing_names_the_recognised_formats_under_the_platform_strip() -> None:
+    from quant_trade.audit.audiences import PLATFORMS_EN, PLATFORMS_ES
+
+    for locale, names, words in (
+        ("es", PLATFORMS_ES, "Y reconoce el formato de exportación de"),
+        ("en", PLATFORMS_EN, "It also recognises the export format of"),
+    ):
+        page = _paid_landing(locale, card_payments=False)
+        also = page.split("class='platforms-also'", 1)[1].split("</p>", 1)[0]
+        assert words in also
+        assert names.replace("&", "&amp;") in also
+        assert "csv" in also
+        assert find_claims(also) == []
+
+
+def test_paid_price_card_explains_the_flow_and_lists_fund_checks() -> None:
+    for locale, cta, fund in (
+        ("es", "Empieza con la vista previa gratis", "Para fondos: calendario año por mes"),
+        ("en", "Start with the free preview", "For funds: year-by-month calendar"),
+    ):
+        page = _paid_landing(locale, card_payments=False)
+        pricing = page.split("id='pricing'", 1)[1]
+        assert cta in pricing and fund in pricing
+        assert find_claims(pricing) == []
