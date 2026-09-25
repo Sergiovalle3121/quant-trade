@@ -660,6 +660,7 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "TEST_DATA_QUALITY_LOW": "modelling",
     "REPORT_HEADER_MISMATCH": "original_file",
     "ISOLATED_OPTIMUM": "out_of_sample",
+    "FORWARD_NOT_HELD": "out_of_sample",
     "MAD_SPIKES": "data_quality",
     "STALE_MARKS": "data_quality",
     "LARGE_GAPS": "data_quality",

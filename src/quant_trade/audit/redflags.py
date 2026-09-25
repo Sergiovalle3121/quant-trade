@@ -368,6 +368,9 @@ CONCENTRATION_WARN: dict[int, float] = {1: 0.33, 2: 0.50, 3: 0.65, 5: 0.80}
 #: losses are removed, to fail or to warn. A big winner cancelled by a big
 #: loser leaves the net to the other trades and is not concentration.
 CONCENTRATION_FAIL_DEPENDENCE = 0.80
+#: Under CONCENTRATION_FAIL_MIN_TRADES a single trade fails only at this share
+#: of the gains and of the net result (10 trades, one of them nearly everything).
+CONCENTRATION_SHORT_FAIL = 0.90
 CONCENTRATION_WARN_DEPENDENCE = 0.50
 #: Largest loss (or adverse excursion) over the mean loss.
 NO_STOP_LOSS_MULTIPLE = 8.0
@@ -596,7 +599,8 @@ def _concentration(pnl: list[float], fees: list[float] | None) -> list[RedFlag]:
     not). A history whose result rests on a few trades says little about the
     rest of the system, and one outsized trade is also what a data error
     looks like. Fees stay with every trade. Under
-    ``CONCENTRATION_FAIL_MIN_TRADES`` trades it only warns."""
+    ``CONCENTRATION_FAIL_MIN_TRADES`` trades it fails only when one trade
+    carries ``CONCENTRATION_SHORT_FAIL`` of the gains and of the net result."""
     n = len(pnl)
     costs = fees if fees is not None and len(fees) == n else [0.0] * n
     net = [value - cost for value, cost in zip(pnl, costs, strict=True)]
@@ -612,12 +616,15 @@ def _concentration(pnl: list[float], fees: list[float] | None) -> list[RedFlag]:
         keep = (total - sum(wins[:k]) - sum(losses[:k])) / total
         fail = CONCENTRATION_FAIL.get(k)
         warn = CONCENTRATION_WARN.get(k)
+        short_fail = (
+            k == 1 and share >= CONCENTRATION_SHORT_FAIL and 1 - keep >= CONCENTRATION_SHORT_FAIL
+        )
         if (
             fail is not None
             and n >= CONCENTRATION_FAIL_MIN_TRADES
             and share >= fail
             and 1 - keep >= CONCENTRATION_FAIL_DEPENDENCE
-        ):
+        ) or short_fail:
             found = ("FAIL", k, share, keep)
             break
         if (
@@ -798,6 +805,10 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
     "ISOLATED_OPTIMUM": {
         "es": "Parámetros en un pico aislado",
         "en": "Settings on a lone peak",
+    },
+    "FORWARD_NOT_HELD": {
+        "es": "La optimización no aguanta en el periodo forward",
+        "en": "The optimisation does not hold in the forward period",
     },
     "REPORT_HEADER_MISMATCH": {
         "es": "El encabezado del informe no cuadra",
