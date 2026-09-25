@@ -51,9 +51,30 @@ NOT_FORWARD = (
 )
 
 
+UNNAMED_FORWARD = (
+    "the optimisation file has two result columns before Profit, as a forward export does, "
+    "but they are not named Forward Result and Back Result; export it again from a terminal "
+    "set to English"
+)
+
+
 def is_forward(table: Sequence[dict[str, float]]) -> bool:
     """True when every row carries both the back and the forward criterion."""
     return bool(table) and all(BACK in row and FORWARD in row for row in table)
+
+
+def unnamed_forward(table: Sequence[dict[str, float]]) -> bool:
+    """A forward export whose result columns carry names the audit does not know.
+
+    A plain export reads Pass, Result, Profit; a forward export Pass, Forward
+    Result, Back Result, Profit. Two unknown columns between Pass and Profit
+    (a terminal in another language, say) must not be read as a plain export:
+    its Profit column would be the forward period's.
+    """
+    if not table or is_forward(table):
+        return False
+    names = list(table[0])
+    return len(names) > 3 and names[0] == "Pass" and names[3] == PROFIT and "Result" not in names
 
 
 def _parse_inputs(raw: str | None) -> dict[str, float]:
@@ -78,6 +99,8 @@ def forward_review(
     """Back against forward results of an MT5 forward optimisation export."""
     if not table:
         return {"status": "NOT_MEASURED", "reason": "no optimisation file uploaded"}, []
+    if unnamed_forward(table):
+        return {"status": "NOT_MEASURED", "reason": UNNAMED_FORWARD}, []
     if not is_forward(table):
         return {"status": "NOT_MEASURED", "reason": NOT_FORWARD}, []
     rows = [row for row in table if math.isfinite(row[BACK]) and math.isfinite(row[FORWARD])]
@@ -182,4 +205,12 @@ def forward_review(
     return review, flags
 
 
-__all__ = ["BACK", "FORWARD", "MIN_PASSES", "forward_review", "is_forward"]
+__all__ = [
+    "BACK",
+    "FORWARD",
+    "MIN_PASSES",
+    "UNNAMED_FORWARD",
+    "forward_review",
+    "is_forward",
+    "unnamed_forward",
+]

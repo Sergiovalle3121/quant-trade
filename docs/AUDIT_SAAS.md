@@ -539,6 +539,13 @@ report's inputs lands in the forward period.
 |---|---|---|
 | `FORWARD_NOT_HELD` | ≥ 20 passes and a rank correlation ≤ 0, or the best backtest passes end the forward period with a profit less than half the time and no more often than all passes | — |
 
+The columns are matched by their English names. A file with two unknown
+columns between Pass and Profit (the forward layout, from a terminal in
+another language, for example) is not read as a plain export: both this
+section and the plateau section say NOT_MEASURED and ask for an export from a
+terminal set to English, because its Profit column would be the forward
+period's.
+
 Limitations: one forward window, chosen by whoever ran the optimisation;
 the criterion is compared by rank, so a custom criterion works too; a
 genetic optimisation lists only the passes it evaluated.

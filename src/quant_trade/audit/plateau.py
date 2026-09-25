@@ -32,6 +32,7 @@ import statistics
 from collections.abc import Sequence
 from typing import Any
 
+from quant_trade.audit.forward import UNNAMED_FORWARD, unnamed_forward
 from quant_trade.audit.redflags import RedFlag
 from quant_trade.audit.schema import measured, not_measured
 
@@ -92,6 +93,8 @@ def parameter_stability(
         return {"status": "NOT_MEASURED", "reason": "no optimisation file uploaded"}, []
     if all("Forward Result" in row and "Back Result" in row for row in table):
         return {"status": "NOT_MEASURED", "reason": FORWARD_EXPORT}, []
+    if unnamed_forward(table):
+        return {"status": "NOT_MEASURED", "reason": UNNAMED_FORWARD}, []
     metric = _metric(table)
     varied = [name for name in parameters if len({row.get(name) for row in table} - {None}) >= 2]
     if metric is None and len(table) >= MIN_PASSES:

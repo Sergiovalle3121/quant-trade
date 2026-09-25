@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from quant_trade.audit.engine import run_audit
-from quant_trade.audit.forward import forward_review, is_forward
+from quant_trade.audit.forward import UNNAMED_FORWARD, forward_review, is_forward, unnamed_forward
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import parse_optimization
@@ -45,8 +45,8 @@ def _back(fast: int, slow: int) -> float:
     return 1000.0 - 20 * abs(fast - 12) - 5 * abs(slow - 48)
 
 
-def _export(forward: Callable[[int, int], float]) -> bytes:
-    rows = ["<Row>" + "".join(_cell(name) for name in HEADER) + "</Row>"]
+def _export(forward: Callable[[int, int], float], header: list[str] = HEADER) -> bytes:
+    rows = ["<Row>" + "".join(_cell(name) for name in header) + "</Row>"]
     number = 0
     for fast in FAST:
         for slow in SLOW:
@@ -127,6 +127,22 @@ def test_plateau_leaves_a_forward_export_alone() -> None:
     review, flags = parameter_stability(summary.table, summary.parameters, report_inputs=None)
     assert review["status"] == "NOT_MEASURED" and flags == []
     assert "forward export" in review["reason"]
+
+
+def test_forward_columns_with_other_names_are_not_read_as_a_plain_export() -> None:
+    header = ["Pass", "Resultado forward", "Resultado back", *HEADER[3:]]
+    summary = parse_optimization(_export(_lost, header))
+    assert not is_forward(summary.table) and unnamed_forward(summary.table)
+    for check in (forward_review, parameter_stability):
+        review, flags = check(summary.table, summary.parameters, report_inputs="FastMA=12")
+        assert review["status"] == "NOT_MEASURED" and flags == []
+        assert review["reason"] == UNNAMED_FORWARD
+
+
+def test_a_plain_export_is_not_taken_for_an_unnamed_forward_one() -> None:
+    header = ["Pass", "Result", *HEADER[3:]]
+    summary = parse_optimization(_export(_held, header))
+    assert not unnamed_forward(summary.table)
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])

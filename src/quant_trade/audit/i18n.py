@@ -631,6 +631,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "correlación de rangos entre los resultados del backtest y del forward {r}",
     ),
     (
+        "the optimisation file has two result columns before Profit, as a forward export does, "
+        "but they are not named Forward Result and Back Result; export it again from a terminal "
+        "set to English",
+        "el archivo de optimización tiene dos columnas de resultado antes de Profit, como una "
+        "exportación forward, pero no se llaman Forward Result y Back Result; vuelve a "
+        "exportarlo desde una terminal en inglés",
+    ),
+    (
         "the optimisation file is not a forward export (no Forward Result and Back Result columns)",
         "el archivo de optimización no es una exportación forward (no tiene las columnas "
         "Forward Result y Back Result)",
