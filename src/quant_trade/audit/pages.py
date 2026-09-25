@@ -1941,6 +1941,34 @@ def compare_page(content: str, *, locale: str = "es") -> str:
     return _page(copy["title"], locale, body, switch_href=other_path, solid_nav=True)
 
 
+def check_page(content: str, *, locale: str = "es", base_url: str = "") -> str:
+    """The page that checks a report file (``audit/check.py`` builds ``content``)."""
+    from quant_trade.audit.check import CHECK_CSS, COPY, check_path
+
+    locale = _locale(locale)
+    copy = COPY[locale]
+    other = "en" if locale == "es" else "es"
+    body = (
+        _page_hero(copy["eyebrow"], copy["title"], copy["lead"])
+        + f"<div class='paper page-main'><div class='wrap'><style>{CHECK_CSS}</style>"
+        + content
+        + "</div></div>"
+    )
+    meta = (
+        _public_meta(copy["title"], copy["lead"], locale, check_path(locale), base_url)
+        if base_url
+        else ""
+    )
+    return _page(
+        copy["title"],
+        locale,
+        body,
+        meta_html=meta,
+        switch_href=check_path(other),
+        solid_nav=True,
+    )
+
+
 _ERROR_TITLES = {
     "es": {"page": "Página no encontrada", "server": "Algo falló"},
     "en": {"page": "Page not found", "server": "Something went wrong"},
