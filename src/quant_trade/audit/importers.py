@@ -2936,6 +2936,11 @@ def _balance_curve(
     return text.encode("utf-8"), initial, warnings
 
 
+def _size_text(size: float) -> str:
+    """A contract size as a reader writes it: 5,000,000 or 0.1, never 5e+06."""
+    return f"{size:,.0f}" if abs(size) >= 100 else f"{size:,.4g}"
+
+
 def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     if not draft.trips:
         raise ReportFormatError(
@@ -2957,7 +2962,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         {(trip.symbol, sizes[trip.symbol]) for trip in trips if abs(sizes[trip.symbol] - 1) > 0.005}
     )
     if unusual:
-        listed = ", ".join(f"{symbol or 'all'} x{size:g}" for symbol, size in unusual)
+        listed = ", ".join(f"{symbol or 'all'} x{_size_text(size)}" for symbol, size in unusual)
         warnings.append(f"{CONTRACT_SIZE_WARNING}: {listed}")
     trades: list[Trade] = []
     sides: list[str] = []

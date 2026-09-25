@@ -530,6 +530,11 @@ def simulate_challenge(
 # Questions for the vendor of a trading robot
 # ---------------------------------------------------------------------------
 
+#: The shortest live record the vendor is asked for.
+LIVE_RECORD_MIN_MONTHS = 6
+#: Past this, "at least N months" reads as an unfair ask; the question says what it takes.
+LIVE_RECORD_ASK_MONTHS = 24
+
 _QUESTIONS: dict[str, dict[str, str]] = {
     # Asked instead of the backtest questions when the upload is an account history.
     "other_accounts": {
@@ -549,6 +554,14 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "con el mismo robot y la misma configuración?",
         "en": "Is there a live or demo account with at least {months} months of auditable "
         "history, with the same robot and settings?",
+    },
+    "live_record_long": {
+        "es": "¿Hay una cuenta real o demo con historial auditable del mismo robot y la misma "
+        "configuración? Con un Sharpe como este harían falta unos {months} meses para "
+        "distinguirlo del azar: cuanto más largo el historial, mejor.",
+        "en": "Is there a live or demo account with auditable history, with the same robot and "
+        "settings? With a Sharpe like this one it would take about {months} months to tell it "
+        "apart from chance: the longer the history, the better.",
     },
     "modelling": {
         "es": "¿Con qué modo de modelado y calidad de históricos se hizo el backtest "
@@ -654,7 +667,7 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "TRIALS_BELOW_VARIANTS": "trials",
 }
 
-_QUESTION_ORDER: tuple[str, ...] = tuple(_QUESTIONS)
+_QUESTION_ORDER: tuple[str, ...] = tuple(k for k in _QUESTIONS if k != "live_record_long")
 #: Questions about how a backtest was made; they do not apply to an account.
 _BACKTEST_ONLY: frozenset[str] = frozenset({"modelling", "trials", "out_of_sample", "costs"})
 
@@ -698,13 +711,16 @@ def vendor_questions(
         wanted.add("equity_curve")
     if not has_trades:
         wanted.add("trades")
-    months = 6
+    months = LIVE_RECORD_MIN_MONTHS
     if min_track_record_months is not None and math.isfinite(min_track_record_months):
-        months = max(6, int(math.ceil(min_track_record_months)))
+        months = max(LIVE_RECORD_MIN_MONTHS, int(math.ceil(min_track_record_months)))
     out: list[dict[str, str]] = []
     for key in _QUESTION_ORDER:
         if key in wanted:
             text = _QUESTIONS[key]
+            if key == "live_record" and months > LIVE_RECORD_ASK_MONTHS:
+                # Years of live history is not a fair ask: say what it would take instead.
+                text = _QUESTIONS["live_record_long"]
             out.append(
                 {
                     "code": key,

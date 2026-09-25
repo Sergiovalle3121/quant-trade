@@ -368,3 +368,30 @@ def test_vendor_questions_follow_flags_and_missing_inputs() -> None:
     assert [q["code"] for q in flagged] == ["live_record", "modelling", "trials", "martingale"]
     assert "18" in flagged[0]["en"]
     assert all(q["es"] and q["en"] for q in flagged)
+
+
+def test_a_long_track_record_is_not_asked_as_a_minimum() -> None:
+    questions = analytics.vendor_questions(
+        [],
+        has_trades=True,
+        trials_measured=True,
+        has_out_of_sample=True,
+        has_costs=True,
+        balance_only=False,
+        min_track_record_months=123.4,
+    )
+    first = questions[0]
+    assert first["code"] == "live_record"
+    assert "al menos" not in first["es"]
+    assert "124 meses" in first["es"] and "124 months" in first["en"]
+    assert not any(q["code"] == "live_record_long" for q in questions)
+    short = analytics.vendor_questions(
+        [],
+        has_trades=True,
+        trials_measured=True,
+        has_out_of_sample=True,
+        has_costs=True,
+        balance_only=False,
+        min_track_record_months=18,
+    )
+    assert "al menos 18 meses" in short[0]["es"]
