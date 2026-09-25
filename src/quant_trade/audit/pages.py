@@ -126,8 +126,9 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
-            "El historial de la cuenta donde corre el robot (MetaTrader, TradingView u otro de "
-            "los formatos de arriba). Te decimos si se comporta como el backtest."
+            "El historial de la cuenta donde corre el robot (MetaTrader, el CSV que exporta "
+            "Myfxbook, FX Blue o una señal de MQL5, u otro de los formatos de arriba). Te "
+            "decimos si se comporta como el backtest y revisamos sus depósitos y retiros."
         ),
         "optimization": "Exportación de optimización de MT5 (XML, opcional)",
         "optimization_help": (
@@ -238,8 +239,9 @@ _COPY: dict[str, dict[str, Any]] = {
             (
                 "¿Qué archivo subo?",
                 "El informe de tu plataforma tal cual: MetaTrader 5 o 4 (HTML), TradingView "
-                "(CSV o XLSX), NinjaTrader, QuantConnect, backtesting.py o vectorbt. También "
-                "sirve una curva de equity en CSV.",
+                "(CSV o XLSX), NinjaTrader, QuantConnect, backtesting.py o vectorbt. Para "
+                "revisar la cuenta de otro trader, el historial en CSV que exporta Myfxbook, "
+                "FX Blue o una señal de MQL5. También sirve una curva de equity en CSV.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -333,8 +335,9 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
-            "The history of the account running the robot (MetaTrader, TradingView or any "
-            "format above). We tell you whether it behaves like the backtest."
+            "The history of the account running the robot (MetaTrader, the CSV exported by "
+            "Myfxbook, FX Blue or an MQL5 signal, or any format above). We tell you whether "
+            "it behaves like the backtest and review its deposits and withdrawals."
         ),
         "optimization": "MT5 optimisation export (XML, optional)",
         "optimization_help": (
@@ -442,8 +445,9 @@ _COPY: dict[str, dict[str, Any]] = {
             (
                 "Which file do I upload?",
                 "Your platform report as it is: MetaTrader 5 or 4 (HTML), TradingView (CSV or "
-                "XLSX), NinjaTrader, QuantConnect, backtesting.py or vectorbt. An equity curve "
-                "in CSV works too.",
+                "XLSX), NinjaTrader, QuantConnect, backtesting.py or vectorbt. To review another "
+                "trader's account, the CSV history exported by Myfxbook, FX Blue or an MQL5 "
+                "signal. An equity curve in CSV works too.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -865,6 +869,9 @@ PLATFORMS: tuple[str, ...] = (
     "QuantConnect",
     "backtesting.py",
     "vectorbt",
+    "Myfxbook",
+    "FX Blue",
+    "MQL5 Signals",
     "CSV",
 )
 
