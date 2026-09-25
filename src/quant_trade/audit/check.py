@@ -47,11 +47,12 @@ COPY: dict[str, dict[str, Any]] = {
         "found_no_class": "Es idéntico, byte a byte, al {kind} que Rigor generó el {date}.",
         "sample": "Es el informe de ejemplo de Rigor, sin cambios.",
         "public": "Ver su página pública",
-        "missing_title": "Rigor no generó este archivo",
+        "missing_title": "Rigor no tiene registro de este archivo",
         "missing": (
-            "No coincide con ningún archivo que Rigor haya entregado: puede haberse editado "
-            "después o venir de otro sitio. Pide al vendedor el enlace a su página pública en "
-            "Rigor, o el archivo tal como lo descargó."
+            "No coincide con ningún archivo que Rigor tenga registrado. Puede haberse editado, "
+            "venir de otro sitio o ser anterior al 25 de septiembre de 2026, cuando Rigor "
+            "empezó a registrar los informes que entrega. Pide al vendedor el enlace a su "
+            "página pública en Rigor, o que descargue el informe de nuevo y te lo envíe."
         ),
         "scope": (
             "Esto solo dice si el archivo cambió desde que Rigor lo generó. No dice nada sobre "
@@ -95,11 +96,12 @@ COPY: dict[str, dict[str, Any]] = {
         "found_no_class": "It is identical, byte for byte, to the {kind} Rigor produced on {date}.",
         "sample": "It is Rigor's sample report, unchanged.",
         "public": "See its public page",
-        "missing_title": "Rigor did not produce this file",
+        "missing_title": "Rigor has no record of this file",
         "missing": (
-            "It matches no file Rigor has handed out: it may have been edited afterwards or "
-            "come from elsewhere. Ask the seller for the link to its public page on Rigor, or "
-            "for the file as they downloaded it."
+            "It matches no file Rigor has on record. It may have been edited, come from "
+            "elsewhere, or predate 25 September 2026, when Rigor started recording the "
+            "reports it hands out. Ask the seller for the link to its public page on Rigor, "
+            "or to download the report again and send it to you."
         ),
         "scope": (
             "This only says whether the file changed since Rigor produced it. It says nothing "

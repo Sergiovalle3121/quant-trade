@@ -1362,8 +1362,9 @@ On `/comprobar` (Spanish) and `/check` (English) anyone uploads the file
 they were given: the server hashes it as it streams in (up to 20 MB,
 60 checks per address and hour), discards it, and says either that those
 exact bytes came from Rigor on that date for a report of that class (with
-the link to its public page when the owner published one), or that Rigor did
-not produce them. The wording says only whether the file changed since Rigor
+the link to its public page when the owner published one), or that Rigor has no
+record of them (edited, from elsewhere, or issued before 25 September 2026,
+when recording started; the page never says Rigor did not produce them). The wording says only whether the file changed since Rigor
 produced it, never anything about the strategy, and passes the guard.
 
 A hash, not a digital signature, was chosen on purpose: it needs no key to

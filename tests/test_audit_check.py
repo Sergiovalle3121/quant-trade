@@ -52,9 +52,9 @@ def test_one_changed_byte_is_not_recognised(tmp_path: Path) -> None:
     edited = content.replace(b'"account"', b'"accounT"', 1)
     assert edited != content
     response = _check(client, edited)
-    assert "Rigor no generó este archivo" in response.text
+    assert "Rigor no tiene registro de este archivo" in response.text
     english = _check(client, edited, "/check")
-    assert "Rigor did not produce this file" in english.text
+    assert "Rigor has no record of this file" in english.text
 
 
 def test_a_downloaded_pdf_is_recognised(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,7 +83,7 @@ def test_a_deleted_audit_is_no_longer_recognised(tmp_path: Path) -> None:
     audit_id, query = _upload(client)
     content = client.get(f"/audits/{audit_id}.json?{query}").content
     assert store.delete_audit(audit_id)  # type: ignore[attr-defined]
-    assert "Rigor no generó este archivo" in _check(client, content).text
+    assert "Rigor no tiene registro de este archivo" in _check(client, content).text
 
 
 def test_the_checked_file_is_not_kept(tmp_path: Path) -> None:
@@ -157,3 +157,16 @@ def test_recording_is_idempotent_and_never_blocks_a_download(
 
     monkeypatch.setattr(store, "record_issued", broken)
     assert client.get(f"/audits/{audit_id}.json?{query}").status_code == 200
+
+
+def test_a_purged_audit_keeps_its_file_hashes(tmp_path: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    client, store = _client(tmp_path)
+    audit_id, query = _upload(client)
+    content = client.get(f"/audits/{audit_id}.json?{query}").content
+    later = datetime.now(UTC) + timedelta(days=400)
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(store.audits.update().values(paid=False))  # type: ignore[attr-defined]
+    assert store.purge_expired(later, retention_days=30) == 1  # type: ignore[attr-defined]
+    assert "Este archivo no se editó" in _check(client, content).text
