@@ -163,4 +163,4 @@ def test_stress_tables_mark_scenarios_that_fall_to_zero_or_below() -> None:
         for row in block.get("rows", [])
         if row["result"]["value"] <= 0
     )
-    assert page.count("<td class='val neg'>") == below
+    assert page.count("<td class='val neg' data-l=") == below
