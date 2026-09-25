@@ -20,7 +20,7 @@ def test_the_live_account_shows_under_the_verdict() -> None:
     hero = page[: page.index("<nav class='report-toc")]
     assert "Cuenta real: En el borde." in hero
     assert "Resultado de operar: -305.20 sobre 1,500.00 depositados." in hero
-    assert "href='#r-d3'" in hero
+    assert "href='#r-d2'" in hero
     assert "Live account: At the edge." in _page("en")
 
 
@@ -223,3 +223,28 @@ def test_trader_terms_in_the_tiles_carry_a_plain_line() -> None:
         assert_report_clean(
             " ".join(v for k, v in LABELS[locale].items() if k.startswith("kpi_hint_"))
         )
+
+
+def test_the_verdict_sentence_speaks_plainly() -> None:
+    from quant_trade.audit.guard import assert_report_clean
+    from quant_trade.audit.verdict import _TEXT
+
+    page = _page("es")
+    assert "El resultado es demasiado constante para explicarse solo por azar" in page
+    assert "no con 3 veces ese coste" in page
+    assert "En el periodo apartado para comprobar (fuera de muestra)" in page
+    assert "estadísticamente distinguible" not in page and "se degrada" not in page
+    assert "too consistent to be explained by chance alone" in _page("en")
+    for locale in ("es", "en"):
+        assert_report_clean(" ".join(_TEXT[locale].values()))
+
+
+def test_dimension_reasons_open_the_technical_tables() -> None:
+    page = _page("es")
+    reasons = page.index("Detalle técnico de cada dimensión</h2>")
+    # After the findings a buyer reads, right before the technical tables.
+    assert page.index("Preguntas para hacerle al vendedor</h2>") < reasons
+    assert reasons < page.index("Rendimiento anualizado</h2>")
+    assert "Número de configuraciones probadas" in page
+    assert "Número de intentos (Sharpe deflactado)" not in page
+    assert "Technical detail by dimension" in _page("en")

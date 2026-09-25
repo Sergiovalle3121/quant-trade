@@ -799,6 +799,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     waitlist_attempts = AttemptLog()
     panel_failures = AttemptLog()
     check_attempts = AttemptLog()
+    card_lookups = AttemptLog()
+    failed_card_sessions = AttemptLog()
     app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
     # Waiting for a slot happens in the event loop (an await, not a blocked
     # thread), so a queue of uploads never starves the pages that share the
@@ -2028,7 +2030,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         notice = None
         if session_id and cfg.stripe_enabled:
             if not record.paid:
-                record = _confirm_card_payment(record, session_id)
+                record = _confirm_card_payment(record, session_id, request)
             notice = message("card_paid" if record.paid else "card_pending", locale)
         elif pay == "done" and cfg.links_enabled:
             # Back from a Payment Link: the webhook unlocks, this page only reports.
@@ -2147,25 +2149,44 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         done = "credit" if applied else "nocredit"
         return RedirectResponse(f"{back}&lang={locale}&acct={done}", status_code=303)
 
-    def _confirm_card_payment(record: Any, session_id: str) -> Any:
+    def _confirm_card_payment(record: Any, session_id: str, request: Request) -> Any:
         """Back from Stripe: ask Stripe about that session and unlock what it paid.
 
         Only a session Stripe reports as paid, for this very audit, unlocks
         anything; a Stripe outage leaves the page locked and the webhook
-        finishes the job.
+        finishes the job. Lookups are limited per address and per audit, and
+        a session that did not unlock is not asked again within the hour, so
+        a script looping the return URL cannot use up the Stripe API rate.
         """
         if not session_id.startswith(payments.SESSION_PREFIX) or len(session_id) > 255:
             return record
+        now = datetime.now(UTC)
+        if failed_card_sessions.count(session_id, now):
+            return record
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        limit = payments.CARD_LOOKUPS_PER_HOUR
+        if (
+            card_lookups.count(f"ip:{ip}", now) >= limit
+            or card_lookups.count(f"audit:{record.id}", now) >= limit
+        ):
+            return record
+        card_lookups.hit(f"ip:{ip}", now)
+        card_lookups.hit(f"audit:{record.id}", now)
         lookup: SessionLookup = app.state.session_lookup
         try:
             session = lookup(cfg, session_id)
         except Exception:  # noqa: BLE001 - any SDK or network failure: stay locked
             logger.warning("checkout session lookup failed for audit %s", record.id)
+            failed_card_sessions.hit(session_id, now)
             return record
         if str((session.get("metadata") or {}).get("audit_id") or "") != record.id:
+            failed_card_sessions.hit(session_id, now)
             return record
-        payments.fulfil(db, cfg, session, at=datetime.now(UTC))
-        return db.get_audit(record.id) or record
+        payments.fulfil(db, cfg, session, at=now)
+        paid = db.get_audit(record.id) or record
+        if not paid.paid:
+            failed_card_sessions.hit(session_id, now)
+        return paid
 
     def _record_locale(record: Any) -> str:
         try:

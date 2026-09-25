@@ -249,6 +249,8 @@ LABELS: dict[str, dict[str, str]] = {
             "que produce el error de muestreo."
         ),
         "pdf_long": "Descargar el informe en PDF",
+        "pdf_busy": "Generando tu PDF… (unos segundos)",
+        "pdf_wait": "El PDF tarda unos segundos en generarse.",
         "pdf_check": "Quien reciba el PDF o el JSON puede comprobar que no se editó.",
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
@@ -262,10 +264,16 @@ LABELS: dict[str, dict[str, str]] = {
             "Cópialo tal como te llegó y vuelve a canjearlo."
         ),
         "code_error_contact": "Si sigue sin funcionar, escríbenos por el botón de arriba.",
-        "buy_code": "¿No tienes código? Pídelo por WhatsApp",
+        "buy_code": "Comprar por WhatsApp",
         "buy_code_how": (
-            "Te respondemos con los datos de pago y, al confirmarse, te enviamos el código. "
-            "Lo escribes aquí abajo y el informe se abre completo."
+            "Nos escribes por WhatsApp; el mensaje ya lleva el número de este informe.|"
+            "Te respondemos con los datos para pagar.|"
+            "Al confirmarse el pago recibes un código: lo escribes aquí abajo y el informe "
+            "se abre completo."
+        ),
+        "buy_code_wait": (
+            "Responde una persona. Si escribes de noche o en fin de semana, te contestamos en "
+            "cuanto lo veamos; mientras tanto tu informe sigue en este enlace."
         ),
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
@@ -514,6 +522,34 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_bench_badge_clean": "Por delante",
         "fund_bench_nm": "Comparación con el índice:",
+        "fund_stress": "¿Cómo le fue en las crisis conocidas?",
+        "fund_stress_intro": (
+            "Rentabilidad del fondo en cada caída de mercado de fecha pública que su historial "
+            "cubre completa, de máximo a mínimo. Las fechas son fijas: no se ajustan al archivo."
+        ),
+        "fund_stress_none": (
+            "El historial no cubre completa ninguna de las caídas de la lista (puntocom, 2008, "
+            "euro 2011, 2015-16, final de 2018, covid, 2022, cripto 2022)."
+        ),
+        "fund_stress_head": "Crisis",
+        "fund_stress_fund": "Fondo",
+        "fund_stress_index": "Índice",
+        "fund_stress_12m": (
+            "Peores 12 meses seguidos: {worst}; mejores: {best}. Terminaron en positivo el "
+            "{share} de los periodos de 12 meses."
+        ),
+        "fund_stress_worse": (
+            "En {worse} de {n} crisis cayó más que su índice. Pregunta qué protege la cartera "
+            "cuando el mercado cae."
+        ),
+        "fund_stress_dotcom": "Estallido de las puntocom",
+        "fund_stress_gfc": "Crisis financiera de 2008",
+        "fund_stress_euro": "Crisis de deuda del euro",
+        "fund_stress_china_oil": "China y caída del petróleo",
+        "fund_stress_late_2018": "Final de 2018",
+        "fund_stress_covid": "Caída por el covid",
+        "fund_stress_rates_2022": "Inflación y tipos, 2022",
+        "fund_stress_crypto_2022": "Invierno cripto 2022",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
@@ -684,6 +720,10 @@ LABELS: dict[str, dict[str, str]] = {
         "engine": "versión del motor",
         "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
+        "code_request_price": (
+            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). "
+            "¿Cómo pago?"
+        ),
         "keep_link": (
             "Guarda el enlace de esta página: con él vuelves a tu informe. Si lo subiste con tu "
             "cuenta, también lo tienes en «Mi cuenta»."
@@ -797,7 +837,7 @@ LABELS: dict[str, dict[str, str]] = {
         "passes": "configuraciones probadas",
         "trials_used": "Intentos usados en el Sharpe deflactado",
         "horizon": "1 año",
-        "reasons_detail": "Razones por dimensión",
+        "reasons_detail": "Detalle técnico de cada dimensión",
         "fees": "Costes que detalla el informe",
         "plan": "Plan para subir de clase",
         "plan_intro": (
@@ -952,6 +992,8 @@ LABELS: dict[str, dict[str, str]] = {
             "and the one sampling error produces."
         ),
         "pdf_long": "Download the report as PDF",
+        "pdf_busy": "Preparing your PDF… (a few seconds)",
+        "pdf_wait": "The PDF takes a few seconds to prepare.",
         "pdf_check": "Whoever receives the PDF or JSON can check that it was not edited.",
         "pdf_check_link": "How they check",
         "switch": "Español",
@@ -965,10 +1007,16 @@ LABELS: dict[str, dict[str, str]] = {
             "or has expired. Copy it exactly as you received it and redeem it again."
         ),
         "code_error_contact": "If it still does not work, message us with the button above.",
-        "buy_code": "No code yet? Ask for one on WhatsApp",
+        "buy_code": "Buy on WhatsApp",
         "buy_code_how": (
-            "We reply with the payment details and, once it is confirmed, send you the code. "
-            "Enter it below and the full report opens."
+            "You message us on WhatsApp; the message already carries this report's number.|"
+            "We reply with the payment details.|"
+            "Once the payment is confirmed you get a code: enter it below and the full "
+            "report opens."
+        ),
+        "buy_code_wait": (
+            "A person replies. If you write at night or at the weekend, we answer as soon as "
+            "we see it; meanwhile your report stays at this link."
         ),
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
@@ -1205,6 +1253,34 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_bench_badge_clean": "Ahead",
         "fund_bench_nm": "Comparison with the benchmark:",
+        "fund_stress": "How did it do in the known crises?",
+        "fund_stress_intro": (
+            "The fund's return through each market fall on the public record that its history "
+            "covers in full, peak to trough. The dates are fixed: they are not fitted to the file."
+        ),
+        "fund_stress_none": (
+            "The history does not cover any fall on the list in full (dot-com, 2008, euro 2011, "
+            "2015-16, late 2018, covid, 2022, crypto 2022)."
+        ),
+        "fund_stress_head": "Crisis",
+        "fund_stress_fund": "Fund",
+        "fund_stress_index": "Index",
+        "fund_stress_12m": (
+            "Worst 12 months in a row: {worst}; best: {best}. {share} of the 12-month periods "
+            "ended positive."
+        ),
+        "fund_stress_worse": (
+            "In {worse} of {n} crises it fell more than its benchmark. Ask what protects the "
+            "portfolio when markets fall."
+        ),
+        "fund_stress_dotcom": "Dot-com bust",
+        "fund_stress_gfc": "2008 financial crisis",
+        "fund_stress_euro": "Euro debt crisis",
+        "fund_stress_china_oil": "China and the oil fall",
+        "fund_stress_late_2018": "Late 2018",
+        "fund_stress_covid": "Covid crash",
+        "fund_stress_rates_2022": "Inflation and rates, 2022",
+        "fund_stress_crypto_2022": "Crypto winter 2022",
         "instruments": "Does it work on each instrument?",
         "ins_intro": (
             "When a robot or a signal trades several markets, the total can come from one of "
@@ -1369,6 +1445,10 @@ LABELS: dict[str, dict[str, str]] = {
         "engine": "engine version",
         "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
+        "code_request_price": (
+            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). "
+            "How do I pay?"
+        ),
         "keep_link": (
             "Save this page's link: it brings you back to your report. If you uploaded it with "
             "your account, it is also in «My account»."
@@ -1479,7 +1559,7 @@ LABELS: dict[str, dict[str, str]] = {
         "passes": "configurations tried",
         "trials_used": "Trials used in the deflated Sharpe",
         "horizon": "1 year",
-        "reasons_detail": "Reasons by dimension",
+        "reasons_detail": "Technical detail by dimension",
         "fees": "Costs the report itemises",
         "plan": "Plan to reach a better class",
         "plan_intro": (
@@ -1535,7 +1615,7 @@ LABELS: dict[str, dict[str, str]] = {
 DIMENSION_TITLES: dict[str, dict[str, str]] = {
     "es": {
         "statistical_significance": "Significación estadística",
-        "multiplicity": "Número de intentos (Sharpe deflactado)",
+        "multiplicity": "Número de configuraciones probadas",
         "costs": "Costes",
         "out_of_sample": "Fuera de muestra",
         "data_quality": "Calidad de datos y forma de operar",
@@ -1543,7 +1623,7 @@ DIMENSION_TITLES: dict[str, dict[str, str]] = {
     },
     "en": {
         "statistical_significance": "Statistical significance",
-        "multiplicity": "Number of trials (deflated Sharpe)",
+        "multiplicity": "Number of settings tried",
         "costs": "Costs",
         "out_of_sample": "Out of sample",
         "data_quality": "Data quality and trading pattern",
@@ -3928,12 +4008,71 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
     out += _fund_calendar(fund.get("years") or [], labels)
     out += _fund_benchmark_html(fund, locale, labels)
+    out += _fund_crises_html(fund, labels)
     if fund.get("net_of_fees"):
         out += (
             f"<p class='muted'>{_badge(fund['net_of_fees']['evidence'])} "
             f"{_e(labels['fund_net'])}</p>"
         )
     out += f"<p class='muted'>{_e(_sentence(localize(fund.get('note', ''), locale)))}</p>"
+    return out
+
+
+def _fund_crises_html(fund: dict[str, Any], labels: dict[str, str]) -> str:
+    """The fund through the dated market falls its history covers."""
+    stress = fund.get("crises")
+    if not stress or stress.get("status") != "MEASURED":
+        return ""
+    out = f"<h3>{_e(labels['fund_stress'])}</h3>"
+    rows = stress.get("windows") or []
+    with_index = any("benchmark" in row for row in rows)
+    if "fell_more_in_crises" in (stress.get("findings") or []):
+        text = labels["fund_stress_worse"].format(
+            worse=int(stress["worse_than_benchmark"]["value"]), n=int(stress["compared"]["value"])
+        )
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>"
+            f"{_behaviour_ask(text)}</ul></div>"
+        )
+    if rows:
+        out += f"<p class='muted'>{_e(labels['fund_stress_intro'])} {_badge('MEASURED')}</p>"
+
+        def cell(item: dict[str, Any] | None, label: str) -> str:
+            if not item:
+                return f"<td class='val' data-l='{_e(label)}'>—</td>"
+            value = float(item["value"])
+            side = " neg" if value < 0 else ""
+            return f"<td class='val{side}' data-l='{_e(label)}'>{_e(_fund_pct(value))}</td>"
+
+        body = "".join(
+            f"<tr><td>{_e(labels['fund_stress_' + row['key']])}<br>"
+            f"<small class='muted'>{_e(row['first'])} – {_e(row['last'])}</small></td>"
+            + cell(row["fund"], labels["fund_stress_fund"])
+            + (cell(row.get("benchmark"), labels["fund_stress_index"]) if with_index else "")
+            + "</tr>"
+            for row in rows
+        )
+        head = (
+            f"<th>{_e(labels['fund_stress_head'])}</th>"
+            f"<th class='val'>{_e(labels['fund_stress_fund'])}</th>"
+            + (f"<th class='val'>{_e(labels['fund_stress_index'])}</th>" if with_index else "")
+        )
+        out += f"<table class='timing'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    else:
+        out += f"<p class='muted'>{_e(labels['fund_stress_none'])}</p>"
+    if stress.get("worst_12m"):
+        out += (
+            "<p class='muted'>"
+            + _e(
+                labels["fund_stress_12m"].format(
+                    worst=_fund_pct(float(stress["worst_12m"]["value"])),
+                    best=_fund_pct(float(stress["best_12m"]["value"])),
+                    share=f"{float(stress['positive_12m']['value']):.0%}",
+                )
+            )
+            + f" {_badge('MEASURED')}</p>"
+        )
     return out
 
 
@@ -4243,9 +4382,12 @@ def render_html(
     if locked and redeem_url:
         if contact_url:
             # Where a client without a code buys one (bank transfer, WhatsApp).
-            contact_url = _prefilled(
-                contact_url, labels["code_request"].format(id=data["audit_id"])
+            request = (
+                labels["code_request_price"].format(id=data["audit_id"], price=price)
+                if price
+                else labels["code_request"].format(id=data["audit_id"])
             )
+            contact_url = _prefilled(contact_url, request)
             if card_on:
                 # With card payment on, WhatsApp is the alternative, not the main button.
                 paybox += (
@@ -4260,7 +4402,11 @@ def render_html(
                     + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
                     f"{_e(labels['buy_code'])}</a>"
-                    f"<p class='muted pay-secure'>{_e(labels['buy_code_how'])}</p>"
+                    "<ol class='buy-steps'>"
+                    + "".join(
+                        f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|")
+                    )
+                    + f"</ol><p class='muted pay-secure'>{_e(labels['buy_code_wait'])}</p>"
                     f"{includes_html}</div>"
                 )
         main_button = contact_url or card_on
@@ -4547,7 +4693,6 @@ def render_html(
     hidden = _hidden_loss_note(data, labels)
     detail: list[tuple[str, str]] = [
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
-        (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
         *(
             [(labels["live"], _live_html(data.get("live"), locale, labels))]
             if data.get("live")
@@ -4631,6 +4776,9 @@ def render_html(
             ),
         ),
         (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
+        # The dimension reasons repeat the verdict in thresholds, so they open the
+        # technical tables instead of sitting between the plan and the findings.
+        (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
         (
             labels["performance"],
             _evidence_rows(
@@ -4695,7 +4843,10 @@ def render_html(
             f"<a class='print-btn' href='#unlock'>{icon('lock')}{_e(labels['unlock_nav'])}</a>"
         )
     elif pdf_url and not locked:
-        print_html = f"<a class='print-btn' href='{_e(pdf_url)}' download>{_e(labels['pdf'])}</a>"
+        print_html = (
+            f"<a class='print-btn' href='{_e(pdf_url)}' download "
+            f"data-busy='{_e(labels['pdf_busy'])}'>{_e(labels['pdf'])}</a>"
+        )
     else:
         print_html = (
             "<button type='button' class='print-btn' "
@@ -4750,7 +4901,9 @@ def render_html(
         + "</div></div>"
         + (
             f"<p class='rise no-print' style='--i:4'><a class='btn btn-primary' "
-            f"href='{_e(pdf_url)}' download>{_e(labels['pdf_long'])}</a></p>"
+            f"href='{_e(pdf_url)}' download data-busy='{_e(labels['pdf_busy'])}'>"
+            f"{_e(labels['pdf_long'])}</a>"
+            f"<noscript> <span class='muted'>{_e(labels['pdf_wait'])}</span></noscript></p>"
             f"<p class='muted pdf-check rise no-print' style='--i:4'>{_e(labels['pdf_check'])} "
             f"<a href='{'/check' if locale == 'en' else '/comprobar'}'>"
             f"{_e(labels['pdf_check_link'])}</a></p>"

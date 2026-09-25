@@ -143,6 +143,11 @@ the curve box gets `trade_list_as_curve` too). A column the customer mapped
 that holds no numbers (or no dates, for a time) gets
 `universal_column_unreadable`, naming the column and its role. Format codes
 never appear in customer text (`tests/test_audit_import_messages.py`).
+A table with entry and exit prices but a single time (Bybit's Closed P&L)
+gets `universal_close_time_only`: without opening times holding time and
+entry timing cannot be measured, so it asks for the executions export (Bybit
+Trade History) instead. A `Contracts` column names the instrument when no
+symbol column exists and `Exec Qty` is the size.
 Tests use synthetic rows (`tests/test_audit_universal_import.py`).
 
 Platform exports the universal reader is checked against
@@ -156,7 +161,10 @@ lines dropped), Charles Schwab Realized Gain/Loss and Transactions,
 Webull orders (the fill price, not the limit), thinkorswim's Account Trade
 History section, TradeStation (a clock-only `Exec Time` joined to `T/D`),
 tastytrade (multiplier column), Fidelity ("YOU BOUGHT ..."), E*TRADE, eToro
-closed positions, cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
+closed positions, XTB xStation 5 closed position history (CSV, or the XLSX with account
+rows above the header and an empty first column; the `Total` row is skipped by
+`universal.without_totals` and a second financing column such as `Rollover`
+is added to the costs), cTrader, Binance (with `Fee Coin`), Kraken, Coinbase and
 Sierra Chart's Trade Activity Log (only `Fills` rows). Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
@@ -876,6 +884,22 @@ flatters a fund whose figures are before fees. It never feeds the benchmark
 dimension (that reads only the uploaded benchmark file, as before), so the
 class does not move.
 
+Through the known crises (`audit/crises.py`). A fixed list of calendar
+windows, each the peak-to-trough months of a fall on the public record: the
+dot-com bust (2000-09 to 2002-09), the 2008 financial crisis (2007-11 to
+2009-02), the euro debt crisis (2011-05 to 2011-09), China and the oil fall
+(2015-06 to 2016-02), late 2018 (2018-10 to 2018-12), the covid crash
+(2020-02 to 2020-03), inflation and rates in 2022 (2022-01 to 2022-09) and
+the 2022 crypto winter (2021-11 to 2022-12). Equity windows follow US
+equities, the crypto one bitcoin; they are fixed in advance and never fitted
+to the file, and only dates are bundled, no market data. For each window the
+record covers in full, MEASURED: the fund's compounded return and, when a
+benchmark is present, the benchmark's. With 24 months or more, the worst and
+best 12-month return and the share of rolling 12-month periods that ended
+positive. One finding, as a question: `fell_more_in_crises` when, over at
+least two windows with a benchmark, the fund did worse in two thirds or more
+of them. No red flag and no class change.
+
 No red flag and no class change. Limitations: a short record has few
 months per bin; smoothing can also come from a genuinely
 trending strategy; a factsheet may round or restate months; returns are
@@ -1051,6 +1075,19 @@ without a declared holdout the best possible class is B, on purpose.
 
 Class A is worded as "no evidence of overfitting found in what was
 supplied". It is not a prediction.
+
+The verdict sentence speaks to a buyer first and keeps the measure's name in
+brackets: significance reads "too consistent to be explained by chance alone
+(Sharpe ratio distinguishable from zero)", the held-out check reads "the
+period held back for checking (out of sample)", and "deflated Sharpe" reads
+"the Sharpe adjusted for those trials". The thresholds are unchanged.
+
+Each dimension is explained once for a buyer ("Qué significa para ti" and the
+plan). The threshold table ("Detalle técnico de cada dimensión" / "Technical
+detail by dimension") now opens the technical tables, after the seller
+questions, instead of repeating the verdict between the plan and the findings;
+the multiplicity dimension is titled "Número de configuraciones probadas" /
+"Number of settings tried".
 
 ## Assumptions and limitations
 
@@ -1332,7 +1369,12 @@ charged buyer who stays locked can be found and refunded or unlocked. Live
 ones are also listed on `/panel` ("Pagos con tarjeta que no abrieron un
 informe": date, Stripe session id, audit id, reason), and the retention purge
 deletes those rows; test-mode ones stay in the log only, since anyone can pay a
-test link with Stripe's public card.
+test link with Stripe's public card. Only sessions that name an audit or carry
+`app=rigor` are listed, so a sale from another app on the same Stripe account
+never shows there. The return page asks Stripe about a session at most 10 times
+an hour per address and per audit (`CARD_LOOKUPS_PER_HOUR`) and does not ask
+again within the hour about a session that did not unlock, so looping the
+return URL cannot use up the account's API rate; the webhook needs no lookup.
 
 ### Selling with access codes
 
@@ -1800,6 +1842,14 @@ The same pass styles the buyer's "What to do now" box from #207. Each step is a 
 Redesign pass 45 gives the four audience pages from #206 (/para/… and /for/…) more shape without changing their words or order. The problems are cards with an amber warning icon. "What Rigor checks" is a grid of cards, two per row on a desktop, each with its name in bold. The price sits in a panel with its buttons. "Other cases" are link cards with an arrow. A check whose name is a question no longer gets an extra full stop ("¿Pico aislado o meseta?.").
 
 Redesign pass 46 tidies the "Name its columns" step from #212 on the upload form. The twelve fields sit in three labelled groups: one row per trade, one row per fill, and either way. On a phone they sit two per row. Once a CSV is picked, the file's own column names show as chips above the fields (read in the browser by `app.js`, the same header row that feeds the suggestions), so the customer can copy them without opening the file.
+
+Redesign pass 47 polishes the screens from the first-sales rewrite (#223). In the locked preview, each padlock sits beside the first line of its item instead of floating between two lines. On a phone the WhatsApp button wraps to two roomy lines, and "Redeem code" fills its row. On the landing, the "And it reads the export format of…" line keeps a quiet underline that brightens on hover. The price cards needed nothing.
+
+Redesign pass 48 styles the account screens from #205. On sign-up and sign-in, the form sits in a white card beside the tinted list of what an account gives. On "My account", the three counts are white tiles, three across even on a phone. On a phone each report is a card with its class, date and "Open" on one row and its status and description below. "Delete my account" is outlined and titled in red, so it does not read like the password card beside it. On sign-up, the words "terms of service" and "privacy policy" are themselves the links to those pages; the line used to link only a lone "›" and left privacy unlinked.
+
+Redesign pass 49 checks the upload form after #230 (report first, extras in a closed "Add more files" box) and the pricing line about the optional account; both needed nothing on a phone or desktop. It adds a quiet "or" rule between the platform report and the equity curve, so it reads that one of the two is enough.
+
+Redesign pass 50 checks the account's side-by-side screen (`/cuenta/comparar`, two reports picked from "My reports"). On a phone the dimension and figure tables now use tighter cells and smaller badges, so a "Fails" badge in the second report no longer spills past the card. It also checks the fund benchmark block and the plain lines under the headline figures on /ejemplo; both read well and needed nothing.
 
 ## Security
 

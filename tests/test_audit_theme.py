@@ -769,3 +769,59 @@ def test_the_name_its_columns_step_groups_fields_by_file_shape(tmp_path: Path, l
     # The file's own column names show as chips once a file is picked (filled by app.js).
     assert "id='report-columns-shown' hidden>" in page
     assert ".map-found code{display:inline-block" in STYLE
+
+
+def test_locked_preview_lines_keep_their_lock_on_the_first_line_and_buttons_fit_a_phone() -> None:
+    # A two-line item keeps its lock beside the first line, not centred between both.
+    assert ".lockbox li{display:flex;gap:10px;align-items:flex-start" in STYLE
+    assert "flex:none;margin-top:4px;opacity:.7;" in STYLE
+    # On a phone the WhatsApp button may wrap to two lines without cramping; redeem fills the row.
+    assert ".paybox.buy .btn{width:100%;height:auto;min-height:48px;padding:12px 18px" in STYLE
+    assert ".paybox.redeem .inline-form .btn{flex:1 1 100%}" in STYLE
+    # The "also reads" line under the platform names keeps a quiet underline.
+    assert ".platforms .platforms-also a:hover{color:var(--text)" in STYLE
+
+
+def test_account_screens_read_as_cards_on_a_phone_and_deleting_looks_like_it() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    # Sign-up and sign-in forms sit in a white card beside the tinted list of benefits.
+    assert ".acct-form{border:1px solid var(--border)" in ACCOUNT_CSS
+    assert ".acct-perks{background:var(--surface-2)}" in ACCOUNT_CSS
+    # On a phone each report is a card: class, date and "Open" on one row.
+    assert ".acct-reports tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto" in (
+        ACCOUNT_CSS.replace("\n", "")
+    )
+    # Deleting the account is set apart in red.
+    assert ".acct-danger h3{color:#b42318}" in ACCOUNT_CSS
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_sign_up_links_the_terms_and_privacy_words_themselves(tmp_path: Path, locale: str) -> None:
+    from quant_trade.audit.account_pages import COPY, path
+
+    page = _client(tmp_path).get(path("signup", locale)).text
+    copy = COPY[locale]
+    for kind in ("terms", "privacy"):
+        assert f"'>{copy[f'{kind}_link']}</a>" in page
+        assert f"href='{legal_url(kind, locale)}'" in page
+    assert ">›</a>" not in page
+    text = copy["terms_agree"].format(terms=copy["terms_link"], privacy=copy["privacy_link"])
+    assert find_claims(text) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_an_or_rule_separates_the_report_from_the_curve(tmp_path: Path, locale: str) -> None:
+    page = _client(tmp_path).get(f"/?lang={locale}").text
+    word = "o" if locale == "es" else "or"
+    rule = f"<div class='or-rule' aria-hidden='true'><span>{word}</span></div>"
+    assert page.index("name='report'") < page.index(rule) < page.index("name='equity'")
+    assert ".or-rule::before,.or-rule::after{content:''" in STYLE
+
+
+def test_the_side_by_side_tables_fit_a_phone() -> None:
+    from quant_trade.audit.compare import COMPARE_CSS
+
+    # The two report columns keep their badges inside the card at 390 px.
+    assert "@media screen and (max-width:620px){.cmp th,.cmp td{padding:10px 8px}" in COMPARE_CSS
+    assert ".cmp .badge{white-space:nowrap;font-size:.62rem" in COMPARE_CSS
