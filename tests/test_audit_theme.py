@@ -943,3 +943,30 @@ def test_the_prop_firm_table_reads_as_cards_on_a_phone(tmp_path: Path) -> None:
     # Four columns do not fit 390 px: each challenge becomes a card, its figures labelled.
     assert "@media screen and (max-width:620px){.paper table.firms," in STYLE
     assert ".firms td[data-l]::before{content:attr(data-l);" in STYLE
+
+
+def test_the_column_choice_reads_as_steps_in_cards_and_one_column_on_a_phone() -> None:
+    # Each group of menus is a card; the re-pick of the file is a dashed drop box.
+    assert ".map-form .map-group{margin:14px 0 0;padding:16px 18px 2px;border:1px solid" in STYLE
+    assert ".map-form>.field{margin:22px 0 0;padding:16px 18px;border:1px dashed" in STYLE
+    # Two menus side by side cut the column names short on a phone.
+    assert ".map-form .map-group .form-grid{grid-template-columns:minmax(0,1fr)}" in STYLE
+    # The browser's grey file button matches the site's buttons.
+    assert "input[type=file]::file-selector-button{" in STYLE
+
+
+def test_what_the_account_keeps_reads_as_a_security_card(tmp_path: Path) -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    page = _client(tmp_path).get("/registro").text
+    stores = page.split("<div class='acct-card acct-stores'>", 1)[1].split("</div>", 1)[0]
+    assert stores.startswith("<h3><svg")
+    assert ".acct-stores h3 svg{flex:none;width:30px;height:30px" in ACCOUNT_CSS
+
+
+def test_small_phones_keep_the_landing_and_timing_tables_inside_the_screen() -> None:
+    assert ".mock-url{white-space:nowrap;overflow:hidden;text-overflow:ellipsis" in STYLE
+    assert ".signin-first .inline-form .btn{width:100%" in STYLE
+    assert "(max-width:380px){.timing th,.timing td{padding:9px 5px!important}" in STYLE
+    # The landing's secondary link is monochrome like the rest, not a lone blue.
+    assert "min-height:44px;color:var(--text);font-weight:500;" in STYLE
