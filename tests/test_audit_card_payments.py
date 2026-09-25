@@ -484,3 +484,17 @@ def test_a_payment_in_the_buyers_currency_unlocks_by_its_usd_amount(tmp_path: Pa
     )
     assert _webhook(client, cheap) == 200
     assert "class='lockbox'" in client.get(f"/audits/{short_id}?token={short_token}").text
+
+
+def test_a_refused_paid_session_leaves_a_log_line_without_amounts(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    client = _client(tmp_path)
+    audit_id, _ = _upload(client)
+    with caplog.at_level("WARNING", logger="quant_trade.audit.payments"):
+        assert _webhook(client, _session(audit_id, amount_total=100)) == 200
+        assert _webhook(client, _session("x\ny", sid="cs_2")) == 200
+    lines = [r.getMessage() for r in caplog.records]
+    assert any("cs_test_1" in line and audit_id in line and "below" in line for line in lines)
+    assert any("xy" in line and "unknown audit" in line for line in lines)
+    assert not any("\n" in line for line in lines)

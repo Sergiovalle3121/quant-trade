@@ -1231,6 +1231,10 @@ still show it, with its credits left, to whoever holds the report token.
 Rotating the webhook secret hides earlier pack codes from their reports
 (the codes keep working). Refunds are made from the Stripe dashboard and do
 not lock a report again; disable a pack code from `/panel` if needed.
+A paid session that does not unlock (wrong amount, currency or marker, an
+unlisted test audit, an unknown audit) is logged as a warning with the
+session id, the audit id and the reason, never an amount or an email, so a
+charged buyer who stays locked can be found and refunded or unlocked.
 
 ### Selling with access codes
 
