@@ -13,6 +13,7 @@ one code at a time. Changing one is a documented decision, not a tweak.
 from __future__ import annotations
 
 import bisect
+import heapq
 import math
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
@@ -392,31 +393,41 @@ def _grid_and_concurrency(
 ) -> tuple[int, int]:
     """Trades added against the position (same symbol and side, worse
     price, while an earlier one is open) and the most positions open at
-    once on one symbol."""
+    once on one symbol.
+
+    One sweep in entry order (``order`` sorted by entry time, then index):
+    a trade that has closed by the time a later one enters stays closed for
+    every trade after it, so closed trades are dropped lazily from heaps
+    keyed by exit time and, per symbol and side, by entry price. That keeps
+    a 50 000-trade upload to well under a second instead of a quadratic
+    scan measured in minutes.
+    """
     adds = 0
     most = 0
+    # Per symbol: exit times of the trades entered so far that are still open.
+    open_exits: dict[str, list[Any]] = {}
+    # Per (symbol, side): the open trade with the worst price for a new
+    # entry on top (highest entry for longs, lowest for shorts).
+    best_price: dict[tuple[str, str], list[tuple[float, Any]]] = {}
     for i in order:
         trade = trades[i]
-        open_same_symbol = [
-            j
-            for j in order
-            if j != i
-            and symbols[j] == symbols[i]
-            and trades[j].entry_time <= trade.entry_time < trades[j].exit_time
-            and (trades[j].entry_time, j) < (trade.entry_time, i)
-        ]
-        most = max(most, len(open_same_symbol) + 1)
-        for j in open_same_symbol:
-            if sides[j] != sides[i]:
-                continue
-            worse = (
-                trade.entry_price < trades[j].entry_price
-                if sides[i] == "long"
-                else trade.entry_price > trades[j].entry_price
-            )
+        now = trade.entry_time
+        exits = open_exits.setdefault(symbols[i], [])
+        while exits and exits[0] <= now:
+            heapq.heappop(exits)
+        most = max(most, len(exits) + 1)
+        key = (symbols[i], sides[i])
+        prices = best_price.setdefault(key, [])
+        while prices and prices[0][1] <= now:
+            heapq.heappop(prices)
+        if prices:
+            top = -prices[0][0] if sides[i] == "long" else prices[0][0]
+            worse = trade.entry_price < top if sides[i] == "long" else trade.entry_price > top
             if worse:
                 adds += 1
-                break
+        heapq.heappush(exits, trade.exit_time)
+        signed = -trade.entry_price if sides[i] == "long" else trade.entry_price
+        heapq.heappush(prices, (signed, trade.exit_time))
     return adds, most
 
 

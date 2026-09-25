@@ -124,3 +124,21 @@ def test_summary_tiles_and_cards_never_split_across_pages() -> None:
     from quant_trade.audit.pdf import PDF_CSS
 
     assert ".kpi,.meaning .item,.recon tr{page-break-inside:avoid;break-inside:avoid}" in PDF_CSS
+
+
+@needs_pdf
+def test_a_second_pdf_waits_for_a_free_slot() -> None:
+    import threading
+
+    for _ in range(pdf_lib.MAX_CONCURRENT_PDFS):
+        assert pdf_lib._SLOTS.acquire(blocking=False)
+    page = "<html><head></head><body><p>x</p></body></html>"
+    try:
+        with pytest.raises(pdf_lib.PdfBusy):
+            pdf_lib.report_pdf(page, audit_id="a", locale="es")
+        threading.Timer(0.3, pdf_lib._SLOTS.release).start()
+        content = pdf_lib.report_pdf(page, audit_id="a", locale="es", wait_seconds=10)
+        assert content.startswith(b"%PDF")
+    finally:
+        for _ in range(pdf_lib.MAX_CONCURRENT_PDFS - 1):
+            pdf_lib._SLOTS.release()

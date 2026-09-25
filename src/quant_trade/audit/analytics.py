@@ -37,12 +37,18 @@ MAX_FAN_POINTS = 120
 #: Upper bound on resampled cells (samples x path length) so an intraday
 #: upload cannot pin the process; samples are reduced to fit and recorded.
 MAX_RESAMPLED_CELLS = 2_000_000
+#: Upper bound on the length of one resampled path. A curve sampled faster
+#: than about hourly (a year of minute bars is 525 960 periods) is first
+#: compounded into consecutive blocks so a path stays this short; without
+#: it a curve logged every second asks for hundreds of gigabytes.
+MAX_RISK_PATH_PERIODS = 10_000
 DEFAULT_BLOCK_SIZE = 5.0
 BUSINESS_DAYS_PER_CALENDAR_DAY = 5.0 / 7.0
 
 NO_TRADES = "no trades uploaded"
 
 RESAMPLED_NOTE = "resampled from the uploaded history, not a forecast"
+TOO_SHORT_FOR_HORIZON = "the history is too short to resample a year at this frequency"
 
 RISK_ASSUMPTIONS: dict[str, list[str]] = {
     "es": [
@@ -273,11 +279,13 @@ def _longest_underwater(equity: np.ndarray) -> np.ndarray:
     return longest
 
 
-def _fan(equity: np.ndarray, points: int = MAX_FAN_POINTS) -> dict[str, list[float] | list[int]]:
+def _fan(
+    equity: np.ndarray, points: int = MAX_FAN_POINTS, *, step: int = 1
+) -> dict[str, list[float] | list[int]]:
     length = equity.shape[1]
     positions = np.unique(np.linspace(0, length - 1, min(points, length)).round().astype(int))
     quantiles = np.percentile(equity[:, positions], FAN_QUANTILES, axis=0)
-    fan: dict[str, list[float] | list[int]] = {"period": [int(p) for p in positions]}
+    fan: dict[str, list[float] | list[int]] = {"period": [int(p) * step for p in positions]}
     for q, row in zip(FAN_QUANTILES, quantiles, strict=True):
         fan[f"p{q}"] = [round(float(value), 6) for value in row]
     return fan
@@ -305,11 +313,24 @@ def drawdown_risk(
     values = _clean(returns)
     thresholds = tuple(float(t) for t in thresholds)
     length = max(2, int(round(periods_per_year * horizon_years)))
-    if len(values) < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
+    supplied = len(values)
+    # Periods compounded into one step of a path (1 unless the curve is
+    # finer than MAX_RISK_PATH_PERIODS per horizon); results are reported
+    # back in the uploaded periods.
+    step = math.ceil(length / MAX_RISK_PATH_PERIODS) if length > MAX_RISK_PATH_PERIODS else 1
+    reason = ""
+    if supplied < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
         reason = (
             f"needs at least {MIN_OBSERVATIONS} returns that are not all identical; "
-            f"{len(values)} supplied"
+            f"{supplied} supplied"
         )
+    elif step > 1:
+        blocks = supplied // step
+        values = np.prod(1.0 + values[: blocks * step].reshape(blocks, step), axis=1) - 1.0
+        length = math.ceil(length / step)
+        if blocks < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
+            reason = TOO_SHORT_FOR_HORIZON
+    if reason:
         return {
             "max_drawdown": {key: not_measured(reason) for key in ("p50", "p95", "p99")},
             "probability_drawdown_at_least": {f"{t:.2f}": not_measured(reason) for t in thresholds},
@@ -323,7 +344,7 @@ def drawdown_risk(
     used = int(min(samples, max(100, MAX_RESAMPLED_CELLS // length)))
     equity = _paths(values, length=length, samples=used, block_size=block_size, seed=seed)
     drawdowns = _max_drawdowns(equity)
-    underwater = _longest_underwater(equity)
+    underwater = _longest_underwater(equity) * step
     note = RESAMPLED_NOTE
     return {
         "max_drawdown": {
@@ -335,16 +356,17 @@ def drawdown_risk(
         "longest_underwater_periods": {
             f"p{q}": measured(float(np.percentile(underwater, q)), note) for q in (50, 95)
         },
-        "fan": {"evidence": "MEASURED", "note": note, **_fan(equity)},
+        "fan": {"evidence": "MEASURED", "note": note, **_fan(equity, step=step)},
         "method": {
             "bootstrap": "stationary",
             "expected_block_size": min(max(float(block_size), 1.0), float(len(values))),
             "samples": used,
             "samples_requested": int(samples),
             "seed": int(seed),
-            "horizon_periods": length,
+            "horizon_periods": length * step,
             "periods_per_year": float(periods_per_year),
-            "observations": int(len(values)),
+            "observations": supplied,
+            "periods_per_step": step,
         },
         "assumptions": RISK_ASSUMPTIONS,
     }

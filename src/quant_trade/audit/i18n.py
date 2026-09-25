@@ -476,6 +476,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "necesita al menos {n} retornos que no sean todos idénticos; se aportaron {m}",
     ),
     (
+        "the history is too short to resample a year at this frequency",
+        "el historial es demasiado corto para remuestrear un año con esta frecuencia",
+    ),
+    (
         "resampled from the uploaded history, not a forecast",
         "remuestreado del historial aportado, no es una predicción",
     ),

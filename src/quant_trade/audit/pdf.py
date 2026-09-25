@@ -91,17 +91,22 @@ def footer_text(audit_id: str, locale: str) -> str:
     return f"{BRAND} · {word} {audit_id}"
 
 
-def report_pdf(page_html: str, *, audit_id: str, locale: str) -> bytes:
+def report_pdf(page_html: str, *, audit_id: str, locale: str, wait_seconds: float = 0.0) -> bytes:
     """``page_html`` (a rendered report) as PDF bytes.
 
     Raises ``PdfUnavailable`` without WeasyPrint and ``PdfBusy`` when
-    ``MAX_CONCURRENT_PDFS`` renders are already running.
+    ``MAX_CONCURRENT_PDFS`` renders are still running after ``wait_seconds``
+    (a second click on the download button waits its turn instead of
+    failing at once).
     """
     try:
         from weasyprint import HTML
     except (ImportError, OSError) as exc:
         raise PdfUnavailable(str(exc)) from exc
-    if not _SLOTS.acquire(blocking=False):
+    acquired = (
+        _SLOTS.acquire(timeout=wait_seconds) if wait_seconds > 0 else _SLOTS.acquire(blocking=False)
+    )
+    if not acquired:
         raise PdfBusy("too many PDFs at once")
     try:
         footer = footer_text(audit_id, locale).replace("\\", "").replace('"', "")
