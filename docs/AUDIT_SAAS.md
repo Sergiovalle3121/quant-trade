@@ -1430,6 +1430,11 @@ without one, and an account never changes what a report says.
   1 crédito de tu cuenta" when their codes have credits left. The code that
   expires first is spent first; the credit and the unlock share one
   transaction, as with a typed code.
+- **From the list**: each full report links its PDF (`/audits/{id}/pdf`, opened
+  by the owner's session without the token) and, when published, its public
+  `/v/` page. The "¿Necesitas créditos?" box shows the single and pack prices
+  from the settings and a WhatsApp link with the request typed; with no
+  credits left it sits above the list.
 - **Comparing**: with two or more full reports, "Mis informes" lets the
   customer tick two and open `/cuenta/comparar` (`/account/comparar`), the
   same side-by-side view as `/comparar` without pasting private links. It is

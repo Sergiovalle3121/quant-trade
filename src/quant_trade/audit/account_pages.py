@@ -99,6 +99,8 @@ COPY: dict[str, dict[str, str]] = {
         "col_status": "Estado",
         "col_what": "Descripción",
         "open": "Abrir",
+        "pdf": "PDF",
+        "public_page": "Página pública",
         "compare_pick_label": "Elegir para comparar",
         "compare_button": "Comparar los dos elegidos",
         "compare_help": "Marca dos informes completos y compáralos lado a lado, sin pegar enlaces.",
@@ -144,6 +146,11 @@ COPY: dict[str, dict[str, str]] = {
         "col_method": "Con",
         "buy_title": "¿Necesitas créditos?",
         "buy_code": "Pedir un código por WhatsApp",
+        "buy_prices_single": "Un informe completo: {price}.",
+        "buy_prices_pack": "Paquete de 3 créditos: {price}.",
+        "buy_message": (
+            "Hola, quiero créditos para mi cuenta: un informe completo o el paquete de 3."
+        ),
         "buy_card": "Paga con tarjeta desde la vista previa de cualquier informe.",
         "security_title": "Contraseña y datos",
         "change_password": "Cambiar contraseña",
@@ -250,6 +257,8 @@ COPY: dict[str, dict[str, str]] = {
         "col_status": "Status",
         "col_what": "Description",
         "open": "Open",
+        "pdf": "PDF",
+        "public_page": "Public page",
         "compare_pick_label": "Pick to compare",
         "compare_button": "Compare the two picked",
         "compare_help": "Tick two full reports and compare them side by side, no links to paste.",
@@ -295,6 +304,9 @@ COPY: dict[str, dict[str, str]] = {
         "col_method": "With",
         "buy_title": "Need credits?",
         "buy_code": "Ask for a code on WhatsApp",
+        "buy_prices_single": "One full report: {price}.",
+        "buy_prices_pack": "Pack of 3 credits: {price}.",
+        "buy_message": "Hi, I want credits for my account: one full report or the pack of 3.",
         "buy_card": "Pay by card from the preview of any report.",
         "security_title": "Password and data",
         "change_password": "Change password",
@@ -369,6 +381,7 @@ background:#fff}
 border-bottom:1px solid var(--border);vertical-align:middle}
 .acct-table th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2)}
 .acct-scroll{overflow-x:auto}
+.acct-links{display:flex;gap:6px;flex-wrap:wrap}
 .acct-cls{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;
 font-weight:700;border:2px solid currentColor}
 .acct-tag{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:999px;
@@ -612,6 +625,11 @@ def report_href(audit_id: str, locale: str) -> str:
     return f"/audits/{audit_id}?lang={locale}"
 
 
+def _usd(cents: int) -> str:
+    whole, rest = divmod(cents, 100)
+    return f"USD {whole}" if rest == 0 else f"USD {whole}.{rest:02d}"
+
+
 def comparable(item: AccountAudit, *, free_mode: bool = False) -> bool:
     """Whether a report on the list can go into a side-by-side comparison."""
     return not item.purged and (item.paid or free_mode)
@@ -647,11 +665,22 @@ def _reports_table(
         status = "".join(f"<span class='acct-tag'>{_e(t)}</span>" for t in tags)
         # The description is the customer's text: wording the guard refuses is withheld.
         what = _safe_text(item.description) if item.description else copy["no_description"]
+        links = []
+        if not item.purged:
+            links.append((report_href(item.audit_id, locale), copy["open"]))
+        if comparable(item, free_mode=free_mode):
+            links.append((f"/audits/{item.audit_id}/pdf?lang={locale}", copy["pdf"]))
+        if item.public_id:
+            links.append((f"/v/{item.public_id}?lang={locale}", copy["public_page"]))
         opener = (
-            ""
-            if item.purged
-            else f"<a class='btn btn-ghost btn-sm' href='{_e(report_href(item.audit_id, locale))}'>"
-            f"{_e(copy['open'])}</a>"
+            "<div class='acct-links'>"
+            + "".join(
+                f"<a class='btn btn-ghost btn-sm' href='{_e(href)}'>{_e(label)}</a>"
+                for href, label in links
+            )
+            + "</div>"
+            if links
+            else ""
         )
         pick = ""
         if pickable:
@@ -758,6 +787,8 @@ def account_page(
     card_payments: bool = False,
     contact_url: str = "",
     free_mode: bool = False,
+    price_cents: int = 0,
+    pack_price_cents: int = 0,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -811,9 +842,17 @@ def account_page(
     buy = ""
     if (access_codes and contact_url) or card_payments:
         lines = ""
+        if price_cents > 0:
+            prices = copy["buy_prices_single"].format(price=_usd(price_cents))
+            if pack_price_cents > 0:
+                prices += " " + copy["buy_prices_pack"].format(price=_usd(pack_price_cents))
+            lines += f"<p>{_e(prices)}</p>"
         if access_codes and contact_url:
+            from quant_trade.audit.report import _prefilled
+
+            href = _prefilled(contact_url, copy["buy_message"])
             lines += (
-                f"<p><a class='btn btn-dark' href='{_e(contact_url)}' rel='noopener noreferrer' "
+                f"<p><a class='btn btn-dark' href='{_e(href)}' rel='noopener noreferrer' "
                 f"target='_blank'>{icon('chat')}{_e(copy['buy_code'])}</a></p>"
             )
         if card_payments:
@@ -861,9 +900,11 @@ def account_page(
         _alert(copy, error, flash)
         + header
         + kpis
+        # Without credits, how to get more comes before the list.
+        + (buy if credits == 0 else "")
         + reports
         + codes_html
-        + buy
+        + (buy if credits > 0 else "")
         + purchases
         + security
     )
