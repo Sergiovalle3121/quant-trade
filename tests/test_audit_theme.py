@@ -411,3 +411,44 @@ def test_losing_history_capital_card_reads_as_one_sentence() -> None:
         assert held.startswith("<div class='live-verdict held'>")
         assert f"<span class='muted'>{start}" in held and f"{end}</span>" in held
         assert find_claims(held) == []
+
+
+def test_full_report_flags_and_not_measured_read_as_cards() -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+    from quant_trade.audit.schema import AuditResult
+    from quant_trade.audit.theme import STYLE
+
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    data["red_flags"] = [
+        {
+            "code": "PROFIT_CONCENTRATION",
+            "severity": "WARN",
+            "detail": "the best trade makes 41% of the total of the winning trades (64 trades)",
+            "value": 0.41,
+        },
+        {"code": "IMPLAUSIBLE_SHARPE", "severity": "FAIL", "detail": "sharpe 9.1", "value": 9.1},
+    ]
+    data["benchmark"] = {"status": "NOT_MEASURED", "reason": "no benchmark was uploaded"}
+    for locale in ("es", "en"):
+        page = render_html(AuditResult.model_validate(data), watermark=False, locale=locale)
+        cards = page[page.index("<ul class='flag-list acct-flags flag-cards'>") :]
+        # The graver flag comes first; the code stays, small, under its title.
+        assert cards.index("IMPLAUSIBLE_SHARPE") < cards.index("PROFIT_CONCENTRATION")
+        assert "<p class='flag-code'>PROFIT_CONCENTRATION</p>" in cards
+        assert "<td>PROFIT_CONCENTRATION</td>" not in page
+        assert "<ul class='nm-list'><li><b>" in page
+        assert ("Resultado concentrado" if locale == "es" else "Result carried") in cards
+        assert find_claims(page) == []
+    assert ".nm-list li{" in STYLE and ".flag-cards li,.nm-list li{break-inside:avoid" in STYLE
+    # Huge figures wrap inside their cell in the PDF instead of leaving the page.
+    assert "td+td{overflow-wrap:anywhere}" in STYLE
+
+
+def test_declared_midnight_dates_and_seal_rows_read_plainly() -> None:
+    from quant_trade.audit.report import LABELS, _evidence_rows, _fmt
+
+    assert _fmt("2024-06-03T00:00:00Z") == "2024-06-03"
+    assert _fmt("2024-06-02T23:59:59Z") == "2024-06-02T23:59:59Z"
+    held = {"status": "NOT_MEASURED", "reason": "no benchmark was uploaded"}
+    assert _evidence_rows(held, LABELS["es"], skip=set()) == ""
