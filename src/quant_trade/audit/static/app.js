@@ -187,4 +187,23 @@
       reader.readAsText(file.slice(0, 65536));
     });
   });
+
+  // A PDF takes a few seconds to render: say so on the button that asked for it.
+  ready(function () {
+    d.querySelectorAll("a[download][data-busy]").forEach(function (link) {
+      link.addEventListener("click", function (ev) {
+        if (link.getAttribute("aria-busy") === "true") {
+          ev.preventDefault();
+          return;
+        }
+        var label = link.textContent;
+        link.textContent = link.getAttribute("data-busy");
+        link.setAttribute("aria-busy", "true");
+        window.setTimeout(function () {
+          link.textContent = label;
+          link.removeAttribute("aria-busy");
+        }, 8000);
+      });
+    });
+  });
 })();

@@ -166,3 +166,25 @@ def test_a_second_download_of_the_same_report_is_not_rendered_again(
     assert english.content == b"%PDF-en"
     assert calls == ["es", "en"]
     assert client.get(f"/audits/{audit_id}/pdf?token=wrong").status_code == 404
+
+
+def test_pdf_buttons_say_the_pdf_is_being_prepared(tmp_path: Path) -> None:
+    """A render takes a few seconds: the buttons carry the busy text the script
+    shows on click, and pages without script say it beside the button."""
+    from quant_trade.audit.guard import find_claims
+    from quant_trade.audit.theme import STATIC_DIR
+
+    client = _client(tmp_path)
+    location = _upload(client)
+    for lang, busy, wait in (
+        ("es", "Generando tu PDF… (unos segundos)", "El PDF tarda unos segundos en generarse."),
+        ("en", "Preparing your PDF… (a few seconds)", "The PDF takes a few seconds to prepare."),
+    ):
+        pages = (client.get(f"{location}&lang={lang}").text,)
+        pages += (client.get("/ejemplo" if lang == "es" else "/sample").text,)
+        for page in pages:
+            assert page.count(f"download data-busy='{busy}'") == 2
+            assert f"<noscript> <span class='muted'>{wait}</span></noscript>" in page
+            assert find_claims(page) == []
+    script = (STATIC_DIR / "app.js").read_text()
+    assert "a[download][data-busy]" in script and "aria-busy" in script
