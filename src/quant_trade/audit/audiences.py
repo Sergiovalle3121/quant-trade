@@ -976,6 +976,179 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
         },
     ),
+    Audience(
+        slug="inversores-particulares",
+        slug_en="retail-investors",
+        icon="globe",
+        text={
+            "es": AudienceText(
+                title="Si inviertes por tu cuenta con DEGIRO, Trading 212, IBKR o XTB, revisa "
+                "tu historial",
+                summary=(
+                    "Sube el historial de tu bróker o la evolución de tu cartera y mira si tu "
+                    "resultado se distingue del azar, cuánto pesan las comisiones y cómo le fue "
+                    "en caídas conocidas del mercado."
+                ),
+                pains=(
+                    "Tu bróker te enseña cuánto subió tu cartera, pero no si eso se distingue "
+                    "del azar ni cómo queda frente a un índice.",
+                    "Las comisiones y el cambio de moneda se comen parte del resultado y no se "
+                    "ven en una sola cifra.",
+                    "Unas pocas operaciones o unos pocos meses muy buenos pueden sostener todo "
+                    "el historial.",
+                ),
+                uploads=(
+                    (
+                        "El historial de operaciones de tu bróker en CSV o Excel: DEGIRO "
+                        "(Transacciones), Trading 212 (historial), Interactive Brokers (Flex "
+                        "Query o Activity Statement) o XTB (historial de posiciones cerradas).",
+                        "csv-universal",
+                    ),
+                    (
+                        "O la evolución de tu cartera: su valor o su rentabilidad por fecha "
+                        "(diaria, semanal o mensual), en CSV o Excel.",
+                        "",
+                    ),
+                    (
+                        "Si quieres compararte con un índice, su serie en CSV en «Opciones "
+                        "avanzadas» (Benchmark).",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "¿Se distingue del azar?",
+                        "Si tu resultado se distingue de cero dada la longitud y la volatilidad "
+                        "de tu historial.",
+                    ),
+                    (
+                        "Frente al índice",
+                        "Si subes la serie de un índice, tu resultado frente a él en las mismas "
+                        "fechas.",
+                    ),
+                    (
+                        "Lo que pesan las comisiones",
+                        "Con tus operaciones y sus costes, qué queda con el doble y el triple "
+                        "de comisiones.",
+                    ),
+                    (
+                        "Tus mejores operaciones y meses",
+                        "El resultado sin ellos, para ver si todo depende de unos pocos.",
+                    ),
+                    (
+                        "Caídas conocidas del mercado",
+                        "Cómo le fue a tu historial en 2008, en marzo de 2020 o en 2022, si tus "
+                        "fechas cubren esas caídas completas.",
+                    ),
+                    (
+                        "¿Sigue igual en el periodo reciente?",
+                        "El último tercio del historial frente al resto.",
+                    ),
+                ),
+                limits=(
+                    "Con el historial de operaciones solo cuenta lo que ya vendiste: las "
+                    "posiciones abiertas y los dividendos quedan fuera, y el informe lo dice. "
+                    "Para verlo todo, sube la evolución de tu cartera.",
+                    "No se conecta a tu bróker, no te dice qué comprar y no predice resultados.",
+                ),
+                faq=(
+                    (
+                        "Solo compro y mantengo, ¿me sirve?",
+                        "Sí, con la evolución de tu cartera (su valor o su rentabilidad por "
+                        "mes). Con el historial de operaciones solo verías lo que vendiste.",
+                    ),
+                    (
+                        "¿Necesita la contraseña de mi bróker?",
+                        "No. Solo el archivo que exportas tú; Rigor no se conecta a ningún "
+                        "bróker.",
+                    ),
+                ),
+            ),
+            "en": AudienceText(
+                title="If you invest on your own with DEGIRO, Trading 212, IBKR or XTB, check "
+                "your history",
+                summary=(
+                    "Upload your broker's history or your portfolio's value over time and see "
+                    "whether your result stands out from luck, how much the fees weigh and how "
+                    "it did through well-known market falls."
+                ),
+                pains=(
+                    "Your broker shows how much your portfolio grew, but not whether that "
+                    "stands out from luck or how it compares with an index.",
+                    "Fees and currency conversion eat part of the result and do not show in a "
+                    "single figure.",
+                    "A few very good trades or months can carry the whole history.",
+                ),
+                uploads=(
+                    (
+                        "Your broker's trade history in CSV or Excel: DEGIRO (Transactions), "
+                        "Trading 212 (history), Interactive Brokers (Flex Query or Activity "
+                        "Statement) or XTB (closed position history).",
+                        "csv-universal",
+                    ),
+                    (
+                        "Or your portfolio over time: its value or its return by date (daily, "
+                        "weekly or monthly), in CSV or Excel.",
+                        "",
+                    ),
+                    (
+                        "To compare yourself with an index, its series as a CSV under "
+                        "'Advanced options' (Benchmark).",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Does it stand out from luck?",
+                        "Whether your result is distinguishable from zero given the length and "
+                        "volatility of your history.",
+                    ),
+                    (
+                        "Against the index",
+                        "If you upload an index series, your result against it over the same "
+                        "dates.",
+                    ),
+                    (
+                        "What the fees weigh",
+                        "With your trades and their costs, what is left at double and triple "
+                        "fees.",
+                    ),
+                    (
+                        "Your best trades and months",
+                        "The result without them, to see whether everything rests on a few.",
+                    ),
+                    (
+                        "Well-known market falls",
+                        "How your history did in 2008, in March 2020 or in 2022, when your "
+                        "dates cover those falls in full.",
+                    ),
+                    (
+                        "Is it the same in the recent period?",
+                        "The last third of the history against the rest.",
+                    ),
+                ),
+                limits=(
+                    "With the trade history it only counts what you already sold: open "
+                    "positions and dividends are left out, and the report says so. To see "
+                    "everything, upload your portfolio over time.",
+                    "It does not connect to your broker, does not tell you what to buy and "
+                    "does not predict results.",
+                ),
+                faq=(
+                    (
+                        "I only buy and hold. Does it work for me?",
+                        "Yes, with your portfolio over time (its value or its return by "
+                        "month). With the trade history you would only see what you sold.",
+                    ),
+                    (
+                        "Does it need my broker password?",
+                        "No. Only the file you export yourself; Rigor does not connect to any "
+                        "broker.",
+                    ),
+                ),
+            ),
+        },
+    ),
 )
 
 AUDIENCES_BY_PATH: dict[str, dict[str, Audience]] = {

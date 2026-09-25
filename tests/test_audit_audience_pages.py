@@ -158,3 +158,24 @@ def test_signal_copiers_have_their_own_page(
     # The other case pages link to it too.
     other = client.get(audience_url("compradores-de-robots", locale)).text
     assert f"href='{path}'" in other
+
+
+@pytest.mark.parametrize(
+    ("locale", "path", "words"),
+    [
+        ("es", "/para/inversores-particulares", ("DEGIRO", "Trading 212", "dividendos")),
+        ("en", "/for/retail-investors", ("DEGIRO", "Trading 212", "dividends")),
+    ],
+)
+def test_retail_investors_have_their_own_page(
+    tmp_path: Path, locale: str, path: str, words: tuple[str, ...]
+) -> None:
+    client = _client(tmp_path, free_mode=False, access_codes=True, price_usd_cents=2900)
+    text = client.get(path).text
+    for word in words:
+        assert word in text
+    # The page says what a trade history leaves out (open positions, dividends).
+    assert find_claims(text) == []
+    landing = client.get("/" if locale == "es" else "/en").text
+    assert landing.count("class='card spot audience'") == 4
+    assert f"href='{path}'" in landing
