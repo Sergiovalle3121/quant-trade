@@ -624,3 +624,36 @@ def test_behaviour_findings_read_as_what_it_shows_then_the_question(locale: str,
         plain = re.sub(r"<[^>]+>", " ", item)
         assert " ".join(plain.split()) == " ".join(text.split())
     assert ".beh-asks li{margin-top:12px" in STYLE
+
+
+def test_instrument_findings_read_like_behaviour_ones_and_a_lone_fact_sits_in_a_row() -> None:
+    from test_audit_instruments import _book
+
+    from quant_trade.audit.instruments import instrument_review
+    from quant_trade.audit.report import LABELS, _instruments_html
+
+    trades, symbols = _book(
+        {"XAUUSD": [50.0] * 15, "EURUSD": [-5.0, 2.0] * 10, "GBPUSD": [-6.0, 3.0] * 10}
+    )
+    review = instrument_review(trades, symbols)
+    for locale, lead in (("es", "Pregunta"), ("en", "Ask")):
+        html = _instruments_html(review, locale, LABELS[locale])
+        # Each finding: what the trades show, then the question on its own line.
+        assert "<ul class='beh-asks'>" in html and html.count("<p class='beh-ask'>") == 2
+        assert f"<span>{lead} " in html
+        assert find_claims(html) == []
+    # One headline figure reads as a row beside its sentence on screens, not a lone tile.
+    assert "@media screen and (min-width:621px){.facts>.fact:only-child{display:flex" in STYLE
+
+
+def test_the_live_account_line_sits_apart_under_the_verdict_with_its_tone(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    page = client.get("/ejemplo").text
+    # The sample carries a live account: one line under the verdict, toned by the outcome.
+    assert "<p class='verdict-live weak'>" in page
+    for tone, token in (("pass", "--ok"), ("weak", "--warn"), ("fail", "--bad")):
+        assert f".verdict-live.{tone}::before{{background:var({token})" in STYLE
+    assert ".verdict-live{margin:20px 0 0;padding-top:16px;border-top:1px solid" in STYLE
+    # In the PDF it keeps the verdict's print size and turns black like it.
+    assert ".verdict-text,.verdict-lead,.verdict-live," in STYLE
+    assert ".verdict-live{border-top-color:#ddd;font-size:9pt" in STYLE
