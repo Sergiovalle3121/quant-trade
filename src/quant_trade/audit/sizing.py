@@ -162,7 +162,7 @@ def capital_review(
     history = float(_deepest_fall(pnl))
     resampled = float(np.percentile(falls, QUANTILE))
     reference = max(resampled, history, platform or 0.0, curve or 0.0)
-    if reference <= 0:
+    if not math.isfinite(reference) or reference <= 0:
         return {"status": "NOT_MEASURED", "reason": "the trades show no fall to size against"}
 
     balance = starting_balance if starting_balance and starting_balance > 0 else None

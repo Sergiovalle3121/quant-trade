@@ -111,6 +111,11 @@ Limits, each written into the report as a reading warning:
 - An optimisation export cell placed past column 4,096 by `ss:Index`
   (`MAX_OPTIMIZATION_COLUMNS`) ends its row: a 200-byte crafted index
   would otherwise pad one row with hundreds of millions of empty cells.
+- An account value over 10^15 (`MAX_ACCOUNT_VALUE`), or a return over
+  10^6 in one period (`MAX_PERIOD_RETURN`), is refused (`value_too_large`):
+  a 1e308 profit overflowed every later sum and the report page failed.
+  The capital section is not measured when its reference fall is not a
+  finite number.
 - NUL characters are dropped when a report is decoded (`decode_text`) and
   from the stored report page: PostgreSQL refuses text holding one, so a
   stray NUL in a robot's name failed the upload with a server error. A
