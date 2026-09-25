@@ -676,17 +676,28 @@ def _platform_fall(metadata: dict[str, str]) -> float | None:
 HIDDEN_LOSS_FLAGS = frozenset({"GRID_AVERAGING", "HIDDEN_FLOATING_DRAWDOWN"})
 #: An uploaded curve is read as money when it starts this close to the starting balance.
 CURVE_MONEY_TOLERANCE = 0.10
+#: Days of slack when checking that the curve covers the trades' dates.
+CURVE_COVER_SLACK_DAYS = 1
 
 
 def _curve_fall(inputs: AuditInputs) -> float | None:
     """Deepest fall in money of an uploaded equity curve that includes open trades.
 
-    Only a curve the client uploaded (not one rebuilt from closed trades) and
+    Only a curve the client uploaded (not one rebuilt from closed trades),
     only when it starts at the stated balance, so an index curve is not read
-    as money."""
+    as money, and only when it covers the trades from the first entry to the
+    last exit, so a short curve cannot stand in for the whole history."""
     balance = inputs.initial_balance or inputs.declared.initial_balance
-    equity = inputs.equity.frame["equity"].to_numpy(dtype=float)
-    if inputs.balance_only or not balance or len(equity) < 2:
+    frame = inputs.equity.frame
+    equity = frame["equity"].to_numpy(dtype=float)
+    trades = inputs.trades.trades if inputs.trades is not None else []
+    if inputs.balance_only or not balance or len(equity) < 2 or not trades:
+        return None
+    stamps = pd.to_datetime(frame["timestamp"], utc=True)
+    slack = pd.Timedelta(days=CURVE_COVER_SLACK_DAYS)
+    first = pd.Timestamp(min(trade.entry_time for trade in trades))
+    last = pd.Timestamp(max(trade.exit_time for trade in trades))
+    if stamps.iloc[0] > first + slack or stamps.iloc[-1] < last - slack:
         return None
     if abs(equity[0] / balance - 1) > CURVE_MONEY_TOLERANCE:
         return None

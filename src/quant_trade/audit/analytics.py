@@ -556,6 +556,12 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "Which modelling mode and history quality was the backtest run with "
         "(real ticks, 1-minute OHLC, open prices only)?",
     },
+    "best_trade": {
+        "es": "¿Qué pasó en la mejor operación (fecha, tamaño, precio) y qué resultado deja el "
+        "sistema sin ella?",
+        "en": "What happened in the best trade (date, size, price), and what result does the "
+        "system leave without it?",
+    },
     "original_file": {
         "es": "¿Puedes enviar el archivo original que exportó MetaTrader, sin editar, con el "
         "encabezado y la lista completa de operaciones?",
@@ -632,6 +638,7 @@ _FLAG_QUESTIONS: dict[str, str] = {
     "MANY_CONCURRENT_POSITIONS": "grid",
     "HIDDEN_FLOATING_DRAWDOWN": "equity_curve",
     "NO_STOP_EVIDENCE": "stop_loss",
+    "PROFIT_CONCENTRATION": "best_trade",
     "NEGATIVE_PAYOFF_HIGH_WINRATE": "payoff",
     "GAIN_INFLATED_BY_FLOWS": "deposits",
     "DEPOSIT_DURING_DRAWDOWN": "deposits",

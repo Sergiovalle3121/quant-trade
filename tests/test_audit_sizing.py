@@ -57,7 +57,7 @@ def test_capital_and_size_follow_from_the_reference_fall() -> None:
 def test_costs_deepen_the_fall_and_results_are_reproducible() -> None:
     trades = _trades(PROFITS)
     plain = capital_review(trades, fees=None, starting_balance=None, seed=1)
-    costly = capital_review(trades, fees=[5.0] * len(trades), starting_balance=None, seed=1)
+    costly = capital_review(trades, fees=[2.0] * len(trades), starting_balance=None, seed=1)
     assert costly["fall_history"]["value"] > plain["fall_history"]["value"]
     assert plain == capital_review(trades, fees=None, starting_balance=None, seed=1)
     assert plain["rows"][0]["size_share"]["evidence"] == "NOT_MEASURED"
@@ -179,3 +179,20 @@ def test_grid_is_sized_on_a_money_curve_and_held_back_on_an_index(scale: float) 
         assert capital["status"] == "NOT_MEASURED"
         assert "open losses" in capital["reason"]
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_curve_that_misses_the_trades_is_no_floor() -> None:
+    curve = positive_drift(400)
+    inputs = build_inputs(
+        csv_bytes(curve.head(5)),
+        DeclaredMetadata(initial_balance=10_000.0),
+        trades_bytes=csv_bytes(_grid_trades(curve)),
+    )
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300)
+    assert result.capital is not None and result.capital["status"] == "NOT_MEASURED"
+    assert "open losses" in result.capital["reason"]
+
+
+def test_a_history_that_loses_gets_no_size() -> None:
+    review = capital_review(_trades([-5.0] * 60), fees=None, starting_balance=10_000.0)
+    assert review["status"] == "NOT_MEASURED" and "net loss" in review["reason"]

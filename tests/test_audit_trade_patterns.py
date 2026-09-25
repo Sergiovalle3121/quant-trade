@@ -126,3 +126,50 @@ def test_no_stop_evidence_from_losses_and_excursions() -> None:
     flags = scan_trade_patterns(_parsed(trades), adverse_excursion=excursions)
     flag = next(f for f in flags if f.code == "NO_STOP_EVIDENCE")
     assert "adverse excursion" in flag.detail
+
+
+def _with_best(best: float, n: int = 40, each: float = 1.0) -> list[Trade]:
+    rest = [_trade(10 * i, 10 * i + 5, 1.0, 100.0, each) for i in range(n - 1)]
+    return [*rest, _trade(10 * n, 10 * n + 5, 1.0, 100.0, best)]
+
+
+def test_one_trade_carrying_the_result_fails() -> None:
+    assert _codes(_with_best(1e9))["PROFIT_CONCENTRATION"] == "FAIL"
+    assert _codes(_with_best(25.0))["PROFIT_CONCENTRATION"] == "WARN"
+    assert "PROFIT_CONCENTRATION" not in _codes(_with_best(5.0))
+    assert "PROFIT_CONCENTRATION" not in _codes(_with_best(1e9, n=20))
+
+
+def test_five_trades_carrying_all_of_it_warn() -> None:
+    losers = [_trade(10 * i, 10 * i + 5, 1.0, 100.0, -1.0) for i in range(40)]
+    winners = [_trade(500 + i, 505 + i, 1.0, 100.0, 20.0) for i in range(5)]
+    flags = scan_trade_patterns(_parsed(losers + winners))
+    flag = next(flag for flag in flags if flag.code == "PROFIT_CONCENTRATION")
+    assert flag.severity == "WARN" and "best 5 trades" in flag.detail
+
+
+def test_one_trade_result_is_class_d_and_renders_clean() -> None:
+    import pandas as pd
+    from audit_fixtures import csv_bytes, positive_drift, trades_following
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.guard import assert_report_clean
+    from quant_trade.audit.i18n import untranslated
+    from quant_trade.audit.report import render
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    curve = positive_drift(800)
+    trades = trades_following(curve, every=10)
+    big = trades.iloc[[-1]].copy()
+    big["exit_price"] = 100.0 + 1e6 / 100.0
+    trades = pd.concat([trades.iloc[:-1], big], ignore_index=True)
+    for locale in ("es", "en"):
+        inputs = build_inputs(
+            csv_bytes(curve), DeclaredMetadata(locale=locale), trades_bytes=csv_bytes(trades)
+        )
+        result = run_audit(inputs, bootstrap_samples=200, risk_samples=300)
+        flag = next(f for f in result.red_flags if f["code"] == "PROFIT_CONCENTRATION")
+        assert flag["severity"] == "FAIL" and result.verdict.overall == "D"
+        html, _ = render(result, watermark=False)
+        assert_report_clean(html)
+        assert untranslated(result.model_dump(mode="json")) == []
