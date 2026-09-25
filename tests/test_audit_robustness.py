@@ -468,3 +468,16 @@ def test_a_trades_csv_row_that_closes_before_it_opens_is_dropped() -> None:
     parsed = parse_trades_csv(data)
     assert len(parsed.trades) == 2
     assert parsed.invalid_rows == 1
+
+
+def test_damaged_tester_header_values_are_not_declared() -> None:
+    from quant_trade.audit.testdata import data_quality, review_test_data
+
+    assert data_quality("-5%") is None
+    for raw in ("-7", "1e300"):
+        review, _ = review_test_data(
+            source_format=importers.MT4_TESTER_HTML,
+            metadata={"mismatched_chart_errors": raw},
+            trades=None,
+        )
+        assert review["mismatched_chart_errors"]["evidence"] == "NOT_MEASURED", raw
