@@ -102,10 +102,7 @@ ICONS: dict[str, str] = {
     "key": "<circle cx='8' cy='15' r='4'/><path d='M11 12l9-9M17 6l3 3M14 9l2 2'/>",
     "bell": "<path d='M4 19c3-5 4-14 8-14s5 9 8 14'/><path d='M4 19h16'/>",
     "layers": "<path d='M12 3l9 5-9 5-9-5z'/><path d='M3 13l9 5 9-5'/>",
-    "coins": (
-        "<ellipse cx='12' cy='6' rx='7' ry='3'/><path d='M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6'/>"
-        "<path d='M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6'/>"
-    ),
+    "percent": "<path d='M19 5L5 19'/><circle cx='7' cy='7' r='2.5'/><circle cx='17' cy='17' r='2.5'/>",
     "split": "<path d='M4 20V4M20 20V4M4 12h16'/><path d='M12 8v8' stroke-dasharray='2 2'/>",
     "database": (
         "<ellipse cx='12' cy='5' rx='8' ry='3'/><path d='M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5'/>"
