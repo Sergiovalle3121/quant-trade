@@ -34,6 +34,9 @@ no extra cost beyond what the uploaded report already lists (there is no
 hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
 at least 30 return observations. Platform reports and the MT5 optimisation export
 may be 10 MB (about 11,000 optimisation passes at some 900 bytes each).
+A larger optimisation export is refused with what to do instead: optimise
+again with the genetic algorithm or narrower ranges, or upload the report alone
+and type the pass count in "Configurations tried" (then DECLARED).
 A forward export whose Forward Result cell is blank or not a number on some
 passes is still read as a forward export: those passes are left out of the
 forward review, and the plateau check never reads its Profit column.

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.forward import UNNAMED_FORWARD, forward_review, is_forward, unnamed_forward
-from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.importers import parse_optimization
 from quant_trade.audit.plateau import parameter_stability
@@ -212,3 +212,22 @@ def test_the_optimisation_export_may_be_as_large_as_a_report(tmp_path: Path) -> 
     }
     response = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
     assert response.status_code == 303
+
+
+@pytest.mark.parametrize(("lang", "hint"), [("es", "genético"), ("en", "genetic")])
+def test_an_optimisation_over_the_limit_says_what_to_do(
+    tmp_path: Path, lang: str, hint: str
+) -> None:
+    export = _export(_lost)
+    settings = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db", max_upload_bytes=len(export) // 3
+    )
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    files = {
+        "report": ("ReportTester.html", (FIXTURES / "mt5_tester.html").read_bytes(), "text/html"),
+        "optimization": ("ReportOptimizer.xml", export, "text/xml"),
+    }
+    response = client.post("/audits", files=files, data={"consent": "on", "locale": lang})
+    assert response.status_code == 413
+    assert hint in response.text
+    assert find_claims(response.text) == []

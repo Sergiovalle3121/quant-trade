@@ -115,6 +115,20 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "El archivo {what} supera el límite de {limit} bytes.",
         "en": "The {what} file exceeds {limit} bytes.",
     },
+    "optimization_too_large": {
+        "es": (
+            "El XML de optimización supera el límite de {limit} bytes (unas {passes} pasadas). "
+            "Vuelve a optimizar con el algoritmo genético o con rangos de parámetros más "
+            "cortos y exporta de nuevo. También puedes subir el informe sin el XML y "
+            "escribir el número de pasadas en «Configuraciones probadas»."
+        ),
+        "en": (
+            "The optimisation XML exceeds {limit} bytes (about {passes} passes). Optimise "
+            "again with the genetic algorithm or narrower parameter ranges and export it "
+            "again. You can also upload the report without the XML and type the number of "
+            'passes in "Configurations tried".'
+        ),
+    },
     "equity_required": {
         "es": (
             "Falta el archivo: sube el informe de tu plataforma (MetaTrader, TradingView...) "
@@ -302,6 +316,8 @@ UPLOAD_FIELDS = 7
 #: 900 bytes a pass, so 5 MB stopped at some 5,500 passes, fewer than a
 #: common genetic run.
 REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
+#: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
+OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
@@ -1087,12 +1103,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 "variants": await _read_limited(variants, what="variants"),
             }
         except UploadTooLarge as exc:
-            text = message(
-                "too_large",
-                loc,
-                what=UPLOAD_NAMES[exc.what][loc],
-                limit=f"{_field_limit(exc.what):,}",
-            )
+            limit = _field_limit(exc.what)
+            if exc.what == "optimization":
+                passes = f"{limit // OPTIMIZATION_PASS_BYTES:,}"
+                text = message("optimization_too_large", loc, limit=f"{limit:,}", passes=passes)
+            else:
+                text = message(
+                    "too_large", loc, what=UPLOAD_NAMES[exc.what][loc], limit=f"{limit:,}"
+                )
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:
             return _html_error(request, 400, message("equity_required", loc), loc)
