@@ -141,7 +141,8 @@ def synthetic_mt5_report(
     balance = 10_000.0
     price = 1.1
     rows = [
-        f"<tr><td>{dates[0]:%Y.%m.%d} 00:00:00</td><td>1</td><td></td><td>balance</td><td></td><td></td>"
+        f"<tr><td>{dates[0]:%Y.%m.%d} 00:00:00</td><td>1</td><td></td><td>balance</td>"
+        "<td></td><td></td>"
         "<td></td><td></td><td>0.00</td><td>0.00</td><td>10 000.00</td><td>10 000.00</td>"
         "<td></td></tr>"
     ]
