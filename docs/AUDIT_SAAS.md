@@ -1529,7 +1529,19 @@ changes what a report says.
   on any account, or when the network address reached the monthly cap. The
   `welcome_reports` row outlives the account, so deleting and signing up
   again does not repeat it. The purge clears the address; the device and
-  file hashes stay. "Mi cuenta" shows it as Disponible/Usado.
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
+  a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
+  and returns rounded to 5 decimals), so a trailing newline, other line
+  endings or renamed columns do not make a new file.
+- **Limits under simultaneous uploads** (`free_claims` table). The checks
+  above are a first look that answers at once; after parsing, the upload
+  takes its claims in one transaction, all or nothing: the free report takes
+  `welcome:account:`, `welcome:device:`, `welcome:file:` and one numbered
+  per-network slot of the month; a free preview takes one of the account's
+  3 numbered slots of the month and one of the network's 10. A claim that
+  is taken sends the upload down the next rule (preview, credit, 402 with
+  no audit kept). A failed upload gives its claims back. Network keys hold
+  a hash of the address and the retention purge deletes them.
 
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`

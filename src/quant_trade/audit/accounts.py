@@ -30,6 +30,7 @@ import hmac
 import re
 import secrets
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlsplit
 
 #: scrypt cost: about 16 MB and a few tens of milliseconds per hash.
@@ -213,9 +214,12 @@ __all__ = [
     "WELCOME_FULL_REPORT",
     "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
+    "claim_month",
+    "content_fingerprint",
     "hash_password",
     "hash_secret",
     "month_start",
+    "network_key",
     "new_secret",
     "normalise_email",
     "password_problem",
@@ -224,3 +228,27 @@ __all__ = [
     "valid_email",
     "verify_password",
 ]
+
+
+def content_fingerprint(frame: Any) -> str:
+    """SHA-256 of what a file says, not of its bytes.
+
+    The curve's timestamps and returns rounded to five decimals: the same
+    track record with a trailing newline, other line endings, extra spaces
+    or renamed columns gives the same fingerprint, so it cannot collect a
+    second free full report on another account.
+    """
+    digest = hashlib.sha256()
+    for stamp, ret in zip(frame["timestamp"], frame["ret"], strict=False):
+        value = 0.0 if ret != ret else round(float(ret), 5)  # NaN on the first row
+        digest.update(f"{stamp}|{value:.5f}\n".encode())
+    return digest.hexdigest()
+
+
+def claim_month(at: datetime) -> str:
+    return at.strftime("%Y-%m")
+
+
+def network_key(client_ip: str) -> str:
+    """The address as it goes into a claim key: hashed, never in clear."""
+    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()[:32]

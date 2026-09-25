@@ -1027,3 +1027,126 @@ def test_the_free_report_address_is_cleared_by_the_purge(tmp_path: Path) -> None
         )
         == "device"
     )
+
+
+# -- the limits hold under simultaneous uploads ------------------------------------
+def test_claims_are_all_or_nothing_and_never_hand_out_a_slot_twice(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    _, store, _ = _client(tmp_path)
+    slots = {"account": [f"preview:account:a:2026-09:{n}" for n in range(3)]}
+
+    def claim(i: int) -> str:
+        return store.claim_free(f"r{i}", keys=(), slots=slots, at=NOW)  # type: ignore[attr-defined]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(claim, range(8)))
+    assert results.count("") == 3 and results.count("account") == 5
+    # A full group rolls back the keys taken in the same call.
+    assert store.claim_free("x", keys=("k",), slots=slots, at=NOW) == "account"  # type: ignore[attr-defined]
+    assert store.claim_free("y", keys=("k",), slots={}, at=NOW) == ""  # type: ignore[attr-defined]
+    assert store.claim_free("z", keys=("k",), slots={}, at=NOW) == "key"  # type: ignore[attr-defined]
+    store.release_free("y")  # type: ignore[attr-defined]
+    assert store.claim_free("z", keys=("k",), slots={}, at=NOW) == ""  # type: ignore[attr-defined]
+
+
+def test_the_free_report_holds_when_the_first_look_is_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Simultaneous uploads all pass the first look; the claims stop them."""
+    from quant_trade.audit import accounts
+
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    monkeypatch.setattr(store, "welcome_refusal", lambda *a, **k: "")
+    monkeypatch.setattr(store, "free_previews_since", lambda *a, **k: 0)
+    monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 50)
+    outcomes = []
+    for n in range(6):
+        browser = TestClient(client.app)
+        browser.cookies.set("rigor_device", "same-browser-id")
+        _signup(browser, f"user{n}@example.com", welcome=True)
+        files = {"equity": ("e.csv", csv_bytes(positive_drift(400 + n, seed=n + 20)), "text/csv")}
+        answer = browser.post(
+            "/audits",
+            files=files,
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": f"198.51.100.{n}"},
+            follow_redirects=False,
+        )
+        outcomes.append(answer.headers["location"])
+    assert sum("acct=welcome" in where for where in outcomes) == 1
+
+
+def test_the_free_report_network_cap_and_previews_hold_when_the_first_look_is_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    monkeypatch.setattr(store, "welcome_refusal", lambda *a, **k: "")
+    monkeypatch.setattr(store, "free_previews_since", lambda *a, **k: 0)
+    monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 50)
+    ip = {"X-Forwarded-For": "203.0.113.90"}
+    welcomes = 0
+    for n in range(5):
+        browser = TestClient(client.app)
+        _signup(browser, f"net{n}@example.com", welcome=True)
+        files = {"equity": ("e.csv", csv_bytes(positive_drift(400 + n, seed=n + 40)), "text/csv")}
+        answer = browser.post(
+            "/audits", files=files, data={"consent": "on"}, headers=ip, follow_redirects=False
+        )
+        welcomes += "acct=welcome" in answer.headers["location"]
+    assert welcomes == 3  # WELCOME_REPORTS_PER_IP_PER_MONTH
+    # One account's previews stop at 3 even when every first look says 0 used.
+    solo = TestClient(client.app)
+    _signup(solo, "solo@example.com")
+    statuses = [
+        solo.post(
+            "/audits",
+            files={"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")},
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": "192.0.2.10"},
+            follow_redirects=False,
+        ).status_code
+        for _ in range(5)
+    ]
+    assert statuses == [303, 303, 303, 402, 402]
+    account = store.find_account("solo@example.com")  # type: ignore[attr-defined]
+    # A refused upload leaves no audit behind on the account.
+    assert len(store.account_audits_list(account.id)) == 3  # type: ignore[attr-defined]
+
+
+def test_one_extra_byte_does_not_make_a_new_file(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    body = csv_bytes(positive_drift(450, seed=11))
+    _signup(client, "a@example.com", welcome=True)
+    first = client.post(
+        "/audits",
+        files={"equity": ("a.csv", body, "text/csv")},
+        data={"consent": "on"},
+        follow_redirects=False,
+    )
+    assert "acct=welcome" in first.headers["location"]
+    other = TestClient(client.app)
+    _signup(other, "b@example.com", welcome=True)
+    again = other.post(
+        "/audits",
+        files={"equity": ("b.csv", body + b"\n", "text/csv")},
+        data={"consent": "on"},
+        follow_redirects=False,
+    )
+    assert again.status_code == 303 and "acct=welcome" not in again.headers["location"]
+
+
+def test_network_claims_hold_only_a_hash_and_the_purge_drops_them(tmp_path: Path) -> None:
+    from quant_trade.audit.accounts import network_key
+
+    _, store, _ = _client(tmp_path)
+    old = datetime(2026, 1, 5, tzinfo=UTC)
+    key = f"preview:ip:{network_key('1.2.3.4')}:2026-01:0"
+    assert "1.2.3.4" not in key
+    store.claim_free("r", keys=(key, "preview:account:a:2026-01:0"), slots={}, at=old)  # type: ignore[attr-defined]
+    store.purge_expired(NOW, retention_days=30)  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        left = [row[0] for row in conn.execute(store.free_claims.select())]  # type: ignore[attr-defined]
+    assert left == ["preview:account:a:2026-01:0"]

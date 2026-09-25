@@ -1751,35 +1751,110 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _html_error(request, 413, text, loc)
         if not uploads["equity"] and not uploads["report"]:
             return _html_error(request, 400, message("equity_required", loc), loc)
-        file_sha256 = hashlib.sha256(uploads["report"] or uploads["equity"] or b"").hexdigest()
+        # A new account's first file is a free full report (once per account,
+        # browser and file); then the month's free previews; then a credit;
+        # else the way to buy. This first look answers at once; the claims
+        # taken after parsing are what make the limits hold when uploads
+        # arrive together.
+        start = acct.month_start(now)
+        device_sha256 = acct.hash_secret(device)
+        reservation = acct.new_secret()
+        fingerprint = ""
+
+        def preview_or_credit(account_id: str) -> Response | None:
+            """The first look at the monthly previews and the credits."""
+            nonlocal free_preview, spend_credit
+            used = db.free_previews_since(start, account_id=account_id)
+            network = db.free_previews_since(start, client_ip=ip)
+            if (
+                used < acct.FREE_PREVIEWS_PER_MONTH
+                and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
+            ):
+                free_preview = True
+            elif db.account_credits(account_id, now) > 0:
+                spend_credit = True
+            else:
+                reason = "quota" if used >= acct.FREE_PREVIEWS_PER_MONTH else "network"
+                return _gate(request, loc, reason, 402)
+            return None
+
+        def claim_preview(account_id: str) -> str:
+            month = acct.claim_month(now)
+            slots = {
+                "account": [
+                    f"preview:account:{account_id}:{month}:{n}"
+                    for n in range(acct.FREE_PREVIEWS_PER_MONTH)
+                ]
+            }
+            if ip:
+                net = acct.network_key(ip)
+                slots["network"] = [
+                    f"preview:ip:{net}:{month}:{n}"
+                    for n in range(acct.FREE_PREVIEWS_PER_IP_PER_MONTH)
+                ]
+            return db.claim_free(reservation, keys=(), slots=slots, at=now)
+
+        def claim_free_use(account_id: str, inputs: Any) -> Response | None:
+            """Take the free full report or a free preview, atomically."""
+            nonlocal welcome, free_preview, spend_credit, fingerprint
+            fingerprint = acct.content_fingerprint(inputs.equity.frame)
+            if welcome:
+                refused = db.welcome_refusal(
+                    account_id,
+                    device_sha256=device_sha256,
+                    file_sha256=fingerprint,
+                    client_ip=ip,
+                    since=start,
+                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                )
+                if not refused:
+                    month = acct.claim_month(now)
+                    slots = (
+                        {
+                            "network": [
+                                f"welcome:ip:{acct.network_key(ip)}:{month}:{n}"
+                                for n in range(acct.WELCOME_REPORTS_PER_IP_PER_MONTH)
+                            ]
+                        }
+                        if ip
+                        else {}
+                    )
+                    keys = (
+                        f"welcome:account:{account_id}",
+                        f"welcome:device:{device_sha256}",
+                        f"welcome:file:{fingerprint}",
+                    )
+                    if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
+                        return None
+                welcome = False
+                refusal = preview_or_credit(account_id)
+                if refusal is not None:
+                    return refusal
+            if free_preview:
+                full = claim_preview(account_id)
+                if not full:
+                    return None
+                free_preview = False
+                if db.account_credits(account_id, now) > 0:
+                    spend_credit = True
+                    return None
+                return _gate(request, loc, "quota" if full == "account" else "network", 402)
+            return None
+
         if gate_account is not None:
-            # A new account's first file is a free full report (once per
-            # account, browser and file); then the month's free previews; then
-            # a credit; else the way to buy.
-            start = acct.month_start(now)
-            device_sha256 = acct.hash_secret(device)
             if acct.WELCOME_FULL_REPORT and not db.welcome_refusal(
                 gate_account.id,
                 device_sha256=device_sha256,
-                file_sha256=file_sha256,
+                file_sha256="",
                 client_ip=ip,
                 since=start,
                 per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
             ):
                 welcome = True
             else:
-                used = db.free_previews_since(start, account_id=gate_account.id)
-                network = db.free_previews_since(start, client_ip=ip)
-                if (
-                    used < acct.FREE_PREVIEWS_PER_MONTH
-                    and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
-                ):
-                    free_preview = True
-                elif db.account_credits(gate_account.id, now) > 0:
-                    spend_credit = True
-                else:
-                    reason = "quota" if used >= acct.FREE_PREVIEWS_PER_MONTH else "network"
-                    return _gate(request, loc, reason, 402)
+                refusal = preview_or_credit(gate_account.id)
+                if refusal is not None:
+                    return refusal
         try:
             # A blank field is not a declaration: 1 trial is assumed (and never
             # held against the client) and no extra cost is added.
@@ -1849,6 +1924,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 # format message, the operator gets the traceback.
                 logger.exception("upload could not be parsed")
                 return _html_error(request, 400, message("invalid_upload", loc), loc)
+            if gate_account is not None:
+                refusal = claim_free_use(gate_account.id, inputs)
+                if refusal is not None:
+                    return refusal
             try:
                 return _run_and_store(
                     inputs, ip, uploads, report_name, code or None, live_name=live_name
@@ -1866,28 +1945,40 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         finally:
             audit_slots.release()
         if not isinstance(outcome, tuple):
+            if gate_account is not None:
+                db.release_free(reservation)
             return outcome
         audit_id, token, paid = outcome
         credit_used = False
         welcomed = False
-        if gate_account is not None and not paid and welcome:
-            welcomed = db.grant_welcome(
-                audit_id,
-                gate_account.id,
-                device_sha256=acct.hash_secret(device),
-                file_sha256=file_sha256,
-                client_ip=ip,
-                at=now,
-            )
-            paid = welcomed
-            free_preview = not welcomed
-        if gate_account is not None and not paid:
-            if spend_credit:
+        if gate_account is not None and paid:
+            db.release_free(reservation)
+        elif gate_account is not None:
+            if welcome:
+                welcomed = db.grant_welcome(
+                    audit_id,
+                    gate_account.id,
+                    device_sha256=device_sha256,
+                    file_sha256=fingerprint,
+                    client_ip=ip,
+                    at=now,
+                )
+                paid = welcomed
+            elif spend_credit:
                 credit_used = db.redeem_with_account(
                     audit_id, gate_account.id, at=datetime.now(UTC)
                 )
                 paid = credit_used
-            if free_preview or not credit_used:
+            if not paid and not free_preview:
+                # The free report or the credit went to a simultaneous upload:
+                # this one is a free preview if the month still has one.
+                db.release_free(reservation)
+                full = claim_preview(gate_account.id)
+                if full:
+                    db.delete_audit(audit_id)
+                    return _gate(request, loc, "quota" if full == "account" else "network", 402)
+                free_preview = True
+            if free_preview:
                 db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
         if paid or _session(request) is not None:
             linked = db.get_audit(audit_id)
