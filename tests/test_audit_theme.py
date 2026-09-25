@@ -315,3 +315,13 @@ def test_form_labels_are_tied_to_their_fields_and_greys_meet_contrast() -> None:
     assert "--text-3:#66666e" in STYLE and "--text-3:#84848b" in STYLE
     assert "--ok:#17742f" in STYLE and "--warn:#9a5200" in STYLE
     assert ".drop:focus-within{outline" in STYLE and "height:44px;transform" in STYLE
+
+
+def test_risk_percentiles_are_cards_and_values_keep_their_tag() -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+
+    page = render_html(sample_result("es", bootstrap_samples=60), watermark=False, locale="es")
+    assert page.count("Drawdown máximo a un año · p") == 3
+    assert "<td></td><td>" not in page
+    assert "<span class='vc'>" in page and ".vc{white-space:nowrap}" in STYLE

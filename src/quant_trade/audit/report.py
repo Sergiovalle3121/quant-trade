@@ -1885,7 +1885,7 @@ def _range_fact(
 def _value_cell(item: dict[str, Any], *, percent: bool) -> str:
     value = item.get("value")
     shown = _fmt(value, key="p50" if percent else "")
-    return f"{shown} {_badge(item.get('evidence', 'NOT_MEASURED'))}"
+    return f"<span class='vc'>{shown} {_badge(item.get('evidence', 'NOT_MEASURED'))}</span>"
 
 
 def _assumptions(block: Any, locale: str, labels: dict[str, str]) -> str:
@@ -1921,10 +1921,14 @@ def _risk_html(
     if risk.get("status") == "MEASURED":
         dd = risk["max_drawdown"]
         html_text += (
-            f"<table><tr><th>{_e(labels['risk_dd'])}</th><th>p50</th><th>p95</th><th>p99</th></tr>"
-            f"<tr><td></td>"
-            + "".join(f"<td>{_value_cell(dd[q], percent=True)}</td>" for q in ("p50", "p95", "p99"))
-            + "</tr></table>"
+            "<div class='facts'>"
+            + "".join(
+                f"<div class='fact'><b>{_e(_fmt(dd[q].get('value'), key='p50'))}</b>"
+                f"<p>{_e(labels['risk_dd'])} · {q} "
+                f"{_badge(dd[q].get('evidence', 'NOT_MEASURED'))}</p></div>"
+                for q in ("p50", "p95", "p99")
+            )
+            + "</div>"
         )
         probs = risk["probability_drawdown_at_least"]
         html_text += (
@@ -2469,7 +2473,8 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
         # "No large open loss" only when the file states the open result at all.
         seen = (account.get("floating_pnl") or {}).get("evidence") != "NOT_MEASURED"
         key = "account_clean" if seen else "account_clean_unseen"
-        out += f"<p class='live-verdict lv-PASS'>{_e(labels[key])}</p>"
+        tone = " lv-PASS" if seen else ""
+        out += f"<p class='live-verdict{tone}'>{_e(labels[key])}</p>"
     out += f"<p class='muted'>{_e(labels['account_scope'])}</p>"
     return out
 
