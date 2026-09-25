@@ -248,7 +248,8 @@ class Store:
                     client_ip=client_ip,
                     declared_json=declared_json,
                     result_json=result_json,
-                    report_html=report_html,
+                    # PostgreSQL refuses text holding a NUL; a page never needs one.
+                    report_html=report_html.replace("\x00", "") if report_html else report_html,
                     overall_class=overall_class,
                     equity_sha256=digests.get("equity.csv"),
                     trades_sha256=digests.get("trades.csv"),
