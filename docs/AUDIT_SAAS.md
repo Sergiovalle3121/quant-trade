@@ -628,6 +628,8 @@ wants to know about its logic. Needs at least 30 closed trades with at least
 - the share of trades opened within 15 minutes of a losing exit against a
   winning one; a finding when it is 20 % or more and twice the share after
   wins: re-entering to win the money back;
+  NOT_MEASURED when every entry and exit time sits at midnight (a file with
+  dates only cannot see minutes);
 - the hit rate of trades that follow two losses in a row (at least 15 of
   them) against the whole history; a finding when it is 15 points lower.
 
@@ -635,6 +637,27 @@ No red flag and no class change: each finding is a question to ask the
 seller. Limitations: trades are ordered by entry time and overlapping trades
 give no pause to measure; the tests treat trades as independent; daily files
 measure hold times in whole days.
+
+### Does it work on each instrument (`audit/instruments.py`)
+
+For buyers of a robot or signal that trades several pairs or markets: "is
+this a portfolio, or one market carrying the rest?". Needs at least 30
+closed trades on at least two instruments, with the file naming each
+trade's instrument. MEASURED per instrument with 10 or more trades (the
+twelve busiest; the rest share an "Others" row): trade count, net result
+after the fees the file itemises and hit rate. When the total is a gain and
+at least two instruments have 10 trades:
+
+- `one_carries`: without the instrument with the best net result, all the
+  others together net zero or a loss;
+- `mostly_one`: otherwise, the best instrument still brings two thirds or
+  more of the net result (the section never calls that spread out);
+- `most_lose`: more than half of those instruments net zero or a loss.
+
+No red flag and no class change: each finding is a question to ask.
+Limitations: instruments are compared by net money at the file's own sizes,
+so a pair traded at larger size weighs more; a few instruments with few
+trades each say little on their own.
 
 ### How much capital it needs, at what size (`audit/sizing.py`)
 

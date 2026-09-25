@@ -26,6 +26,8 @@ from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
+from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
+from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import method_url
@@ -343,6 +345,28 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Se mantiene",
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
+        "instruments": "¿Funciona en cada instrumento?",
+        "ins_intro": (
+            "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
+            "solo mientras los demás pierden. No cambia la clase: son preguntas para hacer."
+        ),
+        "ins_head": "Instrumento",
+        "ins_other": "Otros ({n} con menos de {m} operaciones)",
+        "ins_best": "Parte del resultado neto que viene de {best}",
+        "ins_one_carries": (
+            "Un solo instrumento sostiene el resultado: sin {best}, los demás juntos quedan en "
+            "cero o en pérdida. Pregunta por qué se operan los demás."
+        ),
+        "ins_mostly_one": (
+            "Casi todo el resultado viene de {best} ({share}). Pregunta qué aportan los demás."
+        ),
+        "ins_best_over": "Más que el resultado neto viene de {best}: los demás juntos restan",
+        "ins_most_lose": (
+            "La mayoría de los instrumentos terminan en cero o en pérdida ({losing} de "
+            "{readable}). Pregunta si la estrategia se ajustó a unos pocos mercados."
+        ),
+        "ins_clean": "Ningún instrumento carga él solo con el resultado.",
+        "ins_badge_clean": "Repartido",
         "behaviour": "Cómo se comporta al perder",
         "behaviour_intro": (
             "Lo que te diría un diario de trading: si las pérdidas se aguantan más que las "
@@ -353,7 +377,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Lo que dura una perdedora frente a una ganadora (mediana: {loss} frente a {win})"
         ),
         "beh_quick": (
-            "De las operaciones tras una pérdida se abren en menos de 15 minutos "
+            "Operaciones tras una pérdida abiertas en menos de 15 minutos "
             "(tras una ganancia: {win})"
         ),
         "beh_streak": (
@@ -371,6 +395,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Acierta menos tras una racha de pérdidas. Pregunta si el tamaño o las reglas "
             "cambian en esas rachas."
         ),
+        "beh_quick_nm": "Reentrada rápida tras perder:",
         "beh_clean": "Nada destaca en cómo opera después de perder.",
         "beh_badge_clean": "Sin patrones",
         "beh_badge_found": "Para preguntar",
@@ -865,6 +890,28 @@ LABELS: dict[str, dict[str, str]] = {
         "recent_badge_held": "Holds",
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
+        "instruments": "Does it work on each instrument?",
+        "ins_intro": (
+            "When a robot or a signal trades several markets, the total can come from one of "
+            "them while the others lose. It does not change the class: these are questions to ask."
+        ),
+        "ins_head": "Instrument",
+        "ins_other": "Others ({n} with fewer than {m} trades)",
+        "ins_best": "Share of the net result that comes from {best}",
+        "ins_one_carries": (
+            "One instrument carries the result: without {best}, the others together net zero "
+            "or a loss. Ask why the others are traded."
+        ),
+        "ins_mostly_one": (
+            "Almost all of the result comes from {best} ({share}). Ask what the others add."
+        ),
+        "ins_best_over": "More than the net result comes from {best}: the others together subtract",
+        "ins_most_lose": (
+            "Most instruments end at zero or a loss ({losing} of {readable}). Ask whether the "
+            "strategy was fitted to a few markets."
+        ),
+        "ins_clean": "No single instrument carries the result on its own.",
+        "ins_badge_clean": "Spread out",
         "behaviour": "How it behaves after losing",
         "behaviour_intro": (
             "What a trading journal would tell you: whether losses are held longer than gains, "
@@ -874,9 +921,7 @@ LABELS: dict[str, dict[str, str]] = {
         "beh_hold": (
             "How long a losing trade lasts against a winning one (median: {loss} against {win})"
         ),
-        "beh_quick": (
-            "Of the trades after a loss open within 15 minutes of it (after a win: {win})"
-        ),
+        "beh_quick": ("Trades after a loss opened within 15 minutes of it (after a win: {win})"),
         "beh_streak": "Win rate after {k} losses in a row ({n} trades; whole history: {all})",
         "beh_losers_held_longer": (
             "Losing trades stay open much longer than winning ones. Ask where the stop is and "
@@ -890,6 +935,7 @@ LABELS: dict[str, dict[str, str]] = {
             "It wins less often after a losing streak. Ask whether size or rules change "
             "during those streaks."
         ),
+        "beh_quick_nm": "Quick re-entry after a loss:",
         "beh_clean": "Nothing stands out in how it trades after losing.",
         "beh_badge_clean": "No pattern",
         "beh_badge_found": "To ask",
@@ -3202,7 +3248,11 @@ def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[
         )
     quick = behaviour.get("quick_after_loss")
     # Only worth a line when re-entries after a loss outnumber those after a win.
-    if quick and float(quick["value"]) > float(behaviour["quick_after_win"]["value"]):
+    if (
+        quick
+        and quick["evidence"] == "MEASURED"
+        and float(quick["value"]) > float(behaviour["quick_after_win"]["value"])
+    ):
         tone = " neg" if "quick_after_loss" in findings else ""
         text = labels["beh_quick"].format(win=f"{float(behaviour['quick_after_win']['value']):.0%}")
         facts.append(
@@ -3224,7 +3274,60 @@ def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[
     if facts:
         grid = " pairs" if len(facts) % 2 == 0 else ""
         out += f"<div class='facts{grid}'>{''.join(facts)}</div>"
+    if quick and quick["evidence"] == "NOT_MEASURED":
+        out += (
+            f"<p class='muted'>{_e(labels['beh_quick_nm'])} {_badge('NOT_MEASURED')} "
+            f"{_e(_sentence(localize(quick.get('note', ''), locale)))}</p>"
+        )
     out += f"<p class='muted'>{_e(_sentence(localize(behaviour.get('note', ''), locale)))}</p>"
+    return out
+
+
+def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """Count, net result and hit rate per instrument; no class change."""
+    if not review or review.get("status") != "MEASURED":
+        return ""
+    findings = list(review.get("findings") or [])
+    best = (review.get("best") or {}).get("key", "")
+    out = f"<p class='muted'>{_e(labels['ins_intro'])}</p>"
+    if findings:
+        texts = {
+            "one_carries": labels["ins_one_carries"].format(best=best),
+            "mostly_one": labels["ins_mostly_one"].format(
+                best=best, share=f"{float(review['best']['share']['value']):.0%}"
+            ),
+            "most_lose": labels["ins_most_lose"].format(
+                losing=int((review.get("losing") or {}).get("value", 0)),
+                readable=int(review["readable"]["value"]),
+            ),
+        }
+        items = "".join(f"<li>{_e(texts[code])}</li>" for code in findings)
+        out += (
+            f"<div class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul>{items}</ul></div>"
+        )
+    elif review.get("best"):
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['ins_badge_clean'])}</span> {_e(labels['ins_clean'])}</p>"
+        )
+    if review.get("best"):
+        share = float(review["best"]["share"]["value"])
+        tone = " neg" if {"one_carries", "mostly_one"} & set(findings) else ""
+        out += (
+            f"<div class='facts'><div class='fact{tone}'><b>{share:.0%}</b>"
+            f"<p>{_e(labels['ins_best_over' if share > 1 else 'ins_best'].format(best=best))} "
+            f"{_badge(review['best']['share']['evidence'])}</p></div></div>"
+        )
+
+    def name(key: str) -> str:
+        if key != _INSTRUMENTS_OTHER:
+            return key
+        row = next(row for row in review["rows"] if row["key"] == key)
+        return labels["ins_other"].format(n=int(row["instruments"]["value"]), m=_INSTRUMENTS_MIN)
+
+    out += _timing_table(review["rows"], labels["ins_head"], name, labels)
+    out += f"<p class='muted'>{_e(_sentence(localize(review.get('note', ''), locale)))}</p>"
     return out
 
 
@@ -3727,6 +3830,11 @@ def render_html(
         *(
             [(labels["behaviour"], _behaviour_html(data.get("behaviour"), locale, labels))]
             if (data.get("behaviour") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
+            [(labels["instruments"], _instruments_html(data.get("instruments"), locale, labels))]
+            if (data.get("instruments") or {}).get("status") == "MEASURED"
             else []
         ),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),

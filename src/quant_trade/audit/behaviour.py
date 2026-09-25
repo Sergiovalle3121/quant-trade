@@ -26,7 +26,7 @@ from typing import Any
 
 import pandas as pd
 
-from quant_trade.audit.schema import measured
+from quant_trade.audit.schema import measured, not_measured
 from quant_trade.core.models import Trade
 
 #: Closed trades needed, and winners and losers each.
@@ -46,6 +46,7 @@ STREAK_DROP = 0.15
 #: Two-sided p-value below which a hold-time difference is beyond chance.
 P_VALUE = 0.05
 
+NO_TIME_OF_DAY = "the file has no time of day"
 NOTE = "closed trades by entry and exit time; net result after the fees the file itemises"
 
 
@@ -108,9 +109,19 @@ def behaviour_review(
             review["findings"].append("losers_held_longer")
 
     # 2. Time from one exit to the next entry, after a loss and after a win.
+    # A file with dates only (every time at midnight) cannot see minutes.
+    if all(
+        stamp.hour == stamp.minute == stamp.second == 0 and stamp.microsecond == 0
+        for entry, exit_, _ in rows
+        for stamp in (entry, exit_)
+    ):
+        review["quick_after_loss"] = not_measured(NO_TIME_OF_DAY)
+        rows_for_gaps: list[tuple[Any, Any, float]] = []
+    else:
+        rows_for_gaps = rows
     after_loss: list[timedelta] = []
     after_win: list[timedelta] = []
-    for (_, exit_, net), (entry_next, _, _) in zip(rows, rows[1:], strict=False):
+    for (_, exit_, net), (entry_next, _, _) in zip(rows_for_gaps, rows_for_gaps[1:], strict=False):
         gap = entry_next - exit_
         if gap < timedelta(0):  # overlapping trades: no pause to measure
             continue

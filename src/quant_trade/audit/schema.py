@@ -965,6 +965,8 @@ class AuditResult(BaseModel):
     recent: dict[str, Any] | None = None
     #: Hold times, re-entries and streaks around losses (``audit/behaviour.py``).
     behaviour: dict[str, Any] | None = None
+    #: Count, net result and hit rate per instrument (``audit/instruments.py``).
+    instruments: dict[str, Any] | None = None
     vendor_questions: list[dict[str, str]] = Field(default_factory=list)
 
 
