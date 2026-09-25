@@ -62,7 +62,7 @@ from quant_trade.audit.schema import (
     parse_equity_csv,
 )
 from quant_trade.audit.verdict import DEFAULT_THRESHOLDS, Thresholds
-from quant_trade.metrics.performance import calculate_performance
+from quant_trade.metrics.performance import calculate_performance, periods_per_year
 from quant_trade.metrics.statistics import (
     expected_max_sharpe,
     minimum_track_record_length,
@@ -180,6 +180,11 @@ def _performance(
     # The same Sharpe as the significance section and the red flags (sample
     # standard deviation), so the report never prints two different values.
     metrics["sharpe"] = _annualised_sharpe(returns, ppy)
+    # The volatility the Sharpe divides by, so annual mean / volatility is the
+    # printed Sharpe (the library's population deviation is ~2 % lower at 24 rows).
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    if len(clean) >= 2:
+        metrics["volatility"] = float(clean.std(ddof=1) * math.sqrt(ppy))
     keys = (
         "total_return",
         "cagr",
@@ -201,6 +206,10 @@ def _performance(
         # Compounding five good weeks into a year prints a four-digit
         # "annual" return nobody earned; the total return says it plainly.
         out["cagr"] = not_measured("under a year of history; annualising it would exaggerate")
+    if len(clean) >= 2 and not bool((clean < 0).any()):
+        # No losing period leaves no downside deviation to divide by; a
+        # Sortino of 0 would read as the worst score for the smoothest curve.
+        out["sortino"] = not_measured("no losing period; downside deviation is zero")
     if not trades:
         out["win_rate"] = not_measured("no trades uploaded")
         out["trade_count"] = not_measured("no trades uploaded")
@@ -480,6 +489,9 @@ def _holdout(
     except ValueError as exc:
         reason = f"split failed: {exc}"
         return {"status": "NOT_MEASURED", "reason": reason, **base}, None, None, reason
+    # The out-of-sample side starts from the last in-sample close, so the
+    # move onto its first row is counted (a crash on that day is its own).
+    test = pd.concat([train.tail(1), test], ignore_index=True)
     if len(train) < HOLDOUT_MIN_OBSERVATIONS + 1 or len(test) < HOLDOUT_MIN_OBSERVATIONS + 1:
         reason = (
             f"a side has fewer than {HOLDOUT_MIN_OBSERVATIONS} returns "
@@ -531,6 +543,12 @@ def _benchmark(
     b_eq = joined[["timestamp", "equity_b"]].rename(columns={"equity_b": "equity"})
     s_metrics = calculate_performance(s_eq, [])
     b_metrics = calculate_performance(b_eq, [])
+    # The same sample-deviation Sharpe as the headline figure, so the strategy
+    # never shows two Sharpe ratios in one report.
+    joined_ppy = float(periods_per_year(joined["timestamp"]))
+    for metrics_, eq in ((s_metrics, s_eq), (b_metrics, b_eq)):
+        eq_returns = eq["equity"].astype(float).pct_change().dropna()
+        metrics_["sharpe"] = _annualised_sharpe(eq_returns, joined_ppy)
     comparison = compare_to_benchmark(s_metrics, b_metrics, s_eq, b_eq)
     b_mdd = float(b_metrics["max_drawdown"])
     s_mdd = float(s_metrics["max_drawdown"])

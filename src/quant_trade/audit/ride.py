@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from quant_trade.audit.schema import measured, not_measured
@@ -65,12 +66,17 @@ def ride_review(frame: pd.DataFrame) -> dict[str, Any]:
     peak_value = float(equity.iloc[0])
     peak_at = stamps.iloc[0]
     longest = (0, peak_at, peak_at, True)
+    # Only a stretch that dipped below the high counts: the days between two
+    # rising points (a weekend, a week between rows) are not time under water.
+    dipped = False
     for value, stamp in zip(equity.iloc[1:], stamps.iloc[1:], strict=True):
         if value >= peak_value:
             days = (stamp - peak_at).days
-            if days > longest[0]:
+            if dipped and days > longest[0]:
                 longest = (days, peak_at, stamp, True)
-            peak_value, peak_at = float(value), stamp
+            peak_value, peak_at, dipped = float(value), stamp, False
+        else:
+            dipped = True
     open_days = (last - peak_at).days
     if equity.iloc[-1] < peak_value and open_days > longest[0]:
         longest = (open_days, peak_at, last, False)
@@ -79,7 +85,10 @@ def ride_review(frame: pd.DataFrame) -> dict[str, Any]:
     running = equity.cummax()
     depth = equity / running - 1.0
     low = int(depth.idxmin())
-    high = int(equity.iloc[: low + 1].idxmax())
+    # The last time the high was reached: a flat stretch at the high (a balance
+    # curve with no closed trade) is not part of the fall.
+    before = equity.iloc[: low + 1].to_numpy()
+    high = low - int(np.argmax(before[::-1]))
     back = equity.iloc[low:][equity.iloc[low:] >= equity.iloc[high]]
     recovered = not back.empty
     fell = float(depth.iloc[low]) < 0
