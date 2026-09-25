@@ -28,6 +28,14 @@ SAMPLE_BOOTSTRAP = 500
 #: its size and a thinner edge, as live trading often has.
 SAMPLE_LIVE_DAYS = 120
 SAMPLE_LIVE_START = "2025-01-06"
+#: Business days of the backtest the live account also traded, for pairing.
+SAMPLE_LIVE_OVERLAP = 60
+#: The live account's money: first deposit, a top-up, a withdrawal and the
+#: floating result of the position still open at the end.
+SAMPLE_LIVE_DEPOSIT = 1_000.0
+SAMPLE_LIVE_TOP_UP = 500.0
+SAMPLE_LIVE_WITHDRAWAL = 300.0
+SAMPLE_LIVE_FLOATING = 35.0
 
 
 def _money(value: float) -> str:
@@ -108,15 +116,105 @@ def synthetic_mt5_report(
     return b"\xff\xfe" + html_text.encode("utf-16-le")
 
 
+_MYFXBOOK_HEAD = (
+    "Tags,Ticket,Open Date,Close Date,Symbol,Action,Units/Lots,SL,TP,Open Price,Close Price,"
+    "Commission,Swap,Pips,Profit,Gain,Comment,Magic Number,Duration (DD:HH:MM:SS)"
+)
+
+
+def _stamp(moment: pd.Timestamp) -> str:
+    return moment.strftime("%m/%d/%Y %H:%M")
+
+
 def synthetic_live_statement() -> bytes:
-    """The sample's live account, after the backtest ends. Synthetic by design."""
-    return synthetic_mt5_report(
-        SAMPLE_LIVE_DAYS,
-        edge_pips=1.0,
-        seed=SAMPLE_SEED + 7,
-        lots=0.1,
-        start=SAMPLE_LIVE_START,
-    )
+    """The sample's live account as a Myfxbook CSV export. Synthetic by design.
+
+    It runs the same robot at 0.1 lots on the last ``SAMPLE_LIVE_OVERLAP``
+    business days of the backtest and on ``SAMPLE_LIVE_DAYS`` after it, so the
+    report can pair trades on the shared dates (a few are skipped and a few
+    are extra, as on a real account) and compare the rest. A deposit arrives
+    after the deepest losing stretch, a withdrawal near the end and one
+    position is still open when the statement is printed, so every part of
+    "the real money of the account" has something to show.
+    """
+    from quant_trade.audit.importers import import_report
+
+    backtest = import_report(synthetic_mt5_report(), "SyntheticSampleEA.html").trades
+    rng = np.random.default_rng(SAMPLE_SEED + 7)
+    lots, fee, pip = 0.1, 0.70, 0.0001
+    trades: list[tuple[pd.Timestamp, pd.Timestamp, str, float, float]] = []
+    shared = sorted(
+        zip(backtest.trades, backtest.sides, strict=True), key=lambda pair: pair[0].entry_time
+    )[-SAMPLE_LIVE_OVERLAP:]
+    for trade, side in shared:
+        if rng.random() < 0.12:
+            continue  # the account skipped this signal
+        sign = 1.0 if side == "long" else -1.0
+        delay = pd.Timedelta(minutes=int(rng.integers(0, 25)))
+        # Live fills are a little worse than the tester's on both ends.
+        entry = trade.entry_price + sign * pip * 0.4
+        exit_price = trade.exit_price - sign * pip * 0.6
+        opened = pd.Timestamp(trade.entry_time).tz_localize(None) + delay
+        closed = pd.Timestamp(trade.exit_time).tz_localize(None) + delay
+        trades.append((opened, closed, side, entry, exit_price))
+    price = shared[-1][0].exit_price
+    for index, day in enumerate(pd.bdate_range(SAMPLE_LIVE_START, periods=SAMPLE_LIVE_DAYS)):
+        side = "long" if rng.random() < 0.5 else "short"
+        sign = 1.0 if side == "long" else -1.0
+        # A bad stretch a month in, then the thinner live edge.
+        pips = (-22.0 if 20 <= index < 32 else 1.0) + rng.normal(0.0, 25.0)
+        opened = day + pd.Timedelta(hours=int(rng.choice([2, 5, 9, 11, 14, 16, 19])))
+        entry = round(price, 5)
+        price = round(entry + sign * pips * pip, 5)
+        trades.append((opened, opened + pd.Timedelta(hours=3, minutes=30), side, entry, price))
+    for _ in range(4):
+        # Trades the backtest never took: the same robot rarely matches every signal.
+        trade = shared[int(rng.integers(0, len(shared)))][0]
+        opened = pd.Timestamp(trade.entry_time).tz_localize(None) + pd.Timedelta(hours=5)
+        entry = trade.entry_price
+        trades.append((opened, opened + pd.Timedelta(hours=2), "long", entry, entry + 3 * pip))
+    trades.sort()
+
+    # The top-up lands after the bad stretch's deepest point.
+    stretch_end = pd.bdate_range(SAMPLE_LIVE_START, periods=SAMPLE_LIVE_DAYS)[32]
+    first = trades[0][0].normalize()
+    flows: list[tuple[pd.Timestamp, float]] = [(first, SAMPLE_LIVE_DEPOSIT)]
+    balance, peak, worst, worst_at = SAMPLE_LIVE_DEPOSIT, SAMPLE_LIVE_DEPOSIT, 0.0, trades[0][1]
+    rows: list[str] = []
+    ticket = 5000
+    for opened, closed, side, entry, exit_price in trades:
+        sign = 1.0 if side == "long" else -1.0
+        pips = sign * (exit_price - entry) / pip
+        profit = round(pips * 10.0 * lots - fee, 2)
+        balance += profit
+        peak = max(peak, balance)
+        if closed < stretch_end and balance / peak - 1.0 < worst:
+            worst, worst_at = balance / peak - 1.0, closed
+        rows.append(
+            f",{ticket},{_stamp(opened)},{_stamp(closed)},EURUSD,"
+            f"{'Buy' if side == 'long' else 'Sell'},{lots:.2f},0,0,{entry:.5f},{exit_price:.5f},"
+            f"{-fee:.4f},0.0000,{pips:.1f},{profit:.2f},0,,7,00:03:30:00"
+        )
+        ticket += 1
+    flows.append((worst_at + pd.Timedelta(hours=2), SAMPLE_LIVE_TOP_UP))
+    flows.append((trades[-12][1] + pd.Timedelta(hours=2), -SAMPLE_LIVE_WITHDRAWAL))
+    for moment, amount in flows:
+        action = "Deposit" if amount > 0 else "Withdrawal"
+        rows.append(
+            f",{ticket},{_stamp(moment)},,,{action},0.010,0,0,0,0,0,0,0.0,{amount:.2f},0,"
+            f"{action},0,00:00:00:00"
+        )
+        ticket += 1
+    rows.sort(key=lambda row: pd.Timestamp(row.split(",")[2]))
+    last = trades[-1][1] + pd.Timedelta(hours=1)
+    open_rows = [
+        "",
+        "Open Trades",
+        "Tags,Ticket,Open Date,Symbol,Action,Lots,Open Price,TP,SL,Profit,Pips,Swap",
+        f",{ticket},{_stamp(last)},EURUSD,Sell,{lots:.2f},1.10000,0,0,"
+        f"{-SAMPLE_LIVE_FLOATING:.2f},{-SAMPLE_LIVE_FLOATING:.1f},0",
+    ]
+    return ("\n".join([_MYFXBOOK_HEAD, *rows, *open_rows]) + "\n").encode("utf-8")
 
 
 def synthetic_mt5_optimization(passes: int = SAMPLE_PASSES) -> bytes:
@@ -157,7 +255,7 @@ def sample_result(locale: str = "es", *, bootstrap_samples: int = SAMPLE_BOOTSTR
         report_filename="SyntheticSampleEA.html",
         optimization_bytes=synthetic_mt5_optimization(),
         live_bytes=synthetic_live_statement(),
-        live_filename="SyntheticSampleLive.html",
+        live_filename="SyntheticSampleLive.csv",
     )
     return run_audit(inputs, bootstrap_samples=bootstrap_samples, now=SAMPLE_NOW)
 
