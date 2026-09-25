@@ -2018,6 +2018,8 @@ Redesign pass 53 checks the screens that landed after pass 51 on a phone first. 
 
 Redesign pass 54 walks the free tier's path on a phone first: upload without an account, sign up, first full report, locked preview, "Mi cuenta". The "create your account" screen puts its two buttons in a card, full width on a phone. On a report saved to the account, the tick beside "Guardado en tu cuenta" is icon sized; before, it filled the box. In "Mi cuenta" the free first report comes first while it is unused, in a green tile across the row on a phone, followed by the month's previews and the credits; the tiles sit two across on a phone and in one row on a desktop. On the price cards a long note under the price (the free card's) drops below it whole instead of splitting beside it.
 
+Redesign pass 55 makes each locked figure in a preview's summary a link to the unlock box (`a.kpi.locked`, `href='#unlock'`, labelled with the figure's name and "Desbloquear"), so tapping what someone wants to see takes them to how to see it. The tile looks the same; on hover or focus its border darkens.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
