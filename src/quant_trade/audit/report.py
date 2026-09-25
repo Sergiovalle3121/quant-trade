@@ -343,6 +343,11 @@ LABELS: dict[str, dict[str, str]] = {
             "No pedimos correo ni cuenta."
         ),
         "pack": "pack de 3 informes: USD {price:.0f}",
+        "buy_includes": (
+            "Todas las cifras de cada sección|PDF para guardar o enviar|"
+            "Página pública de verificación para compartir|"
+            "Reembolso si el informe lee mal tu archivo"
+        ),
         "publish": "Publicar verificación pública",
         "publish_help": (
             "Crea una página pública con la clase, las dimensiones y los hashes, y un sello "
@@ -707,6 +712,11 @@ LABELS: dict[str, dict[str, str]] = {
             "We ask for no email and no account."
         ),
         "pack": "pack of 3 reports: USD {price:.0f}",
+        "buy_includes": (
+            "Every figure in every section|A PDF to keep or send|"
+            "A public verification page to share|"
+            "A refund if the report misreads your file"
+        ),
         "publish": "Publish a public verification",
         "publish_help": (
             "Creates a public page with the class, the dimensions and the hashes, and a badge "
@@ -2279,26 +2289,22 @@ def _capital_html(capital: dict[str, Any] | None, locale: str, labels: dict[str,
         if balance
         else labels["capital_scale_plain"]
     )
-    rows = "".join(
-        f"<tr><td>{float(row['limit']):.0%}</td>"
-        f"<td class='val'>{_fmt(row['capital']['value'], key='capital')}</td>"
-        f"<td class='val'>"
-        + (
-            _e(sizing_scale_text(float(row["size_share"]["value"])))
-            if row["size_share"]["value"] is not None
-            else "—"
-        )
-        + "</td></tr>"
+
+    def size_text(row: dict[str, Any]) -> str:
+        share = row["size_share"]["value"]
+        return sizing_scale_text(float(share)) if share is not None else "—"
+
+    # One card per loss limit: a reader compares four numbers, not a table.
+    tiles = "".join(
+        "<li class='cap'>"
+        f"<span class='cap-lim'>{_e(labels['capital_limit'])} "
+        f"<b>{float(row['limit']):.0%}</b></span>"
+        f"<b class='cap-money'>{_fmt(row['capital']['value'], key='capital')}</b>"
+        f"<span class='cap-sub'>{_e(labels['capital_needed'])}</span>"
+        f"<span class='cap-size'><b>{_e(size_text(row))}</b> {_e(scale_head)}</span></li>"
         for row in capital["rows"]
     )
-    out += (
-        "<table class='metrics'><thead><tr>"
-        f"<th>{_e(labels['capital_limit'])}</th>"
-        f"<th class='val'>{_e(labels['capital_needed'])}</th>"
-        f"<th class='val'>{_e(scale_head)}</th>"
-        f"</tr></thead><tbody>{rows}</tbody></table>"
-        f"<p class='muted'>{_e(labels['capital_scale_help'])}</p>"
-    )
+    out += f"<ol class='caps'>{tiles}</ol><p class='muted'>{_e(labels['capital_scale_help'])}</p>"
     return out + _assumptions(capital.get("assumptions"), locale, labels)
 
 
@@ -2500,6 +2506,15 @@ def render_html(
         if price
         else ""
     )
+    # What the payment unlocks, under the price in every buy box.
+    includes_html = (
+        "<ul class='buy-incl'>"
+        + "".join(
+            f"<li>{icon('check')}<span>{_e(item)}</span></li>"
+            for item in labels["buy_includes"].split("|")
+        )
+        + "</ul>"
+    )
     if locked and checkout_url:
         # Card payment is the main way to pay; the pack is the second button.
         pack_button = (
@@ -2515,7 +2530,7 @@ def render_html(
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
             f"{icon('card')}{_e(labels['pay'])}</button>{pack_button}</div>"
             f"<p class='muted pay-secure'>{icon('lock')}<span>{_e(labels['pay_secure'])}</span></p>"
-            "</div></form>"
+            f"</div>{includes_html}</form>"
         )
     if locked and redeem_url:
         if contact_url:
@@ -2536,7 +2551,7 @@ def render_html(
                     + price_html
                     + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
-                    f"{_e(labels['buy_code'])}</a></div>"
+                    f"{_e(labels['buy_code'])}</a>{includes_html}</div>"
                 )
         main_button = contact_url or checkout_url
         paybox += (
