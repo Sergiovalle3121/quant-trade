@@ -858,6 +858,7 @@ border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
 border-color:rgba(128,128,136,.3)}
 .status{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:560;
 background:var(--surface-2);border:1px solid var(--border)}
+@media (max-width:620px){table.kv,table.kv tbody,table.kv tr,table.kv td{display:block}table.kv tr{padding:12px 16px;border-bottom:1px solid var(--border)}table.kv tr:last-child{border-bottom:0}table.kv td{border:0!important;padding:0!important}table.kv td:first-child{color:var(--text-3);font-size:.82rem;margin-bottom:6px}table.kv code{word-break:break-all;white-space:normal}}
 .meaning{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0}
 @media (max-width:760px){.meaning{grid-template-columns:minmax(0,1fr)}}
 .meaning .item{position:relative;border:1px solid transparent;border-radius:20px;
