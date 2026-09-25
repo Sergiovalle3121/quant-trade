@@ -115,3 +115,23 @@ def test_platform_fields_and_flag_severities_read_in_the_report_language() -> No
     assert {flag["severity"] for flag in result.red_flags} == {"FAIL", "WARN"}
     assert ">FAIL<" not in page and ">WARN<" not in page
     assert "Grave" in page and "Aviso" in page
+
+
+def test_the_report_links_every_section_from_its_section_bar() -> None:
+    import re
+
+    from quant_trade.audit.sample import sample_result
+
+    result = sample_result("es", bootstrap_samples=60)
+    for locked in (False, True):
+        page = render_html(
+            result, watermark=locked, locale="es", free_mode=not locked, redeem_url="/r"
+        )
+        bar = page.split("class='report-toc", 1)[1].split("</nav>", 1)[0]
+        targets = re.findall(r"href='#([\w-]+)'", bar)
+        assert targets and len(targets) == len(set(targets))
+        for target in targets:
+            assert f"id='{target}'" in page, target
+        assert ("unlock" in targets) is locked
+    lead = result.verdict.summary.split(". ", 1)[0]
+    assert f"<span class='verdict-lead'>{lead}.</span>" in page

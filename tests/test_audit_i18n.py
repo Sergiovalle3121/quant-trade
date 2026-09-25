@@ -168,7 +168,8 @@ def test_a_report_switches_language_without_changing_the_result() -> None:
     assert _summary_in(data, "en") == english_result.verdict.summary
     page = render_html(spanish_result, watermark=False, locale="en", switch_url="/x?lang=es")
     assert "<html lang='en'>" in page
-    assert english_result.verdict.summary in page.replace("&#x27;", "'")
+    text = re.sub(r"<[^>]+>", "", page).replace("&#x27;", "'")
+    assert english_result.verdict.summary in text
     assert "href='/x?lang=es'" in page and ">Español</a>" in page
     assert find_claims(page) == []
     default = render_html(spanish_result, watermark=False)

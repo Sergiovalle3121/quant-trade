@@ -665,6 +665,12 @@ Long pages (terms, privacy, each export guide) show a sticky "En esta
 página" index beside the text on wide screens; `app.js` marks the section
 being read. It is hidden on narrow screens and in print.
 
+The report opens its verdict with the first sentence as a headline and the
+rest as detail, and a sticky row of section links sits under the hero
+(summary, meaning, charts, red flags, each detail section or the unlock box,
+inputs). The active link follows the reader; the row scrolls sideways on
+phones and is left out of print and the PDF.
+
 
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
