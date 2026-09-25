@@ -1649,6 +1649,10 @@ changes what a report says.
 - **Opening a report**: the owner opens `/audits/{id}` without the token; any
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
+  at sign-up, password change and reset `accounts.common_password` refuses,
+  offline, keyboard and digit runs, repeated units, digits only, and common
+  EN/ES/PT words or the e-mail's name with digits or symbols around them;
+  sign-up and "Mi cuenta" list what the account keeps and how to delete it;
   session cookie `rigor_session`, 256-bit, `HttpOnly`, `SameSite=Lax`,
   `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token

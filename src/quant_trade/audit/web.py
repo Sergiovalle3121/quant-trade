@@ -1227,7 +1227,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _account_redirect(locale)
             csrf = _anon_csrf(request)
             page = account_pages.signup_page(
-                locale=locale, csrf=csrf, next_path=acct.safe_next(next)
+                retention_days=cfg.retention_days,
+                locale=locale,
+                csrf=csrf,
+                next_path=acct.safe_next(next),
             )
             return _anon_page(page, csrf)
 
@@ -1249,6 +1252,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
             def again(error: str, status: int) -> Response:
                 page = account_pages.signup_page(
+                    retention_days=cfg.retention_days,
                     locale=locale,
                     csrf=new_csrf,
                     error=error,
@@ -1423,6 +1427,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         - db.free_previews_since(acct.month_start(now), account_id=account.id),
                     ),
                     free_limit=0 if cfg.free_mode else acct.FREE_PREVIEWS_PER_MONTH,
+                    retention_days=cfg.retention_days,
                     welcome=(
                         ""
                         if cfg.free_mode or not acct.WELCOME_FULL_REPORT
