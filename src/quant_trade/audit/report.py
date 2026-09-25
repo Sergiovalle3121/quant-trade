@@ -26,7 +26,7 @@ from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
-from quant_trade.audit.importers import lead_number
+from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_number
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
 from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
@@ -446,6 +446,14 @@ LABELS: dict[str, dict[str, str]] = {
         "account_drawdown": "Drawdown entonces",
         "account_scope": ("Leído del archivo tal como lo subiste; nada se comprobó con el bróker."),
         "account_trimmed_badge": "Para preguntar",
+        "account_near_empty": (
+            "El {date} una operación ganó o perdió más de lo que un retiro había dejado en la "
+            "cuenta: se operó con la cuenta casi vacía ({days}). Un porcentaje calculado sobre "
+            "casi nada se dispara, así que medimos esos días sobre el saldo de antes del "
+            "retiro. Pregunta por qué se retiró casi todo y se siguió operando con lo que quedó."
+        ),
+        "account_near_empty_days": "{n} día",
+        "account_near_empty_days_many": "{n} días",
         "account_trimmed": (
             "El archivo empieza con operaciones el {date}, sin el depósito que abrió la cuenta: "
             "puede faltar el principio del historial. La ganancia en % se mide desde el primer "
@@ -1340,6 +1348,14 @@ LABELS: dict[str, dict[str, str]] = {
         "account_drawdown": "Drawdown then",
         "account_scope": "Read from the file as uploaded; nothing was checked with the broker.",
         "account_trimmed_badge": "To ask",
+        "account_near_empty": (
+            "On {date} a trade won or lost more than a withdrawal had left in the account: it "
+            "was traded on an almost empty account ({days}). A percentage on almost nothing "
+            "explodes, so we measure those days on the balance before the withdrawal. Ask why "
+            "almost everything was withdrawn and trading went on with what was left."
+        ),
+        "account_near_empty_days": "{n} day",
+        "account_near_empty_days_many": "{n} days",
         "account_trimmed": (
             "The file opens with trades on {date}, without the deposit that funded the account: "
             "the start of the history may be missing. The % gain is measured from the file's "
@@ -3364,7 +3380,11 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         )
     metadata = dict(inputs.get("report_metadata") or {})
     out += _column_map_html(metadata, labels)
-    metadata = {k: v for k, v in metadata.items() if not k.startswith("column_")}
+    metadata = {
+        k: v
+        for k, v in metadata.items()
+        if not k.startswith("column_") and k not in (NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST)
+    }
     if metadata:
         out += (
             f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
@@ -3774,6 +3794,20 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
             f"{_badge(account['floating_share']['evidence'])}</p></div>"
         )
     out += f"<div class='facts'>{''.join(facts)}</div>"
+    near_empty = account.get("near_empty")
+    if isinstance(near_empty, dict) and near_empty.get("first"):
+        count = int(near_empty["days"]["value"])
+        days = labels[
+            "account_near_empty_days" if count == 1 else "account_near_empty_days_many"
+        ].format(n=count)
+        line = labels["account_near_empty"].format(
+            date=_date_text(str(near_empty["first"]), _locale_of(labels)), days=days
+        )
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['account_trimmed_badge'])}</span> {_e(line)} "
+            f"{_badge(near_empty['days']['evidence'])}</p>"
+        )
     if account.get("starts_with_deposit") is False:
         opened = _date_text(str(account["first_trade"]), _locale_of(labels))
         out += (

@@ -127,6 +127,13 @@ MAX_XLSX_MEMBERS = 500
 MAX_XLSX_COLUMNS = 256
 MAX_XLSX_CELLS = 5_000_000
 
+#: Report metadata the balance curve writes when a trade closed on the little
+#: a withdrawal left was measured on the balance before it: how many days, and
+#: the first. Measured by the reader, so the report never lists them as the
+#: platform's own figures.
+NEAR_EMPTY_DAYS = "near_empty_days"
+NEAR_EMPTY_FIRST = "near_empty_first"
+
 FLOATING_DRAWDOWN_WARNING = (
     "the balance curve is built from closed trades only; it does not show floating "
     "(open-trade) drawdown, so the real drawdown was at least as deep"
@@ -3095,7 +3102,7 @@ def _days(start: date, end: date, business: bool) -> list[date]:
 
 def _balance_curve(
     draft: _Draft, trips: list[_Trip], fallback_initial: float | None
-) -> tuple[bytes, float, list[str]]:
+) -> tuple[bytes, float, list[str], list[date]]:
     warnings: list[str] = []
     if draft.cash is not None:
         cash = sorted(draft.cash, key=lambda item: item.time)
@@ -3242,7 +3249,7 @@ def _balance_curve(
             "that starts at the initial balance"
         )
     text = "timestamp,equity\n" + "".join(f"{day.isoformat()},{value:.6f}\n" for day, value in rows)
-    return text.encode("utf-8"), initial, warnings
+    return text.encode("utf-8"), initial, warnings, anchored
 
 
 def _size_text(size: float) -> str:
@@ -3374,7 +3381,9 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         and trip.exit_price > 0
         and trip.exit_time >= trip.entry_time
     ]
-    equity_csv, initial, curve_warnings = _balance_curve(draft, kept or trips, fallback_initial)
+    equity_csv, initial, curve_warnings, anchored = _balance_curve(
+        draft, kept or trips, fallback_initial
+    )
     warnings.extend(curve_warnings)
     if draft.naive_times:
         warnings.append(NAIVE_TIME_WARNING)
@@ -3384,6 +3393,10 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         if component in draft.itemised:
             fees[component] = round(sum(getattr(trip, component) for trip in trips), 10)
     metadata = dict(draft.metadata)
+    if anchored:
+        # Measured, not declared: the account review names the days.
+        metadata[NEAR_EMPTY_DAYS] = str(len(anchored))
+        metadata[NEAR_EMPTY_FIRST] = anchored[0].isoformat()
     metadata.setdefault("start", min(trip.entry_time for trip in trips).date().isoformat())
     metadata.setdefault("end", max(trip.exit_time for trip in trips).date().isoformat())
     symbols = sorted({trip.symbol for trip in trips if trip.symbol})

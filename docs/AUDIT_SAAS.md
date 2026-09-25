@@ -727,7 +727,13 @@ An account emptied by a withdrawal and refilled later is read; trading on a
 zero or negative balance is refused as before. A trade that closes on what a
 withdrawal left, for more than that whole remainder, was opened on the balance
 before the withdrawal and is measured on it; the file-reading notes name the
-first such day.
+first such day. The account section then adds a "Para preguntar" line with
+that date and the number of such days: the account was traded almost empty,
+a percentage on almost nothing explodes, and the buyer should ask why almost
+everything was withdrawn and trading went on with what was left (`account.near_empty`,
+MEASURED; the reader writes the count to the report metadata, which the
+report never lists as the platform's own figures). Informational: no flag,
+no class change. Real-file check (40 files): one signal export shows it.
 
 | Code | WARN | FAIL |
 |---|---|---|
@@ -2096,6 +2102,71 @@ the audit's other hashes and go with `audit delete ID --yes`. A PDF printed
 again, a screenshot or any re-save never matches.
 
 A fifth audience page, for signal copiers (`/para/copiar-senales`, `/for/signal-copiers`), names the risks a copy-trading percentage hides and points each at a live check: martingale sizing, grid averaging, no sign of a stop loss, many small wins with large losses, many positions open at once, hidden floating drawdown, positions still open at the end, and gains inflated by deposits. It asks for the account's exported history, because a screenshot cannot be audited. The landing keeps its four cards and links the fifth page in a line under them, so `AUDIENCE_PAGES` keeps the four card pages first.
+
+### Naming the columns of a file no importer knows (`audit/mapping.py`)
+
+Some uploads are tables that no importer recognises: `unknown_format`,
+`universal_columns_missing`, a column the customer named that is unreadable
+or missing, or one column chosen twice. For these, the upload now answers
+with HTTP 422 and a page instead of a refusal. The page shows the file's
+header and its first three rows, as read. Each field gets a menu listing the
+file's columns with an example value, preselected with the reader's guess or
+the customer's earlier choice. The page also carries the first upload's form
+fields (starting balance, trials, costs, code, consent), and asks for the same
+file again, because the service keeps no file before auditing it. A JSON
+client gets `{"error", "code", "columns"}`. An HTML report or anything else
+that is not a table keeps the plain error.
+
+Nothing is spent on the mapping step. It is not an audit, so the free first
+report, the month's previews and credits are untouched, which the
+`test_audit_column_mapping_screen.py` tests check.
+
+When a mapped upload succeeds for a signed-in customer, the choice is saved
+in `column_maps`. That table keeps only the account id, the SHA-256 of the
+header's normalised names and the column names. The next upload of a file
+with the same header that the importers do not recognise is read with that
+choice. A recognised format is never overridden. A saved choice that no
+longer reads the file brings the mapping page back, preselected.
+`Store.delete_account` deletes the account's column maps.
+
+Two columns are enough on their own. A date (the page's "Fecha" menu, or the
+exit or fill time) with each trade's result becomes an equity curve: the
+results are chained from the declared starting balance (else
+`DEFAULT_INITIAL_BALANCE`, with the importers' own warning), from the day
+before the first result. A date with the balance or equity column is read as
+the curve itself. Either way the file's own SHA-256 is the recorded digest,
+and a warning says the trade-level checks cannot be measured (`MAPPED_PROFIT_WARNING`
+and `MAPPED_BALANCE_WARNING`, with Spanish rules). Rows without a readable date
+or figure are counted in a warning; results that bring the balance to zero or
+less are refused with a request to declare the starting balance
+(`mapped_results_below_zero`). Fewer than two readable rows bring
+the page back (`mapped_curve_unreadable`). A choice that still lacks fields
+is answered on the page itself, naming the missing fields for the way the
+choice points to (one row per trade, per fill, date and result, or date and
+balance).
+
+Columns named on the form are applied before any automatic reader, and a
+file sent with them in the curve field is read as the report. A lone file
+whose "curve" reaches zero (`equity_not_positive`) and whose figures change
+sign at least three times and on 5 % of the rows (`looks_like_results`) is a
+list of results: it gets this page, with its first date column and first other
+numeric column preselected as the date and the result. A balance that falls below zero
+once, or a cumulative profit that starts at 0, keeps the plain refusal
+asking for the account balance. A curve-field file
+with no date or value column the curve reader knows (`missing_timestamp`,
+`missing_value`) gets the page too, with the date and a `Saldo`/`Balance`/
+`Equity` column preselected. A cell with both marks, a repeated mark or a lone
+mark not followed by three digits is read with the mark it settles; only
+`1.234`-like cells follow the column's vote, so a hand-typed column mixing
+`12.34` and `-5,60` is never read a hundred times too large. The decimal mark of a named figure column comes from its cells
+(`12.34` in a semicolon file is twelve), not from the delimiter alone.
+
+A header wider than 500 columns (`universal.WIDEST_HEADER`) is never searched
+for roles and gets the plain refusal, so a 200,000-column file is turned down
+in about a second instead of rendering a multi-megabyte page. The preview
+shows at most 80 columns (`MAX_COLUMNS`) with a count of the rest. The
+access code the customer typed travels as a hidden field of this page only;
+the page is `no-store` and goes only to the person who typed it.
 
 A sixth audience page, for retail investors (`/para/inversores-particulares`, `/for/retail-investors`), covers people who invest on their own through DEGIRO, Trading 212, Interactive Brokers or XTB. It names only live checks: significance, an optional benchmark CSV, double and triple costs, the result without the best trades and months, the fixed crisis windows and the recent third. It states the reader's limit: a trade history counts only closed positions (open ones and dividends are left out), so a buy-and-hold investor should upload the portfolio's value or return over time. The landing's "Otro caso" line links it too.
 

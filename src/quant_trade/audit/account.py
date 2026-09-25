@@ -35,6 +35,8 @@ from quant_trade.audit.importers import (
     MT5_HISTORY_HTML,
     MT5_HISTORY_XLSX,
     MYFXBOOK_CSV,
+    NEAR_EMPTY_DAYS,
+    NEAR_EMPTY_FIRST,
     _lead_num,
 )
 from quant_trade.audit.redflags import RedFlag
@@ -71,6 +73,10 @@ GAIN_NOTE = (
 )
 MONEY_NOTE = "closed trades after commission and swap, in the account currency"
 ON_DEPOSITS_NOTE = "trading result / money deposited"
+NEAR_EMPTY_NOTE = (
+    "days with a trade result larger than the balance a withdrawal left, measured on the "
+    "balance before that withdrawal"
+)
 BALANCE_BEFORE_NOTE = "earlier deposits and withdrawals plus trades closed before it"
 FLOATING_NOTE = "the platform's own summary at the time of the statement"
 
@@ -197,6 +203,14 @@ def account_review(
         "starts_with_deposit": any(when <= first_entry for when, _ in deposits),
         "first_trade": first_entry.isoformat(),
     }
+    near_empty = _lead_num(metadata.get(NEAR_EMPTY_DAYS))
+    if near_empty:
+        # A trade won or lost more than a withdrawal left: it was traded on an
+        # almost empty account, and the curve measures it on the balance before.
+        review["near_empty"] = {
+            "days": measured(int(near_empty), NEAR_EMPTY_NOTE),
+            "first": str(metadata.get(NEAR_EMPTY_FIRST, "")),
+        }
 
     flags: list[RedFlag] = []
     if (
