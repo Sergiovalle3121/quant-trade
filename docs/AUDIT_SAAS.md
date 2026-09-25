@@ -483,6 +483,11 @@ and report wire them in during the integration step):
   mean and median holding hours, SQN (`sqrt(min(N, 100))·mean/std` of per-
   trade gross pnl), trades per month and a long/short split. MEASURED, or
   NOT_MEASURED with the reason (no trades, no losses, a single side).
+  When the file itemises each trade's commission and swap, the win rate
+  (headline tile, trade table, long/short split) counts a trade as won only
+  after its own fees, the same rule as the weekday, hour, instrument and
+  losing-streak tables; the gross share stays as "Aciertos antes de
+  comisiones", and the annualised table no longer repeats the win rate.
 - `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
   the uploaded returns over one year, 2,000 paths by default, capped at
   2,000,000 resampled cells. A curve finer than 10,000 periods a year
