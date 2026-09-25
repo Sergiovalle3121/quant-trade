@@ -91,3 +91,18 @@ def test_locked_report_shows_the_title_only() -> None:
     locked = render_html(result, watermark=True, free_mode=False, redeem_url="/r")
     assert LABELS["es"]["timing"] in locked
     assert LABELS["es"]["timing_intro"] not in locked
+
+
+def test_timing_table_draws_a_bar_per_row_and_marks_losing_groups() -> None:
+    from quant_trade.audit.report import LABELS, _timing_table
+
+    def measured(value: float) -> dict[str, object]:
+        return {"value": value, "evidence": "MEASURED"}
+
+    rows = [
+        {"key": k, "trades": measured(10), "net": measured(net), "win_rate": measured(0.5)}
+        for k, net in ((0, 120.0), (1, -300.0), (2, 40.0))
+    ]
+    html = _timing_table(rows, "Día", lambda k: ("lun", "mar", "mié")[k], LABELS["es"])
+    assert html.count("tbar neg") == 1 and html.count("tbar pos") == 2
+    assert "--w:100%" in html and "<thead>" in html

@@ -731,6 +731,21 @@ th{background:#fafafb;font:500 .68rem var(--mono);text-transform:uppercase;lette
 color:var(--text-3)}
 .paper tr:hover>td{background:#fafafb}
 .paper table.metrics{table-layout:fixed}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:18px 0 8px}
+.fact{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px 22px}
+.fact b{display:block;font-size:2.2rem;font-size:clamp(1.9rem,3.2vw,2.5rem);font-weight:640;letter-spacing:-.05em;
+line-height:1;font-variant-numeric:tabular-nums}
+.fact p{margin:10px 0 0;color:var(--text-2);font-size:.92rem}
+.paper table.timing{table-layout:fixed}
+.timing .c-k{width:24%}.timing .c-n{width:14%}
+.timing .val{text-align:right}
+.timing td.val{font-weight:600;white-space:nowrap}
+.tbar b{display:inline-block;min-width:92px;font-weight:600}
+.tbar-track{display:inline-block;vertical-align:middle;width:calc(100% - 110px);height:6px;
+margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;direction:rtl}
+.tbar-track span{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--text)}
+.tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
+@media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
 .metrics .c-k{width:30%}.metrics .c-v{width:15%}.metrics .c-e{width:170px}
 .metrics td:first-child{font-weight:500}
 .metrics .val{text-align:right;padding-right:28px}
@@ -880,7 +895,7 @@ PRINT = """
 @media print{
 .recon-row{padding:12px 18px;gap:16px;break-inside:avoid;box-shadow:none!important}
 .recon-v span{min-width:0}
-.metrics .val{padding-right:14px}.metrics .c-v{width:17%}
+.metrics .val{padding-right:14px}.tbar-track{width:calc(100% - 100px)}.fact{break-inside:avoid}.fact b{font-size:24pt!important}.metrics .c-v{width:17%}
 .recon-v i{margin:0 16px}.recon-row .badge{margin-left:18px}
 :root,.hero,.page-hero,.report-hero,.lockbox,.verdict{--bg:#fff;--surface:#fff;--surface-2:#f4f4f6;
 --surface-solid:#fff;--text:#000;--text-2:#333;--text-3:#555;--border:#ddd;--border-2:#ccc;
