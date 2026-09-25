@@ -25,6 +25,7 @@ import hmac
 import ipaddress
 import json
 import logging
+import os
 import re
 import secrets
 import threading
@@ -590,6 +591,17 @@ def _client_ip(request: Any, trusted_proxy_hops: int) -> str:
     )
 
 
+_COMMIT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def deployed_version(environ: Any = None) -> str:
+    """The short commit this process runs, from ``RAILWAY_GIT_COMMIT_SHA``
+    (set by Railway on every deploy), or ``unknown`` off Railway."""
+    env = os.environ if environ is None else environ
+    sha = str(env.get("RAILWAY_GIT_COMMIT_SHA", "")).strip().lower()
+    return sha[:7] if _COMMIT_SHA.match(sha) else "unknown"
+
+
 def _wants_json(request: Any) -> bool:
     return "application/json" in request.headers.get("accept", "")
 
@@ -804,6 +816,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "database": cfg.database_kind,
             "legal_configured": cfg.legal_configured,
             "auto_purge": cfg.auto_purge,
+            "version": deployed_version(),
         }
 
     @app.get(PANEL_PATH, response_class=HTMLResponse)

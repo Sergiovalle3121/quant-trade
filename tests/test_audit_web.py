@@ -70,6 +70,7 @@ def test_health_and_landing_pages_pass_the_guard(tmp_path: Path) -> None:
         "database": "sqlite",
         "legal_configured": False,
         "auto_purge": False,
+        "version": "unknown",
     }
     for lang in ("es", "en"):
         page = client.get(f"/?lang={lang}")
@@ -444,3 +445,15 @@ def test_bad_report_fields_are_refused_in_the_form_locale(tmp_path: Path) -> Non
     )
     assert unreadable.status_code == 400
     assert "informe compatible" in unreadable.text
+
+
+def test_health_names_the_deployed_commit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from quant_trade.audit.web import deployed_version
+
+    assert deployed_version(
+        {"RAILWAY_GIT_COMMIT_SHA": "015F16353D67D487F2923D8632768E57E1F159F5"}
+    ) == ("015f163")
+    assert deployed_version({"RAILWAY_GIT_COMMIT_SHA": "<script>"}) == "unknown"
+    assert deployed_version({}) == "unknown"
+    monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "abcdef1234")
+    assert _client(tmp_path).get("/health").json()["version"] == "abcdef1"
