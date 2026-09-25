@@ -232,6 +232,11 @@ def test_an_upload_with_a_code_is_born_paid(tmp_path: Path) -> None:
     # The way to buy comes before the field for a code already bought.
     assert preview.text.index("paybox buy") < preview.text.index("id='redeem-code'")
     assert "href='https://wa.me/000?text=" in preview.text
+    # The header of a locked preview offers the unlock, not printing a watermarked page.
+    header = preview.text.split("<header", 1)[1].split("</header>", 1)[0]
+    assert "href='#unlock'" in header and "window.print()" not in header
+    # Engine and seed chips step aside on phones so the verdict comes first.
+    assert preview.text.count("class='meta-x'") == 2
     assert client.get("/health").json()["access_codes"] is True
     # Tables scroll inside the page on a phone instead of widening it.
     for text in (landing.text, preview.text):

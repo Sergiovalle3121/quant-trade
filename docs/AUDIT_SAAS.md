@@ -763,6 +763,11 @@ images with `python tools/make_og_images.py` after changing the headline.
 Once a report is chosen, the upload zone turns green, swaps its arrow for a
 check, hides the platform list and shows the file name and size as a pill.
 
+A locked preview's header offers "Desbloquear" (a jump to the unlock box)
+instead of printing a watermarked page; unlocked reports keep the print or PDF
+button. On phones the engine and seed chips are hidden so the verdict comes
+first; they stay on wide screens and in the PDF.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and
