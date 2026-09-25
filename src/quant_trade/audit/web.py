@@ -1116,6 +1116,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pack_price_usd=cfg.pack_price_usd,
             extras_open=bool(extras),
             signed_in=_session(request) is not None,
+            operator=(cfg.operator_name, cfg.operator_address),
         )
 
     @app.get("/en", response_class=HTMLResponse)
