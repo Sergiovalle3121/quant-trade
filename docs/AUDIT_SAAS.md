@@ -190,7 +190,10 @@ left out for an unreadable time, with a readable price and quantity, is named
 in the warnings (its symbol and the time as written, five rows at most, then a
 count), because the trade it opened or closed is missing from the results. A `Contracts` column is
 taken as the instrument only when there is no symbol column and its cells are
-not numbers. Time styles read:
+not numbers. A side named by the position (`Open Long`, `Close Long`,
+`Open Short`, `Close Short`, as Bybit's and Bitget's derivatives exports write
+it) is that trade's direction on a closed-trade row; on a fill, closing a long
+sells and closing a short buys. `Fees Paid` and `Exec Fee` are costs. Time styles read:
 `20260115;093000`, `2026-01-15, 09:30:00`, two-digit years, a zone
 abbreviation (`EST`, `CET`) or offset after a day/month date. Day/month
 order that no day past 12 settles is taken from a year-first column of the
