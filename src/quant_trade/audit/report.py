@@ -1364,6 +1364,21 @@ def _e(value: Any) -> str:
 _MIDNIGHT = re.compile(r"^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.0+)?(?:Z|\+00:00)?$")
 
 
+def _table_pct(value: float) -> str:
+    """A percentage with two decimals, or two significant digits when it is
+    smaller than that (``-0.000012%`` on a history in tiny units); never a
+    signed zero."""
+    if not math.isfinite(value) or abs(value) >= 0.00005:
+        return f"{value:,.2%}"
+    if value == 0:
+        return "0.00%"
+    digits = min(10, 1 - math.floor(math.log10(abs(value * 100))))
+    text = f"{value * 100:.{digits}f}"
+    if float(text) == 0:
+        return "0.00%"
+    return f"{text}%"
+
+
 def _fmt(value: Any, *, key: str = "") -> str:
     if value is None:
         return "—"
@@ -1375,7 +1390,7 @@ def _fmt(value: Any, *, key: str = "") -> str:
         if key in COUNT_UP_KEYS and math.isfinite(value):
             return f"{math.ceil(value):,}"
         if key in PERCENT_KEYS:
-            return f"{value:,.2%}"
+            return _table_pct(value)
         if key in MONEY_KEYS:
             return f"{value:,.2f}"
         if key in RATIO_KEYS:
