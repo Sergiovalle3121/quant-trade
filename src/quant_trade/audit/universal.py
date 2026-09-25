@@ -1374,6 +1374,9 @@ def _fills(
     kept = {row[0] for row in chosen}
     pairs = [pair for account in kept for pair in trips[account]]
     still_open = sum(1 for (account, _), lots in open_lots.items() if account in kept and lots)
+    if not pairs:
+        still_open = sum(1 for lots in open_lots.values() if lots)
+    draft.open_positions = still_open
     if still_open:
         draft.warnings.append(
             f"{still_open} position(s) still open at the end of the report; excluded "

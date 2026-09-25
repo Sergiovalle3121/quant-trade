@@ -944,6 +944,8 @@ line-height:1.2;margin:0 0 28px;color:#fff}
 .lockbox ul{list-style:none;padding:0;margin:0 0 28px;display:grid;
 grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px}
 @media (max-width:620px){.lockbox ul{grid-template-columns:minmax(0,1fr)}}
+.lockbox .lock-sample{margin:-12px 0 24px;font-size:.93rem}
+.lockbox .lock-sample a{color:var(--text);text-underline-offset:3px}
 .lockbox li{display:flex;gap:10px;align-items:center;color:#c8c8ce;font-size:.93rem}
 .lockbox li::before{content:'';width:14px;height:14px;flex:none;opacity:.7;
 background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f4f4f6' stroke-width='2' stroke-linecap='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 018 0v3'/%3E%3C/svg%3E")}
