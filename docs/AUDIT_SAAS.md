@@ -1260,7 +1260,7 @@ The landing's report mockup always settles flat and sharp: the hero clips with `
 
 The forward section answers first ("Aguanta" / "No aguanta" callout under the intro), then shows its four figures as a two-by-two grid on screens wider than a phone and two per row in the PDF, so no card is left alone on a row.
 
-Refusals read calm: the error card and the page's eyebrow dot are amber (a fix to make, not an alarm), size limits read in MB or KB instead of bytes, every refusal ends with a period, and a fix after a colon or semicolon (sube, exporta, revisa, upload, export, check...) goes on its own "Qué hacer:" / "What to do:" line. The size and value-too-large refusals now say what to do (a smaller file; check the exported values).
+Refusals read calm: the error card and the page's eyebrow dot are amber (a fix to make, not an alarm), size limits read in MB or KB instead of bytes, every refusal ends with a period, and a fix after a colon or semicolon (sube, exporta, revisa, upload, export, check...) goes on its own "Qué hacer:" / "What to do:" line. The size and value-too-large refusals now say what to do (a smaller file; check the exported values). On the public /v page the audit details read as plain words, the trial counts carry their evidence badge (120 DECLARED) instead of "120 (DECLARED)" in code type, and only the result hash keeps the code style.
 
 ## Security
 

@@ -1644,10 +1644,18 @@ def landing(
 
 
 def _evidence_value(item: Any) -> str:
+    """A figure and its evidence tag as HTML: "120" then the DECLARED badge."""
     if isinstance(item, dict) and "value" in item:
         value = item.get("value")
-        return f"{'—' if value is None else value} ({item.get('evidence', '')})"
-    return "-" if item is None else str(item)
+        shown = "—" if value is None else _e(f"{value:,}" if isinstance(value, int) else value)
+        evidence = str(item.get("evidence", ""))
+        tag = (
+            f" <span class='badge {_e(evidence)}'>{_e(evidence)}</span>"
+            if evidence in ("MEASURED", "DECLARED", "NOT_MEASURED")
+            else ""
+        )
+        return f"<span class='vc'>{shown}{tag}</span>"
+    return "—" if item is None else _e(str(item))
 
 
 def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "") -> str:
@@ -1752,13 +1760,19 @@ def verification_page(
             or "-",
         ),
         (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
-        (copy["v_trials_declared"], _evidence_value(declared.get("trials"))),
-        (copy["v_trials_used"], _evidence_value(trials_used)),
-        (copy["v_result_sha"], result_sha256),
     ]
-    detail_rows = "".join(
-        f"<tr><td>{_e(label)}</td><td><code>{_e(value)}</code></td></tr>"
-        for label, value in details
+    # Words read as words, figures carry their evidence badge, and only the
+    # hash keeps the code style.
+    detail_rows = (
+        "".join(f"<tr><td>{_e(label)}</td><td>{_e(value)}</td></tr>" for label, value in details)
+        + "".join(
+            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item)}</td></tr>"
+            for label, item in (
+                (copy["v_trials_declared"], declared.get("trials")),
+                (copy["v_trials_used"], trials_used),
+            )
+        )
+        + f"<tr><td>{_e(copy['v_result_sha'])}</td><td><code>{_e(result_sha256)}</code></td></tr>"
     )
     page_url = f"{base_url}/v/{public_id}"
     badge_url = f"{page_url}/badge.svg?lang={locale}"

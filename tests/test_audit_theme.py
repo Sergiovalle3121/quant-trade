@@ -511,3 +511,24 @@ def test_refusals_read_calm_with_sizes_and_what_to_do() -> None:
     # A refusal is a fix to make, not an alarm: amber rail and dot, not red.
     assert "border-left:4px solid var(--warn)" in STYLE
     assert "class='dot warn'" in dates or 'class="dot warn"' in dates
+
+
+def test_verification_details_show_figures_with_their_evidence_badge() -> None:
+    from quant_trade.audit.pages import verification_page
+    from quant_trade.audit.sample import sample_result
+    from quant_trade.audit.store import public_view
+
+    for locale in ("es", "en"):
+        view, sha = public_view(sample_result(locale, bootstrap_samples=60).model_dump_json())
+        page = verification_page(
+            view,
+            public_id="a1b2c3d4e5",
+            published_at="2026-09-25T12:00:00Z",
+            result_sha256=sha,
+            base_url="https://example.test",
+            locale=locale,
+        )
+        assert "(DECLARED)" not in page and "(MEASURED)" not in page
+        assert "<span class='vc'>120 <span class='badge DECLARED'>DECLARED</span></span>" in page
+        assert f"<code>{sha}</code>" in page
+        assert find_claims(page) == []
