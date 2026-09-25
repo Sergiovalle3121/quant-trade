@@ -92,3 +92,26 @@ def test_section_renders_clean_in_both_languages(locale: str) -> None:
     title = "Qué capital necesita y a qué tamaño" if locale == "es" else "How much capital"
     assert title in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_platform_drawdown_with_open_trades_is_a_floor() -> None:
+    trades = _trades(PROFITS)
+    plain = capital_review(trades, fees=None, starting_balance=10_000.0, seed=3)
+    floored = capital_review(
+        trades, fees=None, starting_balance=10_000.0, platform_fall=50_000.0, seed=3
+    )
+    assert plain["fall_platform"]["evidence"] == "NOT_MEASURED"
+    assert floored["fall_platform"] == {
+        "value": 50_000.0,
+        "evidence": "DECLARED",
+        "note": "the platform's maximal drawdown in money, open trades included",
+    }
+    assert floored["fall_reference"]["value"] == pytest.approx(50_000.0)
+    assert floored["rows"][1]["capital"]["value"] == pytest.approx(250_000.0)
+
+
+def test_under_a_year_is_marked_and_under_ninety_days_is_held_back() -> None:
+    assert capital_review(_trades(PROFITS), fees=None, starting_balance=1.0)["short_history"]
+    short = _trades([10.0, -5.0] * 20, every_days=2.0)
+    review = capital_review(short, fees=None, starting_balance=1.0)
+    assert review["status"] == "NOT_MEASURED" and "90 days" in review["reason"]

@@ -467,8 +467,22 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "mayor caída en dinero de las operaciones cerradas en su propio orden",
     ),
     (
-        "the larger of the resampled 95th percentile and the history's own fall",
-        "la mayor entre el percentil 95 remuestreado y la caída del propio historial",
+        "the largest of the resampled 95th percentile, the history's own fall and the "
+        "platform's drawdown with open trades",
+        "la mayor entre el percentil 95 remuestreado, la caída del propio historial y el "
+        "drawdown de la plataforma con operaciones abiertas",
+    ),
+    (
+        "the platform's maximal drawdown in money, open trades included",
+        "el drawdown máximo de la plataforma en dinero, con operaciones abiertas",
+    ),
+    (
+        "the file does not print the platform's drawdown in money",
+        "el archivo no imprime el drawdown de la plataforma en dinero",
+    ),
+    (
+        "days from the first entry to the last exit",
+        "días desde la primera entrada hasta la última salida",
     ),
     (
         "reference fall / loss limit, at the backtest's sizes",
@@ -490,12 +504,36 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "necesita al menos {n} operaciones cerradas; se aportaron {m}",
     ),
     (
-        "needs trades spread over at least {n} days",
-        "necesita operaciones repartidas en al menos {n} días",
+        "needs trades spread over at least {n} days; a shorter history stretched to a year "
+        "gives capital figures too uncertain to act on",
+        "necesita operaciones repartidas en al menos {n} días; un historial más corto "
+        "estirado a un año da cifras de capital demasiado inciertas para decidir con ellas",
     ),
     (
         "the trades show no fall to size against",
         "las operaciones no muestran una caída con la que dimensionar",
+    ),
+    (
+        "{n} settings one step away keep {p} of the chosen profit at the median and {q} of "
+        "them end with a profit: the chosen settings look like a lone peak",
+        "{n} configuraciones a un paso conservan en la mediana el {p} del beneficio elegido y "
+        "el {q} de ellas gana: los parámetros elegidos parecen un pico aislado",
+    ),
+    ("from the rows of the optimisation export", "de las filas de la exportación de optimización"),
+    ("rank of the chosen pass / passes", "puesto de la pasada elegida / pasadas"),
+    (
+        "median neighbour profit / chosen profit",
+        "beneficio mediano de los vecinos / beneficio elegido",
+    ),
+    ("the chosen pass shows no profit", "la pasada elegida no tiene beneficio"),
+    (
+        "the optimisation did not try the settings one step away (genetic or sparse)",
+        "la optimización no probó las configuraciones a un paso (genética o dispersa)",
+    ),
+    ("no optimisation file uploaded", "no se subió archivo de optimización"),
+    (
+        "needs at least {n} passes with a profit column and a parameter that varies",
+        "necesita al menos {n} pasadas con columna de beneficio y un parámetro que varíe",
     ),
     (
         "the file is a backtest, not an account history",

@@ -40,7 +40,11 @@ from quant_trade.core.models import Trade
 #: Loss limits, as a share of the account, the section answers for.
 LOSS_LIMITS: tuple[float, ...] = (0.10, 0.20, 0.30, 0.50)
 MIN_TRADES = 30
-MIN_SPAN_DAYS = 30
+#: Below this span a year drawn from the trades is too much extrapolation to
+#: print capital figures a buyer might act on.
+MIN_SPAN_DAYS = 90
+#: Below one year the section carries a visible warning.
+FULL_YEAR_DAYS = 365
 #: Trades in a drawn year are kept within these bounds.
 MIN_YEAR_TRADES = 20
 MAX_YEAR_TRADES = 20_000
@@ -52,7 +56,11 @@ RESAMPLED_NOTE = (
     "at the backtest's sizes"
 )
 HISTORY_NOTE = "deepest fall in money of the closed trades in their own order"
-REFERENCE_NOTE = "the larger of the resampled 95th percentile and the history's own fall"
+REFERENCE_NOTE = (
+    "the largest of the resampled 95th percentile, the history's own fall and the "
+    "platform's drawdown with open trades"
+)
+PLATFORM_NOTE = "the platform's maximal drawdown in money, open trades included"
 CAPITAL_NOTE = "reference fall / loss limit, at the backtest's sizes"
 SCALE_NOTE = "loss limit x starting balance / reference fall"
 ASSUMPTIONS: dict[str, list[str]] = {
@@ -61,12 +69,16 @@ ASSUMPTIONS: dict[str, list[str]] = {
         "Las operaciones se sortean de forma independiente; la caída del propio historial "
         "cubre las rachas.",
         "Los costes son los que detalla el archivo subido.",
+        "Las cifras en dinero van al tamaño que usó el archivo; el tamaño relativo se calcula "
+        "sobre su balance inicial, sin sumar depósitos posteriores.",
         "Mide las pérdidas del historial; no es una predicción.",
     ],
     "en": [
         "Fixed sizes: no compounding and no size change after wins or losses.",
         "Trades are drawn independently of one another; the history's own fall covers streaks.",
         "Costs are those the uploaded file itemises.",
+        "Money figures are at the sizes the file used; the relative size is computed on its "
+        "starting balance, without later deposits.",
         "It measures the history's losses; it is not a forecast.",
     ],
 }
@@ -85,6 +97,7 @@ def capital_review(
     *,
     fees: Sequence[float] | None,
     starting_balance: float | None,
+    platform_fall: float | None = None,
     samples: int = 2000,
     seed: int = 0,
 ) -> dict[str, Any]:
@@ -103,7 +116,8 @@ def capital_review(
     if span_days < MIN_SPAN_DAYS:
         return {
             "status": "NOT_MEASURED",
-            "reason": f"needs trades spread over at least {MIN_SPAN_DAYS} days",
+            "reason": f"needs trades spread over at least {MIN_SPAN_DAYS} days; a shorter "
+            "history stretched to a year gives capital figures too uncertain to act on",
         }
     per_year = int(round(len(pnl) * 365.25 / span_days))
     per_year = min(max(per_year, MIN_YEAR_TRADES), MAX_YEAR_TRADES)
@@ -113,7 +127,8 @@ def capital_review(
     falls = _deepest_fall(drawn)
     history = float(_deepest_fall(pnl))
     resampled = float(np.percentile(falls, QUANTILE))
-    reference = max(resampled, history)
+    platform = platform_fall if platform_fall is not None and platform_fall > 0 else None
+    reference = max(resampled, history, platform or 0.0)
     if reference <= 0:
         return {"status": "NOT_MEASURED", "reason": "the trades show no fall to size against"}
 
@@ -136,12 +151,19 @@ def capital_review(
         "trades_per_year": measured(
             per_year,
             "closed trades per year in the history"
-            if span_days >= 365
+            if span_days >= FULL_YEAR_DAYS
             else "closed trades per year at the history's pace; the history is shorter than a year",
         ),
         "fall_p50": measured(float(np.percentile(falls, 50)), RESAMPLED_NOTE),
         "fall_p95": measured(resampled, RESAMPLED_NOTE),
         "fall_history": measured(history, HISTORY_NOTE),
+        "fall_platform": (
+            declared(platform, PLATFORM_NOTE)
+            if platform is not None
+            else not_measured("the file does not print the platform's drawdown in money")
+        ),
+        "short_history": span_days < FULL_YEAR_DAYS,
+        "span_days": measured(round(span_days), "days from the first entry to the last exit"),
         "fall_reference": measured(reference, REFERENCE_NOTE),
         "starting_balance": (
             declared(balance, "starting balance of the uploaded file")
@@ -161,4 +183,12 @@ def scale_text(share: float) -> str:
     return f"{share:.2f}x" if share < 1 else f"{share:.1f}x"
 
 
-__all__ = ["ASSUMPTIONS", "LOSS_LIMITS", "MIN_TRADES", "capital_review", "scale_text"]
+__all__ = [
+    "ASSUMPTIONS",
+    "FULL_YEAR_DAYS",
+    "LOSS_LIMITS",
+    "MIN_SPAN_DAYS",
+    "MIN_TRADES",
+    "capital_review",
+    "scale_text",
+]

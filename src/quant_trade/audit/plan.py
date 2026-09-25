@@ -301,6 +301,16 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
             "the result."
         ),
     },
+    "ISOLATED_OPTIMUM": {
+        "es": (
+            "Elige valores en una zona donde los vecinos también ganen (una meseta), aunque el "
+            "resultado sea menor, y compruébalos en un tramo fuera de muestra."
+        ),
+        "en": (
+            "Pick values in a zone where the neighbours also end with a profit (a plateau), "
+            "even at a lower result, and check them on an out-of-sample stretch."
+        ),
+    },
     "REPORT_HEADER_MISMATCH": {
         "es": (
             "Pide el archivo original que exporta MetaTrader, no una captura, y vuelve a "
