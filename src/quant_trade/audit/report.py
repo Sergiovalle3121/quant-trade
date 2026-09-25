@@ -995,6 +995,13 @@ STATUS_TEXT: dict[str, dict[str, str]] = {
 #: Reader-facing names of the numeric keys; the key itself when absent.
 KEY_LABELS: dict[str, dict[str, str]] = {
     "es": {
+        "seal_id": "Identificador del sello",
+        "selection_start": "Inicio de la selección",
+        "selection_end": "Fin de la selección",
+        "holdout_start": "Inicio del tramo reservado",
+        "holdout_end": "Fin del tramo reservado",
+        "sealed_at_utc": "Sellado (UTC)",
+        "seal": "Sello (sha256)",
         "total_return": "Retorno total",
         "cagr": "Retorno anual compuesto",
         "volatility": "Volatilidad anual",
@@ -1076,6 +1083,13 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dataset_digest": "Huella del conjunto de datos",
     },
     "en": {
+        "seal_id": "Seal id",
+        "selection_start": "Selection start",
+        "selection_end": "Selection end",
+        "holdout_start": "Holdout start",
+        "holdout_end": "Holdout end",
+        "sealed_at_utc": "Sealed at (UTC)",
+        "seal": "Seal (sha256)",
         "total_return": "Total return",
         "cagr": "Compound annual return",
         "volatility": "Annual volatility",
@@ -1249,6 +1263,9 @@ def _e(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
+_MIDNIGHT = re.compile(r"^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.0+)?(?:Z|\+00:00)?$")
+
+
 def _fmt(value: Any, *, key: str = "") -> str:
     if value is None:
         return "—"
@@ -1272,6 +1289,9 @@ def _fmt(value: Any, *, key: str = "") -> str:
         if abs(value) >= 1:
             return f"{value:,.2f}"
         return f"{value:.4f}"
+    if isinstance(value, str) and (midnight := _MIDNIGHT.match(value)):
+        # A declared date arrives as 2024-06-03T00:00:00Z; the day is what was declared.
+        return midnight.group(1)
     return _e(value)
 
 
@@ -1284,6 +1304,20 @@ SEVERITY_TEXT: dict[str, dict[str, str]] = {
     "es": {"FAIL": "Grave", "WARN": "Aviso", "INFO": "Nota"},
     "en": {"FAIL": "Serious", "WARN": "Warning", "INFO": "Note"},
 }
+
+
+def _sentence(text: str) -> str:
+    """Capitalised and closed with a period, for a detail shown on its own line."""
+    text = text.strip()
+    return text[:1].upper() + text[1:].rstrip(".") + "." if text else ""
+
+
+def _nm_item(item: str) -> str:
+    """ "Benchmark aportado: no se subió un benchmark" as a bold name over its reason."""
+    name, sep, reason = item.partition(": ")
+    if not sep:
+        return f"<li><b>{_e(item)}</b></li>"
+    return f"<li><b>{_e(name)}</b><span>{_e(_sentence(reason))}</span></li>"
 
 
 def _severity_badge(severity: str, locale: str) -> str:
@@ -1461,6 +1495,9 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
             f"<td>{_badge(value['evidence'])}</td><td class='muted'>{_e(note)}</td></tr>"
         )
     if not rows:
+        # A not-measured section already says why; "none" under it adds nothing.
+        if section.get("status") == "NOT_MEASURED":
+            return ""
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
         "<table class='metrics ev'><colgroup><col class='c-k'><col class='c-v'>"
@@ -3154,15 +3191,17 @@ def render_html(
         else f"<p class='muted'>{_e(labels['none'])}</p>"
     )
 
+    order = {"FAIL": 0, "WARN": 1}
     flags_html = (
-        f"<table><tr><th>{_e(labels['code'])}</th><th>{_e(labels['severity'])}</th>"
-        f"<th>{_e(labels['detail'])}</th></tr>"
+        "<ul class='flag-list acct-flags flag-cards'>"
         + "".join(
-            f"<tr><td>{_e(flag['code'])}</td><td>{_severity_badge(flag['severity'], locale)}</td>"
-            f"<td>{_e(localize(flag['detail'], locale))}</td></tr>"
-            for flag in data["red_flags"]
+            f"<li>{_severity_badge(flag['severity'], locale)}"
+            f"<div><b>{_e(flag_title(flag['code'], locale))}</b>"
+            f"<p>{_e(_sentence(localize(flag['detail'], locale)))}</p>"
+            f"<p class='flag-code'>{_e(flag['code'])}</p></div></li>"
+            for flag in sorted(data["red_flags"], key=lambda f: order.get(f["severity"], 2))
         )
-        + "</table>"
+        + "</ul>"
         if data["red_flags"]
         else f"<p class='muted'>{_e(labels['none'])}</p>"
     )
@@ -3174,7 +3213,7 @@ def render_html(
         seal_html += (
             "<table>"
             + "".join(
-                f"<tr><td>{_e(k)}</td><td><code>{_e(hs[k])}</code></td></tr>"
+                f"<tr><td>{_e(_key_label(k, labels))}</td><td><code>{_fmt(hs[k])}</code></td></tr>"
                 for k in (
                     "seal_id",
                     "selection_start",
@@ -3204,7 +3243,7 @@ def render_html(
         if section.get("status") == "NOT_MEASURED"
     ]
     nm_html = (
-        "<ul>" + "".join(f"<li>{_e(item)}</li>" for item in not_measured) + "</ul>"
+        "<ul class='nm-list'>" + "".join(_nm_item(item) for item in not_measured) + "</ul>"
         if not_measured
         else f"<p class='muted'>{_e(labels['none'])}</p>"
     )
