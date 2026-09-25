@@ -458,7 +458,7 @@ Título: Rigor: auditoría estadística de backtests e historiales de EA (MT4, M
 
 Soy <nombre>, autor de Rigor (miembro comercial, declaro mi interés).
 
-Qué hace: lee el informe de MT5 o MT4 tal cual (en 7 idiomas), el XML de optimización, la lista de operaciones de TradingView o el CSV de Myfxbook, FX Blue o una señal de MQL5, y da una clase de A a D en seis dimensiones: significación estadística, Sharpe deflactado con el número real de intentos, costes, fuera de muestra, calidad de datos y benchmark. Cada número dice si se midió del archivo, si lo declaró la plataforma o si no se pudo medir.
+Qué hace: lee el informe de MT5 o MT4 tal cual (en 7 idiomas), el XML de optimización, la lista de operaciones de TradingView, el CSV de Myfxbook, FX Blue o una señal de MQL5, o el historial de otras 21 plataformas (Interactive Brokers, Tradovate, cTrader, Rithmic, Binance y más; si no reconoce las columnas, te pregunta qué es cada una), y da una clase de A a D en seis dimensiones: significación estadística, Sharpe deflactado con el número real de intentos, costes, fuera de muestra, calidad de datos y benchmark. Cada número dice si se midió del archivo, si lo declaró la plataforma o si no se pudo medir.
 
 También: el resultado sin sus mejores operaciones, el modelo de ticks del probador, si la mejor pasada es un pico aislado o una meseta, si el periodo reciente se parece al resto, y una cuenta real frente a miles de historias remuestreadas de su propio backtest, con los depósitos separados del resultado de operar.
 
@@ -477,7 +477,7 @@ Title: Rigor: statistical audit of EA backtests and account histories (MT4, MT5,
 
 I am <name>, the author of Rigor (commercial member, interest declared).
 
-What it does: it reads the MT5 or MT4 report as exported (in 7 languages), the optimisation XML, the TradingView list of trades or the Myfxbook, FX Blue or MQL5 signal CSV, and gives a class from A to D across six dimensions: statistical significance, deflated Sharpe using the real number of trials, costs, out-of-sample, data quality and a benchmark. Every number says whether it was measured from the file, declared by the platform, or could not be measured.
+What it does: it reads the MT5 or MT4 report as exported (in 7 languages), the optimisation XML, the TradingView list of trades, the Myfxbook, FX Blue or MQL5 signal CSV, or the history from 21 other platforms (Interactive Brokers, Tradovate, cTrader, Rithmic, Binance and more; if it does not recognise the columns, it asks what each one is), and gives a class from A to D across six dimensions: statistical significance, deflated Sharpe using the real number of trials, costs, out-of-sample, data quality and a benchmark. Every number says whether it was measured from the file, declared by the platform, or could not be measured.
 
 Also: the result without its best trades, the tester's tick model, whether the best pass is an isolated peak or a plateau, whether the recent period looks like the rest, and a live account compared with thousands of resampled histories of its own backtest, with deposits separated from trading results.
 
@@ -547,6 +547,128 @@ What to do:
 - Rerun the test with double costs.
 
 All of this is statistics on past data: it helps rule out illusions, it does not forecast the future.
+```
+
+F4 a F7 sirven solos, sin enlace: publícalos como respuesta cuando alguien
+pregunte por un backtest, un robot, un reto o un gestor. El objetivo es que se
+vea trabajo real. Solo donde las reglas del foro lo permitan añade al final
+«Hice una herramienta que hace estas cuentas con tu archivo: <enlace>», y di
+que es tuya.
+
+#### F4 · ES · Explicación con números: cuánto Sharpe da la suerte sola
+
+```text
+Título: ¿Cuánto Sharpe sale por pura suerte? Números que puedes repetir en casa
+
+Genera 200 estrategias de ruido puro: rendimientos diarios aleatorios con media cero, tres años de datos (756 días). Ninguna tiene ventaja. Calcula el Sharpe anualizado de cada una y quédate con la mejor.
+
+Repitiendo el experimento 400 veces, la mejor de 200 tiene un Sharpe de alrededor de 1,6. Con 20 estrategias, la mejor ronda 1,1. Coincide con la fórmula del máximo esperado de Bailey y López de Prado: raíz(1/T) multiplicada por un término que crece con el número de pruebas.
+
+Qué significa: si optimizaste 200 combinaciones y la mejor muestra Sharpe 1,5 en tres años, ese número por sí solo no distingue ventaja de suerte. Lo que ayuda:
+- Anota cuántas pruebas hiciste de verdad, incluidas las que borraste.
+- Compara el Sharpe de la elegida con el que daría la suerte con ese número de pruebas (Sharpe deflactado).
+- Mira el tramo que no usaste para elegir.
+
+El código son diez líneas de numpy; si quieres lo pego. Es estadística sobre datos pasados: descarta ilusiones, no prevé el futuro.
+```
+
+#### F4 · EN · Explainer with numbers: how much Sharpe luck alone gives
+
+```text
+Title: How much Sharpe comes from luck alone? Numbers you can repeat at home
+
+Generate 200 pure-noise strategies: random daily returns with zero mean, three years of data (756 days). None has an edge. Compute each one's annualised Sharpe and keep the best.
+
+Repeating the experiment 400 times, the best of 200 has a Sharpe of about 1.6. With 20 strategies, the best is around 1.1. That matches the expected-maximum formula from Bailey and López de Prado: sqrt(1/T) times a term that grows with the number of trials.
+
+What it means: if you optimised 200 combinations and the best shows Sharpe 1.5 over three years, that number alone cannot tell an edge from luck. What helps:
+- Write down how many trials you really ran, including the ones you deleted.
+- Compare the chosen Sharpe with what luck would give for that number of trials (the deflated Sharpe).
+- Look at the period you did not use to choose.
+
+The code is ten lines of numpy; I can paste it if you like. It is statistics on past data: it rules out illusions, it does not forecast the future.
+```
+
+#### F5 · ES · Antes de comprar un EA o copiar una señal: cinco preguntas
+
+```text
+Antes de pagar por un robot o copiar una señal, cinco preguntas que se responden con el historial, no con la publicidad:
+
+1. ¿El porcentaje viene de operar o de depósitos? Una recarga en mitad del historial cambia el crecimiento mostrado. Pide la lista de depósitos y retiros.
+2. ¿Cuál fue el drawdown flotante, no solo el de balance? Un robot que promedia pérdidas puede tener una curva de balance lisa y una cuenta que estuvo al borde.
+3. ¿Cuántas operaciones y cuántos meses hay? Treinta operaciones en tres buenos meses dicen poco.
+4. ¿Qué queda si quitas las cinco mejores operaciones? Si el resultado cambia de signo, depende de muy pocos días.
+5. ¿La cuenta real se parece a su backtest? Si la real va muy por debajo, el backtest no describía lo que pasa en vivo.
+
+Nada de esto prevé el futuro; sirve para no confundir una buena racha con una ventaja.
+```
+
+#### F5 · EN · Before buying an EA or copying a signal: five questions
+
+```text
+Before paying for a robot or copying a signal, five questions the history answers, not the advertising:
+
+1. Does the percentage come from trading or from deposits? A top-up in the middle of the history changes the growth shown. Ask for the list of deposits and withdrawals.
+2. What was the floating drawdown, not just the balance one? A robot that averages down can show a smooth balance curve on an account that came close to the edge.
+3. How many trades and how many months are there? Thirty trades in three good months say little.
+4. What is left without the five best trades? If the result changes sign, it rests on very few days.
+5. Does the live account look like its backtest? If live runs far below, the backtest did not describe what happens live.
+
+None of this forecasts the future; it helps you not mistake a good streak for an edge.
+```
+
+#### F6 · ES · Antes de pagar un reto de prop firm
+
+```text
+Antes de pagar otro reto, puedes medir con tu propio historial qué regla te frena. Tres cuentas sencillas:
+
+1. Pérdida diaria: busca en tu historial el peor día y los cinco peores. Compáralos con el límite diario del reto, calculado sobre el saldo inicial o sobre el máximo del día, según la firma.
+2. Pérdida total: mira el peor tramo de pico a valle. Si ya se acerca al límite, una mala racha normal basta para tocarlo.
+3. Regla del mejor día (consistencia): divide tu mejor día entre el resultado total. Algunas firmas frenan el retiro si ese día pesa demasiado.
+
+Mejor todavía: remuestrea tus operaciones miles de veces y cuenta en qué porcentaje de las historias tocarías cada límite. Eso dice qué reto encaja con tu forma de operar, no si te irá bien.
+
+Las reglas cambian; léelas en la web de la firma el día que pagas.
+```
+
+#### F6 · EN · Before paying for a prop firm challenge
+
+```text
+Before paying for another challenge, you can measure with your own history which rule stops you. Three simple checks:
+
+1. Daily loss: find your worst day and your five worst days. Compare them with the challenge's daily limit, computed from the starting balance or from the day's high, depending on the firm.
+2. Maximum loss: look at your worst peak-to-trough stretch. If it already comes close to the limit, an ordinary bad streak is enough to hit it.
+3. Best-day rule (consistency): divide your best day by the total result. Some firms hold the payout if that day weighs too much.
+
+Better still: resample your trades thousands of times and count in what share of the histories you would hit each limit. That tells you which challenge fits the way you trade, not whether it will go well.
+
+Rules change; read them on the firm's site on the day you pay.
+```
+
+#### F7 · ES · Para quien evalúa un gestor o un fondo por su tabla mensual
+
+```text
+Si te enseñan una tabla de rentabilidades mensuales de un gestor o un fondo, cuatro preguntas antes de fiarte:
+
+1. ¿Cuántos meses hay? Con 24 meses, un Sharpe alto tiene un margen de error muy ancho. Calcula el intervalo, no solo el número.
+2. ¿Los meses son netos de comisiones? Una comisión de gestión y otra de éxito pueden cambiar bastante el resultado del inversor.
+3. ¿Cómo le fue en los meses de crisis del mercado (marzo de 2020, 2022)? Un historial que empieza después no dice cómo se porta en una caída.
+4. ¿Contra qué se compara? Un año del +12 % se lee distinto si el índice de referencia hizo +25 % o −10 %.
+
+Nada de esto juzga al gestor; separa lo que el historial demuestra de lo que solo sugiere.
+```
+
+#### F7 · EN · For someone judging a manager or a fund by its monthly table
+
+```text
+If someone shows you a table of monthly returns for a manager or a fund, four questions before you rely on it:
+
+1. How many months are there? With 24 months, a high Sharpe has a very wide margin of error. Compute the interval, not just the number.
+2. Are the months net of fees? A management fee plus a performance fee can change the investor's result a lot.
+3. How did it do in the market's crisis months (March 2020, 2022)? A history that starts afterwards says nothing about how it behaves in a fall.
+4. What is it compared with? A +12 % year reads differently if the benchmark did +25 % or −10 %.
+
+None of this judges the manager; it separates what the history shows from what it only suggests.
 ```
 
 ### Mensajes directos
