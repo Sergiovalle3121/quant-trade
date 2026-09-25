@@ -74,6 +74,10 @@ DISCLAIMER = {
     ),
 }
 
+#: Years of history needed above this read "more than" it: the figure only
+#: says the search is far too wide for the history.
+LUCK_YEARS_SHOWN = 100
+
 #: The full sample report, linked from a locked preview.
 SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample"}
 
@@ -89,6 +93,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "stress": "Qué queda sin sus mejores operaciones y meses",
         "timing": "En qué horas y días se concentra el resultado",
         "recent": "Si sigue funcionando en el periodo más reciente",
+        "luck": (
+            "Cuánto Sharpe queda al descontar la suerte y cuántos años de historial harían falta"
+        ),
+        "ride": "Tiempo sin nuevos máximos, peor día, peor mes y meses en positivo",
         "behaviour": "Si sube el riesgo después de perder (martingala, promediar)",
         "fund": "Calendario año por mes, peor mes, caída más profunda y tiempo en recuperarse",
         "instruments": "Si funciona en cada mercado o uno carga con el resto",
@@ -120,6 +128,8 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "stress": "What is left without its best trades and months",
         "timing": "Which hours and days the result comes from",
         "recent": "Whether it still works in the most recent period",
+        "luck": "How much Sharpe is left once luck is discounted, and how many years it would take",
+        "ride": "Time without new highs, worst day, worst month and months that ended up",
         "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
         "fund": "Year-by-month calendar, worst month, deepest fall and time to recover",
         "instruments": "Whether it works on each market or one carries the rest",
@@ -424,6 +434,75 @@ LABELS: dict[str, dict[str, str]] = {
         "account_before": "Balance antes",
         "account_drawdown": "Drawdown entonces",
         "account_scope": ("Leído del archivo tal como lo subiste; nada se comprobó con el bróker."),
+        "luck": "¿Cuánto queda al descontar la suerte?",
+        "luck_intro": (
+            "Cuantas más configuraciones se prueban, más alto sale la mejor aunque ninguna tenga "
+            "ventaja. Aquí ponemos el Sharpe del archivo junto al que daría la pura suerte con "
+            "las configuraciones contadas, con la matemática publicada de Bailey y López de "
+            "Prado y de Harvey y Liu. Es la misma cuenta que decide la dimensión «Número de "
+            "configuraciones probadas», dicha en números."
+        ),
+        "luck_badge_beats": "Supera a la suerte",
+        "luck_badge_below": "No supera a la suerte",
+        "luck_beats": (
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin "
+            "habilidad."
+        ),
+        "luck_below": (
+            "Con {n} configuraciones, la pura suerte daría un Sharpe de {luck}, igual o más "
+            "que el {sharpe} de este historial."
+        ),
+        "luck_sharpe": (
+            "Sharpe que darían {n} configuraciones sin habilidad (el del archivo: {sharpe})"
+        ),
+        "luck_years": (
+            "Años de historial con los que esa suerte queda por debajo de este Sharpe "
+            "(el archivo tiene {span})"
+        ),
+        "luck_after": "Sharpe que queda tras descontar {n} configuraciones (Harvey y Liu)",
+        "luck_years_unit": "años",
+        "luck_uncounted": (
+            "Los archivos no dicen cuántas configuraciones se probaron antes de elegir esta. "
+            "La tabla muestra cuánto historial haría falta según cuántas fueran: pregúntaselo "
+            "al vendedor."
+        ),
+        "luck_span_line": "Sharpe del archivo: {sharpe}. Historial: {span}.",
+        "luck_table_trials": "Configuraciones probadas",
+        "luck_table_luck": "Sharpe que daría la suerte",
+        "luck_table_years": "Historial necesario",
+        "luck_table_enough": "¿Alcanza este historial?",
+        "luck_short": (
+            "Con menos de un año de historial, un Sharpe anualizado cambia mucho con pocos "
+            "datos: tómalo como orden de magnitud."
+        ),
+        "luck_more_than": "más de {n} años",
+        "luck_months": "{n} meses",
+        "luck_month_one": "1 mes",
+        "luck_under_month": "menos de 1 mes",
+        "ride": "Cómo se vivió este historial",
+        "ride_intro": (
+            "Un total y una caída máxima no dicen cómo se vivió el historial: cuánto tiempo pasó "
+            "sin un nuevo máximo, cuánto tardó en volver la peor caída, y cómo fueron el peor "
+            "día y el peor mes. Son las cifras que hacen que alguien apague un sistema."
+        ),
+        "ride_days": "{n} días",
+        "ride_under": "Tiempo más largo sin un nuevo máximo ({start} a {end})",
+        "ride_under_open": (
+            "Tiempo sin un nuevo máximo desde el {start}: sigue abierto al final del archivo"
+        ),
+        "ride_fall": "Peor caída: días del máximo ({start}) al mínimo ({low})",
+        "ride_recovery": "Días desde ese mínimo hasta volver al máximo",
+        "ride_not_back": "sin volver",
+        "ride_not_back_note": "La peor caída no se recupera antes de la última fecha del archivo.",
+        "ride_worst_day": "Peor día ({date})",
+        "ride_worst_month": "Peor mes ({month})",
+        "ride_positive": (
+            "Meses en positivo ({k} de {n}); racha más larga de meses en negativo: {run}"
+        ),
+        "ride_closed": (
+            "La curva se reconstruye con operaciones cerradas: las pérdidas abiertas no se ven, "
+            "así que las caídas reales duraron y midieron al menos esto."
+        ),
         "recent": "¿Sigue funcionando en el periodo reciente?",
         "recent_intro": (
             "Un historial largo puede verse bien en total aunque su último tramo ya no sume. "
@@ -1160,6 +1239,68 @@ LABELS: dict[str, dict[str, str]] = {
         "account_before": "Balance before",
         "account_drawdown": "Drawdown then",
         "account_scope": "Read from the file as uploaded; nothing was checked with the broker.",
+        "luck": "What is left once luck is discounted?",
+        "luck_intro": (
+            "The more configurations are tried, the higher the best one comes out even when "
+            "none has an edge. Here the file's Sharpe sits next to what pure luck would give "
+            "with the configurations counted, using the published math of Bailey and López de "
+            "Prado and of Harvey and Liu. It is the same calculation that decides the "
+            "\"Number of settings tried\" dimension, in numbers."
+        ),
+        "luck_badge_beats": "Beats luck",
+        "luck_badge_below": "Does not beat luck",
+        "luck_beats": (
+            "The Sharpe of {sharpe} beats the {luck} that {n} settings with no skill would show."
+        ),
+        "luck_below": (
+            "With {n} settings, pure luck would show a Sharpe of {luck}, as much as or more "
+            "than this history's {sharpe}."
+        ),
+        "luck_sharpe": "Sharpe {n} settings with no skill would show (the file's: {sharpe})",
+        "luck_years": (
+            "Years of history at which that luck falls below this Sharpe (the file has {span})"
+        ),
+        "luck_after": "Sharpe left after discounting {n} settings (Harvey and Liu)",
+        "luck_years_unit": "years",
+        "luck_uncounted": (
+            "The files do not say how many configurations were tried before this one was "
+            "picked. The table shows how much history each search size would need: ask the "
+            "vendor."
+        ),
+        "luck_span_line": "The file's Sharpe: {sharpe}. History: {span}.",
+        "luck_table_trials": "Configurations tried",
+        "luck_table_luck": "Sharpe luck would show",
+        "luck_table_years": "History needed",
+        "luck_table_enough": "Is this history enough?",
+        "luck_short": (
+            "With under a year of history, an annualised Sharpe moves a lot on little data: "
+            "read it as an order of magnitude."
+        ),
+        "luck_more_than": "over {n} years",
+        "luck_months": "{n} months",
+        "luck_month_one": "1 month",
+        "luck_under_month": "under 1 month",
+        "ride": "What living through this history was like",
+        "ride_intro": (
+            "A total and a maximum drawdown do not say what the history was like to live "
+            "through: how long it went without a new high, how long the worst fall took to "
+            "come back, and what the worst day and month were. These are the numbers that "
+            "make people switch a system off."
+        ),
+        "ride_days": "{n} days",
+        "ride_under": "Longest time without a new high ({start} to {end})",
+        "ride_under_open": "Time without a new high since {start}: still open at the file's end",
+        "ride_fall": "Worst fall: days from the high ({start}) to the low ({low})",
+        "ride_recovery": "Days from that low back to the high",
+        "ride_not_back": "not back",
+        "ride_not_back_note": "The worst fall is not regained by the file's last date.",
+        "ride_worst_day": "Worst day ({date})",
+        "ride_worst_month": "Worst month ({month})",
+        "ride_positive": "Months that ended up ({k} of {n}); longest run of losing months: {run}",
+        "ride_closed": (
+            "The curve is rebuilt from closed trades: open losses do not show, so the real "
+            "falls lasted and measured at least this much."
+        ),
         "recent": "Does it still work in the recent period?",
         "recent_intro": (
             "A long history can look good in total while its last stretch no longer adds up. "
@@ -3756,6 +3897,188 @@ def _recent_html(recent: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
+def _luck_html(luck: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """The file's Sharpe next to the luck of the configurations counted, and
+    what a search of 10, 100 or 1,000 would need."""
+    if not luck or luck.get("status") != "MEASURED":
+        return ""
+    sharpe = f"{float(luck['sharpe']['value']):.2f}"
+
+    def years(value: float) -> str:
+        if value > LUCK_YEARS_SHOWN:
+            return labels["luck_more_than"].format(n=LUCK_YEARS_SHOWN)
+        if value >= 1:
+            return f"{value:.1f} {labels['luck_years_unit']}"
+        months = round(value * 12)
+        if months < 1:
+            return labels["luck_under_month"]
+        return labels["luck_month_one" if months == 1 else "luck_months"].format(n=months)
+
+    span_value = float(luck["span_years"]["value"])
+    span = years(span_value)
+    out = f"<p class='muted'>{_e(labels['luck_intro'])}</p>"
+    if luck.get("counted"):
+        n = f"{int(luck['trials']):,}"
+        chance = f"{float(luck['luck_sharpe']['value']):.2f}"
+        beats = bool(luck.get("beats_luck"))
+        key = "beats" if beats else "below"
+        out += (
+            f"<p class='live-verdict lv-{'PASS' if beats else 'WEAK'}'>"
+            f"<span class='badge {'PASS' if beats else 'WEAK'}'>"
+            f"{_e(labels['luck_badge_' + key])}</span> "
+            f"{_e(labels['luck_' + key].format(sharpe=sharpe, luck=chance, n=n))}</p>"
+        )
+        cells = [
+            (chance, luck["luck_sharpe"], labels["luck_sharpe"].format(n=n, sharpe=sharpe)),
+            (
+                years(float(luck["years_needed"]["value"])),
+                luck["years_needed"],
+                labels["luck_years"].format(span=span),
+            ),
+            (
+                f"{float(luck['sharpe_after']['value']):.2f}",
+                luck["sharpe_after"],
+                labels["luck_after"].format(n=n),
+            ),
+        ]
+        tone = "" if beats else " neg"
+        facts = "".join(
+            f"<div class='fact{tone}'><b>{_e(value)}</b><p>{_e(text)} "
+            f"{_badge(item['evidence'])}</p></div>"
+            for value, item, text in cells
+        )
+        out += f"<div class='facts'>{facts}</div>"
+    else:
+        out += (
+            f"<p>{_e(labels['luck_uncounted'])}</p>"
+            f"<p>{_e(labels['luck_span_line'].format(sharpe=sharpe, span=span))} "
+            f"{_badge(luck['sharpe']['evidence'])}</p>"
+        )
+    def enough(row: dict[str, Any]) -> str:
+        return "yes" if float(row["years_needed"]["value"]) <= span_value else "no"
+
+    rows = "".join(
+        f"<tr><td>{int(row['trials']):,}</td>"
+        f"<td class='val' data-l='{_e(labels['luck_table_luck'])}'>"
+        f"{float(row['luck_sharpe']['value']):.2f}</td>"
+        f"<td class='val' data-l='{_e(labels['luck_table_years'])}'>"
+        f"{_e(years(float(row['years_needed']['value'])))}</td>"
+        f"<td class='val' data-l='{_e(labels['luck_table_enough'])}'>"
+        f"{_e(labels[enough(row)])}</td></tr>"
+        for row in luck.get("what_if") or []
+    )
+    if rows:
+        out += (
+            f"<table><thead><tr><th>{_e(labels['luck_table_trials'])}</th>"
+            f"<th class='val'>{_e(labels['luck_table_luck'])}</th>"
+            f"<th class='val'>{_e(labels['luck_table_years'])}</th>"
+            f"<th class='val'>{_e(labels['luck_table_enough'])}</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+        )
+    if span_value < 1:
+        out += f"<p class='muted'>{_e(labels['luck_short'])}</p>"
+    out += f"<p class='muted'>{_e(_sentence(localize(luck.get('note', ''), locale)))}</p>"
+    return out
+
+
+def _ride_html(
+    ride: dict[str, Any] | None, locale: str, labels: dict[str, str], *, closed_only: bool
+) -> str:
+    """Time under water, the worst fall's way down and back, worst day and month."""
+    if not ride or ride.get("status") != "MEASURED":
+        return ""
+    out = f"<p class='muted'>{_e(labels['ride_intro'])}</p>"
+
+    def days(value: Any) -> str:
+        return labels["ride_days"].format(n=f"{int(value):,}")
+
+    def day(iso: str) -> str:
+        return _date_text(iso, locale)
+
+    under_text = (
+        labels["ride_under"].format(
+            start=day(ride["longest_under_from"]), end=day(ride["longest_under_to"])
+        )
+        if ride.get("longest_under_recovered")
+        else labels["ride_under_open"].format(start=day(ride["longest_under_from"]))
+    )
+    cells: list[tuple[str, str, dict[str, Any], str]] = [
+        ("", days(ride["longest_under"]["value"]), ride["longest_under"], under_text),
+    ]
+    fell = ride["fall_days"].get("evidence") == "MEASURED"
+    if fell:
+        back = ride["recovery_days"]
+        cells.append(
+            (
+                "",
+                days(ride["fall_days"]["value"]),
+                ride["fall_days"],
+                labels["ride_fall"].format(
+                    start=day(ride["deepest_from"]), low=day(ride["deepest_low"])
+                ),
+            )
+        )
+        cells.append(
+            (
+                "" if ride.get("recovered") else " neg",
+                days(back["value"])
+                if back.get("evidence") == "MEASURED"
+                else labels["ride_not_back"],
+                back if back.get("evidence") == "MEASURED" else {"evidence": "MEASURED"},
+                labels["ride_recovery"],
+            )
+        )
+    worst_day = ride.get("worst_day") or {}
+    if worst_day.get("evidence") == "MEASURED":
+        cells.append(
+            (
+                " neg",
+                _pct(float(worst_day["value"]), signed=True),
+                worst_day,
+                labels["ride_worst_day"].format(date=day(ride["worst_day_on"])),
+            )
+        )
+    months = ride.get("months") or {}
+    if months.get("evidence") == "MEASURED":
+        total = int(months["value"])
+        share = float(ride["positive_months"]["value"])
+        cells.append(
+            (
+                " neg",
+                _pct(float(ride["worst_month"]["value"]), signed=True),
+                ride["worst_month"],
+                labels["ride_worst_month"].format(
+                    month=_date_text(ride["worst_month_in"] + "-01", locale).split(" ", 1)[1]
+                ),
+            )
+        )
+        cells.append(
+            (
+                "",
+                _pct(share, places=0),
+                ride["positive_months"],
+                labels["ride_positive"].format(
+                    k=round(share * total),
+                    n=total,
+                    run=int(ride["losing_months_run"]["value"]),
+                ),
+            )
+        )
+    facts = "".join(
+        f"<div class='fact{cls}'><b>{_e(value)}</b><p>{_e(text)} {_badge(item['evidence'])}"
+        "</p></div>"
+        for cls, value, item, text in cells
+    )
+    grid = " pairs" if len(cells) % 2 == 0 else ""
+    out += f"<div class='facts{grid}'>{facts}</div>"
+    if fell and not ride.get("recovered"):
+        out += f"<p class='muted'>{_e(labels['ride_not_back_note'])}</p>"
+    if closed_only:
+        out += f"<p class='muted'>{_e(labels['ride_closed'])}</p>"
+    out += f"<p class='muted'>{_e(_sentence(localize(ride.get('note', ''), locale)))}</p>"
+    return out
+
+
 def _duration_text(hours: float, locale: str) -> str:
     """``0.5`` as ``30 min``, ``5.25`` as ``5.3 h``, ``50`` as ``2.1 días``."""
     if hours < 1:
@@ -4706,6 +5029,23 @@ def render_html(
             else []
         ),
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
+        *(
+            [
+                (
+                    labels["ride"],
+                    _ride_html(
+                        data.get("ride"),
+                        locale,
+                        labels,
+                        closed_only=bool((data.get("inputs") or {}).get("balance_only")),
+                    ),
+                )
+            ]
+            # A fund record's section already shows its months and time under water.
+            if (data.get("ride") or {}).get("status") == "MEASURED"
+            and (data.get("fund") or {}).get("status") != "MEASURED"
+            else []
+        ),
         (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
         *(
             [(labels["recent"], _recent_html(data.get("recent"), locale, labels))]
@@ -4737,6 +5077,11 @@ def render_html(
         *(
             [(labels["forward"], _forward_html(data.get("forward"), labels))]
             if (data.get("forward") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
+            [(labels["luck"], _luck_html(data.get("luck"), locale, labels))]
+            if (data.get("luck") or {}).get("status") == "MEASURED"
             else []
         ),
         *(
