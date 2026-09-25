@@ -1123,6 +1123,12 @@ In "El dinero real de la cuenta", a negative percent gain, a negative money resu
 Reading notes from the file importer read as a short list, not one run-on sentence.
 A capital section held back for a short history reads as a grey card with the reason and what to upload.
 
+Accessibility: secondary grey text, the green and amber state colours meet 4.5:1 on the page and card backgrounds in light and dark areas.
+Every form label and help text is tied to its field.
+File drop zones show a visible keyboard focus ring.
+The phone menu button and the report header buttons have 44 px tap areas.
+On a slow phone (150 ms latency, 1.6 Mbps, 4x CPU) the landing's first screen paints in about 0.7 s and /ejemplo in about 1.5 s; production serves pages gzipped.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
