@@ -103,6 +103,14 @@ _TRADE_STAT_KEYS: tuple[str, ...] = (
 )
 
 
+#: Platforms such as MetaTrader count commission and swap inside each trade,
+#: so their profit factor can read a little lower than this one.
+PROFIT_FACTOR_NOTE = (
+    "gross profit / gross loss, before commission and swap; a platform that counts "
+    "them inside each trade can show a slightly lower figure"
+)
+
+
 def _longest_run(flags: Sequence[bool]) -> int:
     longest = run = 0
     for flag in flags:
@@ -175,7 +183,7 @@ def trade_statistics(
         "expectancy": measured(net / n, "average net result per trade, account currency"),
     }
     if len(losses) and gross_loss < 0:
-        out["profit_factor"] = measured(gross_profit / abs(gross_loss), "gross profit / gross loss")
+        out["profit_factor"] = measured(gross_profit / abs(gross_loss), PROFIT_FACTOR_NOTE)
     else:
         out["profit_factor"] = not_measured("no losing trades; the ratio is undefined")
     out["average_win"] = (
