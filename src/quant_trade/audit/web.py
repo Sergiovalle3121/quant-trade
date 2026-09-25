@@ -1105,7 +1105,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         except UploadTooLarge as exc:
             limit = _field_limit(exc.what)
             if exc.what == "optimization":
-                passes = f"{limit // OPTIMIZATION_PASS_BYTES:,}"
+                count = limit // OPTIMIZATION_PASS_BYTES
+                passes = f"{round(count, -3) if count >= 1_000 else count:,}"
                 text = message("optimization_too_large", loc, limit=f"{limit:,}", passes=passes)
             else:
                 text = message(
