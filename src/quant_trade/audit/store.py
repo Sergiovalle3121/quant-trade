@@ -161,6 +161,8 @@ class AccountAudit:
     description: str
     #: Uploaded by this account while signed in (deletable with it).
     own: bool = True
+    #: The public verification page's id when the report is published.
+    public_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -1260,6 +1262,7 @@ class Store:
                     published=row[9] is not None,
                     description=" ".join(description.split())[:120],
                     own=row[10] in OWN_VIAS,
+                    public_id=str(row[9] or ""),
                 )
             )
         return out

@@ -1375,6 +1375,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     card_payments=cfg.stripe_enabled,
                     contact_url=cfg.contact_url,
                     free_mode=cfg.free_mode,
+                    price_cents=cfg.price_usd_cents,
+                    pack_price_cents=cfg.pack_price_usd_cents,
                 )
             )
 
