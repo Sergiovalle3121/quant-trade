@@ -519,6 +519,9 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_how": "Cómo funciona",
         "nav_sample": "Ejemplo",
         "footer_sample_pdf": "Ejemplo en PDF",
+        "footer_check": "Comprobar un informe",
+        "v_check": "¿Te enviaron el PDF o el JSON de este informe? Comprueba que no se editó.",
+        "v_check_link": "Comprobar un archivo",
         "nav_pricing": "Precios",
         "nav_guides": "Guías",
         "nav_faq": "Preguntas",
@@ -695,6 +698,9 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_how": "How it works",
         "nav_sample": "Sample",
         "footer_sample_pdf": "Sample as PDF",
+        "footer_check": "Check a report",
+        "v_check": "Were you sent this report's PDF or JSON? Check that it was not edited.",
+        "v_check_link": "Check a file",
         "nav_pricing": "Pricing",
         "nav_guides": "Guides",
         "nav_faq": "FAQ",
@@ -1024,6 +1030,11 @@ def _guide_links(locale: str) -> str:
     )
 
 
+def _check_url(locale: str) -> str:
+    """The page where anyone checks a report file was not edited."""
+    return "/check" if locale == "en" else "/comprobar"
+
+
 def _footer(locale: str) -> str:
     copy = _COPY[locale]
     ui = _UI[locale]
@@ -1036,6 +1047,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
         f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
+        f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
         f"<li><a href='{_e(method_url(locale))}'>{_e(METHOD_COPY[locale]['title'])}</a></li>"
     )
     legal = (
@@ -1822,8 +1834,10 @@ def verification_page(
     )
     main = (
         "<div class='paper page-main'><div class='wrap wrap-mid'>"
-        f"<div class='disclaimer' style='margin-bottom:40px'><strong>{_e(copy['v_notice'])}."
+        f"<div class='disclaimer' style='margin-bottom:16px'><strong>{_e(copy['v_notice'])}."
         f"</strong> {_e(VERIFICATION_NOTICE[locale])}</div>"
+        f"<p class='check-cta'>{icon('shield')}<span>{_e(ui['v_check'])} "
+        f"<a href='{_check_url(locale)}'>{_e(ui['v_check_link'])}</a></span></p>"
         f"<section class='rsec'><h2>{_e(copy['v_dimensions'])}</h2>"
         f"<div class='meaning'>{cards}</div></section>"
         f"<section class='rsec'><h2>{_e(copy['v_inputs'])}</h2>"
