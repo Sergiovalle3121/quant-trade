@@ -753,9 +753,10 @@ a.print-btn{text-decoration:none}
 .report-hero .verdict+p{margin-top:28px}
 .print-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2}
 @media (max-width:620px){.meta-line .meta-x{display:none}.meta-line span{font-size:.66rem}}
-.lang-switch{font-size:.8rem;font-weight:500;text-decoration:none;color:#a3a3aa;padding:8px 12px;
-border-radius:999px}
-.lang-switch:hover{color:#fff}
+.lang-switch,.nav-end>.nav-account{font-size:.8rem;font-weight:500;text-decoration:none;
+color:#a3a3aa;padding:8px 12px;border-radius:999px}
+.lang-switch:hover,.nav-end>.nav-account:hover{color:#fff}
+@media (max-width:520px){.nav-end>.nav-account{display:none}}
 .report-hero h1{font-weight:640;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.05em;
 line-height:1;margin:16px 0 18px}
 .meta-line{display:flex;flex-wrap:wrap;gap:8px;margin:0}
