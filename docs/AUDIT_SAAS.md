@@ -768,6 +768,10 @@ instead of printing a watermarked page; unlocked reports keep the print or PDF
 button. On phones the engine and seed chips are hidden so the verdict comes
 first; they stay on wide screens and in the PDF.
 
+"Qué pide cada clase" is a list of four cards, one per class, each with its
+letter in the class colour; the report's own class is filled in and labelled
+"Tu informe". In print the four cards stay on one page.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and

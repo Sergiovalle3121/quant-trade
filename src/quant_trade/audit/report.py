@@ -27,7 +27,16 @@ from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
-from quant_trade.audit.theme import SCRIPT_TAG, STYLE, aurora, class_ring, grid_bg, icon, logo
+from quant_trade.audit.theme import (
+    CLASS_COLOURS,
+    SCRIPT_TAG,
+    STYLE,
+    aurora,
+    class_ring,
+    grid_bg,
+    icon,
+    logo,
+)
 from quant_trade.audit.verdict import DIMENSION_ORDER, NOT_MEASURED_ES, meaning, summary
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
@@ -1628,16 +1637,16 @@ CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
 
 def _ladder_html(current: str, labels: dict[str, str]) -> str:
     """The four classes and what each requires, with this report's marked."""
-    you = " class='you'"
     rows = "".join(
-        f"<tr{you if cls == current else ''}><td><b>{cls}</b></td><td>{_e(text)}</td>"
-        f"<td>{_e(labels['ladder_you']) if cls == current else ''}</td></tr>"
+        f"<li class='rung{' you' if cls == current else ''}' style='--c:{CLASS_COLOURS[cls]}'>"
+        f"<span class='rung-cls'>{cls}</span><p>{_e(text)}</p>"
+        + (f"<span class='rung-you'>{_e(labels['ladder_you'])}</span>" if cls == current else "")
+        + "</li>"
         for cls, text in CLASS_LADDER[_locale_of(labels)]
     )
     return (
         f"<p class='muted'>{_e(labels['ladder_intro'])}</p>"
-        f"<table class='ladder'><tr><th>{_e(labels['ladder_class'])}</th>"
-        f"<th>{_e(labels['ladder_needs'])}</th><th></th></tr>{rows}</table>"
+        f"<ol class='ladder' aria-label='{_e(labels['ladder_class'])}'>{rows}</ol>"
     )
 
 
