@@ -1059,7 +1059,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/", response_class=HTMLResponse)
     def index(
-        request: Request, lang: str | None = None, joined: int = 0, error: str | None = None
+        request: Request,
+        lang: str | None = None,
+        joined: int = 0,
+        error: str | None = None,
+        extras: int = 0,
     ) -> str:
         locale = _locale(lang)
         # Only known codes are shown, so the query string cannot inject text.
@@ -1076,6 +1080,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention_days=cfg.retention_days,
             base_url=_site_url(request),
             pack_price_usd=cfg.pack_price_usd,
+            extras_open=bool(extras),
         )
 
     @app.get("/en", response_class=HTMLResponse)

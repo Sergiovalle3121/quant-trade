@@ -86,3 +86,27 @@ def test_second_files_and_challenge_sit_in_a_closed_extras_box() -> None:
         for name in ("optimization", "live", "challenge"):
             assert f"name='{name}'" in extras and f"name='{name}'" not in before
         assert find_claims(extras) == []
+
+
+def test_pricing_offers_the_optional_account_without_touching_the_preview() -> None:
+    for locale, words, href in (
+        ("es", "Cuenta gratis opcional", "/registro"),
+        ("en", "Optional free account", "/signup"),
+    ):
+        page = _paid_landing(locale, card_payments=False)
+        note = page.split("class='muted account-note'", 1)[1].split("</p>", 1)[0]
+        assert words in note and f"href='{href}'" in note
+        assert find_claims(note) == []
+
+
+def test_account_note_links_a_live_sign_up_page(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/a.db", base_url="https://x")
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    for path in ("/registro", "/signup"):
+        assert client.get(path).status_code == 200, path

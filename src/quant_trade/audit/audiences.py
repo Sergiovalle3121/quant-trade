@@ -38,6 +38,9 @@ class Audience:
     slug_en: str
     icon: str
     text: dict[str, AudienceText]
+    #: The start button opens the form's "Añadir más archivos" box (robot buyers
+    #: bring the live account and the optimisation XML).
+    open_extras: bool = False
 
     def slug_for(self, locale: str) -> str:
         return self.slug_en if locale == "en" else self.slug
@@ -126,6 +129,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         slug="compradores-de-robots",
         slug_en="robot-buyers",
         icon="layers",
+        open_extras=True,
         text={
             "es": AudienceText(
                 title="Antes de comprar un robot de trading, revisa su backtest",
