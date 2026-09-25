@@ -54,6 +54,8 @@ def test_a_mismatch_is_shown_and_points_to_the_report_id() -> None:
     assert [row[3] for row in _reading_rows(data)] == [False, False]
     html = _reading_html(data, LABELS["es"])
     assert "No coincide" in html and LABELS["es"]["reading_some_bad"] in html
+    assert html.count("recon-row bad") == 2 and "≠" in html
+    assert "recon-foot bad" in html
 
 
 def test_no_platform_summary_means_no_section() -> None:
