@@ -60,7 +60,7 @@ pythonpath = ["src"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"quant_trade.audit" = ["static/*.js", "static/fonts/*"]
+"quant_trade.audit" = ["static/*.js", "static/*.png", "static/fonts/*"]
 
 [tool.ruff]
 line-length = 100

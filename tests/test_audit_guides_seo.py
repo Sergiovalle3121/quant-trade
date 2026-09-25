@@ -257,3 +257,28 @@ def test_without_a_base_url_links_use_the_address_reached(tmp_path: Path) -> Non
     (tmp_path / "proxy").mkdir()
     proxied = _client(tmp_path / "proxy", base_url="http://localhost:8000", trusted_proxy_hops=1)
     assert _canonical(proxied.get("/en").text) == "https://testserver/en"
+
+
+def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path) -> None:
+    from quant_trade.audit.seo import OG_IMAGE_SIZE
+
+    client = _client(tmp_path)
+    for path, locale in (("/", "es"), ("/en", "en"), ("/ejemplo", "es"), ("/guias", "es")):
+        page = client.get(path).text
+        image = f"{BASE.rstrip('/')}/static/og-{locale}.png"
+        assert f"<meta property='og:image' content='{image}'>" in page, path
+        assert "content='summary_large_image'" in page
+    for locale in ("es", "en"):
+        response = client.get(f"/static/og-{locale}.png")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        body = response.content
+        assert body[:8] == b"\x89PNG\r\n\x1a\n"
+        width, height = int.from_bytes(body[16:20], "big"), int.from_bytes(body[20:24], "big")
+        assert (width, height) == OG_IMAGE_SIZE
+        assert len(body) < 300_000  # WhatsApp skips larger preview images
+
+
+def test_pages_without_a_base_url_leave_the_image_out(tmp_path: Path) -> None:
+    page = _client(tmp_path, base_url="").get("/").text
+    assert "og:image" not in page and "content='summary'" in page
