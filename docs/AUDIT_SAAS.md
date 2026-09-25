@@ -1271,6 +1271,15 @@ The forward section answers first ("Aguanta" / "No aguanta" callout under the in
 
 Refusals read calm: the error card and the page's eyebrow dot are amber (a fix to make, not an alarm), size limits read in MB or KB instead of bytes, every refusal ends with a period, and a fix after a colon or semicolon (sube, exporta, revisa, upload, export, check...) goes on its own "Qué hacer:" / "What to do:" line. The size and value-too-large refusals now say what to do (a smaller file; check the exported values). On the public /v page the audit details read as plain words, the trial counts carry their evidence badge (120 DECLARED) instead of "120 (DECLARED)" in code type, and only the result hash keeps the code style.
 
+Redesign pass 36, the pay step. A wrong, used or expired access code is answered
+under the code field itself, in amber, with what to do next (copy the code as it
+arrived and redeem it again, or message us with the button above); the field is
+marked invalid for screen readers. The redeem form and the upload redirect carry
+`#canjear`, so the page comes back at the field instead of at a banner at the top.
+A payment or code that worked shows a green "done" notice instead of the blue
+informational one. The optimisation XML refusal also states its limit in MB and
+splits into the problem and "What to do".
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

@@ -213,16 +213,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Código de acceso aplicado: este es el informe completo.",
         "en": "Access code applied: this is the full report.",
     },
-    "code_rejected": {
-        "es": (
-            "No se pudo aplicar el código de acceso (no válido, agotado o caducado). "
-            "Esta es la vista previa."
-        ),
-        "en": (
-            "The access code could not be applied (invalid, used up or expired). "
-            "This is the preview."
-        ),
-    },
     "codes_disabled": {
         "es": "Este servicio no acepta códigos de acceso.",
         "en": "This service does not accept access codes.",
@@ -1221,6 +1211,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if code:
                 body["access_code"] = "applied" if paid else "rejected"
             return JSONResponse(body, status_code=201)
+        if code and not paid:
+            # Open the preview at the code field, where the refusal and its fix are shown.
+            location += "#canjear"
         return RedirectResponse(location, status_code=303)
 
     def _load(audit_id: str, token: str | None) -> Any:
@@ -1231,7 +1224,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise HTTPException(status_code=410, detail="purged")
         return record
 
-    def _report_html(record: Any, token: str, locale: str, *, notice: str | None = None) -> str:
+    def _report_html(
+        record: Any,
+        token: str,
+        locale: str,
+        *,
+        notice: str | None = None,
+        code_error: bool = False,
+        notice_ok: bool = False,
+    ) -> str:
         result = AuditResult.model_validate_json(record.result_json)
         unlockable = not record.paid and cfg.stripe_enabled
         redeemable = not record.paid and cfg.access_codes_enabled
@@ -1255,6 +1256,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pack_price_usd=cfg.pack_price_usd if (redeemable or unlockable) else 0.0,
             pack_code=pack_code,
             pack_credits_left=pack_left,
+            code_error=code_error and not record.paid,
+            notice_ok=notice_ok and record.paid,
             legal_links=True,
             locale=locale,
             switch_url=f"{base}?token={token}&lang={other}",
@@ -1340,9 +1343,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = message("card_cancelled", locale)
         elif code == "applied" and record.paid:
             notice = message("code_applied", locale)
-        elif code == "rejected" and not record.paid:
-            notice = message("code_rejected", locale)
-        return _report_html(record, token or "", locale, notice=notice)
+        # A rejected code is answered next to the code field, not in this banner.
+        code_error = code == "rejected" and not record.paid
+        return _report_html(
+            record,
+            token or "",
+            locale,
+            notice=notice,
+            code_error=code_error,
+            notice_ok=record.paid and notice is not None,
+        )
 
     def _confirm_card_payment(record: Any, session_id: str) -> Any:
         """Back from Stripe: ask Stripe about that session and unlock what it paid.

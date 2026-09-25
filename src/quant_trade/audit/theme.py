@@ -658,6 +658,9 @@ color:var(--text-3);margin-bottom:6px!important}
 @media (max-width:520px){.error-card{grid-template-columns:minmax(0,1fr);gap:14px;padding:20px}}
 .notice{color:var(--info);background:color-mix(in srgb,var(--info) 9%,transparent);
 border-color:color-mix(in srgb,var(--info) 30%,transparent);font-weight:560}
+.notice.ok{display:flex;gap:10px;align-items:flex-start;color:var(--ok);
+background:color-mix(in srgb,var(--ok) 9%,transparent);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.notice.ok svg{width:18px;height:18px;flex:none;margin-top:2px}
 .banner{color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent);
 border-color:color-mix(in srgb,var(--warn) 32%,transparent);font-weight:600;letter-spacing:.01em}
 .disclaimer{border:1px solid var(--border);border-radius:16px;padding:18px 20px;
@@ -911,6 +914,12 @@ background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http:/
 background:rgba(255,255,255,.04)}
 .paybox label{color:#ececf0}
 .paybox .inline-form{margin-top:8px}
+.paybox.redeem{scroll-margin-top:132px}
+.code-error{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;padding:12px 14px;
+border-radius:12px;color:#ffd08a;background:rgba(255,179,64,.1);border:1px solid rgba(255,179,64,.32);
+font-size:.9rem;line-height:1.5}
+.code-error svg{width:16px;height:16px;flex:none;margin-top:3px;color:#ffb340}
+.paybox input[aria-invalid=true]{border-color:rgba(255,179,64,.6)}
 .paybox a{color:#fff;font-weight:560}
 .paybox.buy{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;
 padding:22px 24px;background:rgba(255,255,255,.07);border-color:var(--border-2)}

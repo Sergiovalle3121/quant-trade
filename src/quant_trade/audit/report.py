@@ -163,6 +163,11 @@ LABELS: dict[str, dict[str, str]] = {
         "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
         "redeem_button": "Canjear código",
+        "code_error": (
+            "Ese código no desbloqueó el informe: no existe, ya se usó o caducó. "
+            "Cópialo tal como te llegó y vuelve a canjearlo."
+        ),
+        "code_error_contact": "Si sigue sin funcionar, escríbenos por el botón de arriba.",
         "buy_code": "¿No tienes código? Pídelo aquí",
         "generic_rules": "Reglas de referencia genéricas, no las de una firma concreta.",
         "unlock_jump": "Desbloquear el informe completo",
@@ -629,6 +634,11 @@ LABELS: dict[str, dict[str, str]] = {
         "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
         "redeem_button": "Redeem code",
+        "code_error": (
+            "That code did not unlock the report: it does not exist, was already used "
+            "or has expired. Copy it exactly as you received it and redeem it again."
+        ),
+        "code_error_contact": "If it still does not work, message us with the button above.",
         "buy_code": "No code yet? Ask for one here",
         "generic_rules": "Generic reference rules, not any one firm's terms.",
         "unlock_jump": "Unlock the full report",
@@ -2971,6 +2981,17 @@ def _only_unmeasured(body: str) -> bool:
     )
 
 
+def _notice_html(notice: str | None, *, ok: bool) -> str:
+    """The message on top of a report; a payment or code that worked reads as done."""
+    if not notice:
+        return ""
+    if ok:
+        return (
+            f"<div class='notice ok' role='status'>{icon('check')}<span>{_e(notice)}</span></div>"
+        )
+    return f"<div class='notice'>{_e(notice)}</div>"
+
+
 def _pack_notice(labels: dict[str, str], code: str, left: int) -> str:
     """The code a card-paid pack left for the next reports, on the paid report."""
     if not code:
@@ -3004,6 +3025,8 @@ def render_html(
     pdf_url: str | None = None,
     pack_code: str = "",
     pack_credits_left: int = 0,
+    code_error: bool = False,
+    notice_ok: bool = False,
 ) -> str:
     """The audit as one HTML document.
 
@@ -3087,13 +3110,26 @@ def render_html(
                     f"{_e(labels['buy_code'])}</a>{includes_html}</div>"
                 )
         main_button = contact_url or checkout_url
+        error_html, invalid = "", ""
+        if code_error:
+            # Next to the field the customer just used, with what to do next.
+            advice = labels["code_error"] + (
+                " " + labels["code_error_contact"] if main_button else ""
+            )
+            error_html = (
+                f"<p class='code-error' id='redeem-error' role='alert'>{icon('alert')}"
+                f"<span>{_e(advice)}</span></p>"
+            )
+            invalid = " aria-invalid='true' aria-describedby='redeem-error' autofocus"
+        # The fragment survives the redirect, so the page comes back at this form.
         paybox += (
-            f"<form class='paybox' method='post' action='{_e(redeem_url)}'>"
+            f"<form class='paybox redeem' id='canjear' method='post' "
+            f"action='{_e(redeem_url)}#canjear'>"
             f"<label for='redeem-code'>{_e(labels['redeem'])}</label><div class='inline-form'>"
             "<input id='redeem-code' type='text' name='code' required maxlength='40' "
-            "autocomplete='off' spellcheck='false' placeholder='AUD-XXXX-XXXX-XXXX'>"
+            f"autocomplete='off' spellcheck='false' placeholder='AUD-XXXX-XXXX-XXXX'{invalid}>"
             f"<button class='btn {'btn-ghost' if main_button else 'btn-primary'}' type='submit'>"
-            f"{_e(labels['redeem_button'])}</button></div></form>"
+            f"{_e(labels['redeem_button'])}</button></div>{error_html}</form>"
         )
     compare_html = ""
     if compare_link and not locked:
@@ -3499,7 +3535,7 @@ def render_html(
         + grid_bg()
         + "<div class='wrap wrap-mid'>"
         + watermark_html
-        + (f"<div class='notice'>{_e(notice)}</div>" if notice else "")
+        + _notice_html(notice, ok=notice_ok)
         + _pack_notice(labels, pack_code, pack_credits_left)
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(labels['title'])}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
@@ -3660,6 +3696,8 @@ def render(
     pdf_url: str | None = None,
     pack_code: str = "",
     pack_credits_left: int = 0,
+    code_error: bool = False,
+    notice_ok: bool = False,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -3681,6 +3719,8 @@ def render(
         pdf_url=pdf_url,
         pack_code=pack_code,
         pack_credits_left=pack_credits_left,
+        code_error=code_error,
+        notice_ok=notice_ok,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
