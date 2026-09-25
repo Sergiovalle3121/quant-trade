@@ -1134,6 +1134,9 @@ SOURCE_NAMES: dict[str, str] = {
     "quantconnect_trades_csv": "QuantConnect (CSV)",
     "backtestingpy_csv": "backtesting.py (CSV)",
     "vectorbt_csv": "vectorbt (CSV)",
+    "myfxbook_csv": "Myfxbook (CSV)",
+    "mql5_signal_csv": "MQL5 signal (CSV)",
+    "fxblue_csv": "FX Blue (CSV)",
 }
 
 

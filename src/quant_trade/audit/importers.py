@@ -81,6 +81,9 @@ NINJATRADER_CSV = "ninjatrader_csv"
 QUANTCONNECT_TRADES_CSV = "quantconnect_trades_csv"
 BACKTESTINGPY_CSV = "backtestingpy_csv"
 VECTORBT_CSV = "vectorbt_csv"
+MYFXBOOK_CSV = "myfxbook_csv"
+MQL5_SIGNAL_CSV = "mql5_signal_csv"
+FXBLUE_CSV = "fxblue_csv"
 MT5_OPTIMIZATION_XML = "mt5_optimization_xml"
 MT5_TESTER_XLSX = "mt5_tester_xlsx"
 MT5_HISTORY_XLSX = "mt5_history_xlsx"
@@ -99,6 +102,9 @@ REPORT_FORMATS: tuple[str, ...] = (
     QUANTCONNECT_TRADES_CSV,
     BACKTESTINGPY_CSV,
     VECTORBT_CSV,
+    MYFXBOOK_CSV,
+    MQL5_SIGNAL_CSV,
+    FXBLUE_CSV,
 )
 
 #: Used when the file does not state a starting balance and none is supplied.
@@ -1851,10 +1857,17 @@ def _parse_mt4_statement(reader: _TableReader) -> _Draft:
 
 def _read_delimited(text: str) -> tuple[list[str], list[list[str]], str]:
     lines = [line for line in text.splitlines() if line.strip()]
+    hint: str | None = None
+    # Excel's "sep=," first line (FX Blue) names the delimiter; a lone title
+    # line ("History", as some Myfxbook copies start) precedes the header.
+    if lines and re.fullmatch(r"sep=.", lines[0].strip().lstrip("\ufeff")):
+        hint = lines.pop(0).strip()[-1]
+    if lines and lines[0].strip().lstrip("\ufeff").lower() in {"history", "closed trades"}:
+        lines.pop(0)
     if not lines:
         return [], [], ","
     head = lines[0]
-    delimiter = max((",", ";", "\t"), key=head.count)
+    delimiter = hint or max((",", ";", "\t"), key=head.count)
     reader = csv.reader(io.StringIO("\n".join(lines)), delimiter=delimiter)
     try:
         rows = [[cell.strip() for cell in row] for row in reader]
@@ -2411,6 +2424,12 @@ def _table_format(header: list[str]) -> str | None:
         return BACKTESTINGPY_CSV
     if {"avg entry price", "avg exit price", "pnl", "direction", "status"} <= names:
         return VECTORBT_CSV
+    if _is_myfxbook_header(names):
+        return MYFXBOOK_CSV
+    if _is_mql5_signal_header(header):
+        return MQL5_SIGNAL_CSV
+    if _is_fxblue_header(names):
+        return FXBLUE_CSV
     return None
 
 
@@ -2971,6 +2990,274 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
 
 
 # ---------------------------------------------------------------------------
+# Account-tracking exports: Myfxbook, MQL5 signals, FX Blue
+# ---------------------------------------------------------------------------
+
+#: A section title after which a tracking export lists positions still open.
+_OPEN_SECTIONS = {"open trades", "open orders", "open positions"}
+_SIDES = {"buy": "long", "sell": "short"}
+_FLOW_ACTIONS = {"deposit", "withdrawal"}
+
+
+def _flow(amount: float, kind: str) -> float:
+    """A deposit as a positive amount, a withdrawal as a negative one."""
+    return -abs(amount) if kind == "withdrawal" else abs(amount)
+
+
+def _is_myfxbook_header(names: set[str]) -> bool:
+    return {"open date", "close date", "symbol", "action", "open price", "close price",
+            "profit"} <= names and bool(names & {"units/lots", "lots"})  # fmt: skip
+
+
+def _parse_myfxbook(header: list[str], rows: list[list[str]]) -> _Draft:
+    """Myfxbook's "Export" of an account's history (CSV).
+
+    ``Profit`` is the net result in the account's currency (commission and
+    swap included), so the gross is rebuilt as profit minus both. Deposits
+    and withdrawals are rows whose Action says so, dated by Open Date. The
+    positions still open follow an "Open Trades" title and are left out.
+    """
+    columns = _index(header)
+    lots = "units/lots" if "units/lots" in columns else "lots"
+    draft = _Draft(MYFXBOOK_CSV, [])
+    kept: list[list[str]] = []
+    open_rows: list[list[str]] = []
+    for position, row in enumerate(rows):
+        lowered = [cell.strip().lower() for cell in row[:3]]
+        if (lowered and lowered[0] in _OPEN_SECTIONS) or lowered[1:3] == ["ticket", "open date"]:
+            open_rows = rows[position:]
+            break
+        kept.append(row)
+    open_times = _parse_times([_cells(row, columns, "open date") for row in kept])
+    close_times = _parse_times([_cells(row, columns, "close date") for row in kept])
+    itemised: set[str] = {name for name in ("commission", "swap") if name in columns}
+    draft.itemised = itemised
+    cash: list[_Cash] = []
+    for position, row in enumerate(kept):
+        action = _cells(row, columns, "action").strip().lower()
+        profit = _num(_cells(row, columns, "profit"))
+        if action in _FLOW_ACTIONS:
+            moment = open_times.values[position]
+            if moment is None or profit is None:
+                draft.invalid_rows += 1
+            elif profit:
+                cash.append(_Cash(moment, _flow(profit, action), True))
+            continue
+        side = _SIDES.get(action)
+        if side is None:
+            continue  # pending orders and other rows that are not closed trades
+        commission = _num(_cells(row, columns, "commission")) or 0.0
+        swap = _num(_cells(row, columns, "swap")) or 0.0
+        volume = _num(_cells(row, columns, lots))
+        entry_price = _num(_cells(row, columns, "open price"))
+        exit_price = _num(_cells(row, columns, "close price"))
+        entry_time = open_times.values[position]
+        exit_time = close_times.values[position]
+        if None in (volume, entry_price, exit_price, profit, entry_time, exit_time):
+            draft.invalid_rows += 1
+            continue
+        assert volume is not None and entry_price is not None and exit_price is not None
+        assert profit is not None and entry_time is not None and exit_time is not None
+        trip = _Trip(
+            symbol=_cells(row, columns, "symbol").upper(),
+            side=side,
+            volume=abs(volume),
+            entry_time=entry_time,
+            exit_time=exit_time,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            gross=profit - commission - swap,
+            commission=commission,
+            swap=swap,
+        )
+        draft.trips.append(trip)
+        cash.append(_Cash(exit_time, trip.net, False))
+    if any(item.is_flow for item in cash):
+        draft.cash = sorted(cash, key=lambda item: item.time)
+    _floating_from_open(draft, open_rows, cash)
+    draft.naive_times = True
+    return draft
+
+
+def _floating_from_open(draft: _Draft, open_rows: list[list[str]], cash: list[_Cash]) -> None:
+    """The open positions' result a Myfxbook export lists after "Open Trades".
+
+    Stored as the file's own (DECLARED) floating result with the balance the
+    rows imply, so the account review can say how much the balance hides.
+    """
+    header_at = next(
+        (i for i, row in enumerate(open_rows) if "profit" in {c.strip().lower() for c in row}),
+        None,
+    )
+    if header_at is None:
+        return
+    columns = _index(open_rows[header_at])
+    profits = [_num(_cells(row, columns, "profit")) for row in open_rows[header_at + 1 :]]
+    floating = [value for value in profits if value is not None]
+    if not floating:
+        return
+    draft.metadata["declared_floating_pnl"] = f"{sum(floating):.2f}"
+    if any(item.is_flow for item in cash):
+        draft.metadata["declared_balance"] = f"{sum(item.amount for item in cash):.2f}"
+
+
+def _is_mql5_signal_header(header: list[str]) -> bool:
+    names = [cell.strip().lower() for cell in header]
+    return (
+        bool(names)
+        and names[0] == "time"
+        and names.count("time") == 2
+        and {"type", "volume", "symbol", "price", "commission", "swap", "profit"} <= set(names)
+    )
+
+
+def _parse_mql5_signal(header: list[str], rows: list[list[str]]) -> _Draft:
+    """The history or positions CSV an MQL5.com signal page exports.
+
+    Columns repeat (``Time``, ``Price``): the first pair is the opening, the
+    pair after the second ``Time`` the closing. ``Profit`` is gross, with
+    commission and swap in their own columns. ``Balance`` rows are the
+    account's deposits, withdrawals and other balance operations.
+    """
+    names = [cell.strip().lower() for cell in header]
+    close_at = names.index("time", 1)
+    close_price_at = names.index("price", close_at)
+    columns = {
+        name: position
+        for position, name in enumerate(names)
+        if name not in {"time", "price", "volume"}
+    }
+    draft = _Draft(MQL5_SIGNAL_CSV, [])
+    draft.itemised = {"commission", "swap"}
+
+    def cell(row: list[str], at: int) -> str:
+        return row[at] if at < len(row) else ""
+
+    open_times = _parse_times([cell(row, 0) for row in rows])
+    close_times = _parse_times([cell(row, close_at) for row in rows])
+    cash: list[_Cash] = []
+    for position, row in enumerate(rows):
+        kind = cell(row, columns["type"]).strip().lower()
+        profit = _num(cell(row, columns["profit"]))
+        if kind == "balance":
+            moment = open_times.values[position]
+            if moment is None or profit is None:
+                draft.invalid_rows += 1
+            elif profit:
+                cash.append(_Cash(moment, profit, True))
+            continue
+        side = _SIDES.get(kind)
+        if side is None:
+            continue  # cancelled pending orders
+        volume = _num(cell(row, 2))
+        entry_price = _num(cell(row, 4))
+        exit_price = _num(cell(row, close_price_at))
+        entry_time = open_times.values[position]
+        exit_time = close_times.values[position]
+        if None in (volume, entry_price, exit_price, profit, entry_time, exit_time):
+            draft.invalid_rows += 1
+            continue
+        assert volume is not None and entry_price is not None and exit_price is not None
+        assert profit is not None and entry_time is not None and exit_time is not None
+        trip = _Trip(
+            symbol=cell(row, columns["symbol"]).upper(),
+            side=side,
+            volume=abs(volume),
+            entry_time=entry_time,
+            exit_time=exit_time,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            gross=profit,
+            commission=_num(cell(row, columns["commission"])) or 0.0,
+            swap=_num(cell(row, columns["swap"])) or 0.0,
+        )
+        draft.trips.append(trip)
+        cash.append(_Cash(exit_time, trip.net, False))
+    if any(item.is_flow for item in cash):
+        draft.cash = sorted(cash, key=lambda item: item.time)
+    draft.naive_times = open_times.naive or close_times.naive
+    return draft
+
+
+def _is_fxblue_header(names: set[str]) -> bool:
+    return {"type", "ticket", "buy/sell", "open price", "close price", "open time",
+            "close time", "net profit"} <= names  # fmt: skip
+
+
+def _parse_fxblue(header: list[str], rows: list[list[str]]) -> _Draft:
+    """FX Blue's CSV of an account's orders.
+
+    ``Closed position`` rows are trades (``Profit`` gross, ``Swap`` and
+    ``Commission`` apart); ``Deposit`` and ``Withdrawal`` rows move money.
+    An export that holds several accounts is read for the one with the most
+    closed trades, with a warning: mixing accounts would mix balances.
+    """
+    columns = _index(header)
+    draft = _Draft(FXBLUE_CSV, [])
+    draft.itemised = {"commission", "swap"}
+    if "account" in columns:
+        counts: dict[str, int] = {}
+        for row in rows:
+            if _cells(row, columns, "type").strip().lower() == "closed position":
+                name = _cells(row, columns, "account")
+                counts[name] = counts.get(name, 0) + 1
+        if len(counts) > 1:
+            chosen = max(counts, key=lambda name: counts[name])
+            rows = [row for row in rows if _cells(row, columns, "account") == chosen]
+            draft.warnings.append(
+                f"the file holds {len(counts)} accounts; only the one with the most closed "
+                f"trades ({counts[chosen]}) was read"
+            )
+    open_times = _parse_times([_cells(row, columns, "open time") for row in rows])
+    close_times = _parse_times([_cells(row, columns, "close time") for row in rows])
+    cash: list[_Cash] = []
+    for position, row in enumerate(rows):
+        kind = _cells(row, columns, "type").strip().lower()
+        if kind in _FLOW_ACTIONS:
+            moment = open_times.values[position] or close_times.values[position]
+            amount = _num(_cells(row, columns, "net profit"))
+            if amount is None:
+                amount = _num(_cells(row, columns, "profit"))
+            if moment is None or amount is None:
+                draft.invalid_rows += 1
+            elif amount:
+                cash.append(_Cash(moment, _flow(amount, kind), True))
+            continue
+        if kind != "closed position":
+            continue  # open positions and pending orders
+        side = _SIDES.get(_cells(row, columns, "buy/sell").strip().lower())
+        volume = _num(_cells(row, columns, "lots"))
+        entry_price = _num(_cells(row, columns, "open price"))
+        exit_price = _num(_cells(row, columns, "close price"))
+        profit = _num(_cells(row, columns, "profit"))
+        entry_time = open_times.values[position]
+        exit_time = close_times.values[position]
+        if side is None or None in (volume, entry_price, exit_price, profit, entry_time, exit_time):
+            draft.invalid_rows += 1
+            continue
+        assert volume is not None and entry_price is not None and exit_price is not None
+        assert profit is not None and entry_time is not None and exit_time is not None
+        trip = _Trip(
+            symbol=_cells(row, columns, "symbol").upper(),
+            side=side,
+            volume=abs(volume),
+            entry_time=entry_time,
+            exit_time=exit_time,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            gross=profit,
+            commission=_num(_cells(row, columns, "commission")) or 0.0,
+            swap=_num(_cells(row, columns, "swap")) or 0.0,
+        )
+        draft.trips.append(trip)
+        cash.append(_Cash(exit_time, trip.net, False))
+    if any(item.is_flow for item in cash):
+        draft.cash = sorted(cash, key=lambda item: item.time)
+    draft.naive_times = True
+    return draft
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -3035,12 +3322,13 @@ def _unknown_format() -> ReportFormatError:
         "unknown_format",
         "the file is not a supported report. Expected: a MetaTrader 5 or 4 report or "
         "statement (HTML, or XLSX for MetaTrader 5), a TradingView list of trades "
-        "(CSV or XLSX), or a trades CSV from NinjaTrader, QuantConnect, backtesting.py "
-        "or vectorbt",
+        "(CSV or XLSX), a trades CSV from NinjaTrader, QuantConnect, backtesting.py "
+        "or vectorbt, or an account history CSV from Myfxbook, FX Blue or an MQL5 signal",
         "el archivo no es un informe compatible. Se espera: un informe o estado de cuenta "
         "de MetaTrader 5 o 4 (HTML, o XLSX de MetaTrader 5), una lista de operaciones de "
-        "TradingView (CSV o XLSX) "
-        "o un CSV de operaciones de NinjaTrader, QuantConnect, backtesting.py o vectorbt",
+        "TradingView (CSV o XLSX), "
+        "un CSV de operaciones de NinjaTrader, QuantConnect, backtesting.py o vectorbt, "
+        "o el historial en CSV de Myfxbook, FX Blue o una señal de MQL5",
     )
 
 
@@ -3147,6 +3435,12 @@ def import_report(
             draft = _parse_quantconnect(header, rows)
         elif source_format == BACKTESTINGPY_CSV:
             draft = _parse_backtestingpy(header, rows)
+        elif source_format == MYFXBOOK_CSV:
+            draft = _parse_myfxbook(header, rows)
+        elif source_format == MQL5_SIGNAL_CSV:
+            draft = _parse_mql5_signal(header, rows)
+        elif source_format == FXBLUE_CSV:
+            draft = _parse_fxblue(header, rows)
         else:
             draft = _parse_vectorbt(header, rows)
     return _assemble(draft, initial_balance)
@@ -3265,6 +3559,9 @@ __all__ = [
     "MT5_OPTIMIZATION_XML",
     "MT5_TESTER_HTML",
     "MT5_TESTER_XLSX",
+    "MQL5_SIGNAL_CSV",
+    "MYFXBOOK_CSV",
+    "FXBLUE_CSV",
     "NINJATRADER_CSV",
     "QUANTCONNECT_TRADES_CSV",
     "REPORT_FORMATS",

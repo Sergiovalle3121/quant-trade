@@ -214,6 +214,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "retorno y cada drawdown",
     ),
     (
+        "the file holds {n} accounts; only the one with the most closed trades ({m}) was read",
+        "el archivo trae {n} cuentas; solo se leyó la que tiene más operaciones cerradas ({m})",
+    ),
+    (
         "{n} cash flow(s) after the last trade ignored",
         "se ignoraron {n} movimiento(s) de dinero posteriores a la última operación",
     ),
