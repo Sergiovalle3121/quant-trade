@@ -350,7 +350,7 @@ def test_locked_report_keeps_verdict_charts_and_meaning_but_sends_no_detail() ->
     assert result.verdict.summary[:50] in unpaid
     stats = result.trade_stats
     assert stats is not None
-    factor = f"{stats['profit_factor']['value']:.4f}"
+    factor = f"<td>{stats['profit_factor']['value']:.2f}</td>"
     assert factor in paid and factor not in unpaid
     probability = result.challenge["probability"]["pass"]["value"]  # type: ignore[index]
     assert f"{probability:.2%}" in paid

@@ -598,6 +598,23 @@ KEY_LABELS: dict[str, dict[str, str]] = {
     },
 }
 
+#: Amounts in the account currency: always two decimals, like the platforms.
+MONEY_KEYS = {
+    "gross_profit",
+    "gross_loss",
+    "fees_total",
+    "net_pnl",
+    "gross_pnl",
+    "total_cost",
+    "expectancy",
+    "average_win",
+    "average_loss",
+    "commission",
+    "swap",
+}
+#: Ratios a trader reads at two decimals (a profit factor of 1.25, not 1.2453).
+RATIO_KEYS = {"profit_factor", "payoff_ratio", "cost_bps_per_side"}
+
 PERCENT_KEYS = {
     "total_return",
     "cagr",
@@ -651,10 +668,16 @@ def _fmt(value: Any, *, key: str = "") -> str:
     if isinstance(value, float):
         if key in PERCENT_KEYS:
             return f"{value:.2%}"
+        if key in MONEY_KEYS:
+            return f"{value:,.2f}"
+        if key in RATIO_KEYS:
+            return f"{value:.2f}"
         if value.is_integer() and abs(value) < 1e15:
             return f"{int(value):,}"
-        if abs(value) >= 1000:
-            return f"{value:,.1f}"
+        # Four decimals only where they carry information (a per-period Sharpe of
+        # 0.1856); anything at or above one reads at two, like the platforms.
+        if abs(value) >= 1:
+            return f"{value:,.2f}"
         return f"{value:.4f}"
     return _e(value)
 
@@ -1718,9 +1741,11 @@ def render_html(
             f"<th>{_e(labels['gross'])}</th><th>{_e(labels['cost'])}</th><th>{_e(labels['net'])}"
             f"</th><th>{_e(labels['win_rate'])}</th><th>{_e(labels['trades'])}</th></tr>"
             + "".join(
-                f"<tr><td>{_fmt(row['multiplier'])}x</td><td>{_fmt(row['cost_bps_per_side'])}</td>"
-                f"<td>{_fmt(row['gross_pnl']['value'])}</td><td>{_fmt(row['total_cost']['value'])}"
-                f"</td><td>{_fmt(row['net_pnl']['value'])}</td>"
+                f"<tr><td>{_fmt(row['multiplier'])}x</td>"
+                f"<td>{_fmt(row['cost_bps_per_side'], key='cost_bps_per_side')}</td>"
+                f"<td>{_fmt(row['gross_pnl']['value'], key='gross_pnl')}</td>"
+                f"<td>{_fmt(row['total_cost']['value'], key='total_cost')}"
+                f"</td><td>{_fmt(row['net_pnl']['value'], key='net_pnl')}</td>"
                 f"<td>{_fmt(row['win_rate']['value'], key='win_rate')}</td>"
                 f"<td>{_fmt(row['trades'])}</td></tr>"
                 for row in cost["rows"]

@@ -173,3 +173,11 @@ def test_summaries_name_flags_instead_of_codes() -> None:
     assert flag_title("ZERO_DECLARED_COSTS", "en") in summary
     page = render_html(result, watermark=False)
     assert "0 chars" not in page and "No strategy description was written." in page
+
+
+def test_money_and_ratios_read_like_the_platform_prints_them() -> None:
+    assert _fmt(705.8, key="net_pnl") == "705.80"
+    assert _fmt(3655.0, key="gross_profit") == "3,655.00"
+    assert _fmt(-127.60869, key="average_loss") == "-127.61"
+    assert _fmt(1.24531, key="profit_factor") == "1.25"
+    assert _fmt(0.61017, key="win_rate") == "61.02%"
