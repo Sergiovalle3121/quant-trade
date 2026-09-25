@@ -189,7 +189,16 @@ _COPY: dict[str, dict[str, Any]] = {
         "legal_updated": "Última actualización",
         "submit": "Auditar",
         "free_note": "Modo gratuito: el informe completo se entrega con marca de agua.",
-        "paid_note": "Vista previa gratuita; el informe completo cuesta USD {price:.0f}.",
+        "paid_note": (
+            "Con tu cuenta, el primer informe completo es gratis; después, vistas previas "
+            "gratis y el informe completo por USD {price:.0f}."
+        ),
+        "signin_first": (
+            "Antes de subir, crea tu cuenta gratis: tu primer informe sale completo, con PDF, "
+            "sin pagar. Si ya compraste un código, puedes subir sin cuenta."
+        ),
+        "signin_create": "Crear cuenta gratis",
+        "signin_enter": "Ya tengo cuenta",
         "waitlist_title": "Avísame cuando haya novedades",
         "email": "Correo",
         "join": "Apuntarme",
@@ -466,7 +475,16 @@ _COPY: dict[str, dict[str, Any]] = {
         "legal_updated": "Last updated",
         "submit": "Audit",
         "free_note": "Free mode: the full report is delivered with a watermark.",
-        "paid_note": "Free preview; the full report costs USD {price:.0f}.",
+        "paid_note": (
+            "With your account, the first full report is free; after that, free previews "
+            "and the full report for USD {price:.0f}."
+        ),
+        "signin_first": (
+            "Before you upload, create your free account: your first report comes out in full, "
+            "with the PDF, at no cost. If you bought a code, you can upload without an account."
+        ),
+        "signin_create": "Create a free account",
+        "signin_enter": "I have an account",
         "waitlist_title": "Tell me when there is news",
         "email": "E-mail",
         "join": "Join",
@@ -1775,6 +1793,18 @@ def _field(label: str, control: str, help_text: str = "") -> str:
     )
 
 
+def _signin_first(copy: dict[str, Any], locale: str) -> str:
+    """Before the file: the upload needs an account (or a bought code)."""
+    signup, signin = ("/signup", "/login") if locale == "en" else ("/registro", "/entrar")
+    return (
+        f"<div class='signin-first'><p>{_e(copy['signin_first'])}</p>"
+        "<div class='inline-form'>"
+        f"<a class='btn btn-primary' href='{signup}'>{_e(copy['signin_create'])}</a>"
+        f"<a class='btn btn-ghost' href='{signin}'>{_e(copy['signin_enter'])}</a>"
+        "</div></div>"
+    )
+
+
 def _upload_form(
     copy: dict[str, Any],
     locale: str,
@@ -1785,6 +1815,7 @@ def _upload_form(
     access_codes: bool,
     retention_days: int,
     extras_open: bool = False,
+    signin_first: bool = False,
 ) -> str:
     ui = _UI[locale]
     selected = {"es": "", "en": ""}
@@ -1882,6 +1913,7 @@ def _upload_form(
         + f"<h2 class='label' style='font-size:1.2rem;margin-bottom:6px'>{_e(copy['form_title'])}"
         "</h2>"
         + f"{flash}{err}<p class='panel-note'>{icon('shield')}{_e(note)}</p>"
+        + (_signin_first(copy, locale) if signin_first else "")
         + "<form method='post' action='/audits' enctype='multipart/form-data' data-busy='busy'>"
         + _drop(
             "report",
@@ -1987,7 +2019,9 @@ def landing(
     base_url: str = "",
     pack_price_usd: float = 0.0,
     extras_open: bool = False,
+    signed_in: bool | None = None,
 ) -> str:
+    """``signed_in=False`` says, above the file fields, that an upload needs an account."""
     locale = _locale(locale)
     copy = _COPY[locale]
     other = "en" if locale == "es" else "es"
@@ -2026,6 +2060,7 @@ def landing(
             access_codes=access_codes,
             retention_days=retention_days,
             extras_open=extras_open,
+            signin_first=signed_in is False and not free_mode,
         )
         + _faq_html(copy, locale, retention_days=retention_days)
         + _final_cta(copy, locale, sample, joined=joined)

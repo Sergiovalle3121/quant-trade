@@ -534,6 +534,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "opening fee",
         "closing fee",
         "platform fee",
+        "fees paid",
+        "exec fee",
         "transaction and/or third party fees eur",
         "transaction and/or third party fees",
         "transactiekosten",
@@ -1110,13 +1112,22 @@ def _times(
     return imp._TimeColumn(shifted, naive)
 
 
-def _side(text: str) -> str | None:
+def _side(text: str, *, fill: bool = False) -> str | None:
+    """``long`` or ``short``: the trade's direction on a closed-trade row,
+    the order's on a fill (``fill``), where closing a long sells."""
     raw = text.strip()
     if raw in {"1", "+1"}:
         return "long"
     if raw == "-1":
         return "short"
     word = normalise(raw)
+    # Derivatives exchanges (Bybit, Bitget) name the position: "Close Long"
+    # is a long trade, and on a fill it is the sell that closes it.
+    if word in {"openlong", "closelong", "openshort", "closeshort"}:
+        position = "long" if word.endswith("long") else "short"
+        if fill and word.startswith("close"):
+            return "short" if position == "long" else "long"
+        return position
     if word in LONG_WORDS:
         return "long"
     if word in SHORT_WORDS:
@@ -1599,7 +1610,7 @@ def _fills(
         quantity = _amount(_cell(row, columns, "quantity"), decimal)
         price = _amount(_cell(row, columns, "price"), decimal)
         moment = times.values[position]
-        side = _side(_cell(row, columns, "side")) if "side" in columns else None
+        side = _side(_cell(row, columns, "side"), fill=True) if "side" in columns else None
         if quantity is None or quantity == 0 or price is None or price <= 0 or moment is None:
             draft.invalid_rows += 1
             if moment is None and quantity and price and price > 0:

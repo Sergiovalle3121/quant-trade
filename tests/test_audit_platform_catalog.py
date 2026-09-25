@@ -501,6 +501,37 @@ def test_kucoin_fills_use_the_zone_in_the_column_name() -> None:
     assert not any("no timezone" in warning for warning in report.warnings)
 
 
+def test_bybit_derivatives_trade_history_opens_and_closes_positions() -> None:
+    # Bybit spells its own header "Trasaction ID"; the zone is in the time's name.
+    header = (
+        "Contracts,Order No.,Direction,Order Type,Filled Qty,Filled Price,Order Price,"
+        "Filled Type,Trading Fee Rate,Fees Paid,Trasaction ID,Transaction Time(UTC+10),"
+        "Final Balance (USDT)"
+    )
+    rows = [
+        "BTCUSDT,o1,Open Long,Market,0.01,60000,0,Trade,0.00055,0.33,t1,2026-03-15 10:00:00,1000",
+        "BTCUSDT,o2,Close Long,Market,0.01,60500,0,Trade,0.00055,0.33,t2,2026-03-15 14:00:00,1004",
+        "ETHUSDT,o3,Open Short,Market,0.5,3000,0,Trade,0.00055,0.8,t3,2026-03-16 10:00:00,1004",
+        "ETHUSDT,o4,Close Short,Market,0.5,2950,0,Trade,0.00055,0.8,t4,2026-03-16 12:00:00,1028",
+    ]
+    report = _read([header, *rows], "bybit.csv")
+    assert report.source_format == UNIVERSAL_FILLS_CSV
+    assert report.symbols == ["BTCUSDT", "ETHUSDT"]
+    assert report.trades.sides == ["long", "short"]
+    assert _net(report) == [4.34, 23.4]
+    assert report.trades.trades[0].entry_time == datetime(2026, 3, 15, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(("direction", "side"), [("Close Long", "long"), ("Close Short", "short")])
+def test_a_closed_trade_named_by_its_position_keeps_that_direction(
+    direction: str, side: str
+) -> None:
+    header = "Symbol,Direction,Open Time,Close Time,Qty,Entry Price,Exit Price"
+    rows = [f"BTCUSDT,{direction},2026-03-15 10:00,2026-03-15 14:00,1,60000,60500"]
+    report = _read([header, *rows], "closed.csv")
+    assert report.trades.sides == [side]
+
+
 def test_ctrader_history() -> None:
     header = (
         "ID,Symbol,Opening Direction,Opening Time (UTC+0),Closing Time (UTC+0),Entry price,"
