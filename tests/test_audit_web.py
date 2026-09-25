@@ -65,6 +65,7 @@ def test_health_and_landing_pages_pass_the_guard(tmp_path: Path) -> None:
         "status": "ok",
         "free_mode": True,
         "stripe_enabled": False,
+        "card_mode": "off",
         "access_codes": False,
         "database": "sqlite",
         "legal_configured": False,
@@ -281,7 +282,7 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
 
     seen: list[tuple[str, str]] = []
 
-    def fake_checkout(settings: AuditSettings, aid: str, tok: str) -> str:
+    def fake_checkout(settings: AuditSettings, aid: str, tok: str, **_: str) -> str:
         seen.append((aid, tok))
         return "https://checkout.stripe.test/session"
 
@@ -294,7 +295,13 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     event = json.dumps(
         {
             "type": "checkout.session.completed",
-            "data": {"object": {"id": "cs_test_1", "metadata": {"audit_id": audit_id}}},
+            "data": {
+                "object": {
+                    "id": "cs_test_1",
+                    "payment_status": "paid",
+                    "metadata": {"audit_id": audit_id},
+                }
+            },
         }
     ).encode()
     bad = client.post(

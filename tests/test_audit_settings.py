@@ -24,7 +24,7 @@ def test_defaults_are_free_sqlite_and_secretless() -> None:
 
 def test_free_mode_is_forced_without_every_stripe_variable() -> None:
     partial = {**STRIPE, "AUDIT_FREE_MODE": "false"}
-    del partial["STRIPE_PRICE_ID"]
+    del partial["STRIPE_WEBHOOK_SECRET"]
     settings = AuditSettings.from_env(partial)
     assert settings.free_mode is True
     assert settings.stripe_configured is False

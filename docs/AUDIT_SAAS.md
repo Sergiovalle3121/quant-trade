@@ -408,7 +408,7 @@ Routes:
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. `GET /en` is the English landing, a short address to share. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
-| `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). |
+| `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. |
 | `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
@@ -442,8 +442,9 @@ with an empty value):
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///state/audit/audit.db` | SQLite file or Railway Postgres (`postgres://` is normalised to `postgresql+psycopg://`). |
 | `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links, canonical and Open Graph links, the badge snippet, `robots.txt` and `sitemap.xml`. While it is left at the default, those links use the address the request reached (`https` when `AUDIT_TRUSTED_PROXY_HOPS` > 0). Set it to your domain in production. |
-| `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless all three Stripe variables are set or `AUDIT_ACCESS_CODES=true`. |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` | empty | All three are needed for card payments. |
+| `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless both Stripe secrets are set or `AUDIT_ACCESS_CODES=true`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | empty | Both are needed for card payments: a secret (`sk_…`) or restricted (`rk_…`) key and the webhook signing secret (`whsec_…`). A publishable key (`pk_…`) leaves card payments off. `/health` shows `card_mode` (`off`, `test`, `live`) from the key's prefix, never the key. |
+| `STRIPE_PRICE_ID` | empty | Optional. Without it Checkout charges `AUDIT_PRICE_USD_CENTS` (and the pack `AUDIT_PACK_PRICE_USD_CENTS`) in USD with no Stripe product to create. |
 | `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
 | `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
@@ -484,9 +485,7 @@ with an empty value):
    `AUDIT_CONTACT_URL`, then create codes from a shell inside the service
    (`railway ssh`, or the service's shell in the dashboard; see "Selling
    with access codes"). A client without a code sees the price and the
-   `AUDIT_CONTACT_URL` link on the landing and under the locked report. For card payments create a Stripe price, add the three Stripe variables, set
-   `AUDIT_FREE_MODE=false`, and register the webhook endpoint
-   `https://<domain>/webhooks/stripe` for `checkout.session.completed`.
+   `AUDIT_CONTACT_URL` link on the landing and under the locked report. For card payments see "Card payments with Stripe" below.
    Locally: `stripe listen --forward-to localhost:8000/webhooks/stripe`
    then `stripe trigger checkout.session.completed`.
 5. Retention: set `AUDIT_AUTO_PURGE=true`. The service then runs the
@@ -531,6 +530,38 @@ with an empty value):
    the full report appears.
 7. Open the pages on a phone: tables scroll sideways inside the page and
    nothing else overflows.
+
+### Card payments with Stripe
+
+1. In the Stripe dashboard (test mode first) copy the secret key and put it
+   in the service variables as `STRIPE_SECRET_KEY`. Never paste it anywhere
+   else.
+2. Developers > Webhooks > Add endpoint: `https://<domain>/webhooks/stripe`,
+   events `checkout.session.completed` and
+   `checkout.session.async_payment_succeeded`. Copy its signing secret into
+   `STRIPE_WEBHOOK_SECRET`.
+3. Keep `AUDIT_FREE_MODE=false`. `AUDIT_ACCESS_CODES=true` can stay on: the
+   card button becomes the main action and WhatsApp plus the code field
+   stay under it as the alternative.
+4. `/health` shows `"card_mode": "test"`. Pay a report with the test card
+   `4242 4242 4242 4242`, any future date and any CVC: the page comes back
+   unlocked with "Pago recibido". Buy the pack from another report: that
+   report unlocks and shows an access code with 2 credits.
+5. When the Stripe account is activated, swap both variables for the live
+   ones (a live endpoint has its own signing secret); `card_mode` turns
+   `live`.
+
+How it works: the checkout carries `metadata.audit_id` and `metadata.plan`.
+The payment is confirmed by the signed webhook and, when the buyer comes
+back, by asking Stripe for the session in the return link; either one is
+enough and both are idempotent (`audit/payments.py`, `fulfil`). A session
+unlocks only the audit named in its own metadata, and only when Stripe
+reports it `paid`. The pack's code is derived with HMAC from the session id
+and the webhook secret, so only its hash is stored and the paid report can
+still show it, with its credits left, to whoever holds the report token.
+Rotating the webhook secret hides earlier pack codes from their reports
+(the codes keep working). Refunds are made from the Stripe dashboard and do
+not lock a report again; disable a pack code from `/panel` if needed.
 
 ### Selling with access codes
 

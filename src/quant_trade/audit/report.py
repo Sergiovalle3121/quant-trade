@@ -115,7 +115,19 @@ LABELS: dict[str, dict[str, str]] = {
             "promesa de resultados detectadas en ella"
         ),
         "seal": "Sello del holdout declarado",
-        "pay": "Desbloquear el informe completo",
+        "pay": "Pagar con tarjeta",
+        "pay_pack": "Comprar el paquete de 3 (USD {price:.0f})",
+        "pay_secure": (
+            "Pago seguro con Stripe. Ves el informe completo en cuanto se confirma el pago; "
+            "nosotros no vemos ni guardamos los datos de tu tarjeta."
+        ),
+        "buy_code_alt": "¿Prefieres pagar por transferencia? Pide un código aquí",
+        "pack_left": (
+            "Te quedan {n} informes de tu paquete. Para usarlos, escribe este código al "
+            "desbloquear tus próximos informes:"
+        ),
+        "pack_used": "Ya usaste los informes de tu paquete (código {code}).",
+        "pack_keep": "Guárdalo: también aparece aquí cada vez que abres este informe.",
         "locked": "Sección disponible en el informe completo",
         "disclaimer": "Aviso",
         "json_sha": "sha256 del JSON de la auditoría",
@@ -325,7 +337,19 @@ LABELS: dict[str, dict[str, str]] = {
             "expressions detected in it"
         ),
         "seal": "Declared holdout seal",
-        "pay": "Unlock the full report",
+        "pay": "Pay by card",
+        "pay_pack": "Buy the pack of 3 (USD {price:.0f})",
+        "pay_secure": (
+            "Secure payment with Stripe. You see the full report as soon as the payment is "
+            "confirmed; we never see or store your card details."
+        ),
+        "buy_code_alt": "Prefer a bank transfer? Ask for a code here",
+        "pack_left": (
+            "You have {n} reports left in your pack. To use them, enter this code when you "
+            "unlock your next reports:"
+        ),
+        "pack_used": "You have used the reports in your pack (code {code}).",
+        "pack_keep": "Keep it: it also shows here every time you open this report.",
         "locked": "Section available in the full report",
         "disclaimer": "Notice",
         "json_sha": "sha256 of the audit JSON",
@@ -1623,6 +1647,19 @@ def _only_unmeasured(body: str) -> bool:
     )
 
 
+def _pack_notice(labels: dict[str, str], code: str, left: int) -> str:
+    """The code a card-paid pack left for the next reports, on the paid report."""
+    if not code:
+        return ""
+    if left < 1:
+        return f"<div class='notice'>{_e(labels['pack_used'].format(code=code))}</div>"
+    return (
+        f"<div class='notice'><p>{_e(labels['pack_left'].format(n=left))}</p>"
+        f"<p><code>{_e(code)}</code></p>"
+        f"<p class='muted'>{_e(labels['pack_keep'])}</p></div>"
+    )
+
+
 def render_html(
     result: AuditResult,
     *,
@@ -1641,6 +1678,8 @@ def render_html(
     compare_link: str | None = None,
     pack_price_usd: float = 0.0,
     pdf_url: str | None = None,
+    pack_code: str = "",
+    pack_credits_left: int = 0,
 ) -> str:
     """The audit as one HTML document.
 
@@ -1667,12 +1706,30 @@ def render_html(
         verdict = {**verdict, "summary": _summary_in(data, locale)}
 
     paybox = ""
+    price = f"USD {price_usd:,.0f}" if price_usd else ""
+    pack = labels["pack"].format(price=pack_price_usd) if pack_price_usd else ""
+    price_html = (
+        f"<div class='buy-price'><b>{_e(price)}</b>"
+        + (f"<span>{_e(pack)}</span>" if pack else "")
+        + "</div>"
+        if price
+        else ""
+    )
     if locked and checkout_url:
-        price = f" (USD {price_usd:,.0f})" if price_usd else ""
+        # Card payment is the main way to pay; the pack is the second button.
+        pack_button = (
+            "<button class='btn btn-ghost' type='submit' name='plan' value='pack'>"
+            f"{_e(labels['pay_pack'].format(price=pack_price_usd))}</button>"
+            if pack_price_usd
+            else ""
+        )
         paybox = (
-            f"<form class='paybox' method='post' action='{_e(checkout_url)}'>"
-            f"<button class='btn btn-primary btn-lg' type='submit'>{_e(labels['pay'])}{_e(price)}"
-            "</button></form>"
+            f"<form class='paybox buy' method='post' action='{_e(checkout_url)}'>"
+            + price_html
+            + "<div><div class='inline-form'>"
+            "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
+            f"{_e(labels['pay'])}</button>{pack_button}</div>"
+            f"<p class='muted'>{_e(labels['pay_secure'])}</p></div></form>"
         )
     if locked and redeem_url:
         if contact_url:
@@ -1680,27 +1737,27 @@ def render_html(
             contact_url = _prefilled(
                 contact_url, labels["code_request"].format(id=data["audit_id"])
             )
-            price = f"USD {price_usd:,.0f}" if price_usd else ""
-            pack = labels["pack"].format(price=pack_price_usd) if pack_price_usd else ""
-            paybox += (
-                "<div class='paybox buy'>"
-                + (
-                    f"<div class='buy-price'><b>{_e(price)}</b>"
-                    + (f"<span>{_e(pack)}</span>" if pack else "")
-                    + "</div>"
-                    if price
-                    else ""
+            if checkout_url:
+                # With card payment on, WhatsApp is the alternative, not the main button.
+                paybox += (
+                    f"<p class='paybox'><a href='{_e(contact_url)}' rel='noopener noreferrer' "
+                    f"target='_blank'>{_e(labels['buy_code_alt'])}</a></p>"
                 )
-                + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
-                f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
-                f"{_e(labels['buy_code'])}</a></div>"
-            )
+            else:
+                paybox += (
+                    "<div class='paybox buy'>"
+                    + price_html
+                    + f"<a class='btn btn-primary btn-lg' href='{_e(contact_url)}' "
+                    f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
+                    f"{_e(labels['buy_code'])}</a></div>"
+                )
+        main_button = contact_url or checkout_url
         paybox += (
             f"<form class='paybox' method='post' action='{_e(redeem_url)}'>"
             f"<label for='redeem-code'>{_e(labels['redeem'])}</label><div class='inline-form'>"
             "<input id='redeem-code' type='text' name='code' required maxlength='40' "
             "autocomplete='off' spellcheck='false' placeholder='AUD-XXXX-XXXX-XXXX'>"
-            f"<button class='btn {'btn-ghost' if contact_url else 'btn-primary'}' type='submit'>"
+            f"<button class='btn {'btn-ghost' if main_button else 'btn-primary'}' type='submit'>"
             f"{_e(labels['redeem_button'])}</button></div></form>"
         )
     compare_html = ""
@@ -2040,6 +2097,7 @@ def render_html(
         + "<div class='wrap wrap-mid'>"
         + watermark_html
         + (f"<div class='notice'>{_e(notice)}</div>" if notice else "")
+        + _pack_notice(labels, pack_code, pack_credits_left)
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(labels['title'])}</div>"
         + f"<h1 class='rise' style='--i:1'>{_e(labels['verdict'])} {_e(verdict['overall'])}</h1>"
         + f"<div class='meta-line rise' style='--i:2'>{meta}</div>"
@@ -2182,6 +2240,8 @@ def render(
     compare_link: str | None = None,
     pack_price_usd: float = 0.0,
     pdf_url: str | None = None,
+    pack_code: str = "",
+    pack_credits_left: int = 0,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -2201,6 +2261,8 @@ def render(
         compare_link=compare_link,
         pack_price_usd=pack_price_usd,
         pdf_url=pdf_url,
+        pack_code=pack_code,
+        pack_credits_left=pack_credits_left,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
