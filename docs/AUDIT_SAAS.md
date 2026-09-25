@@ -97,6 +97,10 @@ Limits, each written into the report as a reading warning:
   of the Balance column). A mismatch is a warning, never a silent repair.
 - A report without a starting balance uses the one the client declares,
   else 10,000 with a warning.
+- When the rebuilt balance reaches zero or below, the error asks for the real
+  starting balance only when 10,000 was assumed; when the file or the client
+  gave it, it says the account lost all its money on that date and asks for
+  the history up to that day.
 - A CSV line longer than 32 KB (`MAX_CSV_LINE_BYTES`) is refused: no real
   export has one, and pandas takes minutes on a 5 MB line of fields.
 - An optimisation export whose title names another robot, symbol or
@@ -438,6 +442,10 @@ the floating result; otherwise it asks for the equity curve with floating result
 A file that already loses before any extra cost shows its break-even tile as 0
 with "already negative before any extra cost", never a negative cost, and large
 percentages carry thousands separators (+191,136.0 %).
+Ratios and break-even pips carry them too (877,194.39). No share prints as -0.0 %
+or -0 %, and a share short of a whole (-99.7 %) never rounds to -100 %. Every fact
+card (risk, account, plateau, timing, capital and its trade pace) shows its
+MEASURED / DECLARED / NOT_MEASURED tag beside the number.
 
 Trades against an uploaded equity curve (`redflags.scan_trades_against_equity`;
 skipped when the curve was rebuilt from the same report):

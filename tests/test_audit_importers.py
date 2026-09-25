@@ -704,6 +704,18 @@ def test_balance_that_goes_below_zero_asks_for_the_real_balance() -> None:
     with pytest.raises(ReportFormatError) as info:
         import_report(text.encode("utf-8"))
     assert info.value.code == "balance_not_positive"
+    assert "starting balance" in str(info.value)
+
+
+def test_a_blown_account_with_a_known_balance_is_not_asked_for_it() -> None:
+    text = fixture("backtestingpy_trades.csv").decode("utf-8").replace("-279.9", "-20000")
+    with pytest.raises(ReportFormatError) as info:
+        import_report(text.encode("utf-8"), initial_balance=1_000)
+    assert info.value.code == "balance_not_positive"
+    assert "lost all its money" in str(info.value)
+    assert "starting balance" not in str(info.value)
+    assert "perdió todo su dinero" in info.value.message_es
+    assert "indica el balance inicial" not in info.value.message_es
 
 
 def test_optimisation_file_is_not_a_report() -> None:
