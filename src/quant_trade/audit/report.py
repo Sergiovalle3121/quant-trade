@@ -1758,7 +1758,7 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
         row = next((r for r in block.get("rows", []) if r.get("scenario") == scenario), None)
         value = _ev_value(row["result"]) if row else None
         if value is not None:
-            shown = f"{value:+,.1%}" if percent else f"{value:+,.2f}"
+            shown = _stress_value(value, percent=percent, signed=True)
             out.append((labels[label], shown, "good" if value > 0 else "bad"))
     return out
 
@@ -1811,8 +1811,9 @@ def _stress_value(value: Any, *, percent: bool, signed: bool = False) -> str:
     if not isinstance(value, (int, float)):
         return "—"
     if percent:
-        return f"{value:+,.1%}" if signed else f"{value:,.1%}"
-    return f"{value:+,.2f}" if signed else f"{value:,.2f}"
+        return _pct(value, signed=signed)
+    shown = f"{value:+,.2f}" if signed else f"{value:,.2f}"
+    return "0.00" if float(shown.replace(",", "")) == 0 else shown
 
 
 def _stress_table(
