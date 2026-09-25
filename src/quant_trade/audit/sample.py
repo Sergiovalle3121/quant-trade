@@ -20,6 +20,9 @@ from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 
 SAMPLE_SEED = 20260924
 SAMPLE_DAYS = 500
+#: Business days before the main 500, from their own random stream, so the
+#: history spans over two years and the recent-period section is measured.
+SAMPLE_LEAD_DAYS = 60
 SAMPLE_PASSES = 120
 #: A fixed clock so the sample (and its hashes) never change between restarts.
 SAMPLE_NOW = datetime(2026, 9, 24, tzinfo=UTC)
@@ -49,14 +52,24 @@ def synthetic_mt5_report(
     seed: int = SAMPLE_SEED,
     lots: float = 0.5,
     start: str = "2023-01-02",
+    lead_days: int = 0,
 ) -> bytes:
     """An MT5 tester HTML report (UTF-16 LE with BOM, as the terminal writes
-    it) with one EURUSD round trip per business day. Synthetic by design."""
+    it) with one EURUSD round trip per business day. Synthetic by design.
+
+    ``lead_days`` business days before ``start`` come from their own random
+    stream, so the ``days`` from ``start`` on keep the same results."""
     rng = np.random.default_rng(seed)
+    lead_rng = np.random.default_rng(seed + 2)
     # Entry hours come from their own stream so the trades' results stay the
     # same; they spread the entries over the day like an intraday strategy.
     hours = np.random.default_rng(seed + 1).choice([2, 5, 9, 11, 14, 16, 19], size=days)
-    dates = pd.bdate_range(start, periods=days)
+    lead_hours = np.random.default_rng(seed + 3).choice([2, 5, 9, 11, 14, 16, 19], size=lead_days)
+    main_dates = pd.bdate_range(start, periods=days)
+    lead_dates = pd.bdate_range(end=main_dates[0] - pd.offsets.BDay(1), periods=lead_days)
+    dates = lead_dates.append(main_dates) if lead_days else main_dates
+    hours = np.concatenate([lead_hours, hours])
+    streams = [lead_rng] * lead_days + [rng] * days
     balance = 10_000.0
     price = 1.1
     first = dates[0].strftime("%Y.%m.%d")
@@ -68,11 +81,11 @@ def synthetic_mt5_report(
     deal = 2
     # 7.00 per lot per side: 3.50 at the sample's 0.5 lots.
     fee = round(7.0 * lots, 2)
-    for day, hour in zip(dates, hours, strict=True):
-        side = "buy" if rng.random() < 0.5 else "sell"
+    for day, hour, draw in zip(dates, hours, streams, strict=True):
+        side = "buy" if draw.random() < 0.5 else "sell"
         sign = 1.0 if side == "buy" else -1.0
         entry = round(price, 5)
-        pips = edge_pips + rng.normal(0.0, 25.0)
+        pips = edge_pips + draw.normal(0.0, 25.0)
         exit_price = round(entry + sign * pips * 0.0001, 5)
         price = exit_price
         profit = round(pips * 10.0 * lots, 2)
@@ -139,7 +152,9 @@ def synthetic_live_statement() -> bytes:
     """
     from quant_trade.audit.importers import import_report
 
-    backtest = import_report(synthetic_mt5_report(), "SyntheticSampleEA.html").trades
+    backtest = import_report(
+        synthetic_mt5_report(lead_days=SAMPLE_LEAD_DAYS), "SyntheticSampleEA.html"
+    ).trades
     rng = np.random.default_rng(SAMPLE_SEED + 7)
     lots, fee, pip = 0.1, 0.70, 0.0001
     trades: list[tuple[pd.Timestamp, pd.Timestamp, str, float, float]] = []
@@ -251,7 +266,7 @@ def sample_result(locale: str = "es", *, bootstrap_samples: int = SAMPLE_BOOTSTR
     inputs = build_inputs(
         None,
         declared,
-        report_bytes=synthetic_mt5_report(),
+        report_bytes=synthetic_mt5_report(lead_days=SAMPLE_LEAD_DAYS),
         report_filename="SyntheticSampleEA.html",
         optimization_bytes=synthetic_mt5_optimization(),
         live_bytes=synthetic_live_statement(),

@@ -358,8 +358,8 @@ def test_long_key_figures_step_down_to_fit_a_phone_tile() -> None:
     data["performance"]["total_return"]["value"] = 1911.36
     page = render_html(AuditResult.model_validate(data), watermark=False, locale="es")
     assert "<div class='kpi  long'><b>+191,136.0%</b>" in page
-    assert "<div class='kpi good long'><b>+3,472.25</b>" in page
-    assert "class='kpi  long'><b>500 · 55%" not in page
+    assert "<div class='kpi good long'><b>+4,529.30</b>" in page
+    assert "class='kpi  long'><b>560 · 56%" not in page
     assert "<div class='tscroll'><table>" in page
     assert ".kpi.long b{font-size:" in KPI_CSS and ".kpi.xlong b{font-size:" in KPI_CSS
     data["performance"]["total_return"]["value"] = 100000.046
