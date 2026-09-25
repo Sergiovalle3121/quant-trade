@@ -788,6 +788,10 @@ Guide steps wrap long code such as
 `pf.trades.records_readable.to_csv('trades.csv')` instead of widening the
 page on phones.
 
+On a locked preview each executive-summary tile shows a lock and a grey
+placeholder bar (a slow shimmer, off under reduced motion) where the figure
+will be; no stand-in number is ever drawn.
+
 Every page shares one visual system in `audit/theme.py`: a monochrome,
 high-contrast design that alternates black and light-grey sections, with one
 sans-serif family for everything (Inter, tight tracking at display sizes) and

@@ -47,6 +47,9 @@ def test_locked_report_names_the_figures_without_values() -> None:
     assert "class='kpi locked'" in locked
     for _, shown, _ in _kpi_list(data, LABELS["es"]):
         assert f"<b>{shown}</b>" not in locked
+    # A locked tile shows a lock and a placeholder bar, never a stand-in figure.
+    tile = locked.split("class='kpi locked'>", 1)[1].split("</div>", 1)[0]
+    assert "<svg" in tile and "<i></i>" in tile and "•" not in tile
 
 
 def test_figures_that_were_not_measured_are_left_out() -> None:
