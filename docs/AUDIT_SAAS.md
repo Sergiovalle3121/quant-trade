@@ -1208,7 +1208,7 @@ When capital is held back because the trades overlap as a grid or hide open loss
 
 Very large figures stay on the page: chart axes switch to T and then to powers of ten (2.0e18) and widen their left margin to fit the longest label, and in the PDF the monthly returns table shrinks its type, with the widest cells (+10,300,003.0%) set smaller still, so the Total column is never cut. When capital is held back because the trades lose in total, the grey card reads as one capitalised sentence.
 
-In the full report the red flags are cards, gravest first: severity badge, the flag's name in the customer's language, the detail as a sentence and the code in small type underneath (the old three-column table cut the detail off on phones). The "No medido" / "Not measured" list is one card with each check's name in bold over its reason. A not-measured section no longer adds "none" under its reason, the declared holdout seal names its rows in plain words, and a declared midnight date shows as the day (2024-06-03, not 2024-06-03T00:00:00Z).
+In the full report the red flags are cards, gravest first: severity badge, the flag's name in the customer's language, the detail as a sentence and the code in small type underneath (the old three-column table cut the detail off on phones). The "No medido" / "Not measured" list is one card with each check's name in bold over its reason. A not-measured section no longer adds "none" under its reason, the declared holdout seal names its rows in plain words, and a declared midnight date shows as the day (2024-06-03, not 2024-06-03T00:00:00Z). In the PDF a huge figure (95,766,086,888,191,808.00%) wraps inside its table cell instead of running off the page; label columns keep whole words.
 
 ## Security
 

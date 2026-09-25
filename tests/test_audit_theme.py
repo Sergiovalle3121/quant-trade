@@ -441,6 +441,8 @@ def test_full_report_flags_and_not_measured_read_as_cards() -> None:
         assert ("Resultado concentrado" if locale == "es" else "Result carried") in cards
         assert find_claims(page) == []
     assert ".nm-list li{" in STYLE and ".flag-cards li,.nm-list li{break-inside:avoid" in STYLE
+    # Huge figures wrap inside their cell in the PDF instead of leaving the page.
+    assert "td+td{overflow-wrap:anywhere}" in STYLE
 
 
 def test_declared_midnight_dates_and_seal_rows_read_plainly() -> None:
