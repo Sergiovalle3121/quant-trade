@@ -152,10 +152,18 @@ def test_the_sample_report_shows_a_live_account() -> None:
 
     result = sample_result("es", bootstrap_samples=100)
     assert result.live is not None and result.live["status"] == "MEASURED"
-    assert result.live["rescaled"] is True and result.live["overlap"] is False
+    # The sample account also traded the backtest's last weeks, so its trades pair.
+    assert result.live["rescaled"] is True and result.live["overlap"] is True
+    assert result.live["pairing"]["matched"]["value"] >= 50
+    assert not result.live["pairing"]["low_match"]
+    # Its money: a top-up during a losing stretch, a withdrawal, an open position.
+    assert result.account["source"] == "live" and result.account["top_ups"]["value"] == 1
+    assert result.account["withdrawals"]["count"]["value"] == 1
+    assert result.account["floating_pnl"]["value"] < 0
     page = render_html(result, watermark=False)
     assert "Backtest frente a cuenta real" in page
     assert "Cuenta real, a tamaño del backtest" in page
+    assert "El dinero real de la cuenta" in page and "Mismas fechas" in page
     assert "live account" not in page.lower()
     assert find_claims(page) == []
 

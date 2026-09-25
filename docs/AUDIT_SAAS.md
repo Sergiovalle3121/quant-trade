@@ -244,9 +244,16 @@ expected range is the 5th to 95th percentile of the draws).
   not preserved; the comparison says whether the files are alike, never
   what the account will do next.
 
-The `/ejemplo` report carries a synthetic live account (120 business days
-after the backtest, a fifth of its size, a thinner edge) so a visitor sees
-the section; it comes out "En el borde".
+The `/ejemplo` report carries a synthetic live account, a Myfxbook CSV
+export built in `audit/sample.py` (0.1 lots, a fifth of the backtest's
+size). It trades the backtest's last 60 business days too, skipping about
+one signal in eight and adding four trades of its own. That lets "Mismas
+fechas, operación por operación" pair 55 of 59 trades with slightly worse
+fills. It then trades 120 business days after the backtest with a thinner
+edge and a losing stretch. It carries a 500 top-up after that stretch
+(DEPOSIT_DURING_DRAWDOWN), a 300 withdrawal and an open position with a
+35.00 floating loss, so "El dinero real de la cuenta" shows every part. It
+comes out "En el borde"; the dates overlap, and the report says so.
 
 ### Plan to reach a better class
 
