@@ -127,10 +127,12 @@ the columns but not enough gets `universal_columns_missing`, which names
 the missing ones and the columns found. `import_report(..., columns=...)`
 takes the customer's own role-to-column mapping; the upload form asks for
 it under "¿Tu plataforma no aparece o su archivo da error? Indica sus
-columnas" (fields `col_<role>`, 100 characters each, only used with a
-report file), and `app.js` suggests the file's own header names in a
-datalist when a CSV is picked (nothing is uploaded until the form is sent).
-A named column missing from the header is listed in the error. An equity curve
+columnas" (fields `col_<role>`, 200 characters each with control
+characters such as NUL dropped, only used with a report file), and `app.js`
+suggests the file's own header names in a datalist when a CSV is picked
+(nothing is uploaded until the form is sent). A named column missing from
+the header is listed in the error, and one column chosen for two fields
+(entry and exit time, say) gets `universal_column_twice` naming both. An equity curve
 (`timestamp,equity`) is not a trade list and still gets `unknown_format`.
 Refusals say what is wrong: a trade list put in the equity-curve box gets
 `trade_list_as_curve` (upload it as the platform report), a file where every

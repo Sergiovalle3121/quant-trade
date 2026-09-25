@@ -86,3 +86,30 @@ def test_a_mapped_column_missing_from_the_file_is_named(tmp_path: Path) -> None:
     )
     assert answer.status_code == 400
     assert "Perdí" in answer.text
+
+
+def test_one_column_chosen_for_two_fields_is_refused_naming_both(tmp_path: Path) -> None:
+    # Entry and exit time from one column made every trade last zero seconds.
+    client = _client(tmp_path)
+    files = {"report": ("mi_diario.csv", _own_journal(), "text/csv")}
+    twice = {**MAPPING, "col_exit_time": "Cuando entré"}
+    for locale, words in (
+        ("es", "se eligió para dos campos (hora de entrada y hora de salida)"),
+        ("en", "was chosen for two fields (entry time and exit time)"),
+    ):
+        refused = client.post(
+            "/audits", files=files, data={"consent": "on", "locale": locale, **twice}
+        )
+        assert refused.status_code == 400
+        assert words in refused.text
+
+
+def test_a_control_character_in_a_typed_column_name_is_dropped(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    files = {"report": ("mi_diario.csv", _own_journal(), "text/csv")}
+    typed = {**MAPPING, "col_profit": "Ga\x00né\t"}
+    posted = client.post(
+        "/audits", files=files, data={"consent": "on", **typed}, follow_redirects=False
+    )
+    assert posted.status_code == 303, posted.text[:500]
+    assert "\x00" not in client.get(posted.headers["location"]).text

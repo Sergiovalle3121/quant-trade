@@ -113,6 +113,8 @@ PAID_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_suc
 #: The page languages; Spanish is the default everywhere.
 LOCALES = ("es", "en")
 _EMAIL_MAX = 254
+#: Control characters, dropped from the column names a customer types.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
 #: Every message the service itself shows, in both locales. Parse errors
 #: carry their own Spanish text (``ParseError.localized``).
@@ -1684,10 +1686,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
         # "Name its columns": the customer's mapping for a platform no importer knows.
         form = await request.form()
+        # Control characters (a NUL) cannot be in a decoded header; dropped
+        # so a pasted name still matches and never reaches a page.
         report_columns = {
-            role: str(form.get(f"col_{role}") or "").strip()[:100]
+            role: _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()[:200]
             for role in universal.ROLES
-            if str(form.get(f"col_{role}") or "").strip()
+            if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
         }
 
         def parse_and_audit() -> tuple[str, str, bool] | Response:
