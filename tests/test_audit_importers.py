@@ -44,7 +44,7 @@ from quant_trade.audit.importers import (
     parse_optimization,
 )
 from quant_trade.audit.schema import (
-    MAX_UPLOAD_BYTES,
+    MAX_REPORT_BYTES,
     MIN_OBSERVATIONS,
     ParseError,
     parse_equity_csv,
@@ -721,7 +721,7 @@ def test_unknown_and_oversized_files_raise_parse_errors() -> None:
     assert info.value.localized("es") == info.value.message_es
     assert info.value.localized("en") == str(info.value)
     with pytest.raises(ReportFormatError) as big:
-        import_report(b"x" * (MAX_UPLOAD_BYTES + 1))
+        import_report(b"x" * (MAX_REPORT_BYTES + 1))
     assert big.value.code == "file_too_large"
     with pytest.raises(ReportFormatError) as empty:
         import_report(b"   ")

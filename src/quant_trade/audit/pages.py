@@ -122,7 +122,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4 "
             "(o el XLSX que exporta MetaTrader 5), "
             "lista de operaciones de TradingView (CSV o XLSX), o el CSV de operaciones de "
-            "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 5 MB."
+            "NinjaTrader, QuantConnect, backtesting.py o vectorbt. Hasta 10 MB."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -133,8 +133,12 @@ _COPY: dict[str, dict[str, Any]] = {
         "optimization_help": (
             "Cuenta las configuraciones que probaste: el Sharpe deflactado usa ese número real."
         ),
-        "equity": "Curva de equity o serie de retornos (CSV; obligatoria si no subes un informe)",
-        "equity_help": "Columnas: timestamp y equity (o return). Hasta 5 MB.",
+        "equity": (
+            "Curva de equity o serie de retornos (CSV o Excel; obligatoria si no subes un informe)"
+        ),
+        "equity_help": (
+            "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. Hasta 5 MB."
+        ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
         "challenge_help": "Reglas leídas en la web oficial de cada firma el {as_of}. "
@@ -325,7 +329,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "The file as it is: a MetaTrader 5 or 4 tester or history HTML report (or the "
             "XLSX MetaTrader 5 exports), a "
             "TradingView list of trades (CSV or XLSX), or the trades CSV of NinjaTrader, "
-            "QuantConnect, backtesting.py or vectorbt. Up to 5 MB."
+            "QuantConnect, backtesting.py or vectorbt. Up to 10 MB."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -336,8 +340,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "optimization_help": (
             "Counts the configurations you tried: the deflated Sharpe uses that real number."
         ),
-        "equity": "Equity curve or return series (CSV; required without a report)",
-        "equity_help": "Columns: timestamp and equity (or return). Up to 5 MB.",
+        "equity": "Equity curve or return series (CSV or Excel; required without a report)",
+        "equity_help": (
+            "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Up to 5 MB."
+        ),
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
         "challenge_help": "Rules read on each firm's official site on {as_of}. "
@@ -645,7 +651,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Borrado automático si no desbloqueas el informe.",
         ],
         "drop_title": "Arrastra tu informe aquí",
-        "drop_sub": "o haz clic para elegirlo · hasta 5 MB",
+        "drop_sub": "o haz clic para elegirlo · hasta 10 MB",
         "drop_small": "Arrastra o haz clic",
         "no_report": "¿No tienes informe? Sube tu curva de equity",
         "advanced": "Opciones avanzadas",
@@ -820,7 +826,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Deleted automatically if you do not unlock the report.",
         ],
         "drop_title": "Drop your report here",
-        "drop_sub": "or click to choose it · up to 5 MB",
+        "drop_sub": "or click to choose it · up to 10 MB",
         "drop_small": "Drop or click",
         "no_report": "No report? Upload your equity curve",
         "advanced": "Advanced options",
@@ -1018,6 +1024,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
         f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
+        f"<li><a href='{_e(method_url(locale))}'>{_e(METHOD_COPY[locale]['title'])}</a></li>"
     )
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
@@ -1219,7 +1226,55 @@ def _differences(locale: str) -> str:
     return (
         "<section class='section light'><div class='wrap'>"
         + _section_head(ui["diff_eyebrow"], _title_pair(ui["diff_title"]))
-        + f"<div class='cards cards-2'>{cards}</div></div></section>"
+        + f"<div class='cards cards-2'>{cards}</div>{_investor_card(locale)}</div></section>"
+    )
+
+
+#: The landing's pointer for someone about to copy or fund another trader.
+INVESTOR_COPY: dict[str, dict[str, Any]] = {
+    "es": {
+        "eyebrow": "Para quien va a copiar o invertir",
+        "title": "¿Vas a copiar o invertir con alguien?",
+        "text": (
+            "Pide el historial completo de su cuenta de MetaTrader y súbelo junto a su "
+            "backtest. Rigor lee el dinero que de verdad entró y salió y te dice si la cuenta "
+            "se parece a lo que muestra el backtest, con cada cifra etiquetada según su evidencia."
+        ),
+        "points": (
+            "Depósitos y retiros separados del resultado de operar",
+            "La cuenta real frente a miles de historias de su backtest",
+            "Sin conectarnos a su bróker ni a tu dinero",
+        ),
+        "cta": "Cómo revisar su cuenta",
+    },
+    "en": {
+        "eyebrow": "For anyone about to copy or invest",
+        "title": "About to copy or invest with someone?",
+        "text": (
+            "Ask for the full history of their MetaTrader account and upload it with their "
+            "backtest. Rigor reads the money that really went in and out and tells you whether "
+            "the account looks like its backtest, with every figure labelled by its evidence."
+        ),
+        "points": (
+            "Deposits and withdrawals kept apart from trading results",
+            "The live account set against thousands of histories from its backtest",
+            "No connection to their broker or to your money",
+        ),
+        "cta": "How to review their account",
+    },
+}
+
+
+def _investor_card(locale: str) -> str:
+    words = INVESTOR_COPY[locale]
+    points = "".join(f"<li>{icon('check')}<span>{_e(p)}</span></li>" for p in words["points"])
+    return (
+        "<div class='investor' data-reveal>"
+        f"<div><span class='eyebrow'><span class='dot'></span>{_e(words['eyebrow'])}</span>"
+        f"<h3>{_e(words['title'])}</h3><p>{_e(words['text'])}</p>"
+        f"<a class='btn btn-dark' href='{_e(guide_url('cuenta-proveedor', locale))}'>"
+        f"{_e(words['cta'])}<span class='go'>{icon('arrow')}</span></a></div>"
+        f"<ul class='checks'>{points}</ul></div>"
     )
 
 
@@ -1309,6 +1364,8 @@ def _prices_html(
             + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta'])}</a></div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
+            + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
+            f"{_e(METHOD_COPY[locale]['title'])}{icon('arrow')}</a></p>"
         )
     return (
         f"<section class='section dark' id='pricing'><div class='wrap'>{head}{body}</div></section>"
@@ -1441,7 +1498,13 @@ def _upload_form(
         + "<div class='form-grid'>"
         + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
         + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
-        + _drop("equity", copy["equity"], ".csv,text/csv", _e(copy["equity_help"]), locale)
+        + _drop(
+            "equity",
+            copy["equity"],
+            ".csv,.txt,.tsv,.xlsx,text/csv",
+            _e(copy["equity_help"]),
+            locale,
+        )
         + _field(
             copy["challenge"],
             f"<select name='challenge'>{_preset_options(locale)}</select>",
@@ -1876,23 +1939,38 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
     title = f"{words['title']} · {copy['title']}"
     meta = _public_meta(title, words["summary"], locale, method_url(locale), base_url)
 
-    def bullets(items: list[str]) -> str:
+    def bullets(items: list[str], mark: str = "check") -> str:
         return (
-            "<ul class='checks'>"
-            + "".join(f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in items)
+            f"<ul class='checks{'' if mark == 'check' else ' nots'}'>"
+            + "".join(f"<li>{icon(mark)}<span>{_e(item)}</span></li>" for item in items)
             + "</ul>"
         )
 
-    dims_table = "".join(
-        f"<h3>{_e(question)}</h3><p>{_e(measure)}</p>"
-        f"<p><b>{_e(words['col_pass'])}:</b> {_e(rule)}</p>"
-        for question, measure, rule in dimension_rows(locale)
+    dims_table = (
+        "<div class='mdims'>"
+        + "".join(
+            f"<div class='mdim'><div class='icon'>{icon(dim_icon)}</div>"
+            f"<h3>{_e(question)}</h3><p>{_e(measure)}</p>"
+            f"<div class='mdim-rule'><span>{_e(words['col_pass'])}</span><p>{_e(rule)}</p></div>"
+            "</div>"
+            for (question, measure, rule), dim_icon in zip(
+                dimension_rows(locale), _DIMENSION_ICONS.values(), strict=True
+            )
+        )
+        + "</div>"
     )
     ladder = "".join(
-        f"<li><b>{_e(cls)}</b> · {_e(text)}</li>" for cls, text in CLASS_LADDER[locale]
+        f"<li class='rung' style='--c:{CLASS_COLOURS[cls]}'><span class='rung-cls'>{_e(cls)}</span>"
+        f"<p>{_e(text)}</p></li>"
+        for cls, text in CLASS_LADDER[locale]
     )
-    evidence = "".join(f"<li><b>{_e(tag)}</b> · {_e(text)}</li>" for tag, text in words["evidence"])
-    flags = ", ".join(titles.get(locale, titles["en"]) for titles in FLAG_TITLES.values())
+    evidence = "".join(
+        f"<li><span class='badge {_e(tag)}'>{_e(tag)}</span><span>{_e(text)}</span></li>"
+        for tag, text in words["evidence"]
+    )
+    flags = "".join(
+        f"<li>{_e(titles.get(locale, titles['en']))}</li>" for titles in FLAG_TITLES.values()
+    )
     refs = "".join(f"<li>{_e(ref)}</li>" for ref in REFERENCES)
     crumbs = (
         f"<a href='/?lang={_e(locale)}'>{_e(GUIDES_COPY[locale]['back'])}</a><span>/</span>"
@@ -1905,12 +1983,12 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
             [
                 (words["independence_title"], bullets(words["independence"])),
                 (words["dims_title"], dims_table),
-                (words["ladder_title"], f"<ul>{ladder}</ul>"),
-                (words["evidence_title"], f"<ul>{evidence}</ul>"),
-                (words["flags_title"], f"<p>{_e(flags)}.</p>"),
+                (words["ladder_title"], f"<ol class='ladder'>{ladder}</ol>"),
+                (words["evidence_title"], f"<ul class='mtags'>{evidence}</ul>"),
+                (words["flags_title"], f"<ul class='chips'>{flags}</ul>"),
                 (words["repro_title"], bullets(words["repro"])),
-                (words["limits_title"], bullets(words["limits"])),
-                (words["refs_title"], f"<ol>{refs}</ol>"),
+                (words["limits_title"], bullets(words["limits"], "minus")),
+                (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
             ],
             locale,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='/?lang={_e(locale)}#subir'>"

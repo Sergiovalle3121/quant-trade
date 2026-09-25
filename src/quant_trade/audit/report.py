@@ -23,6 +23,8 @@ from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import lead_number
 from quant_trade.audit.legal import legal_links_html
+from quant_trade.audit.method import COPY as METHOD_COPY
+from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
@@ -349,6 +351,13 @@ LABELS: dict[str, dict[str, str]] = {
         "risk_underwater": "Periodos seguidos bajo el máximo",
         "challenge": "Simulador de reto de prop firm",
         "challenge_rules": "Reglas simuladas",
+        "open_loss_badge": "Pérdidas abiertas",
+        "challenge_open_loss": (
+            "Tu plataforma imprime un drawdown de {dd} con las operaciones abiertas, más que "
+            "el límite de pérdida total del reto ({limit}). La simulación usa el balance de "
+            "operaciones cerradas, que no ve esas pérdidas abiertas: con ellas la cuenta del "
+            "reto pudo tocar el límite."
+        ),
         "outcome": "Resultado",
         "probability": "Probabilidad",
         "pass": "Llega al objetivo",
@@ -385,6 +394,7 @@ LABELS: dict[str, dict[str, str]] = {
         "kpis_locked": "Las cifras clave de tu archivo se muestran en el informe completo.",
         "kpi_return": "Retorno total",
         "kpi_drawdown": "Drawdown máximo",
+        "kpi_dd_platform": "Drawdown con operaciones abiertas, según tu plataforma",
         "kpi_dd_p95": "Drawdown p95 remuestreado, 1 año",
         "kpi_sharpe": "Sharpe anualizado",
         "kpi_pf": "Profit factor",
@@ -689,6 +699,13 @@ LABELS: dict[str, dict[str, str]] = {
         "risk_underwater": "Consecutive periods below the peak",
         "challenge": "Prop-firm challenge simulator",
         "challenge_rules": "Rules simulated",
+        "open_loss_badge": "Open losses",
+        "challenge_open_loss": (
+            "Your platform prints a {dd} drawdown with open trades, deeper than the "
+            "challenge's total loss limit ({limit}). The simulation uses the closed-trade "
+            "balance, which does not see those open losses: with them the challenge account "
+            "may have hit the limit."
+        ),
         "outcome": "Outcome",
         "probability": "Probability",
         "pass": "Reaches the target",
@@ -725,6 +742,7 @@ LABELS: dict[str, dict[str, str]] = {
         "kpis_locked": "Your file's key figures are shown in the full report.",
         "kpi_return": "Total return",
         "kpi_drawdown": "Maximum drawdown",
+        "kpi_dd_platform": "Drawdown with open trades, per your platform",
         "kpi_dd_p95": "Resampled drawdown p95, 1 year",
         "kpi_sharpe": "Annualised Sharpe",
         "kpi_pf": "Profit factor",
@@ -853,6 +871,11 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "sharpe_variance_used": "Varianza del Sharpe usada",
         "sharpe_per_period": "Sharpe por periodo",
         "break_even_bps": "Coste de equilibrio (pb por lado)",
+        "break_even_pips": "Coste de equilibrio (pips por lado)",
+        "reference_pips": "Coste de referencia (pips por lado)",
+        "platform_equity_drawdown": "Drawdown con operaciones abiertas (tu plataforma)",
+        "commission": "Comisión",
+        "swap": "Swap",
         "break_even_multiple": "Múltiplo de coste de equilibrio",
         "reference_bps": "Coste de referencia (pb por lado)",
         "dataset_digest": "Huella del conjunto de datos",
@@ -921,6 +944,11 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "sharpe_variance_used": "Sharpe variance used",
         "sharpe_per_period": "Sharpe per period",
         "break_even_bps": "Break-even cost (bps per side)",
+        "break_even_pips": "Break-even cost (pips per side)",
+        "reference_pips": "Reference cost (pips per side)",
+        "platform_equity_drawdown": "Drawdown with open trades (your platform)",
+        "commission": "Commission",
+        "swap": "Swap",
         "break_even_multiple": "Break-even cost multiple",
         "reference_bps": "Reference cost (bps per side)",
         "dataset_digest": "Dataset digest",
@@ -948,10 +976,17 @@ MONEY_KEYS = {
     "balance_before",
 }
 #: Ratios a trader reads at two decimals (a profit factor of 1.25, not 1.2453).
-RATIO_KEYS = {"profit_factor", "payoff_ratio", "cost_bps_per_side"}
+RATIO_KEYS = {
+    "profit_factor",
+    "payoff_ratio",
+    "cost_bps_per_side",
+    "break_even_pips",
+    "reference_pips",
+}
 
 PERCENT_KEYS = {
     "data_quality",
+    "platform_equity_drawdown",
     "total_return",
     "cagr",
     "volatility",
@@ -1206,7 +1241,7 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
     if not rows:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
-        "<table class='metrics'><colgroup><col class='c-k'><col class='c-v'>"
+        "<table class='metrics ev'><colgroup><col class='c-k'><col class='c-v'>"
         "<col class='c-e'><col></colgroup>"
         f"<thead><tr><th>{_e(labels['metric'])}</th><th class='val'>{_e(labels['value'])}</th>"
         f"<th>{_e(labels['evidence'])}</th><th>{_e(labels['note'])}</th></tr></thead><tbody>"
@@ -1414,6 +1449,10 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
     add("kpi_return", total, f"{total:+.1%}" if total is not None else "")
     dd = _ev_value(perf.get("max_drawdown"))
     add("kpi_drawdown", dd, f"{dd:.1%}" if dd is not None else "")
+    platform_dd = _ev_value(perf.get("platform_equity_drawdown"))
+    if platform_dd is not None and (dd is None or platform_dd < dd - 0.005):
+        # Deeper than the closed-trade curve shows: the buyer sees both, side by side.
+        out.append((labels["kpi_dd_platform"], f"{platform_dd:.1%}", "bad"))
     p95 = _ev_value((risk.get("max_drawdown") or {}).get("p95"))
     add("kpi_dd_p95", p95, f"{p95:.1%}" if p95 is not None else "")
     sharpe = _ev_value(perf.get("sharpe"))
@@ -1429,7 +1468,9 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
     if breakeven is not None:
         tone = "bad" if breakeven < 3 * reference else "good"
         label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
-        out.append((label, f"{breakeven:,.2f}", tone))
+        pips = _ev_value(costs.get("break_even_pips"))
+        shown = f"{breakeven:,.2f}" + (f" · {pips:,.1f} pips" if pips is not None else "")
+        out.append((label, shown, tone))
     for block, scenario, label, percent in (
         (stress.get("trades") or {}, "best_5_trades", "kpi_stress", False),
         (stress.get("returns") or {}, "best_5_periods", "kpi_stress_curve", True),
@@ -1635,7 +1676,25 @@ def _risk_html(risk: dict[str, Any] | None, locale: str, labels: dict[str, str])
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
 
 
-def _challenge_html(challenge: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+def _open_loss_note(
+    challenge: dict[str, Any], platform_dd: float | None, labels: dict[str, str]
+) -> str:
+    """A line when the platform's open-trade drawdown already breaks the total loss limit."""
+    limit = (challenge.get("rules") or {}).get("max_total_loss")
+    if platform_dd is None or not isinstance(limit, (int, float)) or limit <= 0:
+        return ""
+    if abs(platform_dd) < limit:
+        return ""
+    text = labels["challenge_open_loss"].format(dd=f"{abs(platform_dd):.1%}", limit=f"{limit:.0%}")
+    return f"<p><span class='badge FAIL'>{_e(labels['open_loss_badge'])}</span> {_e(text)}</p>"
+
+
+def _challenge_html(
+    challenge: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    platform_dd: float | None = None,
+) -> str:
     if not challenge:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     rules = challenge.get("rules", {})
@@ -1658,6 +1717,7 @@ def _challenge_html(challenge: dict[str, Any] | None, locale: str, labels: dict[
         )
     )
     html_text += _status_line(challenge, labels)
+    html_text += _open_loss_note(challenge, platform_dd, labels)
     if challenge.get("status") == "MEASURED":
         probability = challenge["probability"]
         html_text += (
@@ -2053,11 +2113,11 @@ def _account_html(account: dict[str, Any] | None, labels: dict[str, str]) -> str
         if found:
             locale = _locale_of(labels)
             out += (
-                "<ul>"
+                "<ul class='flag-list acct-flags'>"
                 + "".join(
-                    f"<li>{_severity_badge(flag['severity'], locale)} "
-                    f"{_e(flag_title(flag['code'], locale))}: "
-                    f"{_e(localize(flag['detail'], locale))}</li>"
+                    f"<li>{_severity_badge(flag['severity'], locale)}"
+                    f"<div><b>{_e(flag_title(flag['code'], locale))}</b>"
+                    f"<p>{_e(localize(flag['detail'], locale))}</p></div></li>"
                     for flag in found
                 )
                 + "</ul>"
@@ -2645,7 +2705,15 @@ def render_html(
         (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels)),
-        (labels["challenge"], _challenge_html(data.get("challenge"), locale, labels)),
+        (
+            labels["challenge"],
+            _challenge_html(
+                data.get("challenge"),
+                locale,
+                labels,
+                _ev_value((data.get("performance") or {}).get("platform_equity_drawdown")),
+            ),
+        ),
         (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
         (labels["performance"], _evidence_rows(data["performance"], labels, skip=set())),
         (
@@ -2766,6 +2834,8 @@ def render_html(
         f"{_e(DISCLAIMER.get(locale, DISCLAIMER['es']))}</div>"
         f"<p class='muted'>{_e(labels['json_sha'])}: <code>{_e(result_sha256(result))}</code></p>"
         + (legal_links_html(locale) if legal_links else "")
+        + f"<p class='muted no-print'><a href='{_e(method_url(locale))}'>"
+        f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a></p>"
         + f"<p class='muted'>{_e(BRAND)} · {_e(TAGLINE.get(locale, TAGLINE['es']))}</p></div>"
     )
     kpis_html = _kpis_html(data, labels, locked=locked)

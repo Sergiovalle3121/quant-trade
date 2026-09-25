@@ -580,6 +580,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "positivas cuando son peores para la cuenta; diferencias de resultado al tamaño de la "
         "operación del backtest.",
     ),
+    (
+        "deepest drawdown the platform prints with open trades counted",
+        "el drawdown más profundo que imprime la plataforma contando las operaciones abiertas",
+    ),
+    (
+        "per side on {pair} at {price}, the median entry price",
+        "por lado en {pair} a {price}, el precio de entrada mediano",
+    ),
     ("paired live trades / live trades", "operaciones reales emparejadas / operaciones reales"),
     ("fewer than {n} paired trades", "menos de {n} operaciones emparejadas"),
     ("no live trades on the shared dates", "no hay operaciones reales en las fechas comunes"),
@@ -667,6 +675,16 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("unreachable", "inalcanzable"),
     ("variance across {n} variants", "varianza entre {n} variantes"),
     ("sampling variance of the Sharpe estimator", "varianza de muestreo del estimador de Sharpe"),
+    ("PSR against E[max Sharpe] of 1 trial", "PSR frente a E[Sharpe máximo] de 1 intento"),
+    (
+        "PSR against E[max Sharpe] of 1 trial, {source}",
+        "PSR frente a E[Sharpe máximo] de 1 intento, {source}",
+    ),
+    ("PSR against E[max Sharpe] of {n} trials", "PSR frente a E[Sharpe máximo] de {n} intentos"),
+    (
+        "PSR against E[max Sharpe] of {n} trials, {source}",
+        "PSR frente a E[Sharpe máximo] de {n} intentos, {source}",
+    ),
     (
         "PSR against E[max Sharpe] of {n} trial(s)",
         "PSR frente a E[Sharpe máximo] de {n} intento(s)",
