@@ -391,6 +391,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Acierta menos tras una racha de pérdidas. Pregunta si el tamaño o las reglas "
             "cambian en esas rachas."
         ),
+        "beh_quick_nm": "Reentrada rápida tras perder:",
         "beh_clean": "Nada destaca en cómo opera después de perder.",
         "beh_badge_clean": "Sin patrones",
         "beh_badge_found": "Para preguntar",
@@ -926,6 +927,7 @@ LABELS: dict[str, dict[str, str]] = {
             "It wins less often after a losing streak. Ask whether size or rules change "
             "during those streaks."
         ),
+        "beh_quick_nm": "Quick re-entry after a loss:",
         "beh_clean": "Nothing stands out in how it trades after losing.",
         "beh_badge_clean": "No pattern",
         "beh_badge_found": "To ask",
@@ -3250,6 +3252,11 @@ def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[
     if facts:
         grid = " pairs" if len(facts) % 2 == 0 else ""
         out += f"<div class='facts{grid}'>{''.join(facts)}</div>"
+    if quick and quick["evidence"] == "NOT_MEASURED":
+        out += (
+            f"<p class='muted'>{_e(labels['beh_quick_nm'])} {_badge('NOT_MEASURED')} "
+            f"{_e(_sentence(localize(quick.get('note', ''), locale)))}</p>"
+        )
     out += f"<p class='muted'>{_e(_sentence(localize(behaviour.get('note', ''), locale)))}</p>"
     return out
 

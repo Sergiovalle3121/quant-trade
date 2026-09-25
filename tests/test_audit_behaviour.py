@@ -200,3 +200,4 @@ def test_dates_without_a_time_of_day_leave_reentry_unmeasured() -> None:
     assert review["hold_ratio"]["evidence"] == "MEASURED"
     html = _behaviour_html(review, "es", LABELS["es"])
     assert "15 minutos" not in html and "Vuelve a entrar" not in html
+    assert "Reentrada rápida tras perder:" in html and "El archivo no tiene hora del día" in html
