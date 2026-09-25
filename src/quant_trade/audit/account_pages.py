@@ -99,6 +99,15 @@ COPY: dict[str, dict[str, str]] = {
         "col_status": "Estado",
         "col_what": "Descripción",
         "open": "Abrir",
+        "compare_pick_label": "Elegir para comparar",
+        "compare_button": "Comparar los dos elegidos",
+        "compare_help": "Marca dos informes completos y compáralos lado a lado, sin pegar enlaces.",
+        "compare_pick": "Elige exactamente dos informes completos de tu lista para compararlos.",
+        "compare_back": "Volver a mis informes",
+        "compare_lead": (
+            "Dos informes de tu cuenta. Sirve para ver qué cambió entre dos versiones de una "
+            "estrategia o entre dos robots."
+        ),
         "status_full": "Completo",
         "status_preview": "Vista previa",
         "status_purged": "Archivos borrados",
@@ -241,6 +250,15 @@ COPY: dict[str, dict[str, str]] = {
         "col_status": "Status",
         "col_what": "Description",
         "open": "Open",
+        "compare_pick_label": "Pick to compare",
+        "compare_button": "Compare the two picked",
+        "compare_help": "Tick two full reports and compare them side by side, no links to paste.",
+        "compare_pick": "Pick exactly two full reports from your list to compare them.",
+        "compare_back": "Back to my reports",
+        "compare_lead": (
+            "Two reports from your account. Use it to see what changed between two versions "
+            "of a strategy or between two robots."
+        ),
         "status_full": "Full",
         "status_preview": "Preview",
         "status_purged": "Files deleted",
@@ -559,9 +577,21 @@ def report_href(audit_id: str, locale: str) -> str:
     return f"/audits/{audit_id}?lang={locale}"
 
 
-def _reports_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAudit]) -> str:
+def comparable(item: AccountAudit, *, free_mode: bool = False) -> bool:
+    """Whether a report on the list can go into a side-by-side comparison."""
+    return not item.purged and (item.paid or free_mode)
+
+
+def _reports_table(
+    copy: dict[str, str],
+    locale: str,
+    audits: Sequence[AccountAudit],
+    *,
+    free_mode: bool = False,
+) -> str:
     if not audits:
         return f"<p class='muted'>{_e(copy['reports_none'])}</p>"
+    pickable = sum(1 for item in audits if comparable(item, free_mode=free_mode)) >= 2
     head = "".join(
         f"<th>{_e(copy[k])}</th>" for k in ("col_date", "col_class", "col_status", "col_what")
     )
@@ -588,15 +618,36 @@ def _reports_table(copy: dict[str, str], locale: str, audits: Sequence[AccountAu
             else f"<a class='btn btn-ghost btn-sm' href='{_e(report_href(item.audit_id, locale))}'>"
             f"{_e(copy['open'])}</a>"
         )
+        pick = ""
+        if pickable:
+            pick = "<td>"
+            if comparable(item, free_mode=free_mode):
+                pick += (
+                    f"<input type='checkbox' name='id' value='{_e(item.audit_id)}' "
+                    f"aria-label='{_e(copy['compare_pick_label'])}'>"
+                )
+            pick += "</td>"
         rows.append(
-            f"<tr><td>{_e(_date(item.created_at))}</td><td>{_class_badge(item.overall_class)}</td>"
+            f"<tr>{pick}<td>{_e(_date(item.created_at))}</td>"
+            f"<td>{_class_badge(item.overall_class)}</td>"
             f"<td>{status}</td>"
             f"<td>{_e(what)}</td>"
             f"<td>{opener}</td></tr>"
         )
-    return (
-        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}<th></th></tr>"
+    pick_head = "<th></th>" if pickable else ""
+    table = (
+        "<div class='acct-scroll'><table class='acct-table'><thead>"
+        f"<tr>{pick_head}{head}<th></th></tr>"
         f"</thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+    if not pickable:
+        return table
+    return (
+        f"<form method='get' action='{path('account', locale)}/comparar'>"
+        f"<p class='muted'>{_e(copy['compare_help'])}</p>"
+        + table
+        + f"<p><button class='btn btn-dark' type='submit'>{_e(copy['compare_button'])}"
+        "</button></p></form>"
     )
 
 
@@ -669,6 +720,7 @@ def account_page(
     access_codes: bool = False,
     card_payments: bool = False,
     contact_url: str = "",
+    free_mode: bool = False,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -695,7 +747,7 @@ def account_page(
     )
     reports = (
         f"<section class='acct-sec'><h2>{_e(copy['reports_title'])}</h2>"
-        + _reports_table(copy, locale, audits)
+        + _reports_table(copy, locale, audits, free_mode=free_mode)
         + "</section>"
     )
     codes_html = ""
@@ -853,6 +905,7 @@ __all__ = [
     "COPY",
     "PATHS",
     "account_page",
+    "comparable",
     "all_texts",
     "forgot_page",
     "path",
