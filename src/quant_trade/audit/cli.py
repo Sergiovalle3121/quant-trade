@@ -98,6 +98,10 @@ def run(
         float | None,
         typer.Option(help="Starting balance, used only when the report states none", min=0),
     ] = None,
+    live: Annotated[
+        Path | None,
+        typer.Option(help="Live (or demo) account statement to compare with the backtest"),
+    ] = None,
     trades: Annotated[Path | None, typer.Option(help="CSV of closed trades")] = None,
     benchmark: Annotated[Path | None, typer.Option(help="CSV with a benchmark equity")] = None,
     variants: Annotated[Path | None, typer.Option(help="CSV matrix of variant returns")] = None,
@@ -145,6 +149,8 @@ def run(
             report_bytes=_read(report, what="report"),
             report_filename=report.name if report is not None else None,
             optimization_bytes=_read(optimization, what="optimization"),
+            live_bytes=_read(live, what="live"),
+            live_filename=live.name if live is not None else None,
         )
     except ParseError as exc:
         typer.echo(f"cannot audit: {exc}", err=True)

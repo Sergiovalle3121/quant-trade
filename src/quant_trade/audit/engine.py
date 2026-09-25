@@ -28,6 +28,7 @@ import pandas as pd
 
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import costs as cost_lib
+from quant_trade.audit import live as live_lib
 from quant_trade.audit import stress as stress_lib
 from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
@@ -760,6 +761,17 @@ def run_audit(
         if inputs.trades is not None
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
+    live = (
+        live_lib.compare_live(
+            inputs.trades,
+            inputs.live_trades,
+            backtest_symbols=inputs.trade_symbols,
+            live_symbols=inputs.live_symbols,
+            seed=seed,
+        )
+        if inputs.live_trades is not None
+        else None
+    )
     risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
     challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
 
@@ -913,6 +925,7 @@ def run_audit(
         trade_stats=trade_stats,
         stress=stress_tests,
         timing=timing,
+        live=live,
         risk=risk,
         challenge=challenge,
         vendor_questions=questions,

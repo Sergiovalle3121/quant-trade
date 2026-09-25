@@ -174,6 +174,62 @@ LABELS: dict[str, dict[str, str]] = {
         "timing_trades": "Operaciones",
         "timing_net": "Resultado neto",
         "timing_hits": "Aciertos",
+        "live": "Backtest frente a cuenta real",
+        "live_intro": (
+            "Si las operaciones de la cuenta real salieran del mismo backtest, ¿qué tan raro "
+            "sería su resultado? Tomamos al azar operaciones del backtest, tantas como tiene "
+            "la cuenta real, {samples:,} veces, y ubicamos la cuenta real entre esas historias."
+        ),
+        "live_CONSISTENT": (
+            "La cuenta real se comporta como el backtest: su resultado neto y su peor caída "
+            "caen dentro de lo que el backtest hacía esperar."
+        ),
+        "live_EDGE": (
+            "La cuenta real está en el borde: su resultado neto o su peor caída quedan peor "
+            "que en el 95 % de las historias del backtest. Puede ser una mala racha, pero "
+            "merece preguntas al vendedor."
+        ),
+        "live_INCONSISTENT": (
+            "La cuenta real no se comporta como el backtest: su resultado neto o su peor caída "
+            "quedan peor que en el 99 % de las historias del backtest."
+        ),
+        "live_ABOVE": (
+            "La cuenta real queda por encima del 99 % de las historias del backtest. Un "
+            "resultado así suele indicar que los dos archivos no son de la misma "
+            "configuración, tamaño o cuenta: pregúntalo."
+        ),
+        "live_badge_CONSISTENT": "Coherente",
+        "live_badge_EDGE": "En el borde",
+        "live_badge_INCONSISTENT": "No coherente",
+        "live_badge_ABOVE": "Revisar",
+        "live_col_backtest": "Backtest",
+        "live_col_live": "Cuenta real",
+        "live_col_live_rescaled": "Cuenta real, a tamaño del backtest",
+        "live_col_expected": "Rango esperado (90 %)",
+        "live_trades": "Operaciones",
+        "live_period": "Periodo",
+        "live_per_month": "Operaciones al mes",
+        "live_win_rate": "Aciertos",
+        "live_net": "Resultado neto",
+        "live_fall": "Peor caída",
+        "live_avg_win": "Ganancia media",
+        "live_avg_loss": "Pérdida media",
+        "live_below": "Historias del backtest con un resultado neto igual o peor",
+        "live_fall_above": "Historias del backtest con una caída igual o más profunda",
+        "live_rescaled": (
+            "La cuenta real opera {ratio:.2f} veces el tamaño del backtest: cada operación "
+            "real se ajustó al tamaño mediano del backtest antes de comparar."
+        ),
+        "live_same_size": "Mismo tamaño de posición (±25 %): se compara tal cual.",
+        "live_pace": (
+            "La cuenta real hace {ratio:.1f} veces las operaciones al mes del backtest: puede "
+            "no ser la misma configuración."
+        ),
+        "live_overlap": (
+            "Parte de la cuenta real cae dentro del periodo del backtest: esas fechas pudieron "
+            "usarse para ajustar el backtest, así que la comparación es menos exigente."
+        ),
+        "live_symbols": "La cuenta real opera símbolos que el backtest no tiene: {symbols}.",
         "reading": "Lectura de tu archivo",
         "reading_intro": (
             "Antes de analizar nada, volvimos a contar tus operaciones fila por fila y lo "
@@ -396,6 +452,62 @@ LABELS: dict[str, dict[str, str]] = {
         "timing_trades": "Trades",
         "timing_net": "Net result",
         "timing_hits": "Win rate",
+        "live": "Backtest against the live account",
+        "live_intro": (
+            "If the live account's trades came from the same backtest, how unusual would its "
+            "result be? We drew backtest trades at random, as many as the live account holds, "
+            "{samples:,} times, and placed the live account among those histories."
+        ),
+        "live_CONSISTENT": (
+            "The live account behaves like the backtest: its net result and its deepest fall "
+            "lie within what the backtest led to expect."
+        ),
+        "live_EDGE": (
+            "The live account is at the edge: its net result or its deepest fall is worse "
+            "than in 95 % of the backtest's histories. It may be a bad streak, but it deserves "
+            "questions to the seller."
+        ),
+        "live_INCONSISTENT": (
+            "The live account does not behave like the backtest: its net result or its "
+            "deepest fall is worse than in 99 % of the backtest's histories."
+        ),
+        "live_ABOVE": (
+            "The live account sits above 99 % of the backtest's histories. A result like "
+            "this usually means the two files do not share the same configuration, size or "
+            "account: ask."
+        ),
+        "live_badge_CONSISTENT": "Consistent",
+        "live_badge_EDGE": "At the edge",
+        "live_badge_INCONSISTENT": "Not consistent",
+        "live_badge_ABOVE": "Check",
+        "live_col_backtest": "Backtest",
+        "live_col_live": "Live account",
+        "live_col_live_rescaled": "Live, at the backtest's size",
+        "live_col_expected": "Expected range (90 %)",
+        "live_trades": "Trades",
+        "live_period": "Period",
+        "live_per_month": "Trades per month",
+        "live_win_rate": "Win rate",
+        "live_net": "Net result",
+        "live_fall": "Deepest fall",
+        "live_avg_win": "Average win",
+        "live_avg_loss": "Average loss",
+        "live_below": "Backtest histories with a net result as low or lower",
+        "live_fall_above": "Backtest histories with a fall as deep or deeper",
+        "live_rescaled": (
+            "The live account trades {ratio:.2f} times the backtest's size: each live trade "
+            "was scaled to the backtest's median size before comparing."
+        ),
+        "live_same_size": "Same position size (±25 %): compared as traded.",
+        "live_pace": (
+            "The live account makes {ratio:.1f} times the backtest's trades per month: it may "
+            "not be the same configuration."
+        ),
+        "live_overlap": (
+            "Part of the live account falls inside the backtest's period: those dates may "
+            "have been used to fit the backtest, so the comparison is less demanding."
+        ),
+        "live_symbols": "The live account trades symbols the backtest lacks: {symbols}.",
         "reading": "How your file was read",
         "reading_intro": (
             "Before analysing anything, we re-counted your trades row by row and compared "
@@ -1543,6 +1655,101 @@ def _block_name(key: int) -> str:
     return f"{start:02d}:00–{start + 3:02d}:59"
 
 
+LIVE_TONE = {"CONSISTENT": "PASS", "EDGE": "WEAK", "INCONSISTENT": "FAIL", "ABOVE": "WEAK"}
+
+
+def _live_html(live: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """The live statement placed among resampled backtest histories."""
+    if not live:
+        return ""
+    if live.get("status") != "MEASURED":
+        return _status_line(live, labels)
+    outcome = live["outcome"]
+    bt, lv, expected = live["backtest"], live["live"], live["expected"]
+
+    def money(value: float) -> str:
+        return f"{value:,.2f}"
+
+    def pct(value: float) -> str:
+        return f"{value:.0%}"
+
+    def band(key: str, fmt: Any) -> str:
+        return f"{fmt(expected[key]['p5'])} … {fmt(expected[key]['p95'])}"
+
+    def cell(side: dict[str, Any], key: str, fmt: Any) -> str:
+        item = side.get(key)
+        return fmt(item["value"]) if item else "—"
+
+    rows = [
+        (labels["live_trades"], f"{bt['trades']['value']:,}", f"{lv['trades']['value']:,}", ""),
+        (
+            labels["live_period"],
+            f"{bt['start']} – {bt['end']}",
+            f"{lv['start']} – {lv['end']}",
+            "",
+        ),
+        (
+            labels["live_per_month"],
+            f"{bt['per_month']['value']:.1f}",
+            f"{lv['per_month']['value']:.1f}",
+            "",
+        ),
+        (
+            labels["live_win_rate"],
+            cell(bt, "win_rate", pct),
+            cell(lv, "win_rate", pct),
+            band("win_rate", pct),
+        ),
+        (labels["live_net"], cell(bt, "net", money), cell(lv, "net", money), band("net", money)),
+        (
+            labels["live_fall"],
+            cell(bt, "max_fall", money),
+            cell(lv, "max_fall", money),
+            band("max_fall", money),
+        ),
+        (labels["live_avg_win"], cell(bt, "avg_win", money), cell(lv, "avg_win", money), ""),
+        (labels["live_avg_loss"], cell(bt, "avg_loss", money), cell(lv, "avg_loss", money), ""),
+    ]
+    live_head = "live_col_live_rescaled" if live.get("rescaled") else "live_col_live"
+    table = (
+        "<table class='live'><thead><tr><th></th>"
+        f"<th class='val'>{_e(labels[live_head])}</th>"
+        f"<th class='val'>{_e(labels['live_col_expected'])}</th>"
+        f"<th class='val'>{_e(labels['live_col_backtest'])}</th></tr></thead><tbody>"
+        + "".join(
+            f"<tr><td>{_e(name)}</td><td class='val'><strong>{_e(b)}</strong></td>"
+            f"<td class='val'>{_e(c)}</td><td class='val'>{_e(a)}</td></tr>"
+            for name, a, b, c in rows
+        )
+        + "</tbody></table>"
+    )
+    notes = [
+        labels["live_rescaled"].format(ratio=live["size_ratio"]["value"])
+        if live.get("rescaled")
+        else labels["live_same_size"]
+    ]
+    if live.get("pace_differs"):
+        notes.append(labels["live_pace"].format(ratio=live["pace_ratio"]["value"]))
+    if live.get("overlap"):
+        notes.append(labels["live_overlap"])
+    if live.get("new_symbols"):
+        notes.append(labels["live_symbols"].format(symbols=", ".join(live["new_symbols"])))
+    tails = "".join(
+        f"<p>{_e(labels[label])}: <strong>{pct(live[key]['value'])}</strong> "
+        f"{_badge(live[key]['evidence'])}</p>"
+        for label, key in (("live_below", "net_below"), ("live_fall_above", "fall_above"))
+    )
+    return (
+        f"<p class='muted'>{_e(labels['live_intro'].format(samples=live['samples']))}</p>"
+        f"<p><span class='badge {LIVE_TONE[outcome]}'>{_e(labels['live_badge_' + outcome])}"
+        f"</span> {_e(labels['live_' + outcome])}</p>"
+        + table
+        + tails
+        + "".join(f"<p class='muted'>{_e(note)}</p>" for note in notes)
+        + f"<p class='muted'>{_e(localize(live.get('note', ''), locale))}</p>"
+    )
+
+
 def _timing_table(rows: list[dict[str, Any]], head: str, name: Any, labels: dict[str, str]) -> str:
     widest = max((abs(row["net"]["value"]) for row in rows), default=0.0) or 1.0
 
@@ -2036,6 +2243,11 @@ def render_html(
     detail: list[tuple[str, str]] = [
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
+        *(
+            [(labels["live"], _live_html(data.get("live"), locale, labels))]
+            if data.get("live")
+            else []
+        ),
         (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
         (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
         (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),

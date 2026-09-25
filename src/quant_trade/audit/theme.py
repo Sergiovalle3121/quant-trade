@@ -777,6 +777,8 @@ margin-right:10px;border-radius:99px;background:var(--surface-2);overflow:hidden
 .tbar-track span{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--text)}
 .tbar.neg .tbar-track span{background:#dc2626}.tbar.neg b{color:#b91c1c}
 @media (max-width:759px){.paper table.timing{table-layout:auto}.tbar-track{display:none}}
+.live .val{text-align:right;white-space:nowrap}.live td:first-child{font-weight:500}
+@media (max-width:759px){.live td:first-child{min-width:130px}}
 .metrics .c-k{width:30%}.metrics .c-v{width:15%}.metrics .c-e{width:170px}
 .metrics td:first-child{font-weight:500}
 .metrics .val{text-align:right;padding-right:28px}
