@@ -1740,8 +1740,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if cached is not None:
                     return _strategy_pdf_answer(cached, strategy.id)
                 if strategy_pdf_renders.hit(account.id, now) >= STRATEGY_PDFS_PER_WINDOW:
-                    view = link_locale(locale)
-                    return _html_error(request, 429, message("pdf_limit", view), view)
+                    return _html_error(request, 429, message("pdf_limit", locale), locale)
             page = guard_page(
                 account_pages.strategy_page(
                     locale=locale,
@@ -1758,7 +1757,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             page = _SKIP_LINK.sub("", page, count=1)
             # The summary as a PDF: the owner's own page, laid out like a report
             # PDF (no network, the shared render slots), never cached.
-            view = link_locale(locale)
+            view = locale
             try:
                 word = {"en": "strategy", "pt": "estratégia"}.get(locale, "estrategia")
                 content = pdf_lib.report_pdf(
@@ -1852,8 +1851,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     return RedirectResponse(f"{base}?error=compare_pick", status_code=303)
                 result = AuditResult.model_validate_json(record.result_json)
                 results.append(result.model_dump(mode="json"))
-            # The comparison itself is not in Portuguese yet: it reads in English.
-            view = link_locale(locale)
+            view = locale
             body = comparison_body(
                 results[0],
                 results[1],
@@ -1863,13 +1861,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
             copy = account_pages.COPY[view]
             body += f"<p><a class='btn btn-ghost' href='{base}'>{copy['compare_back']}</a></p>"
-            other = account_pages.path("account", "en" if view == "es" else "es")
             query = "&".join(f"id={audit_id}" for audit_id in picked)
             page = compare_page(
                 body,
                 locale=view,
                 lead=copy["compare_lead"],
-                switch_href=f"{other}/comparar?{query}",
+                alternates={
+                    lang: f"{account_pages.path('account', lang)}/comparar?{query}"
+                    for lang in ("es", "en", "pt")
+                },
             )
             return HTMLResponse(guard_page(page))
 
@@ -3099,7 +3099,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             overall=record.overall_class,
             public_id=publication.public_id,
             audited_on=record.created_at[:10],
-            locale=_locale(link_locale(lang or "es")),
+            locale=_report_locale(lang),
         )
         return Response(content=svg, media_type="image/svg+xml")
 
@@ -3112,8 +3112,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             published_at=publication.created_at,
             result_sha256=digest,
             base_url=_site_url(request),
-            # The public page has Spanish and English; a Portuguese reader gets English.
-            locale=_locale(link_locale(lang or "es")),
+            locale=_report_locale(lang),
         )
 
     sample_cache: dict[tuple[str, str], str] = {}

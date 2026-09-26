@@ -747,6 +747,12 @@ def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path:
     )
     assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
     assert client.get(f"/account/comparar?id={ids[0]}&id={ids[1]}").status_code == 200
+    # From /pt/conta the comparison reads in Portuguese and links the Portuguese reports.
+    pt = client.get(f"/pt/conta/comparar?id={ids[0]}&id={ids[1]}").text
+    assert "<html lang='pt'" in pt and "Voltar aos meus relatórios" in pt
+    assert f"/audits/{ids[0]}?lang=pt" in pt and "Back to my reports" not in pt
+    assert "hreflang='pt'" in shown.text and "hreflang='es'" in pt
+    assert not find_claims(re.sub(r"<[^>]+>", " ", pt))
 
     def refused(query: str, prefix: str = "/cuenta") -> bool:
         answer = client.get(f"{prefix}/comparar?{query}", follow_redirects=False)
@@ -1473,7 +1479,7 @@ def test_the_account_screens_exist_in_portuguese(tmp_path: Path) -> None:
     store.mark_paid(audit_id, stripe_session_id="cs_pt", at=NOW)  # type: ignore[attr-defined]
     page = client.get("/pt/conta").text
     assert "Meus relatórios" in page and "Minhas estratégias" in page
-    assert f"/audits/{audit_id}?lang=en" in page  # the report itself reads in English
+    assert f"/audits/{audit_id}?lang=pt" in page  # the report reads in Portuguese
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
     where = client.post(
         "/pt/conta/estrategias/guardar",

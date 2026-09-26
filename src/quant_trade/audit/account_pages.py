@@ -999,7 +999,8 @@ def _class_badge(overall: str) -> str:
 
 
 def report_href(audit_id: str, locale: str) -> str:
-    return f"/audits/{audit_id}?lang={link_locale(locale)}"
+    # The report and its PDF exist in Spanish, English and Portuguese.
+    return f"/audits/{audit_id}?lang={locale}"
 
 
 def _usd(cents: int) -> str:
@@ -1046,9 +1047,9 @@ def _reports_table(
         if not item.purged:
             links.append((report_href(item.audit_id, locale), copy["open"]))
         if comparable(item, free_mode=free_mode):
-            links.append((f"/audits/{item.audit_id}/pdf?lang={link_locale(locale)}", copy["pdf"]))
+            links.append((f"/audits/{item.audit_id}/pdf?lang={locale}", copy["pdf"]))
         if item.public_id:
-            links.append((f"/v/{item.public_id}?lang={link_locale(locale)}", copy["public_page"]))
+            links.append((f"/v/{item.public_id}?lang={locale}", copy["public_page"]))
         opener = (
             "<div class='acct-links'>"
             + "".join(

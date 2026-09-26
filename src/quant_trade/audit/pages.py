@@ -87,6 +87,10 @@ BADGE_NOTICE: dict[str, str] = {
         "Statistical audit of supplied data – not verified with a broker – "
         "not a performance guarantee"
     ),
+    "pt": (
+        "Auditoria estatística de dados fornecidos – não verificados com a corretora – "
+        "não garante resultados"
+    ),
 }
 
 VERIFICATION_NOTICE: dict[str, str] = {
@@ -104,7 +108,17 @@ VERIFICATION_NOTICE: dict[str, str] = {
         "endorsement of any vendor or product. The hashes let anyone check that a file is "
         "exactly the one that was audited."
     ),
+    "pt": (
+        "Esta página resume uma auditoria estatística de dados que o cliente forneceu, não "
+        "verificados com a corretora. A classe descreve a evidência que havia no arquivo "
+        "auditado na data indicada; não garante resultados futuros, não é recomendação de "
+        "investimento e não endossa nenhum vendedor nem produto. Os hashes permitem conferir "
+        "que um arquivo é exatamente o que foi auditado."
+    ),
 }
+
+#: The class word on the verification page and its badge.
+CLASS_WORD: dict[str, str] = {"es": "Clase", "en": "Class", "pt": "Classe"}
 
 #: The sample report's address in each language.
 SAMPLE_PAGE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"}
@@ -2435,7 +2449,7 @@ def _utc_time(stamp: str, locale: str) -> str:
     except ValueError:
         return _e(stamp)
     month = _MONTHS[locale][when.month - 1]
-    if locale == "es":
+    if locale in ("es", "pt"):
         day = f"{when.day} {month} {when.year}"
     else:
         day = f"{month} {when.day}, {when.year}"
@@ -2461,7 +2475,6 @@ def verification_page(
     locale = _locale(locale)
     copy = _COPY[locale]
     ui = _UI[locale]
-    other = "en" if locale == "es" else "es"
     verdict = result["verdict"]
     overall = str(verdict["overall"])
     titles = DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"])
@@ -2513,12 +2526,14 @@ def verification_page(
         f"<a href='{page_url}'><img src='{badge_url}' alt='{BADGE_NOTICE[locale]}' "
         "width='480' height='72'></a>"
     )
-    cls_label = "Clase" if locale == "es" else "Class"
+    cls_label = CLASS_WORD[locale]
     title = f"{copy['v_title']} · {cls_label} {overall}"
     audited = str(result.get("generated_at_utc", ""))
     description = copy["v_description"].format(
         cls_label=cls_label, overall=overall, date=audited[:10], notice=BADGE_NOTICE[locale]
     )
+    alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
+    alternates["es"] = f"/v/{public_id}"
     # Never indexed (an unpublished page should not linger in search), but it
     # previews its class and date when the link is shared.
     meta = head_meta(
@@ -2526,7 +2541,7 @@ def verification_page(
             title=title,
             description=description,
             locale=locale,
-            paths={"es": f"/v/{public_id}", "en": f"/v/{public_id}?lang=en"},
+            paths=alternates,
             index=False,
             # The class card: class, its fixed sentence and the fixed notice, nothing else.
             image=f"class-{overall}",
@@ -2575,7 +2590,7 @@ def verification_page(
         locale,
         hero + main,
         meta_html=meta,
-        switch_href=f"/v/{public_id}?lang={other}",
+        alternates=alternates,
         solid_nav=True,
     )
 
@@ -2584,7 +2599,7 @@ def badge_svg(*, overall: str, public_id: str, audited_on: str, locale: str = "e
     """The badge: class, id, date and the fixed notice. Never a return figure."""
     locale = locale if locale in BADGE_NOTICE else "es"
     title = BRAND
-    label = "Clase" if locale == "es" else "Class"
+    label = CLASS_WORD[locale]
     colour = CLASS_COLOURS.get(overall, "#475569")
     notice = BADGE_NOTICE[locale]
     font = "Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
@@ -2662,7 +2677,13 @@ def legal_page(
     )
 
 
-def compare_page(content: str, *, locale: str = "es", lead: str = "", switch_href: str = "") -> str:
+def compare_page(
+    content: str,
+    *,
+    locale: str = "es",
+    lead: str = "",
+    alternates: dict[str, str] | None = None,
+) -> str:
     """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
     from quant_trade.audit.compare import COMPARE_CSS, COMPARE_PATH, COPY
 
@@ -2674,10 +2695,10 @@ def compare_page(content: str, *, locale: str = "es", lead: str = "", switch_hre
         + content
         + "</div></div>"
     )
-    if switch_href:
-        # A page reached from one report (Mi cuenta) switches only between Spanish and English.
-        return _page(copy["title"], locale, body, switch_href=switch_href, solid_nav=True)
-    return _page(copy["title"], locale, body, alternates=dict(COMPARE_PATH), solid_nav=True)
+    # A comparison reached from Mi cuenta passes its own addresses.
+    return _page(
+        copy["title"], locale, body, alternates=alternates or dict(COMPARE_PATH), solid_nav=True
+    )
 
 
 def check_page(content: str, *, locale: str = "es", base_url: str = "") -> str:
