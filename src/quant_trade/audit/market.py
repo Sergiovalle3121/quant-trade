@@ -128,6 +128,11 @@ TIMEOUT = 5.0
 MAX_BYTES = 4_000_000
 #: Seconds before a series that failed is asked for again.
 RETRY_AFTER = 600.0
+#: Reads of one series per refresh when the network fails (a timeout, a reset
+#: connection), and the pause between them: one slow reply from a central bank
+#: should not leave a report without its row.
+READ_ATTEMPTS = 3
+READ_PAUSE = 1.5
 #: How long a downloaded series is reused before it is read again.
 MAX_AGE = 6 * 3600.0
 #: Highest rate in percent a year a rate series may hold; above it the reply is
@@ -651,8 +656,10 @@ class MarketData:
         max_age: float = MAX_AGE,
         retry_after: float = RETRY_AFTER,
         clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._download = download
+        self._sleep = sleep
         self._max_age = max_age
         self._retry_after = retry_after
         self._clock = clock
@@ -681,6 +688,22 @@ class MarketData:
         """The series already in memory, in a fixed order; starts no download."""
         return tuple(key for key in SERIES if key in self._cache)
 
+    def _read(self, asset: Asset) -> str:
+        """The series' reply, read again after a pause when the network fails
+        (``OSError``: timeouts, resets, refused connections); a reply that
+        arrives but cannot be read is not asked for again here."""
+        for attempt in range(1, READ_ATTEMPTS + 1):
+            try:
+                # An injected reader takes the series id alone; the real one also its provider.
+                if self._download is not None:
+                    return self._download(asset.series)
+                return _download(asset.series, asset.provider)
+            except OSError:
+                if attempt == READ_ATTEMPTS:
+                    raise
+                self._sleep(READ_PAUSE * attempt)
+        raise AssertionError("unreachable")
+
     def refresh(self, key: str) -> bool:
         """Download one series now (in the calling thread); False when another
         refresh of it is running or the download failed."""
@@ -691,12 +714,7 @@ class MarketData:
         if not lock.acquire(blocking=False):
             return False
         try:
-            # An injected reader takes the series id alone; the real one also its provider.
-            text = (
-                self._download(asset.series)
-                if self._download is not None
-                else _download(asset.series, asset.provider)
-            )
+            text = self._read(asset)
             if asset.provider in RATE_PROVIDERS:
                 series = parse_rates(text, asset.provider, asset.series)
             elif asset.provider in PROVIDER_URLS:

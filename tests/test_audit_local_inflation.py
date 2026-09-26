@@ -557,3 +557,33 @@ def test_only_the_publishers_own_gaps_are_allowed_in_a_policy_rate() -> None:
 
     assert MarketData(lambda series: bis("JP")).refresh("cash_jpy") is True
     assert MarketData(lambda series: bis("MX")).refresh("cash_mxn") is False
+
+
+def test_a_failed_read_is_tried_again_before_the_row_is_lost() -> None:
+    # Value's 40-file runs: one slow Bank of Canada or BCB reply dropped a row.
+    calls: list[str] = []
+    pauses: list[float] = []
+
+    def flaky(series: str) -> str:
+        calls.append(series)
+        if len(calls) < market_lib.READ_ATTEMPTS:
+            raise TimeoutError("slow")
+        return BOC
+
+    data = MarketData(flaky, sleep=pauses.append)
+    assert data.refresh("cpi_cad") is True
+    assert len(calls) == market_lib.READ_ATTEMPTS
+    assert len(pauses) == market_lib.READ_ATTEMPTS - 1
+
+    def down(series: str) -> str:
+        raise ConnectionResetError("reset")
+
+    assert MarketData(down, sleep=lambda _: None).refresh("cpi_cad") is False
+
+    def unreadable(series: str) -> str:
+        calls.append(series)
+        return "<html>blocked</html>"
+
+    calls.clear()
+    assert MarketData(unreadable, sleep=lambda _: None).refresh("cpi_cad") is False
+    assert len(calls) == 1
