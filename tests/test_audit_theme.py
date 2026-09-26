@@ -973,7 +973,7 @@ def test_what_the_account_keeps_reads_as_a_security_card(tmp_path: Path) -> None
 def test_small_phones_keep_the_landing_and_timing_tables_inside_the_screen() -> None:
     assert ".mock-url{white-space:nowrap;overflow:hidden;text-overflow:ellipsis" in STYLE
     assert ".signin-first .inline-form .btn{width:100%" in STYLE
-    assert "(max-width:380px){.timing th,.timing td{padding:9px 5px!important}" in STYLE
+    assert "(max-width:420px){.timing th,.timing td{padding:9px 5px!important}" in STYLE
     # The landing's secondary link is monochrome like the rest, not a lone blue.
     assert "min-height:44px;color:var(--text);font-weight:500;" in STYLE
 
