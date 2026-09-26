@@ -246,8 +246,13 @@ _KEYBOARD_ROWS = (
     "zxcvbnm,./",
     "1qaz2wsx3edc4rfv5tgb6yhn7ujm8ik,9ol.0p;/",
     "qazwsxedcrfvtgbyhnujmikolp",
+    "1q2w3e4r5t6y7u8i9o0p",
+    "zaq12wsxcde34rfvbgt56yhnmju78ik,.lo90p;/-",
     "abcdefghijklmnopqrstuvwxyz",
 )
+
+
+_LEET = str.maketrans({"@": "a", "0": "o", "1": "i", "3": "e", "4": "a", "$": "s", "5": "s"})
 
 
 def _is_run(text: str) -> bool:
@@ -287,7 +292,12 @@ def common_password(password: str, *, email: str = "") -> bool:
         return True  # digits only: dates, phone-like runs and counts fall fast
     if core in words or (_repeats(core) and any(core.startswith(w) for w in words if w)):
         return True
-    return any(core == word * (len(core) // len(word)) for word in words if word) or _is_run(core)
+    if any(core == word * (len(core) // len(word)) for word in words if word) or _is_run(core):
+        return True
+    # Leetspeak: "P@ssw0rd2024" is "password" with a year.
+    kept = re.sub(r"[\s._\-!#%^&*+=?¡¿]+", "", text)
+    leet = re.sub(r"^[0-9]+|[0-9]+$", "", kept).translate(_LEET)
+    return leet != core and leet in words
 
 
 def _b64(data: bytes) -> str:

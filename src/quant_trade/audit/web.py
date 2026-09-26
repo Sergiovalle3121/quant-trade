@@ -43,6 +43,7 @@ from quant_trade.audit import account_pages, mapping, payments, universal
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
+from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
@@ -96,6 +97,7 @@ from quant_trade.audit.store import (
     VIA_UPLOAD,
     Store,
     make_store,
+    strategy_name,
 )
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
@@ -1219,11 +1221,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return found.email if found is not None else ""
 
     def _account_locale(path_locale: str, lang: str | None) -> str:
-        return _locale(lang) if lang in LOCALES else path_locale
+        if lang in LOCALES:
+            return _locale(lang)
+        # Portuguese visitors get the English account screens until they exist in pt.
+        return "en" if lang == "pt" else path_locale
 
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
     signin_flashes = ("signed_out", "deleted", "reset_done")
-    account_flashes = ("welcome", "code_linked", "password_changed")
+    account_flashes = ("welcome", "code_linked", "password_changed", "filed")
     account_errors = (
         "code_already",
         "code_other",
@@ -1234,6 +1239,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "compare_pick",
         "password_common",
         "password_short",
+        "file_bad",
+        "strategy_full",
     )
 
     def _signup_get(path_locale: str) -> Callable[..., Response]:
@@ -1449,8 +1456,108 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         if cfg.free_mode or not acct.WELCOME_FULL_REPORT
                         else ("used" if db.welcome_used(account.id) else "available")
                     ),
+                    strategies=db.list_strategies(account.id),
                 )
             )
+
+        return handler
+
+    # -- "Mis estrategias" ---------------------------------------------------
+    def _strategy_file_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            audit_id: Annotated[str, Form(max_length=64)] = "",
+            strategy: Annotated[str, Form(max_length=64)] = "",
+            name: Annotated[str, Form(max_length=200)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            now = datetime.now(UTC)
+            strategy_id = strategy
+            # Only a report on the account's own list can be filed: check it
+            # before a new strategy is made, so a refused filing leaves nothing.
+            listed = {item.audit_id for item in db.account_audits_list(account.id)}
+            if audit_id not in listed:
+                return RedirectResponse(f"{base}?error=file_bad#estrategias", 303)
+            if strategy in ("", "new") or name.strip():
+                if not strategy_name(name):
+                    return RedirectResponse(f"{base}?error=file_bad#estrategias", 303)
+                strategy_id = db.create_strategy(account.id, name, at=now)
+                if not strategy_id:
+                    return RedirectResponse(f"{base}?error=strategy_full#estrategias", 303)
+            if not db.file_report(account.id, audit_id, strategy_id, at=now):
+                return RedirectResponse(f"{base}?error=file_bad#estrategias", 303)
+            where = f"{account_pages.strategies_path(locale)}/{strategy_id}"
+            return RedirectResponse(where, status_code=303)
+
+        return handler
+
+    def _strategy_get(path_locale: str) -> Callable[..., Response]:
+        def handler(request: Request, strategy_id: str, lang: str | None = None) -> Response:
+            locale = _account_locale(path_locale, lang)
+            session = _session(request)
+            here = f"{account_pages.strategies_path(locale)}/{strategy_id}"
+            if session is None:
+                return _signin_redirect(locale, next_path=here)
+            account, csrf, _ = session
+            strategy = db.get_strategy(account.id, strategy_id[:64])
+            if strategy is None:
+                raise _not_found()
+            listed = {item.audit_id: item for item in db.account_audits_list(account.id)}
+            versions = []
+            for audit_id in strategy.audit_ids:
+                item = listed.get(audit_id)
+                if item is None:
+                    continue
+                record = db.get_audit(audit_id)
+                result = (
+                    strategies_lib.load_result(record.result_json)
+                    if record is not None and not record.purged_at
+                    else None
+                )
+                versions.append((item, result))
+            page = account_pages.strategy_page(
+                locale=locale,
+                csrf=csrf,
+                strategy=strategy,
+                versions=versions,
+                free_mode=cfg.free_mode,
+            )
+            return HTMLResponse(guard_page(page))
+
+        return handler
+
+    def _strategy_action(path_locale: str, action: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            strategy_id: str,
+            audit_id: Annotated[str, Form(max_length=64)] = "",
+            name: Annotated[str, Form(max_length=200)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            here = f"{account_pages.strategies_path(locale)}/{strategy_id}"
+            strategy = db.get_strategy(account.id, strategy_id[:64])
+            if strategy is None:
+                raise _not_found()
+            if action == "remove" and audit_id in strategy.audit_ids:
+                db.file_report(account.id, audit_id, "", at=datetime.now(UTC))
+            elif action == "rename":
+                db.rename_strategy(account.id, strategy.id, name)
+            elif action == "delete":
+                db.delete_strategy(account.id, strategy.id)
+                base = account_pages.path("account", locale)
+                return RedirectResponse(f"{base}#estrategias", status_code=303)
+            return RedirectResponse(here, status_code=303)
 
         return handler
 
@@ -1514,7 +1621,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         session = _session(request)
         if session is None:
             return _signin_redirect(locale, next_path=account_pages.path("account", locale))
-        if not acct.same_secret(session[1], csrf):
+        # The CSRF token decides; the browser's own cross-site signal is a
+        # second layer, with the same rules as uploads (Origin: null passes).
+        if not acct.same_secret(session[1], csrf) or _cross_site(request):
             return RedirectResponse(
                 account_pages.path("account", locale) + "?error=csrf", status_code=303
             )
@@ -1671,6 +1780,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]
         )
         app.add_api_route(paths["account"] + "/borrar", _delete_post(path_locale), methods=["POST"])
+        strategies_base = account_pages.strategies_path(path_locale)
+        app.add_api_route(
+            strategies_base + "/guardar", _strategy_file_post(path_locale), methods=["POST"]
+        )
+        app.add_api_route(
+            strategies_base + "/{strategy_id}", _strategy_get(path_locale), **html_get
+        )
+        for suffix, action in (("quitar", "remove"), ("nombre", "rename"), ("borrar", "delete")):
+            app.add_api_route(
+                f"{strategies_base}/{{strategy_id}}/{suffix}",
+                _strategy_action(path_locale, action),
+                methods=["POST"],
+            )
         app.add_api_route(paths["forgot"], _forgot_get(path_locale), **html_get)
         app.add_api_route(paths["reset"], _reset_get(path_locale), **html_get)
         app.add_api_route(paths["reset"], _reset_post(path_locale), methods=["POST"])

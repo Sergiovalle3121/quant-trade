@@ -1696,6 +1696,25 @@ changes what a report says.
   no audit kept). A failed upload gives its claims back. Network keys hold
   a hash of the address and the retention purge deletes them.
 
+- **Mis estrategias** (`audit/strategies.py`, tables `strategies` and
+  `strategy_reports`): an account names a strategy and files reports of its
+  own list under it (one strategy per report, 50 strategies per account),
+  from the form on "Mi cuenta" or after the fact. `/cuenta/estrategias/<id>`
+  (EN `/account/strategies/<id>`) lists the versions oldest first with the
+  class, annualised Sharpe, deflated Sharpe and max drawdown (full reports
+  only; a preview shows its class and the way to unlock). Next to each
+  version, "Qué cambió frente a la versión N": the class (better or worse),
+  each dimension whose ranked result changed (pass, weak, fail; not
+  measured is never compared), said as "cambió" because each report carries
+  its own declarations, and the Sharpe, called better or worse only when the
+  bootstrap 5-95 % bands do not overlap, "sin cambio claro" otherwise, "no
+  comparable" across data frequencies (the frequency label; periods per year
+  within 10 % without one) and "periodos distintos" when the shared dates
+  cover under 80 % of the shorter history. With two or more versions the
+  page says that picking the best of N counts as N trials. Per-test detail needs both versions
+  complete. Rename, remove a version and delete the strategy (its reports
+  stay); deleting the account or a report removes its rows. Nothing here
+  unlocks anything, so nothing new can be farmed.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
