@@ -90,6 +90,7 @@ def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
         "mql5-signal",
         "fxblue",
         "robinhood",
+        "zerodha",
         "csv-universal",
     }
     for guide in GUIDES:
