@@ -2000,7 +2000,9 @@ changes what a report says.
   unknown e-mail and a wrong key give the same answer (someone spamming an
   e-mail can hold its recovery for an hour; the key itself is untouched and
   the owner's reset link still works). The key's date is in
-  the data export; the row goes with the account.
+  the data export; the row goes with the account. The account forms that ask
+  for the current password (recovery key, password change, deletion) share
+  `accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR` per network and per account.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

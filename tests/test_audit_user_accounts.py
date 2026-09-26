@@ -2386,3 +2386,30 @@ def test_the_recovery_key_screens_exist_in_every_language(tmp_path: Path) -> Non
     for locale, words in (("es", "clave de recuperación"), ("en", "recovery key")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
         assert words in privacy and not find_claims(privacy)
+
+
+def test_password_guesses_on_account_forms_count_a_64_and_the_account(tmp_path: Path) -> None:
+    from quant_trade.audit import accounts
+
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    csrf = _csrf(client.get("/cuenta").text)
+
+    def guess(ip: str) -> str:
+        answer = client.post(
+            "/cuenta/recuperacion",
+            data={"current": "adivinando una frase", "csrf": csrf},
+            headers={"X-Forwarded-For": ip},
+            follow_redirects=False,
+        )
+        return answer.headers["location"]
+
+    limit = accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR
+    # Rotating addresses inside one /64 share the limit...
+    for n in range(limit):
+        assert "error=wrong" in guess(f"2001:db8:7:7::{n + 1:x}")
+    assert "error=too_many" in guess("2001:db8:7:7::ffff")
+    # ...and so does the account from any other network.
+    assert "error=too_many" in guess("203.0.113.77")
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]

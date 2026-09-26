@@ -1893,7 +1893,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 account_pages.path("account", locale) + "?error=csrf", status_code=303
             )
         ip = _client_ip(request, cfg.trusted_proxy_hops)
-        if account_actions.hit(ip, datetime.now(UTC)) >= acct.MAX_ACCOUNT_ACTIONS_PER_HOUR:
+        # Counted per network (an IPv6 /64) and per account, so a stolen
+        # session cannot guess the password by rotating addresses.
+        now = datetime.now(UTC)
+        by_net = account_actions.hit(acct.network_address(ip), now)
+        by_account = account_actions.hit("account:" + session[0].id, now)
+        if max(by_net, by_account) >= acct.MAX_ACCOUNT_ACTIONS_PER_HOUR:
             return RedirectResponse(
                 account_pages.path("account", locale) + "?error=too_many", status_code=303
             )
