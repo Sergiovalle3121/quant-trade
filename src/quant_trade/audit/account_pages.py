@@ -397,6 +397,7 @@ COPY: dict[str, dict[str, str]] = {
         "notice_failed": "{count} intentos de entrar con contraseña incorrecta.",
         "notice_new_device": "Una entrada desde un dispositivo nuevo: {device}.",
         "notice_unknown_device": "Una entrada desde un dispositivo desconocido.",
+        "notice_more_devices_one": "Y una entrada más desde otro dispositivo nuevo.",
         "notice_more_devices": "Y {count} entradas más desde otros dispositivos nuevos.",
         "notice_help": "Si no fuiste tú, cambia tu contraseña y cierra las demás sesiones.",
         "notice_link": "Ver la actividad reciente",
@@ -852,6 +853,7 @@ COPY: dict[str, dict[str, str]] = {
         "notice_failed": "{count} sign-in tries with a wrong password.",
         "notice_new_device": "A sign-in from a new device: {device}.",
         "notice_unknown_device": "A sign-in from an unknown device.",
+        "notice_more_devices_one": "And one more sign-in from another new device.",
         "notice_more_devices": "And {count} more sign-ins from other new devices.",
         "notice_help": "If it was not you, change your password and sign out the other sessions.",
         "notice_link": "See recent activity",
@@ -1624,7 +1626,9 @@ def _visit_notice(copy: dict[str, str], locale: str, notice: VisitNotice) -> str
         else:
             items.append(copy["notice_unknown_device"])
     hidden = len(notice.new_devices) - NOTICE_DEVICES_SHOWN
-    if hidden > 0:
+    if hidden == 1:
+        items.append(copy["notice_more_devices_one"])
+    elif hidden > 1:
         items.append(copy["notice_more_devices"].format(count=hidden))
     lines = "".join(f"<li>{_e(item)}</li>" for item in items)
     return (

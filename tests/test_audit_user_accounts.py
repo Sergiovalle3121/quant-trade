@@ -3309,3 +3309,8 @@ def test_a_flood_of_new_devices_lists_three_and_counts_the_rest() -> None:
         assert html.count("<li>") == 4
         assert "Chrome 2 · Linux" in html and "Chrome 3 · Linux" not in html
         assert more in html
+        one = account_pages._visit_notice(
+            account_pages.COPY[locale], locale, VisitNotice(new_devices=devices[:4])
+        )
+        assert one.count("<li>") == 4 and "{count}" not in one
+        assert account_pages.COPY[locale]["notice_more_devices_one"] in one
