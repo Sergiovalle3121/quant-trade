@@ -934,6 +934,7 @@ LABELS: dict[str, dict[str, str]] = {
             "cambia la clase."
         ),
         "currency_prices": "Precios al consumidor: {prices}.",
+        "currency_prices_through": " (precios hasta {month})",
         "currency_attrib_EUR": "euro, Eurostat (vía FRED)",
         "currency_attrib_CHF": "franco suizo, Eurostat",
         "currency_attrib_GBP": (
@@ -2139,6 +2140,7 @@ LABELS: dict[str, dict[str, str]] = {
             "made. It does not change the class."
         ),
         "currency_prices": "Consumer prices: {prices}.",
+        "currency_prices_through": " (prices through {month})",
         "currency_attrib_EUR": "euro, Eurostat (through FRED)",
         "currency_attrib_CHF": "Swiss franc, Eurostat",
         "currency_attrib_GBP": (
@@ -5767,6 +5769,10 @@ def _currency_html(
     def local_name(code: str) -> str:
         return labels.get(f"currency_{code}", code)
 
+    def real_name(name: str, figures: dict[str, Any]) -> str:
+        through = str(figures.get("prices_through") or "")
+        return name + (labels["currency_prices_through"].format(month=through) if through else "")
+
     real = section.get("real") or {}
     items = section.get("currencies") or []
     if base:
@@ -5776,22 +5782,18 @@ def _currency_html(
             "cur-base",
         )
         if real.get("status") == "MEASURED":
-            body += row(
-                labels["currency_real_local"].format(name=local_name(base)), real, "cur-real"
-            )
+            name = labels["currency_real_local"].format(name=local_name(base))
+            body += row(real_name(name, real), real, "cur-real")
     else:
         body = row(labels["currency_dollars"], section.get("dollars") or {}, "cur-base")
         if real.get("status") == "MEASURED":
-            body += row(labels["currency_real"], real, "cur-real")
+            body += row(real_name(labels["currency_real"], real), real, "cur-real")
     for item in items:
         code = str(item.get("code", ""))
         body += row(local_name(code), item)
         if (item.get("real") or {}).get("status") == "MEASURED":
-            body += row(
-                labels["currency_real_local"].format(name=local_name(code)),
-                item["real"],
-                "cur-real",
-            )
+            name = labels["currency_real_local"].format(name=local_name(code))
+            body += row(real_name(name, item["real"]), item["real"], "cur-real")
     out += (
         "<table class='timing holding currency'><thead><tr>"
         f"<th>{_e(labels['currency_head'])}</th>"

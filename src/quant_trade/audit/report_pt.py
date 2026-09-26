@@ -1229,6 +1229,7 @@ REPORT: dict[str, Any] = {
             "muda a classe."
         ),
         "currency_prices": "Preços ao consumidor: {prices}.",
+        "currency_prices_through": " (preços até {month})",
         "currency_attrib_EUR": "euro, Eurostat (via FRED)",
         "currency_attrib_CHF": "franco suíço, Eurostat",
         "currency_attrib_GBP": (

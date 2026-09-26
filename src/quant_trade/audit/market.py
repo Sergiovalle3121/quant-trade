@@ -92,6 +92,10 @@ class Asset:
     negative: bool = False
     #: Where the series is read: ``fred`` or a key of ``PROVIDER_URLS``.
     provider: str = "fred"
+    #: For a monthly price index, the largest ratio between two consecutive
+    #: values; a larger jump is a broken reply (Brazil's worst month, March
+    #: 1990, was about x1.8).
+    max_step: float | None = None
 
     @property
     def source_url(self) -> str:
@@ -138,10 +142,18 @@ CASH = Asset(
 #: is 82.69 (March 2020), so a value above ``MAX_VIX`` is a broken download.
 MAX_VIX = 200.0
 VIX = Asset("vix", "VIX", "VIXCLS", re.compile(r"(?!)"), ceiling=MAX_VIX)
+#: The largest ratio between two consecutive months of a price index.
+MAX_PRICE_STEP = 3.0
 #: US consumer prices (all items, not seasonally adjusted, 1982-84 = 100), monthly;
 #: BLS recommends the unadjusted index for deflating between arbitrary dates.
 CPI = Asset(
-    "cpi", "US consumer prices", "CPIAUCNS", re.compile(r"(?!)"), ceiling=10_000.0, floor=1.0
+    "cpi",
+    "US consumer prices",
+    "CPIAUCNS",
+    re.compile(r"(?!)"),
+    ceiling=10_000.0,
+    floor=1.0,
+    max_step=MAX_PRICE_STEP,
 )
 #: Noon buying rates in New York (Federal Reserve H.10), daily: units of the
 #: currency per US dollar, or US dollars per unit for the euro and the pound.
@@ -215,6 +227,7 @@ LOCAL_CPI: tuple[Asset, ...] = tuple(
         ceiling=MAX_PRICE_INDEX,
         floor=1.0,
         provider=provider,
+        max_step=MAX_PRICE_STEP,
     )
     for code, series, provider in (
         ("EUR", "CP0000EZ19M086NEST", "fred"),
@@ -454,6 +467,10 @@ class MarketData:
                 raise ValueError("FRED value out of range")
             if asset.floor is not None and bool((series < asset.floor).any()):
                 raise ValueError("FRED value out of range")
+            if asset.max_step is not None and len(series) > 1:
+                steps = series.to_numpy(dtype=float)[1:] / series.to_numpy(dtype=float)[:-1]
+                if bool((steps > asset.max_step).any() or (steps < 1 / asset.max_step).any()):
+                    raise ValueError("price index jumps")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False

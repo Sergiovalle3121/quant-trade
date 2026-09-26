@@ -49,6 +49,10 @@ MIN_YEAR_DAYS = 365
 MAX_GAP_DAYS = 7
 #: A consumer price index month older than this before a point is too stale.
 MAX_CPI_GAP_DAYS = 75
+#: When the last point is more than this many days past the start of the last
+#: price month used, the row says which month the prices run through: the
+#: inflation of the months after it is not taken out.
+STALE_TAIL_DAYS = 45
 #: Each currency's consumer price index, by currency code.
 LOCAL_PRICES: dict[str, Asset] = {asset.label: asset for asset in LOCAL_CPI}
 #: Series quoted as US dollars per unit of the currency (the rest are units per dollar).
@@ -205,6 +209,7 @@ def _real(
         "source_url": CPI.source_url,
     }
     out.update(_figures(levels / prices, days, REAL_NOTE))
+    out.update(_through(stamps, cpi))
     inflation = float(prices[-1] / prices[0] - 1.0)
     out["inflation"] = measured(inflation, REAL_NOTE)
     if days >= MIN_YEAR_DAYS and math.isfinite(inflation):
@@ -261,6 +266,7 @@ def _local_real(
         "provider": asset.provider,
     }
     out.update(_figures(levels / prices, days, LOCAL_REAL_NOTE))
+    out.update(_through(stamps, prices_seen))
     inflation = float(prices[-1] / prices[0] - 1.0)
     out["inflation"] = measured(inflation, LOCAL_REAL_NOTE)
     if days >= MIN_YEAR_DAYS and math.isfinite(inflation):
@@ -268,6 +274,16 @@ def _local_real(
             float((1.0 + inflation) ** (365.0 / days) - 1.0), LOCAL_REAL_NOTE
         )
     return out
+
+
+def _through(stamps: pd.DatetimeIndex, prices: pd.Series) -> dict[str, str]:
+    """``prices_through`` (``YYYY-MM``) when the last point is more than
+    ``STALE_TAIL_DAYS`` past the start of the last price month it used."""
+    index = pd.DatetimeIndex(prices.index).tz_localize(None)
+    used = index[index <= stamps[-1].floor("D")]
+    if len(used) == 0 or (stamps[-1] - used.max()).days <= STALE_TAIL_DAYS:
+        return {}
+    return {"prices_through": used.max().strftime("%Y-%m")}
 
 
 def series_keys() -> list[str]:

@@ -261,3 +261,37 @@ def test_new_texts_make_no_claims_and_every_series_is_read() -> None:
             if key.startswith("currency_"):
                 assert find_claims(text) == [], (locale, key)
     assert {asset.key for asset in LOCAL_CPI} <= set(series_keys())
+
+
+def test_a_one_month_jump_in_a_price_index_is_a_broken_reply() -> None:
+    spike = ONS.replace('"2026 JUL","142.9"', '"2026 JUL","9000000"')
+    assert MarketData(lambda series: spike).refresh("cpi_gbp") is False
+    us = "DATE,CPIAUCNS\n2024-01-01,300\n2024-02-01,901\n2024-03-01,302\n"
+    assert MarketData(lambda series: us).refresh("cpi") is False
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_prices_that_end_weeks_before_the_last_point_say_through_which_month(
+    locale: str,
+) -> None:
+    days = pd.date_range("2023-01-02", "2024-03-10", freq="D")
+    frame = _curve(days, np.full(len(days), 10_000.0))
+    prices = _monthly(days, 100.0, 105.0)[:-2]  # through January 2024
+    out = in_currencies(frame, {"cpi_gbp": prices, "cpi": prices}, "GBP")
+    assert out["real"]["prices_through"] == "2024-01"
+    usd = in_currencies(frame, {"cpi": prices}, "USD")
+    assert usd["real"]["prices_through"] == "2024-01"
+    fresh = in_currencies(frame, {"cpi": _monthly(days, 100.0, 105.0)}, "USD")
+    assert "prices_through" not in fresh["real"]
+
+    inputs, _ = _inputs(locale)
+    inputs = replace(inputs, account_currency="GBP")
+    stamps = pd.DatetimeIndex(inputs.equity.frame["timestamp"]).tz_localize(None)
+    late = _monthly(pd.DatetimeIndex(stamps), 130.0, 136.0)[:-1]
+    result = run_audit(
+        inputs, bootstrap_samples=200, risk_samples=300, market={"cpi_gbp": late}.get
+    )
+    html, _ = render(result, watermark=False)
+    month = late.index[-1].strftime("%Y-%m")
+    assert escape(LABELS[locale]["currency_prices_through"].format(month=month)) in html
+    assert untranslated(result.model_dump(mode="json")) == []

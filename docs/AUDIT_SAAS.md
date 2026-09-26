@@ -1404,7 +1404,11 @@ names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
 currency and after that currency's inflation, with the local inflation over
 the dates; without those prices it is NOT_MEASURED with the reason. Another
 named currency leaves it NOT_MEASURED. A price index reply below 1 or above
-10,000,000 is taken as broken.
+10,000,000, or with two consecutive months more than 3 times apart
+(`MAX_PRICE_STEP`), is taken as broken. When the last point is more than 45
+days past the start of the last price month used (`STALE_TAIL_DAYS`), the row
+after inflation says "prices through {month}": the months after it are not
+deflated. The same applies to the dollar row after US inflation.
 Needs 90 days of history. A reply above 10,000 for any of these series is
 taken as broken. It never changes the class.
 
