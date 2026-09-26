@@ -164,3 +164,27 @@ def test_a_document_that_is_not_a_spreadsheet_is_still_refused() -> None:
     with pytest.raises(ReportFormatError) as refused:
         import_report(buffer.getvalue(), "carta.odt")
     assert refused.value.code == "opendocument_sheet"
+    assert "not a spreadsheet" in str(refused.value)
+    assert "no es una hoja de cálculo" in refused.value.message_es
+    assert "não é uma planilha" in refused.value.localized("pt")
+
+
+def test_a_time_a_hair_under_the_minute_rounds_up_as_a_whole() -> None:
+    rows = [[("time", "PT15H29M59.999999997S", "15:30"), ("time", "PT09H05M01.4S", "09:05")]]
+    assert read_xlsx(_ods(rows))["Hoja1"] == [["15:30:00", "09:05:01"]]
+
+
+def test_a_table_inside_a_cell_is_not_read_into_the_outer_sheet() -> None:
+    nested = (
+        '<table:table-row><table:table-cell><table:table table:name="Dentro">'
+        '<table:table-row><table:table-cell office:value-type="string"><text:p>y</text:p>'
+        "</table:table-cell></table:table-row></table:table></table:table-cell></table:table-row>"
+    )
+    grouped = (
+        "<table:table-row-group><table:table-row>"
+        '<table:table-cell office:value-type="string"><text:p>z</text:p></table:table-cell>'
+        "</table:table-row></table:table-row-group>"
+    )
+    sheets = read_xlsx(_ods([["x"]], tail=nested + grouped))
+    assert sheets["Hoja1"] == [["x"], [], ["z"]]
+    assert sheets["Dentro"] == [["y"]]

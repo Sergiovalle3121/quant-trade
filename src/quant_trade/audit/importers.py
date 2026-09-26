@@ -56,7 +56,7 @@ import statistics
 import zipfile
 import zlib
 from collections import deque
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
 from functools import cached_property
@@ -2253,14 +2253,28 @@ def _ods_value(cell: ElementTree.Element) -> Any:
     if kind == "time":
         moment = _ODS_TIME.match(_attribute(cell, "time-value") or "")
         if moment is not None:
+            # Rounded as a whole: 15:29:59.999999997 reads 15:30:00, never 15:29:60.
             hours, minutes, seconds = moment.groups()
-            return f"{int(hours):02d}:{int(minutes):02d}:{float(seconds):02.0f}"
+            total = round(int(hours) * 3600 + int(minutes) * 60 + float(seconds))
+            return f"{total // 3600:02d}:{total // 60 % 60:02d}:{total % 60:02d}"
         return _attribute(cell, "time-value")
     if kind == "boolean":
         return _attribute(cell, "boolean-value")
     paragraphs = ["".join(node.itertext()) for node in cell if _local(node.tag) == "p"]
     text = " ".join(part for part in paragraphs if part)
     return text or None
+
+
+def _ods_rows(table: ElementTree.Element) -> Iterator[ElementTree.Element]:
+    """A table's own rows, inside row groups but never a table nested in a cell."""
+    pending = list(reversed(list(table)))
+    while pending:
+        node = pending.pop()
+        name = _local(node.tag)
+        if name == "table-row":
+            yield node
+        elif name in {"table-row-group", "table-header-rows", "table-rows"}:
+            pending.extend(reversed(list(node)))
 
 
 def _ods_sheets(content: ElementTree.Element) -> dict[str, list[list[Any]]]:
@@ -2276,9 +2290,7 @@ def _ods_sheets(content: ElementTree.Element) -> dict[str, list[list[Any]]]:
         (node for node in content.iter() if _local(node.tag) == "table"), start=1
     ):
         rows: list[list[Any]] = []
-        for row in table.iter():
-            if _local(row.tag) != "table-row":
-                continue
+        for row in _ods_rows(table):
             values: dict[int, Any] = {}
             index = 0
             for cell in row:
@@ -4353,10 +4365,10 @@ def unwrap(data: bytes) -> bytes:
         if "mimetype" in names and "content.xml" in names:
             raise ReportFormatError(
                 "opendocument_sheet",
-                "this is an OpenDocument sheet (.ods), which cannot be read: save it as .xlsx "
-                "or CSV and upload that file",
-                "esta es una hoja OpenDocument (.ods), que no se puede leer: guárdala como "
-                ".xlsx o CSV y sube ese archivo",
+                "this OpenDocument file is not a spreadsheet, so it cannot be read: save the "
+                "trades as .xlsx, .ods or CSV and upload that file",
+                "este archivo OpenDocument no es una hoja de cálculo, así que no se puede leer: "
+                "guarda las operaciones como .xlsx, .ods o CSV y sube ese archivo",
             )
         exports = [
             info
