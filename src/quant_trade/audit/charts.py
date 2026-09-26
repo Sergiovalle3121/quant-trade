@@ -38,6 +38,8 @@ from typing import Any, TypeAlias
 
 import pandas as pd
 
+from quant_trade.audit import report_pt
+
 WIDTH = 720
 HEIGHT = 260
 MARGIN_LEFT = 64
@@ -676,6 +678,9 @@ def monthly_heatmap(
         caption += f" {note}"
     return _figure(table, caption, evidence, "monthly")
 
+
+# The Portuguese of the tables above, over their English (see ``report_pt``).
+report_pt.install(globals(), report_pt.CHARTS)
 
 __all__ = [
     "CHART_CSS",

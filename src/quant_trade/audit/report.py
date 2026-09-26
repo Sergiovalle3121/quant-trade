@@ -20,7 +20,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
-from quant_trade.audit import charts
+from quant_trade.audit import charts, report_pt
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
@@ -57,6 +57,7 @@ from quant_trade.audit.verdict import (
     DEFAULT_THRESHOLDS,
     DIMENSION_ORDER,
     NOT_MEASURED_ES,
+    Locale,
     meaning,
     summary,
 )
@@ -480,8 +481,7 @@ LABELS: dict[str, dict[str, str]] = {
             "(DSR) es del {dsr}, y para aprobar esta dimensión pedimos {need}."
         ),
         "luck_beats": (
-            "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin "
-            "habilidad."
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin habilidad."
         ),
         "luck_below": (
             "Con {n} configuraciones, la pura suerte daría un Sharpe de {luck}, igual o más "
@@ -914,8 +914,7 @@ LABELS: dict[str, dict[str, str]] = {
         "seed": "semilla de las simulaciones",
         "code_request": f"Hola, quiero un código de {BRAND} para el informe {{id}}.",
         "code_request_price": (
-            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). "
-            "¿Cómo pago?"
+            f"Hola, quiero comprar el informe completo de {BRAND} {{id}} ({{price}}). ¿Cómo pago?"
         ),
         "keep_link": (
             "Guarda el enlace de esta página: con él vuelves a tu informe. Si lo subiste con tu "
@@ -1417,7 +1416,7 @@ LABELS: dict[str, dict[str, str]] = {
             "none has an edge. Here the file's Sharpe sits next to what pure luck would give "
             "with the configurations counted, using the published math of Bailey and López de "
             "Prado and of Harvey and Liu. It is the same calculation that decides the "
-            "\"Number of settings tried\" dimension, in numbers."
+            '"Number of settings tried" dimension, in numbers.'
         ),
         "luck_badge_beats": "Beats luck",
         "luck_badge_below": "Does not beat luck",
@@ -1843,8 +1842,7 @@ LABELS: dict[str, dict[str, str]] = {
         "seed": "simulation seed",
         "code_request": f"Hello, I would like a {BRAND} code for report {{id}}.",
         "code_request_price": (
-            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). "
-            "How do I pay?"
+            f"Hello, I would like to buy the full {BRAND} report {{id}} ({{price}}). How do I pay?"
         ),
         "keep_link": (
             "Save this page's link: it brings you back to your report. If you uploaded it with "
@@ -2584,7 +2582,7 @@ def _is_evidence(value: Any) -> bool:
 
 
 def _locale_of(labels: dict[str, str]) -> str:
-    return "es" if labels is LABELS["es"] else "en"
+    return next((locale for locale, table in LABELS.items() if table is labels), "en")
 
 
 #: What the customer's file was, as they know it; the same in both languages.
@@ -2715,6 +2713,8 @@ REASONS_ES: dict[str, str] = {
 
 
 def _localized_reason(reason: str, locale: str) -> str:
+    if locale == "pt":
+        return localize(reason, locale)
     if locale != "es":
         return reason
     return REASONS_ES.get(reason) or localize(reason, locale)
@@ -2749,6 +2749,8 @@ def _reasons_html(verdict: dict[str, Any], locale: str, labels: dict[str, str]) 
     rows = []
     for d in verdict["dimensions"]:
         reasons = d.get("reasons_es") if locale == "es" and d.get("reasons_es") else d["reasons"]
+        if locale == "pt":
+            reasons = [localize(reason, locale) for reason in d["reasons"]]
         rows.append(
             f"<tr><td>{_e(_dimension_title(d['name'], locale))}</td>"
             f"<td>{_status_badge(d['status'], locale)}</td><td>{_e('; '.join(reasons))}</td></tr>"
@@ -2775,6 +2777,8 @@ def _charts_html(data: dict[str, Any], locale: str) -> str:
     note = series.get("note") if series.get("note") != "as uploaded" else None
     if note and locale == "es":
         note = "Balance reconstruido con operaciones cerradas: no muestra el drawdown flotante."
+    elif note and locale == "pt":
+        note = "Saldo reconstruído com operações fechadas: não mostra o drawdown flutuante."
     figures = [
         charts.equity_chart(series["timestamps"], series["equity"], locale=locale, note=note),
         charts.drawdown_chart(series["timestamps"], series["equity"], locale=locale, note=note),
@@ -3209,6 +3213,9 @@ def _assumptions(block: Any, locale: str, labels: dict[str, str]) -> str:
     if not isinstance(block, dict):
         return ""
     items = block.get(locale) or block.get("es") or []
+    if locale == "pt":
+        # A result stores its assumptions in Spanish and English only.
+        items = [localize(item, locale) for item in block.get("en") or []]
     return (
         f"<p class='muted'>{_e(labels['assumptions'])}:</p><ul class='muted'>"
         + "".join(f"<li>{_e(item)}</li>" for item in items)
@@ -3431,9 +3438,7 @@ def _firm_fit_html(
     def pct(item: dict[str, Any] | None, label: str) -> str:
         if not item:
             return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
-        return (
-            f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
-        )
+        return f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
 
     def risk(key: str) -> str:
         return labels["ff_risk_none"] if key == "none" else labels[key]
@@ -3456,13 +3461,18 @@ def _firm_fit_html(
     )
 
 
+def _question_text(question: dict[str, str], locale: str) -> str:
+    if locale == "pt":
+        # A result stores its questions in Spanish and English only.
+        return localize(question.get("en", ""), locale)
+    return question.get(locale) or question.get("es", "")
+
+
 def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[str, str]) -> str:
     if not questions:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     return (
-        "<ol>"
-        + "".join(f"<li>{_e(q.get(locale) or q.get('es', ''))}</li>" for q in questions)
-        + "</ol>"
+        "<ol>" + "".join(f"<li>{_e(_question_text(q, locale))}</li>" for q in questions) + "</ol>"
     )
 
 
@@ -3513,7 +3523,7 @@ def _column_map_html(metadata: dict[str, Any], labels: dict[str, str]) -> str:
     rows = []
     for key in keys:
         # "Columna leída como precio de entrada" -> "precio de entrada".
-        field = platform_label(key, locale).rpartition(" como " if locale == "es" else " as ")[2]
+        field = platform_label(key, locale).rpartition(" as " if locale == "en" else " como ")[2]
         rows.append(
             f"<li><code>{_e(metadata[key])}</code>{icon('arrow')}<span>{_e(field)}</span></li>"
         )
@@ -3530,10 +3540,18 @@ def _other(locale: str) -> str:
 def _summary_in(data: dict[str, Any], locale: str) -> str:
     """The verdict sentence rebuilt in ``locale`` from the stored dimensions."""
     trials = data["multiplicity"].get("trials_used") or data["declared"].get("trials") or {}
+    chosen: Locale = "pt" if locale == "pt" else "en" if locale == "en" else "es"
+    dimensions = [Dimension.model_validate(d) for d in data["verdict"]["dimensions"]]
+    if chosen == "pt":
+        # A result stores its reasons in English and Spanish only.
+        dimensions = [
+            d.model_copy(update={"reasons": [localize(r, "pt") for r in d.reasons]})
+            for d in dimensions
+        ]
     return summary(
-        [Dimension.model_validate(d) for d in data["verdict"]["dimensions"]],
+        dimensions,
         data["verdict"]["overall"],
-        locale="en" if locale == "en" else "es",
+        locale=chosen,
         trials=int(trials.get("value") or 1),
         trials_evidence=str(trials.get("evidence") or "DECLARED"),
         account=is_account_history(data),
@@ -4427,6 +4445,7 @@ def _luck_html(
             f"<p>{_e(labels['luck_span_line'].format(sharpe=sharpe, span=span))} "
             f"{_badge(luck['sharpe']['evidence'])}</p>"
         )
+
     def enough(row: dict[str, Any]) -> str:
         return "yes" if float(row["years_needed"]["value"]) <= span_value else "no"
 
@@ -4558,7 +4577,7 @@ def _duration_text(hours: float, locale: str) -> str:
         return f"{max(1, round(hours * 60))} min"
     if hours < 48:
         return f"{hours:.1f} h"
-    return f"{hours / 24:.1f} " + ("días" if locale == "es" else "days")
+    return f"{hours / 24:.1f} " + {"es": "días", "pt": "dias"}.get(locale, "days")
 
 
 def _behaviour_ask(text: str) -> str:
@@ -5361,9 +5380,7 @@ def render_html(
                     f"rel='noopener noreferrer' target='_blank'>{icon('chat')}"
                     f"{_e(labels['buy_code'])}</a>"
                     "<ol class='buy-steps'>"
-                    + "".join(
-                        f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|")
-                    )
+                    + "".join(f"<li>{_e(step)}</li>" for step in labels["buy_code_how"].split("|"))
                     + f"</ol><p class='muted pay-secure'>{_e(labels['buy_code_wait'])}</p>"
                     f"{includes_html}</div>"
                 )
@@ -5394,8 +5411,9 @@ def render_html(
         from quant_trade.audit.compare import COPY as COMPARE_COPY
         from quant_trade.audit.compare import MAX_LINK_CHARS
 
-        ccopy = COMPARE_COPY["en" if locale == "en" else "es"]
-        action = "/compare" if locale == "en" else "/comparar"
+        # The comparison page has Spanish and English; Portuguese uses the English one.
+        ccopy = COMPARE_COPY["es" if locale == "es" else "en"]
+        action = "/comparar" if locale == "es" else "/compare"
         compare_html = (
             f"<form class='publish no-print' method='post' action='{action}'>"
             f"<p class='muted'>{_e(ccopy['from_report_help'])}</p>"
@@ -5738,7 +5756,10 @@ def render_html(
             else []
         ),
         *(
-            [(labels["luck"], _luck_html(
+            [
+                (
+                    labels["luck"],
+                    _luck_html(
                         data.get("luck"),
                         locale,
                         labels,
@@ -5748,7 +5769,9 @@ def render_html(
                                 "dsr_pass", DEFAULT_THRESHOLDS.dsr_pass
                             )
                         ),
-                    ))]
+                    ),
+                )
+            ]
             if (data.get("luck") or {}).get("status") == "MEASURED"
             else []
         ),
@@ -5862,7 +5885,7 @@ def render_html(
             "<button type='button' class='print-btn' "
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
-    account_href = "/account" if locale == "en" else "/cuenta"
+    account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
@@ -5875,7 +5898,7 @@ def render_html(
         )
         + "</div>"
     )
-    home = "/en" if locale == "en" else "/"
+    home = {"en": "/en", "pt": "/pt"}.get(locale, "/")
     header = (
         f"<header class='nav nav-solid'><div class='wrap nav-in'>{logo(home)}{toolbar}</div>"
         "</header>"
@@ -6228,6 +6251,9 @@ def render(
     guard_texts(result, html_text)
     return html_text, to_json(result)
 
+
+# The Portuguese of the tables above, over their English (see ``report_pt``).
+report_pt.install(globals(), report_pt.REPORT)
 
 __all__ = [
     "DISCLAIMER",

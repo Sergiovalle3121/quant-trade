@@ -214,14 +214,14 @@ def test_trades_outside_the_curve_dates_are_flagged() -> None:
     assert "TRADES_OUTSIDE_EQUITY" in {flag.code for flag in flags}
 
 
-def test_every_red_flag_code_has_a_title_in_both_languages() -> None:
+def test_every_red_flag_code_has_a_title_in_every_language() -> None:
     source = (ROOT / "src/quant_trade/audit/redflags.py").read_text(encoding="utf-8")
     codes = set(re.findall(r'"([A-Z][A-Z_]{5,})",\n\s+"(?:FAIL|WARN)', source))
     codes |= set(re.findall(r'RedFlag\("([A-Z_]+)"', source))
     assert codes, "no flag codes found"
     assert codes <= set(redflags.FLAG_TITLES)
     for titles in redflags.FLAG_TITLES.values():
-        assert set(titles) == {"es", "en"}
+        assert set(titles) == {"es", "en", "pt"}
         assert find_claims(" ".join(titles.values())) == []
 
 

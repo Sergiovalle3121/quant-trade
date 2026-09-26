@@ -91,7 +91,7 @@ def _fetcher() -> Any:
 
 
 def footer_text(audit_id: str, locale: str) -> str:
-    word = "report" if locale == "en" else "informe"
+    word = {"en": "report", "pt": "relatório"}.get(locale, "informe")
     return f"{BRAND} · {word} {audit_id}"
 
 

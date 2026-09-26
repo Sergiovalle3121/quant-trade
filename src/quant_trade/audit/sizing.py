@@ -221,7 +221,7 @@ def scale_text(share: float, locale: str = "en") -> str:
     if not math.isfinite(share):
         return "—"
     if share > MAX_SIZE_SHARE:
-        prefix = "más de" if locale == "es" else "more than"
+        prefix = {"es": "más de", "pt": "mais de"}.get(locale, "more than")
         return f"{prefix} {MAX_SIZE_SHARE:g}x"
     return f"{share:.2f}x" if share < 1 else f"{share:.1f}x"
 

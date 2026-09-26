@@ -1,4 +1,4 @@
-"""Spanish for the English sentences the audit writes into a result.
+"""Spanish and Portuguese for the English sentences the audit writes into a result.
 
 The engine, the importers and the red-flag checks write their notes in
 English, and the result JSON keeps them that way: it is the evidence record
@@ -8,7 +8,8 @@ translates them when it is rendered, with the fixed templates below.
 Each rule is an English template with ``{name}`` placeholders, as the
 sentence appears in the source, and its Spanish twin. The placeholders catch
 the numbers and names the sentence carries (counts, symbols, file labels),
-which are copied unchanged. A sentence no rule knows is shown in English:
+which are copied unchanged. Portuguese works the same way from
+``report_pt.RULES`` and ``report_pt.REASONS``. A sentence no rule knows is shown in English:
 a new warning degrades to English, never to an empty cell. The tests run
 every importer fixture and scenario through ``untranslated`` so a new
 English sentence without a rule fails the build.
@@ -20,6 +21,8 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from quant_trade.audit import report_pt
+from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.verdict import NOT_MEASURED_ES
 
 #: Where a parse warning came from, as ``schema.build_inputs`` prefixes it.
@@ -1835,17 +1838,78 @@ def _compile(english: str) -> re.Pattern[str]:
 _RULES: tuple[tuple[str, re.Pattern[str], str], ...] = tuple(
     (english, _compile(english), spanish) for english, spanish in _RULES_SOURCE
 )
+_RULES_PT: tuple[tuple[str, re.Pattern[str], str], ...] = tuple(
+    (english, _compile(english), portuguese) for english, portuguese in report_pt.RULES
+)
+_FLAG_TITLES_PT: dict[str, str] = {
+    titles["en"]: titles["pt"] for titles in FLAG_TITLES.values() if "pt" in titles
+}
+#: The verdict's reasons, tried one "; "-separated part at a time after the notes.
+_REASONS_PT: tuple[tuple[str, re.Pattern[str], str], ...] = tuple(
+    (english, _compile(english), portuguese) for english, portuguese in report_pt.REASONS
+)
 
 
-def _translate_values(values: dict[str, str]) -> dict[str, str]:
+def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, str]:
     """Placeholders that are themselves fixed English phrases."""
+    compared, trials, initial = (
+        (report_pt.COMPARED, report_pt.TRIAL_SOURCES, report_pt.INITIAL_SOURCES)
+        if locale == "pt"
+        else (_COMPARED, _TRIAL_SOURCES, _INITIAL_SOURCES)
+    )
     out = dict(values)
     if "what" in out:
-        out["what"] = _COMPARED.get(out["what"], out["what"])
+        out["what"] = compared.get(out["what"], out["what"])
     if "source" in out:
         source = out["source"]
-        out["source"] = _TRIAL_SOURCES.get(source, _INITIAL_SOURCES.get(source, source))
+        out["source"] = trials.get(source, initial.get(source, source))
     return out
+
+
+def _render_portuguese(text: str) -> str | None:
+    """``text`` in Portuguese, or ``None`` when no rule knows it."""
+    head, sep, rest = text.partition(": ")
+    if sep and head in report_pt.PREFIXES:
+        inner = _render_portuguese(rest)
+        return None if inner is None else f"{report_pt.PREFIXES[head]}: {inner}"
+    for table in (report_pt.NOT_MEASURED, report_pt.TRIAL_SOURCES):
+        if text in table:
+            return table[text]
+    for lead, portuguese in report_pt.REASON_LEADS.items():
+        if text.startswith(lead):
+            return portuguese + text
+    for english, pattern, template in _RULES_PT:
+        match = pattern.fullmatch(text)
+        if not match:
+            continue
+        values = match.groupdict()
+        singular = report_pt.SINGULAR.get(english) if values.get("n") == "1" else None
+        chosen = singular[1] if singular else template
+        return chosen.format(**_translate_values(values, "pt"))
+    return _reason_portuguese(text)
+
+
+def _reason_portuguese(text: str) -> str | None:
+    """A verdict reason in Portuguese, part by part, or ``None`` if a part is unknown."""
+    parts: list[str] = []
+    for part in text.split("; "):
+        if part in _FLAG_TITLES_PT:
+            # The data-quality dimension lists the red flags by title.
+            parts.append(_FLAG_TITLES_PT[part])
+            continue
+        for _, pattern, template in _REASONS_PT:
+            match = pattern.fullmatch(part)
+            if match:
+                # A value can itself be a phrase, such as "120 trials counted in the files".
+                values = {
+                    name: _reason_portuguese(value) or value
+                    for name, value in match.groupdict().items()
+                }
+                parts.append(template.format(**values))
+                break
+        else:
+            return None
+    return "; ".join(parts)
 
 
 def _render(text: str, locale: str) -> str | None:
@@ -1854,6 +1918,8 @@ def _render(text: str, locale: str) -> str | None:
     English comes back unchanged except for a count of one, which takes the
     singular sentence.
     """
+    if locale == "pt":
+        return _render_portuguese(text)
     head, sep, rest = text.partition(": ")
     if sep and head in _PREFIXES:
         inner = _render(rest, locale)
@@ -1903,13 +1969,15 @@ def _agree(text: str) -> str:
 
 
 def localize(text: str, locale: str) -> str:
-    """``text`` in ``locale``: Spanish when a rule knows it, else unchanged.
+    """``text`` in ``locale``: Spanish or Portuguese when a rule knows it, else English.
 
     Either way a count reads as one item or several, never ``item(s)``.
     """
     if not text:
         return text
-    rendered = _render(text, "es" if locale == "es" else "en")
+    rendered = _render(text, locale) if locale in ("es", "pt") else None
+    if rendered is None:
+        rendered = _render(text, "en")
     return _agree(text if rendered is None else rendered)
 
 
@@ -1939,11 +2007,17 @@ def _result_sentences(data: dict[str, Any]) -> Iterable[str]:
     yield from walk(data.get("declared", {}))
 
 
-def untranslated(data: dict[str, Any]) -> list[str]:
-    """Sentences of a result (as JSON) that no Spanish rule covers."""
+def untranslated(data: dict[str, Any], locale: str | None = None) -> list[str]:
+    """Sentences of a result (as JSON) that no Spanish or no Portuguese rule covers.
+
+    ``locale`` checks one language only.
+    """
+    locales = (locale,) if locale else ("es", "pt")
     missing: list[str] = []
     for text in _result_sentences(data):
-        if text and spanish(text) is None and text not in missing:
+        if not text or text in missing:
+            continue
+        if any(_render(text, each) is None for each in locales):
             missing.append(text)
     return missing
 
