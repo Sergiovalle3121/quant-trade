@@ -2674,6 +2674,18 @@ Informational only: none of these moves a class, a dimension or a red flag.
   times the per-period Sharpe, with `q` the periods a year and the sum cut
   at 10 lags or a fifth of the sample. Smoothed returns (AR(1) at 0.5)
   inflate the plain figure by about 1.7x; this one removes it.
+- The significance section carries `dependence` (50 returns or more and a
+  positive Sharpe): the probability that the true Sharpe is above zero and
+  the returns needed for it to reach 0.95 with Mertens' variance of the
+  Sharpe (the one the plain PSR uses) multiplied by `ratio`, the largest of
+  1, the Newey-West long-run variance of each return's influence on the
+  Sharpe (`z - SR / 2 (z^2 - 1)`, Bartlett weights, lag `floor(4
+  (n/100)^(2/9))`) over its plain variance, and `(1 + rho) / (1 - rho)` for
+  the returns' Kendall-corrected first-order autocorrelation clipped to
+  `[0, 0.9]`. It never reads higher than the plain figure. On simulated
+  returns with no edge and autocorrelation 0.4 the plain PSR passes 0.95
+  about 12 % of the time and this one about 5 %; with independent returns
+  both about 5 %. Informational: the class uses the plain PSR.
 - The benchmark section and the fund-versus-index comparison carry `jensen`
   (24 shared periods or more): Jensen's alpha from regressing the
   strategy's period returns on the benchmark's, annualised, with a
@@ -2738,6 +2750,10 @@ How the report shows them (ES, EN and PT):
   it is 0.1 or more). A higher corrected figure is never printed: with small
   samples it mostly adds noise and would flatter the file. The report says
   the plain figure is not inflated instead.
+- Under Lo's line, the `dependence` probability and track record next to the
+  plain ones when `ratio` is 1.1 or more (with one more sentence when the
+  plain probability reaches 95 % and this one does not), or one line saying
+  dependence does not change it. The class never reads either.
 - Under the benchmark table and in the fund-versus-index block, Jensen's
   alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to
   be chance alone (with "it does not say it will repeat" for a positive

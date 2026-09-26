@@ -694,6 +694,21 @@ LABELS: dict[str, dict[str, str]] = {
             "Los retornos de periodos cercanos tienden a moverse juntos: el Sharpe simple sale "
             "inflado."
         ),
+        "dependence_line": (
+            "Si los retornos no se toman como independientes entre sí, la varianza del Sharpe "
+            "se multiplica por {ratio}: la probabilidad de que el Sharpe real sea mayor que cero "
+            "pasa de {plain} a {psr}, y harían falta unos {track} retornos para que llegara al "
+            "95 % (con la cuenta simple, {plain_track})."
+        ),
+        "dependence_pass_rests": (
+            "Con la cuenta simple la probabilidad supera el 95 %; sin tomar los retornos como "
+            "independientes, no llega."
+        ),
+        "dependence_none": (
+            "Los retornos no dependen de forma apreciable unos de otros: tenerlo en cuenta no "
+            "cambia la probabilidad de que el Sharpe real sea mayor que cero."
+        ),
+        "dependence_info": "Es informativo: la clase usa la cuenta simple.",
         "lo_not_lower": (
             "Sharpe corregido por autocorrelación (Lo, 2002): no queda apreciablemente por "
             "debajo de {plain}, así que el orden de los retornos no infla el Sharpe simple de "
@@ -1792,6 +1807,21 @@ LABELS: dict[str, dict[str, str]] = {
         "lo_lower_plain": (
             "Returns of nearby periods tend to move together: the plain Sharpe comes out inflated."
         ),
+        "dependence_line": (
+            "When the returns are not taken as independent of each other, the Sharpe's "
+            "variance grows {ratio} times: the probability that the true Sharpe is above zero "
+            "goes from {plain} to {psr}, and about {track} returns would be needed for it to "
+            "reach 95 % (the plain count says {plain_track})."
+        ),
+        "dependence_pass_rests": (
+            "The plain count puts the probability above 95 %; without taking the returns as "
+            "independent, it falls short."
+        ),
+        "dependence_none": (
+            "The returns do not depend on each other appreciably: taking that into account "
+            "does not change the probability that the true Sharpe is above zero."
+        ),
+        "dependence_info": "It is informational: the class uses the plain count.",
         "lo_not_lower": (
             "Sharpe corrected for autocorrelation (Lo, 2002): it is not appreciably below "
             "{plain}, so the order of the returns does not inflate the plain Sharpe appreciably. "
@@ -3635,6 +3665,35 @@ def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str
         out += (
             labels["lo_lower"].format(rho=f"{rho:.2f}") if rho >= 0.1 else labels["lo_lower_plain"]
         )
+    return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
+
+
+def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> str:
+    """The probability of a true Sharpe above zero with dependent returns, beside
+    the plain one; it never feeds the class and never reads higher."""
+    block = significance.get("dependence") or {}
+    ratio = _ev_value(block.get("ratio"))
+    psr = _ev_value(block.get("psr"))
+    track = _ev_value(block.get("min_track_record_length"))
+    plain = _ev_value(significance.get("psr"))
+    plain_track = _ev_value(significance.get("min_track_record_length"))
+    if ratio is None or psr is None or track is None or plain is None or plain_track is None:
+        return ""
+    # A widening under a tenth moves the probability by less than the table's
+    # rounding says anything about.
+    if ratio < 1.1:
+        out = labels["dependence_none"]
+    else:
+        out = labels["dependence_line"].format(
+            ratio=f"{ratio:.1f}",
+            plain=_table_pct(plain),
+            psr=_table_pct(psr),
+            track=f"{math.ceil(track):,}",
+            plain_track=f"{math.ceil(plain_track):,}",
+        )
+        if plain >= 0.95 > psr:
+            out += " " + labels["dependence_pass_rests"]
+        out += " " + labels["dependence_info"]
     return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
 
 
@@ -6479,7 +6538,8 @@ def render_html(
                 data["significance"],
                 _ev_value((data.get("performance") or {}).get("sharpe")),
                 labels,
-            ),
+            )
+            + _dependence_html(data["significance"], labels),
         ),
         (labels["multiplicity"], multiplicity_html),
         (labels["bootstrap"], boot_html),
