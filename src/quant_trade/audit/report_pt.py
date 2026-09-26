@@ -4724,14 +4724,17 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "each return placed by the VIX close of the last market day before it starts (calm "
             "below 20, turbulent at 20 or above); return per month compounded over each "
-            "regime's days; Sharpe annualised like the headline Sharpe; gap in mean returns in "
-            "Welch standard errors"
+            "regime's days; Sharpe annualised like the headline Sharpe; gap in mean returns over "
+            "a cautious standard error (the largest of Welch's, Newey-West's and one widened "
+            "for autocorrelated returns)"
         ),
         (
             "cada retorno atribuído segundo o fechamento do VIX do último dia de mercado "
             "anterior ao seu início (tranquilo abaixo de 20, agitado a partir de 20); "
             "rentabilidade por mês composta sobre os dias de cada regime; Sharpe anualizado "
-            "como o Sharpe principal; diferença de retornos médios em erros padrão de Welch"
+            "como o Sharpe principal; diferença de retornos médios dividida por um erro padrão "
+            "prudente (o maior entre o de Welch, o de Newey-West e um ampliado por retornos "
+            "autocorrelacionados)"
         ),
     ),
     (

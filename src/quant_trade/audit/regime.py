@@ -14,7 +14,15 @@ day its stretch starts (at most ``MAX_GAP_DAYS`` old), so the regime was known
 before the return happened. For each regime the report gives the share of the
 time, the number of returns, the return per month compounded over that
 regime's days only, and the Sharpe ratio annualised like the headline one.
-The two mean returns are compared in Welch standard errors; a gap under
+The two mean returns are compared in a cautious standard error, the
+largest of three: Welch's, which lets the two regimes differ in spread;
+Newey and West's (1987), which also holds when returns cluster in time; and
+Welch's widened by ``(1 + rho) / (1 - rho)`` for the first-order
+autocorrelation of the returns around their regime's mean (with Kendall's
+small-sample correction). Welch's alone, on simulated returns with no real
+difference and regimes that last weeks, reads a gap as clear about 10 % of
+the time at an autocorrelation of 0.2 and 17 % at 0.4; the cautious error
+keeps it near 5 %. A gap under
 ``CLEAR_GAP``, or one whose sign disagrees with the order of the two monthly
 figures (volatility drag in a jumpy regime), reads as "no clear difference",
 never as a finding. The VIX is a
@@ -30,6 +38,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit.alpha import MAX_RHO, newey_west_lags
 from quant_trade.audit.market import VIX
 from quant_trade.audit.schema import measured
 
@@ -51,8 +60,9 @@ FLAT_SPREAD = 1e-12
 NOTE = (
     "each return placed by the VIX close of the last market day before it starts (calm "
     "below 20, turbulent at 20 or above); return per month compounded over each regime's "
-    "days; Sharpe annualised like the headline Sharpe; gap in mean returns in Welch "
-    "standard errors"
+    "days; Sharpe annualised like the headline Sharpe; gap in mean returns over a cautious "
+    "standard error (the largest of Welch's, Newey-West's and one widened for "
+    "autocorrelated returns)"
 )
 UNAVAILABLE = "the VIX closes could not be read when the report was made"
 NOT_COVERED = "the VIX closes do not cover the whole history"
@@ -80,6 +90,29 @@ def _side(returns: np.ndarray, days: np.ndarray, total_days: float, ppy: float) 
     if math.isfinite(spread) and spread > FLAT_SPREAD:
         out["sharpe"] = measured(float(returns.mean() / spread * math.sqrt(ppy)), NOTE)
     return out
+
+
+def gap_error(returns: np.ndarray, calm: np.ndarray) -> float:
+    """Cautious standard error of ``mean(calm) - mean(turbulent)`` over returns
+    in time order: the largest of Welch's, Newey-West's (Bartlett weights, the
+    lag rule of :func:`newey_west_lags`, scaled by ``n / (n - 2)``) and
+    Welch's widened for the returns' first-order autocorrelation."""
+    a, b = returns[calm], returns[~calm]
+    n = len(returns)
+    welch = math.sqrt(float(a.var(ddof=1)) / len(a) + float(b.var(ddof=1)) / len(b))
+    misses = np.where(calm, returns - a.mean(), returns - b.mean())
+    # Each return's share of the gap: the difference of means is a sum of these.
+    share = np.where(calm, misses / len(a), -misses / len(b))
+    lags = newey_west_lags(n)
+    variance = float(share @ share)
+    for lag in range(1, lags + 1):
+        variance += 2.0 * (1.0 - lag / (lags + 1)) * float(share[lag:] @ share[:-lag])
+    newey_west = math.sqrt(max(variance, 0.0) * n / (n - 2))
+    sum_sq = float(misses @ misses)
+    rho = float(misses[1:] @ misses[:-1]) / sum_sq if sum_sq > 0 else 0.0
+    rho = min(max(rho + (1.0 + 3.0 * rho) / n, 0.0), MAX_RHO)
+    widened = welch * math.sqrt((1.0 + rho) / (1.0 - rho))
+    return max(welch, newey_west, widened)
 
 
 def by_vix(frame: pd.DataFrame, vix: pd.Series, ppy: float) -> dict[str, Any]:
@@ -135,7 +168,7 @@ def by_vix(frame: pd.DataFrame, vix: pd.Series, ppy: float) -> dict[str, Any]:
         "turbulent": _side(returns[turbulent], span_days[turbulent], total_days, ppy),
     }
     a, b = returns[calm], returns[turbulent]
-    se = math.sqrt(float(a.var(ddof=1)) / len(a) + float(b.var(ddof=1)) / len(b))
+    se = gap_error(returns, calm)
     if math.isfinite(se) and se > FLAT_SPREAD:
         gap = float((a.mean() - b.mean()) / se)
         out["gap_in_se"] = measured(gap, NOTE)
@@ -154,4 +187,5 @@ __all__ = [
     "TURBULENT_AT",
     "UNAVAILABLE",
     "by_vix",
+    "gap_error",
 ]

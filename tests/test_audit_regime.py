@@ -19,6 +19,7 @@ from quant_trade.audit.regime import (
     SHORT,
     TURBULENT_AT,
     by_vix,
+    gap_error,
 )
 from quant_trade.audit.report import LABELS, render
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
@@ -200,3 +201,46 @@ def test_vix_down_is_not_measured_in_words() -> None:
     html = render(result, watermark=False)[0]
     assert_report_clean(html)
     assert "no se pudieron leer los cierres del VIX" in html
+
+
+def _persistent_regimes(rng: np.random.Generator, n: int) -> np.ndarray:
+    """Calm or turbulent spells that last about a month on average."""
+    calm = np.empty(n, dtype=bool)
+    calm[0] = True
+    for i in range(1, n):
+        calm[i] = calm[i - 1] if rng.random() < 0.97 else not calm[i - 1]
+    return calm
+
+
+def _welch(returns: np.ndarray, calm: np.ndarray) -> float:
+    a, b = returns[calm], returns[~calm]
+    return float(np.sqrt(a.var(ddof=1) / len(a) + b.var(ddof=1) / len(b)))
+
+
+def test_the_gap_error_is_never_below_welchs() -> None:
+    rng = np.random.default_rng(30)
+    for _ in range(50):
+        calm = _persistent_regimes(rng, 300)
+        if calm.sum() < 20 or (~calm).sum() < 20:
+            continue
+        returns = rng.normal(0, 0.01, 300)
+        assert gap_error(returns, calm) >= _welch(returns, calm)
+
+
+def test_autocorrelated_returns_with_no_real_gap_seldom_read_as_different() -> None:
+    runs, n = 400, 500
+    cautious = plain = 0
+    for seed in range(runs):
+        rng = np.random.default_rng(seed)
+        calm = _persistent_regimes(rng, n)
+        if calm.sum() < 20 or (~calm).sum() < 20:
+            calm = np.arange(n) % 3 != 0
+        returns = rng.normal(0, 0.01, n)
+        for i in range(1, n):
+            returns[i] += 0.2 * returns[i - 1]
+        gap = returns[calm].mean() - returns[~calm].mean()
+        cautious += abs(gap / gap_error(returns, calm)) >= CLEAR_GAP
+        plain += abs(gap / _welch(returns, calm)) >= CLEAR_GAP
+    # Nominal 5 %; Welch's error alone gives about 10 % here.
+    assert plain / runs > 0.08
+    assert cautious / runs < 0.075
