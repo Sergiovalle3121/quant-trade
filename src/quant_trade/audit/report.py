@@ -26,6 +26,7 @@ from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.holding import EDGE_SE
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_number
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
@@ -683,6 +684,10 @@ LABELS: dict[str, dict[str, str]] = {
             "Se usan semanas porque la hora de cierre del archivo y la del mercado pueden no "
             "coincidir."
         ),
+        "holding_no_clear_edge": (
+            "La diferencia de Sharpe ({z} errores estándar, medida con rentabilidades "
+            "semanales) no basta para decir que le gana al mercado."
+        ),
         "holding_rides": (
             "Se mueve casi al mismo paso que el {label} y no muestra una ventaja clara sobre "
             "mantenerlo: la diferencia de Sharpe queda dentro del ruido de {weeks} semanas. "
@@ -694,7 +699,7 @@ LABELS: dict[str, dict[str, str]] = {
             "quedan cortas."
         ),
         "holding_source": (
-            "Cierres del {label}: {source}, datos públicos de FRED leídos al generar el "
+            "Cierres del {label}: datos públicos de {source} leídos al generar el "
             "informe. Ninguno de los dos Sharpe resta la tasa del efectivo. No cambia la clase."
         ),
         "crises_market": "Mercado en esas fechas",
@@ -1615,6 +1620,10 @@ LABELS: dict[str, dict[str, str]] = {
             "market moved in a week, the strategy moved {beta} % on average. Weeks are used "
             "because the file's closing time and the market's may not match."
         ),
+        "holding_no_clear_edge": (
+            "The Sharpe gap ({z} standard errors, measured on weekly returns) is not enough "
+            "to say it beats the market."
+        ),
         "holding_rides": (
             "It moves almost in step with the {label} and shows no clear edge over holding "
             "it: the Sharpe gap is within the noise of {weeks} weeks. What does it add over "
@@ -1625,7 +1634,7 @@ LABELS: dict[str, dict[str, str]] = {
             "seen, so the strategy's correlation and worst fall read short."
         ),
         "holding_source": (
-            "{label} closes: {source}, public FRED data read when the report was made. No "
+            "{label} closes: public {source} data read when the report was made. No "
             "cash rate is subtracted in either Sharpe ratio. It does not change the class."
         ),
         "crises_market": "Market over those months",
@@ -4883,6 +4892,10 @@ def _holding_html(
         f"<th class='val'>{_e(strategy_head)}</th><th class='val'>{_e(market_head)}</th>"
         f"</tr></thead><tbody>{body}</tbody></table>"
     )
+    z = float(holding["sharpe_gap_in_se"]["value"])
+    if "rides_the_market" not in (holding.get("findings") or []) and z < EDGE_SE:
+        edge = labels["holding_no_clear_edge"].format(z=f"{z:.2f}")
+        out += f"<p class='muted'>{_e(edge)} {_badge('MEASURED')}</p>"
     together = labels["holding_together"].format(
         label=label,
         corr=f"{float(holding['correlation']['value']):.2f}",

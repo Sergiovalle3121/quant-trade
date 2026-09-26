@@ -20,7 +20,7 @@ from quant_trade.audit.holding import MIN_DAYS, sharpe_gap_se, versus_holding
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.market import BY_KEY, MarketData, asset_of, dominant_asset, parse_fred_csv
 from quant_trade.audit.market import _download as real_download
-from quant_trade.audit.report import LABELS, render
+from quant_trade.audit.report import LABELS, _holding_html, render
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 from quant_trade.audit.settings import AuditSettings
 
@@ -440,3 +440,23 @@ def test_warm_downloads_every_series_in_the_background() -> None:
 def test_download_is_blocked_by_the_test_guard() -> None:
     with pytest.raises(RuntimeError):
         market_lib._download("SP500")
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_higher_sharpe_inside_the_noise_says_it_is_not_enough(locale: str) -> None:
+    inputs, closes = _inputs(locale, "US100")
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=lambda k: closes)
+    assert result.holding is not None
+    labels = LABELS[locale]
+    holding = {**result.holding, "findings": []}
+    holding["sharpe_gap_in_se"] = {**holding["sharpe_gap_in_se"], "value": 0.84}
+    shown = _holding_html(holding, locale, labels)
+    assert labels["holding_no_clear_edge"].format(z="0.84") in shown
+    assert_report_clean(shown)
+    holding["sharpe_gap_in_se"] = {**holding["sharpe_gap_in_se"], "value": 2.5}
+    assert "0.84" not in _holding_html(holding, locale, labels)
+    # With the finding shown, its own text already says so.
+    rides = {**holding, "findings": ["rides_the_market"]}
+    rides["sharpe_gap_in_se"] = {**holding["sharpe_gap_in_se"], "value": 0.84}
+    assert labels["holding_no_clear_edge"].split("(")[0] not in _holding_html(rides, locale, labels)
+    assert "FRED ," not in shown and "FRED</a>," not in shown

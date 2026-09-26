@@ -1147,7 +1147,9 @@ Sharpe is not at least 2 standard errors (`EDGE_SE`) above holding's, the
 standard error of the difference of two correlated Sharpe ratios (Jobson and
 Korkie with Memmel's correction) on the weekly returns (`sharpe_gap_se`,
 `sharpe_gap_in_se`). A gap inside the noise reads as "no clear edge", never
-as "worse". Sharpe is used because it does not change with position
+as "worse"; without the finding (low correlation), a gap under 2 standard
+errors still gets one line under the table saying the higher Sharpe is not
+enough to say the strategy beats the market. Sharpe is used because it does not change with position
 size, so a leveraged copy of the index scores the same as the index. Neither
 Sharpe subtracts a cash rate. On a balance-only file a line says the
 strategy's correlation and worst fall read short. The closes are read at
