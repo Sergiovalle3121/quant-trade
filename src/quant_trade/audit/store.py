@@ -224,7 +224,7 @@ ACCOUNT_EVENT_MAX = 50
 #: Wrong-password lines kept per account: their own cap, so a flood of
 #: failures never pushes real events out of the ACCOUNT_EVENT_MAX.
 FAILED_SIGNIN_MAX = 20
-#: Device labels whose last view of Mi cuenta is kept per account.
+#: Browsers whose last view of Mi cuenta is kept per account.
 SEEN_DEVICES_MAX = 20
 
 
@@ -464,16 +464,20 @@ class Store:
             sa.Column("last_at", sa.String(40), nullable=False, index=True),
             sa.UniqueConstraint("account_id", "network", "hour"),
         )
-        # "Desde tu última visita": when each device label last opened Mi
-        # cuenta, and how many tries each wrong-password line had then (JSON,
-        # at most FAILED_SIGNIN_MAX ids), so only newer tries are counted.
-        # Kept per device so a sign-in elsewhere never clears the owner's
-        # notice. At most SEEN_DEVICES_MAX rows; goes with the account.
+        # "Desde tu última visita": when each browser (the hash of its
+        # rigor_device cookie) last opened Mi cuenta, with its device label
+        # for display, and how many tries each wrong-password line had then
+        # (JSON, at most FAILED_SIGNIN_MAX ids), so only newer tries are
+        # counted. Kept per browser so a sign-in elsewhere, even with the
+        # same label, never clears the owner's notice. At most
+        # SEEN_DEVICES_MAX rows (a newcomer past it is not stored), 90 days
+        # without a view; goes with the account.
         self.account_seen = sa.Table(
             "account_seen",
             self.metadata,
             sa.Column("account_id", sa.String(32), primary_key=True),
-            sa.Column("device", sa.String(80), primary_key=True),
+            sa.Column("browser", sa.String(64), primary_key=True),
+            sa.Column("device", sa.String(80), nullable=False, default=""),
             sa.Column("seen_at", sa.String(40), nullable=False),
             sa.Column("failed_json", sa.Text, nullable=False, default="{}"),
         )
@@ -1633,6 +1637,7 @@ class Store:
                 )
             )
             cutoff = _iso(now - timedelta(days=ACCOUNT_EVENT_DAYS))
+            conn.execute(self.account_seen.delete().where(self.account_seen.c.seen_at < cutoff))
             conn.execute(self.account_events.delete().where(self.account_events.c.at < cutoff))
             conn.execute(self.failed_signins.delete().where(self.failed_signins.c.last_at < cutoff))
         return int(gone or 0)
@@ -1712,20 +1717,20 @@ class Store:
                 conn.execute(fs.delete().where(fs.c.id.in_(ids)))
 
     def take_visit_notice(
-        self, account_id: str, now: datetime, *, device: str = "", network: str = ""
+        self, account_id: str, now: datetime, *, browser: str, device: str = ""
     ) -> VisitNotice | None:
-        """What happened since this device last opened Mi cuenta, and mark it seen now.
+        """What happened since this browser last opened Mi cuenta, and mark it seen now.
 
-        Counts wrong-password tries added since and sign-ins from other
-        device labels the account had not used before. Each device label
-        keeps its own last view, so whoever signs in elsewhere never clears
-        the owner's notice. A device's first view shows nothing (and so
-        tells a newcomer nothing). ``None`` when nothing happened.
+        ``browser`` is the hash of the browser's own random cookie. Counts
+        wrong-password tries added since and sign-ins from other device
+        labels the account had not used before. Each browser keeps its own
+        last view, so whoever signs in elsewhere never clears the owner's
+        notice. A browser's first view shows nothing (and so tells a
+        newcomer nothing). ``None`` when nothing happened.
         """
-        del network  # the device label is the unit; kept for the call site
         sa = self._sa
         seen_t, ev, fs = self.account_seen, self.account_events, self.failed_signins
-        mine = (seen_t.c.account_id == account_id) & (seen_t.c.device == device[:80])
+        mine = (seen_t.c.account_id == account_id) & (seen_t.c.browser == browser[:64])
         with self.engine.connect() as conn:
             row = conn.execute(
                 sa.select(seen_t.c.seen_at, seen_t.c.failed_json).where(mine)
@@ -1744,27 +1749,21 @@ class Store:
                     )
                 ).all()
             ]
-        values = {"seen_at": _iso(now), "failed_json": json.dumps(lines, sort_keys=True)}
+        values = {
+            "device": device[:80],
+            "seen_at": _iso(now),
+            "failed_json": json.dumps(lines, sort_keys=True),
+        }
         try:
             with self.engine.begin() as conn:
                 if row is None:
-                    conn.execute(
-                        seen_t.insert().values(account_id=account_id, device=device[:80], **values)
-                    )
-                    old = [
-                        str(r[0])
-                        for r in conn.execute(
-                            sa.select(seen_t.c.device)
-                            .where(seen_t.c.account_id == account_id)
-                            .order_by(seen_t.c.seen_at.desc())
-                            .offset(SEEN_DEVICES_MAX)
-                        ).all()
-                    ]
-                    if old:
+                    # Past the cap a newcomer is not stored (its first view
+                    # shows nothing anyway), so nobody can push the owner out.
+                    if len(viewed) < SEEN_DEVICES_MAX:
                         conn.execute(
-                            seen_t.delete()
-                            .where(seen_t.c.account_id == account_id)
-                            .where(seen_t.c.device.in_(old))
+                            seen_t.insert().values(
+                                account_id=account_id, browser=browser[:64], **values
+                            )
                         )
                 else:
                     conn.execute(seen_t.update().where(mine).values(**values))

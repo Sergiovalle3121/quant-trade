@@ -2207,18 +2207,23 @@ changes what a report says.
   the export lists them under `failed_signins`. Rate-limited tries (429) are
   not counted.
 - **Since your last visit** (`account_seen` table, one row per account and
-  device label, at most `store.SEEN_DEVICES_MAX`): each view of Mi cuenta
-  marks the time for this browser's device label (`store.take_visit_notice`)
-  and, when something happened since that device's previous view, shows a
-  notice on top once: wrong-password tries added since (each line's count
-  at that view is kept in `failed_json`, so a line that spans it counts only
-  the newer tries) and sign-ins from another device label the account had
-  not used before that view. Keyed per device so an intruder who signs in
-  and opens Mi cuenta never clears the owner's notice; a device's first view
-  shows nothing, so a newcomer learns nothing. Limits: labels are coarse
-  (browser and system), so an intruder with the owner's label is never
-  "new"; open tabs at the same instant may each show it. The rows go with
-  the account and the export lists them as `account_page_seen`.
+  browser, keyed by the hash of the browser's `rigor_device` cookie, minted
+  on the first view when missing): each view of Mi cuenta marks the time for
+  this browser (`store.take_visit_notice`) and, when something happened
+  since its previous view, shows a notice on top once: wrong-password tries
+  added since (each line's count at that view is kept in `failed_json`, so a
+  line that spans it counts only the newer tries) and sign-ins from another
+  device label the account had not used before that view. Per browser, so
+  an intruder who signs in and opens Mi cuenta, even with the owner's
+  label, never clears the owner's notice; a browser's first view shows
+  nothing, so a newcomer learns nothing. At most `store.SEEN_DEVICES_MAX`
+  rows: past it a newcomer is not stored rather than pushing anyone out;
+  rows unseen for 90 days go with `purge_sessions`. Limits: clearing
+  cookies makes the next view a first view; labels are coarse, so an
+  intruder with the owner's label is never a "new device" (their tries
+  still show); tabs opened at the same instant may each show it. The rows
+  go with the account and the export lists device and time as
+  `account_page_seen` (never the browser hash).
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

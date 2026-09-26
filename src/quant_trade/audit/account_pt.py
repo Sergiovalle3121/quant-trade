@@ -187,8 +187,9 @@ COPY_PT: dict[str, str] = {
         "dispositivo e a rede; as últimas 50, apagadas após 90 dias ou com a conta. "
         "À parte, as tentativas com senha incorreta na sua conta: quantas por rede e hora, "
         "com o rótulo do dispositivo (nunca o que foi digitado); as últimas 20, apagadas "
-        "após 90 dias ou com a conta. E a hora da sua última visita a «Minha conta», para o "
-        "aviso «Desde sua última visita»; sai com a conta.|"
+        "após 90 dias ou com a conta. E, para cada navegador (sua marca aleatória, como hash), "
+        "a hora da sua última visita a «Minha conta» e seu rótulo, para o aviso «Desde sua "
+        "última visita»; sai após 90 dias sem visitas ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),

@@ -3204,11 +3204,12 @@ def test_since_your_last_visit_shows_new_devices_and_wrong_passwords_once(
     ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
     data = json.loads(client.get("/cuenta/datos").text)
     assert data["account_page_seen"][0]["device"] == "Firefox · Windows"
+    assert "browser" not in data["account_page_seen"][0]
     csrf = _csrf(client.get("/cuenta").text)
     client.post("/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf})
     with store.engine.connect() as conn:  # type: ignore[attr-defined]
         assert conn.execute(store.account_seen.select()).all() == []  # type: ignore[attr-defined]
-    assert store.take_visit_notice(ana.id, datetime.now(UTC)) is None  # type: ignore[attr-defined]
+    assert store.take_visit_notice(ana.id, datetime.now(UTC), browser="x") is None  # type: ignore[attr-defined]
 
 
 def test_since_your_last_visit_exists_in_every_language(tmp_path: Path) -> None:
@@ -3261,3 +3262,32 @@ def test_an_intruder_opening_mi_cuenta_never_clears_the_owners_notice(tmp_path: 
     bare.headers.update({"User-Agent": "", "X-Forwarded-For": "198.51.100.41"})
     _signin(bare, "ana@example.com")
     assert "Una entrada desde un dispositivo desconocido." in client.get("/cuenta").text
+
+
+def test_a_same_label_intruder_or_a_flood_of_browsers_never_clears_the_notice(
+    tmp_path: Path,
+) -> None:
+    from quant_trade.audit.store import SEEN_DEVICES_MAX
+
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.30"})
+    _signup(client)
+    client.get("/cuenta")
+    # An intruder on the same kind of phone gets a browser of its own.
+    twin = TestClient(client.app)
+    twin.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "198.51.100.50"})
+    for _ in range(3):
+        _signin(twin, "ana@example.com", "wrong-guess-here")
+    _signin(twin, "ana@example.com")
+    assert NOTICE not in twin.get("/cuenta").text
+    owner = client.get("/cuenta").text
+    assert "3 intentos de entrar con contraseña incorrecta." in owner
+    # Many new browsers opening Mi cuenta never push the owner's row out.
+    _signin(TestClient(client.app), "ana@example.com", "wrong-guess-here")
+    for n in range(SEEN_DEVICES_MAX + 5):
+        other = TestClient(client.app)
+        other.headers.update({"User-Agent": f"Mozilla/5.0 (X11; Linux) Chrome/{n}"})
+        _signin(other, "ana@example.com")
+        other.get("/cuenta")
+    owner = client.get("/cuenta").text
+    assert "1 intento de entrar con contraseña incorrecta." in owner
