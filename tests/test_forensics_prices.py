@@ -16,6 +16,7 @@ import pytest
 
 from quant_trade.audit import importers
 from quant_trade.audit.forensics import families, rows
+from quant_trade.audit.forensics.calibration import CALIBRATION
 from quant_trade.audit.forensics.checks import Context, prices
 from quant_trade.audit.forensics.header import read_header
 from quant_trade.audit.forensics.results import (
@@ -23,6 +24,7 @@ from quant_trade.audit.forensics.results import (
     STATUS_CLEAN,
     STATUS_INFO,
     STATUS_NOT_MEASURED,
+    STATUS_SIGNAL,
     RawOutcome,
 )
 from quant_trade.audit.forensics.review import REASONS, decide
@@ -37,6 +39,13 @@ TV_G3B = "tradingview_g3b.csv"
 NINJA = "ninjatrader.csv"
 PRIVATE = ("12345678", "Demo Trader", "Synthetic", "FixtureEA")
 COUNT = re.compile(r"^-?\d+$")
+
+
+def _hit_status(check: str, family: str) -> str:
+    """A hit is SIGNAL only on a granted calibration cell, else INFO."""
+    cell = CALIBRATION.get((check, family))
+    return STATUS_SIGNAL if cell is not None and cell.granted else STATUS_INFO
+
 
 MYFXBOOK = (
     "\n".join(
@@ -239,7 +248,9 @@ def test_sltp_fill_hit_when_the_fill_is_on_the_wrong_side(
     assert figure(result, "n_hits") == "1"
     assert figure(result, counter) == "1"
     assert result.examples == (index_of(data, ticket),)
-    assert decide("SLTP_FILL", table_of(data).family, result) == STATUS_INFO
+    assert decide("SLTP_FILL", table_of(data).family, result) == _hit_status(
+        "SLTP_FILL", table_of(data).family
+    )
 
 
 @pytest.mark.parametrize(
@@ -386,7 +397,9 @@ def test_pnl_sign_hit_when_the_result_contradicts_the_move(
     assert result.hits == 1
     assert figure(result, "n_hits") == "1"
     assert result.examples == (index_of(data, ticket),)
-    assert decide("PNL_SIGN", table_of(data).family, result) == STATUS_INFO
+    assert decide("PNL_SIGN", table_of(data).family, result) == _hit_status(
+        "PNL_SIGN", table_of(data).family
+    )
 
 
 def test_pnl_sign_zero_result_legs_are_skipped() -> None:
@@ -669,7 +682,9 @@ def test_price_precision_hit_when_one_cell_changes_digits(
     assert figure(result, "n_hits") == "1"
     assert figure(result, "n_rows_off_mode") == "1"
     assert result.examples == (index_of(data, ticket),)
-    assert decide("PRICE_PRECISION", table_of(data).family, result) == STATUS_INFO
+    assert decide("PRICE_PRECISION", table_of(data).family, result) == _hit_status(
+        "PRICE_PRECISION", table_of(data).family
+    )
 
 
 def test_price_precision_one_time_migration_is_a_split_not_a_hit() -> None:

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from quant_trade.audit import importers
-from quant_trade.audit.forensics import families, rows, symbols, thresholds
+from quant_trade.audit.forensics import families, money, rows, symbols, thresholds
 from quant_trade.audit.forensics.checks import Context
 from quant_trade.audit.forensics.results import (
     DECLARED,
@@ -542,6 +542,16 @@ KEY_OPEN = "open"
 KEY_CLOSE = "close"
 KEY_ENTRY = "entry"
 KEY_EXIT = "exit"
+#: A statement's closed table sorted by one of its printed numeric columns.
+KEY_COLUMN = "column"
+
+#: The printed numeric columns of a statement's closed table, by the names
+#: ``rows.mt4_columns`` gives them; S/L and T/P come from the header texts.
+_MT4_SORTABLE = ("size", "open_price", "sl", "tp", "close_price", "commission", "swap", "profit")
+_MT4_SL_NAMES = frozenset({"s/l", "s / l"})
+_MT4_TP_NAMES = frozenset({"t/p", "t / p"})
+#: Column values compare as integers at this many decimals (prices print 5).
+_COLUMN_SCALE = 8
 
 
 def _seconds(when: datetime) -> int:
@@ -575,7 +585,85 @@ def _ticket_stamps(table: RawTable, timed: tuple[_Timed, ...]) -> _Stamps:
     return found
 
 
-def _order_candidates(table: RawTable) -> tuple[tuple[str, _Stamps], ...]:
+def _sortable_indexes(table: RawTable, row: RawRow) -> dict[str, int]:
+    """Index of every sortable printed column above ``row``."""
+    columns = rows.mt4_columns(table, row)
+    names = [text.strip().lower() for text in table.header_of(row)]
+    for name in names:
+        if name in _MT4_SL_NAMES:
+            columns.setdefault("sl", names.index(name))
+        elif name in _MT4_TP_NAMES:
+            columns.setdefault("tp", names.index(name))
+    return {key: columns[key] for key in _MT4_SORTABLE if key in columns}
+
+
+def _column_stamps(table: RawTable, timed: tuple[_Timed, ...], column: str) -> _Stamps:
+    """A statement's closed trades by one printed numeric column; empty when
+    any trade row lacks the column or prints something that is not a number."""
+    chains = {item.index: item.chain for item in timed if item.table == TABLE_CLOSED}
+    found: _Stamps = []
+    for row in table.rows:
+        if row.index not in chains:
+            continue
+        index = _sortable_indexes(table, row).get(column)
+        number = money.parse_money(row.text(index)) if index is not None else None
+        if number is None:
+            return []
+        found.append((row.index, int(number.scaleb(_COLUMN_SCALE)), chains[row.index]))
+    return found
+
+
+def _sorted_column(
+    table: RawTable, timed: tuple[_Timed, ...], tickets: _Ordering
+) -> tuple[_Ordering, int] | None:
+    """The column the Account History grid was sorted by before the report
+    was saved, if any: a printed numeric column of the closed table that
+    never runs against its own direction, with at least one step that is
+    not a tie, and whose tied rows keep the tickets' own direction (the sort
+    is stable over the grid's ticket order). Ticket, open time and close
+    time are tried first by the caller; this is only for the rest. Returns
+    the ordering (no hits) and the column's index in the header."""
+    ticket_of = {index: key for index, key, _chain in _ticket_stamps(table, timed)}
+    first = next((row for row in table.rows if row.index in ticket_of), None)
+    if first is None:
+        return None
+    for column, position in _sortable_indexes(table, first).items():
+        stamps = _column_stamps(table, timed, column)
+        steps = _steps(stamps)
+        if not steps:
+            continue
+        ordering = _ordering(KEY_COLUMN, stamps, RULE_MAJORITY)
+        if ordering.hits or ordering.ties == len(steps):
+            continue
+        tied = _tied_tickets(stamps, ticket_of)
+        if any(
+            before is None
+            or after is None
+            or (after < before if tickets.direction == DIRECTION_ASC else after > before)
+            for before, after in tied
+        ):
+            continue
+        return ordering, position
+    return None
+
+
+_TiedTickets = list[tuple[int | None, int | None]]
+
+
+def _tied_tickets(stamps: _Stamps, ticket_of: dict[int, int]) -> _TiedTickets:
+    """The tickets of every adjacent pair of one chain whose keys tie."""
+    return [
+        (ticket_of.get(earlier_index), ticket_of.get(index))
+        for (earlier_index, earlier, chain), (index, later, next_chain) in zip(
+            stamps, stamps[1:], strict=False
+        )
+        if chain == next_chain and earlier == later
+    ]
+
+
+def _order_candidates(
+    table: RawTable, timed: tuple[_Timed, ...]
+) -> tuple[tuple[str, _Stamps], ...]:
     """The keys a family's rows may be sorted by, in file order, the
     platform's own first: deal times; tester event times; a statement's
     tickets, else its open or close times (the Account History tab exports
@@ -584,7 +672,6 @@ def _order_candidates(table: RawTable) -> tuple[tuple[str, _Stamps], ...]:
     entry row of the same trade); a NinjaTrader grid's exit or entry times
     (the grid is exported as the user sorted it)."""
     family = table.family
-    timed = _timed_rows(table)
     if family in {families.MT5_HISTORY, families.MT5_TESTER}:
         return ((KEY_DEAL, _stamps(timed, "opened", TABLE_DEALS)),)
     if family == families.MT4_TESTER:
@@ -644,9 +731,10 @@ def run_ROW_ORDER(table: RawTable, ctx: Context) -> RawOutcome:
     if family not in _TIMED_FAMILIES:
         return RawOutcome.skip("format_not_covered")
     rule = RULE_CHRONOLOGICAL if family in _CHRONOLOGICAL_FAMILIES else RULE_MAJORITY
+    timed = _timed_rows(table)
     orderings = [
         _ordering(key, stamps, rule)
-        for key, stamps in _order_candidates(table)
+        for key, stamps in _order_candidates(table, timed)
         if len(_steps(stamps)) >= 1
     ]
     if not orderings:
@@ -655,6 +743,11 @@ def run_ROW_ORDER(table: RawTable, ctx: Context) -> RawOutcome:
     for candidate in orderings[1:]:
         if len(candidate.hits) < len(best.hits):
             best = candidate
+    sorted_column = -1
+    if best.hits and family == families.MT4_STATEMENT and orderings[0].key == KEY_TICKET:
+        found = _sorted_column(table, timed, orderings[0])
+        if found is not None:
+            best, sorted_column = found
     figures: tuple[Figure, ...] = (
         _count("n_rows", best.n_rows),
         _count("n_hits", len(best.hits)),
@@ -663,6 +756,8 @@ def run_ROW_ORDER(table: RawTable, ctx: Context) -> RawOutcome:
         ("order_key", best.key, DECLARED),
         _count("ties", best.ties),
     )
+    if best.key == KEY_COLUMN:
+        figures += (_count("sorted_column", sorted_column),)
     return RawOutcome(hits=len(best.hits), figures=figures, examples=_examples(list(best.hits)))
 
 
