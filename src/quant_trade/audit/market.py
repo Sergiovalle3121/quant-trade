@@ -2,7 +2,8 @@
 
 Consumer prices outside the US come from each official publisher whose terms
 allow reuse in a paid service with attribution (Eurostat, the UK's ONS, the
-Bank of Canada, the Banco Central do Brasil), since FRED's copies of those
+Bank of Canada, the Banco Central do Brasil, Mexico's INEGI, Japan's Statistics
+Bureau through e-Stat), since FRED's copies of those
 indexes stopped updating; they are read the same way and kept the same way.
 
 A report on a strategy that trades the S&P 500, the Nasdaq 100 or bitcoin
@@ -19,6 +20,7 @@ tests pass a stub, and ``tests/conftest.py`` blocks :func:`_download`.
 
 from __future__ import annotations
 
+import csv
 import io
 import json
 import math
@@ -26,6 +28,7 @@ import re
 import threading
 import time
 import urllib.request
+import zipfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -58,7 +61,23 @@ PROVIDER_URLS: dict[str, tuple[str, str]] = {
         "https://dadosabertos.bcb.gov.br/dataset/{series}-indice-nacional-de-precos-ao-"
         "consumidor-amplo-ipca",
     ),
+    # INEGI's open-data zip of the INPC (base second half of July 2018); the
+    # series name only labels it.
+    "inegi": (
+        "https://www.inegi.org.mx/contenidos/programas/inpc/2018a/datosabiertos/"
+        "conjunto_de_datos_inpc_indicador_mensual_csv.zip",
+        "https://www.inegi.org.mx/programas/inpc/2018a/",
+    ),
+    # e-Stat's long-term CPI file of Japan (1970 on, base 2025), by its file id.
+    "estat": (
+        "https://www.e-stat.go.jp/stat-search/file-download?statInfId={series}&fileKind=1",
+        "https://www.e-stat.go.jp/stat-search/files?tstat=000001243876",
+    ),
 }
+#: How each provider's bytes become text: INEGI sends a zip, carried byte for
+#: byte as Latin-1 text and opened by :func:`parse_provider`; e-Stat's CSV is
+#: Shift_JIS whatever its header says. The rest are UTF-8.
+PROVIDER_ENCODING: dict[str, str] = {"inegi": "latin-1", "estat": "cp932"}
 #: Seconds a whole FRED read may take before it is given up.
 TIMEOUT = 5.0
 #: Largest reply read (the longest series is about 0.3 MB).
@@ -215,8 +234,8 @@ EUR_CASH_HISTORY = Asset(
 #: (Eurostat; the euro area's through FRED), the UK's CPI (ONS, Open Government
 #: Licence), Canada's CPI (Statistics Canada, through the Bank of Canada) and
 #: Brazil's IPCA (IBGE, through the Banco Central do Brasil, monthly changes
-#: chained into an index). Mexico's and Japan's official indexes need a
-#: registered key, so those currencies have none yet.
+#: chained into an index), Mexico's INPC (INEGI's open data) and Japan's CPI
+#: (Statistics Bureau, e-Stat's long-term file).
 MAX_PRICE_INDEX = 10_000_000.0
 LOCAL_CPI: tuple[Asset, ...] = tuple(
     Asset(
@@ -235,6 +254,8 @@ LOCAL_CPI: tuple[Asset, ...] = tuple(
         ("CAD", "V41690973", "boc"),
         ("CHF", "CH", "eurostat"),
         ("BRL", "433", "bcb"),
+        ("MXN", "INPC", "inegi"),
+        ("JPY", "000040482943", "estat"),
     )
 )
 #: Every series the service keeps in memory.
@@ -362,9 +383,55 @@ def parse_provider(text: str, provider: str) -> pd.Series:
         if bool((changes.abs() > MAX_MONTHLY_CHANGE).any()):
             raise ValueError("monthly change out of range")
         series = 100.0 * (1.0 + changes / 100.0).cumprod()
+    elif provider == "inegi":
+        frame = pd.read_csv(io.StringIO(_inegi_table(text)), dtype=str)
+        headline = frame["CONCEPTO"].str.endswith(INEGI_HEADLINE, na=False)
+        if not bool(headline.any()):
+            raise ValueError("no INPC rows")
+        rows = frame[headline]
+        if bool(rows["FECHA"].duplicated().any()):
+            raise ValueError("an INPC month appears twice")
+        series = _monthly(rows["FECHA"], rows["VALOR"])
+    elif provider == "estat":
+        lines = text.splitlines()
+        codes = next((line for line in lines if line.startswith(ESTAT_CODE_ROW)), None)
+        if codes is None:
+            raise ValueError("no item codes")
+        column = next(csv.reader([codes])).index(ESTAT_ALL_ITEMS)
+        stamps, values = [], []
+        for row in csv.reader(line for line in lines if re.match(r"^\d{6},", line)):
+            stamps.append(pd.to_datetime(row[0], format="%Y%m", errors="coerce"))
+            values.append(row[column] if column < len(row) else None)
+        if len(set(stamps)) != len(stamps):
+            raise ValueError("a CPI month appears twice")
+        series = _monthly(pd.Series(stamps), pd.Series(values))
     else:
         raise ValueError(f"unknown provider {provider}")
     return series[series > 0]
+
+
+#: The INPC rows among the other indexes of INEGI's file, and the name of the
+#: monthly table inside the zip.
+INEGI_HEADLINE = "Precios al Consumidor (INPC)"
+INEGI_TABLE = "conjunto_de_datos_inpc_mensual.csv"
+#: The row of e-Stat's file that gives each column's item code, and the code of
+#: all items.
+ESTAT_CODE_ROW = "類・品目符号"
+ESTAT_ALL_ITEMS = "0001"
+
+
+def _inegi_table(text: str) -> str:
+    """The monthly table inside INEGI's zip, refused when the zip is broken
+    or the table would open larger than ``MAX_BYTES``."""
+    with zipfile.ZipFile(io.BytesIO(text.encode("latin-1"))) as archive:
+        name = next((n for n in archive.namelist() if n.endswith(INEGI_TABLE)), None)
+        if name is None:
+            raise ValueError("no INPC table in the zip")
+        with archive.open(name) as table:
+            body = table.read(MAX_BYTES + 1)
+    if len(body) > MAX_BYTES:
+        raise ValueError("INPC table too large")
+    return body.decode("utf-8-sig")
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -404,7 +471,7 @@ def _download(series: str, provider: str = "fred") -> str:
                 raise OSError("FRED reply too large")
             if time.monotonic() > deadline:
                 raise TimeoutError("FRED too slow")
-    return b"".join(chunks).decode("utf-8", "replace")
+    return b"".join(chunks).decode(PROVIDER_ENCODING.get(provider, "utf-8"), "replace")
 
 
 class MarketData:
@@ -512,6 +579,7 @@ __all__ = [
     "CPI",
     "FX",
     "LOCAL_CPI",
+    "PROVIDER_ENCODING",
     "SERIES",
     "VIX",
     "Asset",
