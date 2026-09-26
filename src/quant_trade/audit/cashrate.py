@@ -39,7 +39,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from quant_trade.audit.market import CASH, EUR_CASH_HISTORY, LOCAL_CASH, Asset
+from quant_trade.audit.market import (
+    BIS_POLICY_AREAS,
+    CASH,
+    EUR_CASH_HISTORY,
+    LOCAL_CASH,
+    Asset,
+)
 from quant_trade.audit.schema import measured
 
 #: A bill rate older than this before a return's start is too stale to use.
@@ -98,6 +104,17 @@ class LocalCash:
         return (1.0 + rate * self.tenor_days / self.basis) ** (365.0 / self.tenor_days) - 1.0
 
 
+#: The day count of each ``BIS_POLICY_AREAS`` currency's overnight money
+#: market, which its policy rate is read by: 365 days where the market quotes
+#: actual/365 (sterling's convention), 360 elsewhere. Between the two, a 5 %
+#: rate moves by less than a tenth of a point a year.
+BIS_BASIS: dict[str, float] = {
+    **dict.fromkeys(("AUD", "NZD", "INR", "ZAR", "KRW", "NOK", "PLN", "ILS", "THB", "MYR"), 365.0),
+    **dict.fromkeys(
+        ("SEK", "DKK", "CZK", "HUF", "RON", "ISK", "TRY", "SAR", "IDR", "CLP", "COP", "PEN"),
+        360.0,
+    ),
+}
 _BY_CODE = {asset.label: asset for asset in LOCAL_CASH}
 #: Cash rates by account currency: (days in the quote's year, tenor, staleness).
 #: Every quote is simple over its day count except Brazil's Selic, already a
@@ -112,6 +129,10 @@ LOCAL: dict[str, LocalCash] = {
     "JPY": LocalCash(_BY_CODE["JPY"], 365.0, 1.0, MAX_MONTHLY_GAP_DAYS),
     "CAD": LocalCash(_BY_CODE["CAD"], 365.0, 1.0, MAX_GAP_DAYS),
     "CHF": LocalCash(_BY_CODE["CHF"], 360.0, 1.0, MAX_MONTHLY_GAP_DAYS),
+    **{
+        code: LocalCash(_BY_CODE[code], BIS_BASIS[code], 1.0, MAX_MONTHLY_GAP_DAYS)
+        for code in BIS_POLICY_AREAS
+    },
 }
 
 

@@ -1221,6 +1221,28 @@ REPORT: dict[str, Any] = {
         "cash_rate_JPY": "taxa de política monetária do Japão (BIS)",
         "cash_rate_CAD": "taxa de um dia do Canadá, CORRA (Banco do Canadá)",
         "cash_rate_CHF": "taxa de política monetária da Suíça (BIS)",
+        "cash_rate_AUD": "taxa de política monetária da Austrália (BIS)",
+        "cash_rate_NZD": "taxa de política monetária da Nova Zelândia (BIS)",
+        "cash_rate_INR": "taxa de política monetária da Índia (BIS)",
+        "cash_rate_ZAR": "taxa de política monetária da África do Sul (BIS)",
+        "cash_rate_KRW": "taxa de política monetária da Coreia do Sul (BIS)",
+        "cash_rate_SEK": "taxa de política monetária da Suécia (BIS)",
+        "cash_rate_NOK": "taxa de política monetária da Noruega (BIS)",
+        "cash_rate_DKK": "taxa de política monetária da Dinamarca (BIS)",
+        "cash_rate_PLN": "taxa de política monetária da Polônia (BIS)",
+        "cash_rate_CZK": "taxa de política monetária da Tchéquia (BIS)",
+        "cash_rate_HUF": "taxa de política monetária da Hungria (BIS)",
+        "cash_rate_RON": "taxa de política monetária da Romênia (BIS)",
+        "cash_rate_ISK": "taxa de política monetária da Islândia (BIS)",
+        "cash_rate_TRY": "taxa de política monetária da Turquia (BIS)",
+        "cash_rate_ILS": "taxa de política monetária de Israel (BIS)",
+        "cash_rate_SAR": "taxa de política monetária da Arábia Saudita (BIS)",
+        "cash_rate_IDR": "taxa de política monetária da Indonésia (BIS)",
+        "cash_rate_THB": "taxa de política monetária da Tailândia (BIS)",
+        "cash_rate_MYR": "taxa de política monetária da Malásia (BIS)",
+        "cash_rate_CLP": "taxa de política monetária do Chile (BIS)",
+        "cash_rate_COP": "taxa de política monetária da Colômbia (BIS)",
+        "cash_rate_PEN": "taxa de política monetária do Peru (BIS)",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado?",
         "regime_intro": (
             "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
@@ -1413,9 +1435,12 @@ REPORT: dict[str, Any] = {
             "anual, e esses dados estão disponíveis grátis em bankofcanada.ca.",
             "Taxa Selic mensal do Brasil: Banco Central do Brasil, série 4189, sob a Open "
             "Database License (ODbL).",
-            "Taxas de política monetária do México, do Japão e da Suíça. Fonte: BIS (Banco de "
-            "Compensações Internacionais). São as taxas oficiais de cada banco central, não "
-            "taxas de mercado.",
+            "Taxas de política monetária do México, do Japão, da Suíça, da Austrália, da Nova "
+            "Zelândia, da Índia, da África do Sul, da Coreia do Sul, da Suécia, da Noruega, da "
+            "Dinamarca, da Polônia, da Tchéquia, da Hungria, da Romênia, da Islândia, da "
+            "Turquia, de Israel, da Arábia Saudita, da Indonésia, da Tailândia, da Malásia, do "
+            "Chile, da Colômbia e do Peru. Fonte: BIS (Banco de Compensações Internacionais). "
+            "São as taxas oficiais de cada banco central, não taxas de mercado.",
             "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
             "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
             "Government Licence v3.0.",

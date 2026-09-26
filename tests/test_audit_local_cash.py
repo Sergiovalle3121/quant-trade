@@ -143,7 +143,7 @@ def test_without_a_usable_local_rate_only_a_dollar_account_gets_the_bill_line() 
         assert cash["series"] == "DTB3" and "currency" not in cash, currency
     # A euro account whose euro rates start after the history, or none, and a
     # currency with no rate here: the bill is not what their cash paid.
-    for currency, local in (("EUR", late), ("EUR", None), ("AUD", None), ("ars", None)):
+    for currency, local in (("EUR", late), ("EUR", None), ("HKD", None), ("ars", None)):
         inputs = _inputs(days, "es", currency)
 
         def other(key: str, local: pd.Series | None = local) -> pd.Series | None:

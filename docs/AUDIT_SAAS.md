@@ -1506,7 +1506,20 @@ annualised on 252 business days (Banco Central do Brasil SGS 4189, monthly,
 from January 1995: before the Real plan it ran in the thousands a year) and,
 for the peso, the yen and the franc, the central bank's policy rate as the
 BIS compiles it (`WS_CBPOL`, `M.MX`, `M.JP`, `M.CH`, monthly, end of
-period). The BIS figures are official policy rates, not market rates, and so
+period). The same BIS series gives the cash rate of 22 more currencies
+(`market.BIS_POLICY_AREAS`: AUD, NZD, INR, ZAR, KRW, SEK, NOK, DKK, PLN, CZK,
+HUF, RON, ISK, TRY, ILS, SAR, IDR, THB, MYR, CLP, COP, PEN), each read whole on
+26 September 2026 with every month present and within the rate bounds. Each
+quote uses its overnight market's day count (`cashrate.BIS_BASIS`: 365 days
+for AUD, NZD, INR, ZAR, KRW, NOK, PLN, ILS, THB and MYR, 360 for the rest; at
+5 % the two differ by under a tenth of a point a year). Left out: the rouble
+(210 % in 2022, above the bound), the Argentine peso (the BIS series stops in
+mid-2025), the Philippine peso (missing months), the Singapore dollar (no
+series; the MAS steers the exchange rate), the yuan (the BIS series is a
+lending rate, above what cash earned) and the Hong Kong dollar (the base rate
+is the discount window's penalty rate). A policy rate can sit away from what
+overnight cash actually earned (Türkiye's corridor years, for one), which the
+label's "policy rate" says. The BIS figures are official policy rates, not market rates, and so
 are the ECB rates before €STR. The splice picks, for each era, the ECB rate
 closest to what overnight cash earned: in the corridor years before
 October 2008 overnight euro rates (EONIA) sat near the MRO rate, about a point
@@ -1542,7 +1555,7 @@ These series may be negative (the franc, euro and yen rates were); a reply
 outside -5 % to 200 % a year (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Brazil's
 monthly Selic reached 85 % in April 1995) is taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
 `currency.DOLLAR_CODES`) or with no named currency gets the US bill's line.
-Another named currency with no series here (`AUD`, `ARS`…), or whose rates
+Another named currency with no series here (`ARS`, `HKD`, `CNY`…), or whose rates
 cannot be read or do not cover the history, gets no line: the section is
 `NOT_MEASURED` (`NO_LOCAL_CASH`), since the bill is not what cash in that
 currency paid (for pesos argentinos the gap is tens of points a year). The
@@ -1832,7 +1845,7 @@ reuse with attribution, and credits each source where it is shown and on
   data is available free at bankofcanada.ca, which the credit lines do.
 - Banco Central do Brasil (IPCA, Selic SGS 4189): Open Database License
   (ODbL), credited by name.
-- BIS policy rates (MXN, JPY, CHF): "The use of the statistics is
+- BIS policy rates (MXN, JPY, CHF and the 22 of `BIS_POLICY_AREAS`): "The use of the statistics is
   unrestricted, provided that ... the BIS must be cited ... as the source";
   their inclusion must not add a charge, and the report's price does not
   change with them. Cited as "Source: BIS".
