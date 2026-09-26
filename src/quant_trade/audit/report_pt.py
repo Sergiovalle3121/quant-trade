@@ -971,6 +971,11 @@ REPORT: dict[str, Any] = {
             "posições por vários períodos: o Sharpe simples sai inflado."
         ),
         "alpha_line": (
+            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, depois de subtrair "
+            "dos dois lados o que a letra do Tesouro dos EUA de 3 meses pagou (beta {beta}, "
+            "t = {t}, {n} períodos)."
+        ),
+        "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, sem subtrair o que "
             "o caixa pagou (beta {beta}, t = {t}, {n} períodos)."
         ),
