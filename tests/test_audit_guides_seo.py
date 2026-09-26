@@ -286,6 +286,8 @@ def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path)
         ("/guias", "og-es.png"),
         ("/para/retos-prop-firm", "og-for-retos-prop-firm-es.png"),
         ("/for/prop-firm-challenges", "og-for-retos-prop-firm-en.png"),
+        ("/pt", "og-pt.png"),
+        ("/pt/para/desafios-prop-firm", "og-for-retos-prop-firm-pt.png"),
     ):
         page = client.get(path).text
         image = f"{BASE.rstrip('/')}/static/{name}"
@@ -293,7 +295,8 @@ def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path)
         assert "content='summary_large_image'" in page
     from quant_trade.audit.seo import OG_IMAGES
 
-    assert len(OG_IMAGES) == 2 * (2 + 4 + len(AUDIENCE_PAGES))
+    # Spanish and English have every card; Portuguese the site and audience ones.
+    assert len(OG_IMAGES) == 2 * (2 + 4 + len(AUDIENCE_PAGES)) + 1 + len(AUDIENCE_PAGES)
     for name in OG_IMAGES:
         response = client.get(f"/static/{name}")
         assert response.status_code == 200
