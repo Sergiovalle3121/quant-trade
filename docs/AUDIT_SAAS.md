@@ -2804,7 +2804,9 @@ Informational only: none of these moves a class, a dimension or a red flag.
   standard errors from zero. `lagged` adds last month's index return (Dimson,
   1979): smoothed or late-priced funds hide exposure from the plain beta,
   and it turns up as alpha. `timing` adds the squared index return over cash
-  (Treynor and Mazuy, 1966). Standard errors are the largest of HC3,
+  (Treynor and Mazuy, 1966): a significant term reads as convexity, which
+  timing or option-like positions give (selling options gives a negative
+  one), never as timing alone. Standard errors are the largest of HC3,
   Newey-West and, for the alpha, the plain error widened by `(1 + rho) /
   (1 - rho)` for the misses' autocorrelation (Kendall-corrected). On
   simulated funds with no skill, `|t| > 2` then comes up about 4 % of the

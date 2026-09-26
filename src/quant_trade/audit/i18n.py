@@ -1290,10 +1290,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "tardíos o suavizados hacen que la beta simple no vea parte de la exposición",
     ),
     (
-        "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more "
-        "of the market before rises than before falls",
+        "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund gained more in "
+        "months of big market moves than its beta explains (good timing or option-like "
+        "positions), below zero less (poor timing or selling options)",
         "término del índice al cuadrado (Treynor y Mazuy, 1966); por encima de cero, el fondo "
-        "tuvo más exposición al mercado antes de las subidas que antes de las caídas",
+        "ganó más en los meses de mercado muy movido de lo que su beta explica (acertar el "
+        "momento o posiciones con forma de opción), por debajo, menos (equivocar el momento o "
+        "vender opciones)",
     ),
     (
         "alpha over its cautious standard error (the largest of HC3, Newey-West and one "

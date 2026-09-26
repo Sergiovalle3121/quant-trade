@@ -4693,12 +4693,15 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more of "
-            "the market before rises than before falls"
+            "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund gained more "
+            "in months of big market moves than its beta explains (good timing or option-like "
+            "positions), below zero less (poor timing or selling options)"
         ),
         (
-            "termo do benchmark ao quadrado (Treynor e Mazuy, 1966); acima de zero, o fundo teve "
-            "mais exposição ao mercado antes das altas do que antes das quedas"
+            "termo do benchmark ao quadrado (Treynor e Mazuy, 1966); acima de zero, o fundo "
+            "ganhou mais nos meses de mercado muito agitado do que o seu beta explica (acertar o "
+            "momento ou posições com forma de opção), abaixo, menos (errar o momento ou vender "
+            "opções)"
         ),
     ),
     (
