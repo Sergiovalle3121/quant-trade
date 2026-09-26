@@ -174,3 +174,35 @@ def test_every_template_that_is_posted_has_its_tag() -> None:
     ids = set(re.findall(r"^#### ([PFDV]\d+) · ES", text, re.M)) - {"V2"}
     assert {"P1", "F1", "F4", "F7", "D1", "V1"} <= ids
     assert {i.lower() for i in ids} <= set(funnel.REF_TAGS)
+
+
+def test_a_failing_tag_store_never_breaks_a_sign_up(tmp_path: Path) -> None:
+    client, store = _client(tmp_path)
+
+    def broken(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("database away")
+
+    store.set_account_ref = broken  # type: ignore[attr-defined]
+    client.get("/?ref=f4")
+    _signup(client, "ana@example.com")
+    assert client.get("/cuenta", follow_redirects=False).status_code == 200
+
+
+def test_what_we_keep_names_the_tag_in_every_language(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    for path in ("/registro", "/signup", "/pt/cadastro"):
+        assert "?ref=f4" in client.get(path).text, path
+
+
+def test_my_data_download_carries_the_tag(tmp_path: Path) -> None:
+    import json
+
+    client, _ = _client(tmp_path)
+    client.get("/para/retos-prop-firm?ref=f6")
+    _signup(client, "ana@example.com")
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert data["arrived_through_link_tag"] == "f6"
+
+    other = TestClient(client.app, headers=BROWSER)
+    _signup(other, "bea@example.com")
+    assert json.loads(other.get("/cuenta/datos").text)["arrived_through_link_tag"] == ""

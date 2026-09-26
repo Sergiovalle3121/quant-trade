@@ -155,6 +155,8 @@ COPY_PT: dict[str, str] = {
         "o pagamento com cartão é processado pela Stripe.|"
         "Uma marca aleatória do seu navegador e a impressão digital do arquivo, só para dar o "
         "relatório grátis uma vez. Elas ficam mesmo se você apagar a conta, sem o seu e-mail.|"
+        "Se você chegou por um dos nossos links com etiqueta (como ?ref=f4), só essa etiqueta, "
+        "para saber qual link funciona; ela sai com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),

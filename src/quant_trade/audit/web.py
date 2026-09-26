@@ -1345,7 +1345,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("taken", 409)
             ref = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
             if ref:
-                db.set_account_ref(account.id, ref, at=now)
+                try:
+                    db.set_account_ref(account.id, ref, at=now)
+                except Exception:  # noqa: BLE001 - the account and its session come first
+                    logger.warning("could not keep a sign-up tag")
             if next_path:
                 response: Response = RedirectResponse(next_path, status_code=303)
             else:

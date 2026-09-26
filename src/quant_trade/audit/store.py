@@ -1938,6 +1938,7 @@ class Store:
                 {"header_sha256": row[0], "columns": json.loads(row[1]), "updated_at": row[2]}
                 for row in maps
             ],
+            "arrived_through_link_tag": self.account_ref(account_id),
         }
 
     def account_credits(self, account_id: str, now: datetime) -> int:
@@ -2039,6 +2040,17 @@ class Store:
                 )
         except sa.exc.IntegrityError:
             return
+
+    def account_ref(self, account_id: str) -> str:
+        """The tag of the link that brought the account, or ``""``."""
+        sa = self._sa
+        with self.engine.connect() as conn:
+            value = conn.execute(
+                sa.select(self.account_refs.c.ref).where(
+                    self.account_refs.c.account_id == account_id
+                )
+            ).scalar()
+        return str(value or "")
 
     def funnel_events(self, since_day: str) -> dict[str, list[tuple[str, str, str, int]]]:
         """Rows ``(day, locale, ref, count)`` per funnel stage since ``since_day``.
