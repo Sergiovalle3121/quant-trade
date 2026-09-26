@@ -41,8 +41,13 @@ def jensen_alpha(
     """Alpha (annualised), its Newey-West t-statistic, beta and R squared."""
     y = np.asarray(strategy, dtype=float)
     x = np.asarray(benchmark, dtype=float)
+    if len(x) != len(y):
+        raise ValueError("the two return series must be aligned")
+    # A level at zero gives an infinite return: keep only the periods both measure.
+    finite = np.isfinite(y) & np.isfinite(x)
+    y, x = y[finite], x[finite]
     n = len(y)
-    if n < MIN_PERIODS or len(x) != n:
+    if n < MIN_PERIODS:
         return {"status": "NOT_MEASURED", "reason": TOO_FEW}
     if not float(x.std(ddof=1)) > 0:
         return {"status": "NOT_MEASURED", "reason": "the benchmark's returns do not vary"}

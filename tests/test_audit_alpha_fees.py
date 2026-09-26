@@ -89,3 +89,29 @@ def test_the_benchmark_section_carries_the_alpha() -> None:
     jensen = run_audit(inputs).benchmark["jensen"]
     assert jensen["status"] == "MEASURED"
     assert jensen["alpha"]["evidence"] == "MEASURED"
+
+
+def test_a_level_at_zero_does_not_poison_the_alpha() -> None:
+    rng = np.random.default_rng(3)
+    x = rng.normal(0.0, 0.01, 60)
+    y = 0.5 * x + rng.normal(0, 0.002, 60)
+    y[10] = np.inf
+    out = jensen_alpha(y, x, 252.0)
+    assert out["status"] == "MEASURED"
+    assert np.isfinite(out["alpha"]["value"]) and out["periods"] == 59
+
+
+def test_the_performance_fee_is_taken_in_december() -> None:
+    # A record starting in July: fees fall in December, six months in, then
+    # every twelve months, and at the last month (itself a December here).
+    stamps = pd.date_range("2020-07-31", periods=30, freq="ME")
+    r = pd.Series(np.full(30, 0.01), index=stamps)
+    monthly = 1.02 ** (1 / 12) - 1
+    step = 1.01 / (1 + monthly)
+    value = high = 1.0
+    for months in (6, 12, 12):
+        value *= step**months
+        value -= 0.2 * (value - high)
+        high = value
+    growth = fee_drag(r)["two_and_twenty"]["growth"]["value"]
+    assert growth == pytest.approx(value - 1.0)

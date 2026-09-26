@@ -38,6 +38,7 @@ flag and never changes the class: each finding is a question to ask.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -372,13 +373,16 @@ TWO_AND_TWENTY_NOTE = (
 )
 
 
-def _two_and_twenty(returns: np.ndarray) -> float:
-    """Growth of 1 after 2 % a year and 20 % of the gains over the high-water mark."""
+def _two_and_twenty(returns: np.ndarray, months: Sequence[int] | None = None) -> float:
+    """Growth of 1 after 2 % a year and 20 % of the gains over the high-water
+    mark, taken each December (``months`` gives each return's calendar month;
+    without it every 12th return) and at the last month."""
     monthly = (1.0 + MANAGEMENT_FEE) ** (1.0 / 12.0) - 1.0
     value = high_water = 1.0
-    for month, r in enumerate(returns, start=1):
+    for index, r in enumerate(returns):
         value *= (1.0 + r) / (1.0 + monthly)
-        year_end = month % 12 == 0 or month == len(returns)
+        december = months[index] == 12 if months is not None else (index + 1) % 12 == 0
+        year_end = december or index == len(returns) - 1
         if year_end and value > high_water:
             value -= PERFORMANCE_FEE * (value - high_water)
             high_water = value
@@ -413,7 +417,8 @@ def fee_drag(series: pd.Series, comparison: dict[str, Any] | None = None) -> dic
         "gross_growth": measured(float(np.prod(1.0 + r) - 1.0)),
         "rows": rows,
     }
-    growth = _two_and_twenty(r)
+    stamps = pd.DatetimeIndex(series.index) if isinstance(series.index, pd.DatetimeIndex) else None
+    growth = _two_and_twenty(r, list(stamps.month) if stamps is not None else None)
     out["two_and_twenty"] = {
         "management": MANAGEMENT_FEE,
         "performance": PERFORMANCE_FEE,
