@@ -488,3 +488,29 @@ def test_a_headerless_european_export_preselects_its_only_number(
         follow_redirects=False,
     )
     assert posted.status_code == 303, posted.text[:400]
+
+
+def test_the_page_speaks_portuguese_when_the_upload_came_from_pt(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    files = {"report": ("diario.csv", _journal(), "text/csv")}
+    answer = client.post("/audits", files=files, data={"consent": "on", "locale": "pt"})
+    assert answer.status_code == 422
+    page = answer.text
+    assert "Diga-nos o que é cada coluna" in page
+    assert "Compra · ex. 2300" in page
+    assert "Data e hora de entrada" in page and "Saldo ou patrimônio da conta" in page
+    assert "href='/pt#subir'" in page
+    assert "name='locale' value='pt'" in page
+    assert "Tell us what each column is" not in page and "Dinos qué es" not in page
+    assert find_claims(page) == []
+
+
+def test_every_portuguese_text_matches_its_english_placeholders() -> None:
+    placeholders = re.compile(r"\{\w+\}")
+    assert set(mapping.COPY["pt"]) == set(mapping.COPY["en"])
+    for key, english in mapping.COPY["en"].items():
+        portuguese = mapping.COPY["pt"][key]
+        assert sorted(placeholders.findall(portuguese)) == sorted(placeholders.findall(english))
+        assert find_claims(portuguese) == [], key
+    text = mapping.missing_fields({"entry_time": "Abierto"}, "pt")
+    assert text.startswith("Para lê-lo como uma linha por operação, ainda falta:")

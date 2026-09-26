@@ -204,7 +204,78 @@ COPY: dict[str, dict[str, str]] = {
             "figure. Check that the date and the figure are the right columns."
         ),
     },
+    "pt": {
+        "eyebrow": "Seu arquivo",
+        "title": "Diga-nos o que é cada coluna",
+        "lead": (
+            "Lemos seu arquivo, mas não reconhecemos suas colunas. Escolha em cada menu a "
+            "coluna correspondente e envie o mesmo arquivo de novo: nós o auditamos com a sua "
+            "escolha."
+        ),
+        "found": "Assim é o seu arquivo",
+        "found_help": "O cabeçalho e as primeiras linhas, como os lemos.",
+        "choose": "Escolha as colunas",
+        "choose_help": (
+            "Com uma linha por operação: entrada, saída, quantidade e preços. Com uma linha por "
+            "execução (cada compra e cada venda): hora, lado, quantidade e preço. O resto é "
+            "opcional."
+        ),
+        "none": "— nenhuma —",
+        "example": "ex.",
+        "file": "Escolha o mesmo arquivo de novo",
+        "file_help": (
+            "Por segurança não guardamos o arquivo até auditá-lo, então o navegador precisa "
+            "que você o escolha outra vez."
+        ),
+        "remember": (
+            "Se você tem conta, lembramos esta escolha para arquivos com o mesmo cabeçalho: na "
+            "próxima vez ele é lido sozinho."
+        ),
+        "extra": (
+            "Se você também enviou outros arquivos (curva, benchmark, variantes), volte ao "
+            "formulário para adicioná-los."
+        ),
+        "submit": "Auditar com estas colunas",
+        "back": "Voltar ao formulário",
+        "unnamed": "(sem nome)",
+        "unknown": (
+            "Seu arquivo: não é o relatório de uma plataforma que reconheçamos, mas é uma "
+            "tabela. Indique o que é cada coluna e nós o auditamos."
+        ),
+        "curve_group": "Se você só tem data e resultado, ou data e saldo",
+        "curve_help": (
+            "Basta a data com o «Resultado da operação» acima, ou a data com o saldo: o "
+            "Rigor monta a curva com isso."
+        ),
+        "role_date": "Data",
+        "role_balance": "Saldo ou patrimônio da conta",
+        "more_columns": "e mais {n} colunas, que não são mostradas",
+        "missing": "Para lê-lo como {what}, ainda falta: {fields}.",
+        "also": (
+            "Também basta uma data com o resultado de cada operação, ou uma data com o saldo."
+        ),
+        "what_trade": "uma linha por operação",
+        "what_fill": "uma linha por execução",
+        "what_profit": "data e resultado",
+        "what_balance": "data e saldo",
+        "results": (
+            "Seu arquivo parece uma lista de resultados (o que cada dia ou operação ganhou ou "
+            "perdeu), não o saldo da conta. Confirme a data e a coluna de resultado e nós o "
+            "auditamos."
+        ),
+        "few_rows": (
+            "Seu arquivo: com essas colunas restam menos de duas linhas com data e valor "
+            "legíveis. Verifique se a data e o valor são as colunas certas."
+        ),
+    },
 }
+
+#: The languages the column screen speaks; any other reads Spanish.
+LOCALES = tuple(COPY)
+
+
+def _locale(locale: str) -> str:
+    return locale if locale in COPY else "es"
 
 
 @dataclass(frozen=True)
@@ -649,7 +720,7 @@ def _few_rows(locale: str) -> str:
 def missing_fields(columns: Mapping[str, str], locale: str = "es") -> str:
     """Which fields the customer's choice still lacks, for the closest way
     to read the file, and that a date with a result or balance is enough."""
-    locale = "en" if locale == "en" else "es"
+    locale = _locale(locale)
     words = COPY[locale]
     labels: Mapping[str, str] = {
         **_COPY[locale]["map_roles"],
@@ -736,7 +807,7 @@ def mapping_page(
     first upload's other form fields (sent again unchanged), ``chosen`` the
     columns to preselect (the customer's own choice, else the reader's guess).
     """
-    locale = "en" if locale == "en" else "es"
+    locale = _locale(locale)
     words = COPY[locale]
     form_copy = _COPY[locale]
     labels: Mapping[str, str] = form_copy["map_roles"]
@@ -764,6 +835,7 @@ def mapping_page(
         for name, value in (carried or {}).items()
         if name in CARRIED_FIELDS and value
     )
+    back = "/pt#subir" if locale == "pt" else f"/?lang={locale}#subir"
     if "locale" not in (carried or {}):
         hidden += f"<input type='hidden' name='locale' value='{locale}'>"
     body = (
@@ -785,7 +857,7 @@ def mapping_page(
         f"<p class='help'>{_e(words['remember'])}</p><p class='help'>{_e(words['extra'])}</p>"
         "<div class='back-row'>"
         f"<button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button>"
-        f"<a class='btn btn-ghost' href='/?lang={locale}#subir'>{_e(words['back'])}</a>"
+        f"<a class='btn btn-ghost' href='{back}'>{_e(words['back'])}</a>"
         "</div></form></div></div>"
     )
     return _page(f"{words['title']} · {BRAND}", locale, body, solid_nav=True)

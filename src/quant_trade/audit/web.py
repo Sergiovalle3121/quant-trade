@@ -2459,7 +2459,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         )
                         # A curve file with no date in sight keeps its plain refusal.
                         if "date" in guess or exc.code == "equity_not_positive":
-                            return _mapping_answer(request, results, exc, loc, carried, guess)
+                            return _mapping_answer(
+                                request, results, exc, report_loc, carried, guess
+                            )
                 table = (
                     mapping.read_table(uploads["report"])
                     if uploads["report"] and exc.code in mapping.MAPPABLE_CODES
@@ -2484,9 +2486,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     except Exception:
                         # A saved choice that no longer reads the file is offered again.
                         logger.info("a saved column mapping did not read the file")
-                        return _mapping_answer(request, table, exc, loc, carried, saved)
+                        return _mapping_answer(request, table, exc, report_loc, carried, saved)
                 else:
-                    return _mapping_answer(request, table, exc, loc, carried, report_columns)
+                    return _mapping_answer(request, table, exc, report_loc, carried, report_columns)
             except ValueError:
                 return _html_error(request, 400, message("invalid_upload", loc), loc)
             except Exception:

@@ -2415,6 +2415,11 @@ A fifth audience page, for signal copiers (`/para/copiar-senales`, `/for/signal-
 
 ### Naming the columns of a file no importer knows (`audit/mapping.py`)
 
+The screen speaks the upload's language: Spanish, English, or Portuguese
+(`mapping.COPY["pt"]`) for an upload sent from `/pt`, whose "back" link
+returns to `/pt#subir`; a test keeps every Portuguese text on its English
+placeholders and through the guard.
+
 Some uploads are tables that no importer recognises: `unknown_format`,
 `universal_columns_missing`, a column the customer named that is unreadable
 or missing, or one column chosen twice. For these, the upload now answers
