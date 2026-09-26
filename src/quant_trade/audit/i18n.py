@@ -1290,10 +1290,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "tardíos o suavizados hacen que la beta simple no vea parte de la exposición",
     ),
     (
-        "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more "
-        "of the market before rises than before falls",
+        "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund gained more in "
+        "months of big market moves than its beta explains (good timing or option-like "
+        "positions), below zero less (poor timing or selling options)",
         "término del índice al cuadrado (Treynor y Mazuy, 1966); por encima de cero, el fondo "
-        "tuvo más exposición al mercado antes de las subidas que antes de las caídas",
+        "ganó más en los meses de mercado muy movido de lo que su beta explica (acertar el "
+        "momento o posiciones con forma de opción), por debajo, menos (equivocar el momento o "
+        "vender opciones)",
     ),
     (
         "alpha over its cautious standard error (the largest of HC3, Newey-West and one "
@@ -1406,6 +1409,33 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "(Lo, 2002); returns that follow each other make the plain figure too high",
         "Sharpe anualizado teniendo en cuenta la autocorrelación de los retornos (Lo, 2002); "
         "cuando un retorno sigue al anterior, la cifra simple sale demasiado alta",
+    ),
+    (
+        "probability that the true Sharpe is above zero with the returns' dependence on each "
+        "other taken into account: the variance for independent returns widened by the larger "
+        "of a Newey-West and a first-order autocorrelation factor, never narrowed",
+        "probabilidad de que el Sharpe real sea mayor que cero teniendo en cuenta la "
+        "dependencia entre los retornos: la varianza para retornos independientes ampliada por "
+        "el mayor de un factor de Newey-West y uno de autocorrelación de primer orden, nunca "
+        "reducida",
+    ),
+    (
+        "how many times the Sharpe's variance grows when the returns are not taken as "
+        "independent (1 means no change)",
+        "cuántas veces crece la varianza del Sharpe cuando los retornos no se toman como "
+        "independientes (1 significa sin cambio)",
+    ),
+    (
+        "returns needed for that probability to reach 0.95",
+        "retornos necesarios para que esa probabilidad llegue a 0,95",
+    ),
+    (
+        "observed Sharpe <= 0; the plain probability is already below one half",
+        "Sharpe observado <= 0; la probabilidad simple ya queda por debajo de la mitad",
+    ),
+    (
+        "the moments leave no variance to scale by",
+        "los momentos no dejan varianza con la que escalar",
     ),
     (
         "first-order autocorrelation of the returns",

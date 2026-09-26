@@ -23,6 +23,7 @@ import re
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from statistics import NormalDist
 from typing import Any
 
 import numpy as np
@@ -268,6 +269,93 @@ def autocorrelation_adjusted_sharpe(returns: pd.Series, periods_per_year: float)
         "sharpe": measured(per_period * factor, LO_NOTE),
         "lag1": measured(rho[0], "first-order autocorrelation of the returns"),
         "lags": lags,
+    }
+
+
+#: The dependence check reads the influence each return has on the Sharpe,
+#: so it needs the same fifty returns as Lo's figure.
+DEPENDENCE_NOTE = (
+    "probability that the true Sharpe is above zero with the returns' dependence on each "
+    "other taken into account: the variance for independent returns widened by the larger "
+    "of a Newey-West and a first-order autocorrelation factor, never narrowed"
+)
+DEPENDENCE_RATIO_NOTE = (
+    "how many times the Sharpe's variance grows when the returns are not taken as "
+    "independent (1 means no change)"
+)
+DEPENDENCE_TRACK_NOTE = "returns needed for that probability to reach 0.95"
+#: Widening the variance of a Sharpe at or below zero pulls its probability up
+#: towards one half, which would flatter the file.
+DEPENDENCE_NOT_POSITIVE = "observed Sharpe <= 0; the plain probability is already below one half"
+
+
+def dependence_adjusted_psr(returns: pd.Series) -> dict[str, Any]:
+    """PSR and minimum track record with serially dependent returns.
+
+    Mertens' variance of the per-period Sharpe, ``(1 - skew SR + (kurt - 1) / 4
+    SR^2) / (n - 1)``, is the variance of each return's influence on the
+    Sharpe, ``z - SR / 2 (z^2 - 1)`` with ``z`` the standardised return,
+    divided by ``n - 1``; it holds for independent returns only. The factor
+    widening it is the largest of 1, the influence's Newey-West long-run
+    variance over its plain variance (Bartlett weights, the lag of
+    :func:`alpha.newey_west_lags`) and ``(1 + rho) / (1 - rho)`` for the
+    returns' first-order autocorrelation (Kendall-corrected, clipped to
+    ``[0, MAX_RHO]``). It never narrows: negative dependence, which would
+    lower the variance, is mostly noise in samples this size and would
+    flatter the file. With a factor of 1 both figures equal the plain ones."""
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    clean = clean[np.isfinite(clean.to_numpy(dtype=float))]
+    n = len(clean)
+    if n < LO_MIN_OBSERVATIONS:
+        reason = LO_NOT_ENOUGH
+        return {
+            "ratio": not_measured(reason),
+            "psr": not_measured(reason),
+            "min_track_record_length": not_measured(reason),
+        }
+    values = clean.to_numpy(dtype=float)
+    std = float(values.std(ddof=1))
+    moments = return_moments(clean)
+    sharpe = float(moments["sharpe_per_period"])
+    term = (
+        1.0
+        - float(moments["skewness"]) * sharpe
+        + ((float(moments["kurtosis"]) - 1.0) / 4.0) * sharpe**2
+    )
+    if std <= 0 or term <= 0 or sharpe <= 0:
+        reason = (
+            "zero variance"
+            if std <= 0
+            else "the moments leave no variance to scale by"
+            if term <= 0
+            else DEPENDENCE_NOT_POSITIVE
+        )
+        return {
+            "ratio": not_measured(reason),
+            "psr": not_measured(reason),
+            "min_track_record_length": not_measured(reason),
+        }
+    centred = values - values.mean()
+    z = centred / std
+    influence = z - (sharpe / 2.0) * (z**2 - 1.0)
+    influence = influence - influence.mean()
+    plain = float(influence @ influence)
+    lags = alpha_lib.newey_west_lags(n)
+    long_run = plain
+    for lag in range(1, lags + 1):
+        weight = 1.0 - lag / (lags + 1)
+        long_run += 2.0 * weight * float(influence[lag:] @ influence[:-lag])
+    newey_west = long_run / plain if plain > 0 else 1.0
+    rho = float(centred[1:] @ centred[:-1]) / float(centred @ centred)
+    rho = min(max(rho + (1.0 + 3.0 * rho) / n, 0.0), alpha_lib.MAX_RHO)
+    ratio = max(1.0, newey_west, (1.0 + rho) / (1.0 - rho))
+    variance = term * ratio
+    psr = NormalDist().cdf(sharpe * math.sqrt(n - 1) / math.sqrt(variance))
+    track = 1.0 + variance * (NormalDist().inv_cdf(0.95) / sharpe) ** 2
+    return {
+        "ratio": measured(ratio, DEPENDENCE_RATIO_NOTE),
+        "psr": measured(psr, DEPENDENCE_NOTE),
+        "min_track_record_length": measured(track, DEPENDENCE_TRACK_NOTE),
     }
 
 
@@ -1140,6 +1228,7 @@ def run_audit(
     performance = _performance(frame, trades, returns, ppy, inputs.report_metadata or {})
     significance, moments = _significance(returns)
     significance["autocorrelation_adjusted"] = autocorrelation_adjusted_sharpe(returns, ppy)
+    significance["dependence"] = dependence_adjusted_psr(returns)
     multiplicity = _multiplicity(
         moments,
         declared_trials=inputs.declared.trials,
