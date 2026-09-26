@@ -1496,6 +1496,26 @@ def strategies_section(
     )
 
 
+def strategy_missing_page(locale: str) -> str:
+    """A strategy that is not on this account (deleted, or someone else's)."""
+    from quant_trade.audit.strategies import COPY as SCOPY
+
+    locale = _locale(locale)
+    copy = SCOPY[locale]
+    body = (
+        "<div class='wrap-narrow'><div class='acct-card'>"
+        f"<a class='btn btn-dark' href='{path('account', locale)}#estrategias'>"
+        f"{_e(copy['back'])}</a></div></div>"
+    )
+    return _shell(
+        locale,
+        copy["missing_title"],
+        copy["missing_lead"],
+        body,
+        switch={lang: path("account", lang) for lang in LANGUAGES},
+    )
+
+
 def strategy_page(
     *,
     locale: str,

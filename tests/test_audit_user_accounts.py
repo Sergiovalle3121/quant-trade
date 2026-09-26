@@ -2088,3 +2088,23 @@ def test_deleting_credited_invitees_never_frees_the_monthly_cap(
         ana.id,
         store.find_account("friend2@example.com").id,  # type: ignore[attr-defined]
     }
+
+
+def test_the_upload_gate_and_a_missing_strategy_speak_the_visitors_language(
+    tmp_path: Path,
+) -> None:
+    client, _, _ = _client(tmp_path)
+    gate = _upload(client, locale="pt")
+    assert gate.status_code == 401
+    assert "<html lang='pt'" in gate.text and "/pt/cadastro" in gate.text
+    assert account_pages.COPY["pt"]["gate_signin_title"] in gate.text
+    assert "Create your free account" not in gate.text
+    _signup(client)
+    for where, title in (
+        ("/pt/conta/estrategias/999999", "Não encontramos essa estratégia"),
+        ("/cuenta/estrategias/999999", "No encontramos esa estrategia"),
+        ("/account/strategies/999999", "We could not find that strategy"),
+    ):
+        missing = client.get(where)
+        assert missing.status_code == 404 and title in missing.text
+        assert "encontramos esa audit" not in missing.text and "find that audit" not in missing.text
