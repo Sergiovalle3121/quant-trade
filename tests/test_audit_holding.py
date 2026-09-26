@@ -256,7 +256,7 @@ def test_the_report_shows_the_market_beside_the_strategy(locale: str) -> None:
         return closes
 
     result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=market)
-    assert [key for key in asked if key not in ("tbill3m", "vix")] == ["nasdaq100"]
+    assert [key for key in asked if key in market_lib.BY_KEY] == ["nasdaq100"]
     assert result.holding is not None and result.holding["status"] == "MEASURED"
     assert result.holding["findings"] == ["rides_the_market"]
     html, _ = render(result, watermark=False)
@@ -288,7 +288,7 @@ def test_without_market_data_or_a_known_market_there_is_no_section() -> None:
     result = run_audit(
         fx, bootstrap_samples=200, risk_samples=300, market=lambda k: called.append(k) or closes
     )
-    assert result.holding is None and [k for k in called if k not in ("tbill3m", "vix")] == []
+    assert result.holding is None and [k for k in called if k in market_lib.BY_KEY] == []
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])

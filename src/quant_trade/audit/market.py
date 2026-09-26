@@ -55,6 +55,8 @@ class Asset:
     rate: bool = False
     #: A value above this means the download is broken, not the market.
     ceiling: float | None = None
+    #: A value below this means the download is broken, not the market.
+    floor: float | None = None
 
     @property
     def source_url(self) -> str:
@@ -99,8 +101,33 @@ CASH = Asset(
 #: is 82.69 (March 2020), so a value above ``MAX_VIX`` is a broken download.
 MAX_VIX = 200.0
 VIX = Asset("vix", "VIX", "VIXCLS", re.compile(r"(?!)"), ceiling=MAX_VIX)
+#: US consumer prices (all items, not seasonally adjusted, 1982-84 = 100), monthly;
+#: BLS recommends the unadjusted index for deflating between arbitrary dates.
+CPI = Asset(
+    "cpi", "US consumer prices", "CPIAUCNS", re.compile(r"(?!)"), ceiling=10_000.0, floor=1.0
+)
+#: Noon buying rates in New York (Federal Reserve H.10), daily: units of the
+#: currency per US dollar, or US dollars per unit for the euro and the pound.
+FX: tuple[Asset, ...] = tuple(
+    Asset(f"fx_{code.lower()}", code, series, re.compile(r"(?!)"), ceiling=10_000.0, floor=0.01)
+    for code, series in (
+        ("MXN", "DEXMXUS"),
+        ("BRL", "DEXBZUS"),
+        ("EUR", "DEXUSEU"),
+        ("GBP", "DEXUSUK"),
+        ("JPY", "DEXJPUS"),
+        ("CAD", "DEXCAUS"),
+        ("CHF", "DEXSZUS"),
+    )
+)
 #: Every series the service keeps in memory.
-SERIES: dict[str, Asset] = {**BY_KEY, CASH.key: CASH, VIX.key: VIX}
+SERIES: dict[str, Asset] = {
+    **BY_KEY,
+    CASH.key: CASH,
+    VIX.key: VIX,
+    CPI.key: CPI,
+    **{asset.key: asset for asset in FX},
+}
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).
 _SUFFIX = re.compile(r"[._].*$")
@@ -253,6 +280,8 @@ class MarketData:
                 raise ValueError("FRED series has no closes")
             if asset.ceiling is not None and bool((series > asset.ceiling).any()):
                 raise ValueError("FRED value out of range")
+            if asset.floor is not None and bool((series < asset.floor).any()):
+                raise ValueError("FRED value out of range")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False
@@ -277,6 +306,8 @@ class MarketData:
 __all__ = [
     "ASSETS",
     "CASH",
+    "CPI",
+    "FX",
     "SERIES",
     "VIX",
     "Asset",

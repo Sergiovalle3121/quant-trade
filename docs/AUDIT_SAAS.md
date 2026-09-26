@@ -1297,6 +1297,29 @@ covering the whole history; otherwise it is NOT_MEASURED with the reason in
 words. The note says the VIX measures US equities and, for another market,
 is read as a general gauge of fear. It never changes the class.
 
+In your currency and after inflation (`audit/currency.py`). With public data
+on, every report that is not a fund record adds the section "What was it in
+your currency and after inflation?". The curve's dollar levels are converted
+at the Federal Reserve's noon buying rate of each day (FRED H.10: `DEXMXUS`,
+`DEXBZUS`, `DEXUSEU`, `DEXUSUK`, `DEXJPUS`, `DEXCAUS`, `DEXSZUS`; the euro
+and the pound are quoted as dollars per unit and inverted), the last rate on
+or before each point and at most 7 days old (`MAX_GAP_DAYS`), else that
+currency is left out. Per currency it shows the total return, the return a
+year compounded over the calendar days (only from one year of history,
+`MIN_YEAR_DAYS`) and the worst fall in that currency. The dollar row is also
+shown after US inflation: each point is divided by US consumer prices
+(`CPIAUCNS`, not seasonally adjusted, as BLS recommends for deflating between
+arbitrary dates) of its own month or the latest month published, at most 75 days
+old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. The
+deflator is US only (FRED has no current consumer price index for most of the
+other currencies), so the currency figures are before their own inflation and
+the note says so. It runs only for a dollar account: an imported report that
+names `USD` or `USC` (or `USDT`/`USDC`, read at one dollar per coin, which the
+note says), or a file that names no currency, in which case a line
+says it is read as dollars; another named currency leaves it NOT_MEASURED.
+Needs 90 days of history. A reply above 10,000 for any of these series is
+taken as broken. It never changes the class.
+
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section
 "How did it do in the known crises?". The curve is taken at month ends. On
@@ -2020,6 +2043,22 @@ changes what a report says.
   mail provider (for example Resend, Postmark or Amazon SES), a verified
   sending domain, and its API key as a Railway variable; the hooks are listed
   in `accounts.EMAIL_HOOKS`.
+- **Recovery key** (`recovery_keys` table, `/cuenta/recuperacion`, `POST
+  /olvide`): so a customer who forgets the password needs no one, "Mi
+  cuenta" makes a recovery key after the current password: 20 characters
+  from 32 unambiguous ones (100 random bits, `accounts.new_recovery_key`),
+  shown once with `Cache-Control: no-store`; only its SHA-256 and date are
+  kept, and making a new one replaces the old. Mi cuenta nudges accounts
+  without one. On `/olvide`, e-mail + key + new password sets the password,
+  spends the key (a delete that names its hash, so it works once) and signs
+  out every session. Every try counts toward
+  `accounts.MAX_RECOVERY_TRIES_PER_HOUR` (10) per network and per e-mail; an
+  unknown e-mail and a wrong key give the same answer (someone spamming an
+  e-mail can hold its recovery for an hour; the key itself is untouched and
+  the owner's reset link still works). The key's date is in
+  the data export; the row goes with the account. The account forms that ask
+  for the current password (recovery key, password change, deletion) share
+  `accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR` per network and per account.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

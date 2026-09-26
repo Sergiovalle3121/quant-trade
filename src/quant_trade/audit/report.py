@@ -108,6 +108,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "crises": "Cómo le fue en 2008, el covid, 2022 y otras caídas conocidas",
         "holding": "Si le gana a simplemente comprar y mantener el mercado que opera",
         "regime": "Cómo le fue con el mercado tranquilo y con el mercado agitado (VIX)",
+        "currency": (
+            "Cuánto valió la cuenta en pesos, reales, euros y otras monedas, y después de la "
+            "inflación"
+        ),
         "luck": (
             "Cuánto Sharpe queda al descontar la suerte y cuántos años de historial harían falta"
         ),
@@ -146,6 +150,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "crises": "How it did in 2008, covid, 2022 and other known falls",
         "holding": "Whether it beats simply buying and holding the market it trades",
         "regime": "How it did in calm and in turbulent markets (VIX)",
+        "currency": (
+            "What the account was worth in pesos, reais, euros and other currencies, and after "
+            "inflation"
+        ),
         "luck": "How much Sharpe is left once luck is discounted, and how many years it would take",
         "ride": "Time without new highs, worst day, worst month and months that ended up",
         "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
@@ -814,6 +822,43 @@ LABELS: dict[str, dict[str, str]] = {
             "La diferencia de rentabilidad media entre las dos columnas ({z} errores "
             "estándar) no basta para decir que se comporta distinto según el mercado."
         ),
+        "currency": "¿Cuánto valió la cuenta en tu moneda y después de la inflación?",
+        "currency_intro": (
+            "Los saldos de la curva, en dólares, convertidos al tipo de cambio de cada día "
+            "(cotización del mediodía en Nueva York de la Reserva Federal), del {first} al "
+            "{last}. Si vives con otra moneda, esto es lo que valió la cuenta en ella. La "
+            "diferencia con la fila en dólares viene del tipo de cambio, no de la estrategia: "
+            "cuando el dólar sube frente a tu moneda, el resultado en ella sube, y cuando "
+            "baja, baja."
+        ),
+        "currency_assumed": (
+            "El archivo no dice en qué moneda está la cuenta, así que se lee como dólares. Si "
+            "no lo es, esta sección no aplica."
+        ),
+        "currency_not_measured": "Sin conversión a otras monedas: {reason}.",
+        "currency_head": "Moneda",
+        "currency_total": "Rentabilidad total",
+        "currency_yearly": "Al año",
+        "currency_fall": "Peor caída",
+        "currency_dollars": "Dólares (la cuenta)",
+        "currency_real": "Dólares después de la inflación de EE. UU.",
+        "currency_inflation": "La inflación de EE. UU. en esas fechas fue de {total} en total.",
+        "currency_inflation_yearly": (
+            "La inflación de EE. UU. en esas fechas fue de {total} en total ({yearly} al año)."
+        ),
+        "currency_note": (
+            "Las cifras en otras monedas no restan la inflación de esas monedas. El rendimiento"
+            " al año se muestra con al menos un año de historial. Fuente: tipos de cambio y "
+            "precios al consumidor de EE. UU. de {source}, leídos al generar el informe. No "
+            "cambia la clase."
+        ),
+        "currency_MXN": "Pesos mexicanos (MXN)",
+        "currency_BRL": "Reales (BRL)",
+        "currency_EUR": "Euros (EUR)",
+        "currency_GBP": "Libras esterlinas (GBP)",
+        "currency_JPY": "Yenes (JPY)",
+        "currency_CAD": "Dólares canadienses (CAD)",
+        "currency_CHF": "Francos suizos (CHF)",
         "regime_source": (
             "VIX: datos públicos de {source} (serie VIXCLS, de CBOE) leídos al generar el "
             "informe. Mide acciones de EE. UU.: si la estrategia opera otro mercado, tómalo "
@@ -1873,6 +1918,42 @@ LABELS: dict[str, dict[str, str]] = {
             "The gap in mean return between the two columns ({z} standard errors) is not "
             "enough to say it behaves differently depending on the market."
         ),
+        "currency": "What was the account worth in your currency and after inflation?",
+        "currency_intro": (
+            "The curve's levels, in dollars, converted at each day's exchange rate (the Federal"
+            " Reserve's New York noon buying rate), from {first} to {last}. If you live in "
+            "another currency, this is what the account was worth in it. The difference from "
+            "the dollar row comes from the exchange rate, not the strategy: when the dollar "
+            "rises against your currency the result in it rises, and when it falls, it falls."
+        ),
+        "currency_assumed": (
+            "The file does not say which currency the account is in, so it is read as dollars. "
+            "If it is not, this section does not apply."
+        ),
+        "currency_not_measured": "No conversion to other currencies: {reason}.",
+        "currency_head": "Currency",
+        "currency_total": "Total return",
+        "currency_yearly": "A year",
+        "currency_fall": "Worst fall",
+        "currency_dollars": "Dollars (the account)",
+        "currency_real": "Dollars after US inflation",
+        "currency_inflation": "US inflation over those dates was {total} in total.",
+        "currency_inflation_yearly": (
+            "US inflation over those dates was {total} in total ({yearly} a year)."
+        ),
+        "currency_note": (
+            "The figures in other currencies do not subtract those currencies' own inflation. "
+            "The return a year is shown from one year of history. Source: exchange rates and US"
+            " consumer prices from {source}, read when the report was made. It does not change "
+            "the class."
+        ),
+        "currency_MXN": "Mexican pesos (MXN)",
+        "currency_BRL": "Brazilian reais (BRL)",
+        "currency_EUR": "Euros (EUR)",
+        "currency_GBP": "Pounds sterling (GBP)",
+        "currency_JPY": "Japanese yen (JPY)",
+        "currency_CAD": "Canadian dollars (CAD)",
+        "currency_CHF": "Swiss francs (CHF)",
         "regime_source": (
             "VIX: public data from {source} (series VIXCLS, from CBOE) read when the report "
             "was made. It measures US equities: if the strategy trades another market, read "
@@ -5415,6 +5496,69 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
+def _currency_html(
+    section: dict[str, Any] | None, locale: str, labels: dict[str, str]
+) -> str:
+    """The dollar curve in other currencies and after US inflation."""
+    if not section:
+        return ""
+    if section.get("status") != "MEASURED":
+        text = labels["currency_not_measured"].format(
+            reason=localize(str(section.get("reason", "")), locale)
+        )
+        return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
+    intro = labels["currency_intro"].format(
+        first=section.get("first", ""), last=section.get("last", "")
+    )
+    out = f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
+    if section.get("assumption"):
+        out += f"<p>{_e(labels['currency_assumed'])}</p>"
+    heads = (
+        ("total_return", labels["currency_total"]),
+        ("yearly_return", labels["currency_yearly"]),
+        ("worst_fall", labels["currency_fall"]),
+    )
+
+    def row(name: str, figures: dict[str, Any]) -> str:
+        cells = ""
+        for key, head in heads:
+            field = figures.get(key)
+            if field is None:
+                cells += f"<td class='val' data-l='{_e(head)}'>—</td>"
+                continue
+            value = float(field["value"])
+            neg = " neg" if value < 0 else ""
+            cells += f"<td class='val{neg}' data-l='{_e(head)}'>{_e(_fund_pct(value))}</td>"
+        return f"<tr><td>{_e(name)}</td>{cells}</tr>"
+
+    body = row(labels["currency_dollars"], section.get("dollars") or {})
+    real = section.get("real") or {}
+    if real.get("status") == "MEASURED":
+        body += row(labels["currency_real"], real)
+    for item in section.get("currencies") or []:
+        code = str(item.get("code", ""))
+        body += row(labels.get(f"currency_{code}", code), item)
+    out += (
+        "<table class='timing holding'><thead><tr>"
+        f"<th>{_e(labels['currency_head'])}</th>"
+        + "".join(f"<th class='val'>{_e(head)}</th>" for _, head in heads)
+        + f"</tr></thead><tbody>{body}</tbody></table>"
+    )
+    if real.get("status") == "MEASURED":
+        total = _fund_pct(float(real["inflation"]["value"]))
+        if real.get("yearly_inflation"):
+            text = labels["currency_inflation_yearly"].format(
+                total=total, yearly=_fund_pct(float(real["yearly_inflation"]["value"]))
+            )
+        else:
+            text = labels["currency_inflation"].format(total=total)
+        out += f"<p>{_e(text)} {_badge('MEASURED')}</p>"
+    link = "<a href='https://fred.stlouisfed.org/' rel='noopener'>FRED</a>"
+    source = _e(labels["currency_note"].format(source="\x00"))
+    out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
+    return out
+
+
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
     return bool(stress) and (stress or {}).get("status") == "MEASURED"
 
@@ -6222,6 +6366,11 @@ def render_html(
         *(
             [(labels["regime"], _regime_html(data.get("vix_regime"), locale, labels))]
             if data.get("vix_regime")
+            else []
+        ),
+        *(
+            [(labels["currency"], _currency_html(data.get("in_currencies"), locale, labels))]
+            if data.get("in_currencies")
             else []
         ),
         *(

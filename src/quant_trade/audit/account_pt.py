@@ -174,6 +174,8 @@ COPY_PT: dict[str, str] = {
         "mensal.|"
         "Se você chegou por um dos nossos links com etiqueta (como ?ref=f4), só essa etiqueta, "
         "para saber qual link funciona; ela sai com a conta.|"
+        "Se você criar uma chave de recuperação, só a impressão dela (um hash) e a data, nunca "
+        "a chave; ela sai ao ser usada ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -250,6 +252,51 @@ COPY_PT: dict[str, str] = {
     ),
     "forgot_contact": "Escrever pelo WhatsApp",
     "forgot_message": f"Olá, esqueci a senha da minha conta {BRAND}. Meu e-mail é: ",
+    "recover_title": "Com sua chave de recuperação",
+    "recover_lead": (
+        "Se você guardou sua chave de recuperação, crie uma nova senha aqui mesmo. Se não, "
+        "escreva para nós."
+    ),
+    "recover_help": (
+        "Digite o e-mail da sua conta, a chave de 20 caracteres que você guardou e sua nova "
+        "senha. A chave funciona uma única vez; depois crie outra em Minha conta."
+    ),
+    "recovery_key": "Chave de recuperação",
+    "recover_button": "Salvar nova senha",
+    "recover_none_title": "Não tem chave?",
+    "recovery_bad": (
+        "O e-mail ou a chave de recuperação não conferem, ou a chave já foi usada. Confira se "
+        "você a digitou inteira."
+    ),
+    "recovered": (
+        "Senha salva e sessões encerradas. Entre com ela e crie uma nova chave de recuperação "
+        "em Minha conta: a anterior já foi usada."
+    ),
+    "recovery_title": "Chave de recuperação",
+    "recovery_missing": (
+        "Você ainda não tem chave. Com ela você mesmo cria uma nova senha se esquecer a sua, "
+        "sem nos escrever e sem perder seus relatórios."
+    ),
+    "recovery_made": (
+        "Criada em {date}. Se você a perdeu, crie uma nova: a anterior deixa de funcionar."
+    ),
+    "recovery_make": "Criar minha chave de recuperação",
+    "recovery_new": "Criar uma chave nova",
+    "recovery_nudge": (
+        "Crie sua chave de recuperação: se esquecer sua senha, você mesmo a recupera em um minuto."
+    ),
+    "recovery_shown_title": "Sua chave de recuperação",
+    "recovery_shown_lead": (
+        "Guarde-a agora: é a única vez que a mostramos. Guardamos só a impressão dela, então "
+        "ninguém pode vê-la de novo, nem nós."
+    ),
+    "recovery_shown_how": (
+        "Copie-a em um gerenciador de senhas ou escreva-a em papel.|"
+        "Se esquecer sua senha: Esqueci minha senha, seu e-mail, esta chave e uma nova senha.|"
+        "Funciona uma única vez. Quem a tiver junto com seu e-mail pode entrar na sua conta: "
+        "não a compartilhe."
+    ),
+    "recovery_done": "Já guardei, voltar para Minha conta",
     "reset_title": "Criar uma nova senha",
     "reset_lead": "Este link funciona uma vez e expira em 24 horas.",
     "reset_button": "Salvar senha",
