@@ -190,6 +190,12 @@ RULES: tuple[tuple[str, str], ...] = (
     ("no closed trade has positive prices and volume",
      "nenhuma operação fechada tem preços e volume positivos"),
     ("the file has no closed trades", "o arquivo não tem operações fechadas"),
+    ("the page has more than {limit} table cells; export a shorter period and upload that file",
+     "a página tem mais de {limit} células de tabela; exporte um período mais curto e envie "
+     "esse arquivo"),
+    ("the page has more than {limit} table rows; export a shorter period and upload that file",
+     "a página tem mais de {limit} linhas de tabela; exporte um período mais curto e envie "
+     "esse arquivo"),
     ("the file has {count} closed trades; the limit is {limit}",
      "o arquivo tem {count} operações fechadas; o limite é {limit}"),
     ("a trade closed on {when} has a price, quantity or profit too large to be real: check "

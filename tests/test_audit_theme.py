@@ -1204,3 +1204,33 @@ def test_open_sessions_read_as_cards_on_phones() -> None:
     activity = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){.act-table thead") :]
     assert ".act-table td:nth-child(2){grid-column:1/-1" in activity
     assert ".act-table td:nth-child(1){grid-area:2/1/3/-1}" in activity
+
+
+def test_the_fund_split_is_styled() -> None:
+    import numpy as np
+    import pandas as pd
+
+    from quant_trade.audit import report
+    from quant_trade.audit.fund import compare_with_benchmark
+
+    rng = np.random.default_rng(17)
+    index = rng.normal(0.008, 0.045, 60)
+    months = pd.date_range("2014-01-31", periods=60, freq="ME")
+    bench = compare_with_benchmark(
+        pd.Series(0.9 * index + 0.002 + rng.normal(0, 0.01, 60), index=months),
+        pd.Series(index, index=months),
+        "upload",
+        None,
+    )
+    page = report._skill_html(bench, "es", report.LABELS["es"])
+    # The table, its total row and the alpha's reading carry their hooks.
+    assert "<table class='skill'>" in page and "<tr class='skill-total'>" in page
+    assert "<p class='read-line'>" in page
+    # Figures sit right and the total is set off; in the PDF the table and
+    # its introduction stay together on one page.
+    assert "table.skill th.val,table.skill td.val{text-align:right;white-space:nowrap}" in STYLE
+    assert "table.skill tr.skill-total td{border-top:2px solid var(--border-2)" in STYLE
+    assert "table.skill{break-inside:avoid;page-break-inside:avoid}" in STYLE
+    assert ".skill-intro{break-after:avoid;page-break-after:avoid}" in STYLE
+    # On a narrow phone the 2 % + 20 % label wraps instead of widening the page.
+    assert "table.timing tr.fee-classic td:first-child{white-space:normal}" in STYLE

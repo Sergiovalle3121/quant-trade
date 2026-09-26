@@ -76,6 +76,16 @@ no extra cost beyond what the uploaded report already lists (there is no
 hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
 at least 30 return observations. Platform reports and the MT5 optimisation export
 may be 10 MB (about 11,000 optimisation passes at some 900 bytes each).
+A web page may hold at most 100,000 table rows (`MAX_HTML_ROWS`, two per
+trade at the trade limit) and 1,500,000 table cells (`MAX_HTML_CELLS`; a
+MetaTrader report at the size limit holds about a million); both are counted
+before the page is parsed,
+so a longer page is refused at once (`too_many_rows`, in ES, EN and PT). A
+list with one trade per row counts the rows that have both times, a quantity,
+both prices above zero and, when the file has them, a readable side and
+result, before reading any date, and refuses with `too_many_trades`
+when they pass 50,000; a 60,000-trade web table is now refused in about 6 s
+instead of 9 s, most of it reading the page itself.
 A larger optimisation export is refused with what to do instead: optimise
 again with the genetic algorithm or narrower ranges, or upload the report alone
 and type the pass count in "Configurations tried" (then DECLARED).
@@ -2666,6 +2676,8 @@ Redesign pass 65 comes from reading a full report on a 360 px phone as an outsid
 Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
 
 Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
+
+Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?". The yearly figures sit right-aligned, the fund's average return is a shaded total row set off by a rule, and the alpha's range and reading is a ruled line like the other readings. In the PDF the table and its introduction stay on one page instead of leaving the total row alone on the next. On a 360 px phone the fee table's "2 % + 20 %" label ran the page 15 px wide; it now wraps.
 
 ## Security
 

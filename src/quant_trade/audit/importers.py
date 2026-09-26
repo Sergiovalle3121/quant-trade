@@ -59,6 +59,7 @@ from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
+from functools import cached_property
 from html.parser import HTMLParser
 from typing import Any
 from xml.etree import ElementTree
@@ -131,6 +132,14 @@ MAX_XLSX_MEMBERS = 500
 #: hundreds of millions of empty cells.
 MAX_XLSX_COLUMNS = 256
 MAX_XLSX_CELLS = 5_000_000
+#: A web page may hold at most this many table rows: two per trade (a fill
+#: table's buy and sell) at the trade limit. The rows are counted before the
+#: page is parsed, so a longer page is refused at once instead of after
+#: seconds of parsing.
+MAX_HTML_ROWS = 2 * MAX_TRADES
+#: And at most this many table cells: a MetaTrader report at the size limit
+#: holds about a million (75,000 rows of 13 cells).
+MAX_HTML_CELLS = 1_500_000
 
 #: Report metadata the balance curve writes when a trade closed on the little
 #: a withdrawal left was measured on the balance before it: how many days, and
@@ -605,7 +614,13 @@ class _Row:
 
     @property
     def texts(self) -> list[str]:
-        return [cell.text for cell in self.visible]
+        return list(self._texts)
+
+    @cached_property
+    def _texts(self) -> tuple[str, ...]:
+        # Read many times per row while a page is recognised; the cells
+        # are complete once the page is parsed.
+        return tuple(cell.text for cell in self.visible)
 
     @property
     def is_mt_header(self) -> bool:
@@ -682,6 +697,23 @@ class _TableReader(HTMLParser):
 
 
 def _read_html(text: str) -> _TableReader:
+    lowered = text.lower()
+    if lowered.count("<td") + lowered.count("<th") > MAX_HTML_CELLS:
+        raise ReportFormatError(
+            "too_many_rows",
+            f"the page has more than {MAX_HTML_CELLS:,} table cells; export a shorter period "
+            "and upload that file",
+            f"la página tiene más de {MAX_HTML_CELLS:,} celdas de tabla; exporta un periodo "
+            "más corto y sube ese archivo",
+        )
+    if lowered.count("<tr") > MAX_HTML_ROWS:
+        raise ReportFormatError(
+            "too_many_rows",
+            f"the page has more than {MAX_HTML_ROWS:,} table rows; export a shorter period "
+            "and upload that file",
+            f"la página tiene más de {MAX_HTML_ROWS:,} filas de tabla; exporta un periodo "
+            "más corto y sube ese archivo",
+        )
     reader = _TableReader()
     reader.feed(text)
     reader.close()

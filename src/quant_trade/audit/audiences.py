@@ -997,6 +997,13 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "recuperarse y dos pruebas de retornos suavizados.",
                     ),
                     (
+                        "Efectivo, mercado y lo que queda",
+                        "Con su índice y 36 meses en común: cuánto de su rentabilidad pagaba el "
+                        "efectivo, cuánto viene de seguir al índice y cuánto queda (el alfa), "
+                        "con su rango al 95 % y, si es positivo pero aún no se distingue de "
+                        "cero, cuántos meses harían falta.",
+                    ),
+                    (
                         "Preguntas para el gestor",
                         "Qué pedirle, a partir de lo que su archivo no responde.",
                     ),
@@ -1084,6 +1091,13 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "two checks for smoothed returns.",
                     ),
                     (
+                        "Cash, market and what is left",
+                        "With its index and 36 months in common: how much of its return cash "
+                        "paid, how much comes from following the index and how much is left "
+                        "(the alpha), with its 95 % range and, if it is positive but not yet "
+                        "told apart from zero, how many months that would take.",
+                    ),
+                    (
                         "Questions for the manager",
                         "What to ask them, based on what their file does not answer.",
                     ),
@@ -1167,6 +1181,13 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "Com 24 meses ou mais: calendário ano por mês, retorno anual composto, "
                         "volatilidade, pior mês, queda mais funda, tempo para se recuperar e "
                         "duas verificações de retornos suavizados.",
+                    ),
+                    (
+                        "Caixa, mercado e o que sobra",
+                        "Com o seu índice e 36 meses em comum: quanto do retorno o caixa "
+                        "pagava, quanto vem de seguir o índice e quanto sobra (o alfa), com o "
+                        "seu intervalo de 95 % e, se é positivo mas ainda não se distingue de "
+                        "zero, quantos meses seriam precisos.",
                     ),
                     (
                         "Perguntas para o gestor",
