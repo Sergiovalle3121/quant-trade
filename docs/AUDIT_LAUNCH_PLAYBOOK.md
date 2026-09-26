@@ -710,7 +710,7 @@ El Sharpe mide el resultado por encima de lo que pagaba el efectivo. Casi todas 
 
 Con la tasa de tu moneda, el mismo historial puede verse bastante menos bueno. Vale la pena recalcularlo antes de enseñarlo o de comprar una estrategia por su Sharpe.
 
-Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica; si no la indica o está en dólares, la de EE. UU., y en otra moneda no resta ninguna: https://rigor.up.railway.app/?ref=f9
+Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica; si no la indica o está en dólares, la de EE. UU., y en otra moneda no calcula esa línea: https://rigor.up.railway.app/?ref=f9
 ```
 
 #### F9 · EN · The Sharpe in your account's currency
@@ -720,7 +720,7 @@ The Sharpe measures the return above what cash paid. Almost every calculator sub
 
 With your currency's rate, the same history can look quite a bit less good. It is worth recomputing before you show it or buy a strategy for its Sharpe.
 
-Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it; if it names none or is in dollars, the US rate, and in another currency it subtracts none: https://rigor.up.railway.app/en?ref=f9
+Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it; if it names none or is in dollars, the US rate, and in another currency it leaves that line out: https://rigor.up.railway.app/en?ref=f9
 ```
 
 #### F10 · ES · Si operas con Revolut o con Zerodha
