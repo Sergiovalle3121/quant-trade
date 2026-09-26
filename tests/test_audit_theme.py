@@ -1182,9 +1182,12 @@ def test_landing_feature_cards_have_no_orphan_slot_and_read_short_on_phones() ->
         "@media (min-width:641px){.cards-2>.card:last-child:nth-child(odd){grid-column:1/-1}"
         in STYLE
     )
-    phone = STYLE[STYLE.index("@media (max-width:640px){.cards-2>.card{display:grid") :]
-    assert ".cards-2>.card>.icon{grid-row:1;margin:0}" in phone
-    assert ".cards-2>.card>h3{grid-row:1;margin:0" in phone
+    # Every landing card with an icon and a title (the dark "Seis dimensiones"
+    # cards too) puts the icon beside the title on a phone.
+    card = ".cards>.card:has(>.icon+h3)"
+    phone = STYLE[STYLE.index("@media (max-width:640px){" + card + "{display:grid") :]
+    assert card + ">.icon{grid-row:1;margin:0}" in phone
+    assert card + ">h3{grid-row:1;margin:0" in phone
 
 
 def test_open_sessions_read_as_cards_on_phones() -> None:
