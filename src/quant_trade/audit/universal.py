@@ -634,7 +634,12 @@ class ColumnMap:
 
 
 def _role_of(name: str) -> tuple[str, int] | None:
-    """The role a column name plays and its rank in that role's list."""
+    """The role a column name plays and its rank in that role's list.
+
+    A name with ``%`` in it is a ratio, never an amount: ``Profit %`` or
+    ``% Profit`` would otherwise normalise to ``profit`` and be read as money."""
+    if "%" in name:
+        return None
     key = normalise(name)
     if not key:
         return None

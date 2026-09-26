@@ -997,3 +997,26 @@ def test_a_blank_execution_time_falls_back_to_the_trade_date_and_says_so() -> No
     assert trade.entry_time == datetime(2024, 1, 3, tzinfo=UTC)
     assert round(trade.pnl, 2) == 500.0
     assert DATE_ONLY_FILLS_WARNING.format(n=1) in report.warnings
+
+
+def test_a_percent_column_is_never_read_as_money() -> None:
+    # "Profit %" normalises to "profit": ahead of the money column it was read
+    # as the result (10 instead of 1,000) and a false contract size inferred.
+    header = "Symbol,Type,Entry Time,Exit Time,Size,Entry Price,Exit Price,Profit %,Profit"
+    report = _read(
+        [
+            header,
+            "AAPL,Long,2024-01-02 10:00,2024-01-03 10:00,100,100,110,10.0,1000",
+            "MSFT,Long,2024-01-04 10:00,2024-01-05 10:00,10,400,380,-5.0,-200",
+        ]
+    )
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [1000.0, -200.0]
+    assert not any("contract size" in warning for warning in report.warnings)
+    # With only the ratio, the result is the price move times the size.
+    report = _read(
+        [
+            header.removesuffix(",Profit"),
+            "AAPL,Long,2024-01-02 10:00,2024-01-03 10:00,100,100,110,10.0",
+        ]
+    )
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [1000.0]
