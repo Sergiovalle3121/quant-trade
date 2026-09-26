@@ -176,6 +176,8 @@ COPY: dict[str, dict[str, str]] = {
             "tarjeta: el pago con tarjeta lo procesa Stripe.|"
             "Una marca aleatoria de tu navegador y la huella del archivo, solo para dar el "
             "informe gratis una vez. Se conservan aunque borres la cuenta, sin tu correo.|"
+            "Si llegaste por uno de nuestros enlaces con etiqueta (como ?ref=f4), solo esa "
+            "etiqueta, para saber qué enlace funciona; se borra con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -416,6 +418,8 @@ COPY: dict[str, dict[str, str]] = {
             "payments are processed by Stripe.|"
             "A random mark of your browser and the file's fingerprint, only to give the free "
             "report once. They stay even if you delete the account, without your e-mail.|"
+            "If you arrived through one of our tagged links (such as ?ref=f4), only that tag, "
+            "to know which link works; it goes with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -538,6 +542,7 @@ border-radius:9px;background:color-mix(in srgb,var(--ok) 10%,#fff);color:var(--o
 .acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
 box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .acct-form form>p:last-child{margin-bottom:0}
+@media (min-width:761px){.acct-grid>.acct-form{position:sticky;top:84px}}
 .acct-danger{border-color:rgba(180,35,24,.28)}
 .acct-danger h3{color:#b42318}
 .acct-danger .btn{color:#b42318;border-color:rgba(180,35,24,.4)}
@@ -585,7 +590,8 @@ font-size:.92rem;background:var(--surface-2)}
 .acct-gift.is-on{grid-column:1/-1}.acct-gift b{font-size:1.15rem}
 .acct-gate .btn{width:100%;justify-content:center}
 .acct-kpi{padding:12px}.acct-kpi b{font-size:1.5rem}.acct-kpi span{display:block;font-size:.76rem;
-line-height:1.35}.acct-form{padding:20px}}
+line-height:1.35}.acct-form{padding:20px}
+.acct-form button[type=submit]{width:100%;justify-content:center}}
 @media (max-width:620px){.acct-reports thead{display:none}
 .paper table.acct-reports{border:0;background:none;box-shadow:none;overflow:visible}
 .acct-reports,.acct-reports tbody{display:block}

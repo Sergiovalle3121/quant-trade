@@ -39,7 +39,7 @@ from urllib.parse import quote, urlsplit
 
 from pydantic import ValidationError
 
-from quant_trade.audit import account_pages, mapping, payments, universal
+from quant_trade.audit import account_pages, funnel, mapping, payments, universal
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
@@ -58,10 +58,12 @@ from quant_trade.audit.owner import (
     MAX_FAILED_LOGINS_PER_HOUR,
     MAX_NOTE_CHARS,
     PANEL_PATH,
+    funnel_section,
     login_page,
     panel_page,
 )
 from quant_trade.audit.pages import (
+    LANDING_PATHS,
     SAMPLE_BANNER,
     audience_page,
     badge_svg,
@@ -820,15 +822,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     pdf_ok = pdf_lib.available()
     db = store or make_store(cfg.database_url)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
+    visits = funnel.VisitCounter(db)
 
     @contextlib.asynccontextmanager
     async def lifespan(_: Any) -> AsyncIterator[None]:
         if cfg.auto_purge:
             retention.start()
+        visits.start()
         try:
             yield
         finally:
             retention.stop()
+            visits.stop()
 
     app = FastAPI(
         title=BRAND,
@@ -840,6 +845,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.settings = cfg
     app.state.store = db
     app.state.retention = retention
+    app.state.visits = visits
     app.state.checkout_factory = payments.stripe_checkout
     app.state.session_lookup = payments.stripe_session
     upload_attempts = AttemptLog()
@@ -906,9 +912,45 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
     app.add_middleware(HeadAsGetMiddleware)
 
+    #: Where a visit counts for the owner's funnel, and in which language.
+    visit_paths: dict[str, str] = {path: loc for loc, path in LANDING_PATHS.items()}
+    for audience_locale, pages_by_slug in AUDIENCES_BY_PATH.items():
+        for audience_slug in pages_by_slug:
+            visit_paths[audience_url(audience_slug, audience_locale)] = audience_locale
+
+    def _funnel_visit(request: Request, response: Any) -> None:
+        """Count a person's visit to the landing or a case page; remember its tag.
+
+        Only a counter per day, language and tag is kept, in memory until
+        the background flush: nothing here waits on the database. A browser
+        counts once a day (a cookie holds only the date), and the tag of the
+        first listed link it arrives with is kept in a cookie that holds
+        nothing else, so an account created later carries it.
+        """
+        if request.method != "GET" or response.status_code != 200:
+            return
+        path = request.url.path
+        kept = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
+        arrived = funnel.clean_ref(request.query_params.get("ref"))
+        if arrived and not kept:
+            _cookie(response, funnel.REF_COOKIE, arrived, max_age=funnel.REF_DAYS * 86400)
+        locale = visit_paths.get(path)
+        if locale is None or not funnel.is_person(request.headers.get("user-agent")):
+            return
+        if request.headers.get("sec-purpose") or request.headers.get("purpose"):
+            return  # a prefetch, not a visit
+        today = funnel.day_of(datetime.now(UTC))
+        if request.cookies.get(funnel.SEEN_COOKIE) == today:
+            return  # this browser was already counted today
+        _cookie(response, funnel.SEEN_COOKIE, today, max_age=86400)
+        if path == "/" and request.query_params.get("lang") in ("es", "en", "pt"):
+            locale = request.query_params["lang"]
+        visits.add(day=today, locale=locale, ref=kept or arrived)
+
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
+        _funnel_visit(request, response)
         ok = response.status_code == 200
         if request.url.path.startswith("/static/") and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
@@ -1080,6 +1122,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 reset_path = account_pages.path("reset", account.locale)
                 reset_link = f"{_site_url(request)}{reset_path}?token={secret}"
+        visits.flush()
         return HTMLResponse(
             panel_page(
                 key=key,
@@ -1090,6 +1133,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 error=error,
                 reset_link=reset_link,
                 accounts=db.count_accounts(),
+                funnel=funnel_section(
+                    funnel.build(db.funnel_events(funnel.since_day(now))),
+                    days=funnel.FUNNEL_DAYS,
+                    example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
+                ),
             )
         )
 
@@ -1322,6 +1370,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
             if account is None:
                 return again("taken", 409)
+            ref = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
+            if ref:
+                try:
+                    db.set_account_ref(account.id, ref, at=now)
+                except Exception:  # noqa: BLE001 - the account and its session come first
+                    logger.warning("could not keep a sign-up tag")
             if next_path:
                 response: Response = RedirectResponse(next_path, status_code=303)
             else:

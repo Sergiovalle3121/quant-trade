@@ -1059,3 +1059,16 @@ def test_the_buy_and_hold_table_fits_a_phone() -> None:
     assert ".paper table.holding{display:table;width:100%}" in phone
     assert ".holding td:first-child{white-space:normal!important" in phone
     assert ".holding td.val.neg{color:#b42318}" in STYLE
+
+
+def test_the_sign_up_form_stays_in_view_and_fills_a_phone() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    # Beside the long "what we keep" list the form stays in view on a desktop;
+    # on a phone its button spans the card like the site's other forms.
+    assert "@media (min-width:761px){.acct-grid>.acct-form{position:sticky;top:84px}}" in (
+        ACCOUNT_CSS
+    )
+    phone = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){.acct-grid") :]
+    phone = phone[: phone.index("}}") + 2]
+    assert ".acct-form button[type=submit]{width:100%;justify-content:center}" in phone

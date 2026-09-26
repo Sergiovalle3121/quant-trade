@@ -457,6 +457,26 @@ class Store:
             sa.Column("key_sha256", sa.String(64), nullable=False, index=True),
             sa.Column("at", sa.String(40), nullable=False, index=True),
         )
+        #: The owner's funnel (``audit/funnel.py``): visits to the landing and
+        #: case pages as bare counters per day, language and tag, with no
+        #: address, cookie or user agent.
+        self.funnel_visits = sa.Table(
+            "funnel_visits",
+            self.metadata,
+            sa.Column("day", sa.String(10), primary_key=True),
+            sa.Column("locale", sa.String(8), primary_key=True),
+            sa.Column("ref", sa.String(24), primary_key=True),
+            sa.Column("visits", sa.Integer, nullable=False, default=0),
+        )
+        #: The listed tag of the link that brought an account, if any; it
+        #: goes with ``delete_account``.
+        self.account_refs = sa.Table(
+            "account_refs",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("ref", sa.String(24), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
         self.metadata.create_all(self.engine)
 
     # -- column maps -------------------------------------------------------
@@ -1173,6 +1193,7 @@ class Store:
                 self.column_maps,
                 self.strategies,
                 self.strategy_reports,
+                self.account_refs,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
@@ -1917,6 +1938,7 @@ class Store:
                 {"header_sha256": row[0], "columns": json.loads(row[1]), "updated_at": row[2]}
                 for row in maps
             ],
+            "arrived_through_link_tag": self.account_ref(account_id),
         }
 
     def account_credits(self, account_id: str, now: datetime) -> int:
@@ -1983,6 +2005,121 @@ class Store:
                 return False
         except _RedeemRace:  # pragma: no cover - lost a race; the credit rolled back
             return False
+
+    # -- the owner's funnel ------------------------------------------------
+    def count_visit(self, *, day: str, locale: str, ref: str, amount: int = 1) -> None:
+        """Add ``amount`` visits to the counter of ``(day, locale, ref)``."""
+        sa = self._sa
+        table = self.funnel_visits
+        key = (table.c.day == day) & (table.c.locale == locale[:8]) & (table.c.ref == ref[:24])
+        for _ in range(2):
+            with self.engine.begin() as conn:
+                bumped = conn.execute(
+                    table.update().where(key).values(visits=table.c.visits + amount)
+                ).rowcount
+                if bumped:
+                    return
+            try:
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        table.insert().values(
+                            day=day, locale=locale[:8], ref=ref[:24], visits=amount
+                        )
+                    )
+                return
+            except sa.exc.IntegrityError:  # pragma: no cover - another request inserted it
+                continue
+
+    def set_account_ref(self, account_id: str, ref: str, *, at: datetime) -> None:
+        """Keep the tag that brought a new account; the first one stays."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.account_refs.insert().values(
+                        account_id=account_id, ref=ref[:24], created_at=_iso(at)
+                    )
+                )
+        except sa.exc.IntegrityError:
+            return
+
+    def account_ref(self, account_id: str) -> str:
+        """The tag of the link that brought the account, or ``""``."""
+        sa = self._sa
+        with self.engine.connect() as conn:
+            value = conn.execute(
+                sa.select(self.account_refs.c.ref).where(
+                    self.account_refs.c.account_id == account_id
+                )
+            ).scalar()
+        return str(value or "")
+
+    def funnel_events(self, since_day: str) -> dict[str, list[tuple[str, str, str, int]]]:
+        """Rows ``(day, locale, ref, count)`` per funnel stage since ``since_day``.
+
+        Visits come from their counters; the rest from the tables the service
+        already keeps, with the language and tag of the account involved.
+        An event with no account (or a deleted one) has language ``-`` and
+        no tag.
+        """
+        sa = self._sa
+        acc, refs, links = self.accounts, self.account_refs, self.account_audits
+        visits_t = self.funnel_visits
+        out: dict[str, list[tuple[str, str, str, int]]] = {}
+        with self.engine.connect() as conn:
+            out["visits"] = [
+                (str(r[0]), str(r[1]), str(r[2]), int(r[3]))
+                for r in conn.execute(
+                    sa.select(
+                        visits_t.c.day, visits_t.c.locale, visits_t.c.ref, visits_t.c.visits
+                    ).where(visits_t.c.day >= since_day)
+                ).all()
+            ]
+
+            def by_account(stage: str, when: Any, account_col: Any, source: Any) -> None:
+                if source is not acc:
+                    source = source.outerjoin(acc, acc.c.id == account_col)
+                rows = conn.execute(
+                    sa.select(when, acc.c.locale, refs.c.ref)
+                    .select_from(source.outerjoin(refs, refs.c.account_id == account_col))
+                    .where(when >= since_day)
+                ).all()
+                out[stage] = [(str(r[0])[:10], str(r[1] or "-"), str(r[2] or ""), 1) for r in rows]
+
+            by_account("signups", acc.c.created_at, acc.c.id, acc)
+            welcome = self.welcome_reports
+            rows = conn.execute(
+                sa.select(welcome.c.created_at, acc.c.locale, refs.c.ref)
+                .select_from(
+                    welcome.outerjoin(acc, acc.c.id == welcome.c.account_id).outerjoin(
+                        refs, refs.c.account_id == welcome.c.account_id
+                    )
+                )
+                .where(welcome.c.created_at >= since_day)
+                .where(welcome.c.audit_id != "")
+            ).all()
+            out["welcome"] = [(str(r[0])[:10], str(r[1] or "-"), str(r[2] or ""), 1) for r in rows]
+            previews = self.free_previews
+            by_account("previews", previews.c.created_at, previews.c.account_id, previews)
+            audits = self.audits
+            paid = conn.execute(
+                sa.select(audits.c.paid_at, audits.c.stripe_session_id, acc.c.locale, refs.c.ref)
+                .select_from(
+                    audits.outerjoin(links, links.c.audit_id == audits.c.id)
+                    .outerjoin(acc, acc.c.id == links.c.account_id)
+                    .outerjoin(refs, refs.c.account_id == links.c.account_id)
+                )
+                .where(audits.c.paid.is_(True))
+                .where(audits.c.paid_at >= since_day)
+            ).all()
+        out["paid_code"], out["paid_card"] = [], []
+        for when, reference, locale, ref in paid:
+            reference = str(reference or "")
+            if reference.startswith(WELCOME_REFERENCE_PREFIX):
+                continue
+            stage = "paid_code" if reference.startswith(CODE_REFERENCE_PREFIX) else "paid_card"
+            out[stage].append((str(when)[:10], str(locale or "-"), str(ref or ""), 1))
+        return out
 
     # -- retention ---------------------------------------------------------
     def purge_expired(self, now: datetime, *, retention_days: int, dry_run: bool = False) -> int:
