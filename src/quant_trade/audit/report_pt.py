@@ -1027,6 +1027,12 @@ REPORT: dict[str, Any] = {
             "dos dois lados o que a letra do Tesouro dos EUA de 3 meses pagou (beta {beta}, "
             "t = {t}, {n} períodos)."
         ),
+        "alpha_line_local": (
+            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, depois de subtrair "
+            "da estratégia o que o caixa na moeda da conta pagou ({code}: {name}) e do "
+            "benchmark, tomado como cotado em dólares, o que a letra do Tesouro dos EUA de 3 "
+            "meses pagou (beta {beta}, t = {t}, {n} períodos)."
+        ),
         "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, sem subtrair o que "
             "o caixa pagou (beta {beta}, t = {t}, {n} períodos)."
@@ -1043,6 +1049,28 @@ REPORT: dict[str, Any] = {
             "Os retornos de períodos próximos tendem a se mover juntos: o Sharpe simples sai "
             "inflado."
         ),
+        "dependence_line": (
+            "Se os retornos não forem tomados como independentes entre si, a variância do "
+            "Sharpe se multiplica por {ratio}: a probabilidade de que o Sharpe real seja maior "
+            "que zero passa de {plain} para {psr}."
+        ),
+        "dependence_track": (
+            "Seriam necessários uns {track} retornos no total (hoje tem {n}) para que chegasse "
+            "a 95% (com a conta simples, {plain_track})."
+        ),
+        "dependence_track_reached": (
+            "Já chega a 95% com os {n} retornos que tem (bastariam uns {track})."
+        ),
+        "dependence_track_long": "Nem com dez vezes os {n} retornos que tem chegaria a 95%.",
+        "dependence_pass_rests": (
+            "Com a conta simples a probabilidade supera 95%; sem tomar os retornos como "
+            "independentes, não chega."
+        ),
+        "dependence_none": (
+            "Os retornos não dependem de forma apreciável uns dos outros: levar isso em conta "
+            "não muda a probabilidade de que o Sharpe real seja maior que zero."
+        ),
+        "dependence_info": "É informativo: a classe usa a conta simples.",
         "lo_not_lower": (
             "Sharpe corrigido pela autocorrelação (Lo, 2002): não fica apreciavelmente abaixo de "
             "{plain}, então a ordem dos retornos não infla o Sharpe simples de forma apreciável. "
@@ -4722,12 +4750,15 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more of "
-            "the market before rises than before falls"
+            "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund gained more "
+            "in months of big market moves than its beta explains (good timing or option-like "
+            "positions), below zero less (poor timing or selling options)"
         ),
         (
-            "termo do benchmark ao quadrado (Treynor e Mazuy, 1966); acima de zero, o fundo teve "
-            "mais exposição ao mercado antes das altas do que antes das quedas"
+            "termo do benchmark ao quadrado (Treynor e Mazuy, 1966); acima de zero, o fundo "
+            "ganhou mais nos meses de mercado muito agitado do que o seu beta explica (acertar o "
+            "momento ou posições com forma de opção), abaixo, menos (errar o momento ou vender "
+            "opções)"
         ),
     ),
     (
@@ -4811,6 +4842,55 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "Sharpe anualizado levando em conta a autocorrelação dos retornos (Lo, 2002); quando "
             "um retorno segue o anterior, o número simples fica alto demais"
+        ),
+    ),
+    (
+        (
+            "probability that the true Sharpe is above zero with the returns' dependence on "
+            "each other taken into account: the variance for independent returns widened by the "
+            "larger of a Newey-West and a first-order autocorrelation factor, never narrowed"
+        ),
+        (
+            "probabilidade de que o Sharpe real seja maior que zero levando em conta a "
+            "dependência entre os retornos: a variância para retornos independentes ampliada "
+            "pelo maior entre um fator de Newey-West e um de autocorrelação de primeira ordem, "
+            "nunca reduzida"
+        ),
+    ),
+    (
+        (
+            "how many times the Sharpe's variance grows when the returns are not taken as "
+            "independent (1 means no change)"
+        ),
+        (
+            "quantas vezes a variância do Sharpe cresce quando os retornos não são tomados como "
+            "independentes (1 significa sem mudança)"
+        ),
+    ),
+    (
+        "returns needed for that probability to reach 0.95",
+        "retornos necessários para que essa probabilidade chegue a 0,95",
+    ),
+    (
+        "observed Sharpe <= 0; the plain probability is already below one half",
+        "Sharpe observado <= 0; a probabilidade simples já fica abaixo de metade",
+    ),
+    (
+        "the moments leave no variance to scale by",
+        "os momentos não deixam variância para escalar",
+    ),
+    (
+        (
+            "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+            "standard error; what cash in the account's currency paid subtracted from the "
+            "strategy and what the 3-month US Treasury bill paid subtracted from the benchmark, "
+            "taken as priced in US dollars"
+        ),
+        (
+            "retorno além dos movimentos do benchmark (alfa de Jensen), anualizado; erro "
+            "padrão prudente; subtraído da estratégia o que o caixa na moeda da conta pagou e "
+            "do benchmark, tomado como cotado em dólares, o que a letra do Tesouro dos EUA de 3 "
+            "meses pagou"
         ),
     ),
     (

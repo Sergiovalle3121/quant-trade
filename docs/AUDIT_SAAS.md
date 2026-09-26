@@ -316,6 +316,21 @@ A column whose name holds `%` (`Profit %`, `% Profit`, `% chg`) never takes a
 role in the universal reader: it is a ratio, and once normalised `Profit %`
 would read as the money result.
 
+An equity curve or return series (`schema.parse_equity_csv`) takes a return
+column named with a `%` (`Return %`, `Rendimiento %`, `Retorno (%)`) and reads
+it as percentages, whatever the size of its values (a money-market fund's
+`0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
+column, taken only when no `date` or `fecha` column exists. A column whose
+numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
+throughout (one plainly decimal-comma cell decides the column, so a `1,234`
+beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
+as thousands.
+A column that also holds a plain decimal dot (`10234.56`, `0.5`) keeps the dot
+reading, and a cell there that plainly uses a decimal comma is left unread (an
+unreadable row) rather than rescaling the column. Currency signs and codes
+(`$`, `R$`, `US$`, `€`, `£`, `¥`, `₹`, `USD`), spaces and the Swiss `'` are
+dropped; `(1,5)`, `1,5-` and a Unicode minus read as negatives.
+
 Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
 trade_date, exchange, segment, series, trade_type, auction, quantity, price,
 trade_id, order_id, order_execution_time`, header as checked by the open-source
@@ -1333,7 +1348,9 @@ euro and yen rates were); a reply outside -5 % to 200 % a year
 (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
 taken as broken. When the currency has no series here, or its rates cannot
 be read or do not cover the history, the
-line stays the US bill's, with its note. Jensen's alpha keeps the US bill.
+line stays the US bill's, with its note. Jensen's alpha takes the same local
+rate for the strategy's side (the benchmark keeps the bill; see the benchmark
+section).
 It never changes the class.
 
 Calm and turbulent markets (`audit/regime.py`). With public data on, every
@@ -2196,7 +2213,18 @@ changes what a report says.
   abiertas"). The latest 50 per account are kept (`store.ACCOUNT_EVENT_MAX`);
   older than 90 days (`ACCOUNT_EVENT_DAYS`) they go with `purge_sessions`,
   which every sign-in runs. They go with the account, and the export lists
-  them under `activity`. Failed sign-ins are not listed.
+  them under `activity`.
+- **Wrong-password lines** (`failed_signins` table, shown in "Actividad
+  reciente" as "Contraseña incorrecta (N intentos)"): a wrong password for an
+  existing account counts on one line per network and hour (device label and
+  time of the last try; never the typed e-mail or password). The line is
+  written by a background task after the reply is sent, so a real account
+  answers as fast as an unknown e-mail (no account-existence timing signal).
+  Their own cap, `store.FAILED_SIGNIN_MAX` (20 lines), keeps a flood from
+  pushing real events out, and the card shows at most 5 beside 20 real
+  events. They go after 90 days with `purge_sessions`, with the account, and
+  the export lists them under `failed_signins`. Rate-limited tries (429) are
+  not counted.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2803,6 +2831,18 @@ Informational only: none of these moves a class, a dimension or a red flag.
   times the per-period Sharpe, with `q` the periods a year and the sum cut
   at 10 lags or a fifth of the sample. Smoothed returns (AR(1) at 0.5)
   inflate the plain figure by about 1.7x; this one removes it.
+- The significance section carries `dependence` (50 returns or more and a
+  positive Sharpe): the probability that the true Sharpe is above zero and
+  the returns needed for it to reach 0.95 with Mertens' variance of the
+  Sharpe (the one the plain PSR uses) multiplied by `ratio`, the largest of
+  1, the Newey-West long-run variance of each return's influence on the
+  Sharpe (`z - SR / 2 (z^2 - 1)`, Bartlett weights, lag `floor(4
+  (n/100)^(2/9))`) over its plain variance, and `(1 + rho) / (1 - rho)` for
+  the returns' Kendall-corrected first-order autocorrelation clipped to
+  `[0, 0.9]`. It never reads higher than the plain figure. On simulated
+  returns with no edge and autocorrelation 0.4 the plain PSR passes 0.95
+  about 12 % of the time and this one about 5 %; with independent returns
+  both about 5 %. Informational: the class uses the plain PSR.
 - The benchmark section and the fund-versus-index comparison carry `jensen`
   (24 shared periods or more): Jensen's alpha from regressing the
   strategy's period returns on the benchmark's, annualised, with a
@@ -2814,6 +2854,17 @@ Informational only: none of these moves a class, a dimension or a red flag.
   Without it nothing is subtracted, `cash_subtracted` is false and the note
   says so, because then a strategy with beta `b` shows `(1 - b)` times what
   cash paid as alpha.
+  When a report names an account currency with its own cash rate (the
+  currencies of the cash-rate Sharpe) and that rate covers every period too,
+  the strategy loses what cash in that currency paid instead (read by the
+  same quote, staleness and euro history as the cash-rate Sharpe) and the
+  benchmark, taken as priced in US dollars (the note and the line say so; a
+  local index uploaded as the benchmark is not detected), the bill's: each side over its own
+  currency's cash. `cash_currency` then names the currency and the line names
+  both rates. Otherwise a dollar account's bill on both sides stays. With
+  the bill on both sides, a simulated account in reais holding Brazilian cash
+  at 12 % and 0.2 of the index, with the bill at 5 %, showed about 7 % a year
+  of alpha that was only Brazil's cash premium over the bill.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
@@ -2825,7 +2876,9 @@ Informational only: none of these moves a class, a dimension or a red flag.
   standard errors from zero. `lagged` adds last month's index return (Dimson,
   1979): smoothed or late-priced funds hide exposure from the plain beta,
   and it turns up as alpha. `timing` adds the squared index return over cash
-  (Treynor and Mazuy, 1966). Standard errors are the largest of HC3,
+  (Treynor and Mazuy, 1966): a significant term reads as convexity, which
+  timing or option-like positions give (selling options gives a negative
+  one), never as timing alone. Standard errors are the largest of HC3,
   Newey-West and, for the alpha, the plain error widened by `(1 + rho) /
   (1 - rho)` for the misses' autocorrelation (Kendall-corrected). On
   simulated funds with no skill, `|t| > 2` then comes up about 4 % of the
@@ -2876,8 +2929,17 @@ How the report shows them (ES, EN and PT):
   it is 0.1 or more). A higher corrected figure is never printed: with small
   samples it mostly adds noise and would flatter the file. The report says
   the plain figure is not inflated instead.
+- Under Lo's line, the `dependence` probability and track record next to the
+  plain ones when `ratio` is 1.1 or more (with one more sentence when the
+  plain probability reaches 95 % and this one does not; a track record over
+  ten times the history's length is not printed, only that ten times would
+  not reach 95 %, and one within it says the history already reaches it),
+  or one line saying
+  dependence does not change it. The class never reads either.
 - Under the benchmark table and in the fund-versus-index block, Jensen's
-  alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to
+  alpha with beta, t and the periods, saying which cash it subtracted from
+  each side (the account currency's own rate is named) or that it subtracts
+  no cash rate; |t| of 2 or more reads as unlikely to
   be chance alone (with "it does not say it will repeat" for a positive
   alpha), below that as not distinguishable from chance.
 - The fee table's last row is "2 % + 20 % of gains".

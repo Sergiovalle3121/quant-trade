@@ -22,7 +22,9 @@ import math
 import re
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from statistics import NormalDist
 from typing import Any
 
 import numpy as np
@@ -268,6 +270,93 @@ def autocorrelation_adjusted_sharpe(returns: pd.Series, periods_per_year: float)
         "sharpe": measured(per_period * factor, LO_NOTE),
         "lag1": measured(rho[0], "first-order autocorrelation of the returns"),
         "lags": lags,
+    }
+
+
+#: The dependence check reads the influence each return has on the Sharpe,
+#: so it needs the same fifty returns as Lo's figure.
+DEPENDENCE_NOTE = (
+    "probability that the true Sharpe is above zero with the returns' dependence on each "
+    "other taken into account: the variance for independent returns widened by the larger "
+    "of a Newey-West and a first-order autocorrelation factor, never narrowed"
+)
+DEPENDENCE_RATIO_NOTE = (
+    "how many times the Sharpe's variance grows when the returns are not taken as "
+    "independent (1 means no change)"
+)
+DEPENDENCE_TRACK_NOTE = "returns needed for that probability to reach 0.95"
+#: Widening the variance of a Sharpe at or below zero pulls its probability up
+#: towards one half, which would flatter the file.
+DEPENDENCE_NOT_POSITIVE = "observed Sharpe <= 0; the plain probability is already below one half"
+
+
+def dependence_adjusted_psr(returns: pd.Series) -> dict[str, Any]:
+    """PSR and minimum track record with serially dependent returns.
+
+    Mertens' variance of the per-period Sharpe, ``(1 - skew SR + (kurt - 1) / 4
+    SR^2) / (n - 1)``, is the variance of each return's influence on the
+    Sharpe, ``z - SR / 2 (z^2 - 1)`` with ``z`` the standardised return,
+    divided by ``n - 1``; it holds for independent returns only. The factor
+    widening it is the largest of 1, the influence's Newey-West long-run
+    variance over its plain variance (Bartlett weights, the lag of
+    :func:`alpha.newey_west_lags`) and ``(1 + rho) / (1 - rho)`` for the
+    returns' first-order autocorrelation (Kendall-corrected, clipped to
+    ``[0, MAX_RHO]``). It never narrows: negative dependence, which would
+    lower the variance, is mostly noise in samples this size and would
+    flatter the file. With a factor of 1 both figures equal the plain ones."""
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    clean = clean[np.isfinite(clean.to_numpy(dtype=float))]
+    n = len(clean)
+    if n < LO_MIN_OBSERVATIONS:
+        reason = LO_NOT_ENOUGH
+        return {
+            "ratio": not_measured(reason),
+            "psr": not_measured(reason),
+            "min_track_record_length": not_measured(reason),
+        }
+    values = clean.to_numpy(dtype=float)
+    std = float(values.std(ddof=1))
+    moments = return_moments(clean)
+    sharpe = float(moments["sharpe_per_period"])
+    term = (
+        1.0
+        - float(moments["skewness"]) * sharpe
+        + ((float(moments["kurtosis"]) - 1.0) / 4.0) * sharpe**2
+    )
+    if std <= 0 or term <= 0 or sharpe <= 0:
+        reason = (
+            "zero variance"
+            if std <= 0
+            else "the moments leave no variance to scale by"
+            if term <= 0
+            else DEPENDENCE_NOT_POSITIVE
+        )
+        return {
+            "ratio": not_measured(reason),
+            "psr": not_measured(reason),
+            "min_track_record_length": not_measured(reason),
+        }
+    centred = values - values.mean()
+    z = centred / std
+    influence = z - (sharpe / 2.0) * (z**2 - 1.0)
+    influence = influence - influence.mean()
+    plain = float(influence @ influence)
+    lags = alpha_lib.newey_west_lags(n)
+    long_run = plain
+    for lag in range(1, lags + 1):
+        weight = 1.0 - lag / (lags + 1)
+        long_run += 2.0 * weight * float(influence[lag:] @ influence[:-lag])
+    newey_west = long_run / plain if plain > 0 else 1.0
+    rho = float(centred[1:] @ centred[:-1]) / float(centred @ centred)
+    rho = min(max(rho + (1.0 + 3.0 * rho) / n, 0.0), alpha_lib.MAX_RHO)
+    ratio = max(1.0, newey_west, (1.0 + rho) / (1.0 - rho))
+    variance = term * ratio
+    psr = NormalDist().cdf(sharpe * math.sqrt(n - 1) / math.sqrt(variance))
+    track = 1.0 + variance * (NormalDist().inv_cdf(0.95) / sharpe) ** 2
+    return {
+        "ratio": measured(ratio, DEPENDENCE_RATIO_NOTE),
+        "psr": measured(psr, DEPENDENCE_NOTE),
+        "min_track_record_length": measured(track, DEPENDENCE_TRACK_NOTE),
     }
 
 
@@ -572,6 +661,7 @@ def _benchmark(
     strategy: IngestedSeries,
     benchmark: IngestedSeries | None,
     rates: pd.Series | None = None,
+    local_cash: LocalCashRates | None = None,
 ) -> tuple[dict[str, Any], dict[str, float | None], str | None]:
     empty: dict[str, float | None] = {
         "excess_return": None,
@@ -639,8 +729,58 @@ def _benchmark(
         cash = cashrate_lib.span_cash(joined["timestamp"], rates)
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         cash = None
-    section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
+    # The account's own currency's cash comes off the strategy when its rate
+    # covers every period and the bill's covers the benchmark's; otherwise both
+    # sides lose the bill's, as for a dollar account.
+    own = None
+    if local_cash is not None and cash is not None:
+        try:
+            own = cashrate_lib.local_span_cash(
+                joined["timestamp"], local_cash.rates, local_cash.currency, local_cash.history
+            )
+        except Exception:  # noqa: BLE001 (public data must never stop an audit)
+            own = None
+    if own is not None and local_cash is not None:
+        section["jensen"] = alpha_lib.jensen_alpha(
+            s_returns, b_returns, joined_ppy, own, cash, local_cash.currency
+        )
+    else:
+        section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
     return section, values, None
+
+
+@dataclass(frozen=True)
+class LocalCashRates:
+    """The account currency's cash rates as FRED gives them (``history`` is the
+    monthly series that fills dates before ``rates`` starts, when it has one)."""
+
+    currency: str
+    rates: pd.Series
+    history: pd.Series | None = None
+
+
+def _local_cash_rates(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
+) -> LocalCashRates | None:
+    """The account currency's cash rates when public data is on and the
+    currency has one here; ``None`` otherwise or when they cannot be read."""
+    code = (inputs.account_currency or "").strip().upper()
+    if market is None or code not in cashrate_lib.LOCAL:
+        return None
+    local = cashrate_lib.LOCAL[code]
+    try:
+        rates = market(local.asset.key)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return None
+    if rates is None or rates.empty:
+        return None
+    history = None
+    if local.history is not None:
+        try:
+            history = market(local.history.key)
+        except Exception:  # noqa: BLE001 (the history only fills early dates)
+            history = None
+    return LocalCashRates(code, rates, history)
 
 
 def _cscv(variants: np.ndarray | None) -> tuple[dict[str, Any], float | None]:
@@ -918,22 +1058,16 @@ def _local_cash_rate(
 ) -> dict[str, Any] | None:
     """The Sharpe after the account currency's own cash rate, or None when the
     currency has none here or its rates do not cover the history."""
-    code = (inputs.account_currency or "").strip().upper()
-    if code not in cashrate_lib.LOCAL:
+    local = _local_cash_rates(inputs, market)
+    if local is None:
         return None
     try:
-        local = cashrate_lib.LOCAL[code]
-        rates = market(local.asset.key)
-        if rates is None or rates.empty:
-            return None
-        history = None
-        if local.history is not None:
-            try:
-                history = market(local.history.key)
-            except Exception:  # noqa: BLE001 (the history only fills early dates)
-                history = None
         out = cashrate_lib.local_excess_sharpe(
-            inputs.equity.frame, rates, inputs.periods_per_year, code, history
+            inputs.equity.frame,
+            local.rates,
+            inputs.periods_per_year,
+            local.currency,
+            local.history,
         )
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         return None
@@ -1140,6 +1274,7 @@ def run_audit(
     performance = _performance(frame, trades, returns, ppy, inputs.report_metadata or {})
     significance, moments = _significance(returns)
     significance["autocorrelation_adjusted"] = autocorrelation_adjusted_sharpe(returns, ppy)
+    significance["dependence"] = dependence_adjusted_psr(returns)
     multiplicity = _multiplicity(
         moments,
         declared_trials=inputs.declared.trials,
@@ -1167,7 +1302,7 @@ def run_audit(
     holdout, oos_sharpe, gap, holdout_reason = _holdout(frame, inputs.declared.oos_start, ppy)
     bill_rates = _bill_rates(market)
     benchmark, benchmark_values, benchmark_reason = _benchmark(
-        inputs.equity, inputs.benchmark, bill_rates
+        inputs.equity, inputs.benchmark, bill_rates, _local_cash_rates(inputs, market)
     )
     cscv, pbo = _cscv(inputs.variants)
     costs, rows, reference, assumed, gross = _costs(inputs)
