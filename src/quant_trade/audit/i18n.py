@@ -932,12 +932,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "each return placed by the VIX close of the last market day before it starts (calm "
         "below 20, turbulent at 20 or above); return per month compounded over each regime's "
-        "days; Sharpe annualised like the headline Sharpe; gap in mean returns in Welch "
-        "standard errors",
+        "days; Sharpe annualised like the headline Sharpe; gap in mean returns over a cautious "
+        "standard error (the largest of Welch's, Newey-West's and one widened for "
+        "autocorrelated returns)",
         "cada retorno se asigna según el cierre del VIX del último día de mercado anterior a "
         "su inicio (tranquilo por debajo de 20, agitado desde 20); rentabilidad por mes "
         "compuesta sobre los días de cada régimen; Sharpe anualizado como el Sharpe "
-        "principal; diferencia de retornos medios en errores estándar de Welch",
+        "principal; diferencia de retornos medios entre un error estándar prudente (el mayor "
+        "entre el de Welch, el de Newey-West y uno ampliado por retornos autocorrelacionados)",
     ),
     (
         "the VIX closes could not be read when the report was made",
