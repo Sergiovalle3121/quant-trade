@@ -298,6 +298,15 @@ COPY_PT: dict[str, Any] = {
             "app. Da chave, só guardamos a impressão, nunca a chave em si.",
         ),
         (
+            "Quão protegida está minha conta?",
+            "Você pode ativar a verificação em duas etapas com um app de autenticação (Google "
+            "Authenticator, 1Password ou outro): aí, para entrar ou recuperar a conta, são "
+            "precisas duas destas três coisas: sua senha, o código do app ou sua chave de "
+            "recuperação. Em Minha conta você vê onde sua conta está aberta e encerra cada "
+            "sessão, e vê suas entradas e mudanças de segurança mais recentes (até 90 dias), "
+            "incluindo as tentativas com senha incorreta.",
+        ),
+        (
             "Como se usa o selo?",
             "Publique a verificação a partir do seu relatório e copie o código do selo no seu "
             "site, Telegram ou fórum. O selo descreve uma auditoria estatística; não é uma "
@@ -449,10 +458,11 @@ UI_PT: dict[str, Any] = {
             "percent",
             "Frente ao caixa",
             "Subtraímos o que o caixa pagava nas mesmas datas, na moeda da sua conta quando o "
-            "seu relatório a indica (reais, pesos mexicanos, euros, libras, ienes, dólares "
+            "seu relatório a indica e é uma destas (reais, pesos "
+            "mexicanos, euros, libras, ienes, dólares "
             "canadenses ou francos suíços) e, se não, em dólares (letras do Tesouro dos EUA de "
             "3 meses). Dados públicos oficiais. Você vê o Sharpe sem o que o caixa já pagava "
-            "e, se enviar um benchmark, o alfa, medido frente às letras dos EUA.",
+            "e, se enviar um benchmark, o alfa também.",
         ),
         (
             "chart",
@@ -492,7 +502,8 @@ UI_PT: dict[str, Any] = {
         "A conta real frente ao seu backtest",
         "Perguntas para o vendedor do robô ou para o gestor",
         "Se funciona em cada mercado ou se um carrega o resto",
-        "Para fundos: calendário ano por mês, pior mês e tempo para se recuperar",
+        "Para fundos: calendário ano por mês, pior mês e tempo para se recuperar e, com o "
+        "seu índice, quanto é caixa, quanto é mercado e quanto sobra",
         "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
         "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
         "agitado e crises conhecidas",

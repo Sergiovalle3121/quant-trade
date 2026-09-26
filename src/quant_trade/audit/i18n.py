@@ -1069,6 +1069,35 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "US consumer prices do not cover the whole history",
         "los precios al consumidor de EE. UU. no cubren todo el historial",
     ),
+    (
+        (
+            "the levels in that currency divided by that country's official consumer price index "
+            "of each point's month, or the latest month published"
+        ),
+        (
+            "los saldos en esa moneda divididos entre el índice oficial de precios al consumidor "
+            "de ese país del mes de cada punto, o del último mes publicado"
+        ),
+    ),
+    (
+        (
+            "the account's own levels in its currency; return a year compounded over the "
+            "calendar days, shown from one year of history; worst fall from a peak"
+        ),
+        (
+            "los saldos de la cuenta en su propia moneda; rentabilidad al año compuesta sobre "
+            "los días naturales, mostrada desde un año de historial; peor caída desde un máximo"
+        ),
+    ),
+    (
+        "the consumer prices of the account's currency could not be read when the report was made",
+        "no se pudieron leer los precios al consumidor de la moneda de la cuenta al generar el "
+        "informe",
+    ),
+    (
+        "the consumer prices of the account's currency do not cover the whole history",
+        "los precios al consumidor de la moneda de la cuenta no cubren todo el historial",
+    ),
     ("the strategy's compound return a year", "la rentabilidad compuesta anual de la estrategia"),
     (
         "the market's public closes could not be read when the report was made",

@@ -1305,6 +1305,103 @@ GUIDES: tuple[Guide, ...] = (
         },
     ),
     Guide(
+        slug="zerodha",
+        platform="Zerodha",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo exportar tus operaciones de Zerodha",
+                summary=(
+                    "Descarga el Tradebook de Zerodha Console en CSV y súbelo para revisar tus "
+                    "operaciones en NSE y BSE."
+                ),
+                file=(
+                    "Un .csv con las columnas symbol, isin, trade_date, exchange, segment, "
+                    "series, trade_type, auction, quantity, price, trade_id, order_id y "
+                    "order_execution_time."
+                ),
+                steps=(
+                    "Entra en Zerodha Console y abre Reports y luego Tradebook.",
+                    "Elige el segmento (por ejemplo Equity o Futures & Options) y el periodo, "
+                    "y pulsa la flecha para ver las operaciones.",
+                    "Junto al botón Download elige CSV y descarga el archivo.",
+                ),
+                upload="En el campo «Informe de tu plataforma», tal cual.",
+                tips=(
+                    "Console descarga como máximo 365 días de una vez y un segmento por "
+                    "archivo: sube el segmento y el año que quieres revisar.",
+                    "Las ejecuciones se ordenan por order_execution_time, así que las "
+                    "operaciones intradía se emparejan en el orden en que ocurrieron; una "
+                    "fila sin hora usa su fecha y el informe lo dice.",
+                    "El resultado de cada operación es el movimiento del precio por la "
+                    "cantidad del archivo, sin multiplicador de lote.",
+                    "Las ventas de acciones compradas antes de la primera fecha del archivo "
+                    "quedan fuera: el informe las cuenta como posiciones abiertas.",
+                ),
+            ),
+            "en": GuideText(
+                title="How to export your Zerodha trades",
+                summary=(
+                    "Download the Tradebook from Zerodha Console as CSV and upload it to review "
+                    "your NSE and BSE trades."
+                ),
+                file=(
+                    "A .csv with the columns symbol, isin, trade_date, exchange, segment, "
+                    "series, trade_type, auction, quantity, price, trade_id, order_id and "
+                    "order_execution_time."
+                ),
+                steps=(
+                    "Log in to Zerodha Console and open Reports, then Tradebook.",
+                    "Choose the segment (for example Equity or Futures & Options) and the date "
+                    "range, and select the arrow to show the trades.",
+                    "Next to the Download button choose CSV and download the file.",
+                ),
+                upload="In the field 'Your platform report', as it is.",
+                tips=(
+                    "Console downloads at most 365 days at a time and one segment per file: "
+                    "upload the segment and the year you want reviewed.",
+                    "Fills are ordered by order_execution_time, so intraday trades pair in the "
+                    "order they happened; a row with no time uses its date and the report says "
+                    "so.",
+                    "Each trade's result is the price move times the file's quantity, with no "
+                    "lot multiplier.",
+                    "Sales of shares bought before the file's first date are left out: the "
+                    "report counts them as open positions.",
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar suas operações da Zerodha",
+                summary=(
+                    "Baixe o Tradebook do Zerodha Console em CSV e envie para revisar suas "
+                    "operações na NSE e na BSE."
+                ),
+                file=(
+                    "Um .csv com as colunas symbol, isin, trade_date, exchange, segment, "
+                    "series, trade_type, auction, quantity, price, trade_id, order_id e "
+                    "order_execution_time."
+                ),
+                steps=(
+                    "Entre no Zerodha Console e abra Reports e depois Tradebook.",
+                    "Escolha o segmento (por exemplo Equity ou Futures & Options) e o período, "
+                    "e toque na seta para ver as operações.",
+                    "Ao lado do botão Download escolha CSV e baixe o arquivo.",
+                ),
+                upload="No campo 'Relatório da sua plataforma', do jeito que vier.",
+                tips=(
+                    "O Console baixa no máximo 365 dias de uma vez e um segmento por arquivo: "
+                    "envie o segmento e o ano que você quer revisar.",
+                    "As execuções são ordenadas por order_execution_time, então as operações "
+                    "intradiárias são pareadas na ordem em que aconteceram; uma linha sem "
+                    "horário usa a data e o relatório avisa.",
+                    "O resultado de cada operação é o movimento do preço vezes a quantidade "
+                    "do arquivo, sem multiplicador de lote.",
+                    "Vendas de ações compradas antes da primeira data do arquivo ficam de "
+                    "fora: o relatório as conta como posições abertas.",
+                ),
+            ),
+        },
+    ),
+    Guide(
         slug="csv-universal",
         slug_en="universal-csv",
         platform="Otra plataforma (CSV o Excel)",

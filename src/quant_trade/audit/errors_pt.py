@@ -190,6 +190,12 @@ RULES: tuple[tuple[str, str], ...] = (
     ("no closed trade has positive prices and volume",
      "nenhuma operação fechada tem preços e volume positivos"),
     ("the file has no closed trades", "o arquivo não tem operações fechadas"),
+    ("the page has more than {limit} table cells; export a shorter period and upload that file",
+     "a página tem mais de {limit} células de tabela; exporte um período mais curto e envie "
+     "esse arquivo"),
+    ("the page has more than {limit} table rows; export a shorter period and upload that file",
+     "a página tem mais de {limit} linhas de tabela; exporte um período mais curto e envie "
+     "esse arquivo"),
     ("the file has {count} closed trades; the limit is {limit}",
      "o arquivo tem {count} operações fechadas; o limite é {limit}"),
     ("a trade closed on {when} has a price, quantity or profit too large to be real: check "
@@ -209,10 +215,10 @@ RULES: tuple[tuple[str, str], ...] = (
      "the platform as CSV, Excel or HTML instead (the guides show where)",
      "um PDF é um extrato impresso, não dados que possam ser lidos: baixe o histórico da "
      "plataforma em CSV, Excel ou HTML (os guias mostram onde)"),
-    ("this is an OpenDocument sheet (.ods), which cannot be read: save it as .xlsx or CSV "
-     "and upload that file",
-     "esta é uma planilha OpenDocument (.ods), que não pode ser lida: salve como .xlsx ou "
-     "CSV e envie esse arquivo"),
+    ("this OpenDocument file is not a spreadsheet, so it cannot be read: save the trades as "
+     ".xlsx, .ods or CSV and upload that file",
+     "este arquivo OpenDocument não é uma planilha, então não pode ser lido: salve as "
+     "operações como .xlsx, .ods ou CSV e envie esse arquivo"),
     ("the zip holds no CSV, Excel or HTML export; upload the export itself",
      "o zip não contém nenhuma exportação em CSV, Excel ou HTML; envie a própria "
      "exportação"),

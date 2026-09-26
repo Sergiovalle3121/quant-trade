@@ -405,6 +405,15 @@ _COPY: dict[str, dict[str, Any]] = {
                 "código de tu app. De la clave solo guardamos su huella, nunca la clave misma.",
             ),
             (
+                "¿Qué tan protegida está mi cuenta?",
+                "Puedes activar la verificación en dos pasos con una app de autenticación "
+                "(Google Authenticator, 1Password u otra): entonces, para entrar o recuperar la "
+                "cuenta hacen falta dos de estas tres cosas: tu contraseña, el código de la app "
+                "o tu clave de recuperación. En Mi cuenta ves dónde está abierta tu cuenta y "
+                "cierras cada sesión, y ves tus entradas y cambios de seguridad más recientes "
+                "(hasta 90 días), incluidos los intentos con contraseña incorrecta.",
+            ),
+            (
                 "¿Cómo se usa el sello?",
                 "Publica la verificación desde tu informe y copia el código del sello en tu web, "
                 "Telegram o foro. El sello describe una auditoría estadística; no es una promesa "
@@ -691,6 +700,15 @@ _COPY: dict[str, dict[str, Any]] = {
                 "your app. We keep only the key's fingerprint, never the key itself.",
             ),
             (
+                "How well protected is my account?",
+                "You can turn on two-step sign-in with an authenticator app (Google "
+                "Authenticator, 1Password or another): then signing in or recovering the "
+                "account takes two of these three: your password, the code from the app or "
+                "your recovery key. In My account you see where your account is open and "
+                "sign out each session, and you see your most recent sign-ins and security "
+                "changes (up to 90 days), including wrong-password tries.",
+            ),
+            (
                 "How is the badge used?",
                 "Publish the verification from your report and copy the badge code to your "
                 "site, Telegram or forum. The badge describes a statistical audit; it is not a "
@@ -845,11 +863,11 @@ _UI: dict[str, dict[str, Any]] = {
                 "percent",
                 "Frente al efectivo",
                 "Restamos lo que pagaba el efectivo en las mismas fechas, en la moneda de tu "
-                "cuenta si tu reporte la indica (pesos mexicanos, reales, euros, libras, yenes, "
+                "cuenta si tu reporte la indica y es una de estas (pesos mexicanos, "
+                "reales, euros, libras, yenes, "
                 "dólares canadienses o francos suizos) y, si no, en dólares (letras del Tesoro "
                 "de EE. UU. a 3 meses). Datos públicos oficiales. Ves el Sharpe sin lo que ya "
-                "daba el efectivo y, si subes un benchmark, el alfa, medido frente a las letras "
-                "de EE. UU.",
+                "daba el efectivo y, si subes un benchmark, el alfa también.",
             ),
             (
                 "chart",
@@ -889,7 +907,8 @@ _UI: dict[str, dict[str, Any]] = {
             "La cuenta real frente a su backtest",
             "Preguntas para el vendedor del robot o el gestor",
             "Si funciona en cada mercado o uno carga con el resto",
-            "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse",
+            "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse y, con su "
+            "índice, cuánto es efectivo, cuánto es mercado y cuánto queda",
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
             "VIX tranquilo o agitado y crisis conocidas",
@@ -1065,10 +1084,11 @@ _UI: dict[str, dict[str, Any]] = {
                 "percent",
                 "Against cash",
                 "We subtract what cash paid over the same dates, in your account's currency "
-                "when your report names it (Mexican pesos, reais, euros, pounds, yen, Canadian "
+                "when your report names it and it is one of these (Mexican "
+                "pesos, reais, euros, pounds, yen, Canadian "
                 "dollars or Swiss francs) and otherwise in dollars (3-month US Treasury bills). "
                 "Official public data. You see the Sharpe without what cash already paid and, "
-                "if you upload a benchmark, the alpha, measured against US bills.",
+                "if you upload a benchmark, the alpha too.",
             ),
             (
                 "chart",
@@ -1108,7 +1128,8 @@ _UI: dict[str, dict[str, Any]] = {
             "The live account against its backtest",
             "Questions to ask the robot's vendor or the manager",
             "Whether it works on each market or one carries the rest",
-            "For funds: year-by-month calendar, worst month and time to recover",
+            "For funds: year-by-month calendar, worst month and time to recover and, with its "
+            "index, how much is cash, how much is the market and what is left",
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Against cash and the market: the Sharpe without what cash paid, calm or "
             "agitated VIX and known crises",
@@ -2177,7 +2198,7 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
 
 #: What the file pickers offer for a platform file: web pages (and the tables
 #: brokers save as .xls), text tables, workbooks and a zip holding one export.
-REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.xml,.zip"
+REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip"
 
 
 def _upload_form(
@@ -2305,7 +2326,7 @@ def _upload_form(
         + _drop(
             "equity",
             copy["equity"],
-            ".csv,.txt,.tsv,.xlsx,text/csv",
+            ".csv,.txt,.tsv,.xlsx,.ods,text/csv",
             _e(copy["equity_help"]),
             locale,
         )
@@ -2945,6 +2966,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["repro_title"], bullets(words["repro"])),
                 (words["limits_title"], bullets(words["limits"], "minus")),
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
+                (words["data_title"], bullets(words["data"])),
             ],
             locale,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"

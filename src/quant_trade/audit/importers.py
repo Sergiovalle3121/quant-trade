@@ -56,9 +56,10 @@ import statistics
 import zipfile
 import zlib
 from collections import deque
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
+from functools import cached_property
 from html.parser import HTMLParser
 from typing import Any
 from xml.etree import ElementTree
@@ -131,6 +132,14 @@ MAX_XLSX_MEMBERS = 500
 #: hundreds of millions of empty cells.
 MAX_XLSX_COLUMNS = 256
 MAX_XLSX_CELLS = 5_000_000
+#: A web page may hold at most this many table rows: two per trade (a fill
+#: table's buy and sell) at the trade limit. The rows are counted before the
+#: page is parsed, so a longer page is refused at once instead of after
+#: seconds of parsing.
+MAX_HTML_ROWS = 2 * MAX_TRADES
+#: And at most this many table cells: a MetaTrader report at the size limit
+#: holds about a million (75,000 rows of 13 cells).
+MAX_HTML_CELLS = 1_500_000
 
 #: Report metadata the balance curve writes when a trade closed on the little
 #: a withdrawal left was measured on the balance before it: how many days, and
@@ -605,7 +614,13 @@ class _Row:
 
     @property
     def texts(self) -> list[str]:
-        return [cell.text for cell in self.visible]
+        return list(self._texts)
+
+    @cached_property
+    def _texts(self) -> tuple[str, ...]:
+        # Read many times per row while a page is recognised; the cells
+        # are complete once the page is parsed.
+        return tuple(cell.text for cell in self.visible)
 
     @property
     def is_mt_header(self) -> bool:
@@ -682,6 +697,23 @@ class _TableReader(HTMLParser):
 
 
 def _read_html(text: str) -> _TableReader:
+    lowered = text.lower()
+    if lowered.count("<td") + lowered.count("<th") > MAX_HTML_CELLS:
+        raise ReportFormatError(
+            "too_many_rows",
+            f"the page has more than {MAX_HTML_CELLS:,} table cells; export a shorter period "
+            "and upload that file",
+            f"la página tiene más de {MAX_HTML_CELLS:,} celdas de tabla; exporta un periodo "
+            "más corto y sube ese archivo",
+        )
+    if lowered.count("<tr") > MAX_HTML_ROWS:
+        raise ReportFormatError(
+            "too_many_rows",
+            f"the page has more than {MAX_HTML_ROWS:,} table rows; export a shorter period "
+            "and upload that file",
+            f"la página tiene más de {MAX_HTML_ROWS:,} filas de tabla; exporta un periodo "
+            "más corto y sube ese archivo",
+        )
     reader = _TableReader()
     reader.feed(text)
     reader.close()
@@ -2124,6 +2156,13 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
                 ) from exc
             return _xml(data)
 
+        if "xl/workbook.xml" not in names and _is_ods(archive, names):
+            content = load("content.xml")
+            if content is None:
+                raise ReportFormatError(
+                    "bad_xlsx", "the workbook has no sheets", "el libro de Excel no tiene hojas"
+                )
+            return _ods_sheets(content)
         workbook = load("xl/workbook.xml")
         if workbook is None:
             raise ReportFormatError(
@@ -2160,6 +2199,128 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
             if sheet is not None:
                 sheets[node.get("name", f"Sheet{position}")] = _sheet_rows(sheet, shared, percent)
         return sheets
+
+
+#: The ``mimetype`` member of an OpenDocument spreadsheet (.ods).
+ODS_MIMETYPE = b"application/vnd.oasis.opendocument.spreadsheet"
+
+
+def _is_ods(archive: zipfile.ZipFile, names: set[str]) -> bool:
+    """Whether the archive is an OpenDocument spreadsheet, by its ``mimetype``."""
+    if "mimetype" not in names or "content.xml" not in names:
+        return False
+    try:
+        mimetype = _read_member(archive, archive.getinfo("mimetype"), 200)
+    except (
+        _MemberTooLarge,
+        zipfile.BadZipFile,
+        zlib.error,
+        EOFError,
+        NotImplementedError,
+        RuntimeError,
+    ):
+        return False
+    return mimetype.strip() == ODS_MIMETYPE
+
+
+def _attribute(node: ElementTree.Element, name: str) -> str | None:
+    """An attribute by its local name, whatever its namespace."""
+    for key, value in node.attrib.items():
+        if _local(key) == name:
+            return value
+    return None
+
+
+def _repeat(node: ElementTree.Element, name: str) -> int:
+    """How many times an OpenDocument row or cell repeats (1 when unstated)."""
+    text = _attribute(node, name) or "1"
+    return int(text) if text.isdigit() and 0 < len(text) < 10 and int(text) > 0 else 1
+
+
+_ODS_TIME = re.compile(r"^PT(\d+)H(\d+)M(\d+(?:\.\d+)?)S$")
+
+
+def _ods_value(cell: ElementTree.Element) -> Any:
+    """A cell's value: a number, a percentage, a date or time as text, or its text."""
+    kind = _attribute(cell, "value-type")
+    if kind in {"float", "currency", "percentage"}:
+        number = _num(_attribute(cell, "value") or "")
+        if number is not None and kind == "percentage":
+            return PercentCell(number)
+        return number
+    if kind == "date":
+        return _attribute(cell, "date-value")
+    if kind == "time":
+        moment = _ODS_TIME.match(_attribute(cell, "time-value") or "")
+        if moment is not None:
+            # Rounded as a whole: 15:29:59.999999997 reads 15:30:00, never 15:29:60.
+            hours, minutes, seconds = moment.groups()
+            total = round(int(hours) * 3600 + int(minutes) * 60 + float(seconds))
+            return f"{total // 3600:02d}:{total // 60 % 60:02d}:{total % 60:02d}"
+        return _attribute(cell, "time-value")
+    if kind == "boolean":
+        return _attribute(cell, "boolean-value")
+    paragraphs = ["".join(node.itertext()) for node in cell if _local(node.tag) == "p"]
+    text = " ".join(part for part in paragraphs if part)
+    return text or None
+
+
+def _ods_rows(table: ElementTree.Element) -> Iterator[ElementTree.Element]:
+    """A table's own rows, inside row groups but never a table nested in a cell."""
+    pending = list(reversed(list(table)))
+    while pending:
+        node = pending.pop()
+        name = _local(node.tag)
+        if name == "table-row":
+            yield node
+        elif name in {"table-row-group", "table-header-rows", "table-rows"}:
+            pending.extend(reversed(list(node)))
+
+
+def _ods_sheets(content: ElementTree.Element) -> dict[str, list[list[Any]]]:
+    """Every table of an OpenDocument spreadsheet as rows, like ``read_xlsx``.
+
+    Blank rows and cells repeated to the sheet's edge (a million of them is
+    normal) are never laid out; a repeated row with values counts toward
+    the same cell limit as a workbook.
+    """
+    sheets: dict[str, list[list[Any]]] = {}
+    cells = 0
+    for position, table in enumerate(
+        (node for node in content.iter() if _local(node.tag) == "table"), start=1
+    ):
+        rows: list[list[Any]] = []
+        for row in _ods_rows(table):
+            values: dict[int, Any] = {}
+            index = 0
+            for cell in row:
+                if _local(cell.tag) not in {"table-cell", "covered-table-cell"}:
+                    continue
+                repeat = _repeat(cell, "number-columns-repeated")
+                value = _ods_value(cell)
+                if value not in (None, ""):
+                    for column in range(index, min(index + repeat, MAX_XLSX_COLUMNS)):
+                        values[column] = value
+                index += repeat
+                if index >= MAX_XLSX_COLUMNS:
+                    break
+            if not values:
+                rows.append([])
+                continue
+            width = max(values) + 1
+            times = _repeat(row, "number-rows-repeated")
+            cells += width * times
+            if cells > MAX_XLSX_CELLS:
+                raise _xlsx_too_big()
+            laid = [values.get(i) for i in range(width)]
+            rows.extend(list(laid) for _ in range(times))
+        name = _attribute(table, "name") or f"Sheet{position}"
+        sheets[name] = rows
+    if not sheets:
+        raise ReportFormatError(
+            "bad_xlsx", "the workbook has no sheets", "el libro de Excel no tiene hojas"
+        )
+    return sheets
 
 
 def xlsx_as_csv(data: bytes, time_headers: Sequence[str]) -> bytes:
@@ -4168,7 +4329,8 @@ _ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls", "
 
 def unwrap(data: bytes) -> bytes:
     """The export itself: a zip holding one export (not a workbook) gives
-    that file; an old Excel workbook, an OpenDocument sheet or a PDF is
+    that file; an OpenDocument spreadsheet is read like a workbook; an old
+    Excel workbook, another OpenDocument file or a PDF is
     refused with the way to get a file that can be read."""
     if data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
         raise ReportFormatError(
@@ -4198,13 +4360,15 @@ def unwrap(data: bytes) -> bytes:
         names = {info.filename for info in infos}
         if "xl/workbook.xml" in names or len(infos) > MAX_XLSX_MEMBERS:
             return data
+        if _is_ods(archive, names):
+            return data  # read_xlsx reads the OpenDocument spreadsheet
         if "mimetype" in names and "content.xml" in names:
             raise ReportFormatError(
                 "opendocument_sheet",
-                "this is an OpenDocument sheet (.ods), which cannot be read: save it as .xlsx "
-                "or CSV and upload that file",
-                "esta es una hoja OpenDocument (.ods), que no se puede leer: guárdala como "
-                ".xlsx o CSV y sube ese archivo",
+                "this OpenDocument file is not a spreadsheet, so it cannot be read: save the "
+                "trades as .xlsx, .ods or CSV and upload that file",
+                "este archivo OpenDocument no es una hoja de cálculo, así que no se puede leer: "
+                "guarda las operaciones como .xlsx, .ods o CSV y sube ese archivo",
             )
         exports = [
             info

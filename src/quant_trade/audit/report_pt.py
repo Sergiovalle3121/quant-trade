@@ -1229,6 +1229,45 @@ REPORT: dict[str, Any] = {
             " ao ano aparece com pelo menos um ano de histórico. Fonte: cotações e preços ao "
             "consumidor dos EUA de {source}, lidos ao gerar o relatório. Não muda a classe."
         ),
+        "currency_intro_local": (
+            "Os saldos da conta na sua própria moeda, de {first} a {last}, e o que valem "
+            "depois da inflação dessa moeda: se cresceram menos que os preços, a conta perdeu "
+            "poder de compra mesmo tendo crescido."
+        ),
+        "currency_account_local": "{name} (a conta)",
+        "currency_real_local": "{name}, depois da sua inflação",
+        "currency_inflation_local": (
+            "A inflação local ({code}) nessas datas foi de {total} no total."
+        ),
+        "currency_inflation_local_yearly": (
+            "A inflação local ({code}) nessas datas foi de {total} no total ({yearly} ao ano)."
+        ),
+        "currency_note_local": (
+            "Depois da sua inflação: os saldos divididos pelo índice oficial de preços ao "
+            "consumidor do país de cada mês, ou o do último mês publicado. A rentabilidade ao "
+            "ano é mostrada a partir de um ano de histórico. Dados lidos ao gerar o relatório. "
+            "Não muda a classe."
+        ),
+        "currency_note_mixed": (
+            "As linhas «depois da sua inflação» dividem pelo índice oficial de preços ao "
+            "consumidor de cada país de cada mês, ou o do último mês publicado; uma moeda sem "
+            "esse índice em dia (por enquanto, o peso mexicano e o iene) mostra só a sua linha "
+            "antes da inflação. A rentabilidade ao ano é mostrada a partir de um ano de "
+            "histórico. Cotações e preços dos EUA de {source}, lidos ao gerar o relatório. Não "
+            "muda a classe."
+        ),
+        "currency_prices": "Preços ao consumidor: {prices}.",
+        "currency_prices_through": " (preços até {month})",
+        "currency_attrib_EUR": "euro, Eurostat (via FRED)",
+        "currency_attrib_CHF": "franco suíço, índice harmonizado do Eurostat",
+        "currency_attrib_GBP": (
+            "libra, Office for National Statistics, sob a Open Government Licence v3.0"
+        ),
+        "currency_attrib_CAD": (
+            "dólar canadense, Banco do Canadá (IPC da Statistics Canada, disponível grátis em "
+            "bankofcanada.ca)"
+        ),
+        "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA do IBGE)",
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -1304,6 +1343,18 @@ REPORT: dict[str, Any] = {
             "Um relatório não é parecer jurídico, fiscal nem de investimento.",
         ],
         "refs_title": "Fontes",
+        "data_title": "Dados públicos que usamos",
+        "data": [
+            "Cotações, taxas e preços dos EUA, fechamentos de mercados e outras taxas de caixa: "
+            "FRED, Federal Reserve Bank of St. Louis.",
+            "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
+            "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
+            "Government Licence v3.0.",
+            "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
+            "dados estão disponíveis grátis em bankofcanada.ca.",
+            "Preços ao consumidor do Brasil: Banco Central do Brasil (IPCA do IBGE).",
+            "Todos são lidos ao gerar o relatório e nenhum muda a classe.",
+        ],
     },
     "TAGLINE": "Auditoria estatística independente de backtests e históricos",
     "WATERMARK_TEXT": "PRÉVIA — NÃO PAGO",
@@ -5001,6 +5052,34 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "US consumer prices do not cover the whole history",
         "os preços ao consumidor dos EUA não cobrem todo o histórico",
+    ),
+    (
+        (
+            "the levels in that currency divided by that country's official consumer price index "
+            "of each point's month, or the latest month published"
+        ),
+        (
+            "os saldos nessa moeda divididos pelo índice oficial de preços ao consumidor desse "
+            "país do mês de cada ponto, ou do último mês publicado"
+        ),
+    ),
+    (
+        (
+            "the account's own levels in its currency; return a year compounded over the "
+            "calendar days, shown from one year of history; worst fall from a peak"
+        ),
+        (
+            "os saldos da conta na sua própria moeda; rentabilidade ao ano composta sobre os "
+            "dias corridos, mostrada a partir de um ano de histórico; pior queda desde um pico"
+        ),
+    ),
+    (
+        "the consumer prices of the account's currency could not be read when the report was made",
+        "os preços ao consumidor da moeda da conta não puderam ser lidos ao gerar o relatório",
+    ),
+    (
+        "the consumer prices of the account's currency do not cover the whole history",
+        "os preços ao consumidor da moeda da conta não cobrem todo o histórico",
     ),
     (
         "the strategy's compound return a year",

@@ -76,6 +76,16 @@ no extra cost beyond what the uploaded report already lists (there is no
 hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 variants,
 at least 30 return observations. Platform reports and the MT5 optimisation export
 may be 10 MB (about 11,000 optimisation passes at some 900 bytes each).
+A web page may hold at most 100,000 table rows (`MAX_HTML_ROWS`, two per
+trade at the trade limit) and 1,500,000 table cells (`MAX_HTML_CELLS`; a
+MetaTrader report at the size limit holds about a million); both are counted
+before the page is parsed,
+so a longer page is refused at once (`too_many_rows`, in ES, EN and PT). A
+list with one trade per row counts the rows that have both times, a quantity,
+both prices above zero and, when the file has them, a readable side and
+result, before reading any date, and refuses with `too_many_trades`
+when they pass 50,000; a 60,000-trade web table is now refused in about 6 s
+instead of 9 s, most of it reading the page itself.
 A larger optimisation export is refused with what to do instead: optimise
 again with the genetic algorithm or narrower ranges, or upload the report alone
 and type the pass count in "Configurations tried" (then DECLARED).
@@ -283,10 +293,17 @@ exactly one CSV, TXT, TSV, HTML or Excel file (`__MACOSX/` copies and hidden
 files are ignored; the file inside obeys the same size limit). A web page
 that is not a MetaTrader report is read as a trade or fill table with the
 universal reader, which covers the tables brokers save with a `.xls` name;
+an OpenDocument spreadsheet (`.ods`, LibreOffice; recognised by its `mimetype`
+member) is read like an Excel workbook, with the standard library only and the
+same member, inflated-size and cell limits: numbers, currency and percentages
+come from the cell's stored value, dates and times from its ISO value, and the
+blank rows and cells a sheet repeats to its edge are never laid out (a repeated
+row with values counts toward the cell limit). It goes through the same
+detection and column screen as a workbook, so no layout is guessed;
 if no importer knows it, the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
-(`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
+Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
 default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
@@ -1397,13 +1414,42 @@ year compounded over the calendar days (only from one year of history,
 shown after US inflation: each point is divided by US consumer prices
 (`CPIAUCNS`, not seasonally adjusted, as BLS recommends for deflating between
 arbitrary dates) of its own month or the latest month published, at most 75 days
-old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. The
-deflator is US only (FRED has no current consumer price index for most of the
-other currencies), so the currency figures are before their own inflation and
-the note says so. It runs only for a dollar account: an imported report that
-names `USD` or `USC` (or `USDT`/`USDC`, read at one dollar per coin, which the
-note says), or a file that names no currency, in which case a line
-says it is read as dollars; another named currency leaves it NOT_MEASURED.
+old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. Each
+currency's row is followed by the same figures after that currency's own
+inflation (`market.LOCAL_CPI`): the levels in that currency divided by the
+country's official consumer price index of each point's month, or the latest
+month published, at most 75 days old (`MAX_CPI_GAP_DAYS`). FRED's copies of
+these indexes stopped updating (2021-2025), so each comes from an official
+publisher whose terms allow reuse in a paid service with attribution, read at
+run time with no key: the euro area's HICP (Eurostat, through FRED,
+`CP0000EZ19M086NEST`), Switzerland's HICP (Eurostat API, `prc_hicp_minr`,
+`CH`), the UK's CPI (ONS time series `D7BT`, Open Government Licence v3.0),
+Canada's CPI (Statistics Canada's, through the Bank of Canada's Valet API,
+`V41690973`; the Bank asks paid services to say the data is free on its
+site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
+Central do Brasil's SGS series 433, monthly changes chained into an index
+from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
+month, refuses the reply, since a broken link would leave its inflation out of
+every later level). The IMF's CPI
+dataset, which covers every currency, needs written permission for
+commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
+official APIs need a registered key, so the peso and the yen show no row
+after inflation yet, and the note says so. Each row after inflation credits
+its source by name and link, as each licence asks; `/metodologia` lists
+them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
+refuses Python's default); FRED keeps the default. It runs for a dollar
+account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
+read at one dollar per coin, which the note says), or a file that names no
+currency, in which case a line says it is read as dollars. When a report
+names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+currency and after that currency's inflation, with the local inflation over
+the dates; without those prices it is NOT_MEASURED with the reason. Another
+named currency leaves it NOT_MEASURED. A price index reply below 1 or above
+10,000,000, or with two consecutive months more than 3 times apart
+(`MAX_PRICE_STEP`), is taken as broken. When the last point is more than 45
+days past the start of the last price month used (`STALE_TAIL_DAYS`), the row
+after inflation says "prices through {month}": the months after it are not
+deflated. The same applies to the dollar row after US inflation.
 Needs 90 days of history. A reply above 10,000 for any of these series is
 taken as broken. It never changes the class.
 
@@ -2642,6 +2688,8 @@ Redesign pass 65 comes from reading a full report on a 360 px phone as an outsid
 Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
 
 Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
+
+Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?". The yearly figures sit right-aligned, the fund's average return is a shaded total row set off by a rule, and the alpha's range and reading is a ruled line like the other readings. In the PDF the table and its introduction stay on one page instead of leaving the total row alone on the next. On a 360 px phone the fee table's "2 % + 20 %" label ran the page 15 px wide; it now wraps.
 
 ## Security
 
