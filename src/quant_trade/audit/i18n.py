@@ -994,6 +994,52 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "menos de 20 retornos con el mercado agitado (VIX en 20 o más)",
     ),
     ("the curve reaches zero", "la curva llega a cero"),
+    (
+        (
+            "the dollar levels converted at the Federal Reserve's noon buying rate of each day "
+            "(FRED H.10); return a year compounded over the calendar days, shown from one year of"
+            " history; worst fall from a peak in that currency; before that currency's own "
+            "inflation; a USDT or USDC account is read at one dollar per coin"
+        ),
+        (
+            "los saldos en dólares convertidos al tipo de cambio del mediodía de la Reserva "
+            "Federal de cada día (FRED H.10); rentabilidad al año compuesta sobre los días "
+            "naturales, mostrada desde un año de historial; peor caída desde un máximo en esa "
+            "moneda; antes de la inflación de esa moneda; una cuenta en USDT o USDC se lee a un "
+            "dólar por moneda"
+        ),
+    ),
+    (
+        (
+            "the dollar levels divided by US consumer prices (FRED CPIAUCNS) of each point's "
+            "month, or the latest month published; US inflation only"
+        ),
+        (
+            "los saldos en dólares divididos entre los precios al consumidor de EE. UU. (FRED "
+            "CPIAUCNS) del mes de cada punto, o del último mes publicado; solo inflación de EE. "
+            "UU."
+        ),
+    ),
+    (
+        "no currency is named in the file, so the curve is read as US dollars",
+        "el archivo no nombra la moneda, así que la curva se lee en dólares de EE. UU.",
+    ),
+    (
+        "the account is not in US dollars",
+        "la cuenta no está en dólares de EE. UU.",
+    ),
+    (
+        "the exchange rates could not be read when the report was made",
+        "no se pudieron leer los tipos de cambio al generar el informe",
+    ),
+    (
+        "US consumer prices could not be read when the report was made",
+        "no se pudieron leer los precios al consumidor de EE. UU. al generar el informe",
+    ),
+    (
+        "US consumer prices do not cover the whole history",
+        "los precios al consumidor de EE. UU. no cubren todo el historial",
+    ),
     ("the strategy's compound return a year", "la rentabilidad compuesta anual de la estrategia"),
     (
         "the market's public closes could not be read when the report was made",
