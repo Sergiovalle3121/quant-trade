@@ -2510,6 +2510,8 @@ Redesign pass 63 styles the report's new statistics blocks. The 95 % ranges ("¿
 
 Redesign pass 64 styles the currency section ("¿Cuánto valió la cuenta en tu moneda y después de la inflación?"). The account's own dollar row is shaded as the reference, and a rule separates the two dollar rows from the other currencies. On a phone, currency names had wrapped to four lines; they now keep a wider first column, as do the rows of the calm/turbulent market table. In the PDF the table is set smaller, so the section fits one page.
 
+Redesign pass 65 comes from reading a full report on a 360 px phone as an outside customer would. Charts and wide tables that scroll sideways looked cut off with no sign there was more; they now fade at the right edge until scrolled to the end (only elements that actually scroll, and only in browsers with scroll-driven animations; others look as before). In the evidence rows (trade statistics, benchmark, declared values) the tag sat between the name and the value and squeezed names onto three lines; the value now sits beside the name and the tag goes underneath. Prop-firm cards now read the challenge name as the card's title, with the number of phases below it.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

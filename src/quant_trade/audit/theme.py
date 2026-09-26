@@ -1260,6 +1260,17 @@ STATS = """
 table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
 @media (max-width:420px){.facts.ranges .fact b{white-space:normal}}
 table.currency tr.cur-base td{background:var(--surface-2);font-weight:600}
+@keyframes scroll-cue{0%,96%{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent)}
+100%{-webkit-mask-image:none;mask-image:none}}
+@media screen and (max-width:759px){
+.paper figure.chart,.paper .chart-scroll,.paper .tscroll,.paper table:not(.ev):not(.firms){animation:scroll-cue linear both;animation-timeline:scroll(self inline)}
+.paper figure.chart figcaption{max-width:calc(100vw - 88px)}
+.metrics.ev tr{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+.metrics.ev td.val{grid-area:1/2}
+.metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}
+.firms td:first-child{font-size:.95rem!important;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.firms td:first-child br{display:none}
+.firms td:first-child small{display:block;margin-top:3px;font-size:.78rem;font-weight:500;letter-spacing:0;color:var(--text-3)}}
 table.currency tr.cur-real td{border-bottom:2px solid var(--border-2)}
 @media screen and (max-width:420px){.paper table.holding td:first-child{min-width:8.6em}
 .paper table.holding td{padding-left:4px!important;padding-right:4px!important}}
