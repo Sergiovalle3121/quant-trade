@@ -865,8 +865,9 @@ _UI: dict[str, dict[str, Any]] = {
                 "Restamos lo que pagaba el efectivo en las mismas fechas, en la moneda de tu "
                 "cuenta si tu reporte la indica y es una de estas (pesos mexicanos, "
                 "reales, euros, libras, yenes, "
-                "dólares canadienses o francos suizos) y, si no, en dólares (letras del Tesoro "
-                "de EE. UU. a 3 meses). Datos públicos oficiales. Ves el Sharpe sin lo que ya "
+                "dólares canadienses o francos suizos); si no indica moneda o está en dólares, "
+                "en dólares (letras del Tesoro de EE. UU. a 3 meses); en otra moneda, esa "
+                "línea no se calcula. Datos públicos oficiales. Ves el Sharpe sin lo que ya "
                 "daba el efectivo y, si subes un benchmark, el alfa también.",
             ),
             (
@@ -1086,9 +1087,10 @@ _UI: dict[str, dict[str, Any]] = {
                 "We subtract what cash paid over the same dates, in your account's currency "
                 "when your report names it and it is one of these (Mexican "
                 "pesos, reais, euros, pounds, yen, Canadian "
-                "dollars or Swiss francs) and otherwise in dollars (3-month US Treasury bills). "
-                "Official public data. You see the Sharpe without what cash already paid and, "
-                "if you upload a benchmark, the alpha too.",
+                "dollars or Swiss francs); if it names no currency or is in dollars, in "
+                "dollars (3-month US Treasury bills); in another currency, that line is not "
+                "computed. Official public data. You see the Sharpe without what cash already "
+                "paid and, if you upload a benchmark, the alpha too.",
             ),
             (
                 "chart",

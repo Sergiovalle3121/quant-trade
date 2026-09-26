@@ -120,6 +120,13 @@ def test_the_cash_card_uses_the_accounts_currency_for_the_sharpe_and_the_alpha(
     }[locale]
     # Since #347 the alpha subtracts the account currency's cash rate too.
     assert currency in cash and alpha in cash
+    # Since #352 another named currency without a local rate gets no cash line.
+    no_line = {
+        "es": "esa línea no se calcula",
+        "en": "that line is not computed",
+        "pt": "essa linha não é calculada",
+    }[locale]
+    assert no_line in cash
     assert not find_claims(cash)
 
 
