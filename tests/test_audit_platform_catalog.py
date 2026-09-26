@@ -1020,3 +1020,21 @@ def test_a_percent_column_is_never_read_as_money() -> None:
         ]
     )
     assert [round(t.pnl, 2) for t in report.trades.trades] == [1000.0]
+
+
+@pytest.mark.parametrize("header", ["Date,Return %", "Fecha,Rendimiento %", "Data,Retorno %"])
+def test_a_returns_file_never_reaches_the_trade_reader(header: str) -> None:
+    # The %-name rule lives in the trade/fill reader only; a return series
+    # goes to schema.parse_equity_csv, which this change does not touch.
+    data = (header + "\n2024-01-31,1.5%\n2024-02-29,-0.5%\n").encode()
+    from quant_trade.audit.importers import detect_format  # noqa: PLC0415
+
+    assert detect_format(data, "returns.csv") is None
+
+
+def test_the_percent_rule_covers_only_money_and_size_roles() -> None:
+    from quant_trade.audit.universal import AMOUNT_ROLES, _role_of  # noqa: PLC0415
+
+    assert _role_of("Profit %") is None and _role_of("% Profit") is None
+    assert "profit" in AMOUNT_ROLES and "time" not in AMOUNT_ROLES
+    assert _role_of("Profit") == ("profit", 0)
