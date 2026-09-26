@@ -156,3 +156,24 @@ def test_a_failing_fund_is_called_a_fund_in_the_summary() -> None:
     first = _TEXT["es"][f"{overall}.fund"]
     assert result.verdict.summary.startswith(first)  # type: ignore[attr-defined]
     assert "backtest" not in first
+
+
+def test_a_grid_with_its_index_shows_no_robot_steps_and_a_measured_benchmark() -> None:
+    # Value's walk of a fund report: a 72-month grid with the index on alternating rows.
+    from test_audit_fund_benchmark import _labelled_grid
+
+    fund, index = _pair(72)
+    result = _run(_labelled_grid(fund, index, "alternating"))
+    assert _status(result)["benchmark"] != "NOT_MEASURED"
+    data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+    plan = " ".join(
+        " ".join([step.title, step.finding, *step.actions]) for step in improvement_plan(data, "es")
+    )
+    for phrase in (
+        "XML de la optimización",
+        "corre el EA sin cambios",
+        "Compara con una alternativa pasiva",
+    ):
+        assert phrase not in plan
+    page = render(result, watermark=False)[0]  # type: ignore[arg-type]
+    assert "no se subió un benchmark" not in page
