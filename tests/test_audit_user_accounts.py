@@ -3148,3 +3148,21 @@ def test_wrong_password_lines_exist_in_every_language(tmp_path: Path) -> None:
     for locale, words in (("es", "contraseña incorrecta"), ("en", "wrong password")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
         assert words in privacy and not find_claims(privacy)
+
+
+def test_every_account_screen_is_kept_out_of_search_engines(tmp_path: Path) -> None:
+    from quant_trade.audit import seo
+
+    client, _, _ = _client(tmp_path)
+    robots = client.get("/robots.txt").text
+    for locale in account_pages.LANGUAGES:
+        for name, path in account_pages.PATHS[locale].items():
+            assert path.startswith(seo.DISALLOWED_PATHS), (locale, name)
+            assert f"Disallow: {path}" in robots, (locale, name)
+        for name in ("signup", "signin", "forgot", "account"):
+            got = client.get(account_pages.path(name, locale), follow_redirects=False)
+            assert got.headers.get("x-robots-tag") == seo.NOINDEX, (locale, name)
+        assert account_pages.two_step_path(locale).startswith(seo.DISALLOWED_PATHS)
+    # No public page is caught by an account prefix.
+    public = [p for pair in seo.PUBLIC_PAGES for p in pair.values()]
+    assert not [p for p in public if p.startswith(seo.DISALLOWED_PATHS)]
