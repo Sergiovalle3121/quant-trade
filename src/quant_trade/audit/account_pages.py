@@ -1303,7 +1303,7 @@ def strategies_section(
             badge = _class_badge(latest.overall_class) if latest is not None else ""
             items.append(
                 f"<li class='acct-card strat-item'>{badge}<div><b>{_e(strategy.name)}</b>"
-                f"<span class='muted'> · {_e(versions)}</span></div>"
+                f"<span class='muted strat-n'>{_e(versions)}</span></div>"
                 f"<a class='btn btn-ghost btn-sm' href='{base}/{_e(strategy.id)}'>"
                 f"{_e(copy['open'])}</a></li>"
             )
@@ -1364,20 +1364,26 @@ def strategy_page(
     locale = _locale(locale)
     copy = SCOPY[locale]
     base = f"{strategies_path(locale)}/{strategy.id}"
+    figure_keys = ("col_sharpe", "col_dsr", "col_dd")
     head = "".join(
-        f"<th>{_e(copy[k])}</th>"
-        for k in ("col_version", "col_date", "col_class", "col_sharpe", "col_dsr", "col_dd")
+        f"<th>{_e(copy[k])}</th>" for k in ("col_version", "col_date", "col_class", *figure_keys)
     )
+    # The word beside each change gets the colour of its meaning: better, worse or neither.
+    tones = {copy["better"]: "up", copy["worse"]: "down"}
     rows = []
     blocks = []
     previous: tuple[AccountAudit, dict[str, Any] | None] | None = None
     for number, (item, result) in enumerate(versions, start=1):
         full = comparable(item, free_mode=free_mode) and result is not None
         if full and result is not None:
-            cells = "".join(f"<td>{_e(text)}</td>" for text in figures_text(headline(result)))
+            cells = "".join(
+                f"<td class='strat-fig' data-label='{_e(copy[key])}'>{_e(text)}</td>"
+                for key, text in zip(figure_keys, figures_text(headline(result)), strict=True)
+            )
         else:
             cells = (
-                f"<td colspan='3'><span class='acct-tag'>{_e(copy['locked'])}</span> "
+                "<td class='strat-locked' colspan='3'>"
+                f"<span class='acct-tag'>{_e(copy['locked'])}</span> "
                 f"<a href='{_e(report_href(item.audit_id, locale))}'>{_e(copy['unlock'])}</a>"
                 "</td>"
             )
@@ -1389,9 +1395,10 @@ def strategy_page(
             "</form>"
         )
         rows.append(
-            f"<tr><td>v{number}</td><td>{_e(_date(item.created_at))}</td>"
-            f"<td><a href='{_e(report_href(item.audit_id, locale))}'>"
-            f"{_class_badge(item.overall_class)}</a></td>{cells}<td>{remove}</td></tr>"
+            f"<tr><td>v{number}</td><td class='strat-date'>{_e(_date(item.created_at))}</td>"
+            f"<td class='strat-cls'><a href='{_e(report_href(item.audit_id, locale))}'>"
+            f"{_class_badge(item.overall_class)}</a></td>{cells}"
+            f"<td class='strat-rm'>{remove}</td></tr>"
         )
         if previous is not None:
             prev_item, prev_result = previous
@@ -1400,7 +1407,9 @@ def strategy_page(
             if full and prev_full and prev_result is not None and result is not None:
                 lines = what_changed(prev_result, result, locale)
                 items = "".join(
-                    f"<li><span>{_e(what)}</span> <b>{_e(word)}</b></li>" for what, word in lines
+                    f"<li><span>{_e(what)}</span> "
+                    f"<b class='strat-word is-{tones.get(word, 'flat')}'>{_e(word)}</b></li>"
+                    for what, word in lines
                 )
                 compare_href = (
                     f"{path('account', locale)}/comparar?id={prev_item.audit_id}"
@@ -1408,7 +1417,8 @@ def strategy_page(
                 )
                 blocks.append(
                     f"<div class='acct-card strat-change'><h3>v{number}: {_e(title)}</h3>"
-                    f"<ul>{items}</ul><p><a class='btn btn-ghost btn-sm' href='{compare_href}'>"
+                    f"<ul>{items}</ul><p class='strat-cmp'>"
+                    f"<a class='btn btn-ghost btn-sm' href='{compare_href}'>"
                     f"{_e(copy['side_by_side'])}</a></p></div>"
                 )
             else:
@@ -1445,7 +1455,8 @@ def strategy_page(
         "</div>"
     )
     back = (
-        f"<p><a class='btn btn-ghost' href='{path('account', locale)}#estrategias'>"
+        f"<p class='strat-back'><a class='btn btn-ghost' "
+        f"href='{path('account', locale)}#estrategias'>"
         f"{_e(copy['back'])}</a></p>"
     )
     body = (
@@ -1473,13 +1484,56 @@ def strategy_page(
 
 STRATEGY_CSS = """
 .strat-list{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:10px}
-.strat-item{display:flex;gap:14px;align-items:center;padding:14px 18px}
+.strat-item{display:flex;gap:14px;align-items:center;padding:14px 18px;
+transition:border-color .2s var(--ease)}
+.strat-item:hover{border-color:var(--border-2)}
 .strat-item>div{flex:1;min-width:0}
+.strat-item b{overflow-wrap:anywhere}
+.strat-n{font-size:.9rem}
+.strat-n::before{content:' · '}
 .strat-file{max-width:560px}
 .strat-file select,.strat-file input{width:100%}
-.strat-change{margin:14px 0}
-.strat-change ul{margin:0;padding-left:18px;display:grid;gap:6px}
-.strat-change h3{margin:0 0 10px;font-size:1rem}
-.strat-manage{margin-top:28px}
+.strat-table td{font-variant-numeric:tabular-nums;vertical-align:middle}
+.strat-table td:first-child{font-family:var(--mono);font-weight:600}
+.strat-table .strat-fig{font-family:var(--mono)}
+.strat-table .strat-rm{text-align:right}
+.strat-table .strat-rm .btn{color:var(--text-2)}
 .strat-table td form{margin:0}
+.strat-change{margin:14px 0}
+.strat-change h3{margin:0 0 12px;font-size:1rem}
+.strat-change ul{list-style:none;margin:0;padding:0}
+.strat-change li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+padding:10px 0;border-top:1px solid var(--border)}
+.strat-change li:first-child{border-top:0;padding-top:0}
+.strat-word{flex:none;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:99px;
+border:1px solid var(--border);color:var(--text-2);background:var(--surface-2);
+white-space:nowrap}
+.strat-word.is-up{color:var(--ok);border-color:currentColor;
+background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.strat-word.is-down{color:var(--bad);border-color:currentColor;
+background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.strat-cmp{margin:16px 0 0}
+.strat-manage{margin-top:28px;align-items:start}
+.strat-back{margin-top:24px}
+@media (max-width:620px){
+.strat-item{flex-wrap:wrap;gap:10px 14px}
+.strat-item>div{flex-basis:calc(100% - 60px)}
+.strat-item>.btn{width:100%;justify-content:center}
+.strat-n{display:block;margin-top:2px}
+.strat-n::before{content:none}
+.strat-table thead{display:none}
+.paper table.strat-table,.strat-table{border:0;background:none;box-shadow:none;overflow:visible}
+.strat-table,.strat-table tbody{display:block}
+.strat-table tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px 12px;
+align-items:center;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border);
+border-radius:16px;background:var(--surface)}
+.strat-table td{padding:0;border:0}
+.strat-table .strat-fig,.strat-table .strat-locked,.strat-table .strat-rm{grid-column:1/-1}
+.strat-table .strat-fig{display:flex;justify-content:space-between;gap:12px;
+padding-top:8px;border-top:1px solid var(--border)}
+.strat-table .strat-fig::before{content:attr(data-label);font-family:var(--sans);
+color:var(--text-2);font-size:.85rem}
+.strat-table .strat-rm{text-align:left}
+.strat-table .strat-rm .btn{width:100%;justify-content:center}
+.strat-change li{flex-direction:column;align-items:flex-start;gap:6px}}
 """
