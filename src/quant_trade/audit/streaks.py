@@ -15,13 +15,29 @@ longest losing run chance gives, the run it reaches one time in twenty, and
 how often chance reaches the observed run. A low figure says the losses came
 closer together than a random order of the same trades would put them.
 
+Up to ``EXACT_MAX_TRADES`` trades the odds are those of the same trades in
+random order exactly: the ``L`` losses are placed among the ``n`` positions
+uniformly, and the ways to keep every run under ``k`` are the ways to share
+``L`` losses among the ``n - L + 1`` gaps between the other trades with at
+most ``k - 1`` in each (inclusion-exclusion, counted in whole numbers):
+
+    N(k) = sum_j (-1)^j C(n - L + 1, j) C(n - j k, n - L)
+
+so ``P(longest run >= k) = 1 - N(k) / C(n, L)``. Losing independently at
+the same rate spreads the runs wider than a shuffle of a fixed set of
+losses does (30 trades with 6 losses: a run of 4 has odds 3.4 % one way,
+1.4 % the other). Above ``EXACT_MAX_TRADES`` the two agree closely and the
+recurrence above is used, because the exact count grows too slow.
+
 Every figure describes the uploaded trades in random order; nothing here
 predicts a future streak, and none of it changes the class.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import math
+from collections.abc import Callable, Sequence
+from fractions import Fraction
 from typing import Any
 
 import numpy as np
@@ -36,6 +52,9 @@ RARE = 0.05
 CLUSTERED = 0.05
 #: More trades than this take too long to count exactly.
 MAX_TRADES = 100_000
+#: Up to this many trades the odds shuffle the same trades exactly; above it
+#: the independent-loss recurrence stands in (about a second at this size).
+EXACT_MAX_TRADES = 5_000
 
 KEYS = ("losing_run_chance", "losing_run_rare", "losing_run_odds")
 
@@ -61,6 +80,35 @@ def longest_run_tail(n: int, q: float, max_k: int) -> np.ndarray:
     return np.clip(tail, 0.0, 1.0)
 
 
+def shuffle_tail(n: int, losses: int, k: int) -> float:
+    """``P(longest run of losses >= k)`` when ``losses`` of ``n`` trades lose
+    and every order of them is equally likely, exactly."""
+    if k <= 0:
+        return 1.0
+    if k > losses:
+        return 0.0
+    others = n - losses
+    gaps = others + 1
+    ways = 0
+    for j in range(min(gaps, losses // k) + 1):
+        term = math.comb(gaps, j) * math.comb(losses - j * k + others, others)
+        ways += -term if j % 2 else term
+    return 1.0 - float(Fraction(ways, math.comb(n, losses)))
+
+
+def _longest_at_least(tail: Callable[[int], float], top: int, probability: float) -> int:
+    """The longest run ``k`` whose ``tail(k)`` is still at least ``probability``
+    (``tail`` falls as ``k`` grows; ``tail(0)`` is 1)."""
+    low, high = 0, top
+    while low < high:
+        middle = (low + high + 1) // 2
+        if tail(middle) >= probability:
+            low = middle
+        else:
+            high = middle - 1
+    return low
+
+
 def loss_streak_review(pnl: Sequence[float]) -> dict[str, Any]:
     """The observed longest losing run next to the one chance gives."""
     values = np.asarray(pnl, dtype=float)
@@ -81,6 +129,19 @@ def loss_streak_review(pnl: Sequence[float]) -> dict[str, Any]:
     for flag in losing:
         run = run + 1 if flag else 0
         observed = max(observed, run)
+    if n <= EXACT_MAX_TRADES:
+        losses = int(losing.sum())
+        cache: dict[int, float] = {}
+
+        def tail_at(k: int) -> float:
+            if k not in cache:
+                cache[k] = shuffle_tail(n, losses, k)
+            return cache[k]
+
+        median = _longest_at_least(tail_at, losses, 0.5)
+        rare = _longest_at_least(tail_at, losses, RARE)
+        odds = tail_at(observed)
+        return _review(median, rare, odds)
     # Long enough to hold the observed run and the chance tail beyond it.
     max_k = min(n, max(observed, 1) + 1)
     tail = longest_run_tail(n, q, max_k)
@@ -89,6 +150,10 @@ def loss_streak_review(pnl: Sequence[float]) -> dict[str, Any]:
         tail = longest_run_tail(n, q, max_k)
     median = int(np.max(np.nonzero(tail >= 0.5)[0]))
     rare = int(np.max(np.nonzero(tail >= RARE)[0]))
+    return _review(median, rare, float(tail[observed]))
+
+
+def _review(median: int, rare: int, odds: float) -> dict[str, Any]:
     return {
         "losing_run_chance": measured(
             median,
@@ -98,7 +163,7 @@ def loss_streak_review(pnl: Sequence[float]) -> dict[str, Any]:
             rare, "longest losing run chance reaches once in twenty, at the same loss rate"
         ),
         "losing_run_odds": measured(
-            float(tail[observed]),
+            odds,
             "chance of a losing run at least this long, at the same loss rate",
         ),
     }

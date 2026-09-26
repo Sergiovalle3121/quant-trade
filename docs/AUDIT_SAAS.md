@@ -998,12 +998,26 @@ month, the deepest fall and the longest run of months below a previous high
   more and above 1.96/sqrt(n) (Getmansky, Lo and Makarov, 2004); the
   volatility is then also shown unsmoothed, from
   `(r_t - rho r_{t-1}) / (1 - rho)` (Geltner, 1993);
-- `few_small_losses`: months in [-sd/2, 0) against the average of the two
-  neighbouring bins, (0, sd/2] and [-sd, -sd/2), with at least 10 months in
-  those two, and a one-sided Poisson p-value below 0.01 (the discontinuity
-  at zero of Bollen and Pool, 2009). Bins of a quarter deviation, or a
-  normal reference, made honest US market windows (2000-2024) fire; at half
-  a deviation no 5, 10 or 20-year window of the US market since 1927 does.
+- `few_small_losses`: months in [-sd/2, 0) against the two neighbouring
+  bins, (0, sd/2] and [-sd, -sd/2), with at least 10 months in those two
+  (the discontinuity at zero of Bollen and Pool, 2009). Given the months in
+  the three bins, the small-loss count is tested one-sided against the
+  binomial share that a normal curve with the record's own mean and
+  deviation gives that bin; the finding needs p below 0.01. The earlier test
+  (Poisson against the neighbours' plain average) ignored the neighbours'
+  own noise and the curve's slope near zero: on simulated normal months with
+  a mean of 3 % and a deviation of 2 % it fired 5.7 % of the time over 240
+  months instead of 1 %; the binomial share fires 0.5 %. Over every rolling
+  window of the US market (Fama-French market return, 1926-2026) it fires on
+  8 of 1,143 five-year windows (was 14), 3 of 1,083 ten-year windows (was 9)
+  and none of the twenty-year windows. Peaked, fat-tailed months (Laplace)
+  still fire more often than 1 %: the finding stays a question, never a flag.
+- Months: a return is measured only between two consecutive calendar months
+  that both have a level, so a month missing from the file is a hole
+  (`missing_months`), never one "month" spanning two. A file with a row every
+  quarter or year is not a monthly record and the section is not measured. A
+  daily benchmark's final month is left out when it ends more than 7 days
+  before the month's end.
 
 Net of fees (DECLARED). A fund's returns are its own figures after its
 fees, so the upload form has a box for it ("Son rentabilidades de un fondo,
