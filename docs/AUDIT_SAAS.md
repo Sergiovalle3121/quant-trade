@@ -2834,6 +2834,8 @@ Redesign pass 70 walks the fund-record report after its fund-only sections lande
 
 Redesign pass 71 checks the new «¿Cambió su rentabilidad media en algún momento?» section at 360 and 390 px in ES, EN and PT, with and without a change found, and in the PDF. Its two figures use the paired cards from pass 70; the source line under them gets the same space above it as the line under the summary tiles.
 
+Redesign pass 72 walks the fund report with its new verdict against the file's own index, at 360 and 390 px in ES, EN and PT and in the PDF. The screen needed nothing. In the PDF, the bootstrap table's header row sat alone at the foot of a page and the multiplicity section's opening line was split from its table; a table's first row and a section's opening line now stay with what follows, and the page count is unchanged.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
