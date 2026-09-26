@@ -104,12 +104,12 @@ def test_visits_are_bare_counters_per_day_language_and_tag(tmp_path: Path) -> No
     assert _browser(client).get("/en").status_code == 200
     assert _browser(client).get("/?lang=en").status_code == 200
     assert _browser(client).get("/?lang=pt").status_code == 200
+    # "/" shows Spanish whatever ``lang`` says, unless it asks for English.
     assert _visits(client) == {
-        ("es", ""): 1,
+        ("es", ""): 2,
         ("es", "f6"): 1,
         ("pt", "f6"): 1,
         ("en", ""): 2,
-        ("pt", ""): 1,
     }
     columns = {column.name for column in store.funnel_visits.columns}  # type: ignore[attr-defined]
     assert columns == {"day", "locale", "ref", "visits"}

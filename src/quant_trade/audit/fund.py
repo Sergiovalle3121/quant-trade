@@ -47,6 +47,7 @@ import pandas as pd
 from quant_trade.audit.alpha import jensen_alpha
 from quant_trade.audit.crises import crisis_review
 from quant_trade.audit.schema import measured, not_measured
+from quant_trade.audit.skill import monthly_cash, skill_review
 
 #: Periods per year at or below which a file counts as a monthly track record.
 MAX_PERIODS_PER_YEAR = 13.0
@@ -197,8 +198,11 @@ def _capture(fund: np.ndarray, index: np.ndarray) -> float | None:
     return float(np.prod(1.0 + fund) ** (1.0 / k) - 1.0) / index_mean
 
 
-def compare_with_benchmark(fund: pd.Series, index: pd.Series, source: str) -> dict[str, Any]:
-    """The fund against its benchmark over the months both share."""
+def compare_with_benchmark(
+    fund: pd.Series, index: pd.Series, source: str, rates: pd.Series | None = None
+) -> dict[str, Any]:
+    """The fund against its benchmark over the months both share; ``rates``
+    (FRED DTB3, percent) sets cash for the skill split when they cover it."""
     left = _by_month(fund)
     right = _by_month(index)
     shared = pd.concat({"fund": left, "index": right}, axis=1, join="inner").dropna()
@@ -241,6 +245,7 @@ def compare_with_benchmark(fund: pd.Series, index: pd.Series, source: str) -> di
         "findings": [],
     }
     review["jensen"] = jensen_alpha(f, b, 12.0)
+    review["skill"] = skill_review(f, b, monthly_cash(rates, pd.PeriodIndex(shared.index)))
     if tracking > 0:
         review["information_ratio"] = measured(float(active.mean()) * 12.0 / tracking)
     for key, value in (("up_capture", up), ("down_capture", down)):
@@ -263,6 +268,7 @@ def fund_review(
     periods_per_year: float,
     benchmark: pd.Series | None = None,
     benchmark_source: str = "file",
+    rates: pd.Series | None = None,
 ) -> dict[str, Any]:
     """Calendar table, allocator figures and the two fund tests; with a
     benchmark's month-end returns, the comparison with it."""
@@ -349,7 +355,7 @@ def fund_review(
         if p_value < SMALL_P_VALUE:
             review["findings"].append("few_small_losses")
     if benchmark is not None:
-        review["benchmark"] = compare_with_benchmark(series, benchmark, benchmark_source)
+        review["benchmark"] = compare_with_benchmark(series, benchmark, benchmark_source, rates)
     review["crises"] = crisis_review(series, benchmark)
     return review
 

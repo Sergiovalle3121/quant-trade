@@ -4322,21 +4322,122 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "return beyond the benchmark's moves (Jensen's alpha), annualised; Newey-West "
-            "standard error; no cash rate subtracted"
+            "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious standard "
+            "error; no cash rate subtracted"
         ),
         (
             "rentabilidade além dos movimentos do benchmark (alfa de Jensen), anualizada; erro "
-            "padrão de Newey-West; sem subtrair a taxa do caixa"
+            "padrão prudente; sem subtrair a taxa do caixa"
         ),
     ),
     (
-        "alpha over its Newey-West standard error; beyond about 2 it is unlikely to be chance",
         (
-            "alfa dividido pelo seu erro padrão de Newey-West; acima de 2, aproximadamente, é "
-            "pouco provável que seja acaso"
+            "alpha over its cautious standard error (the largest of HC3, Newey-West and one "
+            "widened for autocorrelated misses); beyond about 2 it is unlikely to be chance"
+        ),
+        (
+            "alfa dividido pelo seu erro padrão prudente (o maior entre HC3, Newey-West e um "
+            "ampliado por erros autocorrelacionados); acima de 2, aproximadamente, é pouco "
+            "provável que seja só acaso"
         ),
     ),
+    (
+        (
+            "average yearly return split into cash, exposure to the benchmark (beta times its "
+            "return over cash) and what is left (alpha); the three add up to the fund's average"
+        ),
+        (
+            "rentabilidade anual média dividida entre caixa, exposição ao benchmark (beta vezes o "
+            "seu retorno acima do caixa) e o que sobra (alfa); as três partes somam a média do "
+            "fundo"
+        ),
+    ),
+    (
+        "cash is the 3-month US Treasury bill (FRED DTB3, converted to an annual yield)",
+        (
+            "o caixa é a letra do Tesouro dos EUA de 3 meses (FRED DTB3, convertida em rendimento "
+            "anual)"
+        ),
+    ),
+    (
+        (
+            "no cash rate was available, so cash is taken as zero and the alpha also holds (1 - "
+            "beta) times what cash paid"
+        ),
+        (
+            "não havia taxa do caixa disponível, então o caixa é tomado como zero e o alfa inclui "
+            "também (1 - beta) vezes o que o caixa pagou"
+        ),
+    ),
+    (
+        (
+            "exposure with last month's benchmark return added (Dimson, 1979); late or smoothed "
+            "prices hide part of the exposure from the plain beta"
+        ),
+        (
+            "exposição somando o retorno do benchmark do mês anterior (Dimson, 1979); preços "
+            "atrasados ou suavizados fazem o beta simples não ver parte da exposição"
+        ),
+    ),
+    (
+        (
+            "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more of "
+            "the market before rises than before falls"
+        ),
+        (
+            "termo do benchmark ao quadrado (Treynor e Mazuy, 1966); acima de zero, o fundo teve "
+            "mais exposição ao mercado antes das altas do que antes das quedas"
+        ),
+    ),
+    (
+        "95 % range of the yearly alpha, cautious standard error and Student's t",
+        "intervalo de 95 % do alfa anual, com erro padrão prudente e t de Student",
+    ),
+    (
+        (
+            "months a record with this alpha and this noise would need before the alpha is two "
+            "standard errors from zero"
+        ),
+        (
+            "meses de que um histórico com este alfa e este ruído precisaria para o alfa ficar a "
+            "dois erros padrão de zero"
+        ),
+    ),
+    (
+        "fewer than 36 months shared with the benchmark",
+        "menos de 36 meses em comum com o benchmark",
+    ),
+    ("the alpha is not above zero", "o alfa não é maior que zero"),
+    ("already two standard errors from zero", "já está a dois erros padrão de zero"),
+    (
+        (
+            "the exposure to the benchmark is not two standard errors from zero, so the split is "
+            "not shown as a share"
+        ),
+        (
+            "a exposição ao benchmark não está a dois erros padrão de zero, então a divisão não é "
+            "mostrada como proporção"
+        ),
+    ),
+    ("beta over its cautious standard error", "beta dividido pelo seu erro padrão prudente"),
+    (
+        "the exposure alone is larger than the fund's whole return",
+        "a exposição sozinha é maior que todo o retorno do fundo",
+    ),
+    (
+        "the exposure took away from the fund's return rather than adding to it",
+        "a exposição tirou do retorno do fundo em vez de somar",
+    ),
+    (
+        "the benchmark's returns take too few distinct values for the regressions",
+        "os retornos do benchmark têm poucos valores distintos para as regressões",
+    ),
+    ("the series are not on the same months", "as séries não estão nos mesmos meses"),
+    (
+        "the fund's average return is not above zero",
+        "o retorno médio do fundo não é maior que zero",
+    ),
+    ("the fund moves exactly with the benchmark", "o fundo se move exatamente como o benchmark"),
     (
         "fewer than 24 periods shared with the benchmark",
         "menos de 24 períodos em comum com o benchmark",
