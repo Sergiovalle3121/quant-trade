@@ -57,6 +57,7 @@ REF_TAGS: dict[str, str] = {
     "f9": "F9 · el Sharpe en la moneda de tu cuenta",
     "f10": "F10 · Revolut o Zerodha",
     "f11": "F11 · cuenta protegida",
+    "f12": "F12 · ¿cambió la rentabilidad media?",
     "v1": "V1 · vendedor de EA",
     "d1": "D1 · trader de retos",
     "d2": "D2 · copiar o invertir con otro",

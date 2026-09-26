@@ -56,13 +56,14 @@ COPY_PT: dict[str, Any] = {
     ),
     "form_title": "Pedir uma auditoria",
     "report": "Relatório da sua plataforma (recomendado)",
-    "report_short": "Do jeito que a sua plataforma salva: HTML, XLSX ou CSV, até 10 MB.",
+    "report_short": "Do jeito que a sua plataforma salva: HTML, XLSX, CSV ou PDF, até 10 MB.",
     "report_help": (
         "O arquivo como está: relatório HTML do testador ou do histórico do MetaTrader 5 ou 4 "
         "(ou o XLSX que o MetaTrader 5 exporta), a lista de operações do TradingView (CSV ou "
         "XLSX), o CSV de operações do NinjaTrader, QuantConnect, backtesting.py ou vectorbt, ou "
         "o histórico de operações em CSV ou Excel de qualquer outra corretora ou exchange. "
-        "Reconhece o formato de exportação de " + PLATFORMS_PT + ". Até 10 MB."
+        "Reconhece o formato de exportação de " + PLATFORMS_PT + ". Também um extrato em PDF "
+        "com a tabela de operações: antes de medir você revisa as colunas. Até 10 MB."
     ),
     "live": "Extrato da conta real ou demo (opcional)",
     "live_help": (
@@ -237,7 +238,8 @@ COPY_PT: dict[str, Any] = {
             "da MQL5 exportam. Da sua corretora, exchange ou diário, o histórico de operações em "
             "CSV ou Excel: reconhece o formato de exportação de " + PLATFORMS_PT + ", e em "
             "qualquer outro as colunas são reconhecidas pelo nome. Uma curva de equity em CSV "
-            "também serve.",
+            "também serve, ou um extrato em PDF com a tabela de operações, cujas colunas você "
+            "revisa antes de medir.",
         ),
         (
             "Serve para ações, cripto, futuros ou um fundo?",
@@ -304,7 +306,10 @@ COPY_PT: dict[str, Any] = {
             "precisas duas destas três coisas: sua senha, o código do app ou sua chave de "
             "recuperação. Em Minha conta você vê onde sua conta está aberta e encerra cada "
             "sessão, e vê suas entradas e mudanças de segurança mais recentes (até 90 dias), "
-            "incluindo as tentativas com senha incorreta.",
+            "incluindo as tentativas com senha incorreta. Você também pode entrar com uma "
+            "chave de acesso: a digital, o rosto ou o PIN do seu celular ou computador, sem "
+            "digitar a senha. Em Minha conta, «Proteção da sua conta» mostra o que está ativado "
+            "e como ativar o que falta.",
         ),
         (
             "Como se usa o selo?",
@@ -477,8 +482,9 @@ UI_PT: dict[str, Any] = {
             "Na sua moeda e depois da inflação",
             "Se a conta está em dólares, você vê o resultado em reais, pesos mexicanos, "
             "euros e mais "
-            "quatro moedas ao câmbio de cada dia, e depois da inflação dos EUA (dados públicos "
-            "do FRED).",
+            "quatro moedas ao câmbio de cada dia, e cada uma, também o dólar, depois da sua "
+            "própria inflação. Se a conta está em uma dessas moedas, você a vê depois da "
+            "inflação dessa moeda. Câmbio do FRED e preços oficiais de cada país.",
         ),
     ],
     "how_eyebrow": "Processo",
@@ -508,7 +514,10 @@ UI_PT: dict[str, Any] = {
         "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
         "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
         "agitado e crises conhecidas",
-        "Se a conta está em dólares: o resultado na sua moeda e depois da inflação",
+        "Na sua moeda e depois da sua própria inflação: dólares, reais, pesos mexicanos, "
+        "euros, libras, ienes, dólares canadenses e francos suíços",
+        "Se a sua rentabilidade média mudou em algum momento, e quando "
+        "(com 250 rentabilidades ou mais)",
         "Página pública de verificação com selo",
     ],
     "upload_eyebrow": "Comece aqui",

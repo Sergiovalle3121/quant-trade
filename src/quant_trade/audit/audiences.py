@@ -1004,8 +1004,19 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "cero, cuántos meses harían falta.",
                     ),
                     (
+                        "Frente a su propio índice",
+                        "Si la tabla de su ficha trae una fila con su índice, el informe compara "
+                        "el fondo con él en los meses que comparten (24 o más): la rentabilidad "
+                        "anual de cada uno, los meses por encima, la beta y cómo se mueve cuando "
+                        "el índice sube o baja. Como es el índice que eligió el gestor, superarlo "
+                        "nunca basta por sí solo para una clase A. Si subes otro índice aparte, "
+                        "se usa ese.",
+                    ),
+                    (
                         "Preguntas para el gestor",
-                        "Qué pedirle, a partir de lo que su archivo no responde.",
+                        "Qué pedirle, a partir de lo que su archivo no responde: desde cuándo "
+                        "no cambia su proceso, si algún tramo es simulado y si las cifras son "
+                        "netas de comisiones.",
                     ),
                 ),
                 limits=(
@@ -1098,8 +1109,19 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "told apart from zero, how many months that would take.",
                     ),
                     (
+                        "Against its own index",
+                        "If its factsheet table has a row with its index, the report compares the "
+                        "fund with it over the months they share (24 or more): each one's annual "
+                        "return, the months above it, the beta and how it moves when the index "
+                        "rises or falls. Since the manager chose that index, beating it is never "
+                        "enough on its own for a class A. If you upload another index separately, "
+                        "that one is used.",
+                    ),
+                    (
                         "Questions for the manager",
-                        "What to ask them, based on what their file does not answer.",
+                        "What to ask them, based on what their file does not answer: since "
+                        "when their process has not changed, whether any stretch is simulated "
+                        "and whether the figures are net of fees.",
                     ),
                 ),
                 limits=(
@@ -1190,8 +1212,19 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "zero, quantos meses seriam precisos.",
                     ),
                     (
+                        "Frente ao seu próprio índice",
+                        "Se a tabela da ficha traz uma linha com o seu índice, o relatório "
+                        "compara o fundo com ele nos meses em comum (24 ou mais): o retorno anual "
+                        "de cada um, os meses acima, o beta e como se move quando o índice sobe "
+                        "ou cai. Como é o índice que o gestor escolheu, superá-lo nunca basta "
+                        "sozinho para uma classe A. Se você enviar outro índice à parte, usa-se "
+                        "esse.",
+                    ),
+                    (
                         "Perguntas para o gestor",
-                        "O que perguntar, a partir do que o arquivo dele não responde.",
+                        "O que perguntar, a partir do que o arquivo dele não responde: desde "
+                        "quando o processo não muda, se algum trecho é simulado e se os números "
+                        "são líquidos de taxas.",
                     ),
                 ),
                 limits=(

@@ -142,6 +142,13 @@ def test_the_landing_says_how_an_account_is_protected(locale: str) -> None:
     answers = [answer for _, answer in _COPY[locale]["faq"] if two_of_three in answer]
     assert len(answers) == 1 and sessions in answers[0] and "90" in answers[0]
     assert not find_claims(answers[0])
+    # Passkeys (#362) and the protection card (#365) are named where Mi cuenta names them.
+    passkey, card = {
+        "es": ("llave de acceso", "Protección de tu cuenta"),
+        "en": ("passkey", "Your account's protection"),
+        "pt": ("chave de acesso", "Proteção da sua conta"),
+    }[locale]
+    assert passkey in answers[0] and card in answers[0]
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
@@ -163,3 +170,55 @@ def test_the_fund_page_names_the_cash_market_and_alpha_split(locale: str) -> Non
     checks = " ".join(f"{title} {text}" for title, text in page.text[locale].checks)
     assert "36" in checks and {"es": "alfa", "en": "alpha", "pt": "alfa"}[locale] in checks
     assert not find_claims(checks)
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_currency_card_says_each_currency_after_its_own_inflation(locale: str) -> None:
+    card = next(text for icon, _, text in _UI[locale]["diffs"] if icon == "globe")
+    own = {"es": "su propia inflación", "en": "its own inflation", "pt": "sua própria inflação"}
+    # Since #346 and #358 each currency is deflated by its own prices, not US ones.
+    assert own[locale] in card and "FRED" in card
+    assert not find_claims(card)
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_full_report_list_names_the_mean_shift(locale: str) -> None:
+    line = {
+        "es": "Si su rentabilidad media cambió en algún momento, y cuándo (con 250 "
+        "rentabilidades o más)",
+        "en": "Whether its average return changed at some point, and when (with 250 "
+        "returns or more)",
+        "pt": "Se a sua rentabilidade média mudou em algum momento, e quando (com 250 "
+        "rentabilidades ou mais)",
+    }[locale]
+    assert line in _UI[locale]["full_items"]
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_fund_page_says_its_own_index_cannot_make_an_a(locale: str) -> None:
+    from quant_trade.audit.audiences import AUDIENCE_PAGES
+
+    page = next(p for p in AUDIENCE_PAGES if p.slug == "inversores-gestores-fondos")
+    title = {
+        "es": "Frente a su propio índice",
+        "en": "Against its own index",
+        "pt": "Frente ao seu próprio índice",
+    }[locale]
+    text = dict(page.text[locale].checks)[title]
+    # verdict.overall_class(own_index=True) never lets the file's own index give an A.
+    assert "24" in text and {"es": "clase A", "en": "class A", "pt": "classe A"}[locale] in text
+    assert not find_claims(f"{title} {text}")
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_landing_says_a_pdf_statement_is_accepted(locale: str) -> None:
+    page = html.unescape(landing(locale=locale, free_mode=False, price_usd=29, access_codes=True))
+    phrase = {
+        "es": "un estado de cuenta en PDF con su tabla de operaciones",
+        "en": "a PDF statement with its trade table",
+        "pt": "um extrato em PDF com a tabela de operações",
+    }[locale]
+    # pdf_tables.py reads only a ruled trade table, and the column screen always opens.
+    assert phrase in page.replace("\n", " ")
+    assert "accept='.htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf'" in page
+    assert not find_claims(page)
