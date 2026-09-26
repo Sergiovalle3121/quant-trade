@@ -748,13 +748,13 @@ The report builds your trades from the buys and sells (a deposit never counts as
 #### F11 · ES · Cuando alguien pregunta si es seguro
 
 ```text
-Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves las entradas de los últimos 90 días. Más en las preguntas frecuentes: https://rigor.up.railway.app/?ref=f11#faq
+Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves tus entradas más recientes (hasta 90 días). Más en las preguntas frecuentes: https://rigor.up.railway.app/?ref=f11#faq
 ```
 
 #### F11 · EN · When someone asks whether it is safe
 
 ```text
-Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see the sign-ins of the last 90 days. More in the FAQ: https://rigor.up.railway.app/en?ref=f11#faq
+Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see your most recent sign-ins (up to 90 days). More in the FAQ: https://rigor.up.railway.app/en?ref=f11#faq
 ```
 
 ### Mensajes directos

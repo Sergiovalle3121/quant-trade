@@ -410,8 +410,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "(Google Authenticator, 1Password u otra): entonces, para entrar o recuperar la "
                 "cuenta hacen falta dos de estas tres cosas: tu contraseña, el código de la app "
                 "o tu clave de recuperación. En Mi cuenta ves dónde está abierta tu cuenta y "
-                "cierras cada sesión, y ves las entradas y los cambios de seguridad de los "
-                "últimos 90 días.",
+                "cierras cada sesión, y ves tus entradas y cambios de seguridad más recientes "
+                "(hasta 90 días).",
             ),
             (
                 "¿Cómo se usa el sello?",
@@ -705,8 +705,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "Authenticator, 1Password or another): then signing in or recovering the "
                 "account takes two of these three: your password, the code from the app or "
                 "your recovery key. In My account you see where your account is open and "
-                "sign out each session, and you see the sign-ins and security changes of the "
-                "last 90 days.",
+                "sign out each session, and you see your most recent sign-ins and security "
+                "changes (up to 90 days).",
             ),
             (
                 "How is the badge used?",
