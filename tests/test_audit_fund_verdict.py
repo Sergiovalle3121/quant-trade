@@ -137,11 +137,9 @@ def test_no_plan_step_asks_a_fund_for_robot_files(locale: str) -> None:
     for fund in (_pair()[0], rng.normal(-0.004, 0.03, 60), rng.normal(0.002, 0.03, 60)):
         result = _run(_dated(fund), locale, trials=40)
         data = result.model_dump(mode="json")  # type: ignore[attr-defined]
-        # The history step (how much more record is needed) has its own fund wording.
         text = " ".join(
             " ".join([step.title, step.finding, *step.actions])
             for step in improvement_plan(data, locale)
-            if step.dimension != "statistical_significance"
         )
         for word in ("MT5", "EA ", "XML", "coste por lado", "cost per side", "optimiza", "optimis"):
             assert word not in text, (locale, word)
