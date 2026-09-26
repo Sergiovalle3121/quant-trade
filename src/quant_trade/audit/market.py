@@ -280,7 +280,7 @@ MIN_LOCAL_RATE = -5.0
 #: More currencies whose cash rate is the central bank's policy rate as the BIS
 #: compiles it, by the BIS's area code. Each series was read whole on
 #: 2026-09-26: every month from its start to mid-2026 present, within
-#: ``MIN_LOCAL_RATE``..``MAX_LOCAL_RATE``. Left out: the rouble (210 % in 2022,
+#: ``MIN_LOCAL_RATE``..``MAX_LOCAL_RATE``. Left out: the rouble (210 % in 1993-94,
 #: above ``MAX_LOCAL_RATE``), the Argentine peso (stale since mid-2025), the
 #: Philippine peso (missing months), the Singapore dollar (no series; the MAS
 #: steers the exchange rate), the yuan (the BIS series is a lending rate) and the

@@ -1511,9 +1511,9 @@ period). The same BIS series gives the cash rate of 22 more currencies
 HUF, RON, ISK, TRY, ILS, SAR, IDR, THB, MYR, CLP, COP, PEN), each read whole on
 26 September 2026 with every month present and within the rate bounds. Each
 quote uses its overnight market's day count (`cashrate.BIS_BASIS`: 365 days
-for AUD, NZD, INR, ZAR, KRW, NOK, PLN, ILS, THB and MYR, 360 for the rest; at
+for AUD, NZD, INR, ZAR, KRW, NOK, PLN, ILS, THB, MYR and TRY, 360 for the rest; at
 5 % the two differ by under a tenth of a point a year). Left out: the rouble
-(210 % in 2022, above the bound), the Argentine peso (the BIS series stops in
+(210 % in 1993-94, above the bound), the Argentine peso (the BIS series stops in
 mid-2025), the Philippine peso (missing months), the Singapore dollar (no
 series; the MAS steers the exchange rate), the yuan (the BIS series is a
 lending rate, above what cash earned) and the Hong Kong dollar (the base rate

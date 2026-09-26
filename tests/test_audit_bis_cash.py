@@ -51,6 +51,7 @@ def test_every_bis_currency_is_a_monthly_bis_series_with_its_own_day_count() -> 
     ten = np.array([10.0])
     assert LOCAL["AUD"].yearly(ten)[0] == pytest.approx((1 + 0.10 / 365) ** 365 - 1)
     assert LOCAL["SEK"].yearly(ten)[0] == pytest.approx((1 + 0.10 / 360) ** 365 - 1)
+    assert LOCAL["TRY"].yearly(ten)[0] == pytest.approx((1 + 0.10 / 365) ** 365 - 1)
     # Left out on purpose: no usable series, or not a cash rate.
     for code in ("RUB", "ARS", "PHP", "SGD", "CNY", "HKD"):
         assert code not in LOCAL

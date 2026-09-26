@@ -109,10 +109,11 @@ class LocalCash:
 #: actual/365 (sterling's convention), 360 elsewhere. Between the two, a 5 %
 #: rate moves by less than a tenth of a point a year.
 BIS_BASIS: dict[str, float] = {
-    **dict.fromkeys(("AUD", "NZD", "INR", "ZAR", "KRW", "NOK", "PLN", "ILS", "THB", "MYR"), 365.0),
     **dict.fromkeys(
-        ("SEK", "DKK", "CZK", "HUF", "RON", "ISK", "TRY", "SAR", "IDR", "CLP", "COP", "PEN"),
-        360.0,
+        ("AUD", "NZD", "INR", "ZAR", "KRW", "NOK", "PLN", "ILS", "THB", "MYR", "TRY"), 365.0
+    ),
+    **dict.fromkeys(
+        ("SEK", "DKK", "CZK", "HUF", "RON", "ISK", "SAR", "IDR", "CLP", "COP", "PEN"), 360.0
     ),
 }
 _BY_CODE = {asset.label: asset for asset in LOCAL_CASH}
