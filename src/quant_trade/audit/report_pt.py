@@ -1023,6 +1023,18 @@ REPORT: dict[str, Any] = {
             "Fechamentos do {label}: dados públicos de {source} lidos ao gerar o relatório. "
             "Nenhum dos dois Sharpe subtrai a taxa do caixa. Não muda a classe."
         ),
+        "cash_sharpe": (
+            "Subtraindo o que o caixa em dólares pagava nessas mesmas datas (letras do Tesouro "
+            "dos EUA de 3 meses, {rate} ao ano em média), o Sharpe fica em {sharpe}."
+        ),
+        "cash_below": (
+            "Rendeu menos que o caixa em dólares nessas datas ({ret} ao ano frente a {rate} "
+            "das letras do Tesouro de 3 meses)."
+        ),
+        "cash_note": (
+            "O Sharpe acima não subtrai nenhuma taxa. Se a conta não é em dólares, o justo "
+            "seria subtrair a taxa da sua própria moeda. Fonte: {source}."
+        ),
     },
     "LINK_TEXT": {
         "terms": "Termos de serviço",
@@ -4459,6 +4471,34 @@ RULES: tuple[tuple[str, str], ...] = (
             "dias sem subtrair a taxa do caixa, anualizado pelos dias observados; correlação e "
             "beta com rentabilidades semanais de sexta a sexta"
         ),
+    ),
+    (
+        (
+            "Sharpe ratio of the returns after subtracting what the 3-month US Treasury bill "
+            "paid over the same days (FRED DTB3, converted from the discount rate to an annual "
+            "yield), annualised like the headline Sharpe; a dollar rate"
+        ),
+        (
+            "Sharpe dos retornos após subtrair o que a letra do Tesouro dos EUA de 3 meses "
+            "pagou nos mesmos dias (FRED DTB3, convertida de taxa de desconto para rendimento "
+            "anual), anualizado como o Sharpe principal; é uma taxa em dólares"
+        ),
+    ),
+    (
+        "the Treasury bill rates could not be read when the report was made",
+        "as taxas das letras do Tesouro não puderam ser lidas ao gerar o relatório",
+    ),
+    (
+        "the Treasury bill rates do not cover the whole history",
+        "as taxas das letras do Tesouro não cobrem todo o histórico",
+    ),
+    (
+        "the returns never move",
+        "os retornos nunca se movem",
+    ),
+    (
+        "the strategy's compound return a year",
+        "a rentabilidade composta anual da estratégia",
     ),
     (
         "fewer than 12 weeks shared with the market's public closes",
