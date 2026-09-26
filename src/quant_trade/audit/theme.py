@@ -1264,6 +1264,7 @@ display:none!important}
 .meaning .item,.kpi,.flag-list li{border:1px solid #ddd!important}
 .paper table{display:table}
 h2,.detail h3{break-after:avoid;page-break-after:avoid}.facts{orphans:1;widows:1}
+.detail>h2+p,.paper tr:first-child{break-after:avoid;page-break-after:avoid}
 table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
 .badge,.verdict,.ring,.meaning .item::before{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .watermark{position:fixed}

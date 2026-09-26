@@ -1267,6 +1267,12 @@ def test_paired_figures_sit_two_per_row_on_phones() -> None:
     assert ".facts.pairs .fact b{font-size:1.5rem;overflow-wrap:anywhere}" in phone
 
 
+def test_a_table_header_row_is_not_left_alone_at_a_pdf_page_end() -> None:
+    # The bootstrap table's header row sat alone at the foot of a PDF page,
+    # and a section's opening line was split from the table it introduces.
+    assert ".detail>h2+p,.paper tr:first-child{break-after:avoid;page-break-after:avoid}" in STYLE
+
+
 def test_the_line_under_the_summary_tiles_has_room() -> None:
     # Also the source line under a pair of figures, such as the mean-shift section.
     assert ".kpis+p,.facts+p.muted{margin-top:14px}" in STYLE
