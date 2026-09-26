@@ -296,7 +296,7 @@ def test_portuguese_pages_link_english_only_where_there_is_no_portuguese(tmp_pat
     sample = client.get("/pt/exemplo").text
     # The terms exist in Spanish and English: a Portuguese reader gets English.
     assert "?lang=en'" in sample and "/terminos?lang=es" not in sample
-    assert "hreflang='en'>English</a>" in sample and ">Español</a>" in sample
+    assert "hreflang='en'" in sample and ">English</a>" in sample and ">Español</a>" in sample
     files = {"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")}
     posted = client.post(
         "/audits", files=files, data={"consent": "on", "locale": "pt"}, follow_redirects=False

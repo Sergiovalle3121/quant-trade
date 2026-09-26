@@ -302,6 +302,29 @@ per import; the column screen offers a web table only up to
 `mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
+Revolut's stocks account statement (`Date, Ticker, Type, Quantity, Price per
+share, Total Amount, Currency, FX Rate`, rows as reproduced from a real file in
+github.com/antonioaversa/taxes) is read by the universal fill reader:
+`BUY - MARKET`/`SELL - LIMIT` are the sides, cash rows (top-ups, custody fees,
+dividends) have no price and are dropped, and a `STOCK SPLIT` row
+(`universal.SPLIT_WORDS`) rescales a long position's open lots by the shares it
+adds or removes, keeping their cost (a 1-for-10 reverse split of 100 shares
+arrives as -90); a split of shares not held changes nothing, and one that would
+leave no shares is not applied and is counted in `SPLIT_EMPTIES_WARNING`. Prices in USD print without a sign, like every amount.
+
+Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
+trade_date, exchange, segment, series, trade_type, auction, quantity, price,
+trade_id, order_id, order_execution_time`, header as checked by the open-source
+github.com/prabusw/beancount-importers-india importer) is read by the universal
+fill reader. Fills are timed by `order_execution_time`, ranked above the
+date-only `trade_date`, so intraday trades pair in the order they happened
+whatever the row order. A clock-only execution time joins `trade_date`, and a
+blank one falls back to `trade_date` at the start of that day
+(`universal.DATE_ONLY_FILLS_WARNING` counts those fills, since their order
+within the day is unknown). No F&O lot multiplier is applied (the result is the
+price move times the stated quantity, and the report says so). The XLSX
+download is not named: its layout is unconfirmed.
+
 B3's Área do Investidor Negociação extract is read by column name only
 (`tests/test_audit_b3.py`): `Data do Negócio` is the fill time and always day
 first (`universal.DAY_FIRST_NAMES`), `Tipo de Movimentação` the side
@@ -1286,6 +1309,29 @@ that barely moves), the line says in words that it earned less than cash
 covering the whole history, otherwise it is NOT_MEASURED and not shown. It
 never changes the class.
 
+Cash in the account's own currency (`cashrate.LOCAL`, `market.LOCAL_CASH`).
+When an imported report names the account currency and it is one of MXN,
+BRL, EUR, GBP, JPY, CAD or CHF, the same line subtracts that currency's own
+cash rate instead of the US bill's: Mexico's, Brazil's, Japan's and Canada's
+immediate (overnight interbank) rates from the OECD (`IRSTCI01…M156N`,
+monthly averages), the euro's €STR (`ECBESTRVOLWGTTRMDMNRT`, daily, from
+October 2019; before it, the euro area's OECD immediate rate `IRSTCI01EZM156N`,
+monthly, fills only the earlier dates, `EUR_CASH_HISTORY`), sterling's SONIA (`IUDSOIA`, daily) and, because the Swiss
+immediate rate stops in 2024, Switzerland's 3-month interbank rate
+(`IR3TIB01CHM156N`, monthly). Each quote becomes an annual yield by its own
+convention: a simple rate over its tenor on a 360-day (MXN, EUR, CHF) or
+365-day (GBP, JPY, CAD) year, rolled over for a year,
+`(1 + r·t/basis)^(365/t) - 1`; Brazil's is already a compounded annual yield
+and is used as it is. A daily rate may be 10 days old before a return's
+start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
+average or the latest published). These series may be negative (the franc,
+euro and yen rates were); a reply outside -5 % to 200 % a year
+(`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
+taken as broken. When the currency has no series here, or its rates cannot
+be read or do not cover the history, the
+line stays the US bill's, with its note. Jensen's alpha keeps the US bill.
+It never changes the class.
+
 Calm and turbulent markets (`audit/regime.py`). With public data on, every
 report adds the section "How did it do in calm and in turbulent markets?".
 Each return is placed by the VIX (CBOE, FRED `VIXCLS`, read in the
@@ -2074,6 +2120,50 @@ changes what a report says.
   the data export; the row goes with the account. The account forms that ask
   for the current password (recovery key, password change, deletion) share
   `accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR` per network and per account.
+- **Two-step sign-in** (`two_step` and `two_step_challenges` tables,
+  `/cuenta/dos-pasos`, `/entrar/codigo`, EN `/login/code`): optional, with an
+  authenticator app (TOTP, RFC 6238: HMAC-SHA1, 6 digits, 30 s, one step of
+  drift, `accounts.totp_match`). Turning it on asks for the password and needs
+  a recovery key first; the page shows the 160-bit secret once, as a QR code
+  drawn in the page (`segno`, inline SVG, nothing loaded from outside) and as
+  text, and nothing changes until a first code confirms it (which also signs
+  out the account's other browsers). After a correct
+  password, a two-step account gets a 5-minute challenge cookie
+  (`rigor_2step`, only its hash stored) instead of a session; the code page
+  accepts a code only if its step is newer than the last one used (an
+  update that names the step, so a code never works twice, even at once).
+  Code tries count toward `accounts.MAX_TOTP_TRIES_PER_HOUR` (10) per network
+  and per account. A lost phone: the recovery key on the code page (after
+  the password) signs in once and turns two-step off. On `/olvide`, a
+  two-step account needs the key and a current code (the key is checked
+  first without being spent, so only its holder learns two-step is on), so
+  the key alone never takes the account; a lost phone and a forgotten
+  password go to the owner. Turning it off in Mi
+  cuenta asks for a current code. The owner can turn it off with
+  `quant-trade audit account-two-step-off EMAIL --yes` after checking the
+  request. The secret is stored as is (a code check needs it); the export
+  shows only when it was turned on.
+- **Open sessions** (`session_info` table, "Sesiones abiertas" in Mi cuenta,
+  `/cuenta/sesiones/cerrar` and `/cerrar-otras`): each session keeps a short
+  device label (`accounts.device_label`, such as "Chrome · Windows"; the full
+  browser string is never stored), its network (`accounts.network_address`)
+  and its last use, updated at most every 10 minutes, with a random handle
+  to sign it out by (never the token or its hash). The list marks this
+  browser; signing out this browser's own row signs it out. Sessions opened
+  before the table existed fill in on their next use. Rows go with their
+  session (sign-out, "sign out the others", password change, expiry through
+  `purge_sessions`) and with the account; the export lists each session's
+  device, network and last use.
+- **Recent activity** (`account_events` table, "Actividad reciente" in Mi
+  cuenta): each sign-in (password only, with the app's code, or with the
+  recovery key), sign-up, password change (in the account, with the recovery
+  key or with an owner reset link), two-step on or off (also by the owner's
+  `audit account-two-step-off`), new recovery key and session signed out,
+  with its time, device label and network (the same values as "Sesiones
+  abiertas"). The latest 50 per account are kept (`store.ACCOUNT_EVENT_MAX`);
+  older than 90 days (`ACCOUNT_EVENT_DAYS`) they go with `purge_sessions`,
+  which every sign-in runs. They go with the account, and the export lists
+  them under `activity`. Failed sign-ins are not listed.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2510,6 +2600,12 @@ Redesign pass 63 styles the report's new statistics blocks. The 95 % ranges ("¿
 
 Redesign pass 64 styles the currency section ("¿Cuánto valió la cuenta en tu moneda y después de la inflación?"). The account's own dollar row is shaded as the reference, and a rule separates the two dollar rows from the other currencies. On a phone, currency names had wrapped to four lines; they now keep a wider first column, as do the rows of the calm/turbulent market table. In the PDF the table is set smaller, so the section fits one page.
 
+Redesign pass 65 comes from reading a full report on a 360 px phone as an outside customer would. Charts and wide tables that scroll sideways looked cut off with no sign there was more; they now fade at the right edge until scrolled to the end (only elements that actually scroll, and only in browsers with scroll-driven animations; others look as before). In the evidence rows (trade statistics, benchmark, declared values) the tag sat between the name and the value and squeezed names onto three lines; the value now sits beside the name and the tag goes underneath. Prop-firm cards now read the challenge name as the card's title, with the number of phases below it. The same pass styles the two-step pages: on /cuenta/dos-pasos the note's shield icon had no size and filled the screen; it is now icon-sized beside the note, the QR code sits on a white card, the six-digit code field reads as a code (monospaced, spaced, centred) on both that page and /entrar/codigo, and "¿Perdiste el teléfono?" opens from a card.
+
+Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
+
+Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -2719,6 +2815,15 @@ Informational only: none of these moves a class, a dimension or a red flag.
   compounded over the month's days, read once per audit through the same
   lookup as the cash-rate Sharpe. Without it, cash is zero and `cash_basis`
   says so. Informational: no flag, no class, no headline.
+  The report (ES, EN, PT) shows it in the fund-versus-index block as "How
+  much is cash, how much is the market and what is left?": the three parts
+  and the total in a table, the exposure share or why there is none, the
+  alpha with its 95 % range, t and the usual reading of |t| against 2, and
+  the months needed with "arithmetic, not a promise" (past 600 months it
+  says even 50 years would not be enough). The lagged line shows only when
+  the lag's t is 2 or more and the lagged beta is higher; the timing line
+  only when |t| is 2 or more. With the split measured, it replaces the plain
+  Jensen line there, since its alpha is after cash.
 - The risk section carries `versus_shuffle` (the same 30-return floor as the
   resampled risk, and at least five losing periods): the uploaded maximum
   drawdown against up to 1,000 random orders of the same returns (seed

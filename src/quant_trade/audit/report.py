@@ -751,6 +751,60 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_bench_beat": "Meses en que superó al índice",
         "fund_bench_te": "Error de seguimiento anual (ratio de información {ir})",
         "fund_bench_beta": "Beta frente al índice (correlación {corr})",
+        "skill_title": "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?",
+        "skill_intro": (
+            "Con {n} meses en común con el índice, la rentabilidad media del fondo al año se "
+            "reparte en tres partes que suman el total: lo que pagaban las letras del Tesoro de "
+            "EE. UU. a 3 meses, la exposición al índice y lo que queda."
+        ),
+        "skill_intro_no_cash": (
+            "Con {n} meses en común con el índice, la rentabilidad media del fondo al año se "
+            "reparte en tres partes que suman el total. No había tasa del efectivo para esas "
+            "fechas: se toma como cero, así que el alfa incluye también lo que el efectivo "
+            "habría pagado."
+        ),
+        "skill_part": "Parte",
+        "skill_year": "Al año",
+        "skill_cash": "Efectivo (letras del Tesoro)",
+        "skill_exposure": (
+            "Exposición al índice (beta {beta} por lo que el índice rindió sobre el efectivo)"
+        ),
+        "skill_alpha": "Lo que queda (alfa)",
+        "skill_total": "Rentabilidad media del fondo (media aritmética)",
+        "skill_share": (
+            "La exposición al índice explica el {share} de la rentabilidad del fondo; el "
+            "efectivo va aparte."
+        ),
+        "skill_no_share": "Sin proporción de la exposición: {reason}.",
+        "skill_range": "Alfa al año: {alpha}, rango al 95 % de {low} a {high} (t = {t}).",
+        "skill_needed": (
+            "Con este alfa y este ruido harían falta unos {m} meses de historial en total (hoy hay "
+            "{n}) para que el "
+            "alfa quedara a dos errores estándar de cero. Es una cuenta, no una promesa: no dice "
+            "que el alfa exista ni que vaya a seguir."
+        ),
+        "skill_needed_long": (
+            "Con este alfa y este ruido, ni 50 años de historial bastarían para que el alfa "
+            "quedara a dos errores estándar de cero. Es una cuenta, no una promesa: no dice que "
+            "el alfa exista ni que vaya a seguir."
+        ),
+        "skill_lagged": (
+            "Sumando el retorno del índice del mes anterior (Dimson), la beta sube de {beta} a "
+            "{lagged}: parte de la exposición llega con un mes de retraso, algo típico de "
+            "precios suavizados o tardíos, y la beta simple no la ve. El alfa con esta "
+            "corrección es {alpha} al año."
+        ),
+        "skill_timing_up": (
+            "El fondo ganó más en los meses de mercado muy movido de lo que su beta explica "
+            "(Treynor y Mazuy, t = {t}): lo da acertar el momento o tener posiciones con forma "
+            "de opción. Descontado eso, el alfa de selección es {alpha} al año."
+        ),
+        "skill_timing_down": (
+            "El fondo ganó menos en los meses de mercado muy movido de lo que su beta explica "
+            "(Treynor y Mazuy, t = {t}): lo da equivocar el momento o vender opciones, y le "
+            "restó rentabilidad."
+        ),
+        "skill_nm": "Sin reparto entre efectivo, mercado y alfa: {reason}.",
         "fund_bench_up": "Captura al alza: parte de las subidas del índice que recoge",
         "fund_bench_down": "Captura a la baja: parte de las caídas del índice que recoge",
         "fund_bench_trails": (
@@ -1303,6 +1357,27 @@ LABELS: dict[str, dict[str, str]] = {
             "El Sharpe de arriba no resta ninguna tasa. Si la cuenta no es en dólares, lo justo "
             "sería restar la tasa de su propia moneda. Fuente: {source}."
         ),
+        "cash_sharpe_local": (
+            "Restando lo que pagaba el efectivo en la moneda de la cuenta ({code}) en esas "
+            "mismas fechas ({name}, {rate} al año en promedio), el Sharpe queda en {sharpe}."
+        ),
+        "cash_below_local": (
+            "Rindió menos que el efectivo en la moneda de la cuenta ({code}) en esas fechas "
+            "({ret} al año frente a {rate} de la {name})."
+        ),
+        "cash_note_local": (
+            "El Sharpe de arriba no resta ninguna tasa. La cuenta está en {code}, así que aquí "
+            "se resta la tasa de esa moneda, no la de EE. UU. Fuente: {source}."
+        ),
+        "cash_rate_MXN": "tasa interbancaria a un día de México (OCDE)",
+        "cash_rate_BRL": "tasa interbancaria a un día de Brasil (OCDE)",
+        "cash_rate_EUR": (
+            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la de la OCDE)"
+        ),
+        "cash_rate_GBP": "tasa a un día de la libra, SONIA (Banco de Inglaterra)",
+        "cash_rate_JPY": "tasa interbancaria a un día de Japón (OCDE)",
+        "cash_rate_CAD": "tasa interbancaria a un día de Canadá (OCDE)",
+        "cash_rate_CHF": "tasa interbancaria a 3 meses de Suiza (OCDE)",
         "kpi_hint_pf": "lo ganado por cada 1 perdido",
         "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
         "bps_side": "pb por lado",
@@ -1872,6 +1947,57 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_bench_beat": "Months it beat the benchmark",
         "fund_bench_te": "Annual tracking error (information ratio {ir})",
         "fund_bench_beta": "Beta to the benchmark (correlation {corr})",
+        "skill_title": "How much is cash, how much is the market and what is left?",
+        "skill_intro": (
+            "Over {n} months shared with the benchmark, the fund's average yearly return splits "
+            "into three parts that add up to the total: what 3-month US Treasury bills paid, "
+            "exposure to the benchmark, and what is left."
+        ),
+        "skill_intro_no_cash": (
+            "Over {n} months shared with the benchmark, the fund's average yearly return splits "
+            "into three parts that add up to the total. No cash rate covered those dates: cash "
+            "is taken as zero, so the alpha also holds what cash would have paid."
+        ),
+        "skill_part": "Part",
+        "skill_year": "A year",
+        "skill_cash": "Cash (Treasury bills)",
+        "skill_exposure": (
+            "Exposure to the benchmark (beta {beta} times the benchmark's return over cash)"
+        ),
+        "skill_alpha": "What is left (alpha)",
+        "skill_total": "The fund's average return (arithmetic mean)",
+        "skill_share": (
+            "Exposure to the benchmark explains {share} of the fund's return; cash is separate."
+        ),
+        "skill_no_share": "No share for the exposure: {reason}.",
+        "skill_range": "Alpha a year: {alpha}, 95 % range {low} to {high} (t = {t}).",
+        "skill_needed": (
+            "With this alpha and this noise, a record would need about {m} months in all (it has "
+            "{n} now) before the "
+            "alpha were two standard errors from zero. It is arithmetic, not a promise: it does "
+            "not say the alpha exists or that it will continue."
+        ),
+        "skill_needed_long": (
+            "With this alpha and this noise, even 50 years of record would not be enough for the "
+            "alpha to be two standard errors from zero. It is arithmetic, not a promise: it does "
+            "not say the alpha exists or that it will continue."
+        ),
+        "skill_lagged": (
+            "Adding last month's benchmark return (Dimson), beta rises from {beta} to {lagged}: "
+            "part of the exposure arrives a month late, typical of smoothed or late prices, and "
+            "the plain beta misses it. The alpha with this correction is {alpha} a year."
+        ),
+        "skill_timing_up": (
+            "The fund gained more in months of big market moves than its beta explains (Treynor "
+            "and Mazuy, t = {t}): good timing or option-like positions do this. Net of that, the "
+            "selection alpha is {alpha} a year."
+        ),
+        "skill_timing_down": (
+            "The fund gained less in months of big market moves than its beta explains (Treynor "
+            "and Mazuy, t = {t}): poor timing or selling options does this, and it took away "
+            "from the return."
+        ),
+        "skill_nm": "No split into cash, market and alpha: {reason}.",
         "fund_bench_up": "Up capture: share of the benchmark's rises it takes",
         "fund_bench_down": "Down capture: share of the benchmark's falls it takes",
         "fund_bench_trails": (
@@ -2409,6 +2535,25 @@ LABELS: dict[str, dict[str, str]] = {
             "The Sharpe above subtracts no rate. If the account is not in dollars, the fair "
             "rate to subtract is its own currency's. Source: {source}."
         ),
+        "cash_sharpe_local": (
+            "After subtracting what cash in the account's currency ({code}) paid over the same "
+            "dates ({name}, {rate} a year on average), the Sharpe is {sharpe}."
+        ),
+        "cash_below_local": (
+            "It earned less than cash in the account's currency ({code}) over those dates "
+            "({ret} a year against {rate} for the {name})."
+        ),
+        "cash_note_local": (
+            "The Sharpe above subtracts no rate. The account is in {code}, so the rate "
+            "subtracted here is that currency's, not the US one. Source: {source}."
+        ),
+        "cash_rate_MXN": "overnight interbank rate of Mexico (OECD)",
+        "cash_rate_BRL": "overnight interbank rate of Brazil (OECD)",
+        "cash_rate_EUR": "euro overnight rate, the ECB's €STR (before October 2019, the OECD's)",
+        "cash_rate_GBP": "sterling overnight rate, SONIA (Bank of England)",
+        "cash_rate_JPY": "overnight interbank rate of Japan (OECD)",
+        "cash_rate_CAD": "overnight interbank rate of Canada (OECD)",
+        "cash_rate_CHF": "3-month interbank rate of Switzerland (OECD)",
         "kpi_hint_pf": "what was won for every 1 lost",
         "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
         "bps_side": "bps per side",
@@ -3429,21 +3574,32 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
 
 
 def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
-    """The Sharpe after what a US Treasury bill paid, under the tiles."""
+    """The Sharpe after what cash paid (the account currency's own rate, or a US
+    Treasury bill), under the tiles."""
     cash = data.get("cash_rate") or {}
     if cash.get("status") != "MEASURED":
         return ""
     rate = _pct(float(cash["mean_rate"]["value"]), places=2)
+    code = str(cash.get("currency") or "")
+    local = f"cash_rate_{code}" in labels
+    suffix = "_local" if local else ""
+    extra = {"code": code, "name": labels[f"cash_rate_{code}"]} if local else {}
     if cash.get("below_cash"):
-        first = labels["cash_below"].format(
-            ret=_pct(float(cash["strategy_yearly"]["value"]), places=2), rate=rate
+        first = labels["cash_below" + suffix].format(
+            ret=_pct(float(cash["strategy_yearly"]["value"]), places=2), rate=rate, **extra
         )
     else:
-        first = labels["cash_sharpe"].format(
-            rate=rate, sharpe=f"{float(cash['sharpe_excess']['value']):.2f}"
+        first = labels["cash_sharpe" + suffix].format(
+            rate=rate, sharpe=f"{float(cash['sharpe_excess']['value']):.2f}", **extra
         )
-    text = first + " " + labels["cash_note"].format(source="\x00")
+    text = first + " " + labels["cash_note" + suffix].format(source="\x00", code=code)
     link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    if cash.get("history_source_url"):
+        # The spliced older series (the euro's before €STR) gets its own link.
+        link += (
+            f" (<a href='{_e(str(cash['history_source_url']))}' rel='noopener'>"
+            f"{_e(str(cash.get('history_series', '')))}</a>)"
+        )
     return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
 
@@ -5572,9 +5728,7 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
         z = float(gap["value"])
         better = regime.get("better")
         name = (
-            f"regime_better_{better}"
-            if better in ("calm", "turbulent")
-            else "regime_no_clear_gap"
+            f"regime_better_{better}" if better in ("calm", "turbulent") else "regime_no_clear_gap"
         )
         out += (
             f"<p class='read-line'>{_e(labels[name].format(z=f'{abs(z):.2f}'))} "
@@ -5796,7 +5950,9 @@ def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, st
         + "</p>"
     )
     excess = float(bench["excess"]["value"])
-    corr = f"{float(bench['correlation']['value']):.2f}"
+    corr_value = (bench.get("correlation") or {}).get("value")
+    # A fund with no variance has no correlation; show a dash, not a crash.
+    corr = f"{float(corr_value):.2f}" if corr_value is not None else "—"
     te = f"{float(bench['tracking_error']['value']):.1%}"
     up = (bench.get("up_capture") or {}).get("value")
     down = (bench.get("down_capture") or {}).get("value")
@@ -5865,8 +6021,116 @@ def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, st
                 )
             )
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
-    out += _alpha_html(bench, labels)
+    # With the skill split measured, its alpha (after cash) replaces the plain one.
+    if (bench.get("skill") or {}).get("status") == "MEASURED":
+        out += _skill_html(bench, locale, labels)
+    else:
+        out += _alpha_html(bench, labels) + _skill_html(bench, locale, labels)
     out += f"<p class='muted'>{_e(_sentence(localize(bench.get('note', ''), locale)))}</p>"
+    return out
+
+
+#: Past 50 years, a month count reads as "not within any record".
+NEEDED_MONTHS_SHOWN = 600
+
+
+def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+    """A fund's average return split into cash, exposure to the benchmark and
+    what is left, with the alpha's range and the lagged and timing checks."""
+    skill = bench.get("skill")
+    if not skill:
+        return ""
+    out = f"<h3>{_e(labels['skill_title'])}</h3>"
+    if skill.get("status") != "MEASURED":
+        reason = _sentence(localize(str(skill.get("reason", "")), locale)).rstrip(".")
+        return out + (
+            f"<p class='muted'>{_e(labels['skill_nm'].format(reason=reason))} "
+            f"{_badge('NOT_MEASURED')}</p>"
+        )
+    months = int(skill.get("months") or 0)
+    with_cash = (skill.get("cash_basis") or {}).get("source") is not None
+    intro = labels["skill_intro" if with_cash else "skill_intro_no_cash"].format(n=months)
+    out += f"<p class='muted'>{_e(intro)}</p>"
+    parts = skill.get("attribution") or {}
+    beta = _ev_value(skill.get("beta"))
+    rows = (
+        ("skill_cash", "cash"),
+        ("skill_exposure", "exposure"),
+        ("skill_alpha", "alpha"),
+        ("skill_total", "total"),
+    )
+    body = ""
+    for label, key in rows:
+        value = _ev_value(parts.get(key))
+        if value is None:
+            continue
+        text = labels[label].format(beta=f"{beta:.2f}" if beta is not None else "—")
+        strong = key == "total"
+        cell = _e(_fund_pct(value))
+        body += (
+            f"<tr><td>{'<b>' if strong else ''}{_e(text)}{'</b>' if strong else ''}</td>"
+            f"<td class='val'>{cell}</td></tr>"
+        )
+    if body:
+        out += (
+            f"<table><tr><th>{_e(labels['skill_part'])}</th>"
+            f"<th>{_e(labels['skill_year'])}</th></tr>{body}</table>"
+        )
+    share = parts.get("exposure_share") or {}
+    if share.get("evidence") == "MEASURED" and _ev_value(share) is not None:
+        line = labels["skill_share"].format(share=f"{_ev_value(share):.0%}")
+        out += f"<p>{_e(line)} {_badge('MEASURED')}</p>"
+    elif share.get("note"):
+        reason = _sentence(localize(str(share["note"]), locale)).rstrip(".")
+        out += f"<p class='muted'>{_e(labels['skill_no_share'].format(reason=reason))}</p>"
+    alpha = _ev_value(skill.get("alpha"))
+    t_stat = _ev_value(skill.get("alpha_t_stat"))
+    band = skill.get("alpha_range") or {}
+    low, high = _ev_value(band.get("low")), _ev_value(band.get("high"))
+    if alpha is not None and t_stat is not None and low is not None and high is not None:
+        line = labels["skill_range"].format(
+            alpha=_fund_pct(alpha), low=_fund_pct(low), high=_fund_pct(high), t=f"{t_stat:.2f}"
+        )
+        reading = (
+            labels["alpha_clear_up"]
+            if t_stat >= 2
+            else labels["alpha_clear_down"]
+            if t_stat <= -2
+            else labels["alpha_unclear"]
+        )
+        out += f"<p>{_e(line)} {_badge('MEASURED')} {_e(reading)}</p>"
+    needed = _ev_value(skill.get("months_needed"))
+    if needed is not None:
+        if needed > NEEDED_MONTHS_SHOWN:
+            text = labels["skill_needed_long"]
+        else:
+            text = labels["skill_needed"].format(m=int(needed), n=months)
+        out += f"<p class='muted'>{_e(text)}</p>"
+    lagged = skill.get("lagged") or {}
+    lag_t = _ev_value(lagged.get("lag_t_stat"))
+    lag_beta = _ev_value(lagged.get("beta"))
+    lag_alpha = _ev_value(lagged.get("alpha"))
+    if (
+        lag_t is not None
+        and lag_t >= 2
+        and beta is not None
+        and lag_beta is not None
+        and lag_alpha is not None
+        and lag_beta > beta
+    ):
+        line = labels["skill_lagged"].format(
+            beta=f"{beta:.2f}", lagged=f"{lag_beta:.2f}", alpha=_fund_pct(lag_alpha)
+        )
+        out += f"<p>{_e(line)} {_badge('MEASURED')}</p>"
+    timing = skill.get("timing") or {}
+    gamma_t = _ev_value(timing.get("gamma_t_stat"))
+    selection = _ev_value(timing.get("selection_alpha"))
+    if gamma_t is not None and gamma_t >= 2 and selection is not None:
+        line = labels["skill_timing_up"].format(t=f"{gamma_t:.2f}", alpha=_fund_pct(selection))
+        out += f"<p>{_e(line)} {_badge('MEASURED')}</p>"
+    elif gamma_t is not None and gamma_t <= -2:
+        line = labels["skill_timing_down"].format(t=f"{gamma_t:.2f}")
+        out += f"<p>{_e(line)} {_badge('MEASURED')}</p>"
     return out
 
 
@@ -6628,20 +6892,23 @@ def render_html(
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
+    en_url = (switch_url or "").replace("lang=es", "lang=en")
+    two_switches = locale == "pt" and "lang=es" in (switch_url or "")
+    short_es = " data-short='ES'" if two_switches else ""
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
-            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
-            f"{_e(labels['switch'])}</a>"
+            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'"
+            # Two languages on a narrow phone read as ES and EN (theme.py).
+            f"{short_es}>{_e(labels['switch'])}</a>"
             if switch_url
             else ""
         )
         + (
-            f" <a class='lang-switch' href='{_e(switch_url.replace('lang=es', 'lang=en'))}' "
-            f"hreflang='en'>English</a>"
-            if switch_url and locale == "pt" and "lang=es" in switch_url
+            f" <a class='lang-switch' href='{_e(en_url)}' hreflang='en' data-short='EN'>English</a>"
+            if two_switches
             else ""
         )
         + "</div>"

@@ -858,3 +858,142 @@ def test_platform_time_styles(text: str, expected: datetime) -> None:
     from quant_trade.audit.universal import _times
 
     assert _times([text], False).values == [expected]
+
+
+REVOLUT_HEADER = "Date,Ticker,Type,Quantity,Price per share,Total Amount,Currency,FX Rate"
+
+
+def test_revolut_stocks_statement_pairs_fills_and_follows_splits() -> None:
+    # Revolut's stock account statement, rows shaped as a real one reproduced
+    # in github.com/antonioaversa/taxes (cash rows, "$" prices, a split).
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            '2022-03-30T23:48:44.882381Z,,CASH TOP-UP,,,"$3,000",USD,1.12',
+            '2022-05-10T13:32:24.217636Z,AMZN,BUY - MARKET,0.6,"$2,400.00","$1,440",USD,1.06',
+            "2022-06-02T06:41:50.336664Z,,CUSTODY FEE,,,($1.35),USD,1.07",
+            # A 20-for-1 split adds 11.4 shares to the 0.6 held.
+            "2022-06-06T05:20:46.594417Z,AMZN,STOCK SPLIT,11.4,,$0,USD,1.08",
+            "2022-06-10T04:28:02.657456Z,MSFT,DIVIDEND,,,$10.54,USD,1.07",
+            "2022-06-29T13:45:38.161874Z,CVNA,BUY - LIMIT,10,$23.02,$231.25,USD,1.05",
+            "2022-07-07T15:37:02.604183Z,CVNA,SELL - LIMIT,10,$26.62 ,$266.20 ,USD,1.02",
+            '2022-07-08T15:37:02.604183Z,AMZN,SELL - MARKET,12,$125.00 ,"$1,500.00 ",USD,1.02',
+        ],
+        "trading-account-statement.csv",
+    )
+    trades = report.trades.trades
+    assert [round(trade.pnl, 2) for trade in trades] == [36.0, 60.0]
+    # The split kept the position's cost: 0.6 x 2,400 = 12 x 120.
+    assert round(trades[1].entry_price, 2) == 120.0 and trades[1].quantity == pytest.approx(12)
+    assert report.metadata["column_price"] == "Price per share"
+    assert not any("still open" in warning for warning in report.warnings)
+
+
+def test_a_split_of_shares_not_held_changes_nothing() -> None:
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            "2022-06-06T05:20:46.594417Z,AMZN,STOCK SPLIT,11.4,,$0,USD,1.08",
+            "2022-06-29T13:45:38.161874Z,CVNA,BUY - LIMIT,10,$23.02,$231.25,USD,1.05",
+            "2022-07-07T15:37:02.604183Z,CVNA,SELL - LIMIT,10,$26.62,$266.20,USD,1.02",
+        ]
+    )
+    assert [round(trade.pnl, 2) for trade in report.trades.trades] == [36.0]
+
+
+def test_a_reverse_split_shrinks_the_lots_and_keeps_their_cost() -> None:
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            "2022-01-03T14:30:00.000Z,GSK,BUY - MARKET,100,$5.00,$500.00,USD,1.0",
+            # 1-for-10: 90 of the 100 shares go.
+            "2022-02-01T05:00:00.000Z,GSK,STOCK SPLIT,-90,,$0,USD,1.0",
+            "2022-03-01T14:30:00.000Z,GSK,SELL - MARKET,10,$60.00,$600.00,USD,1.0",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_price == pytest.approx(50.0) and trade.quantity == pytest.approx(10)
+    assert round(trade.pnl, 2) == 100.0
+    assert not any("split" in warning for warning in report.warnings)
+
+
+def test_a_split_that_would_empty_the_position_is_not_applied_and_said() -> None:
+    from quant_trade.audit.universal import SPLIT_EMPTIES_WARNING  # noqa: PLC0415
+
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            "2022-01-03T14:30:00.000Z,GSK,BUY - MARKET,100,$5.00,$500.00,USD,1.0",
+            "2022-02-01T05:00:00.000Z,GSK,STOCK SPLIT,-100,,$0,USD,1.0",
+            "2022-03-01T14:30:00.000Z,GSK,SELL - MARKET,10,$60.00,$600.00,USD,1.0",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_price == pytest.approx(5.0) and round(trade.pnl, 2) == 550.0
+    assert SPLIT_EMPTIES_WARNING.format(n=1) in report.warnings
+
+
+ZERODHA_HEADER = (
+    "symbol,isin,trade_date,exchange,segment,series,trade_type,auction,quantity,price,"
+    "trade_id,order_id,order_execution_time"
+)
+
+
+def test_zerodha_tradebook_pairs_fills_by_execution_time() -> None:
+    # Zerodha Console's tradebook (Reports > Tradebook, CSV), header as checked
+    # by the open-source github.com/prabusw/beancount-importers-india importer.
+    # Rows arrive out of order and an order fills in two trades; the intraday
+    # short only pairs correctly on order_execution_time, not on trade_date.
+    report = _read(
+        [
+            ZERODHA_HEADER,
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,buy,false,4.000000,1500.000000,"
+            "1002,2002,2024-01-02T14:30:00",
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,sell,false,10.000000,1550.000000,"
+            "1001,2001,2024-01-02T09:30:00",
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,buy,false,6.000000,1500.000000,"
+            "1003,2002,2024-01-02T14:30:00",
+            "NIFTY24JANFUT,,2024-01-03,NFO,FO,,buy,false,50.000000,21700.000000,"
+            "1004,2004,2024-01-03T10:00:00",
+            "NIFTY24JANFUT,,2024-01-05,NFO,FO,,sell,false,50.000000,21650.000000,"
+            "1005,2005,2024-01-05T11:00:00",
+        ]
+    )
+    assert report.source_format == UNIVERSAL_FILLS_CSV
+    trades = report.trades.trades
+    assert [round(t.pnl, 2) for t in trades] == [200.0, 300.0, -2500.0]
+    assert trades[0].entry_time == datetime(2024, 1, 2, 9, 30, tzinfo=UTC)
+    assert trades[0].exit_time == datetime(2024, 1, 2, 14, 30, tzinfo=UTC)
+    assert trades[2].exit_time == datetime(2024, 1, 5, 11, 0, tzinfo=UTC)
+
+
+def test_a_clock_only_execution_time_is_joined_to_the_trade_date() -> None:
+    # A clock with no date must never be read as today: it joins trade_date.
+    report = _read(
+        [
+            ZERODHA_HEADER,
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,sell,false,10,1550,1001,2001,09:30:00",
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,buy,false,10,1500,1002,2002,14:30:00",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_time == datetime(2024, 1, 2, 9, 30, tzinfo=UTC)
+    assert trade.exit_time == datetime(2024, 1, 2, 14, 30, tzinfo=UTC)
+    assert round(trade.pnl, 2) == 500.0
+
+
+def test_a_blank_execution_time_falls_back_to_the_trade_date_and_says_so() -> None:
+    from quant_trade.audit.universal import DATE_ONLY_FILLS_WARNING  # noqa: PLC0415
+
+    # Zerodha leaves order_execution_time blank on some rows (auction, expiry).
+    report = _read(
+        [
+            ZERODHA_HEADER,
+            "TCS,INE467B01029,2024-01-03,NSE,EQ,EQ,buy,false,5,3500,1003,2003,",
+            "TCS,INE467B01029,2024-01-04,NSE,EQ,EQ,sell,false,5,3600,1004,2004,2024-01-04T10:00:00",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_time == datetime(2024, 1, 3, tzinfo=UTC)
+    assert round(trade.pnl, 2) == 500.0
+    assert DATE_ONLY_FILLS_WARNING.format(n=1) in report.warnings

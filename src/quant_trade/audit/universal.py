@@ -232,6 +232,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "filled time",
         "exec time",
         "execution time",
+        # Zerodha Console's tradebook: a full timestamp beside a date-only trade_date.
+        "order execution time",
         "trade time",
         "transaction date",
         "transactiondate",
@@ -291,6 +293,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "average filled price",
         "avg. filled price",
         "price / share",
+        "price per share",
         "avg price",
         "average price",
         "execution price",
@@ -1147,6 +1150,27 @@ def header_zone(name: str) -> int | None:
     return offset if sign == "+" else -offset
 
 
+def _dated_blanks(
+    values: list[str], rows: list[list[str]] | None, date_column: int | None
+) -> list[int]:
+    """Rows whose full timestamp is blank while the other date column holds a
+    date with no clock (Zerodha leaves ``order_execution_time`` empty on some
+    rows beside ``trade_date``): those rows take that date, read as its start."""
+    if rows is None or date_column is None:
+        return []
+    filled = [value for value in values if value]
+    if not filled or all(_CLOCK.match(value.strip()) for value in filled):
+        return []
+    if all(re.fullmatch(r"\d{10}(\d{3})?", value) for value in filled):
+        return []
+    dates = [row[date_column].strip() if date_column < len(row) else "" for row in rows]
+    return [
+        index
+        for index, (value, date) in enumerate(zip(values, dates, strict=True))
+        if not value and date and ":" not in date
+    ]
+
+
 def _times(
     values: list[str],
     serial: bool,
@@ -1175,6 +1199,11 @@ def _times(
                 for value, clock in zip(values, clocks, strict=True)
             ]
             filled = [value for value in values if value]
+    blanks = _dated_blanks(values, rows, date_column)
+    if blanks and rows is not None and date_column is not None:
+        values = list(values)
+        for index in blanks:
+            values[index] = rows[index][date_column].strip()
     if filled and all(re.fullmatch(r"\d{10}(\d{3})?", value) for value in filled):
         parsed: list[datetime | None] = [
             datetime.fromtimestamp(int(value) / (1000 if len(value) == 13 else 1), tz=UTC)
@@ -1303,6 +1332,10 @@ UNREADABLE_TRADE_WARNING = (
     "results"
 )
 UNREADABLE_MORE_WARNING = "{n} more row(s) with an unreadable time were left out"
+DATE_ONLY_FILLS_WARNING = (
+    "{n} fill(s) had no time, only a date; each was placed at the start of that day, so its "
+    "order among that day's fills may be wrong"
+)
 #: Rows named one by one before the rest are only counted.
 UNREADABLE_NAMED = 5
 
@@ -1701,6 +1734,34 @@ def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
     )
 
 
+#: A row whose side reads like this changes the shares held, not a trade.
+SPLIT_WORDS = frozenset({"stocksplit"})
+SPLIT_EMPTIES_WARNING = (
+    "{n} stock split(s) that would leave no shares held were not applied; the positions they touch "
+    "may be read wrong"
+)
+
+
+def _split_lots(
+    open_lots: dict[tuple[str, str], list[list[Any]]], account: str, symbol: str, added: float
+) -> bool:
+    """Rescale a long position's lots for a split that added ``added``
+    shares (fewer when negative), keeping each lot's cost; ``False`` when
+    the split would leave the position with no shares, which is not applied."""
+    lots = open_lots.get((account, symbol)) or []
+    held = sum(lot[0] for lot in lots)
+    if held <= 0 or any(lot[0] < 0 for lot in lots):
+        return True  # nothing long held: the split changes nothing here
+    if held + added <= 0:
+        return False
+    ratio = (held + added) / held
+    for lot in lots:
+        lot[0] *= ratio
+        lot[1] /= ratio
+        lot[3] /= ratio
+    return True
+
+
 def _fills(
     draft: imp._Draft, mapping: ColumnMap, rows: list[list[str]], decimal: str, serial: bool
 ) -> int:
@@ -1722,15 +1783,27 @@ def _fills(
         dayfirst=normalise(mapping.names.get("time", "")) in DAY_FIRST_NAMES or None,
     )
     draft.naive_times = times.naive
+    time_cells = [_cell(row, columns, "time") for row in rows]
+    dated = len(_dated_blanks(time_cells, rows, mapping.date_column))
+    if dated:
+        draft.warnings.append(DATE_ONLY_FILLS_WARNING.format(n=dated))
     fills: list[tuple[datetime, int, str, str, float, float, float, float | None, float]] = []
     signed = False
     other_coin = 0
     unreadable: list[tuple[str, str]] = []
+    splits: list[tuple[datetime, str, str, float]] = []
     for position, row in enumerate(rows):
         quantity = _amount(_cell(row, columns, "quantity"), decimal)
         price = _amount(_cell(row, columns, "price"), decimal)
         moment = times.values[position]
-        side = _side(_cell(row, columns, "side"), fill=True) if "side" in columns else None
+        side_text = _cell(row, columns, "side") if "side" in columns else ""
+        if normalise(side_text) in SPLIT_WORDS and quantity and moment is not None:
+            # Revolut's STOCK SPLIT row: the shares added (or taken, if negative).
+            account = _cell(row, columns, "account").strip()
+            symbol = " ".join(_cell(row, columns, "symbol").split())
+            splits.append((moment, account, symbol, quantity))
+            continue
+        side = _side(side_text, fill=True) if "side" in columns else None
         if quantity is None or quantity == 0 or price is None or price <= 0 or moment is None:
             draft.invalid_rows += 1
             if moment is None and quantity and price and price > 0:
@@ -1777,7 +1850,12 @@ def _fills(
     newest_first = len(fills) > 1 and fills[0][0] > fills[-1][0]
     if newest_first:
         fills = [(f[0], -f[1], *f[2:]) for f in fills]
+    splits.sort(key=lambda split: split[0])
+    next_split = unapplied = 0
     for moment, _, account, symbol, signed_qty, price, fee, profit, multiplier in sorted(fills):
+        while next_split < len(splits) and splits[next_split][0] <= moment:
+            unapplied += not _split_lots(open_lots, *splits[next_split][1:])
+            next_split += 1
         lots = open_lots.setdefault((account, symbol), [])
         left = abs(signed_qty)
         fee_per_unit = fee / left
@@ -1806,6 +1884,8 @@ def _fills(
                 lots.pop(0)
         if left > 0:
             lots.append([left if signed_qty > 0 else -left, price, moment, fee_per_unit])
+    if unapplied:
+        draft.warnings.append(SPLIT_EMPTIES_WARNING.format(n=unapplied))
     closed_by_account = {account: len(listed) for account, listed in trips.items()}
     chosen = imp._busiest_account(
         [[account] for account in trips], list(trips), closed_by_account, draft.warnings

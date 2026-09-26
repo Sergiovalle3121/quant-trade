@@ -452,6 +452,16 @@ animation-timeline:view();animation-range:entry 30% cover 55%}}
 .cards-4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:980px){.cards,.cards-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.cards,.cards-2,.cards-4{grid-template-columns:minmax(0,1fr)}}
+/* An odd last card spans the row instead of leaving an empty slot beside it. */
+@media (min-width:641px){.cards-2>.card:last-child:nth-child(odd){grid-column:1/-1}
+.cards-2>.card:last-child:nth-child(odd) p{max-width:68ch}}
+/* On a phone the icon sits beside the card title, so a long list of cards reads shorter. */
+@media (max-width:640px){.cards-2>.card{display:grid;grid-template-columns:auto minmax(0,1fr);
+column-gap:14px;align-items:center;padding:20px 22px}
+.cards-2>.card>.icon{grid-row:1;margin:0}
+.cards-2>.card>h3{grid-row:1;margin:0;font-size:1.08rem}
+.cards-2>.card>:not(.icon):not(h3){grid-column:1/-1}
+.cards-2>.card>p{margin-top:10px}}
 .card{position:relative;border:1px solid var(--border);border-radius:var(--r-lg);
 background:var(--surface);padding:clamp(26px,3vw,36px);overflow:hidden;isolation:isolate;
 transition:border-color .4s,transform .6s var(--ease),box-shadow .4s}
@@ -796,6 +806,9 @@ animation:spin .9s linear infinite}
 color:#a3a3aa;padding:8px 12px;border-radius:999px}
 .lang-switch:hover,.nav-end>.nav-account:hover{color:#fff}
 @media (max-width:520px){.nav-end>.nav-account{display:none}}
+@media (max-width:400px){.nav-end>.lang-switch{padding:8px 6px}.nav-in>.logo{flex:none}
+.nav-end>.lang-switch[data-short]{font-size:0}
+.nav-end>.lang-switch[data-short]::before{content:attr(data-short);font-size:.8rem}}
 .report-hero h1{font-weight:640;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.05em;
 line-height:1;margin:16px 0 18px}
 .meta-line{display:flex;flex-wrap:wrap;gap:8px;margin:0}
@@ -1047,7 +1060,10 @@ background:radial-gradient(90% 120% at 50% -20%,rgba(255,255,255,.12),transparen
 line-height:1.2;margin:0 0 28px;color:#fff}
 .lockbox ul{list-style:none;padding:0;margin:0 0 28px;display:grid;
 grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px}
-@media (max-width:620px){.lockbox ul{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:620px){.lockbox ul{grid-template-columns:minmax(0,1fr)}
+/* On a phone the price and the buy button come right after the heading, before the list. */
+.lockbox{display:flex;flex-direction:column}.lockbox>p:first-child{order:-2}
+.lockbox>.paybox:not(.redeem){order:-1;margin:0 0 28px}}
 .lockbox .lock-sample{margin:-12px 0 24px;font-size:.93rem}
 .lockbox .lock-sample a{color:var(--text);text-underline-offset:3px}
 .lockbox li{display:flex;gap:10px;align-items:flex-start;color:#c8c8ce;font-size:.93rem;line-height:1.5}
@@ -1260,6 +1276,17 @@ STATS = """
 table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
 @media (max-width:420px){.facts.ranges .fact b{white-space:normal}}
 table.currency tr.cur-base td{background:var(--surface-2);font-weight:600}
+@keyframes scroll-cue{0%,96%{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent)}
+100%{-webkit-mask-image:none;mask-image:none}}
+@media screen and (max-width:759px){
+.paper figure.chart,.paper .chart-scroll,.paper .tscroll,.paper table:not(.ev):not(.firms){animation:scroll-cue linear both;animation-timeline:scroll(self inline)}
+.paper figure.chart figcaption{max-width:calc(100vw - 88px)}
+.metrics.ev tr{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+.metrics.ev td.val{grid-area:1/2}
+.metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}
+.firms td:first-child{font-size:.95rem!important;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.firms td:first-child br{display:none}
+.firms td:first-child small{display:block;margin-top:3px;font-size:.78rem;font-weight:500;letter-spacing:0;color:var(--text-3)}}
 table.currency tr.cur-real td{border-bottom:2px solid var(--border-2)}
 @media screen and (max-width:420px){.paper table.holding td:first-child{min-width:8.6em}
 .paper table.holding td{padding-left:4px!important;padding-right:4px!important}}

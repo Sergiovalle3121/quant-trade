@@ -476,6 +476,58 @@ REPORT: dict[str, Any] = {
         "fund_bench_beat": "Meses em que superou o índice",
         "fund_bench_te": "Erro de rastreamento anual (índice de informação {ir})",
         "fund_bench_beta": "Beta frente ao índice (correlação {corr})",
+        "skill_title": "Quanto é caixa, quanto é mercado e quanto sobra?",
+        "skill_intro": (
+            "Com {n} meses em comum com o índice, a rentabilidade média anual do fundo se divide "
+            "em três partes que somam o total: o que as letras do Tesouro dos EUA de 3 meses "
+            "pagavam, a exposição ao índice e o que sobra."
+        ),
+        "skill_intro_no_cash": (
+            "Com {n} meses em comum com o índice, a rentabilidade média anual do fundo se divide "
+            "em três partes que somam o total. Não havia taxa do caixa para essas datas: ela é "
+            "tomada como zero, então o alfa inclui também o que o caixa teria pagado."
+        ),
+        "skill_part": "Parte",
+        "skill_year": "Ao ano",
+        "skill_cash": "Caixa (letras do Tesouro)",
+        "skill_exposure": (
+            "Exposição ao índice (beta {beta} vezes o que o índice rendeu acima do caixa)"
+        ),
+        "skill_alpha": "O que sobra (alfa)",
+        "skill_total": "Rentabilidade média do fundo (média aritmética)",
+        "skill_share": (
+            "A exposição ao índice explica {share} da rentabilidade do fundo; o caixa fica à parte."
+        ),
+        "skill_no_share": "Sem proporção da exposição: {reason}.",
+        "skill_range": "Alfa ao ano: {alpha}, faixa de 95 % de {low} a {high} (t = {t}).",
+        "skill_needed": (
+            "Com este alfa e este ruído, um histórico precisaria de uns {m} meses no total (hoje "
+            "tem {n}) para o alfa "
+            "ficar a dois erros padrão de zero. É uma conta, não uma promessa: não diz que o "
+            "alfa exista nem que vá continuar."
+        ),
+        "skill_needed_long": (
+            "Com este alfa e este ruído, nem 50 anos de histórico bastariam para o alfa ficar a "
+            "dois erros padrão de zero. É uma conta, não uma promessa: não diz que o alfa exista "
+            "nem que vá continuar."
+        ),
+        "skill_lagged": (
+            "Somando o retorno do índice do mês anterior (Dimson), o beta sobe de {beta} para "
+            "{lagged}: parte da exposição chega com um mês de atraso, algo típico de preços "
+            "suavizados ou atrasados, e o beta simples não a vê. O alfa com esta correção é "
+            "{alpha} ao ano."
+        ),
+        "skill_timing_up": (
+            "O fundo ganhou mais nos meses de mercado muito agitado do que o seu beta explica "
+            "(Treynor e Mazuy, t = {t}): isso vem de acertar o momento ou de ter posições com "
+            "forma de opção. Descontado isso, o alfa de seleção é {alpha} ao ano."
+        ),
+        "skill_timing_down": (
+            "O fundo ganhou menos nos meses de mercado muito agitado do que o seu beta explica "
+            "(Treynor e Mazuy, t = {t}): isso vem de errar o momento ou de vender opções, e "
+            "tirou rentabilidade."
+        ),
+        "skill_nm": "Sem divisão entre caixa, mercado e alfa: {reason}.",
         "fund_bench_up": "Captura na alta: parte das altas do índice que o fundo acompanha",
         "fund_bench_down": "Captura na baixa: parte das quedas do índice que o fundo acompanha",
         "fund_bench_trails": (
@@ -1095,6 +1147,27 @@ REPORT: dict[str, Any] = {
             "O Sharpe acima não subtrai nenhuma taxa. Se a conta não é em dólares, o justo "
             "seria subtrair a taxa da sua própria moeda. Fonte: {source}."
         ),
+        "cash_sharpe_local": (
+            "Subtraindo o que o caixa na moeda da conta ({code}) pagava nessas mesmas datas "
+            "({name}, {rate} ao ano em média), o Sharpe fica em {sharpe}."
+        ),
+        "cash_below_local": (
+            "Rendeu menos que o caixa na moeda da conta ({code}) nessas datas ({ret} ao ano "
+            "frente a {rate} da {name})."
+        ),
+        "cash_note_local": (
+            "O Sharpe acima não subtrai nenhuma taxa. A conta está em {code}, então aqui se "
+            "subtrai a taxa dessa moeda, não a dos EUA. Fonte: {source}."
+        ),
+        "cash_rate_MXN": "taxa interbancária de um dia do México (OCDE)",
+        "cash_rate_BRL": "taxa interbancária de um dia do Brasil (OCDE)",
+        "cash_rate_EUR": (
+            "taxa de um dia do euro, €STR do BCE (antes de outubro de 2019, a da OCDE)"
+        ),
+        "cash_rate_GBP": "taxa de um dia da libra, SONIA (Banco da Inglaterra)",
+        "cash_rate_JPY": "taxa interbancária de um dia do Japão (OCDE)",
+        "cash_rate_CAD": "taxa interbancária de um dia do Canadá (OCDE)",
+        "cash_rate_CHF": "taxa interbancária de 3 meses da Suíça (OCDE)",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado?",
         "regime_intro": (
             "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
@@ -2102,6 +2175,20 @@ SINGULAR: dict[str, tuple[str, str]] = {
         "operação de ações no preço de exercício nesses dias), então o resultado não inclui o "
         "movimento das ações",
     ),
+    "{n} fill(s) had no time, only a date; each was placed at the start of that day, so its "
+    "order among that day's fills may be wrong": (
+        "{n} fill had no time, only a date; it was placed at the start of that day, so its "
+        "order among that day's fills may be wrong",
+        "{n} execução sem horário, só com a data; foi colocada no início desse dia, então sua "
+        "ordem entre as execuções desse dia pode estar errada",
+    ),
+    "{n} stock split(s) that would leave no shares held were not applied; the positions they touch "
+    "may be read wrong": (
+        "{n} stock split that would leave no shares held was not applied; the position it touches "
+        "may be read wrong",
+        "não foi aplicado {n} desdobramento ou grupamento que deixaria a posição sem ações; a "
+        "posição afetada pode ser lida errado",
+    ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (
         "{n} share movement that is not a trade (transfer, merger, split) left out; the "
@@ -2387,6 +2474,22 @@ RULES: tuple[tuple[str, str], ...] = (
             "{n} opção(ões) atribuídas ou exercidas cujas ações entregues não estão no arquivo "
             "(nenhuma operação de ações no preço de exercício nesses dias), então o resultado não "
             "inclui o movimento das ações"
+        ),
+    ),
+    (
+        "{n} fill(s) had no time, only a date; each was placed at the start of that day, so its "
+        "order among that day's fills may be wrong",
+        (
+            "{n} execuções sem horário, só com a data; cada uma foi colocada no início desse "
+            "dia, então sua ordem entre as execuções desse dia pode estar errada"
+        ),
+    ),
+    (
+        "{n} stock split(s) that would leave no shares held were not applied; the positions they "
+        "touch may be read wrong",
+        (
+            "não foram aplicados {n} desdobramento(s) ou grupamento(s) que deixariam a posição "
+            "sem ações; as posições afetadas podem ser lidas errado"
         ),
     ),
     (
@@ -4759,6 +4862,18 @@ RULES: tuple[tuple[str, str], ...] = (
             "Sharpe dos retornos após subtrair o que a letra do Tesouro dos EUA de 3 meses "
             "pagou nos mesmos dias (FRED DTB3, convertida de taxa de desconto para rendimento "
             "anual), anualizado como o Sharpe principal; é uma taxa em dólares"
+        ),
+    ),
+    (
+        (
+            "Sharpe ratio of the returns after subtracting what cash in the account's own "
+            "currency paid over the same days (the short rate FRED publishes for that currency, "
+            "converted to an annual yield by its own quote), annualised like the headline Sharpe"
+        ),
+        (
+            "Sharpe dos retornos após subtrair o que o caixa na moeda da conta pagou nos mesmos "
+            "dias (a taxa de curto prazo que o FRED publica para essa moeda, convertida em "
+            "rendimento anual conforme a sua cotação), anualizado como o Sharpe principal"
         ),
     ),
     (
