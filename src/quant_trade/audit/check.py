@@ -7,7 +7,7 @@ given; the server hashes it as it streams in, keeps nothing, and says
 whether those exact bytes came from Rigor, when, and for which class.
 
 It says only that the file is unchanged. It never says the strategy is good,
-and every text passes the profit-claim guard in both languages.
+and every text passes the profit-claim guard in every language.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from quant_trade.audit.seo import CHECK_PATH
 from quant_trade.audit.store import IssuedFile
 from quant_trade.audit.theme import icon
 
@@ -28,7 +29,9 @@ SAMPLE_AUDIT_ID = "sample"
 _MONTHS = {
     "es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"),
     "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+    "pt": ("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"),
 }
+
 
 COPY: dict[str, dict[str, Any]] = {
     "es": {
@@ -134,6 +137,62 @@ COPY: dict[str, dict[str, Any]] = {
             "as it was downloaded from Rigor."
         ),
     },
+    "pt": {
+        "eyebrow": "Comprovar um relatório",
+        "title": "Este relatório saiu assim do Rigor?",
+        "lead": (
+            "Se um vendedor enviou a você um relatório do Rigor, envie-o aqui. Dizemos se o "
+            "arquivo é exatamente o que o Rigor gerou ou se alguém o alterou depois."
+        ),
+        "file": "Relatório que enviaram a você (PDF ou JSON)",
+        "submit": "Comprovar",
+        "drop_title": "Arraste o relatório para cá",
+        "drop_sub": "ou clique para escolher · até 20 MB",
+        "found_title": "Este arquivo não foi editado",
+        "found": (
+            "É idêntico, byte a byte, ao {kind} que o Rigor gerou em {date} para um relatório "
+            "de classe {cls}."
+        ),
+        "found_no_class": "É idêntico, byte a byte, ao {kind} que o Rigor gerou em {date}.",
+        "sample": "É o relatório de exemplo do Rigor, sem alterações.",
+        "public": "Ver a página pública",
+        "missing_title": "O Rigor não tem registro deste arquivo",
+        "missing": (
+            "Não coincide com nenhum arquivo que o Rigor tenha registrado. Pode ter sido "
+            "editado, vir de outro lugar, não ter chegado a ser registrado ou ser anterior a "
+            "25 de setembro de 2026, quando o Rigor começou a registrar os relatórios que "
+            "entrega. Peça ao vendedor o link da página pública no Rigor, ou que baixe o "
+            "relatório de novo e o envie a você."
+        ),
+        "scope": (
+            "Isto só diz se o arquivo mudou desde que o Rigor o gerou. Não diz nada sobre se "
+            "a estratégia vai funcionar."
+        ),
+        "no_file": "Escolha o arquivo do relatório que você quer comprovar.",
+        "too_large": "O arquivo passa de 20 MB; um relatório do Rigor é muito menor.",
+        "again": "Comprovar outro arquivo",
+        "kinds": {"pdf": "PDF", "json": "arquivo JSON"},
+        "shows_title": "Como funciona",
+        "shows": (
+            (
+                "Uma impressão digital do arquivo",
+                "Calculamos a impressão digital SHA-256 do arquivo; mudar um só caractere a muda.",
+            ),
+            (
+                "Comparamos com o que foi entregue",
+                "O Rigor guarda a impressão digital de cada relatório que entrega, nunca o "
+                "arquivo.",
+            ),
+            (
+                "Não guardamos o seu arquivo",
+                "Ele é lido, tem a impressão digital calculada e é descartado.",
+            ),
+        ),
+        "note": (
+            "Um PDF impresso de novo, uma captura de tela ou uma cópia editada nunca "
+            "coincidem: compare o arquivo tal como foi baixado do Rigor."
+        ),
+    },
 }
 
 CHECK_CSS = (
@@ -180,7 +239,7 @@ def _e(value: object) -> str:
 
 
 def _locale(locale: str) -> str:
-    return "en" if locale == "en" else "es"
+    return locale if locale in COPY else "es"
 
 
 def _date(iso: str, locale: str) -> str:
@@ -192,7 +251,7 @@ def _date(iso: str, locale: str) -> str:
 
 
 def check_path(locale: str) -> str:
-    return "/check" if _locale(locale) == "en" else "/comprobar"
+    return CHECK_PATH[_locale(locale)]
 
 
 def check_form(locale: str, *, error: str = "") -> str:
@@ -245,7 +304,8 @@ def check_result(found: IssuedFile | None, digest: str, locale: str) -> str:
         else:
             text = copy["found_no_class"].format(kind=kind, date=date)
         if found.public_id:
-            href = f"/v/{_e(found.public_id)}?lang={locale}"
+            # The public page has no Portuguese yet; it opens in English.
+            href = f"/v/{_e(found.public_id)}?lang={'en' if locale == 'pt' else locale}"
             link = (
                 f"<a class='btn btn-ghost btn-sm' href='{href}'>{_e(copy['public'])}"
                 f"{icon('arrow')}</a>"
@@ -261,6 +321,7 @@ def check_result(found: IssuedFile | None, digest: str, locale: str) -> str:
 
 __all__ = [
     "CHECKS_PER_HOUR_PER_IP",
+    "CHECK_PATH",
     "CHECK_CSS",
     "COPY",
     "MAX_CHECK_BYTES",
