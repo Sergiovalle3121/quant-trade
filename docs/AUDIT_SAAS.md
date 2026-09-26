@@ -52,8 +52,7 @@ Portuguese in `portuguese.MESSAGES_PT`, and the error page, a missing page
 under `/pt/` and any error with `?lang=pt` are Portuguese, with "O que fazer:"
 for the fix. A message no rule knows stays in English, never half-translated;
 `tests/test_audit_errors_pt.py` walks every refusal the importers write, so a
-new one needs its Portuguese rule. The sign-in gate and the column picker
-still open in English from a Portuguese upload.
+new one needs its Portuguese rule.
 
 ## What the client uploads
 

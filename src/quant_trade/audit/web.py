@@ -2110,8 +2110,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         access_code: Annotated[str, Form()] = "",
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
-        # The report's language, which the refusals below also speak; the sign-in
-        # gate and the column picker show Portuguese readers English.
+        # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
         loc = link_locale(report_loc)
         if _cross_site(request):
