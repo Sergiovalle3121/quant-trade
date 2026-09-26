@@ -971,33 +971,99 @@ _MT5_DEAL_HEADER_ALIASES = {
     "прибыль": "profit",
     "баланс": "balance",
     "комментарий": "comment",
+    # Traditional Chinese, as a real terminal export spells the Deals header.
+    "時間": "time",
+    "成交": "deal",
+    "交易品種": "symbol",
+    "類型": "type",
+    "趨勢": "direction",
+    "交易量": "volume",
+    "價位": "price",
+    "訂單": "order",
+    "手續費": "commission",
+    "隔夜利息": "swap",
+    "盈利": "profit",
+    "本日餘額": "balance",
+    "註釋": "comment",
 }
 _MT5_DEAL_REQUIRED = {"time", "type", "direction", "volume", "price", "profit", "balance"}
 
 
 def _mt5_column_map(header: list[str] | None, width: int) -> dict[str, int]:
-    if header is not None:
-        names = [text.strip().lower() for text in header]
-        names = [_MT5_DEAL_HEADER_ALIASES.get(name, name) for name in names]
-        mapped = {name: index for index, name in enumerate(names) if name}
-        if mapped.keys() >= _MT5_DEAL_REQUIRED:
-            return mapped
+    named = _mt5_named_columns(header)
+    if named is not None:
+        return named
     columns = _MT5_HISTORY_COLUMNS if width >= 14 else _MT5_TESTER_COLUMNS
     return {name: index for index, name in enumerate(columns)}
+
+
+def _mt5_named_columns(header: list[str] | None) -> dict[str, int] | None:
+    """The Deals columns by their header's names, when it names them all."""
+    if header is None:
+        return None
+    names = [text.strip().lower() for text in header]
+    names = [_MT5_DEAL_HEADER_ALIASES.get(name, name) for name in names]
+    mapped = {name: index for index, name in enumerate(names) if name}
+    return mapped if mapped.keys() >= _MT5_DEAL_REQUIRED else None
+
+
+def _mt5_chained(rows: list[list[str]], columns: dict[str, int]) -> int:
+    """How many rows' Balance equals the previous Balance plus the row's money."""
+
+    def number(texts: list[str], name: str) -> float | None:
+        index = columns[name]
+        return _num(texts[index]) if index < len(texts) else None
+
+    chained = 0
+    previous: float | None = None
+    for texts in rows:
+        balance = number(texts, "balance")
+        money = sum(
+            number(texts, name) or 0.0
+            for name in ("commission", "fee", "swap", "profit")
+            if name in columns
+        )
+        if (
+            previous is not None
+            and balance is not None
+            and abs(previous + money - balance) <= 0.011
+        ):
+            chained += 1
+        previous = balance
+    return chained
+
+
+def _mt5_unnamed_layout(rows: list[list[str]]) -> dict[str, int]:
+    """The layout of Deals rows whose header names are not known.
+
+    A row's width does not tell the two layouts apart on its own: a workbook
+    may carry a blank trailing column. The layout whose Balance column chains
+    (previous Balance plus the row's profit, commission, fee and swap) is
+    the one the file was written in; on a tie the width decides.
+    """
+    wide = {name: index for index, name in enumerate(_MT5_HISTORY_COLUMNS)}
+    narrow = {name: index for index, name in enumerate(_MT5_TESTER_COLUMNS)}
+    by_width = wide if rows and len(rows[0]) >= 14 else narrow
+    other = narrow if by_width is wide else wide
+    return other if _mt5_chained(rows, other) > _mt5_chained(rows, by_width) else by_width
 
 
 def _mt5_deals(reader: _TableReader) -> tuple[list[_Deal], int]:
     deals: list[_Deal] = []
     invalid = 0
     header: list[str] | None = None
+    found: list[tuple[list[str], dict[str, int] | None]] = []
     for row in reader.rows:
         texts = row.texts
         if row.is_mt_header:
             header = texts
             continue
-        if not _is_mt5_deal(texts):
-            continue
-        columns = _mt5_column_map(header, len(texts))
+        if _is_mt5_deal(texts):
+            found.append((texts, _mt5_named_columns(header)))
+    unnamed = [texts for texts, named in found if named is None]
+    guessed = _mt5_unnamed_layout(unnamed) if unnamed else {}
+    for texts, named in found:
+        columns = named if named is not None else guessed
 
         def cell(name: str, texts: list[str] = texts, columns: dict[str, int] = columns) -> str:
             index = columns.get(name)

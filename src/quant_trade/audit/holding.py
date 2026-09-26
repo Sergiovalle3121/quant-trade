@@ -1,5 +1,11 @@
 """Did the strategy do better than simply holding the market it trades?
 
+Only for a market whose public closes may be reused in a paid report. None of
+the markets recognised today (``market.ASSETS``: the S&P 500, the Nasdaq 100,
+bitcoin) has such a source, so for them the engine reports one NOT_MEASURED
+line (``UNLICENSED``) that points to the benchmark upload; the comparison
+below stays for a market that gets a licensed source.
+
 A robot on the Nasdaq 100 that made 40 % in a year the index rose 50 % did
 not add skill: it rode the market, with extra steps and extra risk. This
 module puts the strategy's own closes beside the public closes of the market
@@ -58,6 +64,15 @@ EDGE_SE = 2.0
 MAX_GAP_DAYS = 5
 
 UNAVAILABLE = "the market's public closes could not be read when the report was made"
+#: A market the file trades whose closes no public source lets a paid report reuse.
+UNLICENSED = (
+    "no public source of this market's closes that we know of has a licence that allows "
+    "reuse in a paid report; to compare, upload its closes as the benchmark file"
+)
+UNLICENSED_WITH_BENCHMARK = (
+    "no public source of this market's closes that we know of has a licence that allows "
+    "reuse in a paid report; the benchmark section compares the strategy with the file you uploaded"
+)
 NOTE = (
     "the strategy's closes against the market's public closes (FRED) on the days both are "
     "seen (the sparser of the two calendars); Sharpe ratios on those days without "
@@ -199,4 +214,13 @@ def versus_holding(frame: pd.DataFrame, closes: pd.Series, asset: Asset) -> dict
     return out
 
 
-__all__ = ["CLOSE_MOVE", "EDGE_SE", "MIN_DAYS", "UNAVAILABLE", "sharpe_gap_se", "versus_holding"]
+__all__ = [
+    "CLOSE_MOVE",
+    "EDGE_SE",
+    "MIN_DAYS",
+    "UNAVAILABLE",
+    "UNLICENSED",
+    "UNLICENSED_WITH_BENCHMARK",
+    "sharpe_gap_se",
+    "versus_holding",
+]

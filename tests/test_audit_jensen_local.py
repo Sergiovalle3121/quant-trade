@@ -91,9 +91,12 @@ def test_the_euro_history_fills_only_the_days_before_estr() -> None:
     days = pd.bdate_range("2018-01-02", "2021-06-30")
     stamps = _stamps(days)
     estr = pd.Series(-0.5, index=pd.bdate_range("2019-10-01", days[-1]))
-    oecd = pd.Series(-0.36, index=pd.date_range("2017-01-01", "2021-06-01", freq="MS"))
+    dfr = pd.Series(-0.36, index=pd.date_range("2017-01-01", "2021-06-30", freq="D"))
     assert local_span_cash(stamps, estr, "EUR") is None
-    cash = local_span_cash(stamps, estr, "EUR", oecd)
+    # The ECB's rates are daily: month-start values are too stale for the history.
+    monthly = dfr[dfr.index.day == 1]
+    assert local_span_cash(stamps, estr, "EUR", {"cash_eur_deposit": monthly}) is None
+    cash = local_span_cash(stamps, estr, "EUR", {"cash_eur_deposit": dfr})
     assert cash is not None
     before = np.asarray(stamps.iloc[:-1].dt.tz_localize(None) < pd.Timestamp("2019-10-01"))
     per_day = np.log1p(cash) / np.diff(days.to_numpy()).astype("timedelta64[D]").astype(float)

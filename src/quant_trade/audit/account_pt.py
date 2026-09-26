@@ -252,6 +252,26 @@ COPY_PT: dict[str, str] = {
         "Um colega convidou você. Crie sua conta e o primeiro relatório completo é grátis."
     ),
     "change_password": "Trocar senha",
+    "change_email": "Trocar e-mail",
+    "email_now": "Você entra com {email}. Depois da troca, você entra com o e-mail novo.",
+    "email_new": "E-mail novo",
+    "email_again": "Repita o e-mail novo",
+    "email_help": (
+        "Ainda não enviamos e-mails para confirmá-lo: confira se está bem escrito. Encerramos "
+        "suas outras sessões."
+    ),
+    "email_passkey_note": (
+        "Suas chaves de acesso continuam funcionando; seu celular ou computador pode continuar "
+        "mostrando o e-mail antigo como nome."
+    ),
+    "email_changed": (
+        "E-mail trocado. A partir de agora você entra com o novo. Suas outras sessões foram "
+        "encerradas."
+    ),
+    "email_mismatch": "Os dois e-mails novos não coincidem. Digite-os de novo.",
+    "email_same": "Esse já é o seu e-mail.",
+    "email_taken": "Não foi possível usar esse e-mail. Tente outro.",
+    "event_email_changed": "E-mail trocado",
     "password_changed": "Senha trocada. Suas outras sessões foram encerradas.",
     "delete_title": "Apagar minha conta",
     "delete_help": (

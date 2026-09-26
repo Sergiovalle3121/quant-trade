@@ -53,7 +53,7 @@ REPORT_HTML = "report.html"
 def _public_market() -> Callable[[str], pd.Series | None]:
     """Public closes for one CLI run: every series read first, within the deadline."""
     data = MarketData()
-    data.warm().join(timeout=40.0)  # three series, each cut off within about 10 s
+    data.warm().join(timeout=40.0)  # every series, each cut off within about 10 s
     return data.closes
 
 
@@ -126,7 +126,7 @@ def run(
     public_data: Annotated[
         bool,
         typer.Option(
-            help="Read public FRED closes to compare with holding the market the file trades"
+            help="Read the public rates, prices and VIX the report credits (FRED and publishers)"
         ),
     ] = False,
     paid: Annotated[bool, typer.Option("--paid/--preview", help="Full report or preview")] = False,

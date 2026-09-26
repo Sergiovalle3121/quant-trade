@@ -221,6 +221,7 @@ ACCOUNT_EVENT_KINDS = (
     "signin_passkey",
     "passkey_added",
     "passkey_removed",
+    "email_changed",
 )
 #: How long an account event is kept, and how many at most per account.
 ACCOUNT_EVENT_DAYS = 90
@@ -1397,6 +1398,27 @@ class Store:
                 .where(self.accounts.c.id == account_id)
                 .values(password_hash=password_hash)
             )
+        return bool(result.rowcount)
+
+    def set_email(self, account_id: str, email: str) -> bool:
+        """Move an account to a new sign-in e-mail; ``False`` when another account has it."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                taken = conn.execute(
+                    sa.select(self.accounts.c.id).where(
+                        (self.accounts.c.email == email) & (self.accounts.c.id != account_id)
+                    )
+                ).first()
+                if taken is not None:
+                    return False
+                result = conn.execute(
+                    self.accounts.update()
+                    .where(self.accounts.c.id == account_id)
+                    .values(email=email)
+                )
+        except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same e-mail
+            return False
         return bool(result.rowcount)
 
     def count_accounts(self) -> int:
