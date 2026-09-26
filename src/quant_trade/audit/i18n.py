@@ -1111,6 +1111,21 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("fewer than ten closed trades", "menos de diez operaciones cerradas"),
     ("fewer than fifty returns", "menos de cincuenta retornos"),
     (
+        "the uploaded returns in random order: the same Sharpe, volatility and final result, "
+        "only the order changes",
+        "los retornos aportados en orden al azar: el mismo Sharpe, la misma volatilidad y el "
+        "mismo resultado final; solo cambia el orden",
+    ),
+    ("deepest fall of the uploaded order", "caída más profunda en el orden aportado"),
+    (
+        "too few losing periods for their order to matter",
+        "muy pocos periodos perdedores para que su orden importe",
+    ),
+    (
+        "no losing period; the drawdown is zero in any order",
+        "ningún periodo perdedor; la caída es cero en cualquier orden",
+    ),
+    (
         "the monthly returns with 2 % a year taken month by month and 20 % of each year's gain "
         "above the previous high taken at the year's end (high-water mark)",
         "las rentabilidades mensuales con un 2 % anual descontado mes a mes y un 20 % de la "

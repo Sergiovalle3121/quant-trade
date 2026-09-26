@@ -513,6 +513,118 @@ def drawdown_risk(
     }
 
 
+#: Random orders of the uploaded returns drawn for ``shuffled_drawdown``,
+#: fewer on long curves so the cells stay under ``MAX_RESAMPLED_CELLS``.
+SHUFFLE_SAMPLES = 1000
+SHUFFLE_MIN_SAMPLES = 100
+SHUFFLE_SEED = 20260926
+#: Share of random orders beyond which the uploaded drawdown reads as unusual.
+SHUFFLE_TAIL = 0.05
+SHUFFLE_NOTE = (
+    "the uploaded returns in random order: the same Sharpe, volatility and final result, "
+    "only the order changes"
+)
+NO_LOSING_PERIOD_DRAWDOWN = "no losing period; the drawdown is zero in any order"
+#: Losing returns needed, and the most shuffles that may tie the uploaded
+#: fall: with a handful of losses every order falls about the same, and a
+#: "typical" reading would call a smoothed curve normal.
+SHUFFLE_MIN_LOSSES = 5
+SHUFFLE_MAX_TIE_SHARE = 0.5
+TOO_FEW_LOSSES_FOR_ORDER = "too few losing periods for their order to matter"
+
+
+def _deepest_fall(values: np.ndarray) -> float:
+    equity = np.concatenate([[1.0], np.cumprod(1.0 + values)])
+    return float(_max_drawdowns(equity[None, :])[0])
+
+
+def shuffled_drawdown(
+    returns: pd.Series | np.ndarray | Sequence[float],
+    *,
+    samples: int = SHUFFLE_SAMPLES,
+    seed: int = SHUFFLE_SEED,
+) -> dict[str, Any]:
+    """The uploaded maximum drawdown against the same returns in random order.
+
+    Shuffling keeps every return, so the Sharpe, the volatility and the final
+    result stay exactly as uploaded; only the order moves. The deepest fall
+    of each random order gives the drawdown this Sharpe and volatility
+    usually produce over this many periods. A much shallower fall than
+    nearly every shuffle means losses rarely follow losses (smoothed or
+    averaged-down curves look like this); a much deeper one means losses
+    come in clusters. Informational: it moves no flag and no class.
+
+    Drawdowns are negative fractions like the headline ``max_drawdown``.
+    Curves longer than ``MAX_RISK_PATH_PERIODS`` are first compounded into
+    consecutive blocks, and the uploaded fall is measured on the same blocks.
+    """
+    values = _clean(returns)
+    supplied = len(values)
+    if supplied < MIN_OBSERVATIONS or float(np.std(values)) <= 0:
+        return {
+            "status": "NOT_MEASURED",
+            "reason": (
+                f"needs at least {MIN_OBSERVATIONS} returns that are not all identical; "
+                f"{supplied} supplied"
+            ),
+        }
+    losses = int((values < 0).sum())
+    if losses == 0:
+        return {"status": "NOT_MEASURED", "reason": NO_LOSING_PERIOD_DRAWDOWN}
+    if losses < SHUFFLE_MIN_LOSSES:
+        return {"status": "NOT_MEASURED", "reason": TOO_FEW_LOSSES_FOR_ORDER}
+    if samples < 1:
+        raise ValueError("samples must be positive")
+    step = math.ceil(supplied / MAX_RISK_PATH_PERIODS) if supplied > MAX_RISK_PATH_PERIODS else 1
+    if step > 1:
+        blocks = supplied // step
+        values = np.prod(1.0 + values[: blocks * step].reshape(blocks, step), axis=1) - 1.0
+    length = len(values)
+    used = int(min(samples, max(SHUFFLE_MIN_SAMPLES, MAX_RESAMPLED_CELLS // length)))
+    rng = np.random.default_rng(seed)
+    order = rng.permuted(np.tile(np.arange(length), (used, 1)), axis=1)
+    equity = np.concatenate([np.ones((used, 1)), np.cumprod(1.0 + values[order], axis=1)], axis=1)
+    falls = _max_drawdowns(equity)
+    observed = _deepest_fall(values)
+    # Ties count on both sides, and the uploaded order counts as one of the
+    # orders, so neither share can reach zero.
+    tolerance = 1e-12
+    # Most orders falling exactly as the upload does, or exactly as each
+    # other does (one loss sets the fall wherever it lands), leaves nothing
+    # for the order to say.
+    typical = float(np.median(falls))
+    ties_upload = float((np.abs(falls - observed) <= tolerance).mean())
+    ties_median = float((np.abs(falls - typical) <= 1e-9).mean())
+    if max(ties_upload, ties_median) > SHUFFLE_MAX_TIE_SHARE:
+        return {"status": "NOT_MEASURED", "reason": TOO_FEW_LOSSES_FOR_ORDER}
+    shallower = (float((falls <= observed + tolerance).sum()) + 1.0) / (used + 1.0)
+    deeper = (float((falls >= observed - tolerance).sum()) + 1.0) / (used + 1.0)
+    if shallower <= SHUFFLE_TAIL:
+        position = "SHALLOWER"
+    elif deeper <= SHUFFLE_TAIL:
+        position = "DEEPER"
+    else:
+        position = "TYPICAL"
+    return {
+        "status": "MEASURED",
+        "observed": measured(-observed, "deepest fall of the uploaded order"),
+        "shuffled": {
+            f"p{q}": measured(-float(np.percentile(falls, q)), SHUFFLE_NOTE) for q in (5, 50, 95)
+        },
+        "share_at_most_as_deep": measured(shallower, SHUFFLE_NOTE),
+        "share_at_least_as_deep": measured(deeper, SHUFFLE_NOTE),
+        "position": position,
+        "method": {
+            "samples": used,
+            "samples_requested": int(samples),
+            "seed": int(seed),
+            "observations": supplied,
+            "periods_per_step": step,
+            "tail": SHUFFLE_TAIL,
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Prop-firm challenge simulator
 # ---------------------------------------------------------------------------
