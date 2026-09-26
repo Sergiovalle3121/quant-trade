@@ -392,26 +392,51 @@ def _to_numeric(series: pd.Series) -> tuple[pd.Series, bool]:
         return pd.to_numeric(series, errors="coerce").astype(float), False
     text = series.astype(str).str.strip()
     percent = bool(text.str.endswith("%").any())
-    # Currency signs ("R$", "US$", "€") and spaces go; "(1,5)" is a negative.
-    bare = text.str.replace(r"[A-Za-z]{1,2}\$|[%$€£¥₹\s]", "", regex=True)
+    # Currency signs and codes ("R$", "US$", "€", "USD") go, and so do spaces
+    # and the Swiss "1'234"; "(1,5)", "1,5-" and a Unicode minus are negatives.
+    bare = text.str.replace("\u2212", "-", regex=False)
+    bare = bare.str.replace(r"[A-Za-z]{1,2}\$|[%$€£¥₹'\s]", "", regex=True)
+    bare = bare.str.replace(r"^[A-Z]{3}|[A-Z]{3}$", "", regex=True)
     bare = bare.str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+    bare = bare.str.replace(r"^([\d.,]+)-$", r"-\1", regex=True)
     if _decimal_comma(bare):
         # "1.234,56" or "10000,5" (Spanish, Portuguese, German): the dots group
         # thousands and the comma is the decimal point, for the whole column.
         bare = bare.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+    else:
+        # In a decimal-dot column a cell that plainly uses a decimal comma
+        # ("10,5") contradicts the rest: it is left unread, and counted as an
+        # unreadable row, rather than read as 105.
+        bare = bare.mask(bare.map(_plain_decimal_comma), "")
     cleaned = bare.str.replace(",", "", regex=False).replace({"": np.nan, "nan": np.nan})
     return pd.to_numeric(cleaned, errors="coerce").astype(float), percent
+
+
+#: A cell that can only be a decimal dot: no comma, and one to two or four and
+#: more digits after the dot ("10234.56", "0.5"); "1.234" could be thousands.
+_PLAIN_DECIMAL_DOT = re.compile(r"^[-+]?\d*\.(\d{1,2}|\d{4,})$")
+
+
+def _plain_decimal_comma(value: object) -> bool:
+    # Imported here: the importers build on this module's types.
+    from quant_trade.audit.importers import _comma_is_decimal
+
+    return isinstance(value, str) and _comma_is_decimal(value)
 
 
 def _decimal_comma(texts: pd.Series) -> bool:
     """Whether a column's numbers use a decimal comma: some cell plainly does
     (a comma after the last dot, or one comma not followed by three digits)
-    and none plainly uses a decimal dot after a thousands comma ("1,234.5")."""
+    and none plainly uses a decimal dot ("1,234.5", or "10234.56" with no
+    comma). A column mixing both marks keeps the dot reading: one stray
+    "10,5" must not rescale every other cell."""
     # Imported here: the importers build on this module's types.
     from quant_trade.audit.importers import _comma_is_decimal
 
     values = [value for value in texts.dropna().astype(str) if value and value != "nan"]
     if any("," in value and "." in value[value.rfind(",") :] for value in values):
+        return False
+    if any(_PLAIN_DECIMAL_DOT.match(value) for value in values):
         return False
     return any(_comma_is_decimal(value) for value in values)
 

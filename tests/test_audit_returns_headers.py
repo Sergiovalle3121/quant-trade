@@ -89,6 +89,11 @@ def test_thousands_commas_and_decimal_dots_read_as_before(
         (["1,5%", "-0,5%"], [1.5, -0.5]),
         (["1,5"], [1.5]),
         (["1e-3", "2E2"], [0.001, 200.0]),
+        # Pre-existing gaps: a Unicode or trailing minus, Swiss "'", currency codes.
+        (["\u22121,5", "2,0"], [-1.5, 2.0]),
+        (["1,5-", "2,0"], [-1.5, 2.0]),
+        (["1'234.56", "5"], [1234.56, 5.0]),
+        (["USD 100", "100 EUR"], [100.0, 100.0]),
     ],
 )
 def test_mixed_number_formats(cells: list[str], expected: list[float]) -> None:
@@ -97,3 +102,37 @@ def test_mixed_number_formats(cells: list[str], expected: list[float]) -> None:
     from quant_trade.audit.schema import _to_numeric  # noqa: PLC0415
 
     assert _to_numeric(pd.Series(cells))[0].tolist() == expected
+
+
+@pytest.mark.parametrize(
+    ("cells", "expected"),
+    [
+        # A decimal-dot column keeps its reading; the stray comma cell is left
+        # unread (an unreadable row) instead of rescaling the whole column.
+        (["10234.56", "10,5"], [10234.56, None]),
+        (["0.5", "1,5"], [0.5, None]),
+        (["1,234.5", "2,5"], [1234.5, None]),
+        # "1.234" is not plainly a decimal dot, so "1,5" still decides.
+        (["1.234", "1,5"], [1234.0, 1.5]),
+    ],
+)
+def test_one_stray_comma_cell_never_rescales_a_dot_column(
+    cells: list[str], expected: list[float | None]
+) -> None:
+    import math  # noqa: PLC0415
+
+    import pandas as pd  # noqa: PLC0415
+
+    from quant_trade.audit.schema import _to_numeric  # noqa: PLC0415
+
+    values = _to_numeric(pd.Series(cells))[0].tolist()
+    assert [None if math.isnan(value) else value for value in values] == expected
+
+
+def test_a_curve_with_one_comma_cell_keeps_its_scale() -> None:
+    rows = "".join(f"2024-01-{day:02d},{10000 + day * 10}.5\n" for day in range(1, 31))
+    curve = parse_equity_csv(
+        ("date,equity\n" + rows + '2024-01-31,"10047,55"\n').encode(), what="equity"
+    )
+    assert curve.frame["equity"].iloc[0] == 10010.5
+    assert curve.unparseable_rows == 1

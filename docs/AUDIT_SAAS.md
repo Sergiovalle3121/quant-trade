@@ -325,8 +325,11 @@ numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
 throughout (one plainly decimal-comma cell decides the column, so a `1,234`
 beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
 as thousands.
-Currency signs (`$`, `R$`, `US$`, `€`, `£`, `¥`, `₹`) are dropped and `(1,5)`
-reads as a negative.
+A column that also holds a plain decimal dot (`10234.56`, `0.5`) keeps the dot
+reading, and a cell there that plainly uses a decimal comma is left unread (an
+unreadable row) rather than rescaling the column. Currency signs and codes
+(`$`, `R$`, `US$`, `€`, `£`, `¥`, `₹`, `USD`), spaces and the Swiss `'` are
+dropped; `(1,5)`, `1,5-` and a Unicode minus read as negatives.
 
 Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
 trade_date, exchange, segment, series, trade_type, auction, quantity, price,
