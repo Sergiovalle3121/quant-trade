@@ -32,6 +32,7 @@ from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
 from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
+from quant_trade.audit.market import IMF_PAGE
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
@@ -906,6 +907,37 @@ LABELS: dict[str, dict[str, str]] = {
             "precios al consumidor de EE. UU. de {source}, leídos al generar el informe. No "
             "cambia la clase."
         ),
+        "currency_intro_local": (
+            "Los saldos de la cuenta en su propia moneda, del {first} al {last}, y lo que "
+            "valen después de la inflación de esa moneda: si crecieron menos que los precios, "
+            "la cuenta perdió poder de compra aunque haya crecido."
+        ),
+        "currency_account_local": "{name} (la cuenta)",
+        "currency_real_local": "{name}, después de su inflación",
+        "currency_inflation_local": (
+            "La inflación local ({code}) en esas fechas fue de {total} en total."
+        ),
+        "currency_inflation_local_yearly": (
+            "La inflación local ({code}) en esas fechas fue de {total} en total ({yearly} al año)."
+        ),
+        "currency_note_local": (
+            "Después de su inflación: los saldos divididos entre el índice de precios al "
+            "consumidor del país de cada mes (el nacional, recopilado por el FMI; el armonizado "
+            "de Eurostat para el euro), o el del último mes publicado. El rendimiento al año se "
+            "muestra con al menos un año de historial. Fuente: precios de {source}, leídos al "
+            "generar el informe. No cambia la clase."
+        ),
+        "currency_note_mixed": (
+            "Las filas «después de su inflación» dividen entre el índice de precios al "
+            "consumidor de cada país de cada mes (el nacional, recopilado por el FMI; el "
+            "armonizado de Eurostat para el euro), o el del último mes publicado; una moneda "
+            "cuyos precios no cubren las fechas muestra solo su fila antes de inflación. El "
+            "rendimiento al año se muestra con al menos un año de historial. Fuente: tipos de "
+            "cambio y precios al consumidor de {source}, leídos al generar el informe. No "
+            "cambia la clase."
+        ),
+        "currency_sources": "{fred} y {imf}",
+        "currency_imf": "el FMI",
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reales (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -2073,6 +2105,36 @@ LABELS: dict[str, dict[str, str]] = {
             " consumer prices from {source}, read when the report was made. It does not change "
             "the class."
         ),
+        "currency_intro_local": (
+            "The account's levels in its own currency, from {first} to {last}, and what they "
+            "are worth after that currency's inflation: if they grew less than prices, the "
+            "account lost buying power even though it grew."
+        ),
+        "currency_account_local": "{name} (the account)",
+        "currency_real_local": "{name} after its own inflation",
+        "currency_inflation_local": (
+            "Local inflation ({code}) over those dates was {total} in total."
+        ),
+        "currency_inflation_local_yearly": (
+            "Local inflation ({code}) over those dates was {total} in total ({yearly} a year)."
+        ),
+        "currency_note_local": (
+            "After its own inflation: the levels divided by the country's consumer price index "
+            "of each month (the national one, compiled by the IMF; Eurostat's harmonised one "
+            "for the euro), or that of the latest month published. The return a year is shown "
+            "from one year of history. Source: prices from {source}, read when the report was "
+            "made. It does not change the class."
+        ),
+        "currency_note_mixed": (
+            "The rows \"after its own inflation\" divide by each country's consumer price index "
+            "of each month (the national one, compiled by the IMF; Eurostat's harmonised one "
+            "for the euro), or that of the latest month published; a currency whose prices do "
+            "not cover the dates shows only its row before inflation. The return a year is "
+            "shown from one year of history. Source: exchange rates and consumer prices from "
+            "{source}, read when the report was made. It does not change the class."
+        ),
+        "currency_sources": "{fred} and {imf}",
+        "currency_imf": "the IMF",
         "currency_MXN": "Mexican pesos (MXN)",
         "currency_BRL": "Brazilian reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -5661,7 +5723,8 @@ def _currency_html(
             reason=localize(str(section.get("reason", "")), locale)
         )
         return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
-    intro = labels["currency_intro"].format(
+    base = str(section.get("base") or "")
+    intro = labels["currency_intro_local" if base else "currency_intro"].format(
         first=section.get("first", ""), last=section.get("last", "")
     )
     out = f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
@@ -5686,13 +5749,34 @@ def _currency_html(
         mark = f" class='{kind}'" if kind else ""
         return f"<tr{mark}><td>{_e(name)}</td>{cells}</tr>"
 
-    body = row(labels["currency_dollars"], section.get("dollars") or {}, "cur-base")
+    def local_name(code: str) -> str:
+        return labels.get(f"currency_{code}", code)
+
     real = section.get("real") or {}
-    if real.get("status") == "MEASURED":
-        body += row(labels["currency_real"], real, "cur-real")
-    for item in section.get("currencies") or []:
+    items = section.get("currencies") or []
+    if base:
+        body = row(
+            labels["currency_account_local"].format(name=local_name(base)),
+            section.get("account") or {},
+            "cur-base",
+        )
+        if real.get("status") == "MEASURED":
+            body += row(
+                labels["currency_real_local"].format(name=local_name(base)), real, "cur-real"
+            )
+    else:
+        body = row(labels["currency_dollars"], section.get("dollars") or {}, "cur-base")
+        if real.get("status") == "MEASURED":
+            body += row(labels["currency_real"], real, "cur-real")
+    for item in items:
         code = str(item.get("code", ""))
-        body += row(labels.get(f"currency_{code}", code), item)
+        body += row(local_name(code), item)
+        if (item.get("real") or {}).get("status") == "MEASURED":
+            body += row(
+                labels["currency_real_local"].format(name=local_name(code)),
+                item["real"],
+                "cur-real",
+            )
     out += (
         "<table class='timing holding currency'><thead><tr>"
         f"<th>{_e(labels['currency_head'])}</th>"
@@ -5701,16 +5785,29 @@ def _currency_html(
     )
     if real.get("status") == "MEASURED":
         total = _fund_pct(float(real["inflation"]["value"]))
+        key = "currency_inflation_local" if base else "currency_inflation"
         if real.get("yearly_inflation"):
-            text = labels["currency_inflation_yearly"].format(
-                total=total, yearly=_fund_pct(float(real["yearly_inflation"]["value"]))
+            text = labels[key + "_yearly"].format(
+                code=base, total=total, yearly=_fund_pct(float(real["yearly_inflation"]["value"]))
             )
         else:
-            text = labels["currency_inflation"].format(total=total)
+            text = labels[key].format(code=base, total=total)
         out += f"<p>{_e(text)} {_badge('MEASURED')}</p>"
-    link = "<a href='https://fred.stlouisfed.org/' rel='noopener'>FRED</a>"
-    source = _e(labels["currency_note"].format(source="\x00"))
-    out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
+    fred = "<a href='https://fred.stlouisfed.org/' rel='noopener'>FRED</a>"
+    imf = f"<a href='{_e(IMF_PAGE)}' rel='noopener'>{_e(labels['currency_imf'])}</a>"
+    local_rows = [item for item in items if (item.get("real") or {}).get("status") == "MEASURED"]
+    if base:
+        note, sources = "currency_note_local", [real] if real.get("status") == "MEASURED" else []
+    elif local_rows:
+        note, sources = "currency_note_mixed", local_rows
+    else:
+        note, sources = "currency_note", []
+    uses_imf = any(
+        (item.get("real") or item).get("provider") == "imf" for item in sources
+    )
+    source = labels["currency_sources"] if uses_imf else "\x00"
+    text = _e(labels[note].format(source=source.format(fred="\x00", imf="\x01")))
+    out += f"<p class='muted'><small>{text.replace(chr(0), fred).replace(chr(1), imf)}</small></p>"
     return out
 
 

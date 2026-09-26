@@ -1,5 +1,10 @@
 """Public daily closes of a few widely traded markets, read from FRED.
 
+Consumer prices outside the US come from the IMF's public CPI dataset (the
+national index each statistics office publishes, compiled by the IMF), where
+FRED's copies stopped updating; they are read the same way and kept the same
+way.
+
 A report on a strategy that trades the S&P 500, the Nasdaq 100 or bitcoin
 can say what simply holding that market did over the same days. The closes
 come from the St. Louis Fed's public FRED service at run time, are kept in
@@ -28,6 +33,13 @@ import pandas as pd
 
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 FRED_PAGE = "https://fred.stlouisfed.org/series/{series}"
+#: The IMF's public CPI dataset (SDMX), monthly, as CSV; no key.
+IMF_CSV = (
+    "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,CPI/{series}"
+    "?startPeriod=1990-01&detail=dataonly"
+)
+IMF_ACCEPT = "application/vnd.sdmx.data+csv;version=1.0.0"
+IMF_PAGE = "https://data.imf.org/en/datasets/IMF.STA:CPI"
 #: Seconds a whole FRED read may take before it is given up.
 TIMEOUT = 5.0
 #: Largest reply read (the longest series is about 0.3 MB).
@@ -59,10 +71,12 @@ class Asset:
     floor: float | None = None
     #: A rate that can go below zero (some central banks' rates did).
     negative: bool = False
+    #: Where the series is read: ``fred`` or ``imf``.
+    provider: str = "fred"
 
     @property
     def source_url(self) -> str:
-        return FRED_PAGE.format(series=self.series)
+        return IMF_PAGE if self.provider == "imf" else FRED_PAGE.format(series=self.series)
 
 
 #: A futures contract month: a month code and year (``NQZ4``) or ``MMYY`` (``NQ 12-24``).
@@ -162,6 +176,32 @@ EUR_CASH_HISTORY = Asset(
     floor=MIN_LOCAL_RATE,
     negative=True,
 )
+#: Consumer prices in each currency of ``FX`` (all items, monthly, not seasonally
+#: adjusted): each country's national index from the IMF's CPI dataset, and the
+#: euro area's harmonised index (Eurostat's HICP) from FRED. Brazil's index runs
+#: from tiny values in 1990 (hyperinflation), so only a ceiling applies.
+MAX_PRICE_INDEX = 10_000_000.0
+LOCAL_CPI: tuple[Asset, ...] = (
+    *(
+        Asset(
+            f"cpi_{code.lower()}",
+            code,
+            f"{country}.CPI._T.IX.M",
+            re.compile(r"(?!)"),
+            ceiling=MAX_PRICE_INDEX,
+            provider="imf",
+        )
+        for code, country in (
+            ("MXN", "MEX"),
+            ("BRL", "BRA"),
+            ("GBP", "GBR"),
+            ("JPY", "JPN"),
+            ("CAD", "CAN"),
+            ("CHF", "CHE"),
+        )
+    ),
+    Asset("cpi_eur", "EUR", "CP0000EZ19M086NEST", re.compile(r"(?!)"), ceiling=10_000.0, floor=1.0),
+)
 #: Every series the service keeps in memory.
 SERIES: dict[str, Asset] = {
     **BY_KEY,
@@ -171,6 +211,7 @@ SERIES: dict[str, Asset] = {
     **{asset.key: asset for asset in FX},
     **{asset.key: asset for asset in LOCAL_CASH},
     EUR_CASH_HISTORY.key: EUR_CASH_HISTORY,
+    **{asset.key: asset for asset in LOCAL_CPI},
 }
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).
@@ -228,8 +269,21 @@ def parse_fred_csv(text: str, *, rate: bool = False, negative: bool = False) -> 
     return series.sort_index()
 
 
+def parse_imf_csv(text: str) -> pd.Series:
+    """The IMF's SDMX CSV (``TIME_PERIOD`` as ``2024-M01``, ``OBS_VALUE``) as a
+    float series indexed by each month's first day; blanks and values that are
+    not above zero dropped."""
+    frame = pd.read_csv(io.StringIO(text), usecols=["TIME_PERIOD", "OBS_VALUE"], dtype=str)
+    months = frame["TIME_PERIOD"].str.strip().str.replace("-M", "-", regex=False)
+    stamps = pd.to_datetime(months, format="%Y-%m", errors="coerce")
+    values = pd.to_numeric(frame["OBS_VALUE"], errors="coerce")
+    series = pd.Series(values.to_numpy(dtype=float), index=pd.DatetimeIndex(stamps))
+    series = series[series.index.notna() & np.isfinite(series) & (series > 0)]
+    return series[~series.index.duplicated(keep="last")].sort_index()
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Refuse redirects, so a read never leaves FRED's fixed https address."""
+    """Refuse redirects, so a read never leaves its fixed https address."""
 
     def redirect_request(self, *args: object, **kwargs: object) -> None:
         return None
@@ -238,17 +292,22 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
-def _download(series: str) -> str:
-    """One FRED series as text, within about ``TIMEOUT`` seconds in all and at
-    most ``MAX_BYTES``. ``read1`` returns whatever one receive brings, so the
-    deadline is checked after every receive and a server that trickles bytes
-    is cut off (each receive is itself bounded by the socket timeout)."""
-    url = FRED_CSV.format(series=series)
+def _download(series: str, provider: str = "fred") -> str:
+    """One FRED (or IMF) series as text, within about ``TIMEOUT`` seconds in all
+    and at most ``MAX_BYTES``. ``read1`` returns whatever one receive brings, so
+    the deadline is checked after every receive and a server that trickles
+    bytes is cut off (each receive is itself bounded by the socket timeout)."""
+    if provider == "imf":
+        request = urllib.request.Request(
+            IMF_CSV.format(series=series), headers={"Accept": IMF_ACCEPT}
+        )
+    else:
+        request = urllib.request.Request(FRED_CSV.format(series=series))
     deadline = time.monotonic() + TIMEOUT
     chunks: list[bytes] = []
     size = 0
     # Python's default User-Agent: FRED stalls some custom ones until the timeout.
-    with _OPENER.open(url, timeout=TIMEOUT) as response:
+    with _OPENER.open(request, timeout=TIMEOUT) as response:
         if getattr(response, "status", 200) != 200:
             raise OSError(f"FRED answered {response.status}")
         while chunk := response.read1(64 * 1024):
@@ -319,8 +378,16 @@ class MarketData:
         if not lock.acquire(blocking=False):
             return False
         try:
-            fetch = self._download or _download
-            series = parse_fred_csv(fetch(asset.series), rate=asset.rate, negative=asset.negative)
+            # An injected reader takes the series id alone; the IMF one also its provider.
+            text = (
+                self._download(asset.series)
+                if self._download is not None
+                else _download(asset.series, asset.provider)
+            )
+            if asset.provider == "imf":
+                series = parse_imf_csv(text)
+            else:
+                series = parse_fred_csv(text, rate=asset.rate, negative=asset.negative)
             if len(series) < 2:
                 raise ValueError("FRED series has no closes")
             if asset.ceiling is not None and bool((series > asset.ceiling).any()):
@@ -353,6 +420,7 @@ __all__ = [
     "CASH",
     "CPI",
     "FX",
+    "LOCAL_CPI",
     "SERIES",
     "VIX",
     "Asset",
@@ -360,4 +428,5 @@ __all__ = [
     "asset_of",
     "dominant_asset",
     "parse_fred_csv",
+    "parse_imf_csv",
 ]

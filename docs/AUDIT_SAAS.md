@@ -1375,13 +1375,26 @@ year compounded over the calendar days (only from one year of history,
 shown after US inflation: each point is divided by US consumer prices
 (`CPIAUCNS`, not seasonally adjusted, as BLS recommends for deflating between
 arbitrary dates) of its own month or the latest month published, at most 75 days
-old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. The
-deflator is US only (FRED has no current consumer price index for most of the
-other currencies), so the currency figures are before their own inflation and
-the note says so. It runs only for a dollar account: an imported report that
-names `USD` or `USC` (or `USDT`/`USDC`, read at one dollar per coin, which the
-note says), or a file that names no currency, in which case a line
-says it is read as dollars; another named currency leaves it NOT_MEASURED.
+old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. Each
+currency's row is followed by the same figures after that currency's own
+inflation (`market.LOCAL_CPI`): the levels in that currency divided by the
+country's consumer price index of each point's month, or the latest month
+published, at most 125 days old (`MAX_LOCAL_CPI_GAP_DAYS`: the IMF compiles
+each index a few weeks after the country publishes it). The indexes are the
+national ones from the IMF's public CPI dataset (SDMX CSV from
+`api.imf.org`, no key: `MEX`, `BRA`, `GBR`, `JPN`, `CAN`, `CHE`
+`.CPI._T.IX.M`), because FRED's OECD copies stopped updating in 2021-2025,
+and Eurostat's harmonised index for the euro area from FRED
+(`CP0000EZ19M086NEST`). A currency whose prices are missing or stale keeps
+its row without the one after inflation, and the note says so. It runs for a
+dollar account: an imported report that names `USD` or `USC` (or
+`USDT`/`USDC`, read at one dollar per coin, which the note says), or a file
+that names no currency, in which case a line says it is read as dollars.
+When a report names MXN, BRL, EUR, GBP, JPY, CAD or CHF, the section shows
+the account in that currency and after that currency's inflation, with the
+local inflation over the dates; without those prices it is NOT_MEASURED with
+the reason. Another named currency leaves it NOT_MEASURED. A price index
+reply above 10,000,000 is taken as broken.
 Needs 90 days of history. A reply above 10,000 for any of these series is
 taken as broken. It never changes the class.
 

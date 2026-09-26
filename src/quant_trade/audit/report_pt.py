@@ -1201,6 +1201,36 @@ REPORT: dict[str, Any] = {
             " ao ano aparece com pelo menos um ano de histórico. Fonte: cotações e preços ao "
             "consumidor dos EUA de {source}, lidos ao gerar o relatório. Não muda a classe."
         ),
+        "currency_intro_local": (
+            "Os saldos da conta na sua própria moeda, de {first} a {last}, e o que valem "
+            "depois da inflação dessa moeda: se cresceram menos que os preços, a conta perdeu "
+            "poder de compra mesmo tendo crescido."
+        ),
+        "currency_account_local": "{name} (a conta)",
+        "currency_real_local": "{name}, depois da sua inflação",
+        "currency_inflation_local": (
+            "A inflação local ({code}) nessas datas foi de {total} no total."
+        ),
+        "currency_inflation_local_yearly": (
+            "A inflação local ({code}) nessas datas foi de {total} no total ({yearly} ao ano)."
+        ),
+        "currency_note_local": (
+            "Depois da sua inflação: os saldos divididos pelo índice de preços ao consumidor "
+            "do país de cada mês (o nacional, compilado pelo FMI; o harmonizado do Eurostat "
+            "para o euro), ou o do último mês publicado. A rentabilidade ao ano é mostrada a "
+            "partir de um ano de histórico. Fonte: preços de {source}, lidos ao gerar o "
+            "relatório. Não muda a classe."
+        ),
+        "currency_note_mixed": (
+            "As linhas «depois da sua inflação» dividem pelo índice de preços ao consumidor de "
+            "cada país de cada mês (o nacional, compilado pelo FMI; o harmonizado do Eurostat "
+            "para o euro), ou o do último mês publicado; uma moeda cujos preços não cobrem as "
+            "datas mostra só a sua linha antes da inflação. A rentabilidade ao ano é mostrada "
+            "a partir de um ano de histórico. Fonte: cotações e preços ao consumidor de "
+            "{source}, lidos ao gerar o relatório. Não muda a classe."
+        ),
+        "currency_sources": "{fred} e {imf}",
+        "currency_imf": "o FMI",
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -4915,6 +4945,36 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "US consumer prices do not cover the whole history",
         "os preços ao consumidor dos EUA não cobrem todo o histórico",
+    ),
+    (
+        (
+            "the levels in that currency divided by that country's consumer price index (IMF "
+            "CPI dataset; Eurostat's harmonised index for the euro) of each point's month, or "
+            "the latest month published"
+        ),
+        (
+            "os saldos nessa moeda divididos pelo índice de preços ao consumidor desse país "
+            "(conjunto de IPC do FMI; índice harmonizado do Eurostat para o euro) do mês de "
+            "cada ponto, ou do último mês publicado"
+        ),
+    ),
+    (
+        (
+            "the account's own levels in its currency; return a year compounded over the "
+            "calendar days, shown from one year of history; worst fall from a peak"
+        ),
+        (
+            "os saldos da conta na sua própria moeda; rentabilidade ao ano composta sobre os "
+            "dias corridos, mostrada a partir de um ano de histórico; pior queda desde um pico"
+        ),
+    ),
+    (
+        "the consumer prices of the account's currency could not be read when the report was made",
+        "os preços ao consumidor da moeda da conta não puderam ser lidos ao gerar o relatório",
+    ),
+    (
+        "the consumer prices of the account's currency do not cover the whole history",
+        "os preços ao consumidor da moeda da conta não cobrem todo o histórico",
     ),
     (
         "the strategy's compound return a year",
