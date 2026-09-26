@@ -243,7 +243,18 @@ otherwise the `ambiguous_dates` error stands. A file listed newest first
 keeps its order reversed among fills with the same time. Without a profit
 or multiplier column, a CME contract code (`ESZ6`, `MNQ DEC26`, `ESZ6.CME`;
 never a bare root, which may be a share ticker) is priced with
-`FUTURES_POINT_VALUE_USD`, with a warning. A profit that fits either net or
+`FUTURES_POINT_VALUE_USD`, with a warning. Eurex and ICE codes are priced
+the same way from `FUTURES_POINT_VALUE_OTHER` (the exchanges' contract
+specifications, as_of 2026-09-25), which also records each contract's
+currency: FDAX x25, FDXM x5, FDXS x1, FESX x10, FSXE x1, FVS x100 and the
+Schatz/Bobl/Bund/Buxl futures x1,000 in EUR, FSMI x10 in CHF; ICE Brent (B)
+x1,000, Gasoil (G) x100, Sugar No. 11 (SB) x1,120 per cent, Coffee (KC) x375,
+Cotton (CT) x500, Cocoa (CC) x10, Orange juice (OJ) x150 and the US Dollar
+Index (DX) x1,000 in USD. The warning names a non-USD currency, and a file
+that mixes currencies is told the results were added without conversion.
+Other single-letter ICE roots (FTSE 100 `Z`, WTI `T`) are left out because
+they would read CME codes such as `ZNZ6` as another contract. NinjaTrader
+executions stay CME-only. A profit that fits either net or
 gross reading exactly (one trade per symbol) is read the way that gives a
 round contract size. Fees in another coin than an exchange pair's quote
 currency are left out; fees of shares or futures always count.
@@ -998,12 +1009,26 @@ month, the deepest fall and the longest run of months below a previous high
   more and above 1.96/sqrt(n) (Getmansky, Lo and Makarov, 2004); the
   volatility is then also shown unsmoothed, from
   `(r_t - rho r_{t-1}) / (1 - rho)` (Geltner, 1993);
-- `few_small_losses`: months in [-sd/2, 0) against the average of the two
-  neighbouring bins, (0, sd/2] and [-sd, -sd/2), with at least 10 months in
-  those two, and a one-sided Poisson p-value below 0.01 (the discontinuity
-  at zero of Bollen and Pool, 2009). Bins of a quarter deviation, or a
-  normal reference, made honest US market windows (2000-2024) fire; at half
-  a deviation no 5, 10 or 20-year window of the US market since 1927 does.
+- `few_small_losses`: months in [-sd/2, 0) against the two neighbouring
+  bins, (0, sd/2] and [-sd, -sd/2), with at least 10 months in those two
+  (the discontinuity at zero of Bollen and Pool, 2009). Given the months in
+  the three bins, the small-loss count is tested one-sided against the
+  binomial share that a normal curve with the record's own mean and
+  deviation gives that bin; the finding needs p below 0.01. The earlier test
+  (Poisson against the neighbours' plain average) ignored the neighbours'
+  own noise and the curve's slope near zero: on simulated normal months with
+  a mean of 3 % and a deviation of 2 % it fired 5.7 % of the time over 240
+  months instead of 1 %; the binomial share fires 0.5 %. Over every rolling
+  window of the US market (Fama-French market return, 1926-2026) it fires on
+  8 of 1,143 five-year windows (was 14), 3 of 1,083 ten-year windows (was 9)
+  and none of the twenty-year windows. Peaked, fat-tailed months (Laplace)
+  still fire more often than 1 %: the finding stays a question, never a flag.
+- Months: a return is measured only between two consecutive calendar months
+  that both have a level, so a month missing from the file is a hole
+  (`missing_months`), never one "month" spanning two. A file with a row every
+  quarter or year is not a monthly record and the section is not measured. A
+  daily benchmark's final month is left out when it ends more than 7 days
+  before the month's end.
 
 Net of fees (DECLARED). A fund's returns are its own figures after its
 fees, so the upload form has a box for it ("Son rentabilidades de un fondo,
@@ -2241,7 +2266,11 @@ A list with no header row whose first row holds a date (an exported P&L list
 often has none) is shown with numbered columns (`Col. 1`, `Col. 2`...), in
 the report and in the curve field, and read with a date and a result or a
 balance chosen among them; a row with a date in it is never taken for the
-header. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
+header. A semicolon file whose first lines all hold the same number of `;`
+is split on `;` with comma decimals, so a European export with its header
+stripped gets the page too. When the only other column is a number, it is
+preselected: as the result when a sample is negative (with the "parece una
+lista de resultados" line), else as the balance. The page preselects a date and a `Saldo`/`Balance`/`Equity`/`Capital`
 column in the report field too. When the file has no price column and either a balance column or
 fewer than two date columns, the date-and-balance-or-result group comes first
 and alone is preselected (a `Volumen` column is not guessed as a trade's

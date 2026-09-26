@@ -14,8 +14,9 @@ from the fund-due-diligence literature go further:
   neighbouring bins (small gains, and slightly larger losses) predict is the
   discontinuity at zero that Bollen and Pool (2009) tie to reported values
   that avoid a negative month. The bins are half a monthly standard
-  deviation wide and the test is one-sided Poisson against the neighbours'
-  average.
+  deviation wide; given the months in the three bins, the small-loss count
+  is tested one-sided against the binomial share a normal curve with the
+  record's mean and deviation gives that bin.
 
 When the file carries its benchmark (a column beside the returns, or a
 factsheet's benchmark rows) or a benchmark file is uploaded, the section also
@@ -71,21 +72,81 @@ INDEX_LIKE_TRACKING = 0.03
 BENCHMARK_NOTE = "the benchmark's returns as supplied; Rigor did not check them against the index"
 
 
-def _poisson_cdf(k: int, mean: float) -> float:
-    """P(X <= k) for X ~ Poisson(mean)."""
-    if mean <= 0:
+def _normal_cdf(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _binomial_cdf(k: int, n: int, p: float) -> float:
+    """P(X <= k) for X ~ Binomial(n, p)."""
+    if p <= 0.0:
         return 1.0
+    if p >= 1.0:
+        return 1.0 if k >= n else 0.0
+    log_p, log_q = math.log(p), math.log1p(-p)
     return min(
         1.0,
-        sum(math.exp(-mean + i * math.log(mean) - math.lgamma(i + 1)) for i in range(k + 1)),
+        sum(
+            math.exp(
+                math.lgamma(n + 1)
+                - math.lgamma(i + 1)
+                - math.lgamma(n - i + 1)
+                + i * log_p
+                + (n - i) * log_q
+            )
+            for i in range(k + 1)
+        ),
     )
 
 
+def _bin_share(mean: float, std: float, width: float) -> float:
+    """Share of the small-loss bin among the three bins, larger loss, small
+    loss and small gain, under a normal curve with this mean and deviation."""
+
+    def mass(low: float, high: float) -> float:
+        return _normal_cdf((high - mean) / std) - _normal_cdf((low - mean) / std)
+
+    larger = mass(-2 * width, -width)
+    small_loss = mass(-width, 0.0)
+    small_gain = mass(0.0, width)
+    total = larger + small_loss + small_gain
+    return small_loss / total if total > 0 else 1.0 / 3.0
+
+
+#: A final month whose last point falls more than this many days before the
+#: month's end is partial (a daily benchmark that stops on the 10th).
+PARTIAL_MONTH_DAYS = 7
+
+
 def monthly_returns(frame: pd.DataFrame) -> pd.Series:
-    """Month-end returns of an equity frame (``timestamp``, ``equity``)."""
-    equity = frame.set_index("timestamp")["equity"].astype(float)
-    month_end = equity.resample("ME").last().dropna()
-    return month_end.pct_change().dropna()
+    """Month-end returns of an equity frame (``timestamp``, ``equity``).
+
+    A return is measured only between two consecutive calendar months that
+    both have a level: a month missing from the file leaves a hole, never one
+    "month" that spans two or three. On a series with several points a month
+    (a daily benchmark), a final month seen only in part is left out, so it
+    is never compared with a full month of the fund."""
+    equity = frame.set_index("timestamp")["equity"].astype(float).sort_index()
+    month_end = equity.resample("ME").last()
+    months = len(month_end)
+    if months > 1 and len(equity) > 1.5 * months:
+        last = pd.Timestamp(equity.index[-1])
+        if last < month_end.index[-1] - pd.Timedelta(days=PARTIAL_MONTH_DAYS):
+            month_end = month_end.iloc[:-1]
+    returns = month_end / month_end.shift(1) - 1.0
+    return returns.iloc[1:].dropna()
+
+
+def months_between_rows(frame: pd.DataFrame) -> float:
+    """Median number of calendar months from one row to the next: 1 for a
+    monthly record, 3 for a quarterly one."""
+    stamps = pd.DatetimeIndex(frame["timestamp"])
+    if stamps.tz is not None:
+        stamps = stamps.tz_convert("UTC").tz_localize(None)
+    periods = stamps.to_period("M").unique().sort_values()
+    if len(periods) < 2:
+        return 0.0
+    steps = [(later - earlier).n for earlier, later in zip(periods[:-1], periods[1:], strict=True)]
+    return float(np.median(steps))
 
 
 def _drawdown(returns: np.ndarray) -> tuple[float, int, bool]:
@@ -202,9 +263,16 @@ def fund_review(
 ) -> dict[str, Any]:
     """Calendar table, allocator figures and the two fund tests; with a
     benchmark's month-end returns, the comparison with it."""
-    if periods_per_year > MAX_PERIODS_PER_YEAR:
+    if periods_per_year > MAX_PERIODS_PER_YEAR or months_between_rows(frame) > 1.0:
+        # A quarterly or yearly record read month by month would compound each
+        # quarter as one month: its annual return and volatility would be wrong.
         return {"status": "NOT_MEASURED", "reason": "the file is not a monthly track record"}
     series = monthly_returns(frame)
+    stamps = pd.DatetimeIndex(frame["timestamp"])
+    if stamps.tz is not None:
+        stamps = stamps.tz_convert("UTC").tz_localize(None)
+    periods = stamps.to_period("M")
+    span = int((periods.max() - periods.min()).n)
     if len(series) < MIN_MONTHS:
         return {"status": "NOT_MEASURED", "reason": f"needs at least {MIN_MONTHS} monthly returns"}
     r = series.to_numpy(dtype=float)
@@ -228,6 +296,8 @@ def fund_review(
         "status": "MEASURED",
         "note": NOTE,
         "months": measured(n),
+        # Calendar months with no return because the file skips a month.
+        "missing_months": measured(max(span - n, 0)),
         "years": years,
         "cagr": measured(float(np.prod(1.0 + r) ** (12.0 / n) - 1.0)),
         "volatility": measured(std * math.sqrt(12.0), "annualised standard deviation"),
@@ -262,8 +332,15 @@ def fund_review(
     review["small_gains"] = measured(small_gains)
     review["small_losses"] = measured(small_losses)
     if small_gains + larger_losses >= MIN_SMALL:
-        expected = (small_gains + larger_losses) / 2
-        p_value = _poisson_cdf(small_losses, expected)
+        # Conditional on the months in the three bins, the small-loss bin's
+        # share is what a normal curve with the record's mean and deviation
+        # gives it. The neighbours' plain average ignored its own noise and the
+        # curve's slope and flagged steady honest funds several times too often.
+        mean = float(r.mean())
+        share = _bin_share(mean, std, width)
+        total = small_gains + small_losses + larger_losses
+        expected = total * share
+        p_value = _binomial_cdf(small_losses, total, share)
         review["small_losses_expected"] = measured(expected)
         review["small_losses_p_value"] = measured(p_value)
         if p_value < SMALL_P_VALUE:
