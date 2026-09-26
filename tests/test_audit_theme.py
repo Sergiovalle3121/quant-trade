@@ -1268,4 +1268,5 @@ def test_paired_figures_sit_two_per_row_on_phones() -> None:
 
 
 def test_the_line_under_the_summary_tiles_has_room() -> None:
-    assert ".kpis+p{margin-top:14px}" in STYLE
+    # Also the source line under a pair of figures, such as the mean-shift section.
+    assert ".kpis+p,.facts+p.muted{margin-top:14px}" in STYLE
