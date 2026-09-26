@@ -116,6 +116,12 @@ wrote them ("Net profit", "Trade", "Profit Column"). A figure written with a
 decimal comma (`1 234,56`, `1.234,56`) is read as 1234.56; `1,234` stays a
 thousands separator. The importers were checked against 23 real public
 MetaTrader files; see `docs/research/audit_iteration4/real_reports_check.md`.
+The MT5 Deals header is also read in Traditional Chinese (from a real XLSX
+export). When a Deals header is in a language not read, the column layout
+(with or without the Fee column) is the one whose Balance chains: each
+Balance equals the previous one plus the row's profit, commission, fee and
+swap. A row's width alone does not decide it, because a workbook can carry a
+blank trailing column that would otherwise shift the Balance into the profit.
 
 NinjaTrader's Trades export is read with English or French headers ("Pos.
 marché.", "Prix d'entrée", "Longue"/"Courte") and with the `90.00 $` amount
