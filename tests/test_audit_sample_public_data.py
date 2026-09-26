@@ -91,3 +91,19 @@ def test_the_sample_page_stays_offline_without_public_data(tmp_path: Path, monke
     cold = _client(tmp_path / "cold", monkeypatch, _Offline)
     page = cold.get("/ejemplo")
     assert page.status_code == 200 and CASH_WORDS not in page.text
+
+
+def test_the_sample_keeps_only_the_current_set_of_series(tmp_path: Path, monkeypatch) -> None:
+    """A page built before the rate arrived is dropped once it is in memory."""
+    holder: dict[str, MarketData] = {}
+
+    class _Late(_Offline):
+        def __init__(self) -> None:
+            MarketData.__init__(self, _bills_only)
+            holder["data"] = self
+
+    client = _client(tmp_path, monkeypatch, _Late)
+    assert CASH_WORDS not in client.get("/ejemplo").text
+    assert holder["data"].refresh(CASH.key)
+    assert CASH_WORDS in client.get("/ejemplo").text
+    assert CASH_WORDS in client.get("/ejemplo").text

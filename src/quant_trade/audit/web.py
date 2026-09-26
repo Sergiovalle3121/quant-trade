@@ -3217,6 +3217,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         market, ready = _sample_market()
         with sample_lock:
             key = (locale, base_url, ready)
+            # Only the current set of series is worth keeping.
+            for stale in [k for k in sample_cache if k[2] != ready]:
+                del sample_cache[stale]
             if key not in sample_cache:
                 html_text, _ = render(
                     sample_result(locale, market=market),
@@ -3233,13 +3236,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return sample_cache[key]
 
     sample_pdfs: dict[tuple[str, tuple[str, ...]], bytes] = {}
+    # Its own lock: a PDF build (seconds) never holds up the sample page.
+    sample_pdf_lock = threading.Lock()
 
     def _sample_pdf(locale: str) -> Response:
         """The sample report as the PDF a buyer gets, built once per language and
         set of public series in memory."""
         market, ready = _sample_market()
-        with sample_lock:
+        with sample_pdf_lock:
             key = (locale, ready)
+            for stale in [k for k in sample_pdfs if k[1] != ready]:
+                del sample_pdfs[stale]
             if key not in sample_pdfs:
                 page, _ = render(
                     sample_result(locale, market=market),
@@ -3256,9 +3263,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
-                    _record_issued(
-                        sample_pdfs[key], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
-                    )
+                    _record_issued(sample_pdfs[key], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf")
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(
                         error_page(message("pdf_busy", locale), locale=locale), status_code=503
