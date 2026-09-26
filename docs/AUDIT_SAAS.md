@@ -1298,7 +1298,11 @@ more on about a third of the days). For each regime it shows the share of
 the time, the returns counted, the return per month compounded over that
 regime's days only (`exp(Σ log(1+r) · 30.44 / days) - 1`) and the Sharpe
 ratio annualised like the headline one ("—" for a flat side). The two mean
-returns are compared in Welch standard errors: at 2 or more (`CLEAR_GAP`),
+returns are compared in a cautious standard error (`gap_error`, the largest
+of Welch's, Newey-West's and Welch's widened by `(1 + rho) / (1 - rho)` for
+the returns' autocorrelation; Welch's alone read a gap as clear about 10 %
+of the time at an autocorrelation of 0.2 on simulated returns with none):
+at 2 or more (`CLEAR_GAP`),
 and only when that gap has the same sign as the difference of the two
 monthly figures (volatility drag can flip them in a jumpy regime), the
 report says in which regime it did better, otherwise that the gap is not

@@ -164,10 +164,11 @@ def _bad_series(days: pd.DatetimeIndex) -> dict[str, pd.Series]:
         "text_index": pd.Series(5.0, index=[str(day.date()) + "x" for day in index]),
         "mixed": pd.Series(mixed, index=index),
         "infinite": pd.Series(np.inf, index=index),
+        "huge": pd.Series(1e300, index=index),
     }
 
 
-@pytest.mark.parametrize("kind", ["text", "text_index", "mixed", "infinite"])
+@pytest.mark.parametrize("kind", ["text", "text_index", "mixed", "infinite", "huge"])
 def test_a_malformed_rate_series_skips_the_cash_line_never_the_audit(kind: str) -> None:
     days = pd.bdate_range("2023-01-02", periods=300)
     frame = _curve(days, np.random.default_rng(5).normal(0.0008, 0.006, len(days)))
