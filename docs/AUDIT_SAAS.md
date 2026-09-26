@@ -2707,6 +2707,15 @@ Informational only: none of these moves a class, a dimension or a red flag.
   compounded over the month's days, read once per audit through the same
   lookup as the cash-rate Sharpe. Without it, cash is zero and `cash_basis`
   says so. Informational: no flag, no class, no headline.
+  The report (ES, EN, PT) shows it in the fund-versus-index block as "How
+  much is cash, how much is the market and what is left?": the three parts
+  and the total in a table, the exposure share or why there is none, the
+  alpha with its 95 % range, t and the usual reading of |t| against 2, and
+  the months needed with "arithmetic, not a promise" (past 600 months it
+  says even 50 years would not be enough). The lagged line shows only when
+  the lag's t is 2 or more and the lagged beta is higher; the timing line
+  only when |t| is 2 or more. With the split measured, it replaces the plain
+  Jensen line there, since its alpha is after cash.
 - The risk section carries `versus_shuffle` (the same 30-return floor as the
   resampled risk, and at least five losing periods): the uploaded maximum
   drawdown against up to 1,000 random orders of the same returns (seed
