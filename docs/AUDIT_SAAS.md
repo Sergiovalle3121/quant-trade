@@ -1859,8 +1859,9 @@ changes what a report says.
   counts an address (free reports and previews per network, their claim
   keys, and the invite self-check) counts an IPv6 address as its /64, since
   a customer can rotate addresses inside it at will; an IPv4 address (or an
-  IPv4-mapped IPv6 one) counts as itself. The free-tier tables keep that
-  network, not the exact IPv6 address.
+  IPv4-mapped IPv6 one) counts as itself. The hourly sign-up limit and the
+  hourly upload and code-redeem limit count the same network. The free-tier
+  tables and each upload keep that network, not the exact IPv6 address.
 - **Limits under simultaneous uploads** (`free_claims` table). The checks
   above are a first look that answers at once; after parsing, the upload
   takes its claims in one transaction, all or nothing: the free report takes

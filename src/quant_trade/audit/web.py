@@ -1428,7 +1428,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("csrf", 400)
             ip = _client_ip(request, cfg.trusted_proxy_hops)
             now = datetime.now(UTC)
-            if signup_attempts.hit(ip, now) >= acct.MAX_SIGNUPS_PER_HOUR:
+            # Counted per network: an IPv6 /64 is one household or server.
+            if signup_attempts.hit(acct.network_address(ip), now) >= acct.MAX_SIGNUPS_PER_HOUR:
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
@@ -2187,7 +2188,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
             return _html_error(request, 400, message("consent_required", report_loc), report_loc)
-        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        # The hourly limit counts a network (an IPv6 /64), and the upload
+        # stores that network, not the exact address.
+        ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
         now = datetime.now(UTC)
         since = now - timedelta(hours=1)
         attempts = upload_attempts.hit(ip, now)
@@ -3022,7 +3025,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if record.paid:
             return RedirectResponse(location, status_code=303)
         # Each attempt counts toward the hourly per-IP limit, like an upload.
-        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
         now = datetime.now(UTC)
         attempts = redeem_attempts.hit(ip, now) + db.count_uploads_since(
             ip, now - timedelta(hours=1)

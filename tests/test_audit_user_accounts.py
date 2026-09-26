@@ -2194,3 +2194,48 @@ def test_ipv6_counts_by_its_64_in_the_free_tier_and_invites(
     assert store.account_credits(ana.id, datetime.now(UTC)) == 0  # type: ignore[attr-defined]
     data = json.loads(client.get("/cuenta/datos").text)
     assert "self" in [item["outcome"] for item in data["invites"]["joined"]]
+
+
+def test_sign_up_and_upload_limits_count_an_ipv6_64_as_one_network(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1, max_uploads_per_hour_per_ip=2)
+    # Rotating addresses inside one /64 share the hourly sign-up limit.
+    for n in range(MAX_SIGNUPS_PER_HOUR + 1):
+        client.cookies.clear()
+        csrf = _csrf(client.get("/registro").text)
+        response = client.post(
+            "/registro",
+            data={"email": f"r{n}@example.com", "password": PASSWORD, "csrf": csrf},
+            headers={"X-Forwarded-For": f"2001:db8:5:6::{n + 1:x}"},
+            follow_redirects=False,
+        )
+        expected = 303 if n < MAX_SIGNUPS_PER_HOUR else 429
+        assert response.status_code == expected, n
+    # Another /64 still signs up.
+    client.cookies.clear()
+    csrf = _csrf(client.get("/registro").text)
+    assert (
+        client.post(
+            "/registro",
+            data={"email": "other@example.com", "password": PASSWORD, "csrf": csrf},
+            headers={"X-Forwarded-For": "2001:db8:5:7::1"},
+            follow_redirects=False,
+        ).status_code
+        == 303
+    )
+    # Rotating addresses inside one /64 share the hourly upload limit, and the
+    # upload stores the network, not the exact address.
+    statuses = [
+        client.post(
+            "/audits",
+            files=_seeded_file(80 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": f"2001:db8:9:9::{n + 1:x}"},
+            follow_redirects=False,
+        ).status_code
+        for n in range(3)
+    ]
+    assert statuses == [303, 303, 429]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        column = store.audits.c.client_ip  # type: ignore[attr-defined]
+        stored = {row[0] for row in conn.execute(column.table.select().with_only_columns(column))}
+    assert stored == {"2001:db8:9:9::/64"}
