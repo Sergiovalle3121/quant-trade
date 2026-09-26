@@ -913,6 +913,24 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("no overlapping days", "ningún día en común"),
     (
+        "Sharpe ratio of the returns after subtracting what the 3-month US Treasury bill paid "
+        "over the same days (FRED DTB3, converted from the discount rate to an annual yield), "
+        "annualised like the headline Sharpe; a dollar rate",
+        "Sharpe de los retornos tras restar lo que pagó la letra del Tesoro de EE. UU. a 3 "
+        "meses en los mismos días (FRED DTB3, convertida de tasa de descuento a rendimiento "
+        "anual), anualizado como el Sharpe principal; es una tasa en dólares",
+    ),
+    (
+        "the Treasury bill rates could not be read when the report was made",
+        "no se pudieron leer las tasas de las letras del Tesoro al generar el informe",
+    ),
+    (
+        "the Treasury bill rates do not cover the whole history",
+        "las tasas de las letras del Tesoro no cubren todo el historial",
+    ),
+    ("the returns never move", "los retornos nunca se mueven"),
+    ("the strategy's compound return a year", "la rentabilidad compuesta anual de la estrategia"),
+    (
         "the market's public closes could not be read when the report was made",
         "no se pudieron leer los cierres públicos del mercado al generar el informe",
     ),
@@ -1176,8 +1194,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "some resamples have no losing trade; the upper end is unbounded",
-        "algunos remuestreos no tienen operaciones perdedoras; el extremo superior no tiene "
-        "límite",
+        "algunos remuestreos no tienen operaciones perdedoras; el extremo superior no tiene límite",
     ),
     (
         "95 % ranges, each trade taken as an independent draw: Wilson for the win rate, "

@@ -256,7 +256,7 @@ def test_the_report_shows_the_market_beside_the_strategy(locale: str) -> None:
         return closes
 
     result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=market)
-    assert asked == ["nasdaq100"]
+    assert [key for key in asked if key != "tbill3m"] == ["nasdaq100"]
     assert result.holding is not None and result.holding["status"] == "MEASURED"
     assert result.holding["findings"] == ["rides_the_market"]
     html, _ = render(result, watermark=False)
@@ -288,7 +288,7 @@ def test_without_market_data_or_a_known_market_there_is_no_section() -> None:
     result = run_audit(
         fx, bootstrap_samples=200, risk_samples=300, market=lambda k: called.append(k) or closes
     )
-    assert result.holding is None and called == []
+    assert result.holding is None and [k for k in called if k != "tbill3m"] == []
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])
@@ -434,7 +434,7 @@ def test_warm_downloads_every_series_in_the_background() -> None:
     asked: list[str] = []
     data = MarketData(lambda s: asked.append(s) or "DATE,V\n2024-01-02,10\n2024-01-03,11\n")
     data.warm().join(timeout=5)
-    assert sorted(asked) == sorted(asset.series for asset in market_lib.ASSETS)
+    assert sorted(asked) == sorted(asset.series for asset in market_lib.SERIES.values())
 
 
 def test_download_is_blocked_by_the_test_guard() -> None:
