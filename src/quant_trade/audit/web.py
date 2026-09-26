@@ -1428,7 +1428,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("csrf", 400)
             ip = _client_ip(request, cfg.trusted_proxy_hops)
             now = datetime.now(UTC)
-            if signup_attempts.hit(ip, now) >= acct.MAX_SIGNUPS_PER_HOUR:
+            # Counted per network: an IPv6 /64 is one household or server.
+            if signup_attempts.hit(acct.network_address(ip), now) >= acct.MAX_SIGNUPS_PER_HOUR:
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
@@ -2187,7 +2188,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
             return _html_error(request, 400, message("consent_required", report_loc), report_loc)
-        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        # The hourly limit counts a network (an IPv6 /64), and the upload
+        # stores that network, not the exact address.
+        ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
         now = datetime.now(UTC)
         since = now - timedelta(hours=1)
         attempts = upload_attempts.hit(ip, now)
@@ -3022,7 +3025,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if record.paid:
             return RedirectResponse(location, status_code=303)
         # Each attempt counts toward the hourly per-IP limit, like an upload.
-        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
         now = datetime.now(UTC)
         attempts = redeem_attempts.hit(ip, now) + db.count_uploads_since(
             ip, now - timedelta(hours=1)
@@ -3115,17 +3118,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale=_report_locale(lang),
         )
 
-    sample_cache: dict[tuple[str, str], str] = {}
+    sample_cache: dict[tuple[str, str, tuple[str, ...]], str] = {}
     sample_lock = threading.Lock()
 
+    def _sample_market() -> tuple[Callable[[str], Any] | None, tuple[str, ...]]:
+        """The public series already in memory for the sample, never waiting on
+        the network; none (the offline sample) until the first download lands."""
+        ready = market_data.ready() if market_data is not None else ()
+        return (market_data.closes if market_data is not None and ready else None), ready
+
     def _sample_html(locale: str, base_url: str) -> str:
-        """Built once per locale and address and kept: the input and the clock
-        are fixed."""
+        """Built once per locale, address and set of public series in memory, and
+        kept: the input and the clock are fixed."""
+        market, ready = _sample_market()
         with sample_lock:
-            key = (locale, base_url)
+            key = (locale, base_url, ready)
             if key not in sample_cache:
                 html_text, _ = render(
-                    sample_result(locale),
+                    sample_result(locale, market=market),
                     watermark=False,
                     free_mode=True,
                     notice=SAMPLE_BANNER[locale],
@@ -3138,14 +3148,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 sample_cache[key] = html_text
             return sample_cache[key]
 
-    sample_pdfs: dict[str, bytes] = {}
+    sample_pdfs: dict[tuple[str, tuple[str, ...]], bytes] = {}
 
     def _sample_pdf(locale: str) -> Response:
-        """The sample report as the PDF a buyer gets, built once per language."""
+        """The sample report as the PDF a buyer gets, built once per language and
+        set of public series in memory."""
+        market, ready = _sample_market()
         with sample_lock:
-            if locale not in sample_pdfs:
+            key = (locale, ready)
+            if key not in sample_pdfs:
                 page, _ = render(
-                    sample_result(locale),
+                    sample_result(locale, market=market),
                     watermark=False,
                     free_mode=True,
                     notice=SAMPLE_BANNER[locale],
@@ -3153,14 +3166,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     locale=locale,
                 )
                 try:
-                    sample_pdfs[locale] = pdf_lib.report_pdf(
+                    sample_pdfs[key] = pdf_lib.report_pdf(
                         page,
                         audit_id=SAMPLE_PDF_NAMES[locale],
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
                     _record_issued(
-                        sample_pdfs[locale], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
+                        sample_pdfs[key], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
                     )
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(
@@ -3168,7 +3181,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
         name = f"rigor-{SAMPLE_PDF_NAMES[locale]}.pdf"
         return Response(
-            content=sample_pdfs[locale],
+            content=sample_pdfs[key],
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'attachment; filename="{name}"',

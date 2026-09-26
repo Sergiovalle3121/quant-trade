@@ -142,8 +142,8 @@ COPY: dict[str, dict[str, str]] = {
         "welcome_available": "Disponible",
         "welcome_used": "Usado",
         "welcome_refused_file": (
-            "Este archivo ya recibió un informe completo gratis en otra cuenta, así que esta "
-            "vez es una vista previa. Tu informe gratis sigue disponible para otro archivo."
+            "Este archivo ya recibió un informe completo gratis, así que esta vez es una "
+            "vista previa. Tu informe gratis sigue disponible para otro archivo."
         ),
         "welcome_refused_device": (
             "Este navegador ya usó un informe completo gratis en otra cuenta, así que esta vez "
@@ -427,7 +427,7 @@ COPY: dict[str, dict[str, str]] = {
         "welcome_available": "Available",
         "welcome_used": "Used",
         "welcome_refused_file": (
-            "This file already got a free full report on another account, so this time it is a "
+            "This file already got a free full report, so this time it is a "
             "preview. Your free report is still available for another file."
         ),
         "welcome_refused_device": (
