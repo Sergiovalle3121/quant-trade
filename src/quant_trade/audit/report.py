@@ -1107,6 +1107,12 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_hint_drawdown": "la peor caída desde un máximo",
         "kpi_hint_dd_p95": "caída que se supera en 1 de cada 20 años simulados",
         "kpi_hint_sharpe": "rendimiento frente a sus altibajos; más alto, más estable",
+        "cash_sharpe": (
+            "Restando lo que pagaba el efectivo en dólares en esas mismas fechas (letras del "
+            "Tesoro de EE. UU. a 3 meses, {rate} al año en promedio), el Sharpe queda en "
+            "{sharpe}. El Sharpe de arriba no resta nada; en otra moneda, la tasa de esa "
+            "moneda es la justa. Fuente: {source}."
+        ),
         "kpi_hint_pf": "lo ganado por cada 1 perdido",
         "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
         "bps_side": "pb por lado",
@@ -2032,6 +2038,12 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_hint_drawdown": "the worst fall from a peak",
         "kpi_hint_dd_p95": "a fall exceeded in 1 of every 20 simulated years",
         "kpi_hint_sharpe": "return against its ups and downs; higher is steadier",
+        "cash_sharpe": (
+            "After subtracting what cash in dollars paid over the same dates (3-month US "
+            "Treasury bills, {rate} a year on average), the Sharpe is {sharpe}. The Sharpe "
+            "above subtracts nothing; in another currency, that currency's rate is the fair "
+            "one. Source: {source}."
+        ),
         "kpi_hint_pf": "what was won for every 1 lost",
         "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
         "bps_side": "bps per side",
@@ -3019,7 +3031,23 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""
-    return note + f"<div class='kpis'>{tiles}</div>"
+    return note + f"<div class='kpis'>{tiles}</div>" + ("" if locked else _cash_html(data, labels))
+
+
+def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
+    """The Sharpe after what a US Treasury bill paid, under the tiles."""
+    cash = data.get("cash_rate") or {}
+    if cash.get("status") != "MEASURED":
+        return ""
+    text = labels["cash_sharpe"].format(
+        rate=_pct(float(cash["mean_rate"]["value"]), places=2),
+        sharpe=f"{float(cash['sharpe_excess']['value']):.2f}",
+        source="\x00",
+    )
+    link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    return (
+        f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
+    )
 
 
 STRESS_SCENARIOS: dict[str, dict[str, str]] = {

@@ -32,6 +32,7 @@ from quant_trade.audit import account as account_lib
 from quant_trade.audit import alpha as alpha_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import behaviour as behaviour_lib
+from quant_trade.audit import cashrate as cashrate_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import crises as crises_lib
 from quant_trade.audit import decay as decay_lib
@@ -841,6 +842,28 @@ def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[st
     return out
 
 
+def _cash_rate(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
+) -> dict[str, Any] | None:
+    """The Sharpe ratio after what a US Treasury bill paid over the same days,
+    when public data is on."""
+    if market is None:
+        return None
+    try:
+        rates = market(market_lib.CASH.key)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        rates = None
+    if rates is None or rates.empty:
+        return {
+            "status": "NOT_MEASURED",
+            "reason": cashrate_lib.UNAVAILABLE,
+            "series": market_lib.CASH.series,
+            "label": market_lib.CASH.label,
+            "source_url": market_lib.CASH.source_url,
+        }
+    return cashrate_lib.excess_sharpe(inputs.equity.frame, rates, inputs.periods_per_year)
+
+
 def _holding(
     inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
 ) -> dict[str, Any] | None:
@@ -1137,6 +1160,7 @@ def run_audit(
         )
     )
     holding = None if fund.get("status") == "MEASURED" else _holding(inputs, market)
+    cash_rate = _cash_rate(inputs, market)
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1346,6 +1370,7 @@ def run_audit(
         fund=fund,
         crises=crises,
         holding=holding,
+        cash_rate=cash_rate,
         luck=luck,
         ride=ride,
         vendor_questions=questions,
