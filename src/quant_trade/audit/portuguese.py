@@ -341,7 +341,7 @@ UI_PT: dict[str, Any] = {
     "trust": [
         ("shield", "Sem conexão com a sua corretora"),
         ("hash", "Impressão SHA-256 de cada arquivo"),
-        ("globe", "Relatório em inglês ou espanhol"),
+        ("globe", "Relatório em português, inglês ou espanhol"),
         ("key", "Primeiro relatório completo grátis com a sua conta"),
     ],
     "mock_url": "relatório · classe B",
@@ -436,7 +436,21 @@ UI_PT: dict[str, Any] = {
             "eye",
             "Página pública com selo",
             "Publique a verificação da sua auditoria e mostre-a com um selo que diz exatamente "
-            "o que ela é e o que não é.",
+            "o que ela é e o que não é, em português, inglês ou espanhol.",
+        ),
+        (
+            "percent",
+            "Frente ao caixa",
+            "Subtraímos o que o dinheiro em caixa em dólares pagava nas mesmas datas (letras do "
+            "Tesouro dos EUA de 3 meses, dados públicos do FRED): você vê o Sharpe sem o que o "
+            "caixa já pagava e, se enviar um benchmark, o alfa também.",
+        ),
+        (
+            "chart",
+            "Mercado tranquilo e agitado",
+            "Cada rentabilidade é atribuída segundo o VIX do dia anterior, e cada crise de data "
+            "pública que o seu histórico cobre é medida à parte: você vê se o resultado depende "
+            "de um só tipo de mercado.",
         ),
     ],
     "how_eyebrow": "Processo",
@@ -463,6 +477,8 @@ UI_PT: dict[str, Any] = {
         "Se funciona em cada mercado ou se um carrega o resto",
         "Para fundos: calendário ano por mês, pior mês e tempo para se recuperar",
         "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
+        "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
+        "agitado e crises conhecidas",
         "Página pública de verificação com selo",
     ],
     "upload_eyebrow": "Comece aqui",

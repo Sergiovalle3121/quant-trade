@@ -730,7 +730,7 @@ _UI: dict[str, dict[str, Any]] = {
         "trust": [
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
-            ("globe", "Informe en español o inglés"),
+            ("globe", "Informe en español, inglés o portugués"),
             ("key", "Primer informe completo gratis con tu cuenta"),
         ],
         "mock_url": "informe · clase B",
@@ -825,7 +825,21 @@ _UI: dict[str, dict[str, Any]] = {
                 "eye",
                 "Página pública con sello",
                 "Publica la verificación de tu auditoría y enséñala con un sello que dice "
-                "exactamente qué es y qué no es.",
+                "exactamente qué es y qué no es, en español, inglés o portugués.",
+            ),
+            (
+                "percent",
+                "Frente al efectivo",
+                "Restamos lo que pagaba el efectivo en dólares en las mismas fechas (letras del "
+                "Tesoro de EE. UU. a 3 meses, datos públicos de FRED): ves el Sharpe sin lo que "
+                "ya daba el efectivo y, si subes un benchmark, el alfa también.",
+            ),
+            (
+                "chart",
+                "Mercado tranquilo y agitado",
+                "Cada rentabilidad se asigna según el VIX del día anterior, y cada crisis de "
+                "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
+                "depende de un solo tipo de mercado.",
             ),
         ],
         "how_eyebrow": "Proceso",
@@ -852,6 +866,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Si funciona en cada mercado o uno carga con el resto",
             "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse",
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
+            "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
+            "VIX tranquilo o agitado y crisis conocidas",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -923,7 +939,7 @@ _UI: dict[str, dict[str, Any]] = {
         "trust": [
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
-            ("globe", "Report in English or Spanish"),
+            ("globe", "Report in English, Spanish or Portuguese"),
             ("key", "First full report free with your account"),
         ],
         "mock_url": "report · class B",
@@ -1017,7 +1033,21 @@ _UI: dict[str, dict[str, Any]] = {
                 "eye",
                 "Public page with a badge",
                 "Publish your audit's verification page and show it with a badge that says "
-                "exactly what it is and what it is not.",
+                "exactly what it is and what it is not, in English, Spanish or Portuguese.",
+            ),
+            (
+                "percent",
+                "Against cash",
+                "We subtract what cash in dollars paid over the same dates (3-month US "
+                "Treasury bills, public FRED data): you see the Sharpe without what cash "
+                "already paid and, if you upload a benchmark, the alpha too.",
+            ),
+            (
+                "chart",
+                "Calm and agitated markets",
+                "Each return is placed by the previous day's VIX, and every publicly dated "
+                "crisis your history covers is measured on its own: you see whether the result "
+                "depends on one kind of market.",
             ),
         ],
         "how_eyebrow": "Process",
@@ -1044,6 +1074,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Whether it works on each market or one carries the rest",
             "For funds: year-by-month calendar, worst month and time to recover",
             "The real money behind an account's %: deposits, top-ups and open losses",
+            "Against cash and the market: the Sharpe without what cash paid, calm or "
+            "agitated VIX and known crises",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",
@@ -2346,6 +2378,7 @@ def landing(
     sample = _sample_url(locale)
     flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
+    signin_first = signed_in is False and not free_mode
     body = (
         _hero(locale, sample)
         + _specs(locale)
@@ -2381,11 +2414,15 @@ def landing(
             access_codes=access_codes,
             retention_days=retention_days,
             extras_open=extras_open,
-            signin_first=signed_in is False and not free_mode,
+            signin_first=signin_first,
         )
         + _faq_html(copy, locale, retention_days=retention_days)
         + _final_cta(copy, locale, sample, joined=joined)
     )
+    if signin_first:
+        # "Start free" goes straight to sign-up: the form would only send a visitor
+        # without an account there, a screen further down.
+        body = body.replace("href='#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
     return _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
 
 

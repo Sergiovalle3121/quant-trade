@@ -5379,9 +5379,7 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
         z = float(gap["value"])
         better = regime.get("better")
         name = (
-            f"regime_better_{better}"
-            if better in ("calm", "turbulent")
-            else "regime_no_clear_gap"
+            f"regime_better_{better}" if better in ("calm", "turbulent") else "regime_no_clear_gap"
         )
         out += (
             f"<p class='read-line'>{_e(labels[name].format(z=f'{abs(z):.2f}'))} "
@@ -6365,20 +6363,23 @@ def render_html(
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
+    en_url = (switch_url or "").replace("lang=es", "lang=en")
+    two_switches = locale == "pt" and "lang=es" in (switch_url or "")
+    short_es = " data-short='ES'" if two_switches else ""
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
-            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
-            f"{_e(labels['switch'])}</a>"
+            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'"
+            # Two languages on a narrow phone read as ES and EN (theme.py).
+            f"{short_es}>{_e(labels['switch'])}</a>"
             if switch_url
             else ""
         )
         + (
-            f" <a class='lang-switch' href='{_e(switch_url.replace('lang=es', 'lang=en'))}' "
-            f"hreflang='en'>English</a>"
-            if switch_url and locale == "pt" and "lang=es" in switch_url
+            f" <a class='lang-switch' href='{_e(en_url)}' hreflang='en' data-short='EN'>English</a>"
+            if two_switches
             else ""
         )
         + "</div>"
