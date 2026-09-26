@@ -2050,6 +2050,32 @@ def _percent_styles(styles: ElementTree.Element | None) -> set[int]:
     return found
 
 
+class _MemberTooLarge(Exception):
+    """An archive member that unpacks past its limit, whatever it declares."""
+
+
+def _read_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, limit: int) -> bytes:
+    """A member's bytes, never more than ``limit``: read in bounded chunks,
+    because a member may declare a small size and unpack to gigabytes, and
+    only stored or deflated members (bzip2 and lzma have no output bound)."""
+    if info.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
+        raise NotImplementedError(f"compression {info.compress_type}")
+    if info.file_size > limit:
+        raise _MemberTooLarge
+    chunks: list[bytes] = []
+    total = 0
+    with archive.open(info) as member:
+        while True:
+            chunk = member.read(min(1 << 20, limit + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > limit:
+                raise _MemberTooLarge
+    return b"".join(chunks)
+
+
 def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
     """Every sheet of a workbook as rows of text or numbers (standard library only)."""
     try:
@@ -2070,7 +2096,9 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
             if name not in names:
                 return None
             try:
-                data = archive.read(name)
+                data = _read_member(archive, archive.getinfo(name), MAX_XLSX_UNCOMPRESSED_BYTES)
+            except _MemberTooLarge as exc:
+                raise _xlsx_too_big() from exc
             except (
                 zipfile.BadZipFile,
                 zlib.error,
@@ -3868,16 +3896,14 @@ def unwrap(data: bytes) -> bytes:
                 f"el zip contiene {len(exports)} exportaciones; sube sola la que tiene las "
                 "operaciones (CSV, Excel o HTML)",
             )
-        if exports[0].file_size > MAX_REPORT_BYTES:
+        try:
+            inner = _read_member(archive, exports[0], MAX_REPORT_BYTES)
+        except _MemberTooLarge as exc:
             raise ReportFormatError(
                 "file_too_large",
-                f"the file in the zip is {exports[0].file_size:,} bytes; the limit is "
-                f"{MAX_REPORT_BYTES:,}",
-                f"el archivo del zip pesa {exports[0].file_size:,} bytes; el límite es "
-                f"{MAX_REPORT_BYTES:,}",
-            )
-        try:
-            inner = archive.read(exports[0])
+                f"the file in the zip is larger than the limit of {MAX_REPORT_BYTES:,} bytes",
+                f"el archivo del zip pesa más que el límite de {MAX_REPORT_BYTES:,} bytes",
+            ) from exc
         except (zipfile.BadZipFile, zlib.error, EOFError, NotImplementedError, RuntimeError) as exc:
             raise ReportFormatError(
                 "bad_zip",
@@ -3999,7 +4025,7 @@ def _mapped_not_found(
     )
 
 
-def _unrecognised(data: bytes) -> ReportFormatError:
+def _unrecognised(data: bytes, reader: _TableReader | None = None) -> ReportFormatError:
     """A table whose columns half match a trade list names what is missing;
     anything else gets the list of supported formats."""
     from quant_trade.audit import universal
@@ -4009,8 +4035,8 @@ def _unrecognised(data: bytes) -> ReportFormatError:
     if "<" not in text.lstrip()[:1]:
         header, rows, _ = _read_delimited(text)
         table = [header, *rows]
-    elif "<table" in text.lstrip()[:200_000].lower():
-        table = [row.texts for row in _read_html(text).rows if any(row.texts)]
+    elif reader is not None:
+        table = [row.texts for row in reader.rows if any(row.texts)]
     if table:
         for candidate in table[:UNIVERSAL_HEADER_SCAN]:
             found = universal.guess_columns(candidate)
@@ -4138,7 +4164,7 @@ def import_report(
             "optimización, y el informe de la prueba individual como informe",
         )
     if source_format is None:
-        raise _unrecognised(data)
+        raise _unrecognised(data, html_reader)
     draft: _Draft
     if source_format in {MT5_TESTER_HTML, MT5_HISTORY_HTML, MT4_TESTER_HTML, MT4_STATEMENT_HTML}:
         reader = html_reader if html_reader is not None else _read_html(decode_text(data))

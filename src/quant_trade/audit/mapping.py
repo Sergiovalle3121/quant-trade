@@ -43,6 +43,9 @@ SAMPLE_ROWS = 3
 MAX_COLUMNS = 80
 #: A header wider than this gets the plain refusal: no one names columns by
 #: hand in such a table, and rendering it would cost the server for nothing.
+#: A web page's table is offered for naming only up to these sizes.
+MAX_HTML_ROWS = 20_000
+MAX_HTML_CELLS = 200_000
 MAX_HEADER = universal.WIDEST_HEADER
 #: Two fields that are enough on their own: a date with each trade's result
 #: (``profit``), or a date with the account's balance or equity.
@@ -296,6 +299,13 @@ def _read_body(data: bytes) -> _Body | None:
         if "<html" in lowered or "<table" in lowered:
             # A trade table saved as a web page (often named .xls); a
             # MetaTrader report is read as it is, never offered here.
+            # The screen may read a file a few times; a page past these
+            # bounds gets the plain refusal instead of seconds of parsing.
+            head = text.lower()
+            if head.count("<tr") > MAX_HTML_ROWS or (
+                head.count("<td") + head.count("<th") > MAX_HTML_CELLS
+            ):
+                return None
             reader = imp._read_html(text)
             if imp._html_format(reader) is not None:
                 return None

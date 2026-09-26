@@ -276,7 +276,11 @@ cannot be read are refused with how to get one that can: an old binary
 Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
 (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
-(`zip_contents`). The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
+(`zip_contents`). A member is unpacked in bounded chunks and never past
+the limit, whatever size it declares, and only stored or deflated members
+are opened (the same holds for workbook members). A web page is parsed once
+per import; the column screen offers a web table only up to
+`mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
 Limits, each written into the report as a reading warning:

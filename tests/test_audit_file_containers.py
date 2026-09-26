@@ -132,3 +132,64 @@ def test_the_upload_form_lets_a_customer_pick_these_files(tmp_path: Path) -> Non
     )
     assert answer.status_code == 400
     assert "guárdalo como .xlsx o CSV" in answer.text
+
+
+def _lying_zip(name: str, size: int, declared: int) -> bytes:
+    """A deflated member of ``size`` zero bytes whose headers declare ``declared``."""
+    data = bytearray(_zip({name: b"0" * size}))
+    real = size.to_bytes(4, "little")
+    fake = declared.to_bytes(4, "little")
+    # The local header and the central directory both carry the size.
+    assert data.count(real) >= 2
+    return bytes(data.replace(real, fake))
+
+
+def test_a_member_that_lies_about_its_size_is_refused_without_unpacking_it() -> None:
+    import tracemalloc  # noqa: PLC0415
+
+    bomb = _lying_zip("history.csv", 60_000_000, 1_000)
+    assert len(bomb) < 200_000
+    tracemalloc.start()
+    try:
+        with pytest.raises(ReportFormatError) as refused:
+            import_report(bomb, "history.zip")
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert refused.value.code in {"file_too_large", "bad_zip"}
+    assert peak < 40_000_000
+
+
+def test_a_workbook_member_that_lies_about_its_size_is_refused() -> None:
+    padding = 45_000_000
+    workbook = b"<workbook>" + b" " * padding + b"</workbook>"
+    bomb = bytearray(_zip({"xl/workbook.xml": workbook}))
+    real = len(workbook).to_bytes(4, "little")
+    assert bomb.count(real) >= 2
+    bomb = bomb.replace(real, (30).to_bytes(4, "little"))
+    import tracemalloc  # noqa: PLC0415
+
+    tracemalloc.start()
+    try:
+        with pytest.raises(ReportFormatError) as refused:
+            import_report(bytes(bomb), "book.xlsx")
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    # Read in bounded chunks, the member stops at its declared size and fails its check.
+    assert refused.value.code in {"xlsx_too_large", "bad_xlsx"}
+    assert peak < 40_000_000
+
+
+def test_only_stored_or_deflated_members_are_unpacked() -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_BZIP2) as archive:
+        archive.writestr("history.csv", TRADES)
+    with pytest.raises(ReportFormatError) as refused:
+        import_report(buffer.getvalue(), "history.zip")
+    assert refused.value.code == "bad_zip"
+
+
+def test_a_huge_web_table_is_not_offered_for_naming() -> None:
+    rows = "".join(f"2026-01-02,{day},x\n" for day in range(mapping.MAX_HTML_ROWS + 5))
+    assert mapping.read_table(_web_page(f"Fecha,Resultado,Nota\n{rows}".encode())) is None
