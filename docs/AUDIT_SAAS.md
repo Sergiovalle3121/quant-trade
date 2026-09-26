@@ -2535,6 +2535,8 @@ Redesign pass 64 styles the currency section ("¿Cuánto valió la cuenta en tu 
 
 Redesign pass 65 comes from reading a full report on a 360 px phone as an outside customer would. Charts and wide tables that scroll sideways looked cut off with no sign there was more; they now fade at the right edge until scrolled to the end (only elements that actually scroll, and only in browsers with scroll-driven animations; others look as before). In the evidence rows (trade statistics, benchmark, declared values) the tag sat between the name and the value and squeezed names onto three lines; the value now sits beside the name and the tag goes underneath. Prop-firm cards now read the challenge name as the card's title, with the number of phases below it. The same pass styles the two-step pages: on /cuenta/dos-pasos the note's shield icon had no size and filled the screen; it is now icon-sized beside the note, the QR code sits on a white card, the six-digit code field reads as a code (monospaced, spaced, centred) on both that page and /entrar/codigo, and "¿Perdiste el teléfono?" opens from a card.
 
+Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
