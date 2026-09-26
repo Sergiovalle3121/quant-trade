@@ -1232,6 +1232,28 @@ that barely moves), the line says in words that it earned less than cash
 covering the whole history, otherwise it is NOT_MEASURED and not shown. It
 never changes the class.
 
+Calm and turbulent markets (`audit/regime.py`). With public data on, every
+report adds the section "How did it do in calm and in turbulent markets?".
+Each return is placed by the VIX (CBOE, FRED `VIXCLS`, read in the
+background with the other series; a reply above 200, `MAX_VIX`, is taken as
+broken) at the close of the last market day *before* the day its stretch
+starts, at most 5 days old (`MAX_GAP_DAYS`), so the regime was known before
+the return: calm below 20, turbulent at 20 or above (`TURBULENT_AT`; 20 is
+close to the index's long-run average, and since 1990 it has closed at 20 or
+more on about a third of the days). For each regime it shows the share of
+the time, the returns counted, the return per month compounded over that
+regime's days only (`exp(Σ log(1+r) · 30.44 / days) - 1`) and the Sharpe
+ratio annualised like the headline one ("—" for a flat side). The two mean
+returns are compared in Welch standard errors: at 2 or more (`CLEAR_GAP`),
+and only when that gap has the same sign as the difference of the two
+monthly figures (volatility drag can flip them in a jumpy regime), the
+report says in which regime it did better, otherwise that the gap is not
+enough to say it behaves differently. It needs 90 days of history
+(`MIN_SPAN_DAYS`), 20 returns in each regime (`MIN_RETURNS`) and VIX closes
+covering the whole history; otherwise it is NOT_MEASURED with the reason in
+words. The note says the VIX measures US equities and, for another market,
+is read as a general gauge of fear. It never changes the class.
+
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section
 "How did it do in the known crises?". The curve is taken at month ends. On
@@ -2589,3 +2611,30 @@ Informational only: none of these moves a class, a dimension or a red flag.
   order), it is `NOT_MEASURED` rather than `TYPICAL`, so a smoothed curve is
   never called normal. Informational: it
   moves no flag and no class.
+
+How the report shows them (ES, EN and PT):
+
+- "How much of this could be chance?" under the trade statistics: the three
+  ranges side by side, and one line when the range of the average per trade
+  includes zero or the profit factor's includes one (either is enough, so a
+  disagreement between them never stays silent in the file's favour). When a
+  range lies wholly below break-even (and neither straddles it), one line says
+  the system loses per trade with these trades and chance does not explain it. The
+  intro calls it a 95 % range of values consistent with the trades, not a
+  prediction.
+- Under the significance table, Lo's Sharpe only when it is lower than the
+  plain one by more than a tenth (with the first-order autocorrelation when
+  it is 0.1 or more). A higher corrected figure is never printed: with small
+  samples it mostly adds noise and would flatter the file. The report says
+  the plain figure is not inflated instead.
+- Under the benchmark table and in the fund-versus-index block, Jensen's
+  alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to
+  be chance alone (with "it does not say it will repeat" for a positive
+  alpha), below that as not distinguishable from chance.
+- The fee table's last row is "2 % + 20 % of gains".
+- In the risk section, "Is the file's worst fall normal for these returns?":
+  the uploaded worst fall beside the 5th to 95th percentile of the same
+  returns in random order, and one sentence for `TYPICAL`, `SHALLOWER`
+  (losses rarely follow losses; the file's fall may understate the risk) or
+  `DEEPER` (losses came in streaks). It says it is not the one-year fall
+  above. Nothing shows when it is `NOT_MEASURED`.

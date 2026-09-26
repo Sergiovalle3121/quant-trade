@@ -53,6 +53,8 @@ class Asset:
     pattern: re.Pattern[str]
     #: A rate in percent, where zero is a real value (not a missing close).
     rate: bool = False
+    #: A value above this means the download is broken, not the market.
+    ceiling: float | None = None
 
     @property
     def source_url(self) -> str:
@@ -84,9 +86,21 @@ ASSETS: tuple[Asset, ...] = (
 BY_KEY = {asset.key: asset for asset in ASSETS}
 #: What a US dollar in cash earned: the 3-month Treasury bill's secondary market
 #: rate, in percent a year (discount basis), as FRED publishes it.
-CASH = Asset("tbill3m", "US 3-month Treasury bill", "DTB3", re.compile(r"(?!)"), rate=True)
+CASH = Asset(
+    "tbill3m",
+    "US 3-month Treasury bill",
+    "DTB3",
+    re.compile(r"(?!)"),
+    rate=True,
+    ceiling=MAX_RATE,
+)
+#: How much movement the options market expects from the S&P 500 over the next
+#: month (CBOE's VIX), in percent a year, as FRED publishes it. Its record close
+#: is 82.69 (March 2020), so a value above ``MAX_VIX`` is a broken download.
+MAX_VIX = 200.0
+VIX = Asset("vix", "VIX", "VIXCLS", re.compile(r"(?!)"), ceiling=MAX_VIX)
 #: Every series the service keeps in memory.
-SERIES: dict[str, Asset] = {**BY_KEY, CASH.key: CASH}
+SERIES: dict[str, Asset] = {**BY_KEY, CASH.key: CASH, VIX.key: VIX}
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).
 _SUFFIX = re.compile(r"[._].*$")
@@ -233,8 +247,8 @@ class MarketData:
             series = parse_fred_csv(fetch(asset.series), rate=asset.rate)
             if len(series) < 2:
                 raise ValueError("FRED series has no closes")
-            if asset.rate and bool((series > MAX_RATE).any()):
-                raise ValueError("FRED rate out of range")
+            if asset.ceiling is not None and bool((series > asset.ceiling).any()):
+                raise ValueError("FRED value out of range")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False
@@ -260,6 +274,7 @@ __all__ = [
     "ASSETS",
     "CASH",
     "SERIES",
+    "VIX",
     "Asset",
     "MarketData",
     "asset_of",

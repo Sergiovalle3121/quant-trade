@@ -287,3 +287,29 @@ def test_a_portuguese_report_speaks_of_the_account_in_portuguese(tmp_path: Any) 
     assert "Relatório salvo na sua conta." in page
     assert "href='/pt/conta'" in page
     assert "Report saved to your account." not in page
+
+
+def test_portuguese_pages_link_english_where_there_is_no_portuguese(tmp_path: Any) -> None:
+    from audit_fixtures import csv_bytes, positive_drift
+
+    client = _web_client(tmp_path)
+    sample = client.get("/pt/exemplo").text
+    # The terms exist in Spanish and English: a Portuguese reader gets English.
+    assert "?lang=en'" in sample and "/terminos?lang=es" not in sample
+    assert "hreflang='en'>English</a>" in sample and ">Español</a>" in sample
+    files = {"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")}
+    posted = client.post(
+        "/audits", files=files, data={"consent": "on", "locale": "pt"}, follow_redirects=False
+    )
+    location = posted.headers["location"]
+    audit_id = location.split("/audits/")[1].split("?")[0]
+    query = location.split("?", 1)[1]
+    published = client.post(f"/audits/{audit_id}/publish?{query}", follow_redirects=False)
+    public = client.get(published.headers["location"]).text
+    assert "<html lang='en'>" in public
+
+
+def test_the_compare_box_speaks_portuguese() -> None:
+    page = render_html(_sample(), watermark=False, locale="pt", compare_link="https://x/a")
+    assert report.LABELS["pt"]["compare_help"] in html.unescape(page)
+    assert "Paste the link" not in page

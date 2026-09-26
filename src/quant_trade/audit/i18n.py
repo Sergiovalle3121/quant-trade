@@ -929,6 +929,34 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "las tasas de las letras del Tesoro no cubren todo el historial",
     ),
     ("the returns never move", "los retornos nunca se mueven"),
+    (
+        "each return placed by the VIX close of the last market day before it starts (calm "
+        "below 20, turbulent at 20 or above); return per month compounded over each regime's "
+        "days; Sharpe annualised like the headline Sharpe; gap in mean returns in Welch "
+        "standard errors",
+        "cada retorno se asigna según el cierre del VIX del último día de mercado anterior a "
+        "su inicio (tranquilo por debajo de 20, agitado desde 20); rentabilidad por mes "
+        "compuesta sobre los días de cada régimen; Sharpe anualizado como el Sharpe "
+        "principal; diferencia de retornos medios en errores estándar de Welch",
+    ),
+    (
+        "the VIX closes could not be read when the report was made",
+        "no se pudieron leer los cierres del VIX al generar el informe",
+    ),
+    (
+        "the VIX closes do not cover the whole history",
+        "los cierres del VIX no cubren todo el historial",
+    ),
+    ("the history covers fewer than 90 days", "el historial cubre menos de 90 días"),
+    (
+        "fewer than 20 returns in calm markets (VIX below 20)",
+        "menos de 20 retornos con el mercado tranquilo (VIX por debajo de 20)",
+    ),
+    (
+        "fewer than 20 returns in turbulent markets (VIX at 20 or above)",
+        "menos de 20 retornos con el mercado agitado (VIX en 20 o más)",
+    ),
+    ("the curve reaches zero", "la curva llega a cero"),
     ("the strategy's compound return a year", "la rentabilidad compuesta anual de la estrategia"),
     (
         "the market's public closes could not be read when the report was made",

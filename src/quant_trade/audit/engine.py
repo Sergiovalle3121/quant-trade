@@ -45,6 +45,7 @@ from quant_trade.audit import live as live_lib
 from quant_trade.audit import luck as luck_lib
 from quant_trade.audit import market as market_lib
 from quant_trade.audit import plateau as plateau_lib
+from quant_trade.audit import regime as regime_lib
 from quant_trade.audit import ride as ride_lib
 from quant_trade.audit import sizing as sizing_lib
 from quant_trade.audit import stress as stress_lib
@@ -877,6 +878,28 @@ def _cash_rate(
     return cashrate_lib.excess_sharpe(inputs.equity.frame, rates, inputs.periods_per_year)
 
 
+def _vix_regime(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
+) -> dict[str, Any] | None:
+    """The returns split by calm and turbulent markets (the VIX), when public
+    data is on."""
+    if market is None:
+        return None
+    try:
+        vix = market(market_lib.VIX.key)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        vix = None
+    if vix is None or vix.empty:
+        return {
+            "status": "NOT_MEASURED",
+            "reason": regime_lib.UNAVAILABLE,
+            "series": market_lib.VIX.series,
+            "label": market_lib.VIX.label,
+            "source_url": market_lib.VIX.source_url,
+        }
+    return regime_lib.by_vix(inputs.equity.frame, vix, inputs.periods_per_year)
+
+
 def _holding(
     inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
 ) -> dict[str, Any] | None:
@@ -1177,6 +1200,7 @@ def run_audit(
     )
     holding = None if fund.get("status") == "MEASURED" else _holding(inputs, market)
     cash_rate = _cash_rate(inputs, market, bill_rates)
+    vix_regime = _vix_regime(inputs, market)
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1387,6 +1411,7 @@ def run_audit(
         crises=crises,
         holding=holding,
         cash_rate=cash_rate,
+        vix_regime=vix_regime,
         luck=luck,
         ride=ride,
         vendor_questions=questions,
