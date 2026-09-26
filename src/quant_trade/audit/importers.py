@@ -64,6 +64,7 @@ from xml.parsers import expat
 
 from quant_trade.audit.schema import (
     MAX_REPORT_BYTES,
+    MAX_ROWS,
     MAX_TRADES,
     ParsedTrades,
     ParseError,
@@ -3831,7 +3832,7 @@ def _is_zip(data: bytes) -> bool:
 
 
 #: What an archive may hold for its one export to be read.
-_ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls")
+_ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls", ".xml")
 
 
 def unwrap(data: bytes) -> bytes:
@@ -3855,7 +3856,8 @@ def unwrap(data: bytes) -> bytes:
             "historial de la plataforma en CSV, Excel o HTML (las guías muestran dónde)",
         )
     if not _is_zip(data):
-        return data
+        flex = _flex_trades(data)
+        return flex if flex is not None else data
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except (zipfile.BadZipFile, EOFError, OSError, ValueError):
@@ -3912,6 +3914,55 @@ def unwrap(data: bytes) -> bytes:
             ) from exc
     # An old workbook or a PDF inside gets its own answer; a zip inside is read as a workbook.
     return inner if _is_zip(inner) else unwrap(inner)
+
+
+#: The most attribute names a Flex ``<Trade>`` table may have.
+MAX_FLEX_COLUMNS = 200
+
+
+def _flex_trades(data: bytes) -> bytes | None:
+    """An Interactive Brokers Flex Query statement in XML (its default
+    format) as a CSV of its executions, one ``<Trade>`` per row with the
+    attribute names as columns, for the same reader as the Flex CSV;
+    ``None`` for any other file."""
+    head = data[:4000]
+    if b"<FlexQueryResponse" not in head and b"<FlexStatements" not in head:
+        return None
+    root = _xml(data)
+    trades = [
+        element.attrib
+        for element in root.iter()
+        if _local(element.tag) == "Trade"
+        and element.get("levelOfDetail", "EXECUTION").upper() == "EXECUTION"
+    ]
+    if not trades:
+        raise ReportFormatError(
+            "flex_no_trades",
+            "the Interactive Brokers statement has no trades: add the Trades section at "
+            "Execution level to the Flex Query, run it again and upload that file",
+            "el estado de Interactive Brokers no tiene operaciones: añade la sección Trades "
+            "a nivel Execution a la Flex Query, vuelve a ejecutarla y sube ese archivo",
+        )
+    too_large = ReportFormatError(
+        "flex_too_large",
+        "the Interactive Brokers statement is too large to read: run the Flex Query for a "
+        "shorter period or with fewer fields, and upload that file",
+        "el estado de Interactive Brokers es demasiado grande para leerlo: ejecuta la Flex "
+        "Query para un periodo más corto o con menos campos y sube ese archivo",
+    )
+    # A real <Trade> has well under a hundred attributes; a table that is the
+    # union of thousands of made-up names would grow as trades x names.
+    columns = list(dict.fromkeys(name for trade in trades for name in trade))
+    if len(columns) > MAX_FLEX_COLUMNS or len(trades) > MAX_ROWS:
+        raise too_large
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(columns)
+    for trade in trades:
+        writer.writerow([trade.get(name, "") for name in columns])
+        if buffer.tell() > MAX_REPORT_BYTES:
+            raise too_large
+    return buffer.getvalue().encode("utf-8")
 
 
 def _html_table(reader: _TableReader) -> tuple[list[str], list[list[str]]] | None:
