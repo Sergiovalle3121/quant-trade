@@ -1465,6 +1465,46 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
+    def _account_data(path_locale: str) -> Callable[..., Response]:
+        def handler(request: Request, lang: str | None = None) -> Response:
+            # "Descargar mis datos": the signed-in account's own rows only,
+            # read-only (a GET), never stored or cached on the way.
+            locale = _account_locale(path_locale, lang)
+            session = _session(request)
+            if session is None:
+                return _signin_redirect(locale, next_path=account_pages.path("account", locale))
+            if _cross_site(request):
+                # Another site cannot make the browser fetch the file.
+                return RedirectResponse(account_pages.path("account", locale), status_code=303)
+            data = db.account_export(session[0].id)
+            if data is None:
+                raise _not_found()
+            now = datetime.now(UTC)
+            payload = {
+                "service": BRAND,
+                "exported_at": now.isoformat().replace("+00:00", "Z"),
+                "not_included": (
+                    "Your password (kept only as a scrypt hash), session and reset tokens and "
+                    "report link tokens (kept only as hashes) and card details (never received: "
+                    "card payments go through Stripe)."
+                ),
+                "retention_days_for_unpaid_reports_and_ips": cfg.retention_days,
+                **data,
+            }
+            body = json.dumps(payload, ensure_ascii=False, indent=2)
+            name = f"{BRAND.lower()}-data-{now:%Y%m%d}.json"
+            return Response(
+                body,
+                media_type="application/json; charset=utf-8",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{name}"',
+                    "Cache-Control": "no-store",
+                    "X-Content-Type-Options": "nosniff",
+                },
+            )
+
+        return handler
+
     # -- "Mis estrategias" ---------------------------------------------------
     def _strategy_file_post(path_locale: str) -> Callable[..., Response]:
         def handler(
@@ -1785,6 +1825,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]
         )
         app.add_api_route(paths["account"] + "/borrar", _delete_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["account"] + "/datos", _account_data(path_locale), methods=["GET"])
         strategies_base = account_pages.strategies_path(path_locale)
         app.add_api_route(
             strategies_base + "/guardar", _strategy_file_post(path_locale), methods=["POST"]

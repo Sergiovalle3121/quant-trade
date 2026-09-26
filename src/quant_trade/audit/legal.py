@@ -643,7 +643,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "Deletion removes everything we hold on that audit: files, report, "
                     "hashes, class and verification page. To leave the updates list, write "
                     "from that address. You can delete your account yourself from your "
-                    "account page. We answer within 30 days.",
+                    "account page, and download a copy of what it holds there ('Download my "
+                    "data'). We answer within 30 days.",
                     "You can also complain to the data protection authority of your country.",
                 ),
             ),
@@ -762,7 +763,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "borrado elimina todo lo que tenemos de esa auditoría: archivos, informe, "
                 "hashes, clase y página de verificación. Para darte de baja de la lista de "
                 "avisos, escribe desde ese correo. Tu cuenta la puedes borrar tú desde la "
-                "página de tu cuenta. Respondemos en un plazo de 30 días.",
+                "página de tu cuenta, y ahí mismo descargar una copia de lo que guarda "
+                "(«Descargar mis datos»). Respondemos en un plazo de 30 días.",
                 "También puedes reclamar ante la autoridad de protección de datos de tu país.",
             ),
         ),
