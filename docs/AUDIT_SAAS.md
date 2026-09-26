@@ -1706,7 +1706,9 @@ changes what a report says.
   codes (never the code or the owner's note), strategies, free previews,
   the free first report's hashes and IP, and the column maps. Never the
   password hash, a session, reset or report token. Backs the "Qué
-  guardamos" block and the right of access in /privacidad
+  guardamos" block and the right of access in /privacidad. A browser-flagged
+  cross-site request is sent back to the account page; a report saved from
+  someone else's link shows its description only once paid
   (`store.account_export`).
 - **Mis estrategias** (`audit/strategies.py`, tables `strategies` and
   `strategy_reports`): an account names a strategy and files reports of its

@@ -1755,3 +1755,34 @@ def test_download_my_data_returns_only_the_owners_rows(tmp_path: Path) -> None:
     es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
     en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
     assert "«Descargar mis datos»" in es and "'Download my data'" in en
+
+
+def test_download_my_data_refuses_cross_site_and_hides_others_descriptions(
+    tmp_path: Path,
+) -> None:
+    import json
+
+    client, store, _ = _client(tmp_path)
+    _signup(client, "ana@example.com")
+    # An anonymous upload paid with a code, later saved by Ana from its link.
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    stranger = TestClient(client.app)
+    theirs = _audit_id(
+        _upload(stranger, description="mi robot secreto", access_code=code).headers["location"]
+    )
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(store.audits.update().values(paid=False, paid_at=None))  # type: ignore[attr-defined]
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    store.link_audit(account.id, theirs, at=NOW)  # type: ignore[attr-defined]  # saved from a link
+    refused = client.get(
+        "/cuenta/datos", headers={"Sec-Fetch-Site": "cross-site"}, follow_redirects=False
+    )
+    assert refused.status_code == 303 and refused.headers["location"] == "/cuenta"
+    data = json.loads(client.get("/cuenta/datos", headers={"Sec-Fetch-Site": "none"}).text)
+    saved = next(item for item in data["reports"] if item["audit_id"] == theirs)
+    assert saved["description"] == "" and saved["upload_ip"] == ""
+    assert "mi robot secreto" not in json.dumps(data)
+    # Once this account pays for it, the description is part of what it bought.
+    store.mark_paid(theirs, stripe_session_id="cs_saved", at=NOW)  # type: ignore[attr-defined]
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert "mi robot secreto" in json.dumps(data, ensure_ascii=False)

@@ -1863,7 +1863,9 @@ class Store:
                 "paid_with": item.paid_with,
                 "files_deleted": item.purged,
                 "public_verification_page": item.public_id or None,
-                "description": item.description,
+                # A report saved from someone else's link keeps its uploader's
+                # words private unless this account paid for it.
+                "description": item.description if item.own or item.paid else "",
                 "upload_ip": ips.get(item.audit_id, "") if item.own else "",
             }
             for item in self.account_audits_list(account_id)

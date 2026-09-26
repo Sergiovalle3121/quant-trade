@@ -1469,6 +1469,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = _session(request)
             if session is None:
                 return _signin_redirect(locale, next_path=account_pages.path("account", locale))
+            if _cross_site(request):
+                # Another site cannot make the browser fetch the file.
+                return RedirectResponse(account_pages.path("account", locale), status_code=303)
             data = db.account_export(session[0].id)
             if data is None:
                 raise _not_found()
