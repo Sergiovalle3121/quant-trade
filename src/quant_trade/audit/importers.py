@@ -2119,9 +2119,11 @@ def _read_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, limit: int) ->
 def _legacy_xls_refused() -> ReportFormatError:
     return ReportFormatError(
         "legacy_xls",
-        "this is an old Excel workbook (.xls), which cannot be read: open it in Excel, "
-        "LibreOffice or Google Sheets and save it as .xlsx or CSV, then upload that file",
-        "este es un libro de Excel antiguo (.xls), que no se puede leer: ábrelo en Excel, "
+        "this file could not be read as an old Excel workbook (.xls); it may be damaged, "
+        "password-protected or not a spreadsheet: open it in Excel, LibreOffice or Google "
+        "Sheets and save it as .xlsx or CSV, then upload that file",
+        "este archivo no se pudo leer como un libro de Excel antiguo (.xls); puede estar "
+        "dañado, protegido con contraseña o no ser una hoja de cálculo: ábrelo en Excel, "
         "LibreOffice o Google Sheets, guárdalo como .xlsx o CSV y sube ese archivo",
     )
 
@@ -2144,6 +2146,10 @@ def read_xls(data: bytes) -> dict[str, list[list[Any]]]:
             file_contents=data,
             on_demand=True,
             formatting_info=False,
+            # Rows as long as their last real cell: padded rows would lay out
+            # rows x widest column (16.7M cells for one cell at IV65536) before
+            # the cell limit could refuse the sheet.
+            ragged_rows=True,
             logfile=io.StringIO(),
             verbosity=0,
         )
@@ -2154,12 +2160,12 @@ def read_xls(data: bytes) -> dict[str, list[list[Any]]]:
     try:
         for index in range(book.nsheets):
             sheet = book.sheet_by_index(index)
-            width = min(sheet.ncols, MAX_XLSX_COLUMNS)
-            cells += sheet.nrows * width
+            widths = [min(sheet.row_len(r), MAX_XLSX_COLUMNS) for r in range(sheet.nrows)]
+            cells += sum(widths)
             if cells > MAX_XLSX_CELLS:
                 raise _xlsx_too_big()
             rows: list[list[Any]] = []
-            for row_index in range(sheet.nrows):
+            for row_index, width in enumerate(widths):
                 row: list[Any] = []
                 for cell in sheet.row_slice(row_index, 0, width):
                     row.append(_xls_value(cell.ctype, cell.value, book.datemode, xlrd))

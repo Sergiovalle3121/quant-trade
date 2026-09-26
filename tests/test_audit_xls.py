@@ -107,5 +107,15 @@ def test_a_damaged_or_foreign_ole_file_gets_the_plain_answer(damage: object) -> 
     with pytest.raises(ReportFormatError) as refused:
         import_report(data, "cuenta.xls")
     assert refused.value.code == "legacy_xls"
-    assert ".xlsx" in str(refused.value)
+    assert ".xlsx" in str(refused.value) and "damaged" in str(refused.value)
+    assert "protegido con contraseña" in refused.value.message_es
+    assert "protegido por senha" in refused.value.localized("pt")
     assert detect_format(data) is None
+
+
+def test_one_cell_at_the_sheet_edge_does_not_lay_out_the_whole_grid() -> None:
+    # Two cells, A1 and IV65536: padded rows would be 65,536 x 256 cells.
+    sheet = read_xlsx(xls({"S": [["a"], *([] for _ in range(65_534)), [None] * 255 + ["b"]]}))
+    rows = sheet["S"]
+    assert rows[0] == ["a"] and rows[-1][-1] == "b"
+    assert sum(len(row) for row in rows) == 1 + 256
