@@ -177,9 +177,7 @@ def _workbook_of(html: bytes) -> bytes:
                 cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{escape(text)}</t></is></c>')
         cells.append("\n")
     sheet_rows = []
-    r = 0
-    for chunk in "".join(cells).split("\n"):
-        r += 1
+    for r, chunk in enumerate("".join(cells).split("\n"), 1):
         if chunk:
             sheet_rows.append(f'<row r="{r}">{chunk}</row>')
     sheet = (
