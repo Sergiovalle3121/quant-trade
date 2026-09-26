@@ -124,6 +124,10 @@ class AuditSettings:
     #: Secret for the owner panel where codes are created from a browser.
     #: No default: empty (or shorter than MIN_ADMIN_KEY_LENGTH) turns it off.
     admin_key: str = field(default="", repr=False)
+    #: Read public market closes (FRED, no key) to compare a strategy with
+    #: holding the market it trades. On by default in the service
+    #: (``AUDIT_PUBLIC_DATA=false`` turns it off); off when built directly.
+    public_data: bool = False
 
     def __post_init__(self) -> None:
         if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
@@ -267,6 +271,7 @@ class AuditSettings:
             operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
             admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
+            public_data=env.get("AUDIT_PUBLIC_DATA", "true").strip().lower() in TRUE_VALUES,
         )
 
 

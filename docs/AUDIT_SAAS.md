@@ -252,7 +252,10 @@ x1,000, Gasoil (G) x100, Sugar No. 11 (SB) x1,120 per cent, Coffee (KC) x375,
 Cotton (CT) x500, Cocoa (CC) x10, Orange juice (OJ) x150 and the US Dollar
 Index (DX) x1,000 in USD; B3 (Brazil, its "Contract Point Value" sheet)
 Ibovespa (IND) x1, Mini Ibovespa (WIN) x0.2, US Dollar (DOL) x50 and Mini US
-Dollar (WDO) x10 in BRL. The report prints amounts without a currency sign,
+Dollar (WDO) x10 in BRL; MexDer (Mexico, its terms and conditions) S&P/BMV
+IPC (IPC) x10, "MINI" IPC (MIP) x2 and the US dollar (DA, USD 10,000 quoted in
+pesos) x10,000 in MXN, read in MexDer's series codes (`IPC DC26`, `MIP MR27`,
+`DA19 DC16`: the Spanish month's first letter and next consonant). The report prints amounts without a currency sign,
 so a file in euros or reais is not shown as dollars. The warning names a non-USD currency, and a file
 that mixes currencies is told the results were added without conversion.
 Other single-letter ICE roots (FTSE 100 `Z`, WTI `T`) are left out because
@@ -1121,6 +1124,57 @@ best 12-month return and the share of rolling 12-month periods that ended
 positive. One finding, as a question: `fell_more_in_crises` when, over at
 least two windows with a benchmark, the fund did worse in two thirds or more
 of them. No red flag and no class change.
+
+Against holding the market it trades (`audit/holding.py`, `audit/market.py`).
+When at least two thirds of a file's trades are on the S&P 500, the Nasdaq 100
+or bitcoin (by symbol name: `US500`, `SPX500`, `ES` futures; `US100`,
+`USTEC`, `NAS100`, `NQ` futures; `BTCUSD`, `BTCUSDT`, `XBTUSD`; broker
+suffixes dropped), or a tester report names one of them, the report puts the
+strategy's closes beside the market's public closes from FRED
+(`SP500`, `NASDAQ100`, `CBBTCUSD`) on the same days: return, worst fall and
+Sharpe ratio for both, plus correlation and beta. The two are paired on the
+sparser calendar, taking the other side's last level on or before each day:
+a strategy that also moves on weekends is read on the market's trading days
+(weekend moves roll into Monday), a weekday strategy beside bitcoin on its
+own days. The strategy's Sharpe here is on those shared days only
+(`strategy_sharpe_shared_days`, labelled "on the same N days"), not the
+headline Sharpe. Correlation and beta use Friday-to-Friday weekly returns,
+because a file's day ends at its last stamp (often broker time read as UTC)
+while FRED closes at the market's close, and that offset pulls daily figures
+toward zero. It needs 60 shared days (`MIN_DAYS`) spanning 90 calendar days
+(`MIN_SPAN_DAYS`) and 12 weekly returns (`MIN_WEEKS`); a market close more
+than 5 days before a strategy day is not paired (`MAX_GAP_DAYS`). One
+finding, as a question, no red flag and no class change: `rides_the_market`
+when the weekly correlation is 0.7 or more (`CLOSE_MOVE`) and the strategy's
+Sharpe is not at least 2 standard errors (`EDGE_SE`) above holding's, the
+standard error of the difference of two correlated Sharpe ratios (Jobson and
+Korkie with Memmel's correction) on the weekly returns (`sharpe_gap_se`,
+`sharpe_gap_in_se`). A gap inside the noise reads as "no clear edge", never
+as "worse"; without the finding (low correlation), a gap under 2 standard
+errors still gets one line under the table saying the higher Sharpe is not
+enough to say the strategy beats the market. Sharpe is used because it does not change with position
+size, so a leveraged copy of the index scores the same as the index. Neither
+Sharpe subtracts a cash rate. On a balance-only file a line says the
+strategy's correlation and worst fall read short. The closes are read at
+run time (`MarketData`, kept in memory for six hours, Python's default
+User-Agent because FRED stalls custom ones), never stored in the repository;
+the service reads them unless `AUDIT_PUBLIC_DATA=false`, the CLI only with
+`--public-data`, and the tests block the download (`tests/conftest.py`).
+The public data can never hold a report back: an audit never downloads.
+`MarketData.closes` answers at once from memory (or with nothing) and, when
+the copy is missing or older than six hours, starts one background
+`refresh`; the service also downloads the three series in a background
+thread when it starts (`warm`). A download reads with `read1`, so its total
+deadline of 5 seconds (`TIMEOUT`) is checked after every receive and a server
+that trickles bytes is cut off within about one more socket timeout; replies
+are capped at 4 MB, redirects are refused (the address stays FRED's fixed
+https one), and values that are not finite are dropped. Only one refresh of
+a series runs at a time, and after a failure (down, slow, rate limited, not
+a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`).
+When the closes are not in memory the section says so in one NOT_MEASURED
+line and the audit goes on. The CLI's `--public-data` reads the three series
+first. The result JSON always carries a `holding` key: `null` when the file
+trades none of these markets or public data is off.
 
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section

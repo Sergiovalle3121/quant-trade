@@ -51,6 +51,7 @@ from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
+from quant_trade.audit.market import MarketData
 from quant_trade.audit.owner import (
     MAX_CREDITS,
     MAX_EXPIRES_DAYS,
@@ -802,6 +803,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         raise ImportError(REQUIRE_WEB) from exc
 
     cfg = settings or AuditSettings.from_env()
+    market_data = MarketData() if cfg.public_data else None
+    if market_data is not None:
+        market_data.warm()
     # Checked once: WeasyPrint needs Pango, which a bare install may lack.
     pdf_ok = pdf_lib.available()
     db = store or make_store(cfg.database_url)
@@ -1830,7 +1834,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> tuple[str, str, bool]:
         """The CPU- and IO-bound part of an upload; runs in the thread pool."""
         now = datetime.now(UTC)
-        result = run_audit(inputs, bootstrap_samples=cfg.bootstrap_samples, now=now)
+        result = run_audit(
+            inputs,
+            bootstrap_samples=cfg.bootstrap_samples,
+            now=now,
+            market=market_data.closes if market_data is not None else None,
+        )
         extra_files: dict[str, bytes] = {}
         if uploads["report"] and report_name:
             extra_files[report_name] = uploads["report"]
