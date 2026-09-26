@@ -253,8 +253,9 @@ class IngestedSeries:
     non_monotonic: bool
     warnings: list[str] = field(default_factory=list)
     #: A benchmark the same file carries (``timestamp``, ``ret``): a column
-    #: beside the returns, or a factsheet's benchmark rows. Read only by the
-    #: fund section; it never feeds the benchmark dimension.
+    #: beside the returns, or a factsheet's benchmark rows. The fund section
+    #: reads it, and so does the benchmark dimension when no benchmark file
+    #: was uploaded (``engine._file_benchmark``).
     benchmark: pd.DataFrame | None = None
 
     @property
@@ -1295,6 +1296,8 @@ class AuditResult(BaseModel):
     #: The Sharpe ratio after what a US Treasury bill paid (``audit/cashrate.py``).
     cash_rate: dict[str, Any] | None = None
     vix_regime: dict[str, Any] | None = None
+    #: Whether the average return shifted at some point (``audit/breaks.py``).
+    mean_shift: dict[str, Any] | None = None
     in_currencies: dict[str, Any] | None = None
     #: The Sharpe next to the luck of the configurations tried (``audit/luck.py``).
     luck: dict[str, Any] | None = None

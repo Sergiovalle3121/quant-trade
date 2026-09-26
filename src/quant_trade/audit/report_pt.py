@@ -429,6 +429,31 @@ REPORT: dict[str, Any] = {
             "acompanhá-la."
         ),
         "recent_badge_faded": "Se apaga",
+        "shift": "A rentabilidade média mudou em algum momento?",
+        "shift_intro": (
+            "Procuramos o momento em que a rentabilidade média da curva mais mudou e medimos se "
+            "essa mudança é maior que a oscilação normal dos seus retornos (teste CUSUM, que leva "
+            "em conta que um retorno pode influenciar o seguinte). Não muda a classe."
+        ),
+        "shift_badge_changed": "Mudou",
+        "shift_badge_steady": "Sem mudança clara",
+        "shift_changed": (
+            "A rentabilidade média mudou por volta de {date} (provavelmente entre {low} e "
+            "{high}): {before} ao ano antes e {after} ao ano depois. Com p {p}, o acaso "
+            "dificilmente explica uma diferença assim."
+        ),
+        "shift_steady": (
+            "Não há uma mudança clara na rentabilidade média ao longo do histórico (p {p}): as "
+            "diferenças entre trechos cabem na oscilação normal dos seus retornos. Não prova "
+            "que não tenha mudado: uma mudança pequena pode passar despercebida."
+        ),
+        "shift_edge": (
+            "O maior desvio está nos primeiros ou nos últimos retornos do histórico (p {p}), "
+            "perto demais da borda para comparar um antes e um depois."
+        ),
+        "shift_before": "Rentabilidade média ao ano antes de {date}",
+        "shift_after": "Rentabilidade média ao ano desde {date}",
+        "shift_band": "banda de 90 %: {low} a {high}",
         "recent_year": "Ano de fechamento",
         "fund": "O que quem investe em um fundo revisaria",
         "fund_intro": (
@@ -1423,6 +1448,7 @@ REPORT: dict[str, Any] = {
         "stress": "O que sobra sem as suas melhores operações e meses",
         "timing": "Em quais horas e dias o resultado se concentra",
         "recent": "Se continua funcionando no período mais recente",
+        "shift": "Se a rentabilidade média mudou em algum momento, e quando",
         "crises": "Como se saiu em 2008, na covid, em 2022 e em outras quedas conhecidas",
         "luck": (
             "Quanto Sharpe sobra ao descontar a sorte e quantos anos de histórico seriam "
@@ -1750,6 +1776,14 @@ VERDICT: dict[str, Any] = {
             "Classe D: o histórico de conta não passa na auditoria; os números de destaque não "
             "podem ser tomados como estão."
         ),
+        "C.fund": (
+            "Classe C: há uma fraqueza importante; não confiaríamos neste histórico de fundo sem "
+            "resolvê-la."
+        ),
+        "D.fund": (
+            "Classe D: o histórico do fundo não passa na auditoria; os números de destaque não "
+            "podem ser tomados como estão."
+        ),
         "statistical_significance.PASS": (
             "Como teste único, o resultado é constante demais para ser explicado só pelo acaso "
             "(Sharpe distinguível de zero)."
@@ -1787,6 +1821,21 @@ VERDICT: dict[str, Any] = {
         "multiplicity.FAIL.undeclared": (
             "Não foi declarado quantas configurações foram testadas e, mesmo com 1, o caso mais "
             "favorável, o resultado não supera o que uma tentativa sem habilidade produziria."
+        ),
+        "multiplicity.PASS.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; com 1, "
+            "o caso mais favorável, o resultado continua acima do que uma tentativa sem "
+            "habilidade produziria. Se forem mais, declará-los pode mudar esta conclusão."
+        ),
+        "multiplicity.WEAK.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
+            "com 1, o caso mais favorável, o Sharpe ajustado por essas tentativas não chega ao "
+            "limiar."
+        ),
+        "multiplicity.FAIL.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
+            "com 1, o caso mais favorável, o resultado não supera o que uma tentativa sem "
+            "habilidade produziria."
         ),
         "costs.PASS": (
             "Com 3 vezes o custo de referência, o resultado das operações continua positivo."
@@ -1889,6 +1938,11 @@ VERDICT: dict[str, Any] = {
             "qual parte é teste sobre dados novos. Pergunte essa data ao fornecedor e declare-a "
             "para medi-lo."
         ),
+        "out_of_sample.NOT_MEASURED.fund": (
+            "O histórico mensal de um fundo é o seu histórico real, mas não diz desde quando o "
+            "gestor aplica o mesmo processo nem se algum trecho é simulado. Pergunte essa data "
+            "ao gestor e declare-a para medi-lo."
+        ),
         "data_quality.PASS": (
             "Não encontramos saltos, lacunas nem padrões de risco oculto nos arquivos. Isso não "
             "descarta erros que os arquivos não mostrem."
@@ -1972,6 +2026,12 @@ PLAN: dict[str, Any] = {
     },
     "ACCOUNT_TITLES": {
         "out_of_sample": "Descubra desde quando opera sem alterações",
+    },
+    "FUND_TITLES": {
+        "out_of_sample": "Descubra desde quando o processo do gestor não muda",
+        "costs": "Confirme se os números são líquidos de taxas",
+        "multiplicity": "Pergunte quantos fundos o gestor administra",
+        "benchmark": "Compare com o índice do fundo",
     },
     "FLAG_HINTS": {
         "TOO_FEW_OBSERVATIONS": (
@@ -2189,6 +2249,9 @@ NOT_MEASURED: dict[str, str] = {
     ),
     "cost rows missing": "faltam linhas de custos",
     "no out-of-sample start declared": "não foi declarado um início fora da amostra",
+    "a fund's record does not say since when its process has run unchanged": (
+        "o histórico do fundo não diz desde quando o seu processo opera sem alterações"
+    ),
     "declared out-of-sample start lies outside the uploaded series": (
         "o início fora da amostra declarado cai fora da série enviada"
     ),
@@ -2474,6 +2537,25 @@ SINGULAR: dict[str, tuple[str, str]] = {
 
 #: (English note template, its Portuguese), the placeholders unchanged.
 RULES: tuple[tuple[str, str], ...] = (
+    (
+        "CUSUM of the returns in time order (Ploberger and Kramer); cautious long-run "
+        "variance; p-value from the Brownian bridge",
+        "CUSUM dos retornos em ordem de tempo (Ploberger e Krämer); variância de longo prazo "
+        "prudente; valor p da ponte browniana",
+    ),
+    (
+        "where the running sum strays furthest from its straight line; 95 % range (Bai)",
+        "onde a soma acumulada mais se afasta da sua linha reta; intervalo de 95 % (Bai)",
+    ),
+    (
+        "average return per period, annualised; 90 % band from its cautious standard error",
+        "retorno médio por período, anualizado; banda de 90 % pelo seu erro-padrão prudente",
+    ),
+    ("fewer than 250 returns", "menos de 250 retornos"),
+    (
+        "a return is too large to measure its spread",
+        "um retorno é grande demais para medir a sua dispersão",
+    ),
     (
         "both {a} and {b} present; using {c}",
         "há colunas {a} e {b}; usa-se {c}",
@@ -3590,6 +3672,7 @@ RULES: tuple[tuple[str, str], ...] = (
         "the fund's own returns after its fees; costs were not measured",
         "rentabilidades do próprio fundo após as suas taxas; os custos não foram medidos",
     ),
+    ("the index the file itself carries", "o índice que o próprio arquivo traz"),
     (
         (
             "the net-of-fees declaration applies only to a monthly fund track record; costs are "
@@ -3777,6 +3860,10 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "the benchmark's monthly returns do not vary",
         "as rentabilidades mensais do índice de referência não variam",
+    ),
+    (
+        "a month in the fund or its benchmark loses 100% or more",
+        "um mês do fundo ou do seu índice de referência perde 100% ou mais",
     ),
     (
         "needs at least {n} months with the benchmark up",
@@ -5580,6 +5667,10 @@ REASONS: tuple[tuple[str, str], ...] = (
     (
         "no out-of-sample start declared",
         "não foi declarado um início fora da amostra",
+    ),
+    (
+        "a fund's record does not say since when its process has run unchanged",
+        "o histórico do fundo não diz desde quando o seu processo opera sem alterações",
     ),
     (
         "declared out-of-sample start lies outside the uploaded series",

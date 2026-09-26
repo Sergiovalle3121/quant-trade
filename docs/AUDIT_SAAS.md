@@ -1045,6 +1045,38 @@ has periods of different sizes; trades are treated as independent, which
 understates the noise of a strategy whose trades cluster; it describes the
 history and says nothing about later periods.
 
+### Did the average return change at some point (`audit/breaks.py`)
+
+`decay.py` compares fixed thirds of closed trades; the rolling and sub-period
+views describe the curve without a test. This section asks one question of
+every curve with 250 or more returns (`breaks.MIN_RETURNS`), trades or not:
+is there a point where the average return shifted by more than the returns'
+noise explains?
+
+- Test: the CUSUM of the returns' deviations from their mean (Ploberger and
+  Krämer, 1992), `max_k |S_k| / (sigma sqrt(n))`, with the Brownian bridge's
+  (Kolmogorov) tail as the p-value. `sigma^2` is the cautious long-run
+  variance: the largest of the plain one, Newey-West (Bartlett, the lag of
+  `alpha.newey_west_lags`) and the plain one widened by `(1 + rho) / (1 - rho)`
+  (Kendall-corrected, clipped to `[0, 0.9]`). On simulated AR(1) returns with
+  t(5) shocks and no shift it passed 5 % in at most about 4.5 % of histories
+  for autocorrelation 0, 0.3 and 0.6 (`tests/test_audit_breaks.py`).
+- `clear` when `p <= 0.05` (`ALPHA_LEVEL`) and at least 30 returns
+  (`MIN_SIDE`) lie on each side of the date; otherwise `edge` says the largest
+  deviation sits too close to either end for a before and an after.
+- The date is where the running sum strays furthest from its line; its
+  range is Bai's (1997) 95 % interval, `11.03 sigma^2 / delta^2` returns on
+  each side (`delta` the shift). On simulated shifts it covered the true date
+  in about 95 % of detected cases.
+- Before and after: each side's average return, annualised, with a 90 %
+  band from its own cautious standard error. All MEASURED.
+
+Informational: no flag, no class change. Limitations: a single shift is
+assumed (several smaller ones read as one, a gradual drift as a date in its
+middle); a small shift in a short history is often missed, which the "Sin
+cambio claro" line says ("no prueba que no haya cambiado"); the date is where
+the change shows most, not its cause; it describes the history only.
+
 ### What is left once luck is discounted (`audit/luck.py`)
 
 The deflated Sharpe gives a probability; this section restates the same
@@ -1193,11 +1225,23 @@ fees, so the upload form has a box for it ("Son rentabilidades de un fondo,
 ya netas de sus comisiones"). It is honoured only for a fund track record: a
 hand-made return or NAV file (or factsheet table) at 13 or fewer periods a
 year, with no trades, platform report or live history (`engine.fund_record`).
-There it drops `ZERO_DECLARED_COSTS`, the section shows the declaration as
+There it drops `ZERO_DECLARED_COSTS` (which no fund record raises now: its
+trading costs are inside each month), the section shows the declaration as
 DECLARED and says Rigor did not measure costs, and the report is titled
 "Auditoría de historial de fondo". Anywhere else the box is ignored with a
 warning and costs are checked as usual. The observation thresholds do not
 change, and the costs dimension stays NOT_MEASURED.
+
+A fund record in the verdict and the plan. With no out-of-sample start
+declared, the out-of-sample reason reads "a fund's record does not say since
+when its process has run unchanged" (`verdict.FUND_OOS_REASON`). The
+dimension card, the summary and the plan ask the manager since when the
+process has been unchanged and whether any stretch is simulated (pro forma),
+not for an optimisation date or an unchanged robot. The costs step asks
+whether the figures are net of the management and performance fees, instead
+of a platform report. Undeclared trials read as how many funds or strategies
+the same manager runs. The caps do not change: out of sample and costs stay
+NOT_MEASURED, and the best class without them is B.
 
 Against its benchmark. Factsheets print the benchmark's months next to the
 fund's, so the equity file may carry it:
@@ -1240,9 +1284,23 @@ benchmark's; each needs 6 such months). Findings, as questions:
 No index data is bundled: the benchmark is the customer's, as supplied, and
 the note says Rigor did not check it against the index. When the fund's
 figures are not declared net of fees, the section says the comparison
-flatters a fund whose figures are before fees. It never feeds the benchmark
-dimension (that reads only the uploaded benchmark file, as before), so the
-class does not move.
+flatters a fund whose figures are before fees. When no benchmark file is
+uploaded, the same index also feeds the benchmark dimension
+(`engine._file_benchmark`): it is laid on the curve's own dates, the first
+point is the base both start from, and it is used only when it gives a return
+for every later point (else the dimension stays NOT_MEASURED). The section
+then carries `source: "file"`, the overlap row says "the index the file
+itself carries", and the plan step says the reference is the file's own
+index. A fund that trails its own index fails the dimension like any other
+upload. An uploaded benchmark file still wins, and a declared "no applicable
+benchmark" still makes it NOT_APPLICABLE. A month in which the fund or its
+index loses 100 % or more (most often a typo in a factsheet) leaves the
+section NOT_MEASURED ("a month in the fund or its benchmark loses 100% or
+more") instead of dividing by a compound growth of zero.
+The index in the file is the one the manager chose to print, so a PASS
+against it is not an independent check: `verdict.overall_class(own_index=True)`
+lets it complete a B but never an A (a FAIL or WEAK counts as usual), and the
+plan's "what would change the class" follows the same rule.
 
 What fees would take (`fund.fee_drag`). On a fund record not declared net
 of fees, a table shows the yearly return and total growth with a yearly fee
@@ -2383,6 +2441,12 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
+  key, two-step sign-in and a passkey (only where passkeys work), each as
+  on or with a link to its card, and counts how many are on. Two-step
+  links to the recovery key while there is none, since it needs one. With
+  everything on, it shrinks to one line. It reads existing rows only and
+  stores nothing.
 - **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
   `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
   acceso" adds one after the current password (`POST /cuenta/llaves`, then

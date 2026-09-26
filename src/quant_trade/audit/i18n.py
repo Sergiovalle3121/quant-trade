@@ -895,6 +895,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the fund's own returns after its fees; costs were not measured",
         "rentabilidades del propio fondo tras sus comisiones; los costes no se midieron",
     ),
+    ("the index the file itself carries", "el índice que trae el propio archivo"),
+    (
+        "a fund's record does not say since when its process has run unchanged",
+        "el historial del fondo no dice desde cuándo su proceso opera sin cambios",
+    ),
     (
         "the net-of-fees declaration applies only to a monthly fund track record; costs are "
         "checked as usual",
@@ -994,6 +999,26 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "pagó el efectivo en su moneda para todo el historial",
     ),
     ("the returns never move", "los retornos nunca se mueven"),
+    (
+        "CUSUM of the returns in time order (Ploberger and Kramer); cautious long-run "
+        "variance; p-value from the Brownian bridge",
+        "CUSUM de los retornos en orden de tiempo (Ploberger y Krämer); varianza de largo "
+        "plazo prudente; valor p del puente browniano",
+    ),
+    (
+        "where the running sum strays furthest from its straight line; 95 % range (Bai)",
+        "donde la suma acumulada más se aleja de su línea recta; rango del 95 % (Bai)",
+    ),
+    (
+        "average return per period, annualised; 90 % band from its cautious standard error",
+        "rentabilidad media por periodo, anualizada; banda del 90 % con su error estándar "
+        "prudente",
+    ),
+    ("fewer than 250 returns", "menos de 250 retornos"),
+    (
+        "a return is too large to measure its spread",
+        "un retorno es demasiado grande para medir su dispersión",
+    ),
     (
         "each return placed by the VIX close of the last market day before it starts (calm "
         "below 20, turbulent at 20 or above); return per month compounded over each regime's "
@@ -1223,6 +1248,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "the benchmark's monthly returns do not vary",
         "las rentabilidades mensuales del índice de referencia no varían",
+    ),
+    (
+        "a month in the fund or its benchmark loses 100% or more",
+        "un mes del fondo o de su índice de referencia pierde el 100 % o más",
     ),
     (
         "needs at least {n} months with the benchmark up",
