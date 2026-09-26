@@ -405,6 +405,15 @@ _COPY: dict[str, dict[str, Any]] = {
                 "código de tu app. De la clave solo guardamos su huella, nunca la clave misma.",
             ),
             (
+                "¿Qué tan protegida está mi cuenta?",
+                "Puedes activar la verificación en dos pasos con una app de autenticación "
+                "(Google Authenticator, 1Password u otra): entonces, para entrar o recuperar la "
+                "cuenta hacen falta dos de estas tres cosas: tu contraseña, el código de la app "
+                "o tu clave de recuperación. En Mi cuenta ves dónde está abierta tu cuenta y "
+                "cierras cada sesión, y ves las entradas y los cambios de seguridad de los "
+                "últimos 90 días.",
+            ),
+            (
                 "¿Cómo se usa el sello?",
                 "Publica la verificación desde tu informe y copia el código del sello en tu web, "
                 "Telegram o foro. El sello describe una auditoría estadística; no es una promesa "
@@ -691,6 +700,15 @@ _COPY: dict[str, dict[str, Any]] = {
                 "your app. We keep only the key's fingerprint, never the key itself.",
             ),
             (
+                "How well protected is my account?",
+                "You can turn on two-step sign-in with an authenticator app (Google "
+                "Authenticator, 1Password or another): then signing in or recovering the "
+                "account takes two of these three: your password, the code from the app or "
+                "your recovery key. In My account you see where your account is open and "
+                "sign out each session, and you see the sign-ins and security changes of the "
+                "last 90 days.",
+            ),
+            (
                 "How is the badge used?",
                 "Publish the verification from your report and copy the badge code to your "
                 "site, Telegram or forum. The badge describes a statistical audit; it is not a "
@@ -889,7 +907,8 @@ _UI: dict[str, dict[str, Any]] = {
             "La cuenta real frente a su backtest",
             "Preguntas para el vendedor del robot o el gestor",
             "Si funciona en cada mercado o uno carga con el resto",
-            "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse",
+            "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse y, con su "
+            "índice, cuánto es efectivo, cuánto es mercado y cuánto queda",
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
             "VIX tranquilo o agitado y crisis conocidas",
@@ -1108,7 +1127,8 @@ _UI: dict[str, dict[str, Any]] = {
             "The live account against its backtest",
             "Questions to ask the robot's vendor or the manager",
             "Whether it works on each market or one carries the rest",
-            "For funds: year-by-month calendar, worst month and time to recover",
+            "For funds: year-by-month calendar, worst month and time to recover and, with its "
+            "index, how much is cash, how much is the market and what is left",
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Against cash and the market: the Sharpe without what cash paid, calm or "
             "agitated VIX and known crises",

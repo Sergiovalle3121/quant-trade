@@ -671,6 +671,92 @@ If someone shows you a table of monthly returns for a manager or a fund, four qu
 None of this judges the manager; it separates what the history shows from what it only suggests.
 ```
 
+#### F8 · ES · Para quien evalúa un fondo: efectivo, mercado y lo que queda
+
+```text
+Cuando un fondo enseña su rentabilidad media al año, conviene partir ese número en tres:
+
+1. Lo que pagaba el efectivo en esas mismas fechas (letras del Tesoro a 3 meses). Eso lo pagaba el dinero quieto.
+2. Lo que viene de seguir a su índice: su beta por lo que el índice rindió sobre el efectivo. Eso lo da también un fondo indexado.
+3. Lo que queda: el alfa. Es lo único que justifica pagar una gestión activa, y con pocos años su margen de error es ancho.
+
+Con 36 meses o más en común con el índice se puede calcular, con su rango al 95 %. Si sale positivo pero no se distingue de cero, también se puede calcular cuántos meses harían falta.
+
+Rigor lo hace con la tabla mensual del fondo y la de su índice: https://rigor.up.railway.app/para/inversores-gestores-fondos?ref=f8
+
+No dice si invertir: separa lo que el historial demuestra de lo que solo sugiere.
+```
+
+#### F8 · EN · For someone judging a fund: cash, market and what is left
+
+```text
+When a fund shows its average return a year, it pays to split that number in three:
+
+1. What cash paid over the same dates (3-month Treasury bills). Money sitting still paid that.
+2. What comes from following its index: its beta times what the index returned over cash. An index fund gives you that too.
+3. What is left: the alpha. It is the only part that justifies paying for active management, and with few years its margin of error is wide.
+
+With 36 months or more in common with the index it can be computed, with its 95 % range. If it comes out positive but cannot be told apart from zero, you can also compute how many months that would take.
+
+Rigor does it from the fund's monthly table and its index's: https://rigor.up.railway.app/for/investors-managers-funds?ref=f8
+
+It does not say whether to invest: it separates what the history shows from what it only suggests.
+```
+
+#### F9 · ES · El Sharpe en la moneda de tu cuenta
+
+```text
+El Sharpe mide lo que ganaste por encima de lo que pagaba el efectivo. Casi todas las calculadoras restan la tasa de EE. UU., pero si tu cuenta está en pesos mexicanos, reales o euros, tu efectivo pagaba la tasa de tu moneda, y hubo años en que la diferencia fue de varios puntos.
+
+Con la tasa de tu moneda, el mismo historial puede verse bastante menos bueno. Vale la pena recalcularlo antes de enseñarlo o de comprar una estrategia por su Sharpe.
+
+Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica, y la de EE. UU. si no: https://rigor.up.railway.app/?ref=f9
+```
+
+#### F9 · EN · The Sharpe in your account's currency
+
+```text
+The Sharpe measures the return above what cash paid. Almost every calculator subtracts the US rate, but if your account is in Mexican pesos, reais or euros, your cash paid your currency's rate, and in some years the gap was several points.
+
+With your currency's rate, the same history can look quite a bit less good. It is worth recomputing before you show it or buy a strategy for its Sharpe.
+
+Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it, and the US rate otherwise: https://rigor.up.railway.app/en?ref=f9
+```
+
+#### F10 · ES · Si operas con Revolut o con Zerodha
+
+```text
+Si operas acciones con Revolut o en India con Zerodha, puedes revisar tu historial sin copiar nada a mano. Sube el archivo tal como lo descargas:
+
+- Revolut: el estado de cuenta de acciones (CSV).
+- Zerodha: el Tradebook de Console (Reports > Tradebook, en CSV).
+
+El informe arma tus operaciones con las compras y ventas (un depósito nunca cuenta como resultado de operar) y mide si el resultado se distingue de la suerte. Qué subir y de dónde: https://rigor.up.railway.app/guias/csv-universal?ref=f10
+```
+
+#### F10 · EN · If you trade with Revolut or Zerodha
+
+```text
+If you trade stocks with Revolut, or in India with Zerodha, you can review your history without copying anything by hand. Upload the file as you download it:
+
+- Revolut: the stocks account statement (CSV).
+- Zerodha: the Console Tradebook (Reports > Tradebook, as CSV).
+
+The report builds your trades from the buys and sells (a deposit never counts as a trading result) and measures whether the result stands out from luck. What to upload and where from: https://rigor.up.railway.app/guides/universal-csv?ref=f10
+```
+
+#### F11 · ES · Cuando alguien pregunta si es seguro
+
+```text
+Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves las entradas de los últimos 90 días. Más en las preguntas frecuentes: https://rigor.up.railway.app/?ref=f11#faq
+```
+
+#### F11 · EN · When someone asks whether it is safe
+
+```text
+Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see the sign-ins of the last 90 days. More in the FAQ: https://rigor.up.railway.app/en?ref=f11#faq
+```
+
 ### Mensajes directos
 
 Solo a quien te pidió información (en un hilo, un comentario o tu WhatsApp).

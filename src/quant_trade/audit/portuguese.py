@@ -298,6 +298,14 @@ COPY_PT: dict[str, Any] = {
             "app. Da chave, só guardamos a impressão, nunca a chave em si.",
         ),
         (
+            "Quão protegida está minha conta?",
+            "Você pode ativar a verificação em duas etapas com um app de autenticação (Google "
+            "Authenticator, 1Password ou outro): aí, para entrar ou recuperar a conta, são "
+            "precisas duas destas três coisas: sua senha, o código do app ou sua chave de "
+            "recuperação. Em Minha conta você vê onde sua conta está aberta e encerra cada "
+            "sessão, e vê as entradas e as mudanças de segurança dos últimos 90 dias.",
+        ),
+        (
             "Como se usa o selo?",
             "Publique a verificação a partir do seu relatório e copie o código do selo no seu "
             "site, Telegram ou fórum. O selo descreve uma auditoria estatística; não é uma "
@@ -492,7 +500,8 @@ UI_PT: dict[str, Any] = {
         "A conta real frente ao seu backtest",
         "Perguntas para o vendedor do robô ou para o gestor",
         "Se funciona em cada mercado ou se um carrega o resto",
-        "Para fundos: calendário ano por mês, pior mês e tempo para se recuperar",
+        "Para fundos: calendário ano por mês, pior mês e tempo para se recuperar e, com o "
+        "seu índice, quanto é caixa, quanto é mercado e quanto sobra",
         "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
         "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
         "agitado e crises conhecidas",
