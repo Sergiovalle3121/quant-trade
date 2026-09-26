@@ -970,3 +970,8 @@ def test_small_phones_keep_the_landing_and_timing_tables_inside_the_screen() -> 
     assert "(max-width:380px){.timing th,.timing td{padding:9px 5px!important}" in STYLE
     # The landing's secondary link is monochrome like the rest, not a lone blue.
     assert "min-height:44px;color:var(--text);font-weight:500;" in STYLE
+
+
+def test_the_real_work_cards_line_up_their_proof_links() -> None:
+    assert "#confianza .card p:last-child:has(>a:only-child){margin-top:auto" in STYLE
+    assert "#confianza .card p>a:only-child::after{content:' \\2192'" in STYLE
