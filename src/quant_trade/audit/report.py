@@ -3458,8 +3458,15 @@ def _summary_in(data: dict[str, Any], locale: str) -> str:
     """The verdict sentence rebuilt in ``locale`` from the stored dimensions."""
     trials = data["multiplicity"].get("trials_used") or data["declared"].get("trials") or {}
     chosen: Locale = "pt" if locale == "pt" else "en" if locale == "en" else "es"
+    dimensions = [Dimension.model_validate(d) for d in data["verdict"]["dimensions"]]
+    if chosen == "pt":
+        # A result stores its reasons in English and Spanish only.
+        dimensions = [
+            d.model_copy(update={"reasons": [localize(r, "pt") for r in d.reasons]})
+            for d in dimensions
+        ]
     return summary(
-        [Dimension.model_validate(d) for d in data["verdict"]["dimensions"]],
+        dimensions,
         data["verdict"]["overall"],
         locale=chosen,
         trials=int(trials.get("value") or 1),

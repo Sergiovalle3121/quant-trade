@@ -149,6 +149,34 @@ def test_the_sample_report_reads_in_portuguese() -> None:
     assert leftovers == set()
 
 
+def test_the_verdict_sentence_gives_its_reasons_in_portuguese() -> None:
+    """A bare curve leaves costs, out-of-sample and benchmark unmeasured; the
+    headline sentence says why in Portuguese, not in the stored English."""
+    from datetime import UTC, datetime
+
+    from audit_fixtures import csv_bytes, positive_drift
+
+    from quant_trade.audit.engine import run_audit
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    inputs = build_inputs(csv_bytes(positive_drift(300)), DeclaredMetadata())
+    result = run_audit(
+        inputs, now=datetime(2026, 1, 1, tzinfo=UTC), audit_id="pt", bootstrap_samples=100
+    )
+    english = [
+        reason
+        for dimension in result.verdict.dimensions
+        if dimension.status == "NOT_MEASURED"
+        for reason in dimension.reasons
+    ]
+    assert english
+    summary = report._summary_in(result.model_dump(mode="json"), "pt")
+    page = render_html(result, watermark=False, locale="pt")
+    for reason in english:
+        assert reason not in summary and reason not in page, reason
+        assert localize(reason, "pt") in summary, reason
+
+
 @pytest.mark.parametrize("locale", ["es", "en"])
 def test_the_result_is_the_same_whatever_language_reads_it(locale: str) -> None:
     """Portuguese is added at render time: the stored result carries no "pt" text."""
