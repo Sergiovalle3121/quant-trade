@@ -293,10 +293,17 @@ exactly one CSV, TXT, TSV, HTML or Excel file (`__MACOSX/` copies and hidden
 files are ignored; the file inside obeys the same size limit). A web page
 that is not a MetaTrader report is read as a trade or fill table with the
 universal reader, which covers the tables brokers save with a `.xls` name;
+an OpenDocument spreadsheet (`.ods`, LibreOffice; recognised by its `mimetype`
+member) is read like an Excel workbook, with the standard library only and the
+same member, inflated-size and cell limits: numbers, currency and percentages
+come from the cell's stored value, dates and times from its ISO value, and the
+blank rows and cells a sheet repeats to its edge are never laid out (a repeated
+row with values counts toward the cell limit). It goes through the same
+detection and column screen as a workbook, so no layout is guessed;
 if no importer knows it, the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
-(`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
+Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
 default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
