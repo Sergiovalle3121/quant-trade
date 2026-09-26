@@ -948,7 +948,7 @@ REPORT: dict[str, Any] = {
         "ranges_intro": (
             "Com {n} operações, cada número tem uma margem. Faixa de 95 %: os valores de fundo "
             "compatíveis com estas operações, se cada uma for independente das demais e o "
-            "sistema não mudou. Não é uma previsão."
+            "sistema não tiver mudado. Não é uma previsão."
         ),
         "ranges_zero": (
             "A faixa da média por operação ou a do fator de lucro inclui o ponto de equilíbrio "
@@ -1343,6 +1343,17 @@ REPORT: dict[str, Any] = {
         "cost_bps_per_side": "Custo por lado (pb)",
         "oos_start": "Início fora da amostra",
         "benchmark_applicable": "Benchmark se aplica",
+        "overlap_share": "Datas em comum com o benchmark",
+        "strategy_total_return": "Retorno total da estratégia",
+        "benchmark_total_return": "Retorno total do benchmark",
+        "excess_return": "Retorno acima do benchmark",
+        "strategy_sharpe": "Sharpe da estratégia",
+        "benchmark_sharpe": "Sharpe do benchmark",
+        "tracking_error": "Erro de rastreamento",
+        "information_ratio": "Índice de informação",
+        "strategy_max_drawdown": "Drawdown máximo da estratégia",
+        "benchmark_max_drawdown": "Drawdown máximo do benchmark",
+        "drawdown_ratio": "Drawdown da estratégia frente ao do benchmark (vezes)",
         "initial_balance": "Saldo inicial",
         "dsr_at_declared": "DSR com as tentativas declaradas",
         "dsr_at_trials_used": "DSR com as tentativas usadas",
