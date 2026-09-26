@@ -395,6 +395,7 @@ COPY: dict[str, dict[str, str]] = {
         "notice_failed_one": "1 intento de entrar con contraseña incorrecta.",
         "notice_failed": "{count} intentos de entrar con contraseña incorrecta.",
         "notice_new_device": "Una entrada desde un dispositivo nuevo: {device}.",
+        "notice_unknown_device": "Una entrada desde un dispositivo desconocido.",
         "notice_help": "Si no fuiste tú, cambia tu contraseña y cierra las demás sesiones.",
         "notice_link": "Ver la actividad reciente",
         "two_step_card": "Verificación en dos pasos",
@@ -847,6 +848,7 @@ COPY: dict[str, dict[str, str]] = {
         "notice_failed_one": "1 sign-in try with a wrong password.",
         "notice_failed": "{count} sign-in tries with a wrong password.",
         "notice_new_device": "A sign-in from a new device: {device}.",
+        "notice_unknown_device": "A sign-in from an unknown device.",
         "notice_help": "If it was not you, change your password and sign out the other sessions.",
         "notice_link": "See recent activity",
         "two_step_card": "Two-step sign-in",
@@ -1609,7 +1611,10 @@ def _visit_notice(copy: dict[str, str], locale: str, notice: VisitNotice) -> str
     elif notice.failed_attempts:
         items.append(copy["notice_failed"].format(count=notice.failed_attempts))
     for device in notice.new_devices:
-        items.append(copy["notice_new_device"].format(device=device))
+        if device.replace("·", "").replace("?", "").strip():
+            items.append(copy["notice_new_device"].format(device=device))
+        else:
+            items.append(copy["notice_unknown_device"])
     lines = "".join(f"<li>{_e(item)}</li>" for item in items)
     return (
         "<div class='acct-card acct-notice' role='alert'>"

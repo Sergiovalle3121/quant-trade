@@ -3203,7 +3203,7 @@ def test_since_your_last_visit_shows_new_devices_and_wrong_passwords_once(
     assert NOTICE not in client.get("/cuenta").text
     ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
     data = json.loads(client.get("/cuenta/datos").text)
-    assert data["account_page_seen_at"]
+    assert data["account_page_seen"][0]["device"] == "Firefox · Windows"
     csrf = _csrf(client.get("/cuenta").text)
     client.post("/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf})
     with store.engine.connect() as conn:  # type: ignore[attr-defined]
@@ -3236,3 +3236,28 @@ def test_since_your_last_visit_exists_in_every_language(tmp_path: Path) -> None:
     for locale, words in (("es", "última visita"), ("en", "last visit")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
         assert words in privacy and not find_claims(privacy)
+
+
+def test_an_intruder_opening_mi_cuenta_never_clears_the_owners_notice(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.30"})
+    _signup(client)
+    client.get("/cuenta")  # the owner's phone has seen Mi cuenta
+    intruder = TestClient(client.app)
+    intruder.headers.update({"User-Agent": LAPTOP_UA, "X-Forwarded-For": "198.51.100.40"})
+    for _ in range(3):
+        _signin(intruder, "ana@example.com", "wrong-guess-here")
+    assert _signin(intruder, "ana@example.com").headers["location"] == "/cuenta"
+    seen_by_intruder = intruder.get("/cuenta").text
+    # A device's first view tells nothing: no tries, no devices.
+    assert NOTICE not in seen_by_intruder
+    owner = client.get("/cuenta").text
+    assert NOTICE in owner
+    notice = owner.split(NOTICE)[1].split("</div>")[0]
+    assert "3 intentos de entrar con contraseña incorrecta." in notice
+    assert "Una entrada desde un dispositivo nuevo: Firefox · Windows." in notice
+    # A sign-in without a browser string reads as an unknown device.
+    bare = TestClient(client.app)
+    bare.headers.update({"User-Agent": "", "X-Forwarded-For": "198.51.100.41"})
+    _signin(bare, "ana@example.com")
+    assert "Una entrada desde un dispositivo desconocido." in client.get("/cuenta").text

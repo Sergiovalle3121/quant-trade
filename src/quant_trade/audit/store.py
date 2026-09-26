@@ -224,6 +224,8 @@ ACCOUNT_EVENT_MAX = 50
 #: Wrong-password lines kept per account: their own cap, so a flood of
 #: failures never pushes real events out of the ACCOUNT_EVENT_MAX.
 FAILED_SIGNIN_MAX = 20
+#: Device labels whose last view of Mi cuenta is kept per account.
+SEEN_DEVICES_MAX = 20
 
 
 @dataclass(frozen=True)
@@ -462,14 +464,16 @@ class Store:
             sa.Column("last_at", sa.String(40), nullable=False, index=True),
             sa.UniqueConstraint("account_id", "network", "hour"),
         )
-        # "Desde tu última visita": when the account last opened Mi cuenta,
-        # and how many tries each wrong-password line had then (JSON, at most
-        # FAILED_SIGNIN_MAX ids), so only newer tries are counted. Goes with
-        # the account.
+        # "Desde tu última visita": when each device label last opened Mi
+        # cuenta, and how many tries each wrong-password line had then (JSON,
+        # at most FAILED_SIGNIN_MAX ids), so only newer tries are counted.
+        # Kept per device so a sign-in elsewhere never clears the owner's
+        # notice. At most SEEN_DEVICES_MAX rows; goes with the account.
         self.account_seen = sa.Table(
             "account_seen",
             self.metadata,
             sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("device", sa.String(80), primary_key=True),
             sa.Column("seen_at", sa.String(40), nullable=False),
             sa.Column("failed_json", sa.Text, nullable=False, default="{}"),
         )
@@ -1710,19 +1714,21 @@ class Store:
     def take_visit_notice(
         self, account_id: str, now: datetime, *, device: str = "", network: str = ""
     ) -> VisitNotice | None:
-        """What happened since the account last opened Mi cuenta, and mark it seen now.
+        """What happened since this device last opened Mi cuenta, and mark it seen now.
 
-        Counts wrong-password tries and sign-ins from a device label the
-        account had not used before (this browser's own device and network
-        excluded). ``None`` on a first visit or when nothing happened.
+        Counts wrong-password tries added since and sign-ins from other
+        device labels the account had not used before. Each device label
+        keeps its own last view, so whoever signs in elsewhere never clears
+        the owner's notice. A device's first view shows nothing (and so
+        tells a newcomer nothing). ``None`` when nothing happened.
         """
+        del network  # the device label is the unit; kept for the call site
         sa = self._sa
         seen_t, ev, fs = self.account_seen, self.account_events, self.failed_signins
+        mine = (seen_t.c.account_id == account_id) & (seen_t.c.device == device[:80])
         with self.engine.connect() as conn:
             row = conn.execute(
-                sa.select(seen_t.c.seen_at, seen_t.c.failed_json).where(
-                    seen_t.c.account_id == account_id
-                )
+                sa.select(seen_t.c.seen_at, seen_t.c.failed_json).where(mine)
             ).first()
             lines = {
                 str(r[0]): int(r[1])
@@ -1730,15 +1736,38 @@ class Store:
                     sa.select(fs.c.id, fs.c.attempts).where(fs.c.account_id == account_id)
                 ).all()
             }
+            viewed = [
+                (str(r[0]), str(r[1]))
+                for r in conn.execute(
+                    sa.select(seen_t.c.device, seen_t.c.seen_at).where(
+                        seen_t.c.account_id == account_id
+                    )
+                ).all()
+            ]
         values = {"seen_at": _iso(now), "failed_json": json.dumps(lines, sort_keys=True)}
         try:
             with self.engine.begin() as conn:
                 if row is None:
-                    conn.execute(seen_t.insert().values(account_id=account_id, **values))
-                else:
                     conn.execute(
-                        seen_t.update().where(seen_t.c.account_id == account_id).values(**values)
+                        seen_t.insert().values(account_id=account_id, device=device[:80], **values)
                     )
+                    old = [
+                        str(r[0])
+                        for r in conn.execute(
+                            sa.select(seen_t.c.device)
+                            .where(seen_t.c.account_id == account_id)
+                            .order_by(seen_t.c.seen_at.desc())
+                            .offset(SEEN_DEVICES_MAX)
+                        ).all()
+                    ]
+                    if old:
+                        conn.execute(
+                            seen_t.delete()
+                            .where(seen_t.c.account_id == account_id)
+                            .where(seen_t.c.device.in_(old))
+                        )
+                else:
+                    conn.execute(seen_t.update().where(mine).values(**values))
         except sa.exc.IntegrityError:
             pass  # another tab marked it at the same moment
         if row is None:
@@ -1752,7 +1781,8 @@ class Store:
         # the tries added since.
         failed = sum(max(0, n - before.get(line, 0)) for line, n in lines.items())
         with self.engine.connect() as conn:
-            known = {
+            # Devices that had opened Mi cuenta before this device's last view.
+            known = {label for label, at in viewed if at <= seen} | {
                 str(r[0])
                 for r in conn.execute(
                     sa.select(ev.c.device)
@@ -1762,19 +1792,18 @@ class Store:
                 ).all()
             }
             recent = conn.execute(
-                sa.select(ev.c.device, ev.c.network)
+                sa.select(ev.c.device)
                 .where(ev.c.account_id == account_id)
                 .where(ev.c.at > seen)
                 .where(ev.c.kind.in_(SIGNIN_KINDS))
                 .order_by(ev.c.id)
             ).all()
         new_devices: list[str] = []
-        for dev, net in recent:
+        for (dev,) in recent:
             label = str(dev)
-            if (label, str(net)) == (device, network) or label in known:
+            if label == device or label in known or label in new_devices:
                 continue
-            if label not in new_devices:
-                new_devices.append(label)
+            new_devices.append(label)
         notice = VisitNotice(failed_attempts=int(failed or 0), new_devices=tuple(new_devices))
         return notice if notice.failed_attempts or notice.new_devices else None
 
@@ -1802,15 +1831,16 @@ class Store:
             for r in rows
         ]
 
-    def _seen_at(self, account_id: str) -> str | None:
+    def _seen_list(self, account_id: str) -> list[dict[str, str]]:
         sa = self._sa
+        seen_t = self.account_seen
         with self.engine.connect() as conn:
-            row = conn.execute(
-                sa.select(self.account_seen.c.seen_at).where(
-                    self.account_seen.c.account_id == account_id
-                )
-            ).first()
-        return str(row[0]) if row else None
+            rows = conn.execute(
+                sa.select(seen_t.c.device, seen_t.c.seen_at)
+                .where(seen_t.c.account_id == account_id)
+                .order_by(seen_t.c.seen_at.desc())
+            ).all()
+        return [{"device": str(r[0]), "seen_at": str(r[1])} for r in rows]
 
     def list_events(self, account_id: str, *, limit: int = ACCOUNT_EVENT_MAX) -> list[AccountEvent]:
         """The account's events, newest first."""
@@ -2798,7 +2828,7 @@ class Store:
                 {"event": e.kind, "at": e.at, "device": e.device, "network": e.network}
                 for e in self.list_events(account_id)
             ],
-            "account_page_seen_at": self._seen_at(account_id),
+            "account_page_seen": self._seen_list(account_id),
             "failed_signins": [
                 {"last_at": e.at, "attempts": e.count, "device": e.device, "network": e.network}
                 for e in self.list_failed_signins(account_id)
