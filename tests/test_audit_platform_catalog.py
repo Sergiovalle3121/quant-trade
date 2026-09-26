@@ -268,6 +268,24 @@ def test_a_flex_xml_without_executions_says_how_to_add_them() -> None:
     assert find_claims(str(error)) == [] and find_claims(error.localized("es")) == []
 
 
+def test_a_flex_xml_with_made_up_attribute_names_is_refused_quickly() -> None:
+    import time  # noqa: PLC0415
+
+    trades = [
+        '<Trade levelOfDetail="EXECUTION" '
+        + " ".join(f'a{row}x{col}="1"' for col in range(20))
+        + " />"
+        for row in range(2_000)
+    ]
+    started = time.perf_counter()
+    with pytest.raises(ReportFormatError) as refused:
+        import_report(_flex_xml(*trades), "flex.xml")
+    assert refused.value.code == "flex_too_large"
+    assert time.perf_counter() - started < 5
+    assert find_claims(str(refused.value)) == []
+    assert find_claims(refused.value.localized("es")) == []
+
+
 def test_a_flex_xml_with_a_document_type_is_refused() -> None:
     doctype = '<!DOCTYPE r [<!ENTITY x "y">]>'
     with pytest.raises(ReportFormatError) as refused:

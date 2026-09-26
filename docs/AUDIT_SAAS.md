@@ -281,7 +281,9 @@ default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
 `<Trade>` at `EXECUTION` level with the attribute names as columns
 (order-level and summary rows are ignored; parsed with the same no-DOCTYPE
 guard as workbooks); a statement with no executions is refused with
-`flex_no_trades`, naming the Trades section to add. A member is unpacked in bounded chunks and never past
+`flex_no_trades`, naming the Trades section to add; one with more than
+`MAX_FLEX_COLUMNS` (200) attribute names, more than `MAX_ROWS` trades, or a
+table past the report size limit is refused with `flex_too_large`. A member is unpacked in bounded chunks and never past
 the limit, whatever size it declares, and only stored or deflated members
 are opened (the same holds for workbook members). A web page is parsed once
 per import; the column screen offers a web table only up to

@@ -64,6 +64,7 @@ from xml.parsers import expat
 
 from quant_trade.audit.schema import (
     MAX_REPORT_BYTES,
+    MAX_ROWS,
     MAX_TRADES,
     ParsedTrades,
     ParseError,
@@ -3915,6 +3916,10 @@ def unwrap(data: bytes) -> bytes:
     return inner if _is_zip(inner) else unwrap(inner)
 
 
+#: The most attribute names a Flex ``<Trade>`` table may have.
+MAX_FLEX_COLUMNS = 200
+
+
 def _flex_trades(data: bytes) -> bytes | None:
     """An Interactive Brokers Flex Query statement in XML (its default
     format) as a CSV of its executions, one ``<Trade>`` per row with the
@@ -3938,11 +3943,25 @@ def _flex_trades(data: bytes) -> bytes | None:
             "el estado de Interactive Brokers no tiene operaciones: añade la sección Trades "
             "a nivel Execution a la Flex Query, vuelve a ejecutarla y sube ese archivo",
         )
+    too_large = ReportFormatError(
+        "flex_too_large",
+        "the Interactive Brokers statement is too large to read: run the Flex Query for a "
+        "shorter period or with fewer fields, and upload that file",
+        "el estado de Interactive Brokers es demasiado grande para leerlo: ejecuta la Flex "
+        "Query para un periodo más corto o con menos campos y sube ese archivo",
+    )
+    # A real <Trade> has well under a hundred attributes; a table that is the
+    # union of thousands of made-up names would grow as trades x names.
     columns = list(dict.fromkeys(name for trade in trades for name in trade))
+    if len(columns) > MAX_FLEX_COLUMNS or len(trades) > MAX_ROWS:
+        raise too_large
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(columns)
-    writer.writerows([trade.get(name, "") for name in columns] for trade in trades)
+    for trade in trades:
+        writer.writerow([trade.get(name, "") for name in columns])
+        if buffer.tell() > MAX_REPORT_BYTES:
+            raise too_large
     return buffer.getvalue().encode("utf-8")
 
 
