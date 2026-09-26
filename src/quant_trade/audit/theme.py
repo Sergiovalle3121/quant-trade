@@ -15,6 +15,7 @@ static page.
 
 from __future__ import annotations
 
+import hashlib
 import html
 from pathlib import Path
 
@@ -36,7 +37,11 @@ STATIC_FILES: dict[str, str] = {
 #: Cache static files for a week; their names change when their content does.
 STATIC_CACHE_CONTROL = "public, max-age=604800"
 
-SCRIPT_SRC = "/static/app.js"
+#: The script's address carries a hash of its content, so a browser that
+#: cached last week's copy fetches the new one the day it changes.
+SCRIPT_SRC = (
+    "/static/app.js?v=" + hashlib.sha256((STATIC_DIR / "app.js").read_bytes()).hexdigest()[:12]
+)
 #: The brand mark as the tab icon, inline so it needs no request.
 FAVICON = (
     "<link rel='icon' type='image/svg+xml' href=\"data:image/svg+xml,"

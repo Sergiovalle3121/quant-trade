@@ -585,13 +585,18 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "(needed to check its codes) and the last code step used, so a code works "
                     "once. It is deleted when you turn it off, when you use your recovery key "
                     "or with your account.",
+                    "If you add a passkey: its credential id, its public key (never the "
+                    "private key, which stays on your device), the name you give it, the site "
+                    "address it was made for, the device's counter and when it was added and "
+                    "last used. It is deleted when you remove it or with your account.",
                     "For 'Open sessions' in your account: for each session, a short device "
                     "label (such as 'Chrome · Windows', never the browser's full string), the "
                     "network address (an IPv6 address counts as its /64) and when it was last "
                     "used. It is deleted when the session is signed out or expires, or with your "
                     "account.",
                     "For 'Recent activity' in your account: each sign-in (with or without a "
-                    "code), each change of password, two-step sign-in or recovery key and each "
+                    "code, or with a passkey), each change of password, two-step sign-in, "
+                    "recovery key or passkeys and each "
                     "session signed out, with its date, the short device label and the network "
                     "address. We keep the latest 50, and delete them after 90 days and with your "
                     "account. Separately, when someone types a wrong password for your account: "
@@ -743,12 +748,17 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "de autenticación (necesaria para comprobar sus códigos) y el último paso de "
                 "código usado, para que cada código sirva una vez. Se borra al desactivarla, al "
                 "usar tu clave de recuperación o con tu cuenta.",
+                "Si añades una llave de acceso: su identificador, su clave pública (nunca la "
+                "privada, que se queda en tu dispositivo), el nombre que le pongas, la dirección "
+                "del sitio para la que se creó, el contador del dispositivo y cuándo se añadió y "
+                "se usó por última vez. Se borra al quitarla o con tu cuenta.",
                 "Para «Sesiones abiertas» en tu cuenta: de cada sesión, una etiqueta corta del "
                 "dispositivo (como «Chrome · Windows», nunca el texto completo del navegador), la "
                 "dirección de red (una IPv6 cuenta como su /64) y cuándo se usó por última vez. "
                 "Se borra al cerrar la sesión o al caducar, o con tu cuenta.",
-                "Para «Actividad reciente» en tu cuenta: cada entrada (con o sin código), cada "
-                "cambio de contraseña, de verificación en dos pasos o de clave de recuperación "
+                "Para «Actividad reciente» en tu cuenta: cada entrada (con o sin código, o con "
+                "llave de acceso), cada cambio de contraseña, de verificación en dos pasos, de "
+                "clave de recuperación o de llaves de acceso "
                 "y cada sesión cerrada, con su fecha, la etiqueta corta del dispositivo y la "
                 "dirección de red. Guardamos las últimas 50, las borramos a los 90 días y "
                 "con tu cuenta. Aparte, cuando alguien escribe una contraseña incorrecta para "

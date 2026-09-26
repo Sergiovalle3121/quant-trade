@@ -179,11 +179,15 @@ COPY_PT: dict[str, str] = {
         "a chave; ela sai ao ser usada ou com a conta.|"
         "Se você ativar a verificação em duas etapas, a chave secreta que seu app "
         "autenticador compartilha e o último código usado; ela sai ao desativar ou com a conta.|"
+        "Se você adicionar uma chave de acesso: seu identificador, sua chave pública (nunca a "
+        "privada, que não sai do seu dispositivo), o nome que você der, o site para o qual foi "
+        "criada, um contador e suas datas; sai ao removê-la ou com a conta.|"
         "De cada sessão aberta: um rótulo curto do dispositivo (como «Chrome · Windows», nunca o "
         "texto completo do navegador), a rede e o último uso, para «Sessões abertas»; sai ao "
         "encerrar a sessão, ao expirar ou com a conta.|"
         "Para «Atividade recente»: cada entrada e cada mudança de segurança (senha, duas "
-        "etapas, chave de recuperação, sessões encerradas) com a data, o rótulo do "
+        "etapas, chave de recuperação, chaves de acesso, sessões encerradas) com a data, "
+        "o rótulo do "
         "dispositivo e a rede; as últimas 50, apagadas após 90 dias ou com a conta. "
         "À parte, as tentativas com senha incorreta na sua conta: quantas por rede e hora, "
         "com o rótulo do dispositivo (nunca o que foi digitado); as últimas 20, apagadas "
@@ -364,6 +368,53 @@ COPY_PT: dict[str, str] = {
     "notice_more_devices": "E mais {count} entradas de outros dispositivos novos.",
     "notice_help": "Se não foi você, troque sua senha e encerre as outras sessões.",
     "notice_link": "Ver a atividade recente",
+    "passkey_card": "Chaves de acesso",
+    "passkey_help": (
+        "Entre com a digital, o rosto ou o PIN do seu celular ou computador, sem digitar a "
+        "senha. A chave privada nunca sai do seu dispositivo."
+    ),
+    "passkey_none": "Você ainda não tem chaves de acesso.",
+    "passkey_fallback": (
+        "Sua senha, o código de duas etapas e a chave de recuperação continuam funcionando. Se "
+        "o site mudar de endereço, as chaves são criadas de novo e enquanto isso você entra "
+        "com eles."
+    ),
+    "passkey_name": "Nome da chave (opcional)",
+    "passkey_add": "Adicionar uma chave de acesso",
+    "passkey_remove": "Remover",
+    "passkey_remove_title": "Remover uma chave de acesso",
+    "passkey_which": "Chave",
+    "passkey_added_on": "Adicionada em {date}",
+    "passkey_used_on": "último uso em {date}",
+    "passkey_never_used": "ainda não usada",
+    "passkey_other_site": "Só funciona em {site}",
+    "passkey_default_name": "Chave de acesso",
+    "passkey_signin": "Entrar com uma chave de acesso",
+    "passkey_step": "Usar uma chave de acesso",
+    "passkey_add_title": "Crie sua chave de acesso",
+    "passkey_add_lead": "Seu dispositivo vai pedir a digital, o rosto ou o PIN para criá-la.",
+    "passkey_get_title": "Entre com sua chave de acesso",
+    "passkey_get_lead": "Escolha a chave no seu dispositivo e confirme com a digital, o rosto "
+    "ou o PIN.",
+    "passkey_go_create": "Criar a chave",
+    "passkey_go_get": "Usar minha chave",
+    "passkey_browser_error": (
+        "Seu navegador não conseguiu usar a chave de acesso. Tente de novo ou entre com sua senha."
+    ),
+    "passkey_back": "Voltar",
+    "passkey_added": "Chave de acesso adicionada. Você já pode entrar com ela.",
+    "passkey_removed": "Chave de acesso removida.",
+    "passkey_failed": (
+        "Não conseguimos verificar a chave de acesso. Tente de novo ou entre com sua senha."
+    ),
+    "passkey_expired": "A página da chave de acesso expirou. Comece de novo.",
+    "passkey_full": (
+        "Você já tem o máximo de chaves de acesso (10) ou essa chave já foi adicionada."
+    ),
+    "passkey_unavailable": "As chaves de acesso não funcionam neste endereço do site.",
+    "event_signin_passkey": "Entrada com chave de acesso",
+    "event_passkey_added": "Chave de acesso adicionada",
+    "event_passkey_removed": "Chave de acesso removida",
     "two_step_card": "Verificação em duas etapas",
     "two_of_three": (
         "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "
