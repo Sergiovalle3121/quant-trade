@@ -62,6 +62,11 @@ def test_a_range_across_zero_says_so() -> None:
         "profit_factor": {"low": measured(0.8), "high": measured(1.9)},
     }
     assert labels["ranges_zero"] in html.unescape(report._ranges_html(ranges, labels))
+    # A few large trades can skew the symmetric range across zero while the
+    # resampled profit factor stays above one: the line is left out then.
+    ranges["profit_factor"]["low"] = measured(1.4)
+    assert labels["ranges_zero"] not in html.unescape(report._ranges_html(ranges, labels))
+    ranges["profit_factor"]["low"] = measured(0.8)
     ranges["expectancy"] = {"low": measured(1.0), "high": measured(5.0)}
     assert labels["ranges_zero"] not in html.unescape(report._ranges_html(ranges, labels))
     # An open upper end reads as such, never as "inf".

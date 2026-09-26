@@ -3357,7 +3357,15 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     average = ranges.get("expectancy") or {}
     low = _ev_value(average.get("low"))
     high = _ev_value(average.get("high"))
-    if low is not None and high is not None and low <= 0 <= high:
+    # The resampled profit factor wins over the symmetric t range when a few
+    # large trades skew them apart: no "zero" line above a factor range over 1.
+    factor_low = _ev_value((ranges.get("profit_factor") or {}).get("low"))
+    if (
+        low is not None
+        and high is not None
+        and low <= 0 <= high
+        and (factor_low is None or factor_low <= 1)
+    ):
         out += f"<p>{_e(labels['ranges_zero'])}</p>"
     return out
 
