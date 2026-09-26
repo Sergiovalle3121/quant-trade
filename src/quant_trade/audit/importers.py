@@ -2343,6 +2343,8 @@ def _ods_value(cell: ElementTree.Element) -> Any:
             # Rounded as a whole: 15:29:59.999999997 reads 15:30:00, never 15:29:60.
             hours, minutes, seconds = moment.groups()
             total = round(int(hours) * 3600 + int(minutes) * 60 + float(seconds))
+            if int(hours) < 24:
+                total = min(total, 86_399)  # 23:59:59.6 is still that day
             return f"{total // 3600:02d}:{total // 60 % 60:02d}:{total % 60:02d}"
         return _attribute(cell, "time-value")
     if kind == "boolean":
