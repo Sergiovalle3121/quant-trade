@@ -1309,6 +1309,29 @@ that barely moves), the line says in words that it earned less than cash
 covering the whole history, otherwise it is NOT_MEASURED and not shown. It
 never changes the class.
 
+Cash in the account's own currency (`cashrate.LOCAL`, `market.LOCAL_CASH`).
+When an imported report names the account currency and it is one of MXN,
+BRL, EUR, GBP, JPY, CAD or CHF, the same line subtracts that currency's own
+cash rate instead of the US bill's: Mexico's, Brazil's, Japan's and Canada's
+immediate (overnight interbank) rates from the OECD (`IRSTCI01…M156N`,
+monthly averages), the euro's €STR (`ECBESTRVOLWGTTRMDMNRT`, daily, from
+October 2019; before it, the euro area's OECD immediate rate `IRSTCI01EZM156N`,
+monthly, fills only the earlier dates, `EUR_CASH_HISTORY`), sterling's SONIA (`IUDSOIA`, daily) and, because the Swiss
+immediate rate stops in 2024, Switzerland's 3-month interbank rate
+(`IR3TIB01CHM156N`, monthly). Each quote becomes an annual yield by its own
+convention: a simple rate over its tenor on a 360-day (MXN, EUR, CHF) or
+365-day (GBP, JPY, CAD) year, rolled over for a year,
+`(1 + r·t/basis)^(365/t) - 1`; Brazil's is already a compounded annual yield
+and is used as it is. A daily rate may be 10 days old before a return's
+start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
+average or the latest published). These series may be negative (the franc,
+euro and yen rates were); a reply outside -5 % to 200 % a year
+(`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
+taken as broken. When the currency has no series here, or its rates cannot
+be read or do not cover the history, the
+line stays the US bill's, with its note. Jensen's alpha keeps the US bill.
+It never changes the class.
+
 Calm and turbulent markets (`audit/regime.py`). With public data on, every
 report adds the section "How did it do in calm and in turbulent markets?".
 Each return is placed by the VIX (CBOE, FRED `VIXCLS`, read in the
@@ -2568,6 +2591,8 @@ Redesign pass 63 styles the report's new statistics blocks. The 95 % ranges ("¿
 Redesign pass 64 styles the currency section ("¿Cuánto valió la cuenta en tu moneda y después de la inflación?"). The account's own dollar row is shaded as the reference, and a rule separates the two dollar rows from the other currencies. On a phone, currency names had wrapped to four lines; they now keep a wider first column, as do the rows of the calm/turbulent market table. In the PDF the table is set smaller, so the section fits one page.
 
 Redesign pass 65 comes from reading a full report on a 360 px phone as an outside customer would. Charts and wide tables that scroll sideways looked cut off with no sign there was more; they now fade at the right edge until scrolled to the end (only elements that actually scroll, and only in browsers with scroll-driven animations; others look as before). In the evidence rows (trade statistics, benchmark, declared values) the tag sat between the name and the value and squeezed names onto three lines; the value now sits beside the name and the tag goes underneath. Prop-firm cards now read the challenge name as the card's title, with the number of phases below it. The same pass styles the two-step pages: on /cuenta/dos-pasos the note's shield icon had no size and filled the screen; it is now icon-sized beside the note, the QR code sits on a white card, the six-digit code field reads as a code (monospaced, spaced, centred) on both that page and /entrar/codigo, and "¿Perdiste el teléfono?" opens from a card.
+
+Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
 
 ## Security
 
