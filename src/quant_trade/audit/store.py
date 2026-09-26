@@ -18,6 +18,7 @@ uploads racing for the last credit cannot both win.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import secrets
 import unicodedata
@@ -468,6 +469,15 @@ class Store:
             self.metadata,
             sa.Column("account_id", sa.String(32), primary_key=True),
             sa.Column("token", sa.String(32), nullable=False, unique=True),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        # "Clave de recuperación": only the key's SHA-256 (the key has 100
+        # random bits), one per account, spent when used.
+        self.recovery_keys = sa.Table(
+            "recovery_keys",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("key_sha256", sa.String(64), nullable=False),
             sa.Column("created_at", sa.String(40), nullable=False),
         )
         self.referrals = sa.Table(
@@ -1234,6 +1244,7 @@ class Store:
                 self.strategies,
                 self.strategy_reports,
                 self.account_refs,
+                self.recovery_keys,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1253,6 +1264,50 @@ class Store:
             )
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
         return deleted
+
+    # -- recovery keys ---------------------------------------------------
+    def set_recovery_key(self, account_id: str, key_sha256: str, *, at: datetime) -> None:
+        """Store a new recovery key (its hash); the previous one stops working."""
+        table = self.recovery_keys
+        with self.engine.begin() as conn:
+            conn.execute(table.delete().where(table.c.account_id == account_id))
+            conn.execute(
+                table.insert().values(
+                    account_id=account_id, key_sha256=key_sha256, created_at=_iso(at)
+                )
+            )
+
+    def recovery_key_created(self, account_id: str) -> str | None:
+        """When the account's recovery key was made, or ``None`` without one."""
+        sa = self._sa
+        table = self.recovery_keys
+        with self.engine.connect() as conn:
+            found = conn.execute(
+                sa.select(table.c.created_at).where(table.c.account_id == account_id)
+            ).first()
+        return str(found[0]) if found is not None else None
+
+    def use_recovery_key(self, account_id: str, key_sha256: str) -> bool:
+        """Spend the account's recovery key if ``key_sha256`` is its hash.
+
+        The delete names the hash, so a key works once even under
+        simultaneous requests.
+        """
+        sa = self._sa
+        table = self.recovery_keys
+        with self.engine.connect() as conn:
+            found = conn.execute(
+                sa.select(table.c.key_sha256).where(table.c.account_id == account_id)
+            ).first()
+        if found is None or not hmac.compare_digest(str(found[0]), key_sha256):
+            return False
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.delete()
+                .where(table.c.account_id == account_id)
+                .where(table.c.key_sha256 == key_sha256)
+            )
+        return bool(result.rowcount)
 
     # -- account sessions ------------------------------------------------
     def create_session(
@@ -2224,6 +2279,8 @@ class Store:
                 "joined_through_an_invite": joined_through is not None,
             },
             "arrived_through_link_tag": self.account_ref(account_id),
+            # Only when it was made: the key's hash never leaves the database.
+            "recovery_key_created_at": self.recovery_key_created(account_id),
         }
 
     def account_credits(self, account_id: str, now: datetime) -> int:
