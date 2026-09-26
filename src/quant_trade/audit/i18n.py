@@ -1103,6 +1103,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "la estrategia se mueve exactamente con el benchmark",
     ),
     ("the benchmark's returns do not vary", "los retornos del benchmark no varían"),
+    (
+        "the strategy's and the benchmark's returns are not on the same dates",
+        "los retornos de la estrategia y los del benchmark no están en las mismas fechas",
+    ),
     ("fewer than two periods a year", "menos de dos periodos por año"),
     (
         "the autocorrelations leave no variance to scale by",

@@ -115,3 +115,11 @@ def test_the_performance_fee_is_taken_in_december() -> None:
         high = value
     growth = fee_drag(r)["two_and_twenty"]["growth"]["value"]
     assert growth == pytest.approx(value - 1.0)
+
+
+def test_misaligned_series_are_not_measured_never_an_error() -> None:
+    out = jensen_alpha(np.zeros(30), np.ones(31), 252.0)
+    assert out["status"] == "NOT_MEASURED"
+    from quant_trade.audit.i18n import spanish
+
+    assert spanish(out["reason"])

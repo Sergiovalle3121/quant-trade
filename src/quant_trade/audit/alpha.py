@@ -28,6 +28,7 @@ NOTE = (
 )
 T_NOTE = "alpha over its Newey-West standard error; beyond about 2 it is unlikely to be chance"
 TOO_FEW = "fewer than 24 periods shared with the benchmark"
+NOT_ALIGNED = "the strategy's and the benchmark's returns are not on the same dates"
 
 
 def newey_west_lags(n: int) -> int:
@@ -42,7 +43,7 @@ def jensen_alpha(
     y = np.asarray(strategy, dtype=float)
     x = np.asarray(benchmark, dtype=float)
     if len(x) != len(y):
-        raise ValueError("the two return series must be aligned")
+        return {"status": "NOT_MEASURED", "reason": NOT_ALIGNED}
     # A level at zero gives an infinite return: keep only the periods both measure.
     finite = np.isfinite(y) & np.isfinite(x)
     y, x = y[finite], x[finite]
