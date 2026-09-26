@@ -2375,6 +2375,8 @@ Redesign pass 60 keeps the sign-up and sign-in form in view on a desktop while t
 
 Redesign pass 61 checks the Portuguese report (/pt/exemplo and its PDF) on a phone and on paper: both read well, and the cover still fits one page. On the way it found that on a 390 px phone (most iPhones) the last column of the day and hour tables ("Aciertos") was cut off in Spanish, and at 360 px in every language. Up to 420 px the timing tables now use tighter cell padding, unspaced headers and a slightly smaller type, and at 380 px or less a smaller one again, so every column fits.
 
+Redesign pass 62 styles two new account pieces. The strategy summary PDF ("Descargar resumen en PDF") had a tiny title, a stray grey line left from the screen's glow and class letters off-centre, and ran two lines onto a second page; its title is now a clear heading, the line is gone, the letters sit in their circles and the summary fits one page. In "Invita a un colega" the personal link reads as a code in a quiet field, and on a phone the WhatsApp button spans the width and the third tile takes a full row.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
