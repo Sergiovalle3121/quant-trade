@@ -2561,6 +2561,36 @@ FUTURES_POINT_VALUE_USD: dict[str, float] = {
     "ZC": 50.0, "ZS": 50.0, "ZW": 50.0,
 }  # fmt: skip
 
+#: Value per point, and its currency, of Eurex and ICE futures, by the
+#: exchange's own product code, from the contract specifications (as_of
+#: 2026-09-25): https://www.eurex.com/ex-en/markets (index and fixed-income
+#: product pages) and https://www.ice.com/products (ICE Futures Europe and
+#: ICE Futures U.S.). Bond futures are quoted in percent of a 100,000 nominal
+#: (1,000 per point); softs in cents per pound (the value is per cent).
+#: Single-letter roots other than Brent (B) and Gasoil (G) are left out:
+#: ``Z`` (FTSE 100) or ``T`` (ICE WTI) would read CME codes as other contracts.
+FUTURES_POINT_VALUE_OTHER: dict[str, tuple[float, str]] = {
+    # Eurex equity index
+    "FDAX": (25.0, "EUR"), "FDXM": (5.0, "EUR"), "FDXS": (1.0, "EUR"),
+    "FESX": (10.0, "EUR"), "FSXE": (1.0, "EUR"), "FSMI": (10.0, "CHF"),
+    "FVS": (100.0, "EUR"),
+    # Eurex fixed income (Schatz, Bobl, Bund, Buxl)
+    "FGBS": (1_000.0, "EUR"), "FGBM": (1_000.0, "EUR"), "FGBL": (1_000.0, "EUR"),
+    "FGBX": (1_000.0, "EUR"),
+    # ICE Futures Europe
+    "B": (1_000.0, "USD"), "G": (100.0, "USD"),
+    # ICE Futures U.S.
+    "SB": (1_120.0, "USD"), "KC": (375.0, "USD"), "CT": (500.0, "USD"),
+    "CC": (10.0, "USD"), "OJ": (150.0, "USD"), "DX": (1_000.0, "USD"),
+}  # fmt: skip
+
+
+def futures_point_value(root: str) -> tuple[float, str] | None:
+    """A futures root's value per point and its currency, CME first."""
+    if root in FUTURES_POINT_VALUE_USD:
+        return FUTURES_POINT_VALUE_USD[root], "USD"
+    return FUTURES_POINT_VALUE_OTHER.get(root)
+
 
 #: What a NinjaTrader Trades export needs; the Account Performance export has no
 #: "Trade number" column, so it is not required.
@@ -2724,10 +2754,10 @@ def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str)
 def _futures_root(instrument: str) -> str:
     """``MES JUN26``, ``MES 03-25`` or the compact ``MNQZ6`` / ``ESH25`` -> the root."""
     first = instrument.strip().split(" ")[0].upper()
-    if first in FUTURES_POINT_VALUE_USD:
+    if futures_point_value(first) is not None:
         return first
     compact = re.fullmatch(r"([A-Z0-9]+?)[FGHJKMNQUVXZ](?:\d{1,2}|\d{4})", first)
-    if compact and compact.group(1) in FUTURES_POINT_VALUE_USD:
+    if compact and futures_point_value(compact.group(1)) is not None:
         return compact.group(1)
     return first
 

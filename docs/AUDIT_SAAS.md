@@ -243,7 +243,18 @@ otherwise the `ambiguous_dates` error stands. A file listed newest first
 keeps its order reversed among fills with the same time. Without a profit
 or multiplier column, a CME contract code (`ESZ6`, `MNQ DEC26`, `ESZ6.CME`;
 never a bare root, which may be a share ticker) is priced with
-`FUTURES_POINT_VALUE_USD`, with a warning. A profit that fits either net or
+`FUTURES_POINT_VALUE_USD`, with a warning. Eurex and ICE codes are priced
+the same way from `FUTURES_POINT_VALUE_OTHER` (the exchanges' contract
+specifications, as_of 2026-09-25), which also records each contract's
+currency: FDAX x25, FDXM x5, FDXS x1, FESX x10, FSXE x1, FVS x100 and the
+Schatz/Bobl/Bund/Buxl futures x1,000 in EUR, FSMI x10 in CHF; ICE Brent (B)
+x1,000, Gasoil (G) x100, Sugar No. 11 (SB) x1,120 per cent, Coffee (KC) x375,
+Cotton (CT) x500, Cocoa (CC) x10, Orange juice (OJ) x150 and the US Dollar
+Index (DX) x1,000 in USD. The warning names a non-USD currency, and a file
+that mixes currencies is told the results were added without conversion.
+Other single-letter ICE roots (FTSE 100 `Z`, WTI `T`) are left out because
+they would read CME codes such as `ZNZ6` as another contract. NinjaTrader
+executions stay CME-only. A profit that fits either net or
 gross reading exactly (one trade per symbol) is read the way that gives a
 round contract size. Fees in another coin than an exchange pair's quote
 currency are left out; fees of shares or futures always count.
