@@ -17,10 +17,10 @@ weeks after its month ends).
 Each currency's row is followed by the same figures after that currency's own
 inflation: its levels divided by that country's official consumer price index
 of each point's month (``market.LOCAL_CPI``: the euro, the pound, the Canadian
-dollar, the Swiss franc and the real), or the latest month published, at most
-``MAX_CPI_GAP_DAYS`` old. A currency without such an index (the peso and the
-yen, whose official indexes need a registered key), or whose prices do not
-cover the history, keeps its row without the one after inflation.
+dollar, the Swiss franc, the real, the peso and the yen), or the latest month
+published, at most ``MAX_CPI_GAP_DAYS`` old. A currency whose prices could not
+be read or do not cover the history keeps its row without the one after
+inflation.
 
 It runs when the account is in US dollars: when an imported report names the
 currency (``USD``, or ``USC`` for a cent account, whose ratios are the same), or
