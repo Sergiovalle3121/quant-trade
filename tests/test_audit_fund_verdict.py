@@ -175,3 +175,22 @@ def test_a_grid_with_its_index_shows_no_robot_steps_and_a_measured_benchmark() -
         assert phrase not in plan
     page = render(result, watermark=False)[0]  # type: ignore[arg-type]
     assert "no se subió un benchmark" not in page
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_an_index_month_of_minus_100_percent_gives_a_report_not_a_crash(locale: str) -> None:
+    # Bug hunt: a -100% index month (a factsheet typo) divided by zero in fee_drag.
+    from test_audit_fund_benchmark import _labelled_grid
+
+    from quant_trade.audit.fund import FULL_LOSS_MONTH
+
+    fund, index = _pair(72)
+    index[30] = -1.0
+    result = _run(_labelled_grid(fund, index, "alternating"), locale)
+    data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+    assert data["fund"]["benchmark"]["reason"] == FULL_LOSS_MONTH
+    html = render(result, watermark=False)[0]  # type: ignore[arg-type]
+    assert_report_clean(html)
+    assert untranslated(data) == []
+    if locale != "en":
+        assert FULL_LOSS_MONTH not in html

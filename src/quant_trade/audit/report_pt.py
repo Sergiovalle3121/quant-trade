@@ -3799,6 +3799,10 @@ RULES: tuple[tuple[str, str], ...] = (
         "as rentabilidades mensais do índice de referência não variam",
     ),
     (
+        "a month in the fund or its benchmark loses 100% or more",
+        "um mês do fundo ou do seu índice de referência perde 100% ou mais",
+    ),
+    (
         "needs at least {n} months with the benchmark up",
         "precisa de pelo menos {n} meses com o índice de referência em alta",
     ),

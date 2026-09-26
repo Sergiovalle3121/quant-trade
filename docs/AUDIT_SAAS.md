@@ -1261,7 +1261,10 @@ then carries `source: "file"`, the overlap row says "the index the file
 itself carries", and the plan step says the reference is the file's own
 index. A fund that trails its own index fails the dimension like any other
 upload. An uploaded benchmark file still wins, and a declared "no applicable
-benchmark" still makes it NOT_APPLICABLE.
+benchmark" still makes it NOT_APPLICABLE. A month in which the fund or its
+index loses 100 % or more (most often a typo in a factsheet) leaves the
+section NOT_MEASURED ("a month in the fund or its benchmark loses 100% or
+more") instead of dividing by a compound growth of zero.
 
 What fees would take (`fund.fee_drag`). On a fund record not declared net
 of fees, a table shows the yearly return and total growth with a yearly fee
