@@ -85,6 +85,52 @@ def test_encoding_codes_for_boms_and_cyrillic() -> None:
     assert rows.encoding_code(("a\x00" * 100).encode("latin-1")) == "utf16le"
 
 
+def test_marker_codes_skip_the_platform_stylesheet() -> None:
+    page = '<html><head><style>.msdate { mso-number-format:"General Date"; }</style></head>'
+    assert rows.marker_codes(page) == ()
+    assert rows.resave_markers(page) == 0
+    resaved = page.replace("<head>", '<head><meta charset="utf-8">')
+    assert rows.marker_codes(resaved) == ("meta_charset",)
+    office = (
+        '<html xmlns:o="urn:schemas-microsoft-com:office:office"><head>'
+        '<meta name="ProgId" content="Excel.Sheet"><style>.xl65 { mso-font-charset:0; }'
+        "</style></head><td class=xl65>1</td>"
+    )
+    assert rows.marker_codes(office) == ("progid", "xmlns_o", "mso", "class_xl")
+    assert rows.resave_markers(office) == 4
+    saved = "<!-- saved from url=(0014)about:internet -->"
+    assert rows.marker_codes(saved) == ("saved_from_url",)
+
+
+def test_generator_codes() -> None:
+    assert rows.generator_code("") == "none"
+    assert rows.generator_code("MetaQuotes Software Corp.") == "metaquotes"
+    assert rows.generator_code("client terminal") == "client_terminal"
+    assert rows.generator_code("strategy tester") == "strategy_tester"
+    assert rows.generator_code("MetaTrader 5") == "metatrader"
+    assert rows.generator_code("Microsoft Excel 15") == "excel"
+    assert rows.generator_code("Microsoft Word 15") == "word"
+    assert rows.generator_code("MSHTML 10.00.9200.16635") == "mshtml"
+    assert rows.generator_code("LibreOffice 7") == "other"
+
+
+def test_mt5_columns_ignore_a_blank_trailing_cell() -> None:
+    """A workbook may store a blank cell past the comment: the width that
+    picks the 13- or 14-column layout ignores it."""
+    texts = (
+        "2020.09.03 04:25:11", "100", "HK50", "buy", "in", "2", "24500.0", "200",
+        "-1.00", "0.00", "0.00", "10000.00", "", "",
+    )  # fmt: skip
+    row = rows.RawRow(0, texts, tuple(rows.RawCell(t) for t in texts), "deals", "mt5_deal", -1)
+    table = rows.RawTable("mt5_history_xlsx", families.MT5_HISTORY, (row,), (), "none", "none",
+                          "none", 0, False)  # fmt: skip
+    columns = rows.mt5_columns(table, row)
+    assert columns["balance"] == 11 and "fee" not in columns
+    wide = texts[:12] + ("note", "10000.00")
+    row = rows.RawRow(0, wide, tuple(rows.RawCell(t) for t in wide), "deals", "mt5_deal", -1)
+    assert rows.mt5_columns(table, row)["balance"] == 12
+
+
 def test_mt4_statement_rows_are_classified() -> None:
     table = _load("mt4_statement.htm")
     assert table.family == families.MT4_STATEMENT

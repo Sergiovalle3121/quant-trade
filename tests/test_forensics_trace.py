@@ -235,7 +235,7 @@ def test_file_trace_reads_the_native_fixtures(
     assert _figure(outcome, "encoding") == "utf8"
     assert _figure(outcome, "line_endings") == "lf"
     assert _figure(outcome, "resave_markers") == "0"
-    assert _figure(outcome, "platform_markers") == "1"
+    assert _figure(outcome, "platform_markers") == "0"
     assert _figure(outcome, "title_attrs") == title_attrs
     assert _figure(outcome, "hidden_cells") == hidden_cells
     assert _figure(outcome, "decimal_comma") == "0"
@@ -259,33 +259,57 @@ def test_file_trace_counts_a_resave_marker_beyond_the_platform_stylesheet() -> N
     stylesheet = b'<style>.msdate { mso-number-format:"General Date"; }</style>'
     with_stylesheet = _altered(mt5, b"</head>", stylesheet + b"</head>")
     outcome = _run(trace.run_FILE_TRACE, with_stylesheet)
-    # The platform's own ``mso-number-format`` rule is one marker and no hit.
-    assert _figure(outcome, "resave_markers") == "1"
-    assert _figure(outcome, "platform_markers") == "1"
+    # The platform's own ``mso-number-format`` rule is not a marker.
+    assert _figure(outcome, "resave_markers") == "0"
+    assert _figure(outcome, "platform_markers") == "0"
     assert outcome.hits == 0
     resaved = _altered(with_stylesheet, b"<head>", b'<head><meta charset="utf-8">')
     outcome = _run(trace.run_FILE_TRACE, resaved)
-    assert _figure(outcome, "resave_markers") == "2"
+    assert _figure(outcome, "resave_markers") == "1"
     assert outcome.hits == 1 and _figure(outcome, "n_hits") == "1"
     mt4 = _altered(_fixture("mt4_statement.htm"), b"</head>", stylesheet + b"</head>")
     outcome = _run(trace.run_FILE_TRACE, mt4)
-    assert _figure(outcome, "resave_markers") == "1" and outcome.hits == 0
+    assert _figure(outcome, "resave_markers") == "0" and outcome.hits == 0
     outcome = _run(trace.run_FILE_TRACE, _altered(mt4, b"<head>", b'<head><meta charset="utf-8">'))
-    assert _figure(outcome, "resave_markers") == "2" and outcome.hits == 1
-    # ``rows`` hands over a count: one foreign marker on a page without the
-    # stylesheet is absorbed by the platform's allowance (a known limit).
+    assert _figure(outcome, "resave_markers") == "1" and outcome.hits == 1
+    # A lone foreign marker on a page without the stylesheet is a hit too.
     lone = _altered(_fixture("mt4_statement.htm"), b"<head>", b'<head><meta charset="utf-8">')
     outcome = _run(trace.run_FILE_TRACE, lone)
-    assert _figure(outcome, "resave_markers") == "1" and outcome.hits == 0
-    # A MetaTrader page the importers do not read still carries the stylesheet.
+    assert _figure(outcome, "resave_markers") == "1" and outcome.hits == 1
+    # An Office re-save carries several markers: each one counts.
+    office = _altered(lone, b"<html>", b'<html xmlns:o="urn:schemas-microsoft-com:office:office">')
+    office = _altered(office, b"</head>", b"<style>.xl65 { mso-font-charset:0; }</style></head>")
+    outcome = _run(trace.run_FILE_TRACE, office)
+    assert _figure(outcome, "resave_markers") == "3" and outcome.hits == 3
+    # A MetaTrader page the importers do not read: no allowance needed.
     trade_report = rows.RawTable("", families.OTHER, (), (), "client_terminal", "utf16le_bom",
-                                 "crlf", 1, False)  # fmt: skip
+                                 "crlf", 0, False)  # fmt: skip
     outcome = trace.run_FILE_TRACE(trade_report, _ctx(trade_report))
-    assert _figure(outcome, "platform_markers") == "1" and outcome.hits == 0
+    assert _figure(outcome, "platform_markers") == "0" and outcome.hits == 0
     optimizer = rows.RawTable(importers.MT5_OPTIMIZATION_XML, families.OTHER, (), (), "none",
                               "utf8", "crlf", 3, False)  # fmt: skip
     outcome = trace.run_FILE_TRACE(optimizer, _ctx(optimizer))
     assert _figure(outcome, "platform_markers") == "3" and outcome.hits == 0
+
+
+def test_file_trace_accepts_the_older_metatrader_generator() -> None:
+    mt5 = _fixture("mt5_history.html")
+    older = _altered(mt5, b'content="client terminal"', b'content="MetaTrader 5"')
+    outcome = _run(trace.run_FILE_TRACE, older)
+    assert _figure(outcome, "generator") == "metatrader"
+    assert _figure(outcome, "generator_native") == "1" and outcome.hits == 0
+    tester = _altered(
+        _fixture("mt5_tester.html"), b'content="strategy tester"', b'content="MetaTrader 5"'
+    )
+    outcome = _run(trace.run_FILE_TRACE, tester)
+    assert _figure(outcome, "generator_native") == "1" and outcome.hits == 0
+    mt4 = _altered(
+        _fixture("mt4_statement.htm"),
+        b'content="MetaQuotes Software Corp."',
+        b'content="MetaTrader 5"',
+    )
+    outcome = _run(trace.run_FILE_TRACE, mt4)
+    assert _figure(outcome, "generator_native") == "0" and outcome.hits == 1
 
 
 def test_file_trace_generator_rules() -> None:

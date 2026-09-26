@@ -61,11 +61,12 @@ _MT_HTML_FAMILIES = frozenset(
 _NATIVE_GENERATORS: dict[str, frozenset[str]] = {
     families.MT4_STATEMENT: frozenset({"metaquotes", "none"}),
     families.MT4_TESTER: frozenset({"metaquotes", "none"}),
-    families.MT5_HISTORY: frozenset({"client_terminal"}),
-    families.MT5_TESTER: frozenset({"strategy_tester"}),
+    families.MT5_HISTORY: frozenset({"client_terminal", "metatrader"}),
+    families.MT5_TESTER: frozenset({"strategy_tester", "metatrader"}),
 }
-#: Generator codes of the MetaTrader terminals and testers.
-_MT_GENERATORS = frozenset({"metaquotes", "client_terminal", "strategy_tester"})
+#: Generator codes of the MetaTrader terminals and testers ("metatrader":
+#: older MT5 builds wrote "MetaTrader 5" as the generator).
+_MT_GENERATORS = frozenset({"metaquotes", "client_terminal", "strategy_tester", "metatrader"})
 #: Re-save markers a format carries by construction (the optimizer's Excel XML).
 _PLATFORM_MARKERS_BY_FORMAT: dict[str, int] = {importers.MT5_OPTIMIZATION_XML: 3}
 #: The ``sections`` bitmask; MT5 "Open Positions" shares the ``open`` bit with
@@ -145,15 +146,10 @@ def _generator_native(table: RawTable) -> bool:
 
 
 def _platform_markers(table: RawTable) -> int:
-    """Re-save markers the platform's own export carries: the
-    ``mso-number-format`` stylesheet of every MetaTrader HTML page (also one
-    the importers do not read, such as the terminal's Trade report)."""
-    by_format = _PLATFORM_MARKERS_BY_FORMAT.get(table.source_format)
-    if by_format is not None:
-        return by_format
-    if table.family in _MT_HTML_FAMILIES or table.generator in _MT_GENERATORS:
-        return 1
-    return 0
+    """Re-save markers the platform's own export carries by construction:
+    the optimizer's Excel XML. (The ``mso-number-format`` stylesheet of every
+    MetaTrader HTML page is not a marker: ``rows.marker_codes`` skips it.)"""
+    return _PLATFORM_MARKERS_BY_FORMAT.get(table.source_format, 0)
 
 
 def _decimal_comma(table: RawTable) -> str:

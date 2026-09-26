@@ -77,7 +77,19 @@ GENERATOR_CODES = (
     "other",
     "none",
 )
-_RESAVE_MARKERS = ("<meta charset", "saved from url", "progid", "xmlns:o=", "mso-", "class=xl")
+#: Traces a re-save through a browser or an Office program leaves in the
+#: page, as ``(code, needle)``. ``mso-`` counts only outside the
+#: ``mso-number-format`` rule that every genuine MetaTrader page carries in
+#: its own stylesheet.
+_RESAVE_MARKERS: tuple[tuple[str, str], ...] = (
+    ("meta_charset", "<meta charset"),
+    ("saved_from_url", "saved from url"),
+    ("progid", "progid"),
+    ("xmlns_o", "xmlns:o="),
+    ("mso", "mso-"),
+    ("class_xl", "class=xl"),
+)
+_PLATFORM_STYLE = "mso-number-format"
 
 _MT5_ORDER_STATES = frozenset(
     {"filled", "canceled", "cancelled", "expired", "rejected", "placed", "partial", "started"}
@@ -234,9 +246,14 @@ def line_endings(text: str) -> str:
     return "none"
 
 
+def marker_codes(text: str) -> tuple[str, ...]:
+    """The re-save markers present in the page, as codes, in a fixed order."""
+    lowered = text[:200_000].lower().replace(_PLATFORM_STYLE, "")
+    return tuple(code for code, needle in _RESAVE_MARKERS if needle in lowered)
+
+
 def resave_markers(text: str) -> int:
-    lowered = text[:200_000].lower()
-    return sum(1 for marker in _RESAVE_MARKERS if marker in lowered)
+    return len(marker_codes(text))
 
 
 def generator_code(meta_generator: str) -> str:
@@ -247,6 +264,7 @@ def generator_code(meta_generator: str) -> str:
         ("metaquotes", "metaquotes"),
         ("client terminal", "client_terminal"),
         ("strategy tester", "strategy_tester"),
+        ("metatrader", "metatrader"),
         ("excel", "excel"),
         ("word", "word"),
         ("mshtml", "mshtml"),
@@ -562,9 +580,16 @@ def mt4_columns(table: RawTable, row: RawRow) -> dict[str, int]:
 
 
 def mt5_columns(table: RawTable, row: RawRow) -> dict[str, int]:
-    """The deals column map of the header above ``row`` (visible cells)."""
+    """The deals column map of the header above ``row`` (visible cells).
+
+    A workbook may store one blank trailing cell past the comment; the
+    width that picks the layout ignores trailing blanks.
+    """
     header = table.header_of(row)
-    return importers._mt5_column_map(list(header) if header else None, len(row.texts))
+    width = len(row.texts)
+    while width > 0 and not row.texts[width - 1]:
+        width -= 1
+    return importers._mt5_column_map(list(header) if header else None, width)
 
 
 def mt5_position_columns(table: RawTable, row: RawRow) -> dict[str, int]:
