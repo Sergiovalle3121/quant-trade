@@ -213,10 +213,16 @@ RULES: tuple[tuple[str, str], ...] = (
      "este arquivo não pôde ser lido como uma planilha antiga do Excel (.xls); pode estar "
      "danificado, protegido por senha ou não ser uma planilha: abra-o no Excel, LibreOffice "
      "ou Google Sheets, salve como .xlsx ou CSV e envie esse arquivo"),
-    ("a PDF is a printed statement, not data that can be read: download the history from "
-     "the platform as CSV, Excel or HTML instead (the guides show where)",
-     "um PDF é um extrato impresso, não dados que possam ser lidos: baixe o histórico da "
+    ("the PDF's trade table could not be read reliably: download the history from the "
+     "platform as CSV, Excel or HTML instead (the guides show where)",
+     "a tabela de operações do PDF não pôde ser lida com segurança: baixe o histórico da "
      "plataforma em CSV, Excel ou HTML (os guias mostram onde)"),
+    ("the PDF has more than {limit} pages: download the history from the platform as CSV, "
+     "Excel or HTML instead, or a PDF of a shorter period",
+     "o PDF tem mais de {limit} páginas: baixe o histórico da plataforma em CSV, Excel ou "
+     "HTML, ou um PDF de um período mais curto"),
+    ("the trades in a PDF are read only once you name its columns",
+     "as operações de um PDF são lidas só quando você indica as colunas"),
     ("this OpenDocument file is not a spreadsheet, so it cannot be read: save the trades as "
      ".xlsx, .ods or CSV and upload that file",
      "este arquivo OpenDocument não é uma planilha, então não pode ser lido: salve as "

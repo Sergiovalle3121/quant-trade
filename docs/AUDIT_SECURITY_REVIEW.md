@@ -72,6 +72,12 @@ Every change below has an offline, deterministic test in
 
 ## Limits that remain
 
+- PDF statements are parsed by pdfplumber (pdfminer.six and pypdfium2) in a
+  child process (`python -m quant_trade.audit.pdf_tables`, no shell, only
+  `PATH` and `PYTHONPATH` in its environment) killed after 10 s, with its
+  address space capped at 1 GB and its CPU at 10 s; only its JSON answer is
+  read back. At most 30 pages and 20,000 characters per page; any failure is
+  the plain `pdf_statement` refusal.
 - Old Excel workbooks (.xls) are parsed by xlrd 2.x, a third-party parser of
   a binary format. It is opened from memory with no formatting and each sheet
   on demand. Any exception it raises becomes the plain `legacy_xls` refusal.
