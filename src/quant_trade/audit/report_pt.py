@@ -4177,6 +4177,94 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "fewer than ten closed trades",
+        "menos de dez operações fechadas",
+    ),
+    (
+        "fewer than fifty returns",
+        "menos de cinquenta retornos",
+    ),
+    (
+        (
+            "the monthly returns with 2 % a year taken month by month and 20 % of each year's "
+            "gain above the previous high taken at the year's end (high-water mark)"
+        ),
+        (
+            "as rentabilidades mensais com 2 % ao ano descontados mês a mês e 20 % do ganho de "
+            "cada ano acima do máximo anterior descontados no fechamento do ano (marca d'água)"
+        ),
+    ),
+    (
+        (
+            "return beyond the benchmark's moves (Jensen's alpha), annualised; Newey-West "
+            "standard error; no cash rate subtracted"
+        ),
+        (
+            "rentabilidade além dos movimentos do benchmark (alfa de Jensen), anualizada; erro "
+            "padrão de Newey-West; sem subtrair a taxa do caixa"
+        ),
+    ),
+    (
+        "alpha over its Newey-West standard error; beyond about 2 it is unlikely to be chance",
+        (
+            "alfa dividido pelo seu erro padrão de Newey-West; acima de 2, aproximadamente, é "
+            "pouco provável que seja acaso"
+        ),
+    ),
+    (
+        "fewer than 24 periods shared with the benchmark",
+        "menos de 24 períodos em comum com o benchmark",
+    ),
+    (
+        "the strategy moves exactly with the benchmark",
+        "a estratégia se move exatamente com o benchmark",
+    ),
+    (
+        "the benchmark's returns do not vary",
+        "os retornos do benchmark não variam",
+    ),
+    (
+        "the strategy's and the benchmark's returns are not on the same dates",
+        "os retornos da estratégia e os do benchmark não estão nas mesmas datas",
+    ),
+    (
+        "fewer than two periods a year",
+        "menos de dois períodos por ano",
+    ),
+    (
+        "the autocorrelations leave no variance to scale by",
+        "as autocorrelações não deixam variância para escalar",
+    ),
+    (
+        (
+            "annualised Sharpe with the autocorrelation of the returns taken into account (Lo, "
+            "2002); returns that follow each other make the plain figure too high"
+        ),
+        (
+            "Sharpe anualizado levando em conta a autocorrelação dos retornos (Lo, 2002); quando "
+            "um retorno segue o anterior, o número simples fica alto demais"
+        ),
+    ),
+    (
+        "first-order autocorrelation of the returns",
+        "autocorrelação de primeira ordem dos retornos",
+    ),
+    (
+        "some resamples have no losing trade; the upper end is unbounded",
+        "algumas reamostragens não têm operações perdedoras; o extremo superior não tem limite",
+    ),
+    (
+        (
+            "95 % ranges, each trade taken as an independent draw: Wilson for the win rate, "
+            "Student's t for the average per trade, trades resampled for the profit factor"
+        ),
+        (
+            "faixas de 95 %, cada operação tomada como um resultado independente: Wilson para a "
+            "taxa de acerto, t de Student para a média por operação e operações reamostradas "
+            "para o fator de lucro"
+        ),
+    ),
+    (
         "Resampled estimate from the supplied history: it is not a prediction.",
         "Estimativa reamostrada do histórico fornecido: não é uma previsão.",
     ),
