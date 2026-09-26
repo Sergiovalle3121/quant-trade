@@ -78,6 +78,7 @@ _EXTREMES = (
 )
 _FILL = {
     "unexplained": "0",
+    "groups": "0",
     "cp95": "100.0",
     "signal": "0",
     "info": "1",

@@ -220,6 +220,7 @@ def _calibration_html(check: CheckResult, locale: str) -> str:
     if cell:
         text = copy["calibration"].format(
             n=cell.get("n", "0"),
+            groups=cell.get("groups", cell.get("n", "0")),
             unexplained=cell.get("unexplained", "0"),
             cp95=cell.get("cp95_upper_pct", "100.0"),
         )

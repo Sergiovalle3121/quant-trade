@@ -321,7 +321,12 @@ def test_finding_sentences_and_notes_pass_the_guard(locale: str) -> None:
         figures=(("n_rows", "99999", "MEASURED"), ("n_hits", "3", "MEASURED")),
         examples=(3, 7, 12),
         applies=True,
-        calibration=(("n", "24"), ("unexplained", "0"), ("cp95_upper_pct", "14.2")),
+        calibration=(
+            ("n", "24"),
+            ("groups", "24"),
+            ("unexplained", "0"),
+            ("cp95_upper_pct", "14.2"),
+        ),
     )
     sentence = forensics_web.finding_sentence(signal, locale)
     assert sentence.startswith(words.CHECK_FACTS[locale]["BALANCE_CHAIN"].split("{")[0])

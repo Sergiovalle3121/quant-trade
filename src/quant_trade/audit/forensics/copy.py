@@ -70,8 +70,9 @@ COPY: dict[str, dict[str, str]] = {
         "clean_note": "Sin huellas en este chequeo.",
         "not_measured_prefix": "No se pudo medir: {reason}.",
         "calibration": (
-            "{n} archivos reales de este formato; señales sin explicar: {unexplained}; "
-            "cota superior 95 %: {cp95} %."
+            "{unexplained} señales sin explicar en {groups} cuentas o estrategias reales "
+            "({n} archivos de este formato) usadas para ajustar el método; con esos datos, "
+            "la tasa de falsas señales podría llegar hasta {cp95} %."
         ),
         "no_calibration": (
             "Sin calibración con archivos reales de este formato todavía: un hallazgo "
@@ -165,8 +166,9 @@ COPY: dict[str, dict[str, str]] = {
         "clean_note": "No traces in this check.",
         "not_measured_prefix": "Could not be measured: {reason}.",
         "calibration": (
-            "{n} real files of this format; unexplained signals: {unexplained}; "
-            "95 % upper bound: {cp95} %."
+            "{unexplained} unexplained signals across {groups} real accounts or strategies "
+            "({n} files of this format) used to tune the method; on that data, the "
+            "false-signal rate could be as high as {cp95} %."
         ),
         "no_calibration": (
             "No calibration on real files of this format yet: a finding counts as a note, "
@@ -256,8 +258,9 @@ COPY: dict[str, dict[str, str]] = {
         "clean_note": "Sem rastros nesta checagem.",
         "not_measured_prefix": "Não foi possível medir: {reason}.",
         "calibration": (
-            "{n} arquivos reais deste formato; sinais sem explicação: {unexplained}; "
-            "limite superior 95 %: {cp95} %."
+            "{unexplained} sinais sem explicação em {groups} contas ou estratégias reais "
+            "({n} arquivos deste formato) usadas para ajustar o método; com esses dados, "
+            "a taxa de falsos sinais pode chegar a {cp95} %."
         ),
         "no_calibration": (
             "Ainda sem calibração com arquivos reais deste formato: um achado conta como "
