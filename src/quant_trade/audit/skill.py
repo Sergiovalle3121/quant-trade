@@ -18,8 +18,10 @@ with three regressions of the fund's return over cash on the index's:
   return, ``beta_0 + beta_1`` is the exposure with the lag counted, and the
   alpha beside it is the one left after it.
 * **Timing** (Treynor and Mazuy, 1966). A squared excess index term: a positive
-  ``gamma`` means the fund held more market before rises than before falls.
-  The alpha of that regression is the part left for choosing holdings.
+  ``gamma`` means the fund gained more in months of big index moves than its
+  beta explains (convexity): good timing does that, and so do option-like
+  positions; selling options gives a negative one. The alpha of that
+  regression is the part left for choosing holdings.
 
 Standard errors are cautious on purpose: each is the largest of three
 estimates. HC3 (MacKinnon and White, 1985) holds when the size of the misses
@@ -73,8 +75,9 @@ DIMSON_NOTE = (
     "prices hide part of the exposure from the plain beta"
 )
 TIMING_NOTE = (
-    "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more "
-    "of the market before rises than before falls"
+    "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund gained more in "
+    "months of big market moves than its beta explains (good timing or option-like "
+    "positions), below zero less (poor timing or selling options)"
 )
 T_NOTE = (
     "alpha over its cautious standard error (the largest of HC3, Newey-West and one "

@@ -633,13 +633,35 @@ class ColumnMap:
     date_column: int | None = None
 
 
+#: Roles holding money or a size, which a ``%`` column never fills.
+AMOUNT_ROLES = frozenset(
+    {
+        "entry_price",
+        "exit_price",
+        "price",
+        "quantity",
+        "profit",
+        "commission",
+        "swap",
+        "multiplier",
+    }
+)
+
+
 def _role_of(name: str) -> tuple[str, int] | None:
-    """The role a column name plays and its rank in that role's list."""
+    """The role a column name plays and its rank in that role's list.
+
+    A name with ``%`` in it is a ratio, never an amount: ``Profit %`` or
+    ``% Profit`` would otherwise normalise to ``profit`` and be read as money,
+    so it takes no money or size role (``AMOUNT_ROLES``). Return series never
+    come here: ``schema.parse_equity_csv`` reads them."""
     key = normalise(name)
     if not key:
         return None
     for role, names in SYNONYMS.items():
         if key in names:
+            if "%" in name and role in AMOUNT_ROLES:
+                return None
             return role, names.index(key)
     return None
 
