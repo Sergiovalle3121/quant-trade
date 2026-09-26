@@ -26,6 +26,7 @@ from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.holding import EDGE_SE
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_number
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
@@ -104,6 +105,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "timing": "En qué horas y días se concentra el resultado",
         "recent": "Si sigue funcionando en el periodo más reciente",
         "crises": "Cómo le fue en 2008, el covid, 2022 y otras caídas conocidas",
+        "holding": "Si le gana a simplemente comprar y mantener el mercado que opera",
         "luck": (
             "Cuánto Sharpe queda al descontar la suerte y cuántos años de historial harían falta"
         ),
@@ -140,6 +142,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "timing": "Which hours and days the result comes from",
         "recent": "Whether it still works in the most recent period",
         "crises": "How it did in 2008, covid, 2022 and other known falls",
+        "holding": "Whether it beats simply buying and holding the market it trades",
         "luck": "How much Sharpe is left once luck is discounted, and how many years it would take",
         "ride": "Time without new highs, worst day, worst month and months that ended up",
         "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
@@ -661,6 +664,44 @@ LABELS: dict[str, dict[str, str]] = {
             "sin operaciones cuenta como plano. Las fechas son fijas: no se ajustan al archivo."
         ),
         "crises_subject": "Estrategia",
+        "holding": "¿Le gana a comprar y mantener el mercado?",
+        "holding_intro": (
+            "La estrategia opera sobre todo el {label}. Estos son sus cierres diarios junto a "
+            "los de simplemente comprar y mantener el {label} los mismos días, del {first} al "
+            "{last} ({days} días). El Sharpe mide lo que paga cada unidad de riesgo: no cambia "
+            "con el tamaño de la posición, así que compara bien una estrategia apalancada con "
+            "el mercado sin apalancar."
+        ),
+        "holding_not_measured": "Sin comparación con el {label}: {reason}.",
+        "holding_strategy": "Estrategia",
+        "holding_market": "Mantener el {label}",
+        "holding_return": "Rentabilidad en el periodo",
+        "holding_drawdown": "Peor caída",
+        "holding_sharpe": "Sharpe en los mismos {days} días (rentabilidad por unidad de riesgo)",
+        "holding_together": (
+            "Correlación semanal (de viernes a viernes) con el {label}: {corr}. Por cada 1 % "
+            "que se movió el mercado en una semana, la estrategia se movió en promedio {beta} %. "
+            "Se usan semanas porque la hora de cierre del archivo y la del mercado pueden no "
+            "coincidir."
+        ),
+        "holding_no_clear_edge": (
+            "La diferencia de Sharpe ({z} errores estándar, medida con rentabilidades "
+            "semanales) no basta para decir que le gana al mercado."
+        ),
+        "holding_rides": (
+            "Se mueve casi al mismo paso que el {label} y no muestra una ventaja clara sobre "
+            "mantenerlo: la diferencia de Sharpe queda dentro del ruido de {weeks} semanas. "
+            "¿Qué agrega frente a comprar el mercado y esperar?"
+        ),
+        "holding_closed_only": (
+            "El archivo solo trae el balance al cerrar operaciones: los días con posiciones "
+            "abiertas no se ven, así que la correlación y la peor caída de la estrategia "
+            "quedan cortas."
+        ),
+        "holding_source": (
+            "Cierres del {label}: datos públicos de {source} leídos al generar el "
+            "informe. Ninguno de los dos Sharpe resta la tasa del efectivo. No cambia la clase."
+        ),
         "crises_market": "Mercado en esas fechas",
         "crises_market_note": (
             "Mercado: cierre del mes previo a la ventana contra el cierre de su último mes, "
@@ -1560,6 +1601,42 @@ LABELS: dict[str, dict[str, str]] = {
             "with no trades counts as flat. The dates are fixed: they are not fitted to the file."
         ),
         "crises_subject": "Strategy",
+        "holding": "Does it beat buying and holding the market?",
+        "holding_intro": (
+            "The strategy trades mostly the {label}. These are its daily closes beside simply "
+            "buying and holding the {label} on the same days, from {first} to {last} ({days} "
+            "days). The Sharpe ratio measures what each unit of risk pays: it does not change "
+            "with position size, so it compares a leveraged strategy fairly with the unleveraged "
+            "market."
+        ),
+        "holding_not_measured": "No comparison with the {label}: {reason}.",
+        "holding_strategy": "Strategy",
+        "holding_market": "Holding the {label}",
+        "holding_return": "Return over the period",
+        "holding_drawdown": "Worst fall",
+        "holding_sharpe": "Sharpe on the same {days} days (return per unit of risk)",
+        "holding_together": (
+            "Weekly correlation (Friday to Friday) with the {label}: {corr}. For each 1 % the "
+            "market moved in a week, the strategy moved {beta} % on average. Weeks are used "
+            "because the file's closing time and the market's may not match."
+        ),
+        "holding_no_clear_edge": (
+            "The Sharpe gap ({z} standard errors, measured on weekly returns) is not enough "
+            "to say it beats the market."
+        ),
+        "holding_rides": (
+            "It moves almost in step with the {label} and shows no clear edge over holding "
+            "it: the Sharpe gap is within the noise of {weeks} weeks. What does it add over "
+            "buying the market and waiting?"
+        ),
+        "holding_closed_only": (
+            "The file only has the balance at each close: days with open positions are not "
+            "seen, so the strategy's correlation and worst fall read short."
+        ),
+        "holding_source": (
+            "{label} closes: public {source} data read when the report was made. No "
+            "cash rate is subtracted in either Sharpe ratio. It does not change the class."
+        ),
         "crises_market": "Market over those months",
         "crises_market_note": (
             "Market: the close of the month before the window against the close of its last "
@@ -4763,6 +4840,84 @@ def _market_note(keys: list[str], labels: dict[str, str]) -> str:
     return f"<p class='muted'><small>{text.replace(chr(0), listed)}</small></p>"
 
 
+def _holding_html(
+    holding: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    *,
+    closed_only: bool = False,
+) -> str:
+    """The strategy beside simply holding the market it trades, on the same days."""
+    if not holding:
+        return ""
+    label = str(holding.get("label", ""))
+    if holding.get("status") != "MEASURED":
+        text = labels["holding_not_measured"].format(
+            label=label, reason=localize(str(holding.get("reason", "")), locale)
+        )
+        return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
+    out = ""
+    days = int(holding["days"]["value"])
+    if "rides_the_market" in (holding.get("findings") or []):
+        rides = labels["holding_rides"].format(
+            label=label, weeks=int(holding["weeks"]["value"])
+        )
+        out += (
+            f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
+            f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>"
+            f"{_behaviour_ask(rides)}</ul></div>"
+        )
+    intro = labels["holding_intro"].format(
+        label=label,
+        first=holding.get("first", ""),
+        last=holding.get("last", ""),
+        days=days,
+    )
+    out += f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
+    strategy_head = labels["holding_strategy"]
+    market_head = labels["holding_market"].format(label=label)
+
+    def row(name: str, key: str, text: Callable[[float], str]) -> str:
+        cells = ""
+        for side, head in (("strategy", strategy_head), ("market", market_head)):
+            field = f"{side}_{key}"
+            if field == "strategy_sharpe":
+                field = "strategy_sharpe_shared_days"
+            value = float(holding[field]["value"])
+            neg = " neg" if value < 0 and key != "sharpe" else ""
+            cells += f"<td class='val{neg}' data-l='{_e(head)}'>{_e(text(value))}</td>"
+        return f"<tr><td>{_e(labels[name].format(days=days))}</td>{cells}</tr>"
+
+    body = (
+        row("holding_return", "return", _fund_pct)
+        + row("holding_drawdown", "drawdown", _fund_pct)
+        + row("holding_sharpe", "sharpe", lambda v: f"{v:.2f}")
+    )
+    out += (
+        f"<table class='timing holding'><thead><tr><th></th>"
+        f"<th class='val'>{_e(strategy_head)}</th><th class='val'>{_e(market_head)}</th>"
+        f"</tr></thead><tbody>{body}</tbody></table>"
+    )
+    z = float(holding["sharpe_gap_in_se"]["value"])
+    if "rides_the_market" not in (holding.get("findings") or []) and z < EDGE_SE:
+        edge = labels["holding_no_clear_edge"].format(z=f"{z:.2f}")
+        out += f"<p class='muted'>{_e(edge)} {_badge('MEASURED')}</p>"
+    together = labels["holding_together"].format(
+        label=label,
+        corr=f"{float(holding['correlation']['value']):.2f}",
+        beta=f"{float(holding['beta']['value']):.2f}",
+    )
+    out += f"<p>{_e(together)} {_badge('MEASURED')}</p>"
+    if closed_only:
+        out += f"<p class='muted'>{_e(labels['holding_closed_only'])}</p>"
+    link = (
+        f"<a href='{_e(str(holding.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    )
+    source = _e(labels["holding_source"].format(label=label, source="\x00"))
+    out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
+    return out
+
+
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
     return bool(stress) and (stress or {}).get("status") == "MEASURED"
 
@@ -5538,6 +5693,21 @@ def render_html(
         *(
             [(labels["crises"], _crises_html(data.get("crises"), labels))]
             if _crises_shown(data.get("crises"))
+            else []
+        ),
+        *(
+            [
+                (
+                    labels["holding"],
+                    _holding_html(
+                        data.get("holding"),
+                        locale,
+                        labels,
+                        closed_only=bool((data.get("inputs") or {}).get("balance_only")),
+                    ),
+                )
+            ]
+            if data.get("holding")
             else []
         ),
         *(
