@@ -232,6 +232,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "filled time",
         "exec time",
         "execution time",
+        # Zerodha Console's tradebook: a full timestamp beside a date-only trade_date.
+        "order execution time",
         "trade time",
         "transaction date",
         "transactiondate",

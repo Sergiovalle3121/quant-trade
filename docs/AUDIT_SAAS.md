@@ -312,6 +312,16 @@ adds or removes, keeping their cost (a 1-for-10 reverse split of 100 shares
 arrives as -90); a split of shares not held changes nothing, and one that would
 leave no shares is not applied and is counted in `SPLIT_EMPTIES_WARNING`. Prices in USD print without a sign, like every amount.
 
+Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
+trade_date, exchange, segment, series, trade_type, auction, quantity, price,
+trade_id, order_id, order_execution_time`, header as checked by the open-source
+github.com/prabusw/beancount-importers-india importer) is read by the universal
+fill reader. Fills are timed by `order_execution_time`, ranked above the
+date-only `trade_date`, so intraday trades pair in the order they happened
+whatever the row order. No F&O lot multiplier is applied (the result is the
+price move times the stated quantity, and the report says so). The XLSX
+download is not named: its layout is unconfirmed.
+
 B3's Área do Investidor Negociação extract is read by column name only
 (`tests/test_audit_b3.py`): `Data do Negócio` is the fill time and always day
 first (`universal.DAY_FIRST_NAMES`), `Tipo de Movimentação` the side

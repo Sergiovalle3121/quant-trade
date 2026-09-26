@@ -931,3 +931,37 @@ def test_a_split_that_would_empty_the_position_is_not_applied_and_said() -> None
     (trade,) = report.trades.trades
     assert trade.entry_price == pytest.approx(5.0) and round(trade.pnl, 2) == 550.0
     assert SPLIT_EMPTIES_WARNING.format(n=1) in report.warnings
+
+
+ZERODHA_HEADER = (
+    "symbol,isin,trade_date,exchange,segment,series,trade_type,auction,quantity,price,"
+    "trade_id,order_id,order_execution_time"
+)
+
+
+def test_zerodha_tradebook_pairs_fills_by_execution_time() -> None:
+    # Zerodha Console's tradebook (Reports > Tradebook, CSV), header as checked
+    # by the open-source github.com/prabusw/beancount-importers-india importer.
+    # Rows arrive out of order and an order fills in two trades; the intraday
+    # short only pairs correctly on order_execution_time, not on trade_date.
+    report = _read(
+        [
+            ZERODHA_HEADER,
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,buy,false,4.000000,1500.000000,"
+            "1002,2002,2024-01-02T14:30:00",
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,sell,false,10.000000,1550.000000,"
+            "1001,2001,2024-01-02T09:30:00",
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,buy,false,6.000000,1500.000000,"
+            "1003,2002,2024-01-02T14:30:00",
+            "NIFTY24JANFUT,,2024-01-03,NFO,FO,,buy,false,50.000000,21700.000000,"
+            "1004,2004,2024-01-03T10:00:00",
+            "NIFTY24JANFUT,,2024-01-05,NFO,FO,,sell,false,50.000000,21650.000000,"
+            "1005,2005,2024-01-05T11:00:00",
+        ]
+    )
+    assert report.source_format == UNIVERSAL_FILLS_CSV
+    trades = report.trades.trades
+    assert [round(t.pnl, 2) for t in trades] == [200.0, 300.0, -2500.0]
+    assert trades[0].entry_time == datetime(2024, 1, 2, 9, 30, tzinfo=UTC)
+    assert trades[0].exit_time == datetime(2024, 1, 2, 14, 30, tzinfo=UTC)
+    assert trades[2].exit_time == datetime(2024, 1, 5, 11, 0, tzinfo=UTC)
