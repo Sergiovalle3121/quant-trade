@@ -2587,9 +2587,14 @@ FUTURES_POINT_VALUE_OTHER: dict[str, tuple[float, str]] = {
     # Ibovespa full and mini, US dollar full and mini, in reais per point.
     "IND": (1.0, "BRL"), "WIN": (0.2, "BRL"), "DOL": (50.0, "BRL"),
     "WDO": (10.0, "BRL"),
-    # MexDer (Mexico), its terms and conditions on https://www.mexder.com.mx:
-    # S&P/BMV IPC x10 and "MINI" IPC x2 in pesos per point; the US dollar
-    # future (DA) is USD 10,000 quoted in pesos per dollar.
+    # MexDer (Mexico), as_of 2026-09-26, its terms and conditions under
+    # http://www.mexder.com.mx/wb3/wb/MEX/MEX_Repositorio/_vtp/MEX/:
+    # S&P/BMV IPC "MXN $10.00 multiplied by the S&P/BMV IPC value"
+    # (1ef4_contratos_futuros/_rid/21/_mto/3/20241014SPBMV_IPC_English.pdf);
+    # "MINI" IPC "MXN $2.00 multiplied by the IPC value"
+    # (1ef4_contratos_futuros/_rid/21/_mto/3/MINI_IPC_Englishvf.pdf); US dollar
+    # (DA) "Contract Size: $10,000 Dollars", quoted in pesos per dollar
+    # (1ef4_presentaciones/_rid/21/_mto/3/MXNUSD_Future.pdf).
     "IPC": (10.0, "MXN"), "MIP": (2.0, "MXN"), "DA": (10_000.0, "MXN"),
 }  # fmt: skip
 
