@@ -1029,7 +1029,7 @@ REPORT: dict[str, Any] = {
         ),
         "alpha_line_local": (
             "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, depois de subtrair "
-            "da estratégia o que o caixa na moeda da conta pagava ({code}: {name}) e do "
+            "da estratégia o que o caixa na moeda da conta pagou ({code}: {name}) e do "
             "benchmark, tomado como cotado em dólares, o que a letra do Tesouro dos EUA de 3 "
             "meses pagou (beta {beta}, t = {t}, {n} períodos)."
         ),

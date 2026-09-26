@@ -729,7 +729,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "alpha_line_local": (
             "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, después "
-            "de restar a la estrategia lo que pagaba el efectivo en la moneda de la cuenta "
+            "de restar a la estrategia lo que pagó el efectivo en la moneda de la cuenta "
             "({code}: {name}) y al benchmark, tomado como cotizado en dólares, lo que pagó la "
             "letra del Tesoro de EE. UU. a 3 meses (beta {beta}, t = {t}, {n} periodos)."
         ),
@@ -1930,8 +1930,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "alpha_line_local": (
             "Jensen's alpha: {alpha} a year beyond what the benchmark explains, after "
-            "subtracting what cash in the account's currency paid from the strategy ({code}: "
-            "{name}) and what the 3-month US Treasury bill paid from the benchmark, taken as "
+            "subtracting what cash in the account's currency ({code}: {name}) paid from the "
+            "strategy and what the 3-month US Treasury bill paid from the benchmark, taken as "
             "priced in US dollars (beta {beta}, t = {t}, {n} periods)."
         ),
         "alpha_line_no_cash": (
