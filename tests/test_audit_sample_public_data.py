@@ -4,13 +4,14 @@ waits on the network and stays the offline sample until a download lands."""
 
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 import pandas as pd
 from fastapi.testclient import TestClient
 
 from quant_trade.audit import web
-from quant_trade.audit.market import CASH, MarketData
+from quant_trade.audit.market import CASH, CPI, FX, MarketData
 from quant_trade.audit.report import LABELS
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.settings import AuditSettings
@@ -107,3 +108,44 @@ def test_the_sample_keeps_only_the_current_set_of_series(tmp_path: Path, monkeyp
     assert holder["data"].refresh(CASH.key)
     assert CASH_WORDS in client.get("/ejemplo").text
     assert CASH_WORDS in client.get("/ejemplo").text
+
+
+MONTHS = pd.date_range("2015-01-01", "2027-01-01", freq="MS")
+PRICES = "DATE,CPIAUCNS\n" + "".join(
+    f"{month:%Y-%m-%d},{250 * 1.0025**i:.3f}\n" for i, month in enumerate(MONTHS)
+)
+
+
+def _bills_prices_and_rates(series: str) -> str:
+    """The bill rate, US prices rising 3 % a year and flat exchange rates."""
+    if series == CPI.series:
+        return PRICES
+    if series in {asset.series for asset in FX}:
+        rate = 1.1 if series.startswith("DEXUS") else 18.0
+        return f"DATE,{series}\n" + "".join(f"{day:%Y-%m-%d},{rate}\n" for day in DAYS)
+    return _bills_only(series)
+
+
+class _WarmedAll(MarketData):
+    """The bill rate, US prices and the exchange rates in memory."""
+
+    def __init__(self) -> None:
+        super().__init__(_bills_prices_and_rates)
+
+    def warm(self):  # type: ignore[no-untyped-def]
+        for key in (CASH.key, CPI.key, *(asset.key for asset in FX)):
+            self.refresh(key)
+        return None
+
+
+def test_the_sample_shows_the_account_in_other_currencies(tmp_path: Path, monkeypatch) -> None:
+    data = _WarmedAll()
+    data.warm()
+    result = sample_result("es", bootstrap_samples=60, market=data.closes)
+    assert result.in_currencies is not None
+    assert result.in_currencies["status"] == "MEASURED"
+    client = _client(tmp_path, monkeypatch, _WarmedAll)
+    for path, locale in (("/ejemplo", "es"), ("/sample", "en"), ("/pt/exemplo", "pt")):
+        page = client.get(path)
+        assert page.status_code == 200
+        assert html.escape(LABELS[locale]["currency"], quote=True) in page.text, path
