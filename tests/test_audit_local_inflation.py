@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import json
+import zipfile
 from dataclasses import replace
 from html import escape
 from typing import Any
@@ -87,7 +89,7 @@ def test_each_provider_reply_becomes_a_monthly_index() -> None:
     # Brazil's monthly changes are chained from January 1995.
     brazil = parse_provider(BCB, "bcb")
     assert list(brazil.to_numpy()) == pytest.approx([101.0, 101.0 * 0.995])
-    assert {asset.label for asset in LOCAL_CPI} == {"EUR", "GBP", "CAD", "CHF", "BRL"}
+    assert {asset.label for asset in LOCAL_CPI} == {"EUR", "GBP", "CAD", "CHF", "BRL", "MXN", "JPY"}
     assert all(asset.key in SERIES for asset in LOCAL_CPI)
     assert SERIES["cpi_eur"].source_url.endswith("CP0000EZ19M086NEST")
     assert SERIES["cpi_gbp"].source_url.startswith("https://www.ons.gov.uk/")
@@ -161,8 +163,12 @@ def test_a_dollar_account_shows_each_currency_after_its_own_inflation() -> None:
     )
     assert real["total_return"]["note"] == LOCAL_REAL_NOTE and real["provider"] == "bcb"
     assert "yearly_inflation" in real
-    # The peso has no open official index here: its row stays, without one after inflation.
+    # The peso's prices were not read: its row stays, without one after inflation.
     assert "real" not in by_code["MXN"]
+    series["cpi_mxn"] = _monthly(days, 130.0, 136.5)
+    peso = {item["code"]: item for item in in_currencies(frame, series, "USD")["currencies"]}
+    assert peso["MXN"]["real"]["provider"] == "inegi"
+    assert peso["MXN"]["real"]["inflation"]["value"] == pytest.approx(0.05, abs=1e-9)
 
 
 def test_prices_that_stop_months_before_the_end_are_not_used() -> None:
@@ -186,7 +192,7 @@ def test_an_account_in_reais_shows_its_own_real_result() -> None:
     assert "dollars" not in out and "assumption" not in out
     missing = in_currencies(_curve(days, levels), {}, "EUR")
     assert missing["reason"] == LOCAL_CPI_UNAVAILABLE and missing["status"] == "NOT_MEASURED"
-    for other in ("MXN", "JPY", "AUD"):
+    for other in ("AUD", "NZD"):
         assert in_currencies(_curve(days, levels), {}, other)["reason"] == OTHER_CURRENCY
 
 
@@ -253,7 +259,15 @@ def test_the_methodology_page_credits_every_public_source(locale: str) -> None:
     for line in words["data"]:  # type: ignore[union-attr]
         assert escape(str(line)) in page
         assert find_claims(str(line)) == []
-    for name in ("FRED", "Eurostat", "Office for National Statistics", "Banco Central do Brasil"):
+    for name in (
+        "FRED",
+        "Eurostat",
+        "Office for National Statistics",
+        "Banco Central do Brasil",
+        "INEGI",
+        "Statistics Bureau",
+        "e-Stat",
+    ):
         assert name in page
 
 
@@ -309,3 +323,157 @@ def test_a_brazilian_chain_with_a_missing_repeated_or_unreadable_month_is_refuse
         with pytest.raises(ValueError):
             parse_provider(broken, "bcb")
         assert MarketData(lambda series, text=broken: text).refresh("cpi_brl") is False
+
+
+INPC = "Índice nacional de precios al consumidor (mensual), Resumen, Precios al Consumidor (INPC)"
+CORE = "Índice nacional de precios al consumidor (mensual), Resumen, Subyacente"
+
+
+def _inegi_zip(rows: list[tuple[str, str, str]], name: str = "conjunto_de_datos") -> str:
+    """INEGI's open-data zip as the downloader hands it over: bytes as Latin-1."""
+    table = "COBERTURA,PERIODICIDAD,FECHA,CONCEPTO,VALOR,UNIDAD_MEDIDA,ESTATUS\n" + "".join(
+        f'Nacional,Mensual,{date},"{concept}",{value},Índice,Cifras definitivas\n'
+        for date, concept, value in rows
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(f"{name}/{name}_inpc_mensual.csv", "\ufeff" + table)
+        archive.writestr("metadatos/metadatos_inpc.txt", "INPC")
+    return buffer.getvalue().decode("latin-1")
+
+
+ESTAT = (
+    "類・品目,総合,生鮮食品を除く総合\n"
+    'Group/Item,All items,"All items, less fresh food"\n'
+    "類・品目符号(Group/Item code),0001,0161\n"
+    "含類総連番(Serial number),001,740\n"
+    "ウエイト(Weight),3543757090,3409504328\n"
+    "ウエイト１万分比(Weight per 10000),10000,9621\n"
+    "202607,102.0,102.1\n"
+    "202608,102.2,102.0\n"
+)
+
+
+def test_mexico_and_japan_prices_are_read_from_their_open_files() -> None:
+    rows = [
+        ("2026-08-01", INPC, "145.462"),
+        ("2026-07-01", INPC, "144.9"),
+        ("2026-07-01", CORE, "150.1"),
+    ]
+    mexico = parse_provider(_inegi_zip(rows), "inegi")
+    assert list(mexico.index) == [pd.Timestamp("2026-07-01"), pd.Timestamp("2026-08-01")]
+    assert list(mexico.to_numpy()) == pytest.approx([144.9, 145.462])  # headline only
+    japan = parse_provider(ESTAT, "estat")
+    assert list(japan.to_numpy()) == pytest.approx([102.0, 102.2])  # the all-items column
+    assert japan.index[-1] == pd.Timestamp("2026-08-01")
+    assert MarketData(lambda series: ESTAT).refresh("cpi_jpy") is True
+    assert SERIES["cpi_mxn"].source_url == "https://www.inegi.org.mx/programas/inpc/2018a/"
+    assert SERIES["cpi_jpy"].source_url.startswith("https://www.e-stat.go.jp/")
+
+
+def test_a_broken_mexican_or_japanese_file_keeps_nothing() -> None:
+    good = [("2026-07-01", INPC, "144.9"), ("2026-08-01", INPC, "145.4")]
+    broken = [
+        _inegi_zip(good + [("2026-08-01", INPC, "145.5")]),  # a month twice
+        _inegi_zip(good, name="otra_tabla"),  # no monthly table
+        _inegi_zip([("2026-07-01", CORE, "150.1")]),  # no headline rows
+        "not a zip",
+        ESTAT.replace("202607,102.0", "202608,102.0"),  # a month twice
+        ESTAT.replace("類・品目符号(Group/Item code),0001", "Code,9999"),  # no item codes
+        ESTAT.replace(",0001,", ",0002,"),  # no all-items column
+    ]
+    for reply in broken:
+        key = "cpi_mxn" if "zip" in reply or "PK" in reply[:2] else "cpi_jpy"
+        assert MarketData(lambda series, text=reply: text).refresh(key) is False, reply[:30]
+
+
+def test_an_inegi_table_too_large_to_open_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    reply = _inegi_zip([("2026-07-01", INPC, "144.9"), ("2026-08-01", INPC, "145.4")])
+    monkeypatch.setattr(market_lib, "MAX_BYTES", 100)
+    with pytest.raises(ValueError, match="too large"):
+        parse_provider(reply, "inegi")
+
+
+def test_zip_and_shift_jis_replies_arrive_intact(monkeypatch: pytest.MonkeyPatch) -> None:
+    replies = {
+        "inegi": _inegi_zip([("2026-08-01", INPC, "145.4")]).encode("latin-1"),
+        "estat": ESTAT.encode("cp932"),
+    }
+    asked: list[Any] = []
+
+    class Reply:
+        status = 200
+
+        def __init__(self, body: bytes) -> None:
+            self.left = [body]
+
+        def __enter__(self) -> Reply:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read1(self, _size: int) -> bytes:
+            return self.left.pop() if self.left else b""
+
+    class Opener:
+        def open(self, request: Any, timeout: float) -> Reply:
+            asked.append(request)
+            provider = "inegi" if "inegi.org.mx" in request.full_url else "estat"
+            return Reply(replies[provider])
+
+    monkeypatch.setattr(market_lib, "_OPENER", Opener())
+    mexico = parse_provider(real_download("INPC", "inegi"), "inegi")
+    assert mexico.iloc[-1] == pytest.approx(145.4)
+    japan = parse_provider(real_download("000040482943", "estat"), "estat")
+    assert japan.iloc[-1] == pytest.approx(102.2)
+    inegi, estat = asked
+    assert inegi.full_url.startswith("https://www.inegi.org.mx/contenidos/programas/inpc/2018a/")
+    assert estat.full_url == (
+        "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000040482943&fileKind=1"
+    )
+    assert inegi.get_header("User-agent") == estat.get_header("User-agent") == PROVIDER_AGENT
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_an_account_in_pesos_and_the_yen_row_credit_their_sources(locale: str) -> None:
+    inputs, days = _inputs(locale)
+    inputs = replace(inputs, account_currency="MXN")
+    series = {"cpi_mxn": _monthly(days, 130.0, 136.0)}
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=series.get)
+    section = result.in_currencies
+    assert section is not None and section["base"] == "MXN" and section["status"] == "MEASURED"
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    labels = LABELS[locale]
+    assert escape(labels["currency_attrib_MXN"]) in html
+    assert "INEGI" in labels["currency_attrib_MXN"]
+    assert untranslated(result.model_dump(mode="json")) == []
+
+    dollars, _ = _inputs(locale)
+    yen = {
+        "fx_jpy": _daily(days, 140.0, 150.0),
+        "cpi_jpy": _monthly(days, 100.0, 102.0),
+        "cpi": _monthly(days, 300.0, 310.0),
+    }
+    result = run_audit(dollars, bootstrap_samples=200, risk_samples=300, market=yen.get)
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    name = labels["currency_JPY"]
+    assert escape(labels["currency_real_local"].format(name=name)) in html
+    assert escape(labels["currency_attrib_JPY"]) in html
+    assert "Statistics Bureau" in labels["currency_attrib_JPY"]
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_an_account_in_another_currency_reads_one_period(locale: str) -> None:
+    inputs, _ = _inputs(locale)
+    inputs = replace(inputs, account_currency="AUD")
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market={}.get)
+    assert result.in_currencies is not None
+    assert result.in_currencies["reason"] == OTHER_CURRENCY
+    html, _ = render(result, watermark=False)
+    prefix = LABELS[locale]["currency_not_measured"].split("{reason}")[0]
+    line = html.split(escape(prefix), 1)[1].split("<", 1)[0].strip()
+    assert line.endswith(".") and not line.endswith(".."), line

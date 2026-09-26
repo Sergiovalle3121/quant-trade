@@ -957,8 +957,8 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_note_mixed": (
             "Las filas «después de su inflación» dividen entre el índice oficial de precios al "
             "consumidor de cada país de cada mes, o el del último mes publicado; una moneda sin "
-            "ese índice al día (por ahora, el peso mexicano y el yen) muestra solo su fila antes "
-            "de inflación. El rendimiento al año se muestra con al menos un año de historial. "
+            "ese índice al día muestra solo su fila antes de inflación. El rendimiento al año "
+            "se muestra con al menos un año de historial. "
             "Tipos de cambio y precios de EE. UU. de {source}, leídos al generar el informe. No "
             "cambia la clase."
         ),
@@ -974,6 +974,14 @@ LABELS: dict[str, dict[str, str]] = {
             "bankofcanada.ca)"
         ),
         "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA del IBGE)",
+        "currency_attrib_MXN": (
+            "peso mexicano, Fuente: INEGI, Índice Nacional de Precios al Consumidor (INPC), "
+            "usado aquí para descontar la inflación de los saldos"
+        ),
+        "currency_attrib_JPY": (
+            "yen, elaborado a partir del Índice de Precios al Consumidor de Japón (Statistics "
+            "Bureau, Ministry of Internal Affairs and Communications), vía e-Stat"
+        ),
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reales (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -2207,8 +2215,8 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_note_mixed": (
             "The rows \"after its own inflation\" divide by each country's official consumer "
             "price index of each month, or that of the latest month published; a currency "
-            "without a current official index (for now, the Mexican peso and the yen) shows "
-            "only its row before inflation. The return a year is shown from one year of "
+            "without a current official index shows only its row before inflation. The "
+            "return a year is shown from one year of "
             "history. Exchange rates and US prices from {source}, read when the report was "
             "made. It does not change the class."
         ),
@@ -2225,6 +2233,14 @@ LABELS: dict[str, dict[str, str]] = {
             "at bankofcanada.ca)"
         ),
         "currency_attrib_BRL": "real, Banco Central do Brasil (IBGE's IPCA)",
+        "currency_attrib_MXN": (
+            "Mexican peso, Source: INEGI, Índice Nacional de Precios al Consumidor (INPC), "
+            "used here to take inflation out of the balances"
+        ),
+        "currency_attrib_JPY": (
+            "yen, created by editing Japan's Consumer Price Index (Statistics Bureau, Ministry "
+            "of Internal Affairs and Communications), through e-Stat"
+        ),
         "currency_MXN": "Mexican pesos (MXN)",
         "currency_BRL": "Brazilian reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -5892,7 +5908,8 @@ def _currency_html(section: dict[str, Any] | None, locale: str, labels: dict[str
         return ""
     if section.get("status") != "MEASURED":
         text = labels["currency_not_measured"].format(
-            reason=localize(str(section.get("reason", "")), locale)
+            # A reason may end in an abbreviation ("EE. UU."); the label adds the period.
+            reason=localize(str(section.get("reason", "")), locale).rstrip(".")
         )
         return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
     base = str(section.get("base") or "")

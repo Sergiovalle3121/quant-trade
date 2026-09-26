@@ -1461,18 +1461,27 @@ site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
 Central do Brasil's SGS series 433, monthly changes chained into an index
 from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
 month, refuses the reply, since a broken link would leave its inflation out of
-every later level). The IMF's CPI
-dataset, which covers every currency, needs written permission for
-commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
-official APIs need a registered key, so the peso and the yen show no row
-after inflation yet, and the note says so. Each row after inflation credits
+every later level), Mexico's INPC (INEGI's open-data zip of the 2018 base,
+from January 2003; its terms allow commercial use with the credit "Fuente:
+INEGI" and the product name; the zip is opened in memory and its table
+refused above `MAX_BYTES`) and Japan's CPI (the Statistics Bureau's
+long-term national file on e-Stat, file id `000040482943`, from 1970, base
+2025, read as Shift_JIS; the Public Data License 1.0 and e-Stat's terms
+allow commercial use, and the credit says the figures are edited from the
+survey). The e-Stat file id is pinned: if e-Stat publishes later months under
+a new id, the yen rows first say "prices through {month}" and then drop to
+the row before inflation, and the id needs updating. A month that appears
+twice in either file refuses the reply. The IMF's CPI dataset, which covers
+every currency, needs written permission for commercial reuse, so it is not
+used; Banxico's and INEGI's APIs need a registered key, while the files used
+here do not. Each row after inflation credits
 its source by name and link, as each licence asks; `/metodologia` lists
 them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
 refuses Python's default); FRED keeps the default. It runs for a dollar
 account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
 read at one dollar per coin, which the note says), or a file that names no
 currency, in which case a line says it is read as dollars. When a report
-names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+names EUR, GBP, CAD, CHF, BRL, MXN or JPY, the section shows the account in that
 currency and after that currency's inflation, with the local inflation over
 the dates; without those prices it is NOT_MEASURED with the reason. Another
 named currency leaves it NOT_MEASURED. A price index reply below 1 or above
@@ -1867,6 +1876,9 @@ with an empty value):
    custom domain you attach (it is also the address in the badge embed code
    of `/v/…` pages), and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
    hourly limit counts the visitor's address and not Railway's proxy.
+   Moving `AUDIT_BASE_URL` to another domain later leaves existing passkeys
+   behind (see "Passkeys" under customer accounts); sign-in by password,
+   code and recovery key is unaffected.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
    `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
@@ -2296,6 +2308,37 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
+  `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
+  acceso" adds one after the current password (`POST /cuenta/llaves`, then
+  `/cuenta/llaves/guardar`) and removes one, also after the password
+  (`/cuenta/llaves/quitar`); at
+  most `passkeys.MAX_PER_ACCOUNT` (10). The sign-in page offers "Entrar con
+  una llave de acceso" (`/entrar/llave`, EN `/login/passkey`, PT
+  `/pt/entrar/chave`): a discoverable credential, so no e-mail is typed, and
+  the device must check its owner (fingerprint, face or PIN, user
+  verification required); device plus that check are two factors, so on a
+  two-step account the passkey is enough. After a correct password, the
+  code page also offers the account's passkeys in place of the code
+  (`/entrar/codigo/llave`). Each passkey page stores a random 32-byte
+  challenge for 5 minutes behind the `rigor_passkey` cookie (only its hash
+  is the key), used once; `passkeys.MAX_STARTS_PER_HOUR` pages per network.
+  The options are embedded in the page and `app.js` posts the device's
+  answer in an ordinary form, so the CSP stays `connect-src 'none'`. The
+  store keeps the credential id, the public key, the counter (a counter
+  that goes backwards is refused; synced passkeys report zero), the name,
+  the host it was made for and dates; never a private key. Events
+  `signin_passkey`, `passkey_added`, `passkey_removed`; the export lists
+  name, site and dates as `passkeys`; the rows go with the account.
+  The relying party is the host of `AUDIT_BASE_URL`, and the buttons show
+  only on requests that reached that host. **Changing the domain**: a
+  passkey is bound by the browser to the host it was made on, so after
+  `AUDIT_BASE_URL` moves to a new domain the old passkeys stop working
+  there. Nothing else changes: the password, the two-step code and the
+  recovery key keep working, the card lists each old passkey as "Solo
+  funciona en <old host>", and customers add a new one on the new domain
+  and remove the old. Announce it before the switch; there is no way to
+  move a passkey between domains.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
