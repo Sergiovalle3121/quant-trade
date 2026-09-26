@@ -381,6 +381,63 @@ def recovery_key_hash(text: str) -> str:
     return hash_secret("recovery:" + re.sub(r"[^A-Z0-9]", "", text.upper()))
 
 
+#: Two-step sign-in with an authenticator app (TOTP, RFC 6238): 6 digits,
+#: 30-second steps, one step of clock drift either way. A code is accepted
+#: only if its step is newer than the last one used, so a code never works
+#: twice. Code tries are limited per network and per account.
+TOTP_DIGITS = 6
+TOTP_PERIOD = 30
+TOTP_DRIFT_STEPS = 1
+TOTP_SECRET_BYTES = 20
+MAX_TOTP_TRIES_PER_HOUR = 10
+#: How long the code page after a correct password stays valid.
+TWO_STEP_CHALLENGE_MINUTES = 5
+TWO_STEP_COOKIE = "rigor_2step"
+
+
+def new_totp_secret() -> str:
+    """A base32 secret (160 random bits), as authenticator apps expect it."""
+    return base64.b32encode(secrets.token_bytes(TOTP_SECRET_BYTES)).decode("ascii")
+
+
+def totp_code(secret: str, step: int) -> str:
+    """The RFC 6238 (HMAC-SHA1) code for one 30-second step."""
+    key = base64.b32decode(secret, casefold=True)
+    digest = hmac.new(key, step.to_bytes(8, "big"), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    number = int.from_bytes(digest[offset : offset + 4], "big") & 0x7FFFFFFF
+    return str(number % 10**TOTP_DIGITS).zfill(TOTP_DIGITS)
+
+
+def totp_step(at: datetime) -> int:
+    return int(at.timestamp()) // TOTP_PERIOD
+
+
+def totp_match(secret: str, code: str, at: datetime) -> int | None:
+    """The step ``code`` belongs to (within the drift), or ``None``."""
+    typed = re.sub(r"\s", "", code)
+    if not re.fullmatch(rf"\d{{{TOTP_DIGITS}}}", typed):
+        return None
+    now = totp_step(at)
+    found = None
+    for step in range(now - TOTP_DRIFT_STEPS, now + TOTP_DRIFT_STEPS + 1):
+        # Every candidate is compared, so the time taken does not tell which.
+        if hmac.compare_digest(totp_code(secret, step), typed):
+            found = step
+    return found
+
+
+def totp_uri(secret: str, email: str, issuer: str) -> str:
+    """The ``otpauth://`` address an authenticator app reads from the QR code."""
+    from urllib.parse import quote
+
+    label = quote(f"{issuer}:{email}", safe="@:")
+    return (
+        f"otpauth://totp/{label}?secret={secret}&issuer={quote(issuer)}"
+        f"&algorithm=SHA1&digits={TOTP_DIGITS}&period={TOTP_PERIOD}"
+    )
+
+
 def hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
 
