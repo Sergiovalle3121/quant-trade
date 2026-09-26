@@ -184,9 +184,12 @@ def test_the_currency_card_says_each_currency_after_its_own_inflation(locale: st
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_the_full_report_list_names_the_mean_shift(locale: str) -> None:
     line = {
-        "es": "Si su rentabilidad media cambió en algún momento, y cuándo",
-        "en": "Whether its average return changed at some point, and when",
-        "pt": "Se a sua rentabilidade média mudou em algum momento, e quando",
+        "es": "Si su rentabilidad media cambió en algún momento, y cuándo (con 250 "
+        "rentabilidades o más)",
+        "en": "Whether its average return changed at some point, and when (with 250 "
+        "returns or more)",
+        "pt": "Se a sua rentabilidade média mudou em algum momento, e quando (com 250 "
+        "rentabilidades ou mais)",
     }[locale]
     assert line in _UI[locale]["full_items"]
 

@@ -923,7 +923,8 @@ _UI: dict[str, dict[str, Any]] = {
             "VIX tranquilo o agitado y crisis conocidas",
             "En tu moneda y tras su propia inflación: dólares, pesos mexicanos, reales, "
             "euros, libras, yenes, dólares canadienses y francos suizos",
-            "Si su rentabilidad media cambió en algún momento, y cuándo",
+            "Si su rentabilidad media cambió en algún momento, y cuándo "
+            "(con 250 rentabilidades o más)",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -1149,7 +1150,7 @@ _UI: dict[str, dict[str, Any]] = {
             "agitated VIX and known crises",
             "In your currency and after its own inflation: dollars, Mexican pesos, reais, "
             "euros, pounds, yen, Canadian dollars and Swiss francs",
-            "Whether its average return changed at some point, and when",
+            "Whether its average return changed at some point, and when (with 250 returns or more)",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",

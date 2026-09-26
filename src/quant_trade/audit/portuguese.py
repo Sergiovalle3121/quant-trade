@@ -514,7 +514,8 @@ UI_PT: dict[str, Any] = {
         "agitado e crises conhecidas",
         "Na sua moeda e depois da sua própria inflação: dólares, reais, pesos mexicanos, "
         "euros, libras, ienes, dólares canadenses e francos suíços",
-        "Se a sua rentabilidade média mudou em algum momento, e quando",
+        "Se a sua rentabilidade média mudou em algum momento, e quando "
+        "(com 250 rentabilidades ou mais)",
         "Página pública de verificação com selo",
     ],
     "upload_eyebrow": "Comece aqui",

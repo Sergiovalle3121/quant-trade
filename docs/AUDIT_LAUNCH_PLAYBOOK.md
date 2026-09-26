@@ -764,10 +764,10 @@ Cuando una estrategia pasa por meses flojos, la pregunta es si cambió algo o si
 
 Tres cuidados:
 1. Hace falta historia: con menos de unas 250 rentabilidades, un cambio pequeño casi nunca se detecta. Que no salga no prueba que no haya cambiado.
-2. El ruido se mide con cuidado: si cada rentabilidad se parece a la anterior, la varianza simple se queda corta (Newey-West).
+2. El ruido se mide con cuidado: si cada rentabilidad se parece a la anterior, la varianza simple se queda corta; Rigor toma la mayor de tres estimaciones (simple, Newey-West y una corregida por autocorrelación).
 3. La fecha es un rango: dice dónde se nota más el cambio, no su causa.
 
-Rigor lo hace con tu archivo y te da la fecha con su rango al 95 % y la media antes y después: https://rigor.up.railway.app/?ref=f12
+Rigor lo hace con tu archivo: si hay un cambio claro, te da la fecha con su rango al 95 % y la media antes y después; si no, te lo dice: https://rigor.up.railway.app/?ref=f12
 
 Describe tu historial; no dice qué pasará después.
 ```
@@ -779,10 +779,10 @@ When a strategy goes through weak months, the question is whether something chan
 
 Three cautions:
 1. It needs history: with fewer than about 250 returns, a small change is rarely detected. Not finding one does not prove nothing changed.
-2. The noise is measured carefully: if each return resembles the one before, the plain variance falls short (Newey-West).
+2. The noise is measured carefully: if each return resembles the one before, the plain variance falls short; Rigor takes the largest of three estimates (plain, Newey-West and one widened for autocorrelation).
 3. The date is a range: it says where the change shows most, not its cause.
 
-Rigor does it from your file and gives the date with its 95 % range and the average before and after: https://rigor.up.railway.app/en?ref=f12
+Rigor does it from your file: if a change is clear, it gives the date with its 95 % range and the average before and after; if not, it says so: https://rigor.up.railway.app/en?ref=f12
 
 It describes your history; it does not say what comes next.
 ```
