@@ -102,6 +102,11 @@ def test_tradovate_orders_are_fills_priced_with_the_contract_point_value() -> No
         ("INDZ26", "IND", 1.0, "BRL"),
         ("WDOF27", "WDO", 10.0, "BRL"),
         ("DOLF27", "DOL", 50.0, "BRL"),
+        ("IPC DC26", "IPC", 10.0, "MXN"),
+        ("IPCDC26", "IPC", 10.0, "MXN"),
+        ("MIP  MR27", "MIP", 2.0, "MXN"),
+        ("DA DC26", "DA", 10_000.0, "MXN"),
+        ("DA19 DC16", "DA", 10_000.0, "MXN"),
         # CME codes that share a first letter keep their own contract.
         ("GCZ6", "GC", 100.0, "USD"),
         ("MGCZ6", "MGC", 10.0, "USD"),
@@ -120,7 +125,8 @@ def test_eurex_and_ice_contracts_carry_their_point_value(
 
 
 @pytest.mark.parametrize(
-    "ticker", ["B", "G", "FDAX", "BRK", "GOOG", "SB", "ZN6", "WIN", "DOL", "INDA"]
+    "ticker",
+    ["B", "G", "FDAX", "BRK", "GOOG", "SB", "ZN6", "WIN", "DOL", "INDA", "IPC", "DA", "DAL"],
 )
 def test_a_bare_root_or_a_share_ticker_is_not_a_contract(ticker: str) -> None:
     from quant_trade.audit.universal import _contract
@@ -160,6 +166,17 @@ def test_b3_mini_index_fills_are_priced_in_reais() -> None:
     report = _read([header, *rows], "fills.csv")
     assert [round(t.pnl, 2) for t in report.trades.trades] == [100.0]
     assert any("point value: WIN x0.2 BRL" in warning for warning in report.warnings)
+
+
+def test_mexder_ipc_fills_are_priced_in_pesos() -> None:
+    header = "Account,B/S,Contract,avgPrice,filledQty,Fill Time"
+    rows = [
+        "ACC1,Sell,IPC DC26,60000,1,09/21/2026 08:00:00",
+        "ACC1,Buy,IPC DC26,59900,1,09/21/2026 09:00:00",
+    ]
+    report = _read([header, *rows], "fills.csv")
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [1000.0]
+    assert any("point value: IPC x10 MXN" in warning for warning in report.warnings)
 
 
 def test_topstepx_trades_with_a_zone_after_the_time() -> None:

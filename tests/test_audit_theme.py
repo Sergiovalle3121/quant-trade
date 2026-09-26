@@ -933,8 +933,12 @@ def test_an_unknown_share_card_falls_back_to_the_site_card() -> None:
     assert og_image_name("class-C", "en") == "og-class-C-en.png"
     assert og_image_name("class-Z", "es") == "og-es.png"
     assert og_image_name("../secret", "es") == "og-es.png"
-    # Portuguese has no cards yet: a Brazilian link previews the English one, not Spanish.
+    # Portuguese has the site and audience cards; the rest preview the English one.
+    assert og_image_name("", "pt") == "og-pt.png"
+    assert og_image_name("for-copiar-senales", "pt") == "og-for-copiar-senales-pt.png"
     assert og_image_name("sample", "pt") == "og-sample-en.png"
+    assert og_image_name("class-B", "pt") == "og-class-B-en.png"
+    assert og_image_name("", "fr") == "og-en.png"
     assert set(OG_IMAGES) <= set(STATIC_FILES)
 
 
@@ -945,3 +949,47 @@ def test_the_prop_firm_table_reads_as_cards_on_a_phone(tmp_path: Path) -> None:
     # Four columns do not fit 390 px: each challenge becomes a card, its figures labelled.
     assert "@media screen and (max-width:620px){.paper table.firms," in STYLE
     assert ".firms td[data-l]::before{content:attr(data-l);" in STYLE
+
+
+def test_the_column_choice_reads_as_steps_in_cards_and_one_column_on_a_phone() -> None:
+    # Each group of menus is a card; the re-pick of the file is a dashed drop box.
+    assert ".map-form .map-group{margin:14px 0 0;padding:16px 18px 2px;border:1px solid" in STYLE
+    assert ".map-form>.field{margin:22px 0 0;padding:16px 18px;border:1px dashed" in STYLE
+    # Two menus side by side cut the column names short on a phone.
+    assert ".map-form .map-group .form-grid{grid-template-columns:minmax(0,1fr)}" in STYLE
+    # The browser's grey file button matches the site's buttons.
+    assert "input[type=file]::file-selector-button{" in STYLE
+
+
+def test_what_the_account_keeps_reads_as_a_security_card(tmp_path: Path) -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    page = _client(tmp_path).get("/registro").text
+    stores = page.split("<div class='acct-card acct-stores'>", 1)[1].split("</div>", 1)[0]
+    assert stores.startswith("<h3><svg")
+    assert ".acct-stores h3 svg{flex:none;width:30px;height:30px" in ACCOUNT_CSS
+
+
+def test_small_phones_keep_the_landing_and_timing_tables_inside_the_screen() -> None:
+    assert ".mock-url{white-space:nowrap;overflow:hidden;text-overflow:ellipsis" in STYLE
+    assert ".signin-first .inline-form .btn{width:100%" in STYLE
+    assert "(max-width:380px){.timing th,.timing td{padding:9px 5px!important}" in STYLE
+    # The landing's secondary link is monochrome like the rest, not a lone blue.
+    assert "min-height:44px;color:var(--text);font-weight:500;" in STYLE
+
+
+def test_the_real_work_cards_line_up_their_proof_links() -> None:
+    assert "#confianza .card p:last-child:has(>a:only-child){margin-top:auto" in STYLE
+    assert "#confianza .card p>a:only-child::after{content:' \\2192'" in STYLE
+    # A class name in the stylesheet would show on pages that leave that line out.
+    assert "trust-ask" not in STYLE
+
+
+def test_both_drawdown_tiles_carry_the_same_sign() -> None:
+    from quant_trade.audit.report import LABELS, _kpi_list
+    from quant_trade.audit.sample import sample_result
+
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    tiles = {label: shown for label, shown, _ in _kpi_list(data, LABELS["es"])}
+    falls = [shown for label, shown in tiles.items() if label.startswith("Drawdown")]
+    assert len(falls) == 2 and all(shown.startswith("-") for shown in falls)
