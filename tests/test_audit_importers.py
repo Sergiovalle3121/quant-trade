@@ -995,6 +995,50 @@ def test_mt5_xlsx_export_reads_like_the_html_report(name: str, expected: str) ->
     assert not any("the report states" in w for w in report.warnings)
 
 
+#: The Deals header of a real Traditional Chinese terminal export (no Fee column).
+_CHINESE_DEALS_HEADER = [
+    "時間", "成交", "交易品種", "類型", "趨勢", "交易量", "價位", "訂單",
+    "手續費", "隔夜利息", "盈利", "本日餘額", "註釋",
+]  # fmt: skip
+
+
+def _deals_without_fee(header: list[object]) -> list[list[object]]:
+    """The history workbook with the older 13-column Deals table (no Fee) under
+    ``header``, no Positions rows and a blank trailing column on every row, as
+    a real export has: the trades come from the Deals alone."""
+    rows = _as_workbook_rows(fixture("mt5_history.html"))
+    positions, orders = rows.index(["Positions"]), rows.index(["Orders"])
+    rows = rows[: positions + 1] + rows[orders:]
+    start = next(i for i, row in enumerate(rows) if row[:2] == ["Time", "Deal"])
+    fee = rows[start].index("Fee")
+    out: list[list[object]] = []
+    for index, row in enumerate(rows):
+        if index == start:
+            row = list(header)
+        elif index > start and isinstance(row[0], str) and row[0][:4].isdigit():
+            row = row[:fee] + row[fee + 1 :]
+        out.append([*row, ""])
+    return out
+
+
+@pytest.mark.parametrize(
+    "header",
+    [_CHINESE_DEALS_HEADER, [f"c{index}" for index in range(13)]],
+    ids=["chinese", "unknown-names"],
+)
+def test_mt5_xlsx_deals_with_a_blank_trailing_column_keep_profit_and_balance_apart(
+    header: list[object],
+) -> None:
+    # A 14-cell row used to be taken for the layout with a Fee column, which
+    # read each deal's Balance as its profit.
+    html_report = import_report(fixture("mt5_history.html"))
+    report = import_report(xlsx({"Sheet1": _deals_without_fee(header)}))
+    assert report.source_format == MT5_HISTORY_XLSX
+    assert gross(report) == gross(html_report)
+    assert report.initial_balance == html_report.initial_balance
+    assert equity_rows(report) == equity_rows(html_report)
+
+
 def test_mt4_statement_before_build_600_has_no_taxes_column() -> None:
     text = fixture("mt4_statement.htm").decode("utf-8")
     text = text.replace("<td>Commission</td><td>Taxes</td>", "<td>Commission</td>")
