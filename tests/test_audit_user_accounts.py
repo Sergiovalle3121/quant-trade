@@ -1878,3 +1878,213 @@ def test_strategy_pdfs_are_cached_and_limited_per_account(
     # The cached one still downloads.
     client.post(f"{where}/nombre", data={"name": "EA 0", "csrf": csrf})
     assert client.get(f"{where}/pdf").status_code == 200
+
+
+# -- "Invita a un colega" -----------------------------------------------------------
+def _invite_token(client: TestClient) -> str:
+    match = re.search(r"invita=([\w-]+)", client.get("/cuenta").text)
+    assert match, "no invite link on the account page"
+    return match.group(1)
+
+
+def _join(client: TestClient, email: str, token: str, headers: dict[str, str] | None = None):
+    page = client.get(f"/registro?invita={token}").text
+    return client.post(
+        "/registro",
+        data={"email": email, "password": PASSWORD, "csrf": _csrf(page), "invite": token},
+        headers=headers or {},
+        follow_redirects=False,
+    )
+
+
+def _seeded_file(seed: int) -> dict[str, tuple[str, bytes, str]]:
+    return {"equity": ("e.csv", csv_bytes(positive_drift(430, seed=seed)), "text/csv")}
+
+
+def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    ana_ip = {"X-Forwarded-For": "203.0.113.10"}
+    _signup(client, welcome=True)
+    assert (
+        "acct=welcome"
+        in client.post(
+            "/audits",
+            files=_seeded_file(21),
+            data={"consent": "on"},
+            headers=ana_ip,
+            follow_redirects=False,
+        ).headers["location"]
+    )
+    page = client.get("/cuenta").text
+    assert "Invita a un colega" in page and "hasta 5 al mes" in page and "wa.me" in page
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    token = _invite_token(client)
+    assert token == _invite_token(client)  # the same link every time
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+
+    # A colleague in another browser and network: invited, then credited.
+    bea = TestClient(client.app)
+    assert "Un colega te invitó" in bea.get(f"/registro?invita={token}").text
+    assert _join(bea, "bea@example.com", token).status_code == 303
+    assert "Esperan su primer informe" in client.get("/cuenta").text
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 0  # type: ignore[attr-defined]
+    bea_ip = {"X-Forwarded-For": "198.51.100.20"}
+    upload = bea.post(
+        "/audits",
+        files=_seeded_file(22),
+        data={"consent": "on"},
+        headers=bea_ip,
+        follow_redirects=False,
+    )
+    assert "acct=welcome" in upload.headers["location"]
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+    summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
+    assert (summary.joined, summary.waiting, summary.credited) == (1, 0, 1)
+    assert "bea@example.com" not in client.get("/cuenta").text  # never who joined
+    # A second upload of the new account credits nothing more.
+    bea.post("/audits", files=_seeded_file(23), data={"consent": "on"}, headers=bea_ip)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+
+    # Someone on Ana's own network is taken as Ana: joined, no credit.
+    carl = TestClient(client.app)
+    _join(carl, "carl@example.com", token)
+    carl.post("/audits", files=_seeded_file(24), data={"consent": "on"}, headers=ana_ip)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+    summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
+    assert (summary.joined, summary.credited) == (2, 1)
+
+    # Ana's own browser (her free report's mark) is never noted as an invite.
+    device = client.cookies.get("rigor_device")
+    mine = TestClient(client.app)
+    mine.cookies.set("rigor_device", device)
+    _join(mine, "dan@example.com", token)
+    assert store.invite_summary(ana.id, datetime.now(UTC)).joined == 2  # type: ignore[attr-defined]
+
+    # The data download carries dates and outcomes, never the other account.
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert data["invites"]["link_token"] == token
+    assert [item["outcome"] for item in data["invites"]["joined"]] == ["credited", "self"]
+    assert "bea@example.com" not in json.dumps(data)
+    assert json.loads(bea.get("/cuenta/datos").text)["invites"]["joined_through_an_invite"]
+
+
+def test_invites_ignore_bad_tokens_the_signed_in_inviter_and_the_monthly_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "REFERRAL_MONTHLY_CAP", 1)
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    token = _invite_token(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    # An unknown or malformed token: a normal sign-up, no banner, nothing noted.
+    stranger = TestClient(client.app)
+    assert "Un colega te invitó" not in stranger.get("/registro?invita=nope<script>").text
+    assert _join(stranger, "eve@example.com", "x" * 20).status_code == 303
+    assert store.invite_summary(ana.id, datetime.now(UTC)).joined == 0  # type: ignore[attr-defined]
+    # The inviter, still signed in, posting a sign-up with its own link.
+    _join(client, "fake@example.com", token)
+    assert store.invite_summary(ana.id, datetime.now(UTC)).joined == 0  # type: ignore[attr-defined]
+    # Past the month's cap an invite still joins, with no credit.
+    for n, email in enumerate(("bea@example.com", "carl@example.com")):
+        friend = TestClient(client.app)
+        _join(friend, email, token)
+        friend.post(
+            "/audits",
+            files=_seeded_file(30 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": f"198.51.100.{40 + n}"},
+        )
+    summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
+    assert (summary.joined, summary.credited, summary.credited_this_month) == (2, 1, 1)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+
+
+def test_deleting_either_account_removes_its_invite_rows(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    token = _invite_token(client)
+    friend = TestClient(client.app)
+    _join(friend, "bea@example.com", token)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    bea = store.find_account("bea@example.com")  # type: ignore[attr-defined]
+    assert store.invite_summary(ana.id, datetime.now(UTC)).joined == 1  # type: ignore[attr-defined]
+    store.delete_account(bea.id)  # type: ignore[attr-defined]
+    assert store.invite_summary(ana.id, datetime.now(UTC)).joined == 0  # type: ignore[attr-defined]
+    store.delete_account(ana.id)  # type: ignore[attr-defined]
+    assert store.inviter_for_token(token) is None  # type: ignore[attr-defined]
+    for gone in (ana.id, bea.id):
+        assert store.account_export(gone) is None  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert not conn.execute(store.referrals.select()).all()  # type: ignore[attr-defined]
+        assert not conn.execute(store.invite_links.select()).all()  # type: ignore[attr-defined]
+
+
+def test_invite_screens_exist_in_every_language_and_pass_the_guard() -> None:
+    from quant_trade.audit.store import InviteSummary
+
+    for locale in account_pages.LANGUAGES:
+        html = account_pages.invite_section(
+            locale,
+            account_pages.InviteView(
+                link="https://example.test/registro?invita=abc12345",
+                summary=InviteSummary(joined=3, waiting=1, credited=2, credited_this_month=1),
+                credits=1,
+                monthly_cap=5,
+            ),
+        )
+        text = re.sub(r"<[^>]+>", " ", html)
+        assert "abc12345" in html and not find_claims(text)
+        assert "{" not in text
+        signup = account_pages.signup_page(locale=locale, csrf="c" * 30, invite="abc12345")
+        assert "name='invite' value='abc12345'" in signup
+        assert account_pages.COPY[locale]["invited_banner"] in signup
+
+
+def test_deleting_credited_invitees_never_frees_the_monthly_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "REFERRAL_MONTHLY_CAP", 2)
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    token = _invite_token(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+
+    def invite(n: int) -> TestClient:
+        friend = TestClient(client.app)
+        _join(friend, f"friend{n}@example.com", token)
+        friend.get("/cuenta")  # the invitee's own invite link exists too
+        friend.post(
+            "/audits",
+            files=_seeded_file(50 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": f"198.51.100.{60 + n}"},
+        )
+        return friend
+
+    for n in range(2):
+        invite(n)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 2  # type: ignore[attr-defined]
+    for n in range(2):
+        friend = store.find_account(f"friend{n}@example.com")  # type: ignore[attr-defined]
+        store.delete_account(friend.id)  # type: ignore[attr-defined]
+    invite(2)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 2  # type: ignore[attr-defined]
+    summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
+    assert (summary.joined, summary.credited, summary.credited_this_month) == (3, 2, 2)
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        kept = conn.execute(store.referrals.select()).mappings().all()  # type: ignore[attr-defined]
+        # The deleted invitees keep only an outcome under a random id.
+        assert all(
+            row["device_sha256"] == "" for row in kept if row["invitee_id"].startswith("gone")
+        )
+        tokens = conn.execute(store.invite_links.select()).mappings().all()  # type: ignore[attr-defined]
+    assert {row["account_id"] for row in tokens} == {
+        ana.id,
+        store.find_account("friend2@example.com").id,  # type: ignore[attr-defined]
+    }

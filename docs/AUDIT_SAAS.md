@@ -1850,6 +1850,26 @@ changes what a report says.
   carries no links. The same summary on the same day is served from memory;
   an account renders at most 10 in 10 minutes (then 429), since they share
   the report PDFs' render slots.
+- **Invita a un colega** (`store.invite_*`, `record_referral`,
+  `reward_referral`; tables `invite_links` and `referrals`): "Mi cuenta"
+  shows a personal link `/registro?invita=<token>` (EN `/signup`, PT
+  `/pt/cadastro`) with a WhatsApp share, how many joined, how many wait for
+  their first report and the credits received (this month out of the cap).
+  A sign-up through the link is noted unless the token is unknown, the
+  inviter is still signed in in that browser, or the browser carries the
+  mark of the inviter's own free report. The inviter gets
+  `accounts.REFERRAL_CREDITS` (1) full-report credit, as an access code no
+  one sees linked to the inviter, only when the new account's free first
+  report is granted, so the free tier's browser, file and address limits
+  already held; it is refused as `self` when that upload's browser mark or
+  address is one the inviter used (its free report, previews, own uploads),
+  and as `cap` past `accounts.REFERRAL_MONTHLY_CAP` (5) credited invites in
+  the calendar month (unique slots, so simultaneous rewards cannot pass it).
+  The inviter never sees who joined. Rows go with the inviter's account; an
+  invitee's deletion drops a pending row and keeps a decided one (dates,
+  outcome, slot) under a random id with no browser mark, so deleting
+  credited invitees never frees the cap. They show in "Descargar mis datos". Off in free mode or without the free first
+  report.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
@@ -2394,6 +2414,11 @@ again, a screenshot or any re-save never matches.
 A fifth audience page, for signal copiers (`/para/copiar-senales`, `/for/signal-copiers`), names the risks a copy-trading percentage hides and points each at a live check: martingale sizing, grid averaging, no sign of a stop loss, many small wins with large losses, many positions open at once, hidden floating drawdown, positions still open at the end, and gains inflated by deposits. It asks for the account's exported history, because a screenshot cannot be audited. The landing keeps its four cards and links the fifth page in a line under them, so `AUDIENCE_PAGES` keeps the four card pages first.
 
 ### Naming the columns of a file no importer knows (`audit/mapping.py`)
+
+The screen speaks the upload's language: Spanish, English, or Portuguese
+(`mapping.COPY["pt"]`) for an upload sent from `/pt`, whose "back" link
+returns to `/pt#subir`; a test keeps every Portuguese text on its English
+placeholders and through the guard.
 
 Some uploads are tables that no importer recognises: `unknown_format`,
 `universal_columns_missing`, a column the customer named that is unreadable

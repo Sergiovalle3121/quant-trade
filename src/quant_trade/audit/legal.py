@@ -25,7 +25,7 @@ from quant_trade.audit.funnel import REF_COOKIE, REF_DAYS, SEEN_COOKIE
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
-LEGAL_UPDATED = "2026-09-25"
+LEGAL_UPDATED = "2026-09-26"
 
 STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
 
@@ -571,6 +571,13 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "gets it only once. The address is cleared after "
                     f"{days} days; the two hashes stay, even if you delete your account and "
                     "without your e-mail, so the offer cannot be repeated.",
+                    "For 'Invite a colleague': each account's invite link, and for an account "
+                    "created through someone's link, the date, whether its free first report "
+                    "happened and the hash of its browser identifier, to refuse self-invites. "
+                    "The inviter sees only counts, never who joined. It is deleted with the "
+                    "inviter's account; when the account that joined is deleted, its row "
+                    "keeps only the dates and the outcome under a random id (no e-mail, no "
+                    "browser hash), so the monthly limit still holds.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
@@ -698,6 +705,13 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 f"archivo lo reciba una sola vez. La dirección se borra a los {days} días; los "
                 "dos hashes se quedan, aunque borres tu cuenta y sin tu correo, para que la "
                 "oferta no se repita.",
+                "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, para una "
+                "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
+                "informe gratis y el hash del identificador de su navegador, para rechazar "
+                "autoinvitaciones. Quien invita ve solo cifras, nunca quién se unió. Se borra "
+                "con la cuenta de quien invita; si se borra la cuenta que se unió, su fila "
+                "guarda solo las fechas y el resultado bajo un id al azar (sin correo ni hash "
+                "del navegador), para que el límite mensual se mantenga.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "

@@ -5343,7 +5343,8 @@ def render_html(
     labels = LABELS.get(locale, LABELS["es"])
     locked = watermark and not free_mode
     verdict = data["verdict"]
-    if locale != declared_locale:
+    if locale != declared_locale or locale == "pt":
+        # Stored reasons are English and Spanish only, so Portuguese always rebuilds.
         verdict = {**verdict, "summary": _summary_in(data, locale)}
 
     paybox = ""
