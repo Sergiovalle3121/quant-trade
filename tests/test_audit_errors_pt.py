@@ -219,3 +219,28 @@ def test_the_pt_trust_cards_open_the_portuguese_sample(tmp_path: Path) -> None:
     trust = page.split("class='card spot'", 1)[1] if "class='card spot'" in page else page
     assert "/pt/exemplo" in trust
     assert "/sample?lang=en" not in page
+
+
+def test_back_from_a_portuguese_error_goes_to_the_portuguese_form(tmp_path: Path) -> None:
+    assert "href='/pt#subir'" in error_page("x", locale="pt")
+    assert "href='/?lang=es#subir'" in error_page("x", locale="es")
+    client = _client(tmp_path)
+    files = {"report": ("conta.xls", LEGACY_XLS, "application/vnd.ms-excel")}
+    refused = client.post("/audits", files=files, data={"consent": "on", "locale": "pt"})
+    missing = client.get("/pt/nao-existe")
+    for page in (refused.text, missing.text):
+        assert "href='/pt#subir'" in page
+        assert "/?lang=pt" not in page
+    # And the page it goes to is the Portuguese form.
+    assert "<html lang='pt'>" in client.get("/pt").text
+
+
+def test_numbers_in_a_portuguese_refusal_use_portuguese_separators() -> None:
+    text = errors_pt.portuguese("the file is 12,345,678 bytes; the limit is 10,485,760")
+    assert text == "o arquivo tem 12.345.678 bytes; o limite é 10.485.760"
+    dated = errors_pt.portuguese("the equity file has fewer than two usable rows")
+    assert dated == "o arquivo da curva de equity tem menos de duas linhas utilizáveis"
+
+
+def test_a_very_long_message_is_not_tried_against_the_rules() -> None:
+    assert errors_pt.portuguese("the " + "x" * (errors_pt.MAX_MESSAGE_CHARS + 1)) is None

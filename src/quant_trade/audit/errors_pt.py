@@ -333,9 +333,24 @@ _COMPILED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
 )
 
 
+#: Longer messages are not tried against the rules: real refusals are far
+#: shorter, and the lazy groups make a long unmatched string slow.
+MAX_MESSAGE_CHARS = 4000
+_THOUSANDS = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?")
+
+
+def _number(value: str) -> str:
+    """``1,000,000.5`` as Portuguese writes it: ``1.000.000,5``."""
+    if not _THOUSANDS.fullmatch(value):
+        return value
+    return value.replace(",", " ").replace(".", ",").replace(" ", ".")
+
+
 def portuguese(message: str) -> str | None:
     """The Portuguese of one refusal, or ``None`` when no rule knows it."""
     text = message.strip()
+    if len(text) > MAX_MESSAGE_CHARS:
+        return None
     if text.startswith(LIVE_PREFIX[0]):
         inner = portuguese(text[len(LIVE_PREFIX[0]) :])
         return None if inner is None else LIVE_PREFIX[1] + inner
@@ -343,10 +358,10 @@ def portuguese(message: str) -> str | None:
         match = pattern.fullmatch(text)
         if match:
             values = {
-                name: _VALUES.get(name, str)(value) for name, value in match.groupdict().items()
+                name: _VALUES.get(name, _number)(value) for name, value in match.groupdict().items()
             }
             return template.format(**values)
     return None
 
 
-__all__ = ["FIELDS_PT", "FILES_PT", "LIVE_PREFIX", "RULES", "portuguese"]
+__all__ = ["FIELDS_PT", "FILES_PT", "LIVE_PREFIX", "MAX_MESSAGE_CHARS", "RULES", "portuguese"]

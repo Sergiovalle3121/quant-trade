@@ -949,7 +949,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request.cookies.get(funnel.SEEN_COOKIE) == today:
             return  # this browser was already counted today
         _cookie(response, funnel.SEEN_COOKIE, today, max_age=86400)
-        if path == "/" and request.query_params.get("lang") in ("es", "en", "pt"):
+        # "/" renders Spanish or English; Portuguese lives at /pt.
+        if path == "/" and request.query_params.get("lang") in ("es", "en"):
             locale = request.query_params["lang"]
         visits.add(day=today, locale=locale, ref=kept or arrived)
 

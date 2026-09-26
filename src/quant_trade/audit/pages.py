@@ -2764,6 +2764,8 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     ui = _UI[locale]
     other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
+    # "/" has no Portuguese: the Portuguese form is at /pt.
+    back = LANDING_PATHS["pt"] if locale == "pt" else f"/?lang={locale}"
     # A Portuguese page offers both other languages in the bar, not a third button.
     switch = (
         ""
@@ -2775,7 +2777,7 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
         _page_hero(ui["error_eyebrow"], title, dot="warn")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"{_error_card(message, locale)}<div class='back-row'>"
-        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"
+        f"<a class='btn btn-dark' href='{_e(back)}#subir'>{_e(copy['back'])}</a>"
         f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
         f"{_e(GUIDES_COPY[locale]['title'])}</a>{switch}</div></div></div>"
     )
