@@ -1309,6 +1309,16 @@ class Store:
             ).first()
         return str(found[0]) if found is not None else None
 
+    def recovery_key_matches(self, account_id: str, key_sha256: str) -> bool:
+        """Whether ``key_sha256`` is the account's key, without spending it."""
+        sa = self._sa
+        table = self.recovery_keys
+        with self.engine.connect() as conn:
+            found = conn.execute(
+                sa.select(table.c.key_sha256).where(table.c.account_id == account_id)
+            ).first()
+        return found is not None and hmac.compare_digest(str(found[0]), key_sha256)
+
     def use_recovery_key(self, account_id: str, key_sha256: str) -> bool:
         """Spend the account's recovery key if ``key_sha256`` is its hash.
 

@@ -2083,8 +2083,12 @@ changes what a report says.
   accepts a code only if its step is newer than the last one used (an
   update that names the step, so a code never works twice, even at once).
   Code tries count toward `accounts.MAX_TOTP_TRIES_PER_HOUR` (10) per network
-  and per account. A lost phone: the recovery key on the code page (or on
-  `/olvide`) signs in once and turns two-step off. Turning it off in Mi
+  and per account. A lost phone: the recovery key on the code page (after
+  the password) signs in once and turns two-step off. On `/olvide`, a
+  two-step account needs the key and a current code (the key is checked
+  first without being spent, so only its holder learns two-step is on), so
+  the key alone never takes the account; a lost phone and a forgotten
+  password go to the owner. Turning it off in Mi
   cuenta asks for a current code. The owner can turn it off with
   `quant-trade audit account-two-step-off EMAIL --yes` after checking the
   request. The secret is stored as is (a code check needs it); the export

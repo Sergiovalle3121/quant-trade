@@ -294,6 +294,13 @@ COPY: dict[str, dict[str, str]] = {
             "contraseña nueva. La clave sirve una sola vez; después crea otra en «Mi cuenta»."
         ),
         "recovery_key": "Clave de recuperación",
+        "recover_code": "Código de tu app (solo con verificación en dos pasos)",
+        "recover_code_help": "Déjalo vacío si no activaste la verificación en dos pasos.",
+        "code_bad_reset": (
+            "Tu cuenta tiene verificación en dos pasos: escribe también un código actual de tu "
+            "app. Si perdiste el teléfono, entra con tu contraseña y usa la clave en el paso "
+            "del código, o escríbenos."
+        ),
         "recover_button": "Guardar contraseña nueva",
         "recover_none_title": "¿No tienes clave?",
         "recovery_bad": (
@@ -332,6 +339,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "recovery_done": "Ya la guardé, volver a Mi cuenta",
         "two_step_card": "Verificación en dos pasos",
+        "two_of_three": (
+            "Con los dos pasos activos, para entrar o recuperar la cuenta necesitas dos de "
+            "estas tres cosas: tu contraseña, el código de tu app o tu clave de recuperación. "
+            "Guarda la clave lejos de tu contraseña."
+        ),
         "two_step_is_off": (
             "Desactivada. Actívala para que, además de tu contraseña, se pida un código de "
             "6 dígitos de una app de autenticación (Google Authenticator, Microsoft "
@@ -679,6 +691,13 @@ COPY: dict[str, dict[str, str]] = {
             "password. The key works once; afterwards make a new one in My account."
         ),
         "recovery_key": "Recovery key",
+        "recover_code": "Code from your app (only with two-step sign-in)",
+        "recover_code_help": "Leave it empty if you did not turn on two-step sign-in.",
+        "code_bad_reset": (
+            "Your account has two-step sign-in: also type a current code from your app. If you "
+            "lost your phone, sign in with your password and use the key at the code step, or "
+            "write to us."
+        ),
         "recover_button": "Save new password",
         "recover_none_title": "No key?",
         "recovery_bad": (
@@ -717,6 +736,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "recovery_done": "I saved it, back to My account",
         "two_step_card": "Two-step sign-in",
+        "two_of_three": (
+            "With two-step on, signing in or recovering the account takes two of these three: "
+            "your password, the code from your app or your recovery key. Keep the key apart "
+            "from your password."
+        ),
         "two_step_is_off": (
             "Off. Turn it on so that, besides your password, signing in asks for a 6-digit "
             "code from an authenticator app (Google Authenticator, Microsoft Authenticator, "
@@ -1109,6 +1133,7 @@ def forgot_page(
             f"<form method='post' action='{path('forgot', locale)}' autocomplete='off'>"
             f"<h2>{_e(copy['recover_title'])}</h2>"
             f"<p class='muted'>{_e(copy['recover_help'])}</p>"
+            f"<p class='muted'>{_e(copy['two_of_three'])}</p>"
             + _hidden("csrf", csrf)
             + _email_field(copy, email)
             + _field(
@@ -1116,6 +1141,12 @@ def forgot_page(
                 "<input type='text' name='key' required maxlength='40' autocomplete='off' "
                 "spellcheck='false' autocapitalize='characters' "
                 "placeholder='XXXXX-XXXXX-XXXXX-XXXXX'>",
+            )
+            + _field(
+                copy["recover_code"],
+                "<input type='text' name='code' inputmode='numeric' pattern='[0-9 ]{6,8}' "
+                "maxlength='8' autocomplete='one-time-code' spellcheck='false'>",
+                copy["recover_code_help"],
             )
             + _field(
                 copy["password_new"],
@@ -1839,6 +1870,7 @@ def two_step_setup_page(
         "<div class='wrap-narrow'>"
         + _alert(copy, error)
         + f"<ol class='buy-steps'>{steps}</ol>"
+        + f"<p class='acct-nudge'>{icon('shield')}<span>{_e(copy['two_of_three'])}</span></p>"
         + f"<div class='acct-qr'>{qr_svg}</div>"
         + f"<p class='muted'>{_e(copy['two_step_secret'])}</p>"
         + f"<p class='acct-key'><code>{_e(grouped)}</code></p>"

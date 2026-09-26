@@ -2510,6 +2510,8 @@ def test_two_step_turns_on_only_after_a_code_and_needs_a_recovery_key(tmp_path: 
     shown = client.post("/cuenta/dos-pasos", data={"current": PASSWORD, "csrf": csrf})
     assert shown.headers["cache-control"] == "no-store"
     assert "Escanea el código QR" in shown.text and "<svg" in shown.text
+    assert "dos de estas tres cosas" in shown.text
+    assert "dos de estas tres cosas" in TestClient(client.app).get("/olvide").text
     assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
     secret = SECRET_SHAPE.search(shown.text).group(1).replace(" ", "")  # type: ignore[union-attr]
     ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
@@ -2601,11 +2603,29 @@ def test_a_lost_phone_signs_in_with_the_recovery_key_and_turns_two_step_off(
     assert "la verificación en dos pasos quedó" in other.get(done.headers["location"]).text
     assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
     assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
-    # /olvide with a recovery key turns it off too.
-    _turn_on_two_step(other)
+    # On /olvide the key alone is not enough while two-step is on: the app's
+    # code is asked too, and a wrong one leaves the key unspent.
+    secret = _turn_on_two_step(other)
     key = KEY_SHAPE.search(_make_recovery_key(other).text).group(1)  # type: ignore[union-attr]
-    assert _recover(TestClient(client.app), "ana@example.com", key).status_code == 303
-    assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+    stranger = TestClient(client.app)
+    alone = _recover(stranger, "ana@example.com", key)
+    assert alone.status_code == 400 and "código actual de tu app" in alone.text
+    assert store.recovery_key_created(ana.id) is not None  # type: ignore[attr-defined]
+    csrf = _csrf(stranger.get("/olvide").text)
+    both = stranger.post(
+        "/olvide",
+        data={
+            "email": "ana@example.com",
+            "key": key,
+            "code": _code(secret, 1),
+            "password": NEW_PASSWORD,
+            "csrf": csrf,
+        },
+        follow_redirects=False,
+    )
+    assert both.status_code == 303 and "done=recovered" in both.headers["location"]
+    assert store.two_step_on(ana.id)  # type: ignore[attr-defined]
+    assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
 
 
 def test_turning_two_step_off_needs_a_current_code(tmp_path: Path) -> None:
@@ -2691,6 +2711,9 @@ def test_the_two_step_screens_exist_in_every_language(tmp_path: Path) -> None:
         shown = client.post(f"{prefix}/dos-pasos", data={"current": PASSWORD, "csrf": csrf})
         assert words in shown.text, prefix
         assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
+    assert "two of these three" in TestClient(client.app).get("/forgot").text
+    pt_forgot = TestClient(client.app).get(account_pages.path("forgot", "pt")).text
+    assert "duas destas três coisas" in pt_forgot
     secret = SECRET_SHAPE.search(shown.text).group(1).replace(" ", "")  # type: ignore[union-attr]
     csrf = _csrf(client.get("/pt/conta").text)
     client.post("/pt/conta/dos-pasos/confirmar", data={"code": _code(secret), "csrf": csrf})

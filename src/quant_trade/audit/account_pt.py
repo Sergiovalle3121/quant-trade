@@ -264,6 +264,13 @@ COPY_PT: dict[str, str] = {
         "senha. A chave funciona uma única vez; depois crie outra em Minha conta."
     ),
     "recovery_key": "Chave de recuperação",
+    "recover_code": "Código do seu app (só com verificação em duas etapas)",
+    "recover_code_help": "Deixe vazio se você não ativou a verificação em duas etapas.",
+    "code_bad_reset": (
+        "Sua conta tem verificação em duas etapas: digite também um código atual do seu app. Se "
+        "você perdeu o telefone, entre com sua senha e use a chave na etapa do código, ou "
+        "escreva para nós."
+    ),
     "recover_button": "Salvar nova senha",
     "recover_none_title": "Não tem chave?",
     "recovery_bad": (
@@ -300,6 +307,11 @@ COPY_PT: dict[str, str] = {
     ),
     "recovery_done": "Já guardei, voltar para Minha conta",
     "two_step_card": "Verificação em duas etapas",
+    "two_of_three": (
+        "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "
+        "três coisas: sua senha, o código do seu app ou sua chave de recuperação. Guarde a chave "
+        "longe da sua senha."
+    ),
     "two_step_is_off": (
         "Desativada. Ative-a para que, além da sua senha, o login peça um código de 6 dígitos "
         "de um app autenticador (Google Authenticator, Microsoft Authenticator, 1Password ou "

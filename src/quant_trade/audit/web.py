@@ -2117,6 +2117,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             request: Request,
             email: Annotated[str, Form(max_length=320)] = "",
             key: Annotated[str, Form(max_length=200)] = "",
+            code: Annotated[str, Form(max_length=20)] = "",
             password: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
             lang: str | None = None,
@@ -2149,12 +2150,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if problem:
                 return again(problem, 400)
             account = db.find_account(clean) if acct.valid_email(clean) else None
-            if account is None or not db.use_recovery_key(account.id, acct.recovery_key_hash(key)):
+            key_hash = acct.recovery_key_hash(key)
+            if account is None or not db.recovery_key_matches(account.id, key_hash):
                 return again("recovery_bad", 400)
+            # With two-step on, the key alone is not enough to take the
+            # account: the app's code is asked too (only a key holder sees
+            # this). A lost phone uses the key on the code page, with the
+            # password, or the owner.
+            state = db.two_step_state(account.id)
+            if state is not None and state[1]:
+                step = acct.totp_match(state[0], code, now)
+                if step is None or not db.use_two_step_step(account.id, step):
+                    return again("code_bad_reset", 400)
+            if not db.use_recovery_key(account.id, key_hash):
+                return again("recovery_bad", 400)  # pragma: no cover - spent at once
             db.set_password(account.id, acct.hash_password(password))
             db.delete_sessions(account.id)
-            # The key proves the account without the phone: two-step goes off.
-            db.stop_two_step(account.id)
             return _signin_redirect(locale, done="recovered")
 
         return handler
