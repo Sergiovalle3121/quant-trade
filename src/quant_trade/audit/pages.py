@@ -401,7 +401,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "¿Y si olvido mi contraseña?",
                 "En Mi cuenta creas una clave de recuperación y la guardas. Si olvidas la "
                 "contraseña, con tu correo y esa clave pones una nueva tú mismo, sin esperar un "
-                "correo. Solo guardamos su huella, nunca la clave.",
+                "correo. Si activaste la verificación en dos pasos, también te pedimos el "
+                "código de tu app. De la clave solo guardamos su huella, nunca la clave misma.",
             ),
             (
                 "¿Cómo se usa el sello?",
@@ -686,7 +687,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "What if I forget my password?",
                 "In My account you make a recovery key and keep it. If you forget the password, "
                 "your e-mail and that key let you set a new one yourself, without waiting for "
-                "an e-mail. We keep only its fingerprint, never the key.",
+                "an e-mail. If you turned on two-step sign-in, we also ask for the code from "
+                "your app. We keep only the key's fingerprint, never the key itself.",
             ),
             (
                 "How is the badge used?",

@@ -293,8 +293,9 @@ COPY_PT: dict[str, Any] = {
         (
             "E se eu esquecer minha senha?",
             "Em Minha conta você cria uma chave de recuperação e a guarda. Se esquecer a senha, "
-            "com seu e-mail e essa chave você mesmo cria uma nova, sem esperar um e-mail. Só "
-            "guardamos a impressão dela, nunca a chave.",
+            "com seu e-mail e essa chave você mesmo cria uma nova, sem esperar um e-mail. "
+            "Se você ativou a verificação em duas etapas, também pedimos o código do seu "
+            "app. Da chave, só guardamos a impressão, nunca a chave em si.",
         ),
         (
             "Como se usa o selo?",
