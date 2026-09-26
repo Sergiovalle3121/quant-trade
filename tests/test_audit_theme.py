@@ -1279,3 +1279,11 @@ def test_a_table_header_row_is_not_left_alone_at_a_pdf_page_end() -> None:
 def test_the_line_under_the_summary_tiles_has_room() -> None:
     # Also the source line under a pair of figures, such as the mean-shift section.
     assert ".kpis+p,.facts+p.muted{margin-top:14px}" in STYLE
+
+
+def test_the_pdf_rows_notice_reads_as_a_warning_not_a_bare_box() -> None:
+    # The column screen's note that the rows came from a PDF had only a
+    # black outline; it now wears the same amber as the refusal card above it.
+    rule = STYLE.split("\n.warning{", 1)[1].split("}", 1)[0]
+    assert "background:color-mix(in srgb,var(--warn) 7%,#fff)" in rule
+    assert "border-left:3px solid var(--warn)" in rule
