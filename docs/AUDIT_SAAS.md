@@ -1389,7 +1389,9 @@ Canada's CPI (Statistics Canada's, through the Bank of Canada's Valet API,
 `V41690973`; the Bank asks paid services to say the data is free on its
 site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
 Central do Brasil's SGS series 433, monthly changes chained into an index
-from January 1995; a month beyond ±50 % refuses the reply). The IMF's CPI
+from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
+month, refuses the reply, since a broken link would leave its inflation out of
+every later level). The IMF's CPI
 dataset, which covers every currency, needs written permission for
 commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
 official APIs need a registered key, so the peso and the yen show no row

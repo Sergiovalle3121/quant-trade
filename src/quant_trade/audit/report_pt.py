@@ -1231,7 +1231,7 @@ REPORT: dict[str, Any] = {
         "currency_prices": "Preços ao consumidor: {prices}.",
         "currency_prices_through": " (preços até {month})",
         "currency_attrib_EUR": "euro, Eurostat (via FRED)",
-        "currency_attrib_CHF": "franco suíço, Eurostat",
+        "currency_attrib_CHF": "franco suíço, índice harmonizado do Eurostat",
         "currency_attrib_GBP": (
             "libra, Office for National Statistics, sob a Open Government Licence v3.0"
         ),

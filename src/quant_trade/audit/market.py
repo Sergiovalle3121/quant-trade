@@ -342,9 +342,23 @@ def parse_provider(text: str, provider: str) -> pd.Series:
         series = _monthly(frame.iloc[:, 0], frame.iloc[:, 1])
     elif provider == "bcb":
         frame = pd.DataFrame(json.loads(text))
-        stamps = pd.Series(pd.to_datetime(frame["data"], format="%d/%m/%Y", errors="coerce"))
-        changes = _monthly(stamps, frame["valor"])
-        changes = changes[changes.index >= pd.Timestamp(BCB_START)]
+        stamps = pd.to_datetime(frame["data"], format="%d/%m/%Y", errors="coerce")
+        values = pd.to_numeric(frame["valor"], errors="coerce")
+        kept = (stamps >= pd.Timestamp(BCB_START)).to_numpy()
+        changes = pd.Series(
+            values.to_numpy(dtype=float)[kept], index=pd.DatetimeIndex(stamps[kept])
+        ).sort_index()
+        # A chain is only as good as its links: a missing, repeated or unreadable
+        # month would leave its inflation out of every later level.
+        months = changes.index.to_period("M")
+        expected = pd.period_range(months.min(), months.max(), freq="M") if len(months) else []
+        if (
+            bool(stamps.isna().any())
+            or not bool(np.isfinite(changes.to_numpy()).all())
+            or len(months) != len(expected)
+            or not bool((months == expected).all())
+        ):
+            raise ValueError("IPCA months are not consecutive")
         if bool((changes.abs() > MAX_MONTHLY_CHANGE).any()):
             raise ValueError("monthly change out of range")
         series = 100.0 * (1.0 + changes / 100.0).cumprod()

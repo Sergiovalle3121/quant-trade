@@ -295,3 +295,15 @@ def test_prices_that_end_weeks_before_the_last_point_say_through_which_month(
     month = late.index[-1].strftime("%Y-%m")
     assert escape(LABELS[locale]["currency_prices_through"].format(month=month)) in html
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_brazilian_chain_with_a_missing_repeated_or_unreadable_month_is_refused() -> None:
+    months = [{"data": f"01/{month:02d}/1995", "valor": "1.0"} for month in range(1, 7)]
+    assert len(parse_provider(json.dumps(months), "bcb")) == 6
+    missing = months[:2] + months[3:]
+    repeated = months[:3] + [months[2]] + months[3:]
+    unreadable = months[:2] + [{"data": "01/03/1995", "valor": "1,5"}] + months[3:]
+    for broken in (json.dumps(rows) for rows in (missing, repeated, unreadable)):
+        with pytest.raises(ValueError):
+            parse_provider(broken, "bcb")
+        assert MarketData(lambda series, text=broken: text).refresh("cpi_brl") is False

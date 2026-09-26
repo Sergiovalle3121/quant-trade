@@ -936,7 +936,7 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_prices": "Precios al consumidor: {prices}.",
         "currency_prices_through": " (precios hasta {month})",
         "currency_attrib_EUR": "euro, Eurostat (vía FRED)",
-        "currency_attrib_CHF": "franco suizo, Eurostat",
+        "currency_attrib_CHF": "franco suizo, índice armonizado de Eurostat",
         "currency_attrib_GBP": (
             "libra, Office for National Statistics, bajo la Open Government Licence v3.0"
         ),
@@ -2142,7 +2142,7 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_prices": "Consumer prices: {prices}.",
         "currency_prices_through": " (prices through {month})",
         "currency_attrib_EUR": "euro, Eurostat (through FRED)",
-        "currency_attrib_CHF": "Swiss franc, Eurostat",
+        "currency_attrib_CHF": "Swiss franc, Eurostat's harmonised index",
         "currency_attrib_GBP": (
             "pound, Office for National Statistics, licensed under the Open Government Licence "
             "v3.0"
