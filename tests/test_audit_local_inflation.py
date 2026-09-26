@@ -464,3 +464,16 @@ def test_an_account_in_pesos_and_the_yen_row_credit_their_sources(locale: str) -
     assert escape(labels["currency_attrib_JPY"]) in html
     assert "Statistics Bureau" in labels["currency_attrib_JPY"]
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_an_account_in_another_currency_reads_one_period(locale: str) -> None:
+    inputs, _ = _inputs(locale)
+    inputs = replace(inputs, account_currency="AUD")
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market={}.get)
+    assert result.in_currencies is not None
+    assert result.in_currencies["reason"] == OTHER_CURRENCY
+    html, _ = render(result, watermark=False)
+    prefix = LABELS[locale]["currency_not_measured"].split("{reason}")[0]
+    line = html.split(escape(prefix), 1)[1].split("<", 1)[0].strip()
+    assert line.endswith(".") and not line.endswith(".."), line

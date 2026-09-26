@@ -5862,7 +5862,8 @@ def _currency_html(
         return ""
     if section.get("status") != "MEASURED":
         text = labels["currency_not_measured"].format(
-            reason=localize(str(section.get("reason", "")), locale)
+            # A reason may end in an abbreviation ("EE. UU."); the label adds the period.
+            reason=localize(str(section.get("reason", "")), locale).rstrip(".")
         )
         return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
     base = str(section.get("base") or "")
