@@ -1179,8 +1179,11 @@ trades none of these markets or public data is off.
 Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
 report adds one line under the key figures: the Sharpe ratio of the returns
 after subtracting what the 3-month US Treasury bill paid over the same days
-(FRED `DTB3`, read in the background with the market closes, in percent a
-year on a discount basis; zeros are real rates and kept). Each return spans
+(FRED `DTB3`, read in the background with the market closes; zeros are
+real rates and kept, and a reply with a rate above 25 % a year, `MAX_RATE`,
+is taken as broken). FRED quotes a bank-discount rate `d`, so it is turned
+into the yield a 91-day bill compounds to over a year,
+`(1 - d·91/360)^(-365/91) - 1` (5.234 % for `d` = 5 %). Each return spans
 the days from the previous point to its own, and the bill's rate on or before
 the start of that stretch (at most 10 days old, `MAX_GAP_DAYS`) is
 compounded over those days; the result is annualised like the headline

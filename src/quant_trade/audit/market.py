@@ -36,6 +36,9 @@ MAX_BYTES = 4_000_000
 RETRY_AFTER = 600.0
 #: How long a downloaded series is reused before it is read again.
 MAX_AGE = 6 * 3600.0
+#: Highest rate in percent a year a rate series may hold; above it the reply is
+#: taken as broken (US bills peaked near 16 % in 1981).
+MAX_RATE = 25.0
 #: Share of the trades one market must carry to stand for the file.
 DOMINANT = 2 / 3
 
@@ -230,6 +233,8 @@ class MarketData:
             series = parse_fred_csv(fetch(asset.series), rate=asset.rate)
             if len(series) < 2:
                 raise ValueError("FRED series has no closes")
+            if asset.rate and bool((series > MAX_RATE).any()):
+                raise ValueError("FRED rate out of range")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False

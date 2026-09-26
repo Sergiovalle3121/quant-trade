@@ -9,10 +9,12 @@ time) and reports the Sharpe ratio of what is left, beside the plain one.
 
 Each return spans the days from the previous point to its own; the bill's
 rate on or before the start of that stretch (at most ``MAX_GAP_DAYS`` old) is
-compounded over those days. The rate is taken as FRED publishes it (discount
-basis, a few hundredths of a point below the bond-equivalent yield). It is a
-dollar rate: for an account in another currency, that currency's own cash
-rate is the fair one, and the note says so. Nothing here changes the class.
+compounded over those days. FRED publishes a bank-discount rate ``d``: a
+91-day bill costs ``1 - d * 91 / 360``, so the annual yield compounded is
+``(1 - d * 91 / 360) ** (-365 / 91) - 1`` (5.234 % for a 5 % discount rate),
+and that yield is what is used. It is a dollar rate: for an account in another
+currency, that currency's own cash rate is the fair one, and the note says so.
+Nothing here changes the class.
 """
 
 from __future__ import annotations
@@ -28,18 +30,25 @@ from quant_trade.audit.schema import measured
 
 #: A bill rate older than this before a return's start is too stale to use.
 MAX_GAP_DAYS = 10
+#: Days to maturity of the 3-month bill the discount rate is quoted for.
+BILL_DAYS = 91.0
 #: Returns needed before the figure is worth printing.
 MIN_RETURNS = 10
 
 NOTE = (
     "Sharpe ratio of the returns after subtracting what the 3-month US Treasury bill paid "
-    "over the same days (FRED DTB3, discount basis), annualised like the headline Sharpe; "
-    "a dollar rate"
+    "over the same days (FRED DTB3, converted from the discount rate to an annual yield), "
+    "annualised like the headline Sharpe; a dollar rate"
 )
 UNAVAILABLE = "the Treasury bill rates could not be read when the report was made"
 NOT_COVERED = "the Treasury bill rates do not cover the whole history"
 TOO_FEW = "fewer than ten returns"
 FLAT = "the returns never move"
+
+
+def annual_yield(discount: np.ndarray) -> np.ndarray:
+    """The compounded annual yield of a 91-day bill bought at bank discount ``discount``."""
+    return (1.0 - discount * BILL_DAYS / 360.0) ** (-365.0 / BILL_DAYS) - 1.0
 
 
 def _days(stamps: pd.Series) -> pd.DatetimeIndex:
@@ -72,7 +81,7 @@ def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str
     stale = paired["seen"].isna() | ((paired["day"] - paired["seen"]).dt.days > MAX_GAP_DAYS)
     if bool(stale.any()):
         return {"status": "NOT_MEASURED", "reason": NOT_COVERED, **base}
-    yearly = paired["rate"].to_numpy(dtype=float) / 100.0
+    yearly = annual_yield(paired["rate"].to_numpy(dtype=float) / 100.0)
     cash = (1.0 + yearly) ** (np.clip(span_days, 0.0, None) / 365.0) - 1.0
     excess = returns - cash
     spread = float(excess.std(ddof=1))
@@ -89,4 +98,4 @@ def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str
     }
 
 
-__all__ = ["NOTE", "UNAVAILABLE", "excess_sharpe"]
+__all__ = ["NOTE", "UNAVAILABLE", "annual_yield", "excess_sharpe"]

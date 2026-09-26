@@ -7,11 +7,11 @@ import pandas as pd
 import pytest
 from audit_fixtures import csv_bytes
 
-from quant_trade.audit.cashrate import NOT_COVERED, excess_sharpe
+from quant_trade.audit.cashrate import NOT_COVERED, annual_yield, excess_sharpe
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
-from quant_trade.audit.market import parse_fred_csv
+from quant_trade.audit.market import MarketData, parse_fred_csv
 from quant_trade.audit.report import LABELS, render
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 
@@ -32,11 +32,12 @@ def test_a_strategy_that_earned_the_bill_rate_has_no_excess() -> None:
     # Exactly the bill's 5 % a year over each stretch, plus a little noise.
     noise = np.random.default_rng(1).normal(0, 1e-4, len(days))
     noise -= noise[1:].mean()  # the returns after the first carry no edge over the bill
-    frame["equity"] = 10_000 * np.cumprod(1 + (1.05 ** (spans / 365) - 1) + noise)
+    bill = float(annual_yield(np.array([0.05]))[0])
+    frame["equity"] = 10_000 * np.cumprod(1 + ((1 + bill) ** (spans / 365) - 1) + noise)
     out = excess_sharpe(frame, _rates(days, 5.0), 252.0)
     assert out["status"] == "MEASURED"
     assert abs(out["sharpe_excess"]["value"]) < 0.05
-    assert out["mean_rate"]["value"] == pytest.approx(0.05)
+    assert out["mean_rate"]["value"] == pytest.approx(0.05234, abs=1e-4)
 
 
 def test_the_bill_rate_lowers_the_sharpe_and_zero_rates_change_nothing() -> None:
@@ -78,7 +79,7 @@ def test_the_report_shows_it_under_the_tiles(locale: str) -> None:
     assert_report_clean(html)
     assert "href='https://fred.stlouisfed.org/series/DTB3'" in html
     assert LABELS[locale]["cash_sharpe"].split("(")[0] in html
-    assert "5.20%" in html
+    assert f"{float(annual_yield(np.array([0.052]))[0]):.2%}" in html  # 5.45 %, the yield
     assert find_claims(LABELS[locale]["cash_sharpe"]) == []
     assert untranslated(result.model_dump(mode="json")) == []
     # Without public data, nothing is asked and nothing is shown.
@@ -99,3 +100,27 @@ def test_bill_rates_down_is_not_measured_and_hidden() -> None:
     assert result.cash_rate is not None and result.cash_rate["status"] == "NOT_MEASURED"
     assert untranslated(result.model_dump(mode="json")) == []
     assert LABELS["es"]["cash_sharpe"].split("(")[0] not in render(result, watermark=False)[0]
+
+
+def test_the_discount_rate_becomes_the_bills_annual_yield() -> None:
+    """A constant 5 % DTB3 compounds to 1.05234 over 365 daily spans."""
+    days = pd.date_range("2023-01-01", periods=366, freq="D")
+    rates = pd.Series(5.0, index=days)
+    growth = 1.0
+    bill = float(annual_yield(np.array([0.05]))[0])
+    for _ in range(365):
+        growth *= (1.0 + bill) ** (1.0 / 365.0)
+    assert growth == pytest.approx(1.05234, abs=1e-4)
+    frame = _curve(days, np.zeros(len(days)))
+    frame["equity"] = 10_000 * np.cumprod(np.r_[1.0, np.full(365, (1 + bill) ** (1 / 365))])
+    out = excess_sharpe(frame, rates, 365.0)
+    assert out["mean_rate"]["value"] == pytest.approx(0.05234, abs=1e-4)
+
+
+def test_a_rate_reply_out_of_range_counts_as_unavailable() -> None:
+    for bad in ("99999", "1e300"):
+        text = f"DATE,DTB3\n2024-01-02,5.1\n2024-01-03,{bad}\n2024-01-04,5.2\n"
+        data = MarketData(lambda series, text=text: text)
+        assert data.refresh("tbill3m") is False and data.closes("tbill3m") is None
+    good = MarketData(lambda series: "DATE,DTB3\n2024-01-02,5.1\n2024-01-03,5.2\n")
+    assert good.refresh("tbill3m") is True

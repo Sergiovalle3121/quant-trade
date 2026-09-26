@@ -911,11 +911,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("no overlapping days", "ningún día en común"),
     (
         "Sharpe ratio of the returns after subtracting what the 3-month US Treasury bill paid "
-        "over the same days (FRED DTB3, discount basis), annualised like the headline Sharpe; "
-        "a dollar rate",
+        "over the same days (FRED DTB3, converted from the discount rate to an annual yield), "
+        "annualised like the headline Sharpe; a dollar rate",
         "Sharpe de los retornos tras restar lo que pagó la letra del Tesoro de EE. UU. a 3 "
-        "meses en los mismos días (FRED DTB3, base de descuento), anualizado como el Sharpe "
-        "principal; es una tasa en dólares",
+        "meses en los mismos días (FRED DTB3, convertida de tasa de descuento a rendimiento "
+        "anual), anualizado como el Sharpe principal; es una tasa en dólares",
     ),
     (
         "the Treasury bill rates could not be read when the report was made",
