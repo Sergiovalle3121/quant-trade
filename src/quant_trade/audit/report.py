@@ -583,8 +583,8 @@ LABELS: dict[str, dict[str, str]] = {
         "shift": "¿Cambió su rentabilidad media en algún momento?",
         "shift_intro": (
             "Buscamos el momento en que la rentabilidad media de la curva más cambió y medimos "
-            "si ese cambio es mayor que el vaivén normal de sus retornos (prueba CUSUM, con un "
-            "error que admite retornos encadenados). No cambia la clase."
+            "si ese cambio es mayor que el vaivén normal de sus retornos (prueba CUSUM, que tiene "
+            "en cuenta que un retorno puede influir en el siguiente). No cambia la clase."
         ),
         "shift_badge_changed": "Cambió",
         "shift_badge_steady": "Sin cambio claro",
@@ -1854,9 +1854,8 @@ LABELS: dict[str, dict[str, str]] = {
         "shift": "Did its average return change at some point?",
         "shift_intro": (
             "We look for the moment the curve's average return changed most and measure "
-            "whether that change is larger than the normal swing of its returns (a CUSUM test, "
-            "with an error that allows for returns that follow on from each other). It does "
-            "not change the class."
+            "whether that change is larger than the normal swing of its returns (a CUSUM test "
+            "that allows for one return influencing the next). It does not change the class."
         ),
         "shift_badge_changed": "Changed",
         "shift_badge_steady": "No clear change",
@@ -5232,7 +5231,7 @@ def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> s
             p=p,
         )
         out += (
-            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"<p class='live-verdict lv-INFO'><span class='badge INFO'>"
             f"{_e(labels['shift_badge_changed'])}</span> {_e(text)}</p>"
         )
         facts = ""
@@ -5254,7 +5253,7 @@ def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> s
     else:
         key = "shift_edge" if shift.get("edge") else "shift_steady"
         out += (
-            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"<p class='live-verdict lv-INFO'><span class='badge INFO'>"
             f"{_e(labels['shift_badge_steady'])}</span> {_e(labels[key].format(p=p))} "
             f"{_badge('MEASURED')}</p>"
         )
