@@ -2206,6 +2206,15 @@ changes what a report says.
   events. They go after 90 days with `purge_sessions`, with the account, and
   the export lists them under `failed_signins`. Rate-limited tries (429) are
   not counted.
+- **Since your last visit** (`account_seen` table, one time per account): each
+  view of Mi cuenta marks the time (`store.take_visit_notice`) and, when
+  something happened since the previous view, shows a notice on top once:
+  wrong-password tries added since (each line's count at the previous view
+  is kept in `failed_json`, so a line that spans it counts only the newer
+  tries) and sign-ins from a device label the
+  account had not used before that view, leaving out this browser's own
+  device and network. A first view shows nothing. The time goes with the
+  account and the export lists it as `account_page_seen_at`.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

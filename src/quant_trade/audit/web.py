@@ -1762,10 +1762,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _signin_redirect(locale, next_path=account_pages.path("account", locale))
             account, csrf, session_hash = session
             now = datetime.now(UTC)
+            try:
+                device, network = _device_network(request)
+                notice = db.take_visit_notice(account.id, now, device=device, network=network)
+            except Exception:  # pragma: no cover - best effort, never blocks the page
+                logger.warning("visit notice failed", exc_info=True)
+                notice = None
             return HTMLResponse(
                 account_pages.account_page(
                     locale=locale,
                     account=account,
+                    notice=notice,
                     audits=db.account_audits_list(account.id),
                     codes=db.account_codes_list(account.id),
                     credits=db.account_credits(account.id, now),

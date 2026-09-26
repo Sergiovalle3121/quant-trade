@@ -597,7 +597,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "account. Separately, when someone types a wrong password for your account: "
                     "how many tries there were per network and hour, the device label and the "
                     "time of the last one, never the e-mail or password typed; we keep the "
-                    "latest 20 lines, and delete them after 90 days and with your account.",
+                    "latest 20 lines, and delete them after 90 days and with your account. And "
+                    "the time of your last visit to 'My account', only to tell you what happened "
+                    "since; it is deleted with your account.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
@@ -750,7 +752,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "con tu cuenta. Aparte, cuando alguien escribe una contraseña incorrecta para "
                 "tu cuenta: cuántos intentos hubo por red y por hora, la etiqueta del "
                 "dispositivo y la hora del último, nunca el correo ni la contraseña escritos; "
-                "guardamos las últimas 20 líneas, las borramos a los 90 días y con tu cuenta.",
+                "guardamos las últimas 20 líneas, las borramos a los 90 días y con tu cuenta. "
+                "Y la hora de tu última visita a «Mi cuenta», solo para avisarte de lo que pasó "
+                "desde entonces; se borra con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "

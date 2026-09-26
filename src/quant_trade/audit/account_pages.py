@@ -28,6 +28,7 @@ from quant_trade.audit.store import (
     InviteSummary,
     SessionView,
     StrategyRecord,
+    VisitNotice,
 )
 from quant_trade.audit.theme import CLASS_COLOURS, icon
 
@@ -218,7 +219,8 @@ COPY: dict[str, dict[str, str]] = {
             "dispositivo y la red; las últimas 50, borradas a los 90 días o con la cuenta. "
             "Aparte, los intentos con contraseña incorrecta en tu cuenta: cuántos por red y "
             "hora, con la etiqueta del dispositivo (nunca lo que se escribió); los últimos 20, "
-            "borrados a los 90 días o con la cuenta.|"
+            "borrados a los 90 días o con la cuenta. Y la hora de tu última visita a «Mi cuenta», "
+            "para el aviso «Desde tu última visita»; se borra con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -389,6 +391,12 @@ COPY: dict[str, dict[str, str]] = {
         "event_sessions_ended": "Se cerraron todas las demás sesiones",
         "event_signin_failed_one": "Contraseña incorrecta (1 intento)",
         "event_signin_failed": "Contraseña incorrecta ({count} intentos)",
+        "notice_title": "Desde tu última visita",
+        "notice_failed_one": "1 intento de entrar con contraseña incorrecta.",
+        "notice_failed": "{count} intentos de entrar con contraseña incorrecta.",
+        "notice_new_device": "Una entrada desde un dispositivo nuevo: {device}.",
+        "notice_help": "Si no fuiste tú, cambia tu contraseña y cierra las demás sesiones.",
+        "notice_link": "Ver la actividad reciente",
         "two_step_card": "Verificación en dos pasos",
         "two_of_three": (
             "Con los dos pasos activos, para entrar o recuperar la cuenta necesitas dos de "
@@ -666,7 +674,9 @@ COPY: dict[str, dict[str, str]] = {
             "recovery key, sessions signed out) with its date, device label and network; the "
             "latest 50, deleted after 90 days or with the account. Separately, wrong-password "
             "tries on your account: how many per network and hour, with the device label "
-            "(never what was typed); the latest 20, deleted after 90 days or with the account.|"
+            "(never what was typed); the latest 20, deleted after 90 days or with the account. And "
+            "the time of your last visit to 'My account', for the 'Since your last visit' notice; "
+            "it goes with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -833,6 +843,12 @@ COPY: dict[str, dict[str, str]] = {
         "event_sessions_ended": "All other sessions were signed out",
         "event_signin_failed_one": "Wrong password (1 try)",
         "event_signin_failed": "Wrong password ({count} tries)",
+        "notice_title": "Since your last visit",
+        "notice_failed_one": "1 sign-in try with a wrong password.",
+        "notice_failed": "{count} sign-in tries with a wrong password.",
+        "notice_new_device": "A sign-in from a new device: {device}.",
+        "notice_help": "If it was not you, change your password and sign out the other sessions.",
+        "notice_link": "See recent activity",
         "two_step_card": "Two-step sign-in",
         "two_of_three": (
             "With two-step on, signing in or recovering the account takes two of these three: "
@@ -1077,6 +1093,8 @@ line-height:1.25;white-space:normal;text-align:center}
 .sess-table .sess-act{padding-top:10px}
 .sess-table .sess-act .btn,.acct-sessions>form .btn{width:100%;justify-content:center}}
 .acct-activity{margin-top:36px}
+.acct-notice{margin-bottom:24px;border-color:var(--bad)}
+.acct-notice ul{margin:8px 0 8px 18px}
 .act-table td:nth-child(2){font-weight:600}
 @media (max-width:760px){.act-table thead{display:none}
 .paper table.act-table,.act-table{border:0;background:none;box-shadow:none;overflow:visible}
@@ -1583,6 +1601,24 @@ def _sessions_card(
     )
 
 
+def _visit_notice(copy: dict[str, str], locale: str, notice: VisitNotice) -> str:
+    """ "Desde tu última visita": wrong-password tries and new-device sign-ins, once."""
+    items = []
+    if notice.failed_attempts == 1:
+        items.append(copy["notice_failed_one"])
+    elif notice.failed_attempts:
+        items.append(copy["notice_failed"].format(count=notice.failed_attempts))
+    for device in notice.new_devices:
+        items.append(copy["notice_new_device"].format(device=device))
+    lines = "".join(f"<li>{_e(item)}</li>" for item in items)
+    return (
+        "<div class='acct-card acct-notice' role='alert'>"
+        f"<h3>{icon('shield')}{_e(copy['notice_title'])}</h3><ul>{lines}</ul>"
+        f"<p class='muted'>{_e(copy['notice_help'])} "
+        f"<a href='{path('account', locale)}#actividad'>{_e(copy['notice_link'])}</a></p></div>"
+    )
+
+
 def _event_label(copy: dict[str, str], item: AccountEvent) -> str:
     if item.kind == "signin_failed":
         if item.count == 1:
@@ -1739,6 +1775,7 @@ def account_page(
     two_step_since: str = "",
     sessions: Sequence[SessionView] = (),
     events: Sequence[AccountEvent] = (),
+    notice: VisitNotice | None = None,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
@@ -1933,6 +1970,7 @@ def account_page(
     )
     body = (
         _alert(copy, error, flash)
+        + (_visit_notice(copy, locale, notice) if notice else "")
         + header
         + recovery_nudge
         + kpis
