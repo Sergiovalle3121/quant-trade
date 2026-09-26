@@ -1764,10 +1764,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _signin_redirect(locale, next_path=account_pages.path("account", locale))
             account, csrf, session_hash = session
             now = datetime.now(UTC)
-            return HTMLResponse(
+            # This browser's own random id (the same cookie as the free
+            # report's), minted here when missing; only its hash is stored.
+            browser = request.cookies.get(acct.DEVICE_COOKIE) or ""
+            new_browser = ""
+            if not 20 <= len(browser) <= 128:
+                browser = new_browser = acct.new_secret()
+            try:
+                notice = db.take_visit_notice(
+                    account.id,
+                    now,
+                    browser=acct.hash_secret(browser),
+                    device=_device_network(request)[0],
+                )
+            except Exception:  # pragma: no cover - best effort, never blocks the page
+                logger.warning("visit notice failed", exc_info=True)
+                notice = None
+            page = HTMLResponse(
                 account_pages.account_page(
                     locale=locale,
                     account=account,
+                    notice=notice,
                     audits=db.account_audits_list(account.id),
                     codes=db.account_codes_list(account.id),
                     credits=db.account_credits(account.id, now),
@@ -1822,6 +1839,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     ),
                 )
             )
+            if new_browser:
+                _cookie(page, acct.DEVICE_COOKIE, new_browser, max_age=acct.DEVICE_DAYS * 86400)
+            return page
 
         return handler
 

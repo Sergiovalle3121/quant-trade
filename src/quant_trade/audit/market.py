@@ -1,5 +1,10 @@
 """Public daily closes of a few widely traded markets, read from FRED.
 
+Consumer prices outside the US come from each official publisher whose terms
+allow reuse in a paid service with attribution (Eurostat, the UK's ONS, the
+Bank of Canada, the Banco Central do Brasil), since FRED's copies of those
+indexes stopped updating; they are read the same way and kept the same way.
+
 A report on a strategy that trades the S&P 500, the Nasdaq 100 or bitcoin
 can say what simply holding that market did over the same days. The closes
 come from the St. Louis Fed's public FRED service at run time, are kept in
@@ -15,6 +20,7 @@ tests pass a stub, and ``tests/conftest.py`` blocks :func:`_download`.
 from __future__ import annotations
 
 import io
+import json
 import math
 import re
 import threading
@@ -28,6 +34,31 @@ import pandas as pd
 
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 FRED_PAGE = "https://fred.stlouisfed.org/series/{series}"
+#: The User-Agent sent to the providers other than FRED.
+PROVIDER_AGENT = "Rigor-audit/1.0 (public statistics reader)"
+#: Where each non-FRED provider serves a series (all public, no key) and the
+#: page a reader can check it on.
+PROVIDER_URLS: dict[str, tuple[str, str]] = {
+    "eurostat": (
+        "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_minr"
+        "?geo={series}&coicop18=TOTAL&unit=I25&format=JSON",
+        "https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_minr/default/table",
+    ),
+    "ons": (
+        "https://www.ons.gov.uk/generator?format=csv"
+        "&uri=/economy/inflationandpriceindices/timeseries/{series}/mm23",
+        "https://www.ons.gov.uk/economy/inflationandpriceindices/timeseries/{series}/mm23",
+    ),
+    "boc": (
+        "https://www.bankofcanada.ca/valet/observations/{series}/csv",
+        "https://www.bankofcanada.ca/rates/price-indexes/cpi/",
+    ),
+    "bcb": (
+        "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json",
+        "https://dadosabertos.bcb.gov.br/dataset/{series}-indice-nacional-de-precos-ao-"
+        "consumidor-amplo-ipca",
+    ),
+}
 #: Seconds a whole FRED read may take before it is given up.
 TIMEOUT = 5.0
 #: Largest reply read (the longest series is about 0.3 MB).
@@ -59,9 +90,17 @@ class Asset:
     floor: float | None = None
     #: A rate that can go below zero (some central banks' rates did).
     negative: bool = False
+    #: Where the series is read: ``fred`` or a key of ``PROVIDER_URLS``.
+    provider: str = "fred"
+    #: For a monthly price index, the largest ratio between two consecutive
+    #: values; a larger jump is a broken reply (Brazil's worst month, March
+    #: 1990, was about x1.8).
+    max_step: float | None = None
 
     @property
     def source_url(self) -> str:
+        if self.provider in PROVIDER_URLS:
+            return PROVIDER_URLS[self.provider][1].format(series=self.series)
         return FRED_PAGE.format(series=self.series)
 
 
@@ -103,10 +142,18 @@ CASH = Asset(
 #: is 82.69 (March 2020), so a value above ``MAX_VIX`` is a broken download.
 MAX_VIX = 200.0
 VIX = Asset("vix", "VIX", "VIXCLS", re.compile(r"(?!)"), ceiling=MAX_VIX)
+#: The largest ratio between two consecutive months of a price index.
+MAX_PRICE_STEP = 3.0
 #: US consumer prices (all items, not seasonally adjusted, 1982-84 = 100), monthly;
 #: BLS recommends the unadjusted index for deflating between arbitrary dates.
 CPI = Asset(
-    "cpi", "US consumer prices", "CPIAUCNS", re.compile(r"(?!)"), ceiling=10_000.0, floor=1.0
+    "cpi",
+    "US consumer prices",
+    "CPIAUCNS",
+    re.compile(r"(?!)"),
+    ceiling=10_000.0,
+    floor=1.0,
+    max_step=MAX_PRICE_STEP,
 )
 #: Noon buying rates in New York (Federal Reserve H.10), daily: units of the
 #: currency per US dollar, or US dollars per unit for the euro and the pound.
@@ -162,6 +209,34 @@ EUR_CASH_HISTORY = Asset(
     floor=MIN_LOCAL_RATE,
     negative=True,
 )
+#: Consumer prices in the currencies of ``FX`` whose official index is current
+#: and may be reused in a paid service with attribution (all items, monthly, not
+#: seasonally adjusted): the euro area's and Switzerland's harmonised indexes
+#: (Eurostat; the euro area's through FRED), the UK's CPI (ONS, Open Government
+#: Licence), Canada's CPI (Statistics Canada, through the Bank of Canada) and
+#: Brazil's IPCA (IBGE, through the Banco Central do Brasil, monthly changes
+#: chained into an index). Mexico's and Japan's official indexes need a
+#: registered key, so those currencies have none yet.
+MAX_PRICE_INDEX = 10_000_000.0
+LOCAL_CPI: tuple[Asset, ...] = tuple(
+    Asset(
+        f"cpi_{code.lower()}",
+        code,
+        series,
+        re.compile(r"(?!)"),
+        ceiling=MAX_PRICE_INDEX,
+        floor=1.0,
+        provider=provider,
+        max_step=MAX_PRICE_STEP,
+    )
+    for code, series, provider in (
+        ("EUR", "CP0000EZ19M086NEST", "fred"),
+        ("GBP", "d7bt", "ons"),
+        ("CAD", "V41690973", "boc"),
+        ("CHF", "CH", "eurostat"),
+        ("BRL", "433", "bcb"),
+    )
+)
 #: Every series the service keeps in memory.
 SERIES: dict[str, Asset] = {
     **BY_KEY,
@@ -171,6 +246,7 @@ SERIES: dict[str, Asset] = {
     **{asset.key: asset for asset in FX},
     **{asset.key: asset for asset in LOCAL_CASH},
     EUR_CASH_HISTORY.key: EUR_CASH_HISTORY,
+    **{asset.key: asset for asset in LOCAL_CPI},
 }
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).
@@ -228,8 +304,71 @@ def parse_fred_csv(text: str, *, rate: bool = False, negative: bool = False) -> 
     return series.sort_index()
 
 
+#: Brazil's monthly changes are chained from the Real plan on, after the
+#: hyperinflation years; a month outside these bounds (in percent) is broken.
+BCB_START = "1995-01-01"
+MAX_MONTHLY_CHANGE = 50.0
+
+
+def _monthly(stamps: pd.Series, values: pd.Series) -> pd.Series:
+    series = pd.Series(
+        pd.to_numeric(values, errors="coerce").to_numpy(dtype=float),
+        index=pd.DatetimeIndex(pd.to_datetime(stamps, errors="coerce")),
+    )
+    series = series[series.index.notna() & np.isfinite(series)]
+    return series[~series.index.duplicated(keep="last")].sort_index()
+
+
+def parse_provider(text: str, provider: str) -> pd.Series:
+    """A monthly price index from one provider's reply, indexed by each month's
+    first day; blanks and values that are not above zero dropped."""
+    if provider == "eurostat":
+        data = json.loads(text)
+        times = data["dimension"]["time"]["category"]["index"]
+        by_position = {int(position): value for position, value in data["value"].items()}
+        stamps = pd.Series(sorted(times, key=times.get))
+        values = pd.Series([by_position.get(int(times[t])) for t in stamps], dtype=float)
+        series = _monthly(stamps + "-01", values)
+    elif provider == "ons":
+        rows = re.findall(r'^"(\d{4}) ([A-Z]{3})","([^"]*)"\s*$', text, flags=re.M)
+        stamps = pd.Series([f"01 {month} {year}" for year, month, _ in rows])
+        series = _monthly(
+            pd.Series(pd.to_datetime(stamps, format="%d %b %Y", errors="coerce")),
+            pd.Series([value for *_, value in rows]),
+        )
+    elif provider == "boc":
+        body = text.split('"OBSERVATIONS"', 1)[1]
+        frame = pd.read_csv(io.StringIO(body.strip()), dtype=str)
+        series = _monthly(frame.iloc[:, 0], frame.iloc[:, 1])
+    elif provider == "bcb":
+        frame = pd.DataFrame(json.loads(text))
+        stamps = pd.to_datetime(frame["data"], format="%d/%m/%Y", errors="coerce")
+        values = pd.to_numeric(frame["valor"], errors="coerce")
+        kept = (stamps >= pd.Timestamp(BCB_START)).to_numpy()
+        changes = pd.Series(
+            values.to_numpy(dtype=float)[kept], index=pd.DatetimeIndex(stamps[kept])
+        ).sort_index()
+        # A chain is only as good as its links: a missing, repeated or unreadable
+        # month would leave its inflation out of every later level.
+        months = changes.index.to_period("M")
+        expected = pd.period_range(months.min(), months.max(), freq="M") if len(months) else []
+        if (
+            bool(stamps.isna().any())
+            or not bool(np.isfinite(changes.to_numpy()).all())
+            or len(months) != len(expected)
+            or not bool((months == expected).all())
+        ):
+            raise ValueError("IPCA months are not consecutive")
+        if bool((changes.abs() > MAX_MONTHLY_CHANGE).any()):
+            raise ValueError("monthly change out of range")
+        series = 100.0 * (1.0 + changes / 100.0).cumprod()
+    else:
+        raise ValueError(f"unknown provider {provider}")
+    return series[series > 0]
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Refuse redirects, so a read never leaves FRED's fixed https address."""
+    """Refuse redirects, so a read never leaves its fixed https address."""
 
     def redirect_request(self, *args: object, **kwargs: object) -> None:
         return None
@@ -238,17 +377,24 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
-def _download(series: str) -> str:
-    """One FRED series as text, within about ``TIMEOUT`` seconds in all and at
-    most ``MAX_BYTES``. ``read1`` returns whatever one receive brings, so the
-    deadline is checked after every receive and a server that trickles bytes
-    is cut off (each receive is itself bounded by the socket timeout)."""
-    url = FRED_CSV.format(series=series)
+def _download(series: str, provider: str = "fred") -> str:
+    """One FRED (or other provider's) series as text, within about ``TIMEOUT`` seconds in all
+    and at most ``MAX_BYTES``. ``read1`` returns whatever one receive brings, so
+    the deadline is checked after every receive and a server that trickles
+    bytes is cut off (each receive is itself bounded by the socket timeout)."""
+    if provider in PROVIDER_URLS:
+        url = PROVIDER_URLS[provider][0].format(series=series)
+    else:
+        url = FRED_CSV.format(series=series)
+    # FRED gets Python's default User-Agent (it stalls some custom ones); the ONS
+    # refuses that one, so the other providers get a plain name.
+    headers = {"User-Agent": PROVIDER_AGENT} if provider in PROVIDER_URLS else {}
+    request = urllib.request.Request(url, headers=headers)
     deadline = time.monotonic() + TIMEOUT
     chunks: list[bytes] = []
     size = 0
     # Python's default User-Agent: FRED stalls some custom ones until the timeout.
-    with _OPENER.open(url, timeout=TIMEOUT) as response:
+    with _OPENER.open(request, timeout=TIMEOUT) as response:
         if getattr(response, "status", 200) != 200:
             raise OSError(f"FRED answered {response.status}")
         while chunk := response.read1(64 * 1024):
@@ -319,14 +465,26 @@ class MarketData:
         if not lock.acquire(blocking=False):
             return False
         try:
-            fetch = self._download or _download
-            series = parse_fred_csv(fetch(asset.series), rate=asset.rate, negative=asset.negative)
+            # An injected reader takes the series id alone; the real one also its provider.
+            text = (
+                self._download(asset.series)
+                if self._download is not None
+                else _download(asset.series, asset.provider)
+            )
+            if asset.provider in PROVIDER_URLS:
+                series = parse_provider(text, asset.provider)
+            else:
+                series = parse_fred_csv(text, rate=asset.rate, negative=asset.negative)
             if len(series) < 2:
                 raise ValueError("FRED series has no closes")
             if asset.ceiling is not None and bool((series > asset.ceiling).any()):
                 raise ValueError("FRED value out of range")
             if asset.floor is not None and bool((series < asset.floor).any()):
                 raise ValueError("FRED value out of range")
+            if asset.max_step is not None and len(series) > 1:
+                steps = series.to_numpy(dtype=float)[1:] / series.to_numpy(dtype=float)[:-1]
+                if bool((steps > asset.max_step).any() or (steps < 1 / asset.max_step).any()):
+                    raise ValueError("price index jumps")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False
@@ -353,6 +511,7 @@ __all__ = [
     "CASH",
     "CPI",
     "FX",
+    "LOCAL_CPI",
     "SERIES",
     "VIX",
     "Asset",
@@ -360,4 +519,5 @@ __all__ = [
     "asset_of",
     "dominant_asset",
     "parse_fred_csv",
+    "parse_provider",
 ]

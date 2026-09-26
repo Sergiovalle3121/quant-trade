@@ -1375,9 +1375,14 @@ start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
 average or the latest published). These series may be negative (the franc,
 euro and yen rates were); a reply outside -5 % to 200 % a year
 (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
-taken as broken. When the currency has no series here, or its rates cannot
-be read or do not cover the history, the
-line stays the US bill's, with its note. Jensen's alpha takes the same local
+taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
+`currency.DOLLAR_CODES`) or with no named currency gets the US bill's line.
+Another named currency with no series here (`AUD`, `ARS`…), or whose rates
+cannot be read or do not cover the history, gets no line: the section is
+`NOT_MEASURED` (`NO_LOCAL_CASH`), since the bill is not what cash in that
+currency paid (for pesos argentinos the gap is tens of points a year). The
+code is read like the currency section (trimmed, upper case, 8 characters),
+so the three currency-aware pieces agree on it. Jensen's alpha takes the same local
 rate for the strategy's side (the benchmark keeps the bill; see the benchmark
 section).
 It never changes the class.
@@ -1421,13 +1426,42 @@ year compounded over the calendar days (only from one year of history,
 shown after US inflation: each point is divided by US consumer prices
 (`CPIAUCNS`, not seasonally adjusted, as BLS recommends for deflating between
 arbitrary dates) of its own month or the latest month published, at most 75 days
-old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. The
-deflator is US only (FRED has no current consumer price index for most of the
-other currencies), so the currency figures are before their own inflation and
-the note says so. It runs only for a dollar account: an imported report that
-names `USD` or `USC` (or `USDT`/`USDC`, read at one dollar per coin, which the
-note says), or a file that names no currency, in which case a line
-says it is read as dollars; another named currency leaves it NOT_MEASURED.
+old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. Each
+currency's row is followed by the same figures after that currency's own
+inflation (`market.LOCAL_CPI`): the levels in that currency divided by the
+country's official consumer price index of each point's month, or the latest
+month published, at most 75 days old (`MAX_CPI_GAP_DAYS`). FRED's copies of
+these indexes stopped updating (2021-2025), so each comes from an official
+publisher whose terms allow reuse in a paid service with attribution, read at
+run time with no key: the euro area's HICP (Eurostat, through FRED,
+`CP0000EZ19M086NEST`), Switzerland's HICP (Eurostat API, `prc_hicp_minr`,
+`CH`), the UK's CPI (ONS time series `D7BT`, Open Government Licence v3.0),
+Canada's CPI (Statistics Canada's, through the Bank of Canada's Valet API,
+`V41690973`; the Bank asks paid services to say the data is free on its
+site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
+Central do Brasil's SGS series 433, monthly changes chained into an index
+from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
+month, refuses the reply, since a broken link would leave its inflation out of
+every later level). The IMF's CPI
+dataset, which covers every currency, needs written permission for
+commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
+official APIs need a registered key, so the peso and the yen show no row
+after inflation yet, and the note says so. Each row after inflation credits
+its source by name and link, as each licence asks; `/metodologia` lists
+them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
+refuses Python's default); FRED keeps the default. It runs for a dollar
+account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
+read at one dollar per coin, which the note says), or a file that names no
+currency, in which case a line says it is read as dollars. When a report
+names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+currency and after that currency's inflation, with the local inflation over
+the dates; without those prices it is NOT_MEASURED with the reason. Another
+named currency leaves it NOT_MEASURED. A price index reply below 1 or above
+10,000,000, or with two consecutive months more than 3 times apart
+(`MAX_PRICE_STEP`), is taken as broken. When the last point is more than 45
+days past the start of the last price month used (`STALE_TAIL_DAYS`), the row
+after inflation says "prices through {month}": the months after it are not
+deflated. The same applies to the dollar row after US inflation.
 Needs 90 days of history. A reply above 10,000 for any of these series is
 taken as broken. It never changes the class.
 
@@ -2225,6 +2259,24 @@ changes what a report says.
   events. They go after 90 days with `purge_sessions`, with the account, and
   the export lists them under `failed_signins`. Rate-limited tries (429) are
   not counted.
+- **Since your last visit** (`account_seen` table, one row per account and
+  browser, keyed by the hash of the browser's `rigor_device` cookie, minted
+  on the first view when missing): each view of Mi cuenta marks the time for
+  this browser (`store.take_visit_notice`) and, when something happened
+  since its previous view, shows a notice on top once: wrong-password tries
+  added since (each line's count at that view is kept in `failed_json`, so a
+  line that spans it counts only the newer tries) and sign-ins from another
+  device label the account had not used before that view. Per browser, so
+  an intruder who signs in and opens Mi cuenta, even with the owner's
+  label, never clears the owner's notice; a browser's first view shows
+  nothing, so a newcomer learns nothing. At most `store.SEEN_DEVICES_MAX`
+  rows: past it a newcomer is not stored rather than pushing anyone out;
+  rows unseen for 90 days go with `purge_sessions`. Limits: clearing
+  cookies makes the next view a first view; labels are coarse, so an
+  intruder with the owner's label is never a "new device" (their tries
+  still show); tabs opened at the same instant may each show it. The rows
+  go with the account and the export lists device and time as
+  `account_page_seen` (never the browser hash).
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2863,7 +2915,9 @@ Informational only: none of these moves a class, a dimension or a red flag.
   benchmark, taken as priced in US dollars (the note and the line say so; a
   local index uploaded as the benchmark is not detected), the bill's: each side over its own
   currency's cash. `cash_currency` then names the currency and the line names
-  both rates. Otherwise a dollar account's bill on both sides stays. With
+  both rates. Otherwise a dollar account's bill on both sides stays, and an
+  account in another named currency has nothing subtracted (the line says
+  so), never the bill. With
   the bill on both sides, a simulated account in reais holding Brazilian cash
   at 12 % and 0.2 of the index, with the bill at 5 %, showed about 7 % a year
   of alpha that was only Brazil's cash premium over the bill.
