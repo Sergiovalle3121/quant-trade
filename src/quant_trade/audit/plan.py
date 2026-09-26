@@ -140,10 +140,14 @@ FUND_TITLES: dict[str, dict[str, str]] = {
     "es": {
         OUT_OF_SAMPLE: "Averigua desde cuándo el gestor no cambia de proceso",
         COSTS: "Confirma si las cifras son netas de comisiones",
+        MULTIPLICITY: "Pregunta cuántos fondos lleva el gestor",
+        BENCHMARK: "Compara con el índice del fondo",
     },
     "en": {
         OUT_OF_SAMPLE: "Find out since when the manager's process is unchanged",
         COSTS: "Confirm whether the figures are net of fees",
+        MULTIPLICITY: "Ask how many funds the manager runs",
+        BENCHMARK: "Compare with the fund's index",
     },
 }
 
@@ -151,6 +155,7 @@ FUND_TITLES: dict[str, dict[str, str]] = {
 def _fund_record(data: dict[str, Any]) -> bool:
     """True when a stored audit result was run on a fund's track record."""
     return bool((data.get("fund") or {}).get("track_record"))
+
 
 #: What the audit would need to see for each red flag, in both languages.
 FLAG_HINTS: dict[str, dict[str, str]] = {
@@ -495,7 +500,18 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "passa com 0.95 ou mais e, abaixo de 0.5, não passa.",
             )
         )
-    if half is not None:
+    if half is not None and _fund_record(data):
+        parts.append(
+            _say(
+                locale,
+                f"Con {half:.0f} o más fondos o estrategias del mismo gestor cae por debajo "
+                "de 0.5.",
+                f"With {half:.0f} or more funds or strategies from the same manager it falls "
+                "below 0.5.",
+                f"Com {half:.0f} ou mais fundos ou estratégias do mesmo gestor cai abaixo de 0.5.",
+            )
+        )
+    elif half is not None:
         parts.append(
             _say(
                 locale,
@@ -517,6 +533,25 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             )
         )
     counted = (mult.get("trials_used") or {}).get("evidence") == "MEASURED"
+    if _fund_record(data):
+        # A fund has no optimisation to export: its trials are the other funds
+        # and strategies the same manager runs or has closed.
+        return " ".join(parts), _say(
+            locale,
+            [
+                "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y decláralo "
+                "como número de intentos: un buen historial entre muchos pesa menos.",
+            ],
+            [
+                "Ask the manager how many funds or strategies they run or have closed and "
+                "declare it as the number of trials: one good record among many weighs less.",
+            ],
+            [
+                "Pergunte ao gestor quantos fundos ou estratégias administra ou já encerrou e "
+                "declare isso como número de tentativas: um bom histórico entre muitos pesa "
+                "menos.",
+            ],
+        )
     if not counted:
         upload = _say(
             locale,
@@ -862,6 +897,29 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
 
 def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     bench = data.get("benchmark") or {}
+    if status == "NOT_MEASURED" and _fund_record(data):
+        finding = _say(
+            locale,
+            "No hay un índice con el que comparar el fondo.",
+            "There is no index to compare the fund with.",
+            "Não há um índice com o qual comparar o fundo.",
+        )
+        actions = _say(
+            locale,
+            [
+                "Añade al archivo los meses del índice que el fondo declara como referencia (el "
+                "de su folleto o ficha), o súbelo como archivo de benchmark.",
+            ],
+            [
+                "Add the months of the index the fund names as its benchmark (the one in its "
+                "prospectus or factsheet) to the file, or upload it as a benchmark file.",
+            ],
+            [
+                "Acrescente ao arquivo os meses do índice que o fundo declara como referência (o "
+                "do seu prospecto ou lâmina), ou envie-o como arquivo de benchmark.",
+            ],
+        )
+        return finding, actions
     if status == "NOT_MEASURED":
         finding = _say(
             locale,

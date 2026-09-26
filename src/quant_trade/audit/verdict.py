@@ -507,6 +507,14 @@ _TEXT: dict[str, dict[str, str]] = {
             "Clase D: el historial de cuenta no supera la auditoría; los números de cabecera "
             "no se pueden tomar tal cual."
         ),
+        "C.fund": (
+            "Clase C: hay una debilidad importante; no confiaríamos en este historial de fondo "
+            "sin resolverla."
+        ),
+        "D.fund": (
+            "Clase D: el historial del fondo no supera la auditoría; los números de cabecera "
+            "no se pueden tomar tal cual."
+        ),
         f"{STATISTICAL}.PASS": (
             "Como una sola prueba, el resultado es demasiado constante para explicarse solo "
             "por azar (Sharpe distinguible de cero)."
@@ -612,6 +620,14 @@ _TEXT: dict[str, dict[str, str]] = {
         ),
         "D.account": (
             "Class D: the account history does not pass the audit; the headline numbers "
+            "cannot be taken as they stand."
+        ),
+        "C.fund": (
+            "Class C: there is a material weakness; we would not rely on this fund's track "
+            "record until it is resolved."
+        ),
+        "D.fund": (
+            "Class D: the fund's track record does not pass the audit; the headline numbers "
             "cannot be taken as they stand."
         ),
         f"{STATISTICAL}.PASS": (
@@ -957,7 +973,10 @@ def summary(
     ``fund`` names it a fund's track record."""
     text = _TEXT[locale]
     source = TRIAL_SOURCE[locale].get(trials_evidence, TRIAL_SOURCE[locale]["DECLARED"])
-    lines = [text.get(f"{overall}.account", text[overall]) if account else text[overall]]
+    if fund and f"{overall}.fund" in text:
+        lines = [text[f"{overall}.fund"]]
+    else:
+        lines = [text.get(f"{overall}.account", text[overall]) if account else text[overall]]
     by_name = {dimension.name: dimension for dimension in dimensions}
     for name in DIMENSION_ORDER:
         dimension = by_name.get(name)

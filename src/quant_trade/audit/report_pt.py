@@ -1704,6 +1704,14 @@ VERDICT: dict[str, Any] = {
             "Classe D: o histórico de conta não passa na auditoria; os números de destaque não "
             "podem ser tomados como estão."
         ),
+        "C.fund": (
+            "Classe C: há uma fraqueza importante; não confiaríamos neste histórico de fundo sem "
+            "resolvê-la."
+        ),
+        "D.fund": (
+            "Classe D: o histórico do fundo não passa na auditoria; os números de destaque não "
+            "podem ser tomados como estão."
+        ),
         "statistical_significance.PASS": (
             "Como teste único, o resultado é constante demais para ser explicado só pelo acaso "
             "(Sharpe distinguível de zero)."
@@ -1950,6 +1958,8 @@ PLAN: dict[str, Any] = {
     "FUND_TITLES": {
         "out_of_sample": "Descubra desde quando o processo do gestor não muda",
         "costs": "Confirme se os números são líquidos de taxas",
+        "multiplicity": "Pergunte quantos fundos o gestor administra",
+        "benchmark": "Compare com o índice do fundo",
     },
     "FLAG_HINTS": {
         "TOO_FEW_OBSERVATIONS": (

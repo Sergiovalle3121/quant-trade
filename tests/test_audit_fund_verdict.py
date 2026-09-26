@@ -129,3 +129,30 @@ def test_new_fund_texts_make_no_claims() -> None:
                 assert find_claims(text) == [], (locale, key)
         for text in FUND_TITLES.get(locale, {}).values():
             assert find_claims(text) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_no_plan_step_asks_a_fund_for_robot_files(locale: str) -> None:
+    rng = np.random.default_rng(4)
+    for fund in (_pair()[0], rng.normal(-0.004, 0.03, 60), rng.normal(0.002, 0.03, 60)):
+        result = _run(_dated(fund), locale, trials=40)
+        data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+        # The history step (how much more record is needed) has its own fund wording.
+        text = " ".join(
+            " ".join([step.title, step.finding, *step.actions])
+            for step in improvement_plan(data, locale)
+            if step.dimension != "statistical_significance"
+        )
+        for word in ("MT5", "EA ", "XML", "coste por lado", "cost per side", "optimiza", "optimis"):
+            assert word not in text, (locale, word)
+        assert_report_clean(render(result, watermark=False)[0])  # type: ignore[arg-type]
+
+
+def test_a_failing_fund_is_called_a_fund_in_the_summary() -> None:
+    rng = np.random.default_rng(9)
+    result = _run(_dated(rng.normal(-0.01, 0.03, 60)))
+    overall = result.verdict.overall  # type: ignore[attr-defined]
+    assert overall in {"C", "D"}
+    first = _TEXT["es"][f"{overall}.fund"]
+    assert result.verdict.summary.startswith(first)  # type: ignore[attr-defined]
+    assert "backtest" not in first
