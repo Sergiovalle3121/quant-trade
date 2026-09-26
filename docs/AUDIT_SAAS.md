@@ -300,6 +300,29 @@ per import; the column screen offers a web table only up to
 `mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
+Robinhood's Account Activity report (`robinhood_csv`, the columns `Activity
+Date`, `Instrument`, `Description`, `Trans Code`, `Quantity`, `Price`,
+`Amount`, as Robinhood's help centre and open-source importers describe it;
+tests in `tests/test_audit_robinhood.py` use synthetic rows) is read by
+`importers._parse_robinhood`. `Buy`/`Sell` trade shares and
+`BTO`/`STO`/`BTC`/`STC` trade options, paired first in, first out per share
+symbol or per option contract (the contract is taken from the Description,
+"SPY 3/15/2024 Call $500.00", at `OPTION_MULTIPLIER` = 100 shares). Cash rows
+(deposits `ACH`, dividends `CDIV`, interest, fees) are not trades. An option
+that expires (`OEXP`), is assigned (`OASGN`) or exercised (`OEXER`) closes at
+no premium; its record shows `EXPIRED_OPTION_PRICE` (0.01) as the exit price
+because a trade needs a positive price, and its result is computed at zero.
+The shares an assignment delivers come on their own row. Regulatory fees are
+the gap between `Amount` and the fill's value, as commission. A split
+(`SPR`) or symbol exchange (`SXCH`), whose leaving shares carry an `S`
+("200S"), rescales the lots held. Assumptions and limits, each warned in the
+report: Robinhood shares are read as long only, so a `Sell` (or `STC`/`BTC`)
+beyond the open position closes something opened before the file starts and
+is left out (`ROBINHOOD_UNOPENED_WARNING`); other share movements
+(transfers `ACATI`, mergers) are left out (`ROBINHOOD_MOVES_WARNING`). Dates
+carry no clock, so holding times are in whole days. Within a day, opens come
+before closes and expiries last.
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating

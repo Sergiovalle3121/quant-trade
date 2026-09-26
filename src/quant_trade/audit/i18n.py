@@ -131,6 +131,19 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "operaciones cerradas",
     ),
     (
+        "{n} closing trade(s) of positions the file never shows being opened (opened before "
+        "its first date or transferred in) left out; download the full history to include them",
+        "se dejaron fuera {n} cierre(s) de posiciones cuya apertura no aparece en el archivo "
+        "(abiertas antes de su primera fecha o traspasadas); descarga el historial completo "
+        "para incluirlos",
+    ),
+    (
+        "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+        "positions they change may be read wrong",
+        "se dejaron fuera {n} movimiento(s) de acciones que no son operaciones (traspasos, "
+        "fusiones, splits); las posiciones que cambian pueden leerse mal",
+    ),
+    (
         "{n} deal(s) closed by the tester at the end of the test",
         "el probador cerró {n} operación(es) al final de la prueba",
     ),
@@ -1807,6 +1820,21 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} position(s) still open at the end of the report; excluded from the closed trades": (
         "{n} position still open at the end of the report; excluded from the closed trades",
         "{n} posición seguía abierta al final del informe; queda fuera de las operaciones cerradas",
+    ),
+    "{n} closing trade(s) of positions the file never shows being opened (opened before "
+    "its first date or transferred in) left out; download the full history to include them": (
+        "{n} closing trade of a position the file never shows being opened (opened before "
+        "its first date or transferred in) left out; download the full history to include it",
+        "se dejó fuera {n} cierre de una posición cuya apertura no aparece en el archivo "
+        "(abierta antes de su primera fecha o traspasada); descarga el historial completo "
+        "para incluirlo",
+    ),
+    "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+    "positions they change may be read wrong": (
+        "{n} share movement that is not a trade (transfer, merger, split) left out; the "
+        "position it changes may be read wrong",
+        "se dejó fuera {n} movimiento de acciones que no es una operación (traspaso, fusión, "
+        "split); la posición que cambia puede leerse mal",
     ),
     "{n} deal(s) closed by the tester at the end of the test": (
         "{n} deal closed by the tester at the end of the test",

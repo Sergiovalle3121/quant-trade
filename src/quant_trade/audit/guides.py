@@ -1208,6 +1208,103 @@ GUIDES: tuple[Guide, ...] = (
         },
     ),
     Guide(
+        slug="robinhood",
+        platform="Robinhood",
+        field="report",
+        text={
+            "es": GuideText(
+                title="Cómo exportar tus operaciones de Robinhood",
+                summary=(
+                    "Genera el informe Account Activity de Robinhood en CSV y súbelo para revisar "
+                    "tus operaciones con acciones y opciones."
+                ),
+                file=(
+                    "Un .csv con las columnas Activity Date, Process Date, Settle Date, "
+                    "Instrument, Description, Trans Code, Quantity, Price y Amount."
+                ),
+                steps=(
+                    "En Robinhood, abre tu cuenta, entra en Reports and statements y elige "
+                    "Account activity report.",
+                    "Pulsa Generate new report, elige la cuenta y el periodo completo (desde tu "
+                    "primera compra) y pulsa Generate report.",
+                    "Robinhood avisa cuando está listo (suele tardar unas 2 horas, hasta 24); "
+                    "descárgalo desde Reports.",
+                ),
+                upload="En el campo «Informe de tu plataforma», tal cual.",
+                tips=(
+                    "Las opciones cuentan 100 acciones por contrato; una opción que vence, se "
+                    "asigna o se ejerce cierra sin prima.",
+                    "Los depósitos, dividendos, intereses y comisiones no son operaciones y no "
+                    "se cuentan como tales.",
+                    "Las ventas de acciones compradas antes de la primera fecha del archivo, o "
+                    "traspasadas desde otro bróker, quedan fuera y el informe lo dice: elige el "
+                    "periodo desde tu primera compra.",
+                    "El informe no incluye futuros ni cripto de Robinhood.",
+                ),
+            ),
+            "en": GuideText(
+                title="How to export your Robinhood trades",
+                summary=(
+                    "Generate Robinhood's Account Activity report as CSV and upload it to review "
+                    "your stock and option trades."
+                ),
+                file=(
+                    "A .csv with the columns Activity Date, Process Date, Settle Date, "
+                    "Instrument, Description, Trans Code, Quantity, Price and Amount."
+                ),
+                steps=(
+                    "In Robinhood, open your account, go to Reports and statements and choose "
+                    "Account activity report.",
+                    "Select Generate new report, pick the account and the whole period (from "
+                    "your first purchase) and select Generate report.",
+                    "Robinhood tells you when it is ready (usually about 2 hours, up to 24); "
+                    "download it from Reports.",
+                ),
+                upload="In the field 'Your platform report', as it is.",
+                tips=(
+                    "Options count 100 shares a contract; an option that expires, is assigned "
+                    "or is exercised closes at no premium.",
+                    "Deposits, dividends, interest and fees are not trades and are not counted "
+                    "as such.",
+                    "Sales of shares bought before the file's first date, or transferred in "
+                    "from another broker, are left out and the report says so: pick the period "
+                    "from your first purchase.",
+                    "The report does not include Robinhood futures or crypto.",
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar suas operações da Robinhood",
+                summary=(
+                    "Gere o relatório Account Activity da Robinhood em CSV e envie para revisar "
+                    "suas operações com ações e opções."
+                ),
+                file=(
+                    "Um .csv com as colunas Activity Date, Process Date, Settle Date, "
+                    "Instrument, Description, Trans Code, Quantity, Price e Amount."
+                ),
+                steps=(
+                    "Na Robinhood, abra sua conta, entre em Reports and statements e escolha "
+                    "Account activity report.",
+                    "Toque em Generate new report, escolha a conta e o período completo (desde "
+                    "sua primeira compra) e toque em Generate report.",
+                    "A Robinhood avisa quando estiver pronto (costuma levar umas 2 horas, até "
+                    "24); baixe em Reports.",
+                ),
+                upload="No campo 'Relatório da sua plataforma', do jeito que vier.",
+                tips=(
+                    "As opções contam 100 ações por contrato; uma opção que vence, é exercida "
+                    "ou atribuída fecha sem prêmio.",
+                    "Depósitos, dividendos, juros e tarifas não são operações e não são "
+                    "contados como tal.",
+                    "Vendas de ações compradas antes da primeira data do arquivo, ou "
+                    "transferidas de outra corretora, ficam de fora e o relatório diz isso: "
+                    "escolha o período desde sua primeira compra.",
+                    "O relatório não inclui futuros nem cripto da Robinhood.",
+                ),
+            ),
+        },
+    ),
+    Guide(
         slug="csv-universal",
         slug_en="universal-csv",
         platform="Otra plataforma (CSV o Excel)",
@@ -1240,11 +1337,12 @@ GUIDES: tuple[Guide, ...] = (
                     "Activity Statement en CSV), Tradovate (Performance u Orders), TopstepX y "
                     "otras cuentas de ProjectX (Trades), TradeStation, thinkorswim (Account "
                     "Statement), Charles Schwab (Transactions o Realized Gain/Loss), Fidelity, "
-                    "E*TRADE, Webull, tastytrade, eToro (posiciones cerradas), XTB (xStation 5, "
-                    "historial de posiciones cerradas), DEGIRO (Transacciones, en cualquier "
-                    "idioma), Trading 212 (historial), cTrader (History), Rithmic (Completed "
-                    "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase y "
-                    "KuCoin (historial de ejecuciones).",
+                    "E*TRADE, Webull, Robinhood (informe Account Activity; las opciones a 100 "
+                    "acciones por contrato), tastytrade, eToro (posiciones cerradas), XTB "
+                    "(xStation 5, historial de posiciones cerradas), DEGIRO (Transacciones, en "
+                    "cualquier idioma), Trading 212 (historial), cTrader (History), Rithmic "
+                    "(Completed Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, "
+                    "Coinbase y KuCoin (historial de ejecuciones).",
                     "Los costes de DEGIRO vienen en euros y se restan tal cual, también en "
                     "acciones que cotizan en otra moneda; el resultado de Trading 212 viene en "
                     "la moneda de tu cuenta y se usa como tal.",
@@ -1290,7 +1388,8 @@ GUIDES: tuple[Guide, ...] = (
                     "the Activity Statement as CSV), Tradovate (Performance or Orders), "
                     "TopstepX and other ProjectX accounts (Trades), TradeStation, thinkorswim "
                     "(Account Statement), Charles Schwab (Transactions or Realized Gain/Loss), "
-                    "Fidelity, E*TRADE, Webull, tastytrade, eToro (closed positions), XTB "
+                    "Fidelity, E*TRADE, Webull, Robinhood (Account Activity report; options at "
+                    "100 shares a contract), tastytrade, eToro (closed positions), XTB "
                     "(xStation 5 closed position history), DEGIRO (Transactions, in any "
                     "language), Trading 212 (history), cTrader (History), Rithmic (Completed "
                     "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase and "
@@ -1340,7 +1439,8 @@ GUIDES: tuple[Guide, ...] = (
                     "o Activity Statement em CSV), Tradovate (Performance ou Orders), TopstepX "
                     "e outras contas ProjectX (Trades), TradeStation, thinkorswim (Account "
                     "Statement), Charles Schwab (Transactions ou Realized Gain/Loss), "
-                    "Fidelity, E*TRADE, Webull, tastytrade, eToro (posições fechadas), XTB "
+                    "Fidelity, E*TRADE, Webull, Robinhood (relatório Account Activity; as opções a "
+                    "100 ações por contrato), tastytrade, eToro (posições fechadas), XTB "
                     "(histórico de posições fechadas do xStation 5), DEGIRO (Transações, em "
                     "qualquer idioma), Trading 212 (histórico), cTrader (History), Rithmic "
                     "(Completed Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, "

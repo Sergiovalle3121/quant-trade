@@ -1958,6 +1958,21 @@ SINGULAR: dict[str, tuple[str, str]] = {
         "{n} position still open at the end of the report; excluded from the closed trades",
         "{n} posição continuava aberta no fim do relatório; fica fora das operações fechadas",
     ),
+    "{n} closing trade(s) of positions the file never shows being opened (opened before "
+    "its first date or transferred in) left out; download the full history to include them": (
+        "{n} closing trade of a position the file never shows being opened (opened before "
+        "its first date or transferred in) left out; download the full history to include it",
+        "ficou de fora {n} fechamento de uma posição cuja abertura não aparece no arquivo "
+        "(aberta antes da primeira data ou transferida); baixe o histórico completo para "
+        "incluí-lo",
+    ),
+    "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+    "positions they change may be read wrong": (
+        "{n} share movement that is not a trade (transfer, merger, split) left out; the "
+        "position it changes may be read wrong",
+        "ficou de fora {n} movimento de ações que não é uma operação (transferência, fusão, "
+        "desdobramento); a posição que ele altera pode ser lida errado",
+    ),
     "{n} deal(s) closed by the tester at the end of the test": (
         "{n} deal closed by the tester at the end of the test",
         "o testador fechou {n} operação no fim do teste",
@@ -2198,6 +2213,23 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "{n} posição(ões) ainda estavam abertas no fim do relatório; ficam fora das "
             "operações fechadas"
+        ),
+    ),
+    (
+        "{n} closing trade(s) of positions the file never shows being opened (opened before "
+        "its first date or transferred in) left out; download the full history to include them",
+        (
+            "ficaram de fora {n} fechamento(s) de posições cuja abertura não aparece no "
+            "arquivo (abertas antes da primeira data ou transferidas); baixe o histórico "
+            "completo para incluí-los"
+        ),
+    ),
+    (
+        "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+        "positions they change may be read wrong",
+        (
+            "ficaram de fora {n} movimento(s) de ações que não são operações (transferências, "
+            "fusões, desdobramentos); as posições que eles alteram podem ser lidas errado"
         ),
     ),
     (
