@@ -991,6 +991,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the Treasury bill rates do not cover the whole history",
         "las tasas de las letras del Tesoro no cubren todo el historial",
     ),
+    (
+        "the account is not in US dollars and what cash in its currency paid could not be "
+        "read for the whole history",
+        "la cuenta no está en dólares estadounidenses y no se pudo leer lo que "
+        "pagó el efectivo en su moneda para todo el historial",
+    ),
     ("the returns never move", "los retornos nunca se mueven"),
     (
         "each return placed by the VIX close of the last market day before it starts (calm "

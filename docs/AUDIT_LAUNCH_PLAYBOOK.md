@@ -676,7 +676,7 @@ None of this judges the manager; it separates what the history shows from what i
 ```text
 Cuando un fondo enseña su rentabilidad media al año, conviene partir ese número en tres:
 
-1. Lo que pagaba el efectivo en esas mismas fechas (letras del Tesoro a 3 meses). Eso lo pagaba el dinero quieto.
+1. Lo que pagaba el efectivo en esas mismas fechas (si el fondo es en dólares, las letras del Tesoro a 3 meses). Eso lo pagaba el dinero quieto.
 2. Lo que viene de seguir a su índice: su beta por lo que el índice rindió sobre el efectivo. Eso lo da también un fondo indexado.
 3. Lo que queda: el alfa. Es lo único que justifica pagar una gestión activa, y con pocos años su margen de error es ancho.
 
@@ -692,7 +692,7 @@ No dice si invertir: separa lo que el historial demuestra de lo que solo sugiere
 ```text
 When a fund shows its average return a year, it pays to split that number in three:
 
-1. What cash paid over the same dates (3-month Treasury bills). Money sitting still paid that.
+1. What cash paid over the same dates (for a dollar fund, 3-month Treasury bills). Money sitting still paid that.
 2. What comes from following its index: its beta times what the index returned over cash. An index fund gives you that too.
 3. What is left: the alpha. It is the only part that justifies paying for active management, and with few years its margin of error is wide.
 
@@ -706,11 +706,11 @@ It does not say whether to invest: it separates what the history shows from what
 #### F9 · ES · El Sharpe en la moneda de tu cuenta
 
 ```text
-El Sharpe mide lo que ganaste por encima de lo que pagaba el efectivo. Casi todas las calculadoras restan la tasa de EE. UU., pero si tu cuenta está en pesos mexicanos, reales o euros, tu efectivo pagaba la tasa de tu moneda, y hubo años en que la diferencia fue de varios puntos.
+El Sharpe mide el resultado por encima de lo que pagaba el efectivo. Casi todas las calculadoras restan la tasa de EE. UU., pero si tu cuenta está en pesos mexicanos, reales o euros, tu efectivo pagaba la tasa de tu moneda, y hubo años en que la diferencia fue de varios puntos.
 
 Con la tasa de tu moneda, el mismo historial puede verse bastante menos bueno. Vale la pena recalcularlo antes de enseñarlo o de comprar una estrategia por su Sharpe.
 
-Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica, y la de EE. UU. si no: https://rigor.up.railway.app/?ref=f9
+Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica; si no la indica o está en dólares, la de EE. UU., y en otra moneda no calcula esa línea: https://rigor.up.railway.app/?ref=f9
 ```
 
 #### F9 · EN · The Sharpe in your account's currency
@@ -720,7 +720,7 @@ The Sharpe measures the return above what cash paid. Almost every calculator sub
 
 With your currency's rate, the same history can look quite a bit less good. It is worth recomputing before you show it or buy a strategy for its Sharpe.
 
-Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it, and the US rate otherwise: https://rigor.up.railway.app/en?ref=f9
+Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it; if it names none or is in dollars, the US rate, and in another currency it leaves that line out: https://rigor.up.railway.app/en?ref=f9
 ```
 
 #### F10 · ES · Si operas con Revolut o con Zerodha

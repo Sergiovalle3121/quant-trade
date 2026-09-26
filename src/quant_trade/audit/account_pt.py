@@ -187,7 +187,9 @@ COPY_PT: dict[str, str] = {
         "dispositivo e a rede; as últimas 50, apagadas após 90 dias ou com a conta. "
         "À parte, as tentativas com senha incorreta na sua conta: quantas por rede e hora, "
         "com o rótulo do dispositivo (nunca o que foi digitado); as últimas 20, apagadas "
-        "após 90 dias ou com a conta.|"
+        "após 90 dias ou com a conta. E, para cada navegador (sua marca aleatória, como hash), "
+        "a hora da sua última visita a «Minha conta» e seu rótulo, para o aviso «Desde sua "
+        "última visita»; sai após 90 dias sem visitas ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -353,6 +355,15 @@ COPY_PT: dict[str, str] = {
     "event_sessions_ended": "Todas as outras sessões foram encerradas",
     "event_signin_failed_one": "Senha incorreta (1 tentativa)",
     "event_signin_failed": "Senha incorreta ({count} tentativas)",
+    "notice_title": "Desde sua última visita",
+    "notice_failed_one": "1 tentativa de entrar com senha incorreta.",
+    "notice_failed": "{count} tentativas de entrar com senha incorreta.",
+    "notice_new_device": "Uma entrada de um dispositivo novo: {device}.",
+    "notice_unknown_device": "Uma entrada de um dispositivo desconhecido.",
+    "notice_more_devices_one": "E mais uma entrada de outro dispositivo novo.",
+    "notice_more_devices": "E mais {count} entradas de outros dispositivos novos.",
+    "notice_help": "Se não foi você, troque sua senha e encerre as outras sessões.",
+    "notice_link": "Ver a atividade recente",
     "two_step_card": "Verificação em duas etapas",
     "two_of_three": (
         "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "

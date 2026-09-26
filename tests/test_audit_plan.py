@@ -63,7 +63,9 @@ def test_missing_out_of_sample_and_trades_say_the_class_cap() -> None:
 
 
 def test_significance_step_counts_the_observations_still_needed() -> None:
-    data = _data(_result(returns_frame(120, mean=0.0006, std=0.01, seed=8)))
+    # A drift whose missing history is within ten times the file's own, so
+    # the step counts it; beyond that it says the gap is out of reach.
+    data = _data(_result(returns_frame(120, mean=0.001, std=0.01, seed=8)))
     sig = data["significance"]
     need = sig["min_track_record_length"]["value"]
     have = sig["observations"]["value"]

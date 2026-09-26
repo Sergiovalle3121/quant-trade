@@ -299,10 +299,16 @@ same member, inflated-size and cell limits: numbers, currency and percentages
 come from the cell's stored value, dates and times from its ISO value, and the
 blank rows and cells a sheet repeats to its edge are never laid out (a repeated
 row with values counts toward the cell limit). It goes through the same
-detection and column screen as a workbook, so no layout is guessed;
-if no importer knows it, the column screen offers its columns. Files that
+detection and column screen as a workbook, so no layout is guessed. An
+Excel 97-2003 workbook (`.xls`, an OLE2 compound file) is read the same way
+with xlrd 2.x (the web extra; it reads only this format and never runs
+macros), with no formatting, each sheet loaded on demand and unloaded after,
+the same cell and column limits, and date cells turned into ISO text in the
+workbook's own date system (1900 or 1904). If no importer knows the sheet,
+the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
+save it as .xlsx or CSV), an OpenDocument file
 that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
@@ -337,7 +343,13 @@ An equity curve or return series (`schema.parse_equity_csv`) takes a return
 column named with a `%` (`Return %`, `Rendimiento %`, `Retorno (%)`) and reads
 it as percentages, whatever the size of its values (a money-market fund's
 `0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
-column, taken only when no `date` or `fecha` column exists. A column whose
+column, taken only when no `date` or `fecha` column exists. Spanish and
+Portuguese curves are read by a fund's value per share (`Valor da cota`,
+`Valor cuota`, `Valor cuotaparte`) or, without one, the balance column `Saldo`
+(after the English names, so `equity` or `balance` wins when both exist).
+`Patrimonio`/`Patrimônio` is not read on its own: in a fund file it is the net
+assets, which move with subscriptions and redemptions, so it goes to the
+column screen. A column whose
 numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
 throughout (one plainly decimal-comma cell decides the column, so a `1,234`
 beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
@@ -1382,9 +1394,14 @@ start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
 average or the latest published). These series may be negative (the franc,
 euro and yen rates were); a reply outside -5 % to 200 % a year
 (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
-taken as broken. When the currency has no series here, or its rates cannot
-be read or do not cover the history, the
-line stays the US bill's, with its note. Jensen's alpha takes the same local
+taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
+`currency.DOLLAR_CODES`) or with no named currency gets the US bill's line.
+Another named currency with no series here (`AUD`, `ARS`…), or whose rates
+cannot be read or do not cover the history, gets no line: the section is
+`NOT_MEASURED` (`NO_LOCAL_CASH`), since the bill is not what cash in that
+currency paid (for pesos argentinos the gap is tens of points a year). The
+code is read like the currency section (trimmed, upper case, 8 characters),
+so the three currency-aware pieces agree on it. Jensen's alpha takes the same local
 rate for the strategy's side (the benchmark keeps the bill; see the benchmark
 section).
 It never changes the class.
@@ -2261,6 +2278,24 @@ changes what a report says.
   events. They go after 90 days with `purge_sessions`, with the account, and
   the export lists them under `failed_signins`. Rate-limited tries (429) are
   not counted.
+- **Since your last visit** (`account_seen` table, one row per account and
+  browser, keyed by the hash of the browser's `rigor_device` cookie, minted
+  on the first view when missing): each view of Mi cuenta marks the time for
+  this browser (`store.take_visit_notice`) and, when something happened
+  since its previous view, shows a notice on top once: wrong-password tries
+  added since (each line's count at that view is kept in `failed_json`, so a
+  line that spans it counts only the newer tries) and sign-ins from another
+  device label the account had not used before that view. Per browser, so
+  an intruder who signs in and opens Mi cuenta, even with the owner's
+  label, never clears the owner's notice; a browser's first view shows
+  nothing, so a newcomer learns nothing. At most `store.SEEN_DEVICES_MAX`
+  rows: past it a newcomer is not stored rather than pushing anyone out;
+  rows unseen for 90 days go with `purge_sessions`. Limits: clearing
+  cookies makes the next view a first view; labels are coarse, so an
+  intruder with the owner's label is never a "new device" (their tries
+  still show); tabs opened at the same instant may each show it. The rows
+  go with the account and the export lists device and time as
+  `account_page_seen` (never the browser hash).
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2705,6 +2740,8 @@ Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-co
 
 Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?". The yearly figures sit right-aligned, the fund's average return is a shaded total row set off by a rule, and the alpha's range and reading is a ruled line like the other readings. In the PDF the table and its introduction stay on one page instead of leaving the total row alone on the next. On a 360 px phone the fee table's "2 % + 20 %" label ran the page 15 px wide; it now wraps.
 
+Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the dependence line, Jensen's alpha on the account's rate, the fund split), the landing's new "¿Qué tan protegida está mi cuenta?" answer and the fund page's checks at 360 and 390 px. Nothing ran past the screen and no heading was stranded at a PDF page end. The tallest part was the evidence tables (trade statistics, significance, benchmark), where each row was its own card; on a phone each table is now one card with rules between rows, so the same figures take less scrolling and read as a list. Rendered with public data on (FRED), the crisis table gains an index column and ran 27 px past a 360 px screen; on a phone each crisis is now a card with its name, dates and labelled figures. The local-cash Sharpe line under the summary tiles gets a little space above it, and the landing's "Frente al efectivo" card fits at 360 and 390 px in all three languages. With each currency's own inflation (EUR, GBP, CAD, CHF, BRL), the currency table's figures keep a visible gap on narrow phones; the /metodologia list of public data sources uses the page's existing check list and fits at 360 px.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -2899,7 +2936,9 @@ Informational only: none of these moves a class, a dimension or a red flag.
   benchmark, taken as priced in US dollars (the note and the line say so; a
   local index uploaded as the benchmark is not detected), the bill's: each side over its own
   currency's cash. `cash_currency` then names the currency and the line names
-  both rates. Otherwise a dollar account's bill on both sides stays. With
+  both rates. Otherwise a dollar account's bill on both sides stays, and an
+  account in another named currency has nothing subtracted (the line says
+  so), never the bill. With
   the bill on both sides, a simulated account in reais holding Brazilian cash
   at 12 % and 0.2 of the index, with the bill at 5 %, showed about 7 % a year
   of alpha that was only Brazil's cash premium over the bill.
