@@ -3453,7 +3453,7 @@ def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
     line = labels["alpha_line"].format(
         alpha=_pct(alpha, signed=True),
         beta=f"{beta:.2f}",
-        t=f"{t_stat:.1f}",
+        t=f"{t_stat:.2f}",
         n=f"{int(block.get('periods') or 0):,}",
     )
     key = (
@@ -3563,7 +3563,9 @@ def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str
     samples = int((shuffle.get("method") or {}).get("samples") or 0)
     line = labels["shuffle_line"].format(
         observed=f"{abs(observed):.1%}",
-        samples=f"{samples:,}",
+        # One thousand orders reads "1,000" in English; Spanish and Portuguese
+        # write four-digit counts without a separator.
+        samples=f"{samples:,}" if _locale_of(labels) == "en" else str(samples),
         low=f"{abs(low):.1%}",
         high=f"{abs(high):.1%}",
         mid=f"{abs(mid):.1%}",
@@ -5330,12 +5332,14 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
         f"<td class='val'>{_e(_fund_pct(float(row['growth']['value'])))}</td></tr>"
         for row in fees.get("rows") or []
     )
-    classic = fees.get("two_and_twenty")
-    if classic:
+    classic = fees.get("two_and_twenty") or {}
+    classic_cagr = _ev_value(classic.get("cagr"))
+    classic_growth = _ev_value(classic.get("growth"))
+    if classic_cagr is not None and classic_growth is not None:
         body += (
             f"<tr><td>{_e(labels['fund_fees_two_twenty'])}</td>"
-            f"<td class='val'>{_e(_fund_pct(float(classic['cagr']['value'])))}</td>"
-            f"<td class='val'>{_e(_fund_pct(float(classic['growth']['value'])))}</td></tr>"
+            f"<td class='val'>{_e(_fund_pct(classic_cagr))}</td>"
+            f"<td class='val'>{_e(_fund_pct(classic_growth))}</td></tr>"
         )
     out = (
         f"<h3>{_e(labels['fund_fees'])}</h3>"

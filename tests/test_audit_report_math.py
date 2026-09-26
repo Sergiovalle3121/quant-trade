@@ -89,7 +89,7 @@ def test_lo_sharpe_is_shown_only_when_it_is_lower() -> None:
 
 @pytest.mark.parametrize(
     ("t_stat", "key"),
-    [(2.5, "alpha_clear_up"), (-2.5, "alpha_clear_down"), (1.0, "alpha_unclear")],
+    [(2.5, "alpha_clear_up"), (-2.5, "alpha_clear_down"), (1.96, "alpha_unclear")],
 )
 def test_alpha_reads_its_t_statistic(t_stat: float, key: str) -> None:
     labels = report.LABELS["es"]
@@ -102,7 +102,8 @@ def test_alpha_reads_its_t_statistic(t_stat: float, key: str) -> None:
             "periods": 60,
         }
     }
-    assert labels[key] in html.unescape(report._alpha_html(bench, labels))
+    shown = html.unescape(report._alpha_html(bench, labels))
+    assert labels[key] in shown and f"{t_stat:.2f}" in shown
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -146,7 +147,8 @@ def test_the_worst_fall_is_placed_among_random_orders(locale: str, position: str
     labels = report.LABELS[locale]
     shown = html.unescape(report._shuffle_html(_shuffle(position, 0.012), labels))
     assert labels["shuffle_title"] in shown
-    assert "8.0%" in shown and "12.0%" in shown and "34.0%" in shown and "1,000" in shown
+    assert "8.0%" in shown and "12.0%" in shown and "34.0%" in shown
+    assert ("1,000" in shown) == (locale == "en")
     assert labels[f"shuffle_{position}"].split(":")[0] in shown
     assert find_claims(shown) == []
 
