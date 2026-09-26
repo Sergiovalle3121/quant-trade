@@ -398,6 +398,12 @@ _COPY: dict[str, dict[str, Any]] = {
                 "si tú la publicas.",
             ),
             (
+                "¿Y si olvido mi contraseña?",
+                "En Mi cuenta creas una clave de recuperación y la guardas. Si olvidas la "
+                "contraseña, con tu correo y esa clave pones una nueva tú mismo, sin esperar un "
+                "correo. Solo guardamos su huella, nunca la clave.",
+            ),
+            (
                 "¿Cómo se usa el sello?",
                 "Publica la verificación desde tu informe y copia el código del sello en tu web, "
                 "Telegram o foro. El sello describe una auditoría estadística; no es una promesa "
@@ -675,6 +681,12 @@ _COPY: dict[str, dict[str, Any]] = {
                 "{retention} days and only the class and the hashes remain. It is never "
                 "published: the verification page shows the class, the dimensions and the "
                 "hashes, and only if you publish it.",
+            ),
+            (
+                "What if I forget my password?",
+                "In My account you make a recovery key and keep it. If you forget the password, "
+                "your e-mail and that key let you set a new one yourself, without waiting for "
+                "an e-mail. We keep only its fingerprint, never the key.",
             ),
             (
                 "How is the badge used?",

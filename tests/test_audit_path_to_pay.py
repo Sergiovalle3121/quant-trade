@@ -91,3 +91,14 @@ def test_a_portuguese_report_fits_its_two_language_links_on_a_narrow_phone() -> 
         sample_result("es"), watermark=False, locale="es", switch_url="/audits/x?lang=en"
     )
     assert "data-short=" not in spanish
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
+    from quant_trade.audit.pages import _COPY
+
+    words = {"es": "clave de recuperación", "en": "recovery key", "pt": "chave de recuperação"}
+    answers = [answer for _, answer in _COPY[locale]["faq"] if words[locale] in answer]
+    assert len(answers) == 1
+    assert not find_claims(answers[0])
+    assert words[locale] in _text(landing(locale=locale, free_mode=False, signed_in=False))

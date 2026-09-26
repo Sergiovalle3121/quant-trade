@@ -291,6 +291,12 @@ COPY_PT: dict[str, Any] = {
             "publicar.",
         ),
         (
+            "E se eu esquecer minha senha?",
+            "Em Minha conta você cria uma chave de recuperação e a guarda. Se esquecer a senha, "
+            "com seu e-mail e essa chave você mesmo cria uma nova, sem esperar um e-mail. Só "
+            "guardamos a impressão dela, nunca a chave.",
+        ),
+        (
             "Como se usa o selo?",
             "Publique a verificação a partir do seu relatório e copie o código do selo no seu "
             "site, Telegram ou fórum. O selo descreve uma auditoria estatística; não é uma "
