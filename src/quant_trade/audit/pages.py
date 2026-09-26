@@ -22,6 +22,7 @@ from quant_trade.audit.audiences import (
     PLATFORMS_EN,
     PLATFORMS_ES,
     PLATFORMS_PT,
+    RECOGNISED_PLATFORMS,
     Audience,
     audience_url,
 )
@@ -766,7 +767,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("6", "dimensiones auditadas"),
             ("{flags}", "banderas rojas revisadas en cada archivo"),
             ("{presets}", "retos de prop firms simulables"),
-            ("{platforms}", "plataformas que se leen tal cual"),
+            ("{platforms}", "plataformas que reconoce"),
         ],
         "evidence_eyebrow": "Evidencia",
         "evidence_title": ("Cada número dice", "de dónde sale."),
@@ -958,7 +959,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("6", "audited dimensions"),
             ("{flags}", "red flags checked on every file"),
             ("{presets}", "prop-firm challenges to simulate"),
-            ("{platforms}", "platforms read as they are"),
+            ("{platforms}", "platforms it recognises"),
         ],
         "evidence_eyebrow": "Evidence",
         "evidence_title": ("Every number says", "where it comes from."),
@@ -1440,7 +1441,9 @@ def _specs(locale: str) -> str:
     ui = _UI[locale]
     counts = {
         "presets": len(PRESETS),
-        "platforms": len(PLATFORMS),
+        # Distinct platforms named on the page: the dedicated readers (minus
+        # the generic "CSV") plus the exports the universal reader recognises.
+        "platforms": len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"}),
         "flags": len(FLAG_TITLES),
     }
     specs = "".join(

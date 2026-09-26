@@ -78,6 +78,7 @@ def test_navigation_has_a_phone_menu_and_links_the_comparison() -> None:
 
 
 def test_landing_leads_with_the_product_and_real_key_figures() -> None:
+    from quant_trade.audit.audiences import RECOGNISED_PLATFORMS
     from quant_trade.audit.pages import PLATFORMS
     from quant_trade.audit.prop_presets import PRESETS
     from quant_trade.audit.redflags import FLAG_TITLES
@@ -88,7 +89,8 @@ def test_landing_leads_with_the_product_and_real_key_figures() -> None:
         assert page.index("<h1") < page.index("class='stage") < page.index("class='specs'")
         assert ("sintéticos" if locale == "es" else "synthetic") in page
         specs = page.split("class='specs'", 1)[1].split("</div></div>", 1)[0]
-        for count in (len(FLAG_TITLES), len(PRESETS), len(PLATFORMS)):
+        platforms = len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"})
+        for count in (len(FLAG_TITLES), len(PRESETS), platforms):
             assert f"<b data-count>{count}</b>" in specs
     # One sans family plus the mono; the old serif is gone from pages and static files.
     assert "Instrument Serif" not in STYLE
