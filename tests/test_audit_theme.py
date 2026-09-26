@@ -1259,5 +1259,13 @@ def test_currency_figures_keep_a_gap_on_phones() -> None:
     assert ".paper table.currency td:first-child{min-width:7.4em}" in STYLE
 
 
+def test_paired_figures_sit_two_per_row_on_phones() -> None:
+    # The fund's figures and "Cómo se vivió este historial" were one tall card
+    # per figure on a phone; two per row halves the scroll.
+    phone = STYLE[STYLE.index("@media screen and (max-width:620px){.facts.pairs") :]
+    assert phone.startswith(".facts.pairs{grid-template-columns:repeat(2,minmax(0,1fr))", 36)
+    assert ".facts.pairs .fact b{font-size:1.5rem;overflow-wrap:anywhere}" in phone
+
+
 def test_the_line_under_the_summary_tiles_has_room() -> None:
     assert ".kpis+p{margin-top:14px}" in STYLE
