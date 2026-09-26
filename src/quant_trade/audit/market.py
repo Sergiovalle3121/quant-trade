@@ -36,6 +36,9 @@ MAX_BYTES = 4_000_000
 RETRY_AFTER = 600.0
 #: How long a downloaded series is reused before it is read again.
 MAX_AGE = 6 * 3600.0
+#: Highest rate in percent a year a rate series may hold; above it the reply is
+#: taken as broken (US bills peaked near 16 % in 1981).
+MAX_RATE = 25.0
 #: Share of the trades one market must carry to stand for the file.
 DOMINANT = 2 / 3
 
@@ -48,6 +51,8 @@ class Asset:
     #: Symbol names that stand for this market once cleaned (upper case,
     #: letters and digits only, a broker suffix such as ``.cash`` dropped).
     pattern: re.Pattern[str]
+    #: A rate in percent, where zero is a real value (not a missing close).
+    rate: bool = False
 
     @property
     def source_url(self) -> str:
@@ -77,6 +82,11 @@ ASSETS: tuple[Asset, ...] = (
     ),
 )
 BY_KEY = {asset.key: asset for asset in ASSETS}
+#: What a US dollar in cash earned: the 3-month Treasury bill's secondary market
+#: rate, in percent a year (discount basis), as FRED publishes it.
+CASH = Asset("tbill3m", "US 3-month Treasury bill", "DTB3", re.compile(r"(?!)"), rate=True)
+#: Every series the service keeps in memory.
+SERIES: dict[str, Asset] = {**BY_KEY, CASH.key: CASH}
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).
 _SUFFIX = re.compile(r"[._].*$")
@@ -118,15 +128,17 @@ def dominant_asset(symbols: Sequence[str] | None, metadata_symbol: str = "") -> 
     return BY_KEY[key] if counts[key] >= DOMINANT * len(names) else None
 
 
-def parse_fred_csv(text: str) -> pd.Series:
-    """FRED's two-column CSV as a float series indexed by day; blanks dropped."""
+def parse_fred_csv(text: str, *, rate: bool = False) -> pd.Series:
+    """FRED's two-column CSV as a float series indexed by day; blanks dropped
+    (and zeros too, unless the series is a rate)."""
     frame = pd.read_csv(io.StringIO(text))
     if frame.shape[1] < 2:
         raise ValueError("not a FRED series")
     stamps = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
     values = pd.to_numeric(frame.iloc[:, 1], errors="coerce")
     series = pd.Series(values.to_numpy(dtype=float), index=pd.DatetimeIndex(stamps))
-    series = series[series.index.notna() & np.isfinite(series) & (series > 0)]
+    usable = (series >= 0) if rate else (series > 0)
+    series = series[series.index.notna() & np.isfinite(series) & usable]
     return series.sort_index()
 
 
@@ -188,11 +200,11 @@ class MarketData:
         self._clock = clock
         self._cache: dict[str, tuple[float, pd.Series]] = {}
         self._failed: dict[str, float] = {}
-        self._locks = {asset.key: threading.Lock() for asset in ASSETS}
+        self._locks = {key: threading.Lock() for key in SERIES}
 
     def closes(self, key: str) -> pd.Series | None:
         """The asset's closes in memory, or None; never waits on the network."""
-        if key not in BY_KEY:
+        if key not in SERIES:
             return None
         cached = self._cache.get(key)
         now = self._clock()
@@ -210,7 +222,7 @@ class MarketData:
     def refresh(self, key: str) -> bool:
         """Download one series now (in the calling thread); False when another
         refresh of it is running or the download failed."""
-        asset = BY_KEY.get(key)
+        asset = SERIES.get(key)
         if asset is None:
             return False
         lock = self._locks[key]
@@ -218,9 +230,11 @@ class MarketData:
             return False
         try:
             fetch = self._download or _download
-            series = parse_fred_csv(fetch(asset.series))
+            series = parse_fred_csv(fetch(asset.series), rate=asset.rate)
             if len(series) < 2:
                 raise ValueError("FRED series has no closes")
+            if asset.rate and bool((series > MAX_RATE).any()):
+                raise ValueError("FRED rate out of range")
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False
@@ -234,8 +248,8 @@ class MarketData:
         """Download every series in a background thread (at service start)."""
 
         def run() -> None:
-            for asset in ASSETS:
-                self.refresh(asset.key)
+            for key in SERIES:
+                self.refresh(key)
 
         thread = threading.Thread(target=run, name="market-data-warm", daemon=True)
         thread.start()
@@ -244,6 +258,8 @@ class MarketData:
 
 __all__ = [
     "ASSETS",
+    "CASH",
+    "SERIES",
     "Asset",
     "MarketData",
     "asset_of",
