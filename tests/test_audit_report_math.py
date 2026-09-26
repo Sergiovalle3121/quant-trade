@@ -126,3 +126,39 @@ def test_a_curve_without_trades_shows_no_ranges() -> None:
     for locale in LOCALES:
         text = _text(render_html(result, watermark=False, locale=locale))
         assert report.LABELS[locale]["ranges_title"] not in text
+
+
+def _shuffle(position: str, share: float) -> dict:
+    return {
+        "status": "MEASURED",
+        "observed": measured(-0.08),
+        "shuffled": {"p5": measured(-0.12), "p50": measured(-0.2), "p95": measured(-0.34)},
+        "share_at_most_as_deep": measured(share),
+        "share_at_least_as_deep": measured(share),
+        "position": position,
+        "method": {"samples": 1000},
+    }
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("position", ["TYPICAL", "SHALLOWER", "DEEPER"])
+def test_the_worst_fall_is_placed_among_random_orders(locale: str, position: str) -> None:
+    labels = report.LABELS[locale]
+    shown = html.unescape(report._shuffle_html(_shuffle(position, 0.012), labels))
+    assert labels["shuffle_title"] in shown
+    assert "8.0%" in shown and "12.0%" in shown and "34.0%" in shown and "1,000" in shown
+    assert labels[f"shuffle_{position}"].split(":")[0] in shown
+    assert find_claims(shown) == []
+
+
+def test_an_unmeasured_shuffle_shows_nothing() -> None:
+    labels = report.LABELS["es"]
+    assert report._shuffle_html({"status": "NOT_MEASURED", "reason": "x"}, labels) == ""
+    assert report._shuffle_html(None, labels) == ""
+
+
+def test_the_report_shows_the_shuffle_when_the_engine_measures_it() -> None:
+    result = _with_trades_and_benchmark()
+    shuffle = result.model_dump(mode="json")["risk"]["versus_shuffle"]
+    text = _text(render_html(result, watermark=False, locale="es"))
+    assert (report.LABELS["es"]["shuffle_title"] in text) == (shuffle["status"] == "MEASURED")

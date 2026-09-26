@@ -628,6 +628,32 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_fees_two_twenty": "2 % + 20 % de las ganancias",
         "compare_help": "Pega el enlace de otro informe tuyo para verlos lado a lado.",
+        "shuffle_title": "¿Es normal la peor caída del archivo para estos retornos?",
+        "shuffle_line": (
+            "Peor caída del archivo: {observed}. Con los mismos retornos en {samples} órdenes al "
+            "azar, la peor caída va de {low} a {high} en 9 de cada 10 órdenes (mediana {mid})."
+        ),
+        "shuffle_intro": (
+            "Cambiar el orden no cambia el Sharpe, la volatilidad ni el resultado final: solo "
+            "muestra qué caída suelen traer estos retornos a lo largo de todo el archivo. No es "
+            "la caída a un año de la tabla de arriba."
+        ),
+        "shuffle_TYPICAL": (
+            "Está dentro de lo habitual para estos retornos: el orden en que llegaron no la hace "
+            "ni mucho más leve ni mucho más profunda."
+        ),
+        "shuffle_SHALLOWER": (
+            "Es más leve que en casi todos los órdenes al azar: solo {share} de ellos cae tan "
+            "poco. Las pérdidas casi nunca siguieron a otras pérdidas. Así se ven las curvas "
+            "suavizadas, las que promedian posiciones perdedoras o un orden favorable que no "
+            "tiene por qué repetirse. La caída del archivo puede quedarse corta como medida del "
+            "riesgo."
+        ),
+        "shuffle_DEEPER": (
+            "Es más profunda que en casi todos los órdenes al azar: solo {share} de ellos cae "
+            "tanto. Las pérdidas llegaron en rachas, así que el Sharpe y la volatilidad por sí "
+            "solos subestiman lo que costó aguantar esta curva."
+        ),
         "ranges_title": "¿Cuánto de esto podría ser azar?",
         "ranges_intro": (
             "Con {n} operaciones, cada cifra tiene un margen. Con un 95 % de confianza, el "
@@ -1621,6 +1647,31 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "fund_fees_two_twenty": "2 % + 20 % of gains",
         "compare_help": "Paste the link of another of your reports to see them side by side.",
+        "shuffle_title": "Is the file's worst fall normal for these returns?",
+        "shuffle_line": (
+            "Worst fall in the file: {observed}. With the same returns in {samples} random "
+            "orders, the worst fall runs from {low} to {high} in 9 of 10 orders (median {mid})."
+        ),
+        "shuffle_intro": (
+            "Changing the order does not change the Sharpe, the volatility or the final result: "
+            "it only shows the fall these returns usually bring over the whole file. It is not "
+            "the one-year fall in the table above."
+        ),
+        "shuffle_TYPICAL": (
+            "It is within the usual range for these returns: the order they came in makes it "
+            "neither much milder nor much deeper."
+        ),
+        "shuffle_SHALLOWER": (
+            "It is milder than in almost every random order: only {share} of them fall this "
+            "little. Losses almost never followed losses. Smoothed curves, curves that average "
+            "down losing positions, or a favourable order that need not repeat look like this. "
+            "The file's fall may understate the risk."
+        ),
+        "shuffle_DEEPER": (
+            "It is deeper than in almost every random order: only {share} of them fall this far. "
+            "Losses came in streaks, so the Sharpe and the volatility alone understate what it "
+            "took to sit through this curve."
+        ),
         "ranges_title": "How much of this could be chance?",
         "ranges_intro": (
             "With {n} trades, every figure has a margin. With 95 % confidence, the system's "
@@ -3491,7 +3542,39 @@ def _risk_html(
             f"{_value_cell(under['p50'], percent=False)}, {_e(labels['risk_under_p95'])} "
             f"{_value_cell(under['p95'], percent=False)}</p>"
         )
+    html_text += _shuffle_html(risk.get("versus_shuffle"), labels)
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
+
+
+def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """The file's worst fall beside the same returns in random order."""
+    if not shuffle or shuffle.get("status") != "MEASURED":
+        return ""
+    observed = _ev_value(shuffle.get("observed"))
+    spread = shuffle.get("shuffled") or {}
+    low, mid, high = (_ev_value(spread.get(q)) for q in ("p5", "p50", "p95"))
+    position = shuffle.get("position")
+    if observed is None or low is None or mid is None or high is None:
+        return ""
+    if position not in ("TYPICAL", "SHALLOWER", "DEEPER"):
+        return ""
+    share_key = "share_at_most_as_deep" if position == "SHALLOWER" else "share_at_least_as_deep"
+    share = _ev_value(shuffle.get(share_key))
+    samples = int((shuffle.get("method") or {}).get("samples") or 0)
+    line = labels["shuffle_line"].format(
+        observed=f"{abs(observed):.1%}",
+        samples=f"{samples:,}",
+        low=f"{abs(low):.1%}",
+        high=f"{abs(high):.1%}",
+        mid=f"{abs(mid):.1%}",
+    )
+    verdict = labels[f"shuffle_{position}"].format(share=f"{share or 0:.1%}")
+    return (
+        f"<h3>{_e(labels['shuffle_title'])}</h3>"
+        f"<p>{_e(line)} {_badge('MEASURED')}</p>"
+        f"<p>{_e(verdict)}</p>"
+        f"<p class='muted'>{_e(labels['shuffle_intro'])}</p>"
+    )
 
 
 def _cost_gap_note(
@@ -5099,9 +5182,7 @@ def _holding_html(
     out = ""
     days = int(holding["days"]["value"])
     if "rides_the_market" in (holding.get("findings") or []):
-        rides = labels["holding_rides"].format(
-            label=label, weeks=int(holding["weeks"]["value"])
-        )
+        rides = labels["holding_rides"].format(label=label, weeks=int(holding["weeks"]["value"]))
         out += (
             f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
             f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>"
@@ -5150,9 +5231,7 @@ def _holding_html(
     out += f"<p>{_e(together)} {_badge('MEASURED')}</p>"
     if closed_only:
         out += f"<p class='muted'>{_e(labels['holding_closed_only'])}</p>"
-    link = (
-        f"<a href='{_e(str(holding.get('source_url', '')))}' rel='noopener'>FRED</a>"
-    )
+    link = f"<a href='{_e(str(holding.get('source_url', '')))}' rel='noopener'>FRED</a>"
     source = _e(labels["holding_source"].format(label=label, source="\x00"))
     out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
     return out

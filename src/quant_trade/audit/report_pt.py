@@ -986,6 +986,32 @@ REPORT: dict[str, Any] = {
             "não o usa: com poucos dados essa alta costuma ser ruído."
         ),
         "compare_help": "Cole o link de outro relatório seu para vê-los lado a lado.",
+        "shuffle_title": "A pior queda do arquivo é normal para estes retornos?",
+        "shuffle_line": (
+            "Pior queda do arquivo: {observed}. Com os mesmos retornos em {samples} ordens "
+            "aleatórias, a pior queda vai de {low} a {high} em 9 de cada 10 ordens (mediana "
+            "{mid})."
+        ),
+        "shuffle_intro": (
+            "Mudar a ordem não muda o Sharpe, a volatilidade nem o resultado final: só mostra "
+            "que queda esses retornos costumam trazer ao longo de todo o arquivo. Não é a queda "
+            "em um ano da tabela acima."
+        ),
+        "shuffle_TYPICAL": (
+            "Está dentro do habitual para estes retornos: a ordem em que chegaram não a torna "
+            "nem muito mais leve nem muito mais profunda."
+        ),
+        "shuffle_SHALLOWER": (
+            "É mais leve do que em quase todas as ordens aleatórias: só {share} delas caem tão "
+            "pouco. As perdas quase nunca seguiram outras perdas. Assim se parecem as curvas "
+            "suavizadas, as que fazem preço médio em posições perdedoras ou uma ordem favorável "
+            "que não precisa se repetir. A queda do arquivo pode subestimar o risco."
+        ),
+        "shuffle_DEEPER": (
+            "É mais profunda do que em quase todas as ordens aleatórias: só {share} delas caem "
+            "tanto. As perdas vieram em sequência, então o Sharpe e a volatilidade sozinhos "
+            "subestimam o que custou aguentar esta curva."
+        ),
         "holding": "Ganha de comprar e manter o mercado?",
         "holding_intro": (
             "A estratégia opera sobretudo o {label}. Estes são os seus fechamentos diários ao "

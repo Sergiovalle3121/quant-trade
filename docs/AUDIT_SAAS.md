@@ -2534,3 +2534,9 @@ How the report shows them (ES, EN and PT):
   be chance alone (with "it does not say it will repeat" for a positive
   alpha), below that as not distinguishable from chance.
 - The fee table's last row is "2 % + 20 % of gains".
+- In the risk section, "Is the file's worst fall normal for these returns?":
+  the uploaded worst fall beside the 5th to 95th percentile of the same
+  returns in random order, and one sentence for `TYPICAL`, `SHALLOWER`
+  (losses rarely follow losses; the file's fall may understate the risk) or
+  `DEEPER` (losses came in streaks). It says it is not the one-year fall
+  above. Nothing shows when it is `NOT_MEASURED`.
