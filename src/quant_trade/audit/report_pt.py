@@ -1062,6 +1062,40 @@ REPORT: dict[str, Any] = {
             "A diferença de rentabilidade média entre as duas colunas ({z} erros padrão) não "
             "basta para dizer que se comporta de forma diferente conforme o mercado."
         ),
+        "currency": "Quanto foi na sua moeda e depois da inflação?",
+        "currency_intro": (
+            "Os saldos da curva, em dólares, convertidos pela cotação de cada dia (taxa do "
+            "meio-dia em Nova York do Federal Reserve), de {first} a {last}. Se você vive com "
+            "outra moeda, isto é o que a estratégia fez nela: o que a sua moeda subiu ou caiu "
+            "frente ao dólar soma-se ao resultado."
+        ),
+        "currency_assumed": (
+            "O arquivo não diz em que moeda está a conta, então ela é lida como dólares. Se não"
+            " for, esta seção não se aplica."
+        ),
+        "currency_not_measured": "Sem conversão para outras moedas: {reason}.",
+        "currency_head": "Moeda",
+        "currency_total": "Rentabilidade total",
+        "currency_yearly": "Ao ano",
+        "currency_fall": "Pior queda",
+        "currency_dollars": "Dólares (a conta)",
+        "currency_real": "Dólares depois da inflação dos EUA",
+        "currency_inflation": "A inflação dos EUA nessas datas foi de {total} no total.",
+        "currency_inflation_yearly": (
+            "A inflação dos EUA nessas datas foi de {total} no total ({yearly} ao ano)."
+        ),
+        "currency_note": (
+            "Os números em outras moedas não subtraem a inflação dessas moedas. A rentabilidade"
+            " ao ano aparece com pelo menos um ano de histórico. Fonte: cotações e preços ao "
+            "consumidor dos EUA de {source}, lidos ao gerar o relatório. Não muda a classe."
+        ),
+        "currency_MXN": "Pesos mexicanos (MXN)",
+        "currency_BRL": "Reais (BRL)",
+        "currency_EUR": "Euros (EUR)",
+        "currency_GBP": "Libras esterlinas (GBP)",
+        "currency_JPY": "Ienes (JPY)",
+        "currency_CAD": "Dólares canadenses (CAD)",
+        "currency_CHF": "Francos suíços (CHF)",
         "regime_source": (
             "VIX: dados públicos de {source} (série VIXCLS, da CBOE) lidos ao gerar o "
             "relatório. Mede ações dos EUA: se a estratégia opera outro mercado, leia-o como "
@@ -1182,6 +1216,7 @@ REPORT: dict[str, Any] = {
         "benchmark": "A comparação com o benchmark que você enviou",
         "holding": "Se ganha de simplesmente comprar e manter o mercado que opera",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado (VIX)",
+        "currency": "Quanto foi em pesos, reais, euros e outras moedas, e depois da inflação",
     },
     "DIMENSION_TITLES": {
         "statistical_significance": "Significância estatística",
@@ -4566,6 +4601,50 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "the curve reaches zero",
         "a curva chega a zero",
+    ),
+    (
+        (
+            "the dollar levels converted at the Federal Reserve's noon buying rate of each day "
+            "(FRED H.10); return a year compounded over the calendar days, shown from one year of"
+            " history; worst fall from a peak in that currency; before that currency's own "
+            "inflation"
+        ),
+        (
+            "os saldos em dólares convertidos pela taxa do meio-dia do Federal Reserve de cada "
+            "dia (FRED H.10); rentabilidade ao ano composta sobre os dias corridos, mostrada a "
+            "partir de um ano de histórico; pior queda desde um pico nessa moeda; antes da "
+            "inflação dessa moeda"
+        ),
+    ),
+    (
+        (
+            "the dollar levels divided by US consumer prices (FRED CPIAUCSL) of each point's "
+            "month, or the latest month published; US inflation only"
+        ),
+        (
+            "os saldos em dólares divididos pelos preços ao consumidor dos EUA (FRED CPIAUCSL) do"
+            " mês de cada ponto, ou do último mês publicado; só inflação dos EUA"
+        ),
+    ),
+    (
+        "no currency is named in the file, so the curve is read as US dollars",
+        "o arquivo não nomeia a moeda, então a curva é lida em dólares dos EUA",
+    ),
+    (
+        "the account is not in US dollars",
+        "a conta não está em dólares dos EUA",
+    ),
+    (
+        "the exchange rates could not be read when the report was made",
+        "as cotações não puderam ser lidas ao gerar o relatório",
+    ),
+    (
+        "US consumer prices could not be read when the report was made",
+        "os preços ao consumidor dos EUA não puderam ser lidos ao gerar o relatório",
+    ),
+    (
+        "US consumer prices do not cover the whole history",
+        "os preços ao consumidor dos EUA não cobrem todo o histórico",
     ),
     (
         "the strategy's compound return a year",

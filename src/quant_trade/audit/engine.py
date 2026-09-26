@@ -35,6 +35,7 @@ from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import cashrate as cashrate_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import crises as crises_lib
+from quant_trade.audit import currency as currency_lib
 from quant_trade.audit import decay as decay_lib
 from quant_trade.audit import firmfit as firmfit_lib
 from quant_trade.audit import forward as forward_lib
@@ -875,6 +876,21 @@ def _cash_rate(
     return cashrate_lib.excess_sharpe(inputs.equity.frame, rates, inputs.periods_per_year)
 
 
+def _currency(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
+) -> dict[str, Any] | None:
+    """The curve in other currencies and after US inflation, when public data is on."""
+    if market is None:
+        return None
+    series: dict[str, pd.Series | None] = {}
+    for key in currency_lib.series_keys():
+        try:
+            series[key] = market(key)
+        except Exception:  # noqa: BLE001 (public data must never stop an audit)
+            series[key] = None
+    return currency_lib.in_currencies(inputs.equity.frame, series, inputs.account_currency)
+
+
 def _vix_regime(
     inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
 ) -> dict[str, Any] | None:
@@ -1196,6 +1212,8 @@ def run_audit(
     holding = None if fund.get("status") == "MEASURED" else _holding(inputs, market)
     cash_rate = _cash_rate(inputs, market, bill_rates)
     vix_regime = _vix_regime(inputs, market)
+    # A fund's table rarely names its currency; converting it as dollars would mislead.
+    in_currencies = None if fund.get("status") == "MEASURED" else _currency(inputs, market)
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1407,6 +1425,7 @@ def run_audit(
         holding=holding,
         cash_rate=cash_rate,
         vix_regime=vix_regime,
+        in_currencies=in_currencies,
         luck=luck,
         ride=ride,
         vendor_questions=questions,

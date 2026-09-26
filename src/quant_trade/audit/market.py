@@ -99,8 +99,30 @@ CASH = Asset(
 #: is 82.69 (March 2020), so a value above ``MAX_VIX`` is a broken download.
 MAX_VIX = 200.0
 VIX = Asset("vix", "VIX", "VIXCLS", re.compile(r"(?!)"), ceiling=MAX_VIX)
+#: US consumer prices (all items, seasonally adjusted, 1982-84 = 100), monthly.
+CPI = Asset("cpi", "US consumer prices", "CPIAUCSL", re.compile(r"(?!)"), ceiling=10_000.0)
+#: Noon buying rates in New York (Federal Reserve H.10), daily: units of the
+#: currency per US dollar, or US dollars per unit for the euro and the pound.
+FX: tuple[Asset, ...] = tuple(
+    Asset(f"fx_{code.lower()}", code, series, re.compile(r"(?!)"), ceiling=10_000.0)
+    for code, series in (
+        ("MXN", "DEXMXUS"),
+        ("BRL", "DEXBZUS"),
+        ("EUR", "DEXUSEU"),
+        ("GBP", "DEXUSUK"),
+        ("JPY", "DEXJPUS"),
+        ("CAD", "DEXCAUS"),
+        ("CHF", "DEXSZUS"),
+    )
+)
 #: Every series the service keeps in memory.
-SERIES: dict[str, Asset] = {**BY_KEY, CASH.key: CASH, VIX.key: VIX}
+SERIES: dict[str, Asset] = {
+    **BY_KEY,
+    CASH.key: CASH,
+    VIX.key: VIX,
+    CPI.key: CPI,
+    **{asset.key: asset for asset in FX},
+}
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).
 _SUFFIX = re.compile(r"[._].*$")
@@ -273,6 +295,8 @@ class MarketData:
 __all__ = [
     "ASSETS",
     "CASH",
+    "CPI",
+    "FX",
     "SERIES",
     "VIX",
     "Asset",
