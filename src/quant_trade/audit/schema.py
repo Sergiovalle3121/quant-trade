@@ -60,9 +60,30 @@ MAX_PERIOD_RETURN = 1e6
 MAX_CURRENCY_CHARS = 8
 MIN_OBSERVATIONS = 30
 
-TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha", "observation_date")
+TIMESTAMP_ALIASES = (
+    "timestamp",
+    "date",
+    "datetime",
+    "time",
+    "ts",
+    "fecha",
+    "observation_date",
+    # Portuguese "Data"; last, so an English file's "date" always wins.
+    "data",
+)
 EQUITY_ALIASES = ("equity", "nav", "balance", "value", "portfolio_value", "close", "capital")
-RETURN_ALIASES = ("return", "returns", "ret", "pnl_pct", "daily_return", "retorno")
+RETURN_ALIASES = (
+    "return",
+    "returns",
+    "ret",
+    "pnl_pct",
+    "daily_return",
+    "retorno",
+    "retornos",
+    "rendimiento",
+    "rentabilidad",
+    "rentabilidade",
+)
 
 TRADE_ENTRY_TIME = ("entry_time", "entry_date", "open_time", "open_date", "entry", "fecha_entrada")
 TRADE_EXIT_TIME = ("exit_time", "exit_date", "close_time", "close_date", "exit", "fecha_salida")
@@ -268,11 +289,24 @@ def _normalise_columns(frame: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def _pick(frame: pd.DataFrame, aliases: tuple[str, ...]) -> str | None:
+def _pick(frame: pd.DataFrame, aliases: tuple[str, ...], *, percent: bool = False) -> str | None:
+    """The first column named by an alias. With ``percent`` a name that also
+    carries ``%`` matches too (``Return %``, ``% return``, ``Retorno (%)``);
+    only a return column may, since a ``%`` beside a price or a profit is a
+    ratio and not that amount."""
     for alias in aliases:
         if alias in frame.columns:
             return alias
+        if percent:
+            for column in frame.columns:
+                if "%" in column and _without_percent(column) == alias:
+                    return str(column)
     return None
+
+
+def _without_percent(column: str) -> str:
+    """A normalised column name without its ``%`` and brackets."""
+    return re.sub(r"_+", "_", re.sub(r"[%()\[\]]", "", column)).strip("_")
 
 
 def _as_utf8_csv(data: bytes) -> bytes:
@@ -358,8 +392,53 @@ def _to_numeric(series: pd.Series) -> tuple[pd.Series, bool]:
         return pd.to_numeric(series, errors="coerce").astype(float), False
     text = series.astype(str).str.strip()
     percent = bool(text.str.endswith("%").any())
-    cleaned = text.str.replace(r"[%$,\s]", "", regex=True).replace({"": np.nan, "nan": np.nan})
+    # Currency signs and codes ("R$", "US$", "€", "USD") go, and so do spaces
+    # and the Swiss "1'234"; "(1,5)", "1,5-" and a Unicode minus are negatives.
+    bare = text.str.replace("\u2212", "-", regex=False)
+    bare = bare.str.replace(r"[A-Za-z]{1,2}\$|[%$€£¥₹'\s]", "", regex=True)
+    bare = bare.str.replace(r"^[A-Z]{3}|[A-Z]{3}$", "", regex=True)
+    bare = bare.str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+    bare = bare.str.replace(r"^([\d.,]+)-$", r"-\1", regex=True)
+    if _decimal_comma(bare):
+        # "1.234,56" or "10000,5" (Spanish, Portuguese, German): the dots group
+        # thousands and the comma is the decimal point, for the whole column.
+        bare = bare.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+    else:
+        # In a decimal-dot column a cell that plainly uses a decimal comma
+        # ("10,5") contradicts the rest: it is left unread, and counted as an
+        # unreadable row, rather than read as 105.
+        bare = bare.mask(bare.map(_plain_decimal_comma), "")
+    cleaned = bare.str.replace(",", "", regex=False).replace({"": np.nan, "nan": np.nan})
     return pd.to_numeric(cleaned, errors="coerce").astype(float), percent
+
+
+#: A cell that can only be a decimal dot: no comma, and one to two or four and
+#: more digits after the dot ("10234.56", "0.5"); "1.234" could be thousands.
+_PLAIN_DECIMAL_DOT = re.compile(r"^[-+]?\d*\.(\d{1,2}|\d{4,})$")
+
+
+def _plain_decimal_comma(value: object) -> bool:
+    # Imported here: the importers build on this module's types.
+    from quant_trade.audit.importers import _comma_is_decimal
+
+    return isinstance(value, str) and _comma_is_decimal(value)
+
+
+def _decimal_comma(texts: pd.Series) -> bool:
+    """Whether a column's numbers use a decimal comma: some cell plainly does
+    (a comma after the last dot, or one comma not followed by three digits)
+    and none plainly uses a decimal dot ("1,234.5", or "10234.56" with no
+    comma). A column mixing both marks keeps the dot reading: one stray
+    "10,5" must not rescale every other cell."""
+    # Imported here: the importers build on this module's types.
+    from quant_trade.audit.importers import _comma_is_decimal
+
+    values = [value for value in texts.dropna().astype(str) if value and value != "nan"]
+    if any("," in value and "." in value[value.rfind(",") :] for value in values):
+        return False
+    if any(_PLAIN_DECIMAL_DOT.match(value) for value in values):
+        return False
+    return any(_comma_is_decimal(value) for value in values)
 
 
 def _to_timestamps(series: pd.Series) -> pd.Series:
@@ -408,7 +487,7 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         warnings.extend(grid.warnings)
         ts_col = "timestamp"
     equity_col = _pick(raw, EQUITY_ALIASES)
-    return_col = _pick(raw, RETURN_ALIASES)
+    return_col = _pick(raw, RETURN_ALIASES, percent=True)
     no_values = equity_col is None and return_col is None
     if (ts_col is None or no_values) and what == "equity" and _is_trade_list(raw):
         raise ParseError(
@@ -449,7 +528,9 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     timestamps = _to_timestamps(raw[ts_col])
     values, percent = _to_numeric(raw[value_col])
     if source == "returns":
-        if percent:
+        # "Return %" states the unit as a % sign in the cells does: 1.5 is 1.5 %,
+        # and a money-market fund's 0.03 is 0.03 % (factsheet grids read the same).
+        if percent or "%" in value_col:
             values = values / 100.0
             warnings.append("returns were percent-formatted; divided by 100")
         elif values.abs().median() > 0.5:

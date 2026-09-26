@@ -316,6 +316,21 @@ A column whose name holds `%` (`Profit %`, `% Profit`, `% chg`) never takes a
 role in the universal reader: it is a ratio, and once normalised `Profit %`
 would read as the money result.
 
+An equity curve or return series (`schema.parse_equity_csv`) takes a return
+column named with a `%` (`Return %`, `Rendimiento %`, `Retorno (%)`) and reads
+it as percentages, whatever the size of its values (a money-market fund's
+`0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
+column, taken only when no `date` or `fecha` column exists. A column whose
+numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
+throughout (one plainly decimal-comma cell decides the column, so a `1,234`
+beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
+as thousands.
+A column that also holds a plain decimal dot (`10234.56`, `0.5`) keeps the dot
+reading, and a cell there that plainly uses a decimal comma is left unread (an
+unreadable row) rather than rescaling the column. Currency signs and codes
+(`$`, `R$`, `US$`, `€`, `£`, `¥`, `₹`, `USD`), spaces and the Swiss `'` are
+dropped; `(1,5)`, `1,5-` and a Unicode minus read as negatives.
+
 Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
 trade_date, exchange, segment, series, trade_type, auction, quantity, price,
 trade_id, order_id, order_execution_time`, header as checked by the open-source
