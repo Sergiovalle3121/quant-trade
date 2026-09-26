@@ -36,7 +36,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from quant_trade.audit.market import CASH, LOCAL_CASH, Asset
+from quant_trade.audit.market import CASH, EUR_CASH_HISTORY, LOCAL_CASH, Asset
 from quant_trade.audit.schema import measured
 
 #: A bill rate older than this before a return's start is too stale to use.
@@ -78,6 +78,13 @@ class LocalCash:
     tenor_days: float
     #: How old the last value before a return's start may be.
     max_gap: int
+    #: A monthly series, same quote, used only before ``asset`` starts.
+    history: Asset | None = None
+
+    @property
+    def name(self) -> str:
+        """What the result calls the rate (the report names it in words)."""
+        return f"{self.asset.label} cash rate (FRED {self.asset.series})"
 
     def yearly(self, percent: np.ndarray) -> np.ndarray:
         rate = np.asarray(percent, dtype=float) / 100.0
@@ -91,8 +98,8 @@ _BY_CODE = {asset.label: asset for asset in LOCAL_CASH}
 LOCAL: dict[str, LocalCash] = {
     "MXN": LocalCash(_BY_CODE["MXN"], 360.0, 1.0, MAX_MONTHLY_GAP_DAYS),
     "BRL": LocalCash(_BY_CODE["BRL"], None, 1.0, MAX_MONTHLY_GAP_DAYS),
-    "EUR": LocalCash(_BY_CODE["EUR"], 360.0, 1.0, 10),
-    "GBP": LocalCash(_BY_CODE["GBP"], 365.0, 1.0, 10),
+    "EUR": LocalCash(_BY_CODE["EUR"], 360.0, 1.0, MAX_GAP_DAYS, EUR_CASH_HISTORY),
+    "GBP": LocalCash(_BY_CODE["GBP"], 365.0, 1.0, MAX_GAP_DAYS),
     "JPY": LocalCash(_BY_CODE["JPY"], 365.0, 1.0, MAX_MONTHLY_GAP_DAYS),
     "CAD": LocalCash(_BY_CODE["CAD"], 365.0, 1.0, MAX_MONTHLY_GAP_DAYS),
     "CHF": LocalCash(_BY_CODE["CHF"], 360.0, 91.0, MAX_MONTHLY_GAP_DAYS),
@@ -112,7 +119,7 @@ def _days(stamps: pd.Series) -> pd.DatetimeIndex:
 def _span_rates(
     stamps: pd.DatetimeIndex,
     rates: pd.Series,
-    max_gap: int = MAX_GAP_DAYS,
+    max_gap: int | np.ndarray = MAX_GAP_DAYS,
     to_yearly: Callable[[np.ndarray], np.ndarray] | None = None,
 ) -> tuple[np.ndarray, np.ndarray] | str:
     """The rate's annual yield at the start of each span between consecutive
@@ -133,7 +140,8 @@ def _span_rates(
         on="day",
         direction="backward",
     )
-    stale = paired["seen"].isna() | ((paired["day"] - paired["seen"]).dt.days > max_gap)
+    old = (paired["day"] - paired["seen"]).dt.days.to_numpy(dtype=float)
+    stale = paired["seen"].isna().to_numpy() | (old > max_gap)
     if bool(stale.any()):
         return NOT_COVERED
     quoted = paired["rate"].to_numpy(dtype=float)
@@ -161,29 +169,52 @@ def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str
     return _excess(frame, rates, ppy, base, NOTE, MAX_GAP_DAYS, None)
 
 
-def local_excess_sharpe(
-    frame: pd.DataFrame, rates: pd.Series, ppy: float, currency: str
-) -> dict[str, Any]:
-    """The Sharpe ratio of the returns in ``frame`` after the cash rate of the
-    account's own ``currency`` (a key of ``LOCAL``); the values are cleaned
-    first (numbers only, within the series' bounds)."""
-    local = LOCAL[currency]
-    asset = local.asset
-    base = {
-        "series": asset.series,
-        "label": asset.label,
-        "source_url": asset.source_url,
-        "currency": currency,
-    }
+def _clean(rates: pd.Series | None, asset: Asset) -> pd.Series:
+    """Numbers only, on readable dates, within the series' bounds."""
+    if rates is None or rates.empty:
+        return pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     index = pd.DatetimeIndex(pd.to_datetime(rates.index))
+    index = index.tz_localize(None) if index.tz is not None else index
     values = pd.to_numeric(pd.Series(rates.to_numpy(), index=index), errors="coerce")
     numbers = values.to_numpy(dtype=float)
     low = asset.floor if asset.floor is not None else -math.inf
     high = asset.ceiling if asset.ceiling is not None else math.inf
-    values = values[np.isfinite(numbers) & (numbers >= low) & (numbers <= high)].astype(float)
+    kept = values[np.isfinite(numbers) & (numbers >= low) & (numbers <= high)]
+    return kept.astype(float).sort_index()
+
+
+def local_excess_sharpe(
+    frame: pd.DataFrame,
+    rates: pd.Series,
+    ppy: float,
+    currency: str,
+    history: pd.Series | None = None,
+) -> dict[str, Any]:
+    """The Sharpe ratio of the returns in ``frame`` after the cash rate of the
+    account's own ``currency`` (a key of ``LOCAL``). The values are cleaned
+    first; a ``history`` series (monthly, same quote) fills only the dates
+    before ``rates`` starts, where a value may be ``MAX_MONTHLY_GAP_DAYS`` old."""
+    local = LOCAL[currency]
+    asset = local.asset
+    base: dict[str, Any] = {
+        "series": asset.series,
+        "label": local.name,
+        "source_url": asset.source_url,
+        "currency": currency,
+    }
+    values = _clean(rates, asset)
     if values.empty:
         return {"status": "NOT_MEASURED", "reason": UNAVAILABLE, **base}
-    return _excess(frame, values, ppy, base, NOTE_LOCAL, local.max_gap, local.yearly)
+    max_gap: int | np.ndarray = local.max_gap
+    if local.history is not None:
+        older = _clean(history, local.history)
+        older = older[older.index < values.index[0]]
+        if not older.empty:
+            starts = _days(frame["timestamp"])[:-1].floor("D")
+            max_gap = np.where(starts < values.index[0], MAX_MONTHLY_GAP_DAYS, local.max_gap)
+            values = pd.concat([older, values])
+            base["history_series"] = local.history.series
+    return _excess(frame, values, ppy, base, NOTE_LOCAL, max_gap, local.yearly)
 
 
 def _excess(
@@ -192,7 +223,7 @@ def _excess(
     ppy: float,
     base: dict[str, Any],
     note: str,
-    max_gap: int,
+    max_gap: int | np.ndarray,
     to_yearly: Callable[[np.ndarray], np.ndarray] | None,
 ) -> dict[str, Any]:
     stamps = _days(frame["timestamp"])

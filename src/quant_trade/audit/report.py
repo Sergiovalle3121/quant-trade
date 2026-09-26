@@ -1295,7 +1295,9 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "cash_rate_MXN": "tasa interbancaria a un día de México (OCDE)",
         "cash_rate_BRL": "tasa interbancaria a un día de Brasil (OCDE)",
-        "cash_rate_EUR": "tasa a un día del euro, €STR (BCE)",
+        "cash_rate_EUR": (
+            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la de la OCDE)"
+        ),
         "cash_rate_GBP": "tasa a un día de la libra, SONIA (Banco de Inglaterra)",
         "cash_rate_JPY": "tasa interbancaria a un día de Japón (OCDE)",
         "cash_rate_CAD": "tasa interbancaria a un día de Canadá (OCDE)",
@@ -2398,7 +2400,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "cash_rate_MXN": "overnight interbank rate of Mexico (OECD)",
         "cash_rate_BRL": "overnight interbank rate of Brazil (OECD)",
-        "cash_rate_EUR": "euro overnight rate, €STR (ECB)",
+        "cash_rate_EUR": "euro overnight rate, the ECB's €STR (before October 2019, the OECD's)",
         "cash_rate_GBP": "sterling overnight rate, SONIA (Bank of England)",
         "cash_rate_JPY": "overnight interbank rate of Japan (OECD)",
         "cash_rate_CAD": "overnight interbank rate of Canada (OECD)",

@@ -1087,7 +1087,9 @@ REPORT: dict[str, Any] = {
         ),
         "cash_rate_MXN": "taxa interbancária de um dia do México (OCDE)",
         "cash_rate_BRL": "taxa interbancária de um dia do Brasil (OCDE)",
-        "cash_rate_EUR": "taxa de um dia do euro, €STR (BCE)",
+        "cash_rate_EUR": (
+            "taxa de um dia do euro, €STR do BCE (antes de outubro de 2019, a da OCDE)"
+        ),
         "cash_rate_GBP": "taxa de um dia da libra, SONIA (Banco da Inglaterra)",
         "cash_rate_JPY": "taxa interbancária de um dia do Japão (OCDE)",
         "cash_rate_CAD": "taxa interbancária de um dia do Canadá (OCDE)",

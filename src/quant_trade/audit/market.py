@@ -150,6 +150,18 @@ LOCAL_CASH: tuple[Asset, ...] = tuple(
         ("CHF", "IR3TIB01CHM156N"),
     )
 )
+#: The euro area's immediate rate (OECD, monthly), for the years before €STR
+#: starts in October 2019; FRED's copy stops updating in 2026.
+EUR_CASH_HISTORY = Asset(
+    "cash_eur_history",
+    "EUR",
+    "IRSTCI01EZM156N",
+    re.compile(r"(?!)"),
+    rate=True,
+    ceiling=MAX_LOCAL_RATE,
+    floor=MIN_LOCAL_RATE,
+    negative=True,
+)
 #: Every series the service keeps in memory.
 SERIES: dict[str, Asset] = {
     **BY_KEY,
@@ -158,6 +170,7 @@ SERIES: dict[str, Asset] = {
     CPI.key: CPI,
     **{asset.key: asset for asset in FX},
     **{asset.key: asset for asset in LOCAL_CASH},
+    EUR_CASH_HISTORY.key: EUR_CASH_HISTORY,
 }
 
 #: Broker suffixes after a dot or underscore (``US100.cash``, ``BTCUSD_i``).

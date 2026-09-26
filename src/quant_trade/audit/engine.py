@@ -919,11 +919,18 @@ def _local_cash_rate(
     if code not in cashrate_lib.LOCAL:
         return None
     try:
-        rates = market(cashrate_lib.LOCAL[code].asset.key)
+        local = cashrate_lib.LOCAL[code]
+        rates = market(local.asset.key)
         if rates is None or rates.empty:
             return None
+        history = None
+        if local.history is not None:
+            try:
+                history = market(local.history.key)
+            except Exception:  # noqa: BLE001 (the history only fills early dates)
+                history = None
         out = cashrate_lib.local_excess_sharpe(
-            inputs.equity.frame, rates, inputs.periods_per_year, code
+            inputs.equity.frame, rates, inputs.periods_per_year, code, history
         )
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         return None

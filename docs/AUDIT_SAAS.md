@@ -1292,7 +1292,8 @@ BRL, EUR, GBP, JPY, CAD or CHF, the same line subtracts that currency's own
 cash rate instead of the US bill's: Mexico's, Brazil's, Japan's and Canada's
 immediate (overnight interbank) rates from the OECD (`IRSTCI01…M156N`,
 monthly averages), the euro's €STR (`ECBESTRVOLWGTTRMDMNRT`, daily, from
-October 2019), sterling's SONIA (`IUDSOIA`, daily) and, because the Swiss
+October 2019; before it, the euro area's OECD immediate rate `IRSTCI01EZM156N`,
+monthly, fills only the earlier dates, `EUR_CASH_HISTORY`), sterling's SONIA (`IUDSOIA`, daily) and, because the Swiss
 immediate rate stops in 2024, Switzerland's 3-month interbank rate
 (`IR3TIB01CHM156N`, monthly). Each quote becomes an annual yield by its own
 convention: a simple rate over its tenor on a 360-day (MXN, EUR, CHF) or
@@ -1304,7 +1305,7 @@ average or the latest published). These series may be negative (the franc,
 euro and yen rates were); a reply outside -5 % to 200 % a year
 (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
 taken as broken. When the currency has no series here, or its rates cannot
-be read or do not cover the history (the euro before October 2019), the
+be read or do not cover the history, the
 line stays the US bill's, with its note. Jensen's alpha keeps the US bill.
 It never changes the class.
 

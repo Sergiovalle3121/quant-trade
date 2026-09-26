@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from html import escape
 
 import numpy as np
 import pandas as pd
@@ -111,7 +112,7 @@ def test_a_euro_account_subtracts_the_euro_rate(locale: str) -> None:
     html, _ = render(result, watermark=False)
     assert_report_clean(html)
     labels = LABELS[locale]
-    assert labels["cash_rate_EUR"] in html
+    assert escape(labels["cash_rate_EUR"]) in html
     assert labels["cash_note_local"].split("{code}")[0] in html
     for key, text in labels.items():
         if key.startswith(
@@ -150,3 +151,33 @@ def test_a_broken_local_series_never_stops_the_audit() -> None:
     result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=market)
     assert result.cash_rate is not None and result.cash_rate["status"] == "NOT_MEASURED"
     assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_older_euro_dates_take_the_oecd_monthly_rate_and_only_those() -> None:
+    days = pd.bdate_range("2018-01-02", "2021-06-30")
+    frame = _curve(days, np.full(len(days), 0.0001))
+    estr = pd.Series(-0.5, index=pd.bdate_range("2019-10-01", days[-1]))
+    oecd = pd.Series(-0.36, index=pd.date_range("2017-01-01", "2021-06-01", freq="MS"))
+    assert local_excess_sharpe(frame, estr, 252.0, "EUR")["status"] == "NOT_MEASURED"
+    out = local_excess_sharpe(frame, estr, 252.0, "EUR", oecd)
+    assert out["status"] == "MEASURED" and out["history_series"] == "IRSTCI01EZM156N"
+    # The mean mixes -0.36 % before October 2019 and -0.5 % after.
+    low, high = (float(LOCAL["EUR"].yearly(np.array([v]))[0]) for v in (-0.5, -0.36))
+    assert low < out["mean_rate"]["value"] < high
+    # €STR still has to be fresh after it starts: a month-long hole is not covered.
+    holed = estr[(estr.index < "2020-03-01") | (estr.index > "2020-04-01")]
+    assert local_excess_sharpe(frame, holed, 252.0, "EUR", oecd)["status"] == "NOT_MEASURED"
+
+
+def test_the_engine_reads_the_euro_history_for_an_old_euro_account() -> None:
+    days = pd.bdate_range("2018-01-02", "2021-06-30")
+    inputs = _inputs(days, "es", "EUR")
+    series = {
+        "cash_eur": pd.Series(-0.5, index=pd.bdate_range("2019-10-01", days[-1])),
+        "cash_eur_history": pd.Series(
+            -0.36, index=pd.date_range("2017-01-01", "2021-06-01", freq="MS")
+        ),
+    }
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=series.get)
+    assert result.cash_rate is not None and result.cash_rate["currency"] == "EUR"
+    assert result.cash_rate["label"] == "EUR cash rate (FRED ECBESTRVOLWGTTRMDMNRT)"
