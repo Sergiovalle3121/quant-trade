@@ -841,6 +841,31 @@ LIVE_RECORD_MIN_MONTHS = 6
 LIVE_RECORD_ASK_MONTHS = 24
 
 _QUESTIONS: dict[str, dict[str, str]] = {
+    # Asked of a fund's monthly record: there is no robot, backtest or trade list.
+    "fund_net": {
+        "es": "¿Las rentabilidades son netas de todas las comisiones (gestión, éxito, entrada "
+        "y salida)? ¿De qué clase de participación son?",
+        "en": "Are the returns net of all fees (management, performance, entry and exit)? "
+        "Which share class are they for?",
+    },
+    "fund_same_record": {
+        "es": "¿Todo el historial es del mismo fondo, con el mismo gestor y la misma estrategia, "
+        "o incluye años simulados o de otro vehículo?",
+        "en": "Is the whole record the same fund, with the same manager and strategy, or does "
+        "it include simulated years or another vehicle's?",
+    },
+    "fund_other": {
+        "es": "¿El gestor lleva otros fondos o cuentas con la misma estrategia? Pide también "
+        "los que se cerraron: enseñar solo el que salió bien es habitual.",
+        "en": "Does the manager run other funds or accounts with the same strategy? Ask for "
+        "the ones that were closed too: showing only the one that went well is common.",
+    },
+    "fund_admin": {
+        "es": "¿Quién calcula el valor liquidativo y quién audita las cuentas del fondo? Pide "
+        "el nombre del administrador y del auditor independientes.",
+        "en": "Who calculates the net asset value and who audits the fund's accounts? Ask for "
+        "the names of the independent administrator and auditor.",
+    },
     # Asked instead of the backtest questions when the upload is an account history.
     "other_accounts": {
         "es": "¿Es la única cuenta con esta estrategia? Pide también las cuentas que se "
@@ -1030,6 +1055,7 @@ def vendor_questions(
     account_history: bool = False,
     min_track_record_months: float | None = None,
     findings: Iterable[str] = (),
+    fund_record: bool = False,
 ) -> list[dict[str, str]]:
     """Questions a buyer can put to the seller of a trading robot.
 
@@ -1043,7 +1069,18 @@ def vendor_questions(
     An account history (``account_history``) is the live record itself and
     its prices are real fills, so the backtest questions (modelling, trials,
     held-out period, assumed costs) give way to the ones an investor needs.
+    A fund's monthly record (``fund_record``) has no robot and no trades:
+    it gets the questions a fund investor asks, plus the data-quality one.
     """
+    if fund_record:
+        fund_wanted = {"fund_net", "fund_same_record", "fund_other", "fund_admin"}
+        if any(_FLAG_QUESTIONS.get(code) == "data_quality" for code in flag_codes):
+            fund_wanted.add("data_quality")
+        return [
+            {"code": key, "es": _QUESTIONS[key]["es"], "en": _QUESTIONS[key]["en"]}
+            for key in _QUESTION_ORDER
+            if key in fund_wanted
+        ]
     wanted: set[str] = (
         {"other_accounts", "backtest_match"} if account_history else {"live_record", "modelling"}
     )

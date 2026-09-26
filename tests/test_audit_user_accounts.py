@@ -3166,3 +3166,151 @@ def test_every_account_screen_is_kept_out_of_search_engines(tmp_path: Path) -> N
     # No public page is caught by an account prefix.
     public = [p for pair in seo.PUBLIC_PAGES for p in pair.values()]
     assert not [p for p in public if p.startswith(seo.DISALLOWED_PATHS)]
+
+
+NOTICE = "class='acct-card acct-notice'"
+
+
+def test_since_your_last_visit_shows_new_devices_and_wrong_passwords_once(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": LAPTOP_UA, "X-Forwarded-For": "2001:db8:7:7::1"})
+    _signup(client)
+    first = client.get("/cuenta").text
+    assert NOTICE not in first  # a first view shows nothing
+    # A new device signs in and someone types wrong passwords.
+    phone = TestClient(client.app)
+    phone.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.20"})
+    _signin(phone, "ana@example.com")
+    for _ in range(2):
+        _signin(TestClient(client.app), "ana@example.com", "wrong-guess-here", ip="198.51.100.3")
+    page = client.get("/cuenta").text
+    assert NOTICE in page
+    notice = page.split(NOTICE)[1].split("</div>")[0]
+    assert "2 intentos de entrar con contraseña incorrecta." in notice
+    assert "Una entrada desde un dispositivo nuevo: Safari · iPhone." in notice
+    assert "#actividad" in notice and "cambia tu contraseña" in notice
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    # Once seen, it is gone.
+    assert NOTICE not in client.get("/cuenta").text
+    # A device already used, even from another network, is not new; this
+    # browser's own sign-in is never reported.
+    _signin(phone, "ana@example.com", ip="203.0.113.99")
+    again = TestClient(client.app)
+    again.headers.update({"User-Agent": LAPTOP_UA, "X-Forwarded-For": "2001:db8:7:7::1"})
+    _signin(again, "ana@example.com")
+    assert NOTICE not in client.get("/cuenta").text
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert data["account_page_seen"][0]["device"] == "Firefox · Windows"
+    assert "browser" not in data["account_page_seen"][0]
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post("/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf})
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.account_seen.select()).all() == []  # type: ignore[attr-defined]
+    assert store.take_visit_notice(ana.id, datetime.now(UTC), browser="x") is None  # type: ignore[attr-defined]
+
+
+def test_since_your_last_visit_exists_in_every_language(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client)
+    for prefix, words in (
+        ("/account", ("Since your last visit", "1 sign-in try with a wrong password.")),
+        (
+            account_pages.path("account", "pt"),
+            # The same network's line spans both views: only the newer try counts.
+            ("Desde sua última visita", "1 tentativa de entrar com senha incorreta."),
+        ),
+    ):
+        client.get(prefix)
+        _signin(TestClient(client.app), "ana@example.com", "wrong-guess-here")
+        page = client.get(prefix).text
+        assert all(w in page for w in words), prefix
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    ctx = LegalContext(
+        operator_name="Op",
+        operator_contact="op@example.com",
+        operator_address="México",
+        jurisdiction="Leyes de México",
+    )
+    for locale, words in (("es", "última visita"), ("en", "last visit")):
+        privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
+        assert words in privacy and not find_claims(privacy)
+
+
+def test_an_intruder_opening_mi_cuenta_never_clears_the_owners_notice(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.30"})
+    _signup(client)
+    client.get("/cuenta")  # the owner's phone has seen Mi cuenta
+    intruder = TestClient(client.app)
+    intruder.headers.update({"User-Agent": LAPTOP_UA, "X-Forwarded-For": "198.51.100.40"})
+    for _ in range(3):
+        _signin(intruder, "ana@example.com", "wrong-guess-here")
+    assert _signin(intruder, "ana@example.com").headers["location"] == "/cuenta"
+    seen_by_intruder = intruder.get("/cuenta").text
+    # A device's first view tells nothing: no tries, no devices.
+    assert NOTICE not in seen_by_intruder
+    owner = client.get("/cuenta").text
+    assert NOTICE in owner
+    notice = owner.split(NOTICE)[1].split("</div>")[0]
+    assert "3 intentos de entrar con contraseña incorrecta." in notice
+    assert "Una entrada desde un dispositivo nuevo: Firefox · Windows." in notice
+    # A sign-in without a browser string reads as an unknown device.
+    bare = TestClient(client.app)
+    bare.headers.update({"User-Agent": "", "X-Forwarded-For": "198.51.100.41"})
+    _signin(bare, "ana@example.com")
+    assert "Una entrada desde un dispositivo desconocido." in client.get("/cuenta").text
+
+
+def test_a_same_label_intruder_or_a_flood_of_browsers_never_clears_the_notice(
+    tmp_path: Path,
+) -> None:
+    from quant_trade.audit.store import SEEN_DEVICES_MAX
+
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.30"})
+    _signup(client)
+    client.get("/cuenta")
+    # An intruder on the same kind of phone gets a browser of its own.
+    twin = TestClient(client.app)
+    twin.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "198.51.100.50"})
+    for _ in range(3):
+        _signin(twin, "ana@example.com", "wrong-guess-here")
+    _signin(twin, "ana@example.com")
+    assert NOTICE not in twin.get("/cuenta").text
+    owner = client.get("/cuenta").text
+    assert "3 intentos de entrar con contraseña incorrecta." in owner
+    # Many new browsers opening Mi cuenta never push the owner's row out.
+    _signin(TestClient(client.app), "ana@example.com", "wrong-guess-here")
+    for n in range(SEEN_DEVICES_MAX + 5):
+        other = TestClient(client.app)
+        other.headers.update({"User-Agent": f"Mozilla/5.0 (X11; Linux) Chrome/{n}"})
+        _signin(other, "ana@example.com")
+        other.get("/cuenta")
+    owner = client.get("/cuenta").text
+    assert "1 intento de entrar con contraseña incorrecta." in owner
+
+
+def test_a_flood_of_new_devices_lists_three_and_counts_the_rest() -> None:
+    from quant_trade.audit import account_pages
+    from quant_trade.audit.store import VisitNotice
+
+    devices = tuple(f"Chrome {n} · Linux" for n in range(8))
+    for locale, more in (
+        ("es", "Y 5 entradas más desde otros dispositivos nuevos."),
+        ("en", "And 5 more sign-ins from other new devices."),
+        ("pt", "E mais 5 entradas de outros dispositivos novos."),
+    ):
+        html = account_pages._visit_notice(
+            account_pages.COPY[locale], locale, VisitNotice(new_devices=devices)
+        )
+        assert html.count("<li>") == 4
+        assert "Chrome 2 · Linux" in html and "Chrome 3 · Linux" not in html
+        assert more in html
+        one = account_pages._visit_notice(
+            account_pages.COPY[locale], locale, VisitNotice(new_devices=devices[:4])
+        )
+        assert one.count("<li>") == 4 and "{count}" not in one
+        assert account_pages.COPY[locale]["notice_more_devices_one"] in one
