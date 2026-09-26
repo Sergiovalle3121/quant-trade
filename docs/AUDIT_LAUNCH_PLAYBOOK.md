@@ -748,13 +748,43 @@ The report builds your trades from the buys and sells (a deposit never counts as
 #### F11 · ES · Cuando alguien pregunta si es seguro
 
 ```text
-Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves tus entradas más recientes (hasta 90 días), incluidos los intentos con contraseña incorrecta. Más en las preguntas frecuentes: https://rigor.up.railway.app/?ref=f11#faq
+Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves tus entradas más recientes (hasta 90 días), incluidos los intentos con contraseña incorrecta. También puedes entrar con una llave de acceso: la huella, la cara o el PIN de tu teléfono o computadora, sin escribir la contraseña. Más en las preguntas frecuentes: https://rigor.up.railway.app/?ref=f11#faq
 ```
 
 #### F11 · EN · When someone asks whether it is safe
 
 ```text
-Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see your most recent sign-ins (up to 90 days), including wrong-password tries. More in the FAQ: https://rigor.up.railway.app/en?ref=f11#faq
+Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see your most recent sign-ins (up to 90 days), including wrong-password tries. You can also sign in with a passkey: your phone's or computer's fingerprint, face or PIN, without typing the password. More in the FAQ: https://rigor.up.railway.app/en?ref=f11#faq
+```
+
+#### F12 · ES · ¿Dejó de funcionar o es una mala racha?
+
+```text
+Cuando una estrategia pasa por meses flojos, la pregunta es si cambió algo o si es ruido. Una prueba clásica lo mide: la suma acumulada de lo que cada rentabilidad se aparta de la media (CUSUM, Ploberger y Krämer, 1992). Si en algún punto se aleja de cero más de lo que explica el ruido, la media cambió cerca de esa fecha.
+
+Tres cuidados:
+1. Hace falta historia: con menos de unas 250 rentabilidades, un cambio pequeño casi nunca se detecta. Que no salga no prueba que no haya cambiado.
+2. El ruido se mide con cuidado: si cada rentabilidad se parece a la anterior, la varianza simple se queda corta (Newey-West).
+3. La fecha es un rango: dice dónde se nota más el cambio, no su causa.
+
+Rigor lo hace con tu archivo y te da la fecha con su rango al 95 % y la media antes y después: https://rigor.up.railway.app/?ref=f12
+
+Describe tu historial; no dice qué pasará después.
+```
+
+#### F12 · EN · Did it stop working, or is it a bad run?
+
+```text
+When a strategy goes through weak months, the question is whether something changed or it is noise. A classic test measures it: the running sum of how far each return sits from the average (CUSUM, Ploberger and Krämer, 1992). If at some point it strays from zero by more than the noise explains, the average changed near that date.
+
+Three cautions:
+1. It needs history: with fewer than about 250 returns, a small change is rarely detected. Not finding one does not prove nothing changed.
+2. The noise is measured carefully: if each return resembles the one before, the plain variance falls short (Newey-West).
+3. The date is a range: it says where the change shows most, not its cause.
+
+Rigor does it from your file and gives the date with its 95 % range and the average before and after: https://rigor.up.railway.app/en?ref=f12
+
+It describes your history; it does not say what comes next.
 ```
 
 ### Mensajes directos

@@ -411,7 +411,10 @@ _COPY: dict[str, dict[str, Any]] = {
                 "cuenta hacen falta dos de estas tres cosas: tu contraseña, el código de la app "
                 "o tu clave de recuperación. En Mi cuenta ves dónde está abierta tu cuenta y "
                 "cierras cada sesión, y ves tus entradas y cambios de seguridad más recientes "
-                "(hasta 90 días), incluidos los intentos con contraseña incorrecta.",
+                "(hasta 90 días), incluidos los intentos con contraseña incorrecta. También "
+                "puedes entrar con una llave de acceso: la huella, la cara o el PIN de tu "
+                "teléfono o computadora, sin escribir la contraseña. En Mi cuenta, «Protección "
+                "de tu cuenta» te muestra qué tienes activado y cómo activar lo que falta.",
             ),
             (
                 "¿Cómo se usa el sello?",
@@ -706,7 +709,10 @@ _COPY: dict[str, dict[str, Any]] = {
                 "account takes two of these three: your password, the code from the app or "
                 "your recovery key. In My account you see where your account is open and "
                 "sign out each session, and you see your most recent sign-ins and security "
-                "changes (up to 90 days), including wrong-password tries.",
+                "changes (up to 90 days), including wrong-password tries. You can also sign in "
+                "with a passkey: your phone's or computer's fingerprint, face or PIN, without "
+                'typing the password. In My account, "Your account\'s protection" shows what '
+                "is on and how to turn on the rest.",
             ),
             (
                 "How is the badge used?",
@@ -882,8 +888,10 @@ _UI: dict[str, dict[str, Any]] = {
                 "En tu moneda y tras la inflación",
                 "Si la cuenta está en dólares, ves su resultado en pesos mexicanos, "
                 "reales, euros y otras "
-                "cuatro monedas al tipo de cambio de cada día, y después de la inflación de "
-                "EE. UU. (datos públicos de FRED).",
+                "cuatro monedas al tipo de cambio de cada día, y cada una, también el dólar, "
+                "después de su propia inflación. Si la cuenta está en una de esas monedas, lo "
+                "ves después de la inflación de esa moneda. Tipos de cambio de FRED y precios "
+                "oficiales de cada país.",
             ),
         ],
         "how_eyebrow": "Proceso",
@@ -913,7 +921,9 @@ _UI: dict[str, dict[str, Any]] = {
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
             "VIX tranquilo o agitado y crisis conocidas",
-            "Si la cuenta está en dólares: el resultado en tu moneda y tras la inflación",
+            "En tu moneda y tras su propia inflación: dólares, pesos mexicanos, reales, "
+            "euros, libras, yenes, dólares canadienses y francos suizos",
+            "Si su rentabilidad media cambió en algún momento, y cuándo",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -1104,8 +1114,10 @@ _UI: dict[str, dict[str, Any]] = {
                 "In your currency and after inflation",
                 "If the account is in dollars, you see its result in Mexican pesos, "
                 "reais, euros and "
-                "four more currencies at each day's exchange rate, and after US inflation "
-                "(public FRED data).",
+                "four more currencies at each day's exchange rate, and each one, the dollar "
+                "too, after its own inflation. If the account is in one of those currencies, "
+                "you see it after that currency's inflation. Exchange rates from FRED and "
+                "each country's official prices.",
             ),
         ],
         "how_eyebrow": "Process",
@@ -1135,7 +1147,9 @@ _UI: dict[str, dict[str, Any]] = {
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Against cash and the market: the Sharpe without what cash paid, calm or "
             "agitated VIX and known crises",
-            "If the account is in dollars: the result in your currency and after inflation",
+            "In your currency and after its own inflation: dollars, Mexican pesos, reais, "
+            "euros, pounds, yen, Canadian dollars and Swiss francs",
+            "Whether its average return changed at some point, and when",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",
