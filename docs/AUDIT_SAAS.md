@@ -2530,6 +2530,25 @@ Informational only: none of these moves a class, a dimension or a red flag.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
+- The fund comparison carries `skill` (36 shared months or more;
+  `audit/skill.py`): where the fund's return came from. Each month's fund
+  and index returns over cash are regressed: `r_f - c = alpha + beta (r_b -
+  c)` splits the average yearly return into cash, exposure and alpha, which
+  add up exactly. The exposure share is given only when beta is at least two
+  standard errors from zero. `lagged` adds last month's index return (Dimson,
+  1979): smoothed or late-priced funds hide exposure from the plain beta,
+  and it turns up as alpha. `timing` adds the squared index return over cash
+  (Treynor and Mazuy, 1966). Standard errors are the largest of HC3,
+  Newey-West and, for the alpha, the plain error widened by `(1 + rho) /
+  (1 - rho)` for the misses' autocorrelation (Kendall-corrected). On
+  simulated funds with no skill, `|t| > 2` then comes up about 4 % of the
+  time, and 5 % to 8 % when the misses are strongly autocorrelated; Newey-West
+  alone gave up to 12 %. The alpha has a 95 % Student-t range and, when
+  positive but under two standard errors, `months_needed = n (2 / t)^2`.
+  Cash is FRED DTB3, the month's mean converted to an annual yield and
+  compounded over the month's days, read once per audit through the same
+  lookup as the cash-rate Sharpe. Without it, cash is zero and `cash_basis`
+  says so. Informational: no flag, no class, no headline.
 - The risk section carries `versus_shuffle` (the same 30-return floor as the
   resampled risk, and at least five losing periods): the uploaded maximum
   drawdown against up to 1,000 random orders of the same returns (seed
