@@ -1175,3 +1175,13 @@ def test_two_step_pages_are_styled() -> None:
     assert ".acct-nudge svg{flex:none;width:20px;height:20px" in ACCOUNT_CSS
     assert "input[autocomplete=one-time-code]{font-family:var(--mono)" in ACCOUNT_CSS
     assert ".acct-lost{margin-top:22px;border:1px solid var(--border)" in ACCOUNT_CSS
+
+
+def test_landing_feature_cards_have_no_orphan_slot_and_read_short_on_phones() -> None:
+    assert (
+        "@media (min-width:641px){.cards-2>.card:last-child:nth-child(odd){grid-column:1/-1}"
+        in STYLE
+    )
+    phone = STYLE[STYLE.index("@media (max-width:640px){.cards-2>.card{display:grid") :]
+    assert ".cards-2>.card>.icon{grid-row:1;margin:0}" in phone
+    assert ".cards-2>.card>h3{grid-row:1;margin:0" in phone
