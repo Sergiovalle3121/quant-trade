@@ -162,6 +162,11 @@ class Asset:
     #: False when no public source of the series allows reuse in a paid
     #: report: the market is recognised but its closes are never read.
     licensed: bool = True
+    #: A monthly series: every month from its first to its last must be there
+    #: (a missing month is a broken reply), except the ``gaps`` its publisher
+    #: leaves on purpose, each ``(first month, last month)`` as "YYYY-MM".
+    monthly: bool = False
+    gaps: tuple[tuple[str, str], ...] = ()
 
     @property
     def source_url(self) -> str:
@@ -232,6 +237,9 @@ CPI = Asset(
     ceiling=10_000.0,
     floor=1.0,
     max_step=MAX_PRICE_STEP,
+    monthly=True,
+    # BLS published no October 2025 index (the federal shutdown).
+    gaps=(("2025-10", "2025-10"),),
 )
 #: Noon buying rates in New York (Federal Reserve H.10), daily: units of the
 #: currency per US dollar, or US dollars per unit for the euro and the pound.
@@ -247,6 +255,14 @@ FX: tuple[Asset, ...] = tuple(
         ("CHF", "DEXSZUS"),
     )
 )
+#: Months the BIS leaves without a Japanese policy rate, because the Bank of
+#: Japan targeted reserves or the monetary base instead of a rate (zero rates
+#: 1999-2000, quantitative easing 2001-2006, QQE 2013-2016).
+JAPAN_NO_POLICY_RATE: tuple[tuple[str, str], ...] = (
+    ("1999-03", "2000-07"),
+    ("2001-04", "2006-02"),
+    ("2013-05", "2016-08"),
+)
 #: Highest and lowest rate a local cash series may hold (Brazil's Selic reached
 #: 85 % a year in April 1995; the Swiss policy rate went to -0.75 % in 2015).
 MAX_LOCAL_RATE = 200.0
@@ -256,8 +272,7 @@ MIN_LOCAL_RATE = -5.0
 #: both through FRED; Canada's CORRA (Bank of Canada) and Brazil's monthly
 #: Selic (Banco Central do Brasil); and, for the peso, the yen and the franc,
 #: the central bank's policy rate as the BIS compiles it (an official rate,
-#: not a market one; Japan has no value from May 2013 to August 2016, when the
-#: Bank of Japan set no policy rate).
+#: not a market one; Japan has none in the months of ``JAPAN_NO_POLICY_RATE``).
 LOCAL_CASH: tuple[Asset, ...] = tuple(
     Asset(
         f"cash_{code.lower()}",
@@ -269,6 +284,8 @@ LOCAL_CASH: tuple[Asset, ...] = tuple(
         floor=MIN_LOCAL_RATE,
         negative=True,
         provider=provider,
+        monthly=provider in ("bis", "bcb_rate"),
+        gaps=JAPAN_NO_POLICY_RATE if series == "JP" else (),
     )
     for code, series, provider in (
         ("MXN", "MX", "bis"),
@@ -314,6 +331,7 @@ LOCAL_CPI: tuple[Asset, ...] = tuple(
         floor=1.0,
         provider=provider,
         max_step=MAX_PRICE_STEP,
+        monthly=True,
     )
     for code, series, provider in (
         ("EUR", "CP0000EZ19M086NEST", "fred"),
@@ -551,6 +569,30 @@ def _inegi_table(text: str) -> str:
     return body.decode("utf-8-sig")
 
 
+def _check_months(series: pd.Series, gaps: tuple[tuple[str, str], ...] = ()) -> None:
+    """Raise unless ``series`` has each month from its first to its last once,
+    leaving out only the publisher's own ``gaps``."""
+    months = pd.DatetimeIndex(series.index).to_period("M")
+    if months.has_duplicates:
+        raise ValueError("a month appears twice")
+    expected = pd.period_range(months.min(), months.max(), freq="M")
+    for first, last in gaps:
+        expected = expected[(expected < pd.Period(first, "M")) | (expected > pd.Period(last, "M"))]
+    if len(months) != len(expected) or not bool((months.sort_values() == expected).all()):
+        raise ValueError("a month is missing")
+
+
+def _check_not_shorter(series: pd.Series, kept: pd.Series) -> None:
+    """Raise when a new reply covers less than the copy already kept: it starts
+    later, ends earlier or has fewer points inside the kept copy's span (a
+    partial or truncated reply), so the kept copy stays and a rerun of the same
+    file reads the same values."""
+    first, last = kept.index[0], kept.index[-1]
+    inside = int(((series.index >= first) & (series.index <= last)).sum())
+    if series.index[0] > first or series.index[-1] < last or inside < len(kept):
+        raise ValueError("the reply covers less than the kept copy")
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Refuse redirects, so a read never leaves its fixed https address."""
 
@@ -671,6 +713,11 @@ class MarketData:
                 steps = series.to_numpy(dtype=float)[1:] / series.to_numpy(dtype=float)[:-1]
                 if bool((steps > asset.max_step).any() or (steps < 1 / asset.max_step).any()):
                     raise ValueError("price index jumps")
+            if asset.monthly:
+                _check_months(series, asset.gaps)
+            kept = self._cache.get(key)
+            if kept is not None:
+                _check_not_shorter(series, kept[1])
         except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
             self._failed[key] = self._clock()
             return False

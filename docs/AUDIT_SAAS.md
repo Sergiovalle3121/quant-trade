@@ -1327,6 +1327,20 @@ are capped at 4 MB, redirects are refused (the address stays FRED's fixed
 https one), and values that are not finite are dropped. Only one refresh of
 a series runs at a time, and after a failure (down, slow, rate limited, not
 a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`).
+So that a rerun of the same file reads the same values, a reply never
+replaces a kept copy it covers less of: one that starts later, ends earlier
+or has fewer points inside the kept copy's span (a short or truncated reply)
+is refused and the kept copy stays (`_check_not_shorter`). Every monthly
+series (US and local consumer prices, Brazil's Selic, the BIS policy rates;
+`Asset.monthly`) must also hold each month from its first to its last once,
+or the reply is refused (`_check_months`), except the gaps its publisher
+leaves on purpose (`Asset.gaps`: October 2025 in US CPI, which BLS never
+published, and `JAPAN_NO_POLICY_RATE`). A report built before a series is in
+memory (the service's first minutes, or a series that never loaded) does not
+only miss rows: an account in a currency whose own cash rate is missing, or
+whose euro history is missing for pre-2019 dates, gets the US bill's cash
+line and Jensen's alpha with the bill on both sides, so those figures
+differ from a report built with the rate in memory.
 When the closes are not in memory the section says so in one NOT_MEASURED
 line and the audit goes on. The CLI's `--public-data` reads the series
 first. The result JSON always carries a `holding` key: `null` when the file
@@ -1391,9 +1405,11 @@ day, the BIS's end-of-period value on the month's last day, so a point never
 takes a month-end value before that month has ended. Both the BIS's monthly
 series and the ECB's daily one are filled for every period at the source (the
 rate in force carries forward), so no step rule is needed, except that the
-BIS has no Japanese value from May 2013 to August 2016, when the Bank of
-Japan set no policy rate: a yen account with returns in that stretch is not
-covered and keeps the US bill's line. Each reply is refused when a date
+BIS has no Japanese value in three stretches when the Bank of Japan targeted
+reserves or the monetary base instead of a rate (March 1999 to July 2000,
+April 2001 to February 2006, May 2013 to August 2016;
+`market.JAPAN_NO_POLICY_RATE`): a yen account with returns in those
+stretches is not covered and keeps the US bill's line. Each reply is refused when a date
 appears twice, a date or value is unreadable, or the reply is for another
 series (the BIS's `REF_AREA`, the ECB's `KEY`, the Bank of Canada's column).
 These series may be negative (the franc, euro and yen rates were); a reply

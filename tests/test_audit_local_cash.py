@@ -238,7 +238,12 @@ def test_each_new_source_is_read_in_its_own_shape() -> None:
     jpy = parse_rates(_bis("JP", [("2016-08", "-0.1"), ("2016-09", "-0.1")]), "bis", "JP")
     assert list(jpy.index) == [pd.Timestamp("2016-08-31"), pd.Timestamp("2016-09-30")]
     for key, text in (
-        ("cash_brl", BCB_4189),
+        (
+            "cash_brl",
+            BCB_4189.replace(',{"data":"01/08/2026","valor":"13.94"}', "").replace(
+                ',{"data":"01/09/2026","valor":"13.80"}', ""
+            ),
+        ),
         ("cash_cad", BOC_CORRA),
         ("cash_eur_history", ECB_DFR),
         ("cash_jpy", _bis("JP", [("2026-07", "1"), ("2026-08", "1")])),
