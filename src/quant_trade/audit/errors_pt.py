@@ -224,6 +224,14 @@ RULES: tuple[tuple[str, str], ...] = (
      "o arquivo dentro do zip passa do limite de {limit} bytes"),
     ("the zip is damaged or encrypted and could not be read",
      "o zip está danificado ou criptografado e não pôde ser lido"),
+    ("the Interactive Brokers statement has no trades: add the Trades section at Execution "
+     "level to the Flex Query, run it again and upload that file",
+     "o extrato da Interactive Brokers não tem operações: adicione a seção Trades no nível "
+     "Execution à Flex Query, execute-a de novo e envie esse arquivo"),
+    ("the Interactive Brokers statement is too large to read: run the Flex Query for a "
+     "shorter period or with fewer fields, and upload that file",
+     "o extrato da Interactive Brokers é grande demais para ser lido: execute a Flex Query "
+     "para um período mais curto ou com menos campos e envie esse arquivo"),
     ("the file is not a supported report. Expected: a MetaTrader 5 or 4 report or statement "
      "(HTML, or XLSX for MetaTrader 5), a TradingView list of trades (CSV or XLSX), a trades "
      "or executions CSV from NinjaTrader, a trades CSV from QuantConnect, backtesting.py or "

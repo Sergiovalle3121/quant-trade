@@ -124,7 +124,7 @@ def test_the_upload_form_lets_a_customer_pick_these_files(tmp_path: Path) -> Non
     settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db")
     client = TestClient(create_app(settings, make_store(settings.database_url)))
     page = client.get("/").text
-    assert "name='report' accept='.htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.zip'" in page
+    assert "name='report' accept='.htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.xml,.zip'" in page
     answer = client.post(
         "/audits",
         files={"report": ("viejo.xls", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 600)},
