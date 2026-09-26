@@ -85,7 +85,7 @@ FILE_NAMES_ES = {
 }
 
 #: Report file extensions kept in the digest name; anything else is ``.bin``.
-REPORT_EXTENSIONS = ("html", "htm", "csv", "xlsx", "txt", "xml")
+REPORT_EXTENSIONS = ("html", "htm", "csv", "xlsx", "xls", "txt", "tsv", "xml", "zip")
 
 
 class ParseError(ValueError):
