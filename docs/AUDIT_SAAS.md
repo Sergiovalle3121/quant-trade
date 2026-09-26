@@ -2321,6 +2321,12 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
+  key, two-step sign-in and a passkey (only where passkeys work), each as
+  on or with a link to its card, and counts how many are on. Two-step
+  links to the recovery key while there is none, since it needs one. With
+  everything on, it shrinks to one line. It reads existing rows only and
+  stores nothing.
 - **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
   `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
   acceso" adds one after the current password (`POST /cuenta/llaves`, then
