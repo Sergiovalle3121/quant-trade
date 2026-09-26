@@ -931,8 +931,12 @@ def test_an_unknown_share_card_falls_back_to_the_site_card() -> None:
     assert og_image_name("class-C", "en") == "og-class-C-en.png"
     assert og_image_name("class-Z", "es") == "og-es.png"
     assert og_image_name("../secret", "es") == "og-es.png"
-    # Portuguese has no cards yet: a Brazilian link previews the English one, not Spanish.
+    # Portuguese has the site and audience cards; the rest preview the English one.
+    assert og_image_name("", "pt") == "og-pt.png"
+    assert og_image_name("for-copiar-senales", "pt") == "og-for-copiar-senales-pt.png"
     assert og_image_name("sample", "pt") == "og-sample-en.png"
+    assert og_image_name("class-B", "pt") == "og-class-B-en.png"
+    assert og_image_name("", "fr") == "og-en.png"
     assert set(OG_IMAGES) <= set(STATIC_FILES)
 
 
@@ -975,3 +979,15 @@ def test_small_phones_keep_the_landing_and_timing_tables_inside_the_screen() -> 
 def test_the_real_work_cards_line_up_their_proof_links() -> None:
     assert "#confianza .card p:last-child:has(>a:only-child){margin-top:auto" in STYLE
     assert "#confianza .card p>a:only-child::after{content:' \\2192'" in STYLE
+    # A class name in the stylesheet would show on pages that leave that line out.
+    assert "trust-ask" not in STYLE
+
+
+def test_both_drawdown_tiles_carry_the_same_sign() -> None:
+    from quant_trade.audit.report import LABELS, _kpi_list
+    from quant_trade.audit.sample import sample_result
+
+    data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
+    tiles = {label: shown for label, shown, _ in _kpi_list(data, LABELS["es"])}
+    falls = [shown for label, shown in tiles.items() if label.startswith("Drawdown")]
+    assert len(falls) == 2 and all(shown.startswith("-") for shown in falls)

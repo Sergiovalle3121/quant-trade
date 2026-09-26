@@ -139,7 +139,7 @@ def test_search_engines_see_the_portuguese_landing(tmp_path: Path) -> None:
     pt = client.get("/pt").text
     assert "<link rel='canonical' href='http://testserver/pt'>" in pt
     assert "content='pt_BR'" in pt
-    assert "/static/og-en.png" in pt
+    assert "/static/og-pt.png" in pt
 
 
 @pytest.mark.parametrize("page", AUDIENCE_PAGES, ids=lambda page: page.slug)
