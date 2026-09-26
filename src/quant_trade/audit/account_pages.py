@@ -203,6 +203,8 @@ COPY: dict[str, dict[str, str]] = {
             "nada suyo, para el límite mensual.|"
             "Si llegaste por uno de nuestros enlaces con etiqueta (como ?ref=f4), solo esa "
             "etiqueta, para saber qué enlace funciona; se borra con la cuenta.|"
+            "Si creas una clave de recuperación, solo su huella (un hash) y la fecha, nunca la "
+            "clave; se borra al usarla o con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -280,6 +282,53 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "forgot_contact": "Escribir por WhatsApp",
         "forgot_message": f"Hola, olvidé la contraseña de mi cuenta de {BRAND}. Mi correo es: ",
+        "recover_title": "Con tu clave de recuperación",
+        "recover_lead": (
+            "Si guardaste tu clave de recuperación, pon una contraseña nueva aquí mismo. "
+            "Si no, escríbenos."
+        ),
+        "recover_help": (
+            "Escribe el correo de tu cuenta, la clave de 20 caracteres que guardaste y tu "
+            "contraseña nueva. La clave sirve una sola vez; después crea otra en «Mi cuenta»."
+        ),
+        "recovery_key": "Clave de recuperación",
+        "recover_button": "Guardar contraseña nueva",
+        "recover_none_title": "¿No tienes clave?",
+        "recovery_bad": (
+            "El correo o la clave de recuperación no coinciden, o la clave ya se usó. "
+            "Revisa que la escribiste completa."
+        ),
+        "recovered": (
+            "Contraseña guardada y sesiones cerradas. Entra con ella y crea una clave de "
+            "recuperación nueva en «Mi cuenta»: la anterior ya se usó."
+        ),
+        "recovery_title": "Clave de recuperación",
+        "recovery_missing": (
+            "Aún no tienes clave. Con ella pones una contraseña nueva tú mismo si la olvidas, "
+            "sin escribirnos y sin perder tus informes."
+        ),
+        "recovery_made": (
+            "Creada el {date}. Si la perdiste, crea una nueva: la anterior deja de servir."
+        ),
+        "recovery_make": "Crear mi clave de recuperación",
+        "recovery_new": "Crear una clave nueva",
+        "recovery_nudge": (
+            "Crea tu clave de recuperación: si olvidas tu contraseña, la recuperas tú mismo "
+            "en un minuto."
+        ),
+        "recovery_shown_title": "Tu clave de recuperación",
+        "recovery_shown_lead": (
+            "Guárdala ahora: es la única vez que la mostramos. Solo guardamos su huella, así "
+            "que nadie puede volver a verla, ni nosotros."
+        ),
+        "recovery_shown_how": (
+            "Cópiala en un gestor de contraseñas o escríbela en papel.|"
+            "Si olvidas tu contraseña: «Olvidé mi contraseña», tu correo, esta clave y una "
+            "contraseña nueva.|"
+            "Sirve una sola vez. Quien la tenga junto con tu correo puede entrar a tu cuenta: "
+            "no la compartas."
+        ),
+        "recovery_done": "Ya la guardé, volver a Mi cuenta",
         "reset_title": "Pon una contraseña nueva",
         "reset_lead": "Este enlace funciona una sola vez y caduca en 24 horas.",
         "reset_button": "Guardar contraseña",
@@ -488,6 +537,8 @@ COPY: dict[str, dict[str, str]] = {
             "of theirs, for the monthly limit.|"
             "If you arrived through one of our tagged links (such as ?ref=f4), only that tag, "
             "to know which link works; it goes with the account.|"
+            "If you make a recovery key, only its fingerprint (a hash) and the date, never the "
+            "key; it goes when used or with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -563,6 +614,52 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "forgot_contact": "Write on WhatsApp",
         "forgot_message": f"Hi, I forgot the password of my {BRAND} account. My e-mail is: ",
+        "recover_title": "With your recovery key",
+        "recover_lead": (
+            "If you saved your recovery key, set a new password right here. If not, write to us."
+        ),
+        "recover_help": (
+            "Type your account's e-mail, the 20-character key you saved and your new "
+            "password. The key works once; afterwards make a new one in My account."
+        ),
+        "recovery_key": "Recovery key",
+        "recover_button": "Save new password",
+        "recover_none_title": "No key?",
+        "recovery_bad": (
+            "The e-mail or the recovery key do not match, or the key was already used. "
+            "Check that you typed all of it."
+        ),
+        "recovered": (
+            "Password saved and sessions signed out. Sign in with it and make a new recovery "
+            "key in My account: the old one is used up."
+        ),
+        "recovery_title": "Recovery key",
+        "recovery_missing": (
+            "You have no key yet. With it you set a new password yourself if you forget it, "
+            "without writing to us and without losing your reports."
+        ),
+        "recovery_made": (
+            "Made on {date}. If you lost it, make a new one: the old one stops working."
+        ),
+        "recovery_make": "Make my recovery key",
+        "recovery_new": "Make a new key",
+        "recovery_nudge": (
+            "Make your recovery key: if you forget your password, you recover it yourself in "
+            "a minute."
+        ),
+        "recovery_shown_title": "Your recovery key",
+        "recovery_shown_lead": (
+            "Save it now: this is the only time we show it. We keep only its fingerprint, so "
+            "nobody can see it again, not even us."
+        ),
+        "recovery_shown_how": (
+            "Copy it into a password manager or write it on paper.|"
+            "If you forget your password: I forgot my password, your e-mail, this key and a "
+            "new password.|"
+            "It works once. Whoever has it together with your e-mail can enter your account: "
+            "do not share it."
+        ),
+        "recovery_done": "I saved it, back to My account",
         "reset_title": "Set a new password",
         "reset_lead": "This link works once and expires in 24 hours.",
         "reset_button": "Save password",
@@ -657,6 +754,11 @@ margin-bottom:8px}
 .acct-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;
 margin:18px 0 28px}
 .acct-gift b{font-size:1.3rem;line-height:1.5}
+.acct-nudge{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;
+padding:12px 16px;border:1px solid var(--border);border-radius:14px}
+.acct-key code{display:block;font-size:1.35rem;letter-spacing:.06em;padding:18px;
+border:1px dashed var(--border);border-radius:14px;text-align:center;
+overflow-wrap:anywhere;user-select:all}
 .acct-gift.is-on{border-color:color-mix(in srgb,var(--ok) 45%,var(--border));
 background:color-mix(in srgb,var(--ok) 7%,#fff)}
 .acct-gift.is-on b{color:var(--ok)}
@@ -882,7 +984,10 @@ def signin_page(
     )
 
 
-def forgot_page(*, locale: str, contact_url: str) -> str:
+def forgot_page(
+    *, locale: str, contact_url: str, csrf: str = "", error: str = "", email: str = ""
+) -> str:
+    """A new password with the recovery key; without one, a message to the owner."""
     locale = _locale(locale)
     copy = COPY[locale]
     button = ""
@@ -891,11 +996,37 @@ def forgot_page(*, locale: str, contact_url: str) -> str:
 
         href = _prefilled(contact_url, copy["forgot_message"])
         button = (
-            f"<p><a class='btn btn-primary btn-lg' href='{_e(href)}' rel='noopener noreferrer' "
+            f"<p><a class='btn btn-ghost' href='{_e(href)}' rel='noopener noreferrer' "
             f"target='_blank'>{icon('chat')}{_e(copy['forgot_contact'])}</a></p>"
+        )
+    recover = ""
+    if csrf:
+        recover = (
+            f"<form method='post' action='{path('forgot', locale)}' autocomplete='off'>"
+            f"<h2>{_e(copy['recover_title'])}</h2>"
+            f"<p class='muted'>{_e(copy['recover_help'])}</p>"
+            + _hidden("csrf", csrf)
+            + _email_field(copy, email)
+            + _field(
+                copy["recovery_key"],
+                "<input type='text' name='key' required maxlength='40' autocomplete='off' "
+                "spellcheck='false' autocapitalize='characters' "
+                "placeholder='XXXXX-XXXXX-XXXXX-XXXXX'>",
+            )
+            + _field(
+                copy["password_new"],
+                f"<input type='password' name='password' required "
+                f"minlength='{MIN_PASSWORD_CHARS}' maxlength='256' autocomplete='new-password'>",
+                copy["password_help"],
+            )
+            + f"<button class='btn btn-primary btn-lg' type='submit'>"
+            f"{_e(copy['recover_button'])}</button></form>"
         )
     body = (
         "<div class='wrap-narrow'>"
+        + _alert(copy, error)
+        + recover
+        + f"<h2>{_e(copy['recover_none_title'])}</h2><p class='muted'>{_e(copy['forgot_lead'])}</p>"
         + button
         + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
         "</p></div>"
@@ -903,9 +1034,30 @@ def forgot_page(*, locale: str, contact_url: str) -> str:
     return _shell(
         locale,
         copy["forgot_title"],
-        copy["forgot_lead"],
+        copy["recover_lead"],
         body,
         switch=_switch("forgot", locale),
+    )
+
+
+def recovery_key_page(*, locale: str, key: str) -> str:
+    """The new recovery key, shown this once."""
+    locale = _locale(locale)
+    copy = COPY[locale]
+    steps = "".join(f"<li>{_e(step)}</li>" for step in copy["recovery_shown_how"].split("|"))
+    body = (
+        "<div class='wrap-narrow'>"
+        f"<p class='acct-key'><code>{_e(key)}</code></p>"
+        f"<ol class='buy-steps'>{steps}</ol>"
+        f"<p><a class='btn btn-primary' href='{path('account', locale)}'>"
+        f"{_e(copy['recovery_done'])}</a></p></div>"
+    )
+    return _shell(
+        locale,
+        copy["recovery_shown_title"],
+        copy["recovery_shown_lead"],
+        body,
+        switch={lang: path("account", lang) for lang in LANGUAGES},
     )
 
 
@@ -1219,8 +1371,13 @@ def account_page(
     retention_days: int = 30,
     strategies: Sequence[StrategyRecord] = (),
     invite: InviteView | None = None,
+    recovery_created: str = "",
 ) -> str:
-    """ "My reports": the reports, credits, codes and purchases of one account."""
+    """ "My reports": the reports, credits, codes and purchases of one account.
+
+    ``recovery_created`` is when the account's recovery key was made (empty
+    without one).
+    """
     locale = _locale(locale)
     copy = COPY[locale]
     home = _home(locale)
@@ -1313,6 +1470,18 @@ def account_page(
         + _purchases_table(copy, locale, audits)
         + "</section>"
     )
+    recovery_status = (
+        copy["recovery_made"].format(date=_date(recovery_created))
+        if recovery_created
+        else copy["recovery_missing"]
+    )
+    # Without a key, a forgotten password needs the owner: say so near the top.
+    recovery_nudge = (
+        ""
+        if recovery_created
+        else f"<p class='acct-nudge'>{icon('shield')}<span>{_e(copy['recovery_nudge'])}</span> "
+        f"<a href='#recuperacion'>{_e(copy['recovery_make'])}</a></p>"
+    )
     security = (
         f"<section class='acct-sec'><h2>{_e(copy['security_title'])}</h2>"
         "<div class='acct-grid'>"
@@ -1344,7 +1513,20 @@ def account_page(
         + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
         f"<span>{_e(copy['delete_reports'])}</span></label>"
         f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
-        "</form></div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
+        "</form>"
+        f"<form class='acct-card' id='recuperacion' method='post' "
+        f"action='{path('account', locale)}/recuperacion'>"
+        f"<h3>{_e(copy['recovery_title'])}</h3>"
+        f"<p class='muted'>{_e(recovery_status)}</p>"
+        + _hidden("csrf", csrf)
+        + _field(
+            copy["password_current"],
+            "<input type='password' name='current' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + f"<button class='btn btn-dark' type='submit'>"
+        f"{_e(copy['recovery_new' if recovery_created else 'recovery_make'])}</button></form>"
+        "</div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
         f"<a class='btn btn-ghost' href='{path('account', locale)}/datos' download>"
         f"{icon('file')} {_e(copy['export_button'])}</a></div>"
@@ -1353,6 +1535,7 @@ def account_page(
     body = (
         _alert(copy, error, flash)
         + header
+        + recovery_nudge
         + kpis
         # Without credits, how to get more comes before the list.
         + (buy if credits == 0 else "")
