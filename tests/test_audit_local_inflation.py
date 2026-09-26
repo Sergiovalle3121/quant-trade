@@ -248,7 +248,9 @@ def test_the_report_of_an_account_in_canadian_dollars(locale: str) -> None:
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
 def test_the_methodology_page_credits_every_public_source(locale: str) -> None:
     page = method_page(locale=locale)
-    for line in METHOD_COPY[locale]["data"]:  # type: ignore[union-attr]
+    words = METHOD_COPY[locale]
+    assert words["data_title"] != METHOD_COPY["en"]["data_title"] or locale == "en"
+    for line in words["data"]:  # type: ignore[union-attr]
         assert escape(str(line)) in page
         assert find_claims(str(line)) == []
     for name in ("FRED", "Eurostat", "Office for National Statistics", "Banco Central do Brasil"):

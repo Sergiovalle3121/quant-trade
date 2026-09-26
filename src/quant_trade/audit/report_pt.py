@@ -1315,6 +1315,18 @@ REPORT: dict[str, Any] = {
             "Um relatório não é parecer jurídico, fiscal nem de investimento.",
         ],
         "refs_title": "Fontes",
+        "data_title": "Dados públicos que usamos",
+        "data": [
+            "Cotações, taxas e preços dos EUA, fechamentos de mercados e outras taxas de caixa: "
+            "FRED, Federal Reserve Bank of St. Louis.",
+            "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
+            "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
+            "Government Licence v3.0.",
+            "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
+            "dados estão disponíveis grátis em bankofcanada.ca.",
+            "Preços ao consumidor do Brasil: Banco Central do Brasil (IPCA do IBGE).",
+            "Todos são lidos ao gerar o relatório e nenhum muda a classe.",
+        ],
     },
     "TAGLINE": "Auditoria estatística independente de backtests e históricos",
     "WATERMARK_TEXT": "PRÉVIA — NÃO PAGO",
