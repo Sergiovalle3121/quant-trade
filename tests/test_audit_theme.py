@@ -1234,3 +1234,11 @@ def test_the_fund_split_is_styled() -> None:
     assert ".skill-intro{break-after:avoid;page-break-after:avoid}" in STYLE
     # On a narrow phone the 2 % + 20 % label wraps instead of widening the page.
     assert "table.timing tr.fee-classic td:first-child{white-space:normal}" in STYLE
+
+
+def test_evidence_rows_read_as_one_list_on_phones() -> None:
+    phone = STYLE[STYLE.index("@keyframes scroll-cue") :]
+    # On a phone the rows of an evidence table share one card with rules
+    # between them, instead of a stack of separate cards.
+    assert ".metrics.ev tbody{gap:0;background:#fff;border:1px solid var(--border)" in phone
+    assert ".metrics.ev tr:first-child{border-top:0}" in phone

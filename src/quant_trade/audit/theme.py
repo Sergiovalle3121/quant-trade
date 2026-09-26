@@ -1289,6 +1289,10 @@ table.currency tr.cur-base td{background:var(--surface-2);font-weight:600}
 .metrics.ev tr{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
 .metrics.ev td.val{grid-area:1/2}
 .metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}
+.metrics.ev tbody{gap:0;background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.metrics.ev tr{border:0;border-radius:0;border-top:1px solid var(--border);background:none;padding:11px 14px;gap:4px 12px}
+.metrics.ev tr:first-child{border-top:0}
+.metrics.ev td:nth-child(3) .badge{transform:scale(.9);transform-origin:left center}
 .firms td:first-child{font-size:.95rem!important;font-weight:600;letter-spacing:-.01em;line-height:1.3}
 .firms td:first-child br{display:none}
 .firms td:first-child small{display:block;margin-top:3px;font-size:.78rem;font-weight:500;letter-spacing:0;color:var(--text-3)}}
