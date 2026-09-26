@@ -1073,6 +1073,25 @@ REPORT: dict[str, Any] = {
             "O Sharpe acima não subtrai nenhuma taxa. Se a conta não é em dólares, o justo "
             "seria subtrair a taxa da sua própria moeda. Fonte: {source}."
         ),
+        "cash_sharpe_local": (
+            "Subtraindo o que o caixa na moeda da conta ({code}) pagava nessas mesmas datas "
+            "({name}, {rate} ao ano em média), o Sharpe fica em {sharpe}."
+        ),
+        "cash_below_local": (
+            "Rendeu menos que o caixa na moeda da conta ({code}) nessas datas ({ret} ao ano "
+            "frente a {rate} da {name})."
+        ),
+        "cash_note_local": (
+            "O Sharpe acima não subtrai nenhuma taxa. A conta está em {code}, então aqui se "
+            "subtrai a taxa dessa moeda, não a dos EUA. Fonte: {source}."
+        ),
+        "cash_rate_MXN": "taxa interbancária de um dia do México (OCDE)",
+        "cash_rate_BRL": "taxa interbancária de um dia do Brasil (OCDE)",
+        "cash_rate_EUR": "taxa de um dia do euro, €STR (BCE)",
+        "cash_rate_GBP": "taxa de um dia da libra, SONIA (Banco da Inglaterra)",
+        "cash_rate_JPY": "taxa interbancária de um dia do Japão (OCDE)",
+        "cash_rate_CAD": "taxa interbancária de um dia do Canadá (OCDE)",
+        "cash_rate_CHF": "taxa interbancária de 3 meses da Suíça (OCDE)",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado?",
         "regime_intro": (
             "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
@@ -4691,6 +4710,18 @@ RULES: tuple[tuple[str, str], ...] = (
             "Sharpe dos retornos após subtrair o que a letra do Tesouro dos EUA de 3 meses "
             "pagou nos mesmos dias (FRED DTB3, convertida de taxa de desconto para rendimento "
             "anual), anualizado como o Sharpe principal; é uma taxa em dólares"
+        ),
+    ),
+    (
+        (
+            "Sharpe ratio of the returns after subtracting what cash in the account's own "
+            "currency paid over the same days (the short rate FRED publishes for that currency, "
+            "converted to an annual yield by its own quote), annualised like the headline Sharpe"
+        ),
+        (
+            "Sharpe dos retornos após subtrair o que o caixa na moeda da conta pagou nos mesmos "
+            "dias (a taxa de curto prazo que o FRED publica para essa moeda, convertida em "
+            "rendimento anual conforme a sua cotação), anualizado como o Sharpe principal"
         ),
     ),
     (

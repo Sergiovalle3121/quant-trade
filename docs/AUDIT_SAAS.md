@@ -1275,6 +1275,28 @@ that barely moves), the line says in words that it earned less than cash
 covering the whole history, otherwise it is NOT_MEASURED and not shown. It
 never changes the class.
 
+Cash in the account's own currency (`cashrate.LOCAL`, `market.LOCAL_CASH`).
+When an imported report names the account currency and it is one of MXN,
+BRL, EUR, GBP, JPY, CAD or CHF, the same line subtracts that currency's own
+cash rate instead of the US bill's: Mexico's, Brazil's, Japan's and Canada's
+immediate (overnight interbank) rates from the OECD (`IRSTCI01…M156N`,
+monthly averages), the euro's €STR (`ECBESTRVOLWGTTRMDMNRT`, daily, from
+October 2019), sterling's SONIA (`IUDSOIA`, daily) and, because the Swiss
+immediate rate stops in 2024, Switzerland's 3-month interbank rate
+(`IR3TIB01CHM156N`, monthly). Each quote becomes an annual yield by its own
+convention: a simple rate over its tenor on a 360-day (MXN, EUR, CHF) or
+365-day (GBP, JPY, CAD) year, rolled over for a year,
+`(1 + r·t/basis)^(365/t) - 1`; Brazil's is already a compounded annual yield
+and is used as it is. A daily rate may be 10 days old before a return's
+start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
+average or the latest published). These series may be negative (the franc,
+euro and yen rates were); a reply outside -5 % to 200 % a year
+(`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
+taken as broken. When the currency has no series here, or its rates cannot
+be read or do not cover the history (the euro before October 2019), the
+line stays the US bill's, with its note. Jensen's alpha keeps the US bill.
+It never changes the class.
+
 Calm and turbulent markets (`audit/regime.py`). With public data on, every
 report adds the section "How did it do in calm and in turbulent markets?".
 Each return is placed by the VIX (CBOE, FRED `VIXCLS`, read in the

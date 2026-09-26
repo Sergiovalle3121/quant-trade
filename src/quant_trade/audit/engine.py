@@ -882,10 +882,14 @@ def _cash_rate(
     market: Callable[[str], pd.Series | None] | None,
     rates: pd.Series | None,
 ) -> dict[str, Any] | None:
-    """The Sharpe ratio after what a US Treasury bill paid over the same days,
-    when public data is on."""
+    """The Sharpe ratio after what cash paid over the same days, when public
+    data is on: the account currency's own rate when a report names a currency
+    with one, else (or when that rate cannot be used) the US Treasury bill's."""
     if market is None:
         return None
+    local = _local_cash_rate(inputs, market)
+    if local is not None:
+        return local
     if rates is None:
         return {
             "status": "NOT_MEASURED",
@@ -904,6 +908,26 @@ def _cash_rate(
             "label": market_lib.CASH.label,
             "source_url": market_lib.CASH.source_url,
         }
+
+
+def _local_cash_rate(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None]
+) -> dict[str, Any] | None:
+    """The Sharpe after the account currency's own cash rate, or None when the
+    currency has none here or its rates do not cover the history."""
+    code = (inputs.account_currency or "").strip().upper()
+    if code not in cashrate_lib.LOCAL:
+        return None
+    try:
+        rates = market(cashrate_lib.LOCAL[code].asset.key)
+        if rates is None or rates.empty:
+            return None
+        out = cashrate_lib.local_excess_sharpe(
+            inputs.equity.frame, rates, inputs.periods_per_year, code
+        )
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return None
+    return out if out.get("status") == "MEASURED" else None
 
 
 def _currency(
