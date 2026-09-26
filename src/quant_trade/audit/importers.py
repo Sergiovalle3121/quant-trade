@@ -4039,9 +4039,10 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
             close(item.option, -math.copysign(quantity, open_quantity), 0.0, item.day, 0.0)
             if item.code == "oexp":
                 expired += 1
-            else:
+            elif _delivered(deliveries, item.underlying, item.day, item.strike):
                 assigned += 1
-                undelivered += not _delivered(deliveries, item.underlying, item.day, item.strike)
+            else:
+                undelivered += 1
         elif item.code in _ROBINHOOD_SHARE_EVENTS:
             group = events.pop((item.day, item.code), None)
             if group is not None:

@@ -254,5 +254,6 @@ def test_an_assignment_without_its_share_trade_is_said() -> None:
         _row("3/29/2024", "SPY", "SPDR S&P 500 ETF", "Sell", "10", "$450.00", "$4,500.00"),
     ]
     warnings = _warnings(rows)
-    assert ROBINHOOD_ASSIGNED_WARNING.format(n=1) in warnings
     assert ROBINHOOD_UNDELIVERED_WARNING.format(n=1) in warnings
+    # One option gets one line: not also "the total result is right".
+    assert not any("assigned or exercised:" in warning for warning in warnings)
