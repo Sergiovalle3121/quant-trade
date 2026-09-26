@@ -11,9 +11,11 @@ import pytest
 from quant_trade.audit import i18n
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.importers import (
+    ROBINHOOD_ASSIGNED_WARNING,
     ROBINHOOD_CSV,
     ROBINHOOD_EXPIRED_WARNING,
     ROBINHOOD_MOVES_WARNING,
+    ROBINHOOD_UNDELIVERED_WARNING,
     ROBINHOOD_UNOPENED_WARNING,
     detect_format,
     import_report,
@@ -155,7 +157,14 @@ def test_a_position_still_open_at_the_end_is_left_out() -> None:
 
 @pytest.mark.parametrize("n", [1, 4])
 @pytest.mark.parametrize(
-    "template", [ROBINHOOD_UNOPENED_WARNING, ROBINHOOD_MOVES_WARNING, ROBINHOOD_EXPIRED_WARNING]
+    "template",
+    [
+        ROBINHOOD_UNOPENED_WARNING,
+        ROBINHOOD_MOVES_WARNING,
+        ROBINHOOD_EXPIRED_WARNING,
+        ROBINHOOD_ASSIGNED_WARNING,
+        ROBINHOOD_UNDELIVERED_WARNING,
+    ],
 )
 def test_the_new_warnings_read_in_every_language(template: str, n: int) -> None:
     english = template.format(n=n)
@@ -211,3 +220,39 @@ def test_many_small_buys_closed_by_one_sale_are_paired_quickly() -> None:
         import_report(_report(rows(120_000)), "Robinhood.csv")
     assert refused.value.code == "too_many_trades"
     assert time.perf_counter() - started < 30
+
+
+SPY_PUT = "SPY 3/15/2024 Put $450.00"
+
+
+@pytest.mark.parametrize(
+    ("delivered_on", "price"), [("3/15/2024", "$450.00"), ("3/18/2024", "$450")]
+)
+def test_an_assigned_put_closes_at_no_premium_and_its_shares_trade_on_their_own(
+    delivered_on: str, price: str
+) -> None:
+    rows = [
+        _row("2/10/2024", "SPY", SPY_PUT, "STO", "1", "$1.50", "$150.00"),
+        _row("3/15/2024", "SPY", f"Option Assigned {SPY_PUT}", "OASGN", "1"),
+        _row(delivered_on, "SPY", "SPDR S&P 500 ETF", "Buy", "100", price, "($45,000.00)"),
+        _row("3/20/2024", "SPY", "SPDR S&P 500 ETF", "Sell", "100", "$455.00", "$45,500.00"),
+    ]
+    report = import_report(_report(rows), "Robinhood.csv")
+    # The premium kept, then the delivered shares from the strike: 150 + 500.
+    assert [round(trade.pnl, 2) for trade in report.trades.trades] == [150.0, 500.0]
+    assert ROBINHOOD_ASSIGNED_WARNING.format(n=1) in report.warnings
+    assert not any("not in the file" in warning for warning in report.warnings)
+    assert not any("expired" in warning for warning in report.warnings)
+
+
+def test_an_assignment_without_its_share_trade_is_said() -> None:
+    rows = [
+        _row("2/10/2024", "SPY", SPY_PUT, "STO", "1", "$1.50", "$150.00"),
+        _row("3/15/2024", "SPY", f"Option Assigned {SPY_PUT}", "OASGN", "1"),
+        # A share trade that is not the delivery: another price, then too late.
+        _row("3/15/2024", "SPY", "SPDR S&P 500 ETF", "Buy", "10", "$440.00", "($4,400.00)"),
+        _row("3/29/2024", "SPY", "SPDR S&P 500 ETF", "Sell", "10", "$450.00", "$4,500.00"),
+    ]
+    warnings = _warnings(rows)
+    assert ROBINHOOD_ASSIGNED_WARNING.format(n=1) in warnings
+    assert ROBINHOOD_UNDELIVERED_WARNING.format(n=1) in warnings

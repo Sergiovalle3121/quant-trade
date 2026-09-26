@@ -138,12 +138,28 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "para incluirlos",
     ),
     (
-        "{n} option(s) expired, assigned or exercised: each closes at no premium, so its "
-        "result is the whole premium, and its exit price shows 0.01 (the smallest option "
-        "tick) because a trade needs a positive price",
-        "{n} opción(es) vencieron, se asignaron o se ejercieron: cada una cierra sin prima, así "
-        "que su resultado es toda la prima, y su precio de salida figura como 0.01 (el mínimo "
-        "de una opción) porque una operación necesita un precio positivo",
+        "{n} option(s) expired: each closes at no premium, so its result is the whole premium, and "
+        "its exit price shows 0.01 (the smallest option tick) because a trade needs a positive "
+        "price",
+        "{n} opción(es) vencieron: cada una cierra sin prima, así que su resultado es toda la "
+        "prima, y su precio de salida figura como 0.01 (el mínimo de una opción) porque una "
+        "operación necesita un precio positivo",
+    ),
+    (
+        "{n} option(s) assigned or exercised: each closes at no premium and the shares it delivers "
+        "open at the strike as their own trade, so the total result is right but the win rate and "
+        "average trade count one position as two",
+        "{n} opción(es) asignadas o ejercidas: cada una cierra sin prima y las acciones que "
+        "entrega abren al precio de ejercicio como una operación aparte, así que el resultado "
+        "total es correcto, pero el % de aciertos y la operación media cuentan una posición como "
+        "dos",
+    ),
+    (
+        "{n} option(s) assigned or exercised whose delivered shares are not in the file (no share "
+        "trade at the strike within a few days), so their result leaves out the stock move",
+        "{n} opción(es) asignadas o ejercidas cuyas acciones entregadas no están en el archivo "
+        "(ninguna operación de acciones al precio de ejercicio en esos días), así que su resultado "
+        "no incluye el movimiento de las acciones",
     ),
     (
         "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
@@ -1837,15 +1853,31 @@ _SINGULAR: dict[str, tuple[str, str]] = {
         "(abierta antes de su primera fecha o traspasada); descarga el historial completo "
         "para incluirlo",
     ),
-    "{n} option(s) expired, assigned or exercised: each closes at no premium, so its "
-    "result is the whole premium, and its exit price shows 0.01 (the smallest option "
-    "tick) because a trade needs a positive price": (
-        "{n} option expired, was assigned or was exercised: it closes at no premium, so its "
-        "result is the whole premium, and its exit price shows 0.01 (the smallest option "
-        "tick) because a trade needs a positive price",
-        "{n} opción venció, se asignó o se ejerció: cierra sin prima, así que su resultado es "
-        "toda la prima, y su precio de salida figura como 0.01 (el mínimo de una opción) "
-        "porque una operación necesita un precio positivo",
+    "{n} option(s) expired: each closes at no premium, so its result is the whole premium, and its "
+    "exit price shows 0.01 (the smallest option tick) because a trade needs a positive price": (
+        "{n} option expired: it closes at no premium, so its result is the whole premium, and its "
+        "exit price shows 0.01 (the smallest option tick) because a trade needs a positive price",
+        "{n} opción venció: cierra sin prima, así que su resultado es toda la prima, y su precio "
+        "de salida figura como 0.01 (el mínimo de una opción) porque una operación necesita un "
+        "precio positivo",
+    ),
+    "{n} option(s) assigned or exercised: each closes at no premium and the shares it delivers "
+    "open at the strike as their own trade, so the total result is right but the win rate and "
+    "average trade count one position as two": (
+        "{n} option assigned or exercised: it closes at no premium and the shares it delivers open "
+        "at the strike as their own trade, so the total result is right but the win rate and "
+        "average trade count one position as two",
+        "{n} opción asignada o ejercida: cierra sin prima y las acciones que entrega abren al "
+        "precio de ejercicio como una operación aparte, así que el resultado total es correcto, "
+        "pero el % de aciertos y la operación media cuentan una posición como dos",
+    ),
+    "{n} option(s) assigned or exercised whose delivered shares are not in the file (no share "
+    "trade at the strike within a few days), so their result leaves out the stock move": (
+        "{n} option assigned or exercised whose delivered shares are not in the file (no share "
+        "trade at the strike within a few days), so its result leaves out the stock move",
+        "{n} opción asignada o ejercida cuyas acciones entregadas no están en el archivo (ninguna "
+        "operación de acciones al precio de ejercicio en esos días), así que su resultado no "
+        "incluye el movimiento de las acciones",
     ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (

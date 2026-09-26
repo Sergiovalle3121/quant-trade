@@ -316,7 +316,13 @@ Contract sizes are stated, not inferred (`_Draft.known_sizes`: 100 per option
 contract, 1 per share), so an expiry never changes an option's size and no
 currency-drift warning applies. Open lots are queues, and pairing stops with
 `too_many_trades` as soon as it passes `MAX_TRADES`.
-The shares an assignment delivers come on their own row. Regulatory fees are
+The shares an assignment delivers come on their own row, opened at the
+strike, so the total is right but the win rate and average trade count one
+position as two (`ROBINHOOD_ASSIGNED_WARNING`; expiries have their own
+`ROBINHOOD_EXPIRED_WARNING`). When no share trade in the underlying at the
+strike (within 0.5 % or a cent) falls within `_DELIVERY_DAYS` (4) days of the
+assignment, `ROBINHOOD_UNDELIVERED_WARNING` says the stock move is missing.
+Share rows are indexed by symbol and day, so the check stays linear. Regulatory fees are
 the gap between `Amount` and the fill's value, as commission. A split
 (`SPR`) or symbol exchange (`SXCH`), whose leaving shares carry an `S`
 ("200S"), rescales the lots held. Assumptions and limits, each warned in the

@@ -47,6 +47,7 @@ Formats, pairing rules and samples come from
 
 from __future__ import annotations
 
+import bisect
 import csv
 import io
 import math
@@ -3832,9 +3833,17 @@ ROBINHOOD_UNOPENED_WARNING = (
     "first date or transferred in) left out; download the full history to include them"
 )
 ROBINHOOD_EXPIRED_WARNING = (
-    "{n} option(s) expired, assigned or exercised: each closes at no premium, so its result "
-    "is the whole premium, and its exit price shows 0.01 (the smallest option tick) because "
-    "a trade needs a positive price"
+    "{n} option(s) expired: each closes at no premium, so its result is the whole premium, and its "
+    "exit price shows 0.01 (the smallest option tick) because a trade needs a positive price"
+)
+ROBINHOOD_ASSIGNED_WARNING = (
+    "{n} option(s) assigned or exercised: each closes at no premium and the shares it delivers "
+    "open at the strike as their own trade, so the total result is right but the win rate and "
+    "average trade count one position as two"
+)
+ROBINHOOD_UNDELIVERED_WARNING = (
+    "{n} option(s) assigned or exercised whose delivered shares are not in the file (no share "
+    "trade at the strike within a few days), so their result leaves out the stock move"
 )
 ROBINHOOD_MOVES_WARNING = (
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
@@ -3846,13 +3855,36 @@ def _is_robinhood_header(names: set[str]) -> bool:
     return names >= _ROBINHOOD_COLUMNS
 
 
-def _robinhood_option(description: str) -> str | None:
-    """The option contract a Description names, written one way for every row."""
+def _robinhood_option(description: str) -> tuple[str, str, float] | None:
+    """The option contract a Description names, written one way for every row,
+    with its underlying and strike."""
     match = _ROBINHOOD_OPTION.search(" ".join(description.split()))
     if match is None:
         return None
-    ticker, expiry, kind, strike = match.groups()
-    return f"{ticker.upper()} {expiry} {kind.title()} {float(strike.replace(',', '')):g}"
+    ticker, expiry, kind, strike_text = match.groups()
+    strike = float(strike_text.replace(",", ""))
+    return f"{ticker.upper()} {expiry} {kind.title()} {strike:g}", ticker.upper(), strike
+
+
+#: How far from an assignment a share trade at the strike may be dated and
+#: priced and still count as its delivery (settlement lags, cents rounding).
+_DELIVERY_DAYS = 4
+_DELIVERY_PRICE_SHARE = 0.005
+
+
+def _delivered(
+    deliveries: dict[tuple[str, date], list[float]], underlying: str, day: datetime, strike: float
+) -> bool:
+    """True when the file has a share trade in the underlying at the strike
+    within a few days of an assignment or exercise."""
+    tolerance = max(0.011, strike * _DELIVERY_PRICE_SHARE)
+    for shift in range(-_DELIVERY_DAYS, _DELIVERY_DAYS + 1):
+        prices = deliveries.get((underlying, (day + timedelta(days=shift)).date()))
+        if prices:
+            at = bisect.bisect_left(prices, strike - tolerance)
+            if at < len(prices) and prices[at] <= strike + tolerance:
+                return True
+    return False
 
 
 @dataclass
@@ -3861,6 +3893,8 @@ class _RobinhoodRow:
     code: str
     symbol: str
     option: str | None
+    underlying: str
+    strike: float
     quantity: float | None
     leaving: bool
     price: float | None
@@ -3895,13 +3929,15 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
             if code in _ROBINHOOD_TRADES:
                 draft.invalid_rows += 1
             continue
-        description = _cells(row, columns, "description")
+        contract = _robinhood_option(_cells(row, columns, "description"))
         listed.append(
             _RobinhoodRow(
                 day=day,
                 code=code,
                 symbol=" ".join(_cells(row, columns, "instrument").split()),
-                option=_robinhood_option(description),
+                option=contract[0] if contract else None,
+                underlying=contract[1] if contract else "",
+                strike=contract[2] if contract else 0.0,
                 quantity=_num(quantity_text[:-1] if leaving else quantity_text),
                 leaving=leaving,
                 price=_num(_cells(row, columns, "price")),
@@ -3922,7 +3958,13 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
 
     listed.sort(key=lambda item: (item.day, stage(item)))
     lots: dict[str, deque[list[Any]]] = {}
-    unopened = moves = expired = 0
+    unopened = moves = expired = assigned = undelivered = 0
+    deliveries: dict[tuple[str, date], list[float]] = {}
+    for item in listed:
+        if item.code in {"buy", "sell"} and item.option is None and item.price is not None:
+            deliveries.setdefault((item.symbol.upper(), item.day.date()), []).append(item.price)
+    for prices in deliveries.values():
+        prices.sort()
 
     def close(symbol: str, signed: float, price: float, moment: datetime, fee: float) -> float:
         """Close open lots against a fill; returns the quantity left over."""
@@ -3994,9 +4036,12 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
                 continue
             open_quantity = sum(lot[0] for lot in held)
             quantity = min(abs(item.quantity or open_quantity), abs(open_quantity))
-            before = len(draft.trips)
             close(item.option, -math.copysign(quantity, open_quantity), 0.0, item.day, 0.0)
-            expired += len(draft.trips) > before
+            if item.code == "oexp":
+                expired += 1
+            else:
+                assigned += 1
+                undelivered += not _delivered(deliveries, item.underlying, item.day, item.strike)
         elif item.code in _ROBINHOOD_SHARE_EVENTS:
             group = events.pop((item.day, item.code), None)
             if group is not None:
@@ -4010,6 +4055,10 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
         draft.warnings.append(ROBINHOOD_MOVES_WARNING.format(n=moves))
     if expired:
         draft.warnings.append(ROBINHOOD_EXPIRED_WARNING.format(n=expired))
+    if assigned:
+        draft.warnings.append(ROBINHOOD_ASSIGNED_WARNING.format(n=assigned))
+    if undelivered:
+        draft.warnings.append(ROBINHOOD_UNDELIVERED_WARNING.format(n=undelivered))
     still_open = sum(1 for held in lots.values() if held)
     draft.open_positions = still_open
     if still_open:
