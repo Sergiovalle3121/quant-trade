@@ -325,7 +325,8 @@ it is never matched to a known platform, the upload is answered with
 `pdf_columns` and the screen shows the rows with a notice (ES, EN, PT) that
 they were rebuilt from a PDF and should be checked; a saved column choice is
 never applied to a PDF without showing it. The audit read from it carries
-`PDF_ROWS_WARNING`. The extraction runs in a child process killed after
+`PDF_ROWS_WARNING`, and its file-format line (report, verification details,
+comparison card) says PDF rather than CSV / Excel. The extraction runs in a child process killed after
 10 s, with 1 GB of memory and 10 s of CPU; at most 30 pages, 20,000
 characters per page and 200,000 table cells in all. The table's pieces are joined across pages only when
 they all have the same columns (a header repeated on each page is dropped);

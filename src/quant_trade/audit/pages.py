@@ -57,8 +57,8 @@ from quant_trade.audit.report import (
     CLASS_LADDER,
     DIMENSION_TITLES,
     DISCLAIMER,
-    SOURCE_NAMES,
     STATUS_TEXT,
+    source_name,
 )
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.settings import PACK_CREDITS
@@ -2601,10 +2601,7 @@ def verification_page(
     details = [
         (
             copy["v_format"],
-            SOURCE_NAMES.get(str(inputs.get("source_format")), "")
-            or inputs.get("source_format")
-            or inputs.get("source")
-            or "-",
+            source_name(inputs) or inputs.get("source") or "-",
         ),
         (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
     ]

@@ -203,6 +203,20 @@ def test_the_upload_shows_the_screen_with_the_notice_then_reads_the_named_column
         "/audits", files=files, data={"consent": "on", **named}, follow_redirects=False
     )
     assert posted.status_code == 303, posted.text[:500]
+    report = client.get(posted.headers["location"])
+    assert report.status_code == 200
+    assert "Formato del archivo: PDF</p>" in report.text
+    assert "Formato del archivo: CSV / Excel" not in report.text
+
+
+def test_the_file_format_line_names_a_pdf_whatever_columns_read_it() -> None:
+    from quant_trade.audit.report import source_name
+
+    csv = {"source_format": "universal_trades_csv", "parse_warnings": []}
+    assert source_name(csv) == "CSV / Excel"
+    assert source_name({**csv, "parse_warnings": [PDF_ROWS_WARNING]}) == "PDF"
+    assert source_name({**csv, "parse_warnings": [f"report: {PDF_ROWS_WARNING}"]}) == "PDF"
+    assert source_name({}, "CSV") == "CSV"
 
 
 def test_a_table_past_the_cell_cap_or_an_answer_past_the_size_cap_is_refused(
