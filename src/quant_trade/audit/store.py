@@ -28,6 +28,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from quant_trade.audit import store_hooks
 from quant_trade.audit.schema import AuditResult
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
 
@@ -715,6 +716,7 @@ class Store:
             sa.Column("ref", sa.String(24), nullable=False),
             sa.Column("created_at", sa.String(40), nullable=False),
         )
+        store_hooks.define_tables(self)  # the continuous track record's tables
         self.metadata.create_all(self.engine)
 
     # -- column maps -------------------------------------------------------
@@ -1327,6 +1329,7 @@ class Store:
             conn.execute(
                 self.strategy_reports.delete().where(self.strategy_reports.c.audit_id == audit_id)
             )
+            store_hooks.on_delete_audit(self, conn, audit_id)
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
         return bool(deleted.rowcount)
 
@@ -1458,6 +1461,7 @@ class Store:
                 .where(r.c.invitee_id == account_id)
                 .values(invitee_id="gone" + secrets.token_hex(14), device_sha256="")
             )
+            store_hooks.on_delete_account(self, conn, account_id)
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
         return deleted
 
@@ -3086,6 +3090,7 @@ class Store:
                 "joined_through_an_invite": joined_through is not None,
             },
             "arrived_through_link_tag": self.account_ref(account_id),
+            "track_records": store_hooks.export_account(self, account_id),
             # Only when it was made: the key's hash never leaves the database.
             "recovery_key_created_at": self.recovery_key_created(account_id),
             # When two-step sign-in was turned on; never its secret.
@@ -3296,6 +3301,7 @@ class Store:
             )
             if dry_run:
                 return count
+            store_hooks.on_purge(self, conn, cutoff=cutoff)
             conn.execute(
                 self.refused_payments.delete().where(self.refused_payments.c.created_at < cutoff)
             )

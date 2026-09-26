@@ -309,9 +309,25 @@ the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
 Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
 save it as .xlsx or CSV), an OpenDocument file
-that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
-Excel or HTML history), and a zip with none or several exports
-(`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
+that is not a spreadsheet (`opendocument_sheet`), a PDF statement whose table
+cannot be read with confidence (`pdf_statement`: download the CSV, Excel or
+HTML history), and a zip with none or several exports (`zip_contents`).
+
+A PDF statement (`audit/pdf_tables.py`) is read only as a ruled table
+(pdfplumber's line strategy, web extra) and only through the column screen:
+it is never matched to a known platform, the upload is answered with
+`pdf_columns` and the screen shows the rows with a notice (ES, EN, PT) that
+they were rebuilt from a PDF and should be checked; a saved column choice is
+never applied to a PDF without showing it. The audit read from it carries
+`PDF_ROWS_WARNING`. The extraction runs in a child process killed after
+10 s, with 1 GB of memory and 10 s of CPU; at most 30 pages, 20,000
+characters per page and 200,000 table cells in all. The table's pieces are joined across pages only when
+they all have the same columns (a header repeated on each page is dropped);
+a header with fewer than three named columns or a repeated name, text laid
+out without rules, a scanned page, or any data row filling less than 60 % of
+the named columns (a row cut by a page break) refuses the whole file with
+`pdf_statement`: a refusal costs less than a misread trade. The rows are read
+with a dot as the decimal mark, as a web page's are. An Interactive Brokers Flex Query statement in XML (its
 default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
 `<Trade>` at `EXECUTION` level with the attribute names as columns
 (order-level and summary rows are ignored; parsed with the same no-DOCTYPE
@@ -2833,6 +2849,8 @@ Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the depe
 Redesign pass 70 walks the fund-record report after its fund-only sections landed, at 360 and 390 px in ES, EN and PT. The paired figure cards (the fund's own figures, its figures against the index, and a trading report's "Cómo se vivió este historial") were one tall card per figure on a phone; they now sit two per row, with the evidence label under each figure, so the same block takes about half the scroll. Screen only; the PDF keeps its two-per-row print layout.
 
 Redesign pass 71 checks the new «¿Cambió su rentabilidad media en algún momento?» section at 360 and 390 px in ES, EN and PT, with and without a change found, and in the PDF. Its two figures use the paired cards from pass 70; the source line under them gets the same space above it as the line under the summary tiles.
+
+Redesign pass 72 walks the fund report with its new verdict against the file's own index, at 360 and 390 px in ES, EN and PT and in the PDF. The screen needed nothing. In the PDF, the bootstrap table's header row sat alone at the foot of a page and the multiplicity section's opening line was split from its table; a table's first row and a section's opening line now stay with what follows, and the page count is unchanged.
 
 ## Security
 

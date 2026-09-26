@@ -995,6 +995,8 @@ REPORT: dict[str, Any] = {
         "kpi_hint_sharpe": "rendimento frente aos seus altos e baixos; mais alto, mais estável",
         "kpi_hint_pf": "o ganho para cada 1 perdido",
         "kpi_hint_breakeven": "quanto mais operar pode custar antes de chegar a zero",
+        "kpi_hint_stress": "o que sobra do resultado líquido sem essas 5; com todas: {full}",
+        "kpi_hint_stress_curve": "rentabilidade total sem esses 5; com todos: {full}",
         "bps_side": "pb por lado",
         "stress": "Testes de estresse: sem os melhores resultados",
         "stress_intro": (
@@ -4742,6 +4744,16 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "a curva foi lida da coluna de saldo que você indicou; o arquivo não lista "
             "operações, então não é possível medir as verificações por operação"
+        ),
+    ),
+    (
+        (
+            "the trades were read from the table of a PDF statement; check the trade list "
+            "against the statement"
+        ),
+        (
+            "as operações foram lidas da tabela de um extrato em PDF; compare a lista de "
+            "operações com o extrato"
         ),
     ),
     (

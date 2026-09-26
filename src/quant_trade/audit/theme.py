@@ -461,12 +461,12 @@ animation-timeline:view();animation-range:entry 30% cover 55%}}
 @media (min-width:641px){.cards-2>.card:last-child:nth-child(odd){grid-column:1/-1}
 .cards-2>.card:last-child:nth-child(odd) p{max-width:68ch}}
 /* On a phone the icon sits beside the card title, so a long list of cards reads shorter. */
-@media (max-width:640px){.cards-2>.card{display:grid;grid-template-columns:auto minmax(0,1fr);
+@media (max-width:640px){.cards>.card:has(>.icon+h3){display:grid;grid-template-columns:auto minmax(0,1fr);
 column-gap:14px;align-items:center;padding:20px 22px}
-.cards-2>.card>.icon{grid-row:1;margin:0}
-.cards-2>.card>h3{grid-row:1;margin:0;font-size:1.08rem}
-.cards-2>.card>:not(.icon):not(h3){grid-column:1/-1}
-.cards-2>.card>p{margin-top:10px}}
+.cards>.card:has(>.icon+h3)>.icon{grid-row:1;margin:0}
+.cards>.card:has(>.icon+h3)>h3{grid-row:1;margin:0;font-size:1.08rem}
+.cards>.card:has(>.icon+h3)>:not(.icon):not(h3){grid-column:1/-1}
+.cards>.card:has(>.icon+h3)>p{margin-top:10px}}
 .card{position:relative;border:1px solid var(--border);border-radius:var(--r-lg);
 background:var(--surface);padding:clamp(26px,3vw,36px);overflow:hidden;isolation:isolate;
 transition:border-color .4s,transform .6s var(--ease),box-shadow .4s}
@@ -1264,6 +1264,7 @@ display:none!important}
 .meaning .item,.kpi,.flag-list li{border:1px solid #ddd!important}
 .paper table{display:table}
 h2,.detail h3{break-after:avoid;page-break-after:avoid}.facts{orphans:1;widows:1}
+.detail>h2+p,.paper tr:first-child{break-after:avoid;page-break-after:avoid}
 table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
 .badge,.verdict,.ring,.meaning .item::before{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .watermark{position:fixed}

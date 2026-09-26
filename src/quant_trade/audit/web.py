@@ -39,7 +39,15 @@ from urllib.parse import quote, urlsplit
 
 from pydantic import ValidationError
 
-from quant_trade.audit import account_pages, funnel, mapping, payments, universal
+from quant_trade.audit import (
+    account_pages,
+    forensics_web,
+    funnel,
+    mapping,
+    payments,
+    track_seal_pages,
+    universal,
+)
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import passkeys as pk
@@ -3355,7 +3363,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     return _html_error(
                         request, 400, _sentence(exc.localized(report_loc)), report_loc
                     )
-                # The columns this account chose before for the same header.
+                # The columns this account chose before for the same header;
+                # a PDF's rows are always shown, never read on a saved choice.
                 saved = (
                     mapping.usable_mapping(
                         mapping.loads(
@@ -3363,7 +3372,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         ),
                         table,
                     )
-                    if mapper and not report_columns
+                    if mapper and not report_columns and not table.pdf
                     else {}
                 )
                 if saved:
@@ -4393,6 +4402,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 await run_in_threadpool(payments.fulfil, db, cfg, session, at=datetime.now(UTC))
         return JSONResponse({"received": True})
 
+    # Hidden features mount here with the app's own closures; each module's
+    # switch is a constant, and while it is off nothing is registered.
+    hooks = dict(
+        load=_load,
+        session=_session,
+        cross_site=_cross_site,
+        signed_in_action=_signed_in_action,
+        panel_failures=panel_failures,
+        settings=cfg,
+        store=db,
+        slots=audit_slots,
+    )
+    forensics_web.register(app, **hooks)
+    track_seal_pages.register(app, **hooks)
     return app
 
 
