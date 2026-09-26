@@ -14,9 +14,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
+from quant_trade.audit.funnel import DIRECT, REF_DAYS, REF_TAGS
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 
 if TYPE_CHECKING:
+    from quant_trade.audit.funnel import Funnel, FunnelCounts
     from quant_trade.audit.store import AccessCodeRecord, RefusedPayment
 
 PANEL_PATH = "/panel"
@@ -65,7 +67,32 @@ TEXT: dict[str, str] = {
     "reset_link": "Enlace creado. Cópialo y envíalo ahora: no se puede volver a mostrar.",
     "reset_unknown": "No hay ninguna cuenta con ese correo.",
     "accounts": "Cuentas de clientes",
+    "funnel_title": "Embudo de ventas: últimos {days} días",
+    "funnel_lead": (
+        "De dónde vienen tus clientes. Publica cada enlace con su etiqueta al final, por "
+        "ejemplo {example}, y aquí verás cuántas visitas, cuentas y pagos trae cada "
+        "publicación. Sin etiqueta, o con una que no está en la lista, cuenta como «sin "
+        "etiqueta»."
+    ),
+    "funnel_by_ref": "Por etiqueta",
+    "funnel_by_day": "Por día e idioma",
+    "funnel_empty": "Todavía no hay nada que contar en estos días.",
+    "funnel_ref_cols": "Etiqueta|Qué es|Visitas|Cuentas|Informe gratis|Vistas previas|Pagos",
+    "funnel_day_cols": "Día|Idioma|Visitas|Cuentas|Informe gratis|Vistas previas|Pagos",
+    "funnel_total": "Total",
+    "funnel_direct": "sin etiqueta",
+    "funnel_paid": "{code} con código, {card} con tarjeta",
+    "funnel_tags": "Etiquetas que cuentan",
+    "funnel_limits": (
+        "Las visitas son de la página principal y de las páginas de cada caso, sin robots ni "
+        "vistas previas de enlaces; solo se guarda un contador por día, idioma y etiqueta, sin "
+        "dirección ni cookie. La etiqueta se recuerda {ref_days} días en el navegador y queda "
+        "en la cuenta si se crea. Los pagos e informes se cuentan por el idioma de la cuenta; "
+        "sin cuenta aparecen con «-». Un informe borrado por la retención deja de contar."
+    ),
 }
+
+LOCALE_NAMES: dict[str, str] = {"es": "español", "en": "inglés", "pt": "portugués", "-": "-"}
 
 #: The panel is in Spanish; ``payments.refusal`` reasons are logged in English.
 REFUSAL_REASONS: dict[str, str] = {
@@ -159,6 +186,70 @@ def _refused_table(refused: Sequence[RefusedPayment]) -> str:
     )
 
 
+def _counts_cells(counts: FunnelCounts) -> list[str]:
+    c = counts.counts
+    paid = str(counts.paid)
+    if counts.paid:
+        paid += " (" + TEXT["funnel_paid"].format(code=c["paid_code"], card=c["paid_card"]) + ")"
+    return [str(c["visits"]), str(c["signups"]), str(c["welcome"]), str(c["previews"]), paid]
+
+
+def _table(cols: str, rows: list[list[str]]) -> str:
+    head = "".join(f"<th>{_e(col)}</th>" for col in cols.split("|"))
+    body = "".join("<tr>" + "".join(f"<td>{_e(c)}</td>" for c in row) + "</tr>" for row in rows)
+    return (
+        "<div style='overflow-x:auto'>"
+        f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>"
+    )
+
+
+def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
+    """Visits, accounts, free reports, previews and payments by tag and by day."""
+    title = TEXT["funnel_title"].format(days=days)
+    lead = TEXT["funnel_lead"].format(example=example)
+    out = f"<h2 style='margin-top:40px'>{_e(title)}</h2><p>{_e(lead)}</p>"
+    if not funnel.by_ref:
+        out += f"<p class='muted'>{_e(TEXT['funnel_empty'])}</p>"
+    else:
+        ordered = sorted(
+            funnel.by_ref.items(),
+            key=lambda item: (
+                -item[1].paid,
+                -item[1].counts["signups"],
+                -item[1].counts["visits"],
+                item[0],
+            ),
+        )
+        ref_rows = [
+            [
+                TEXT["funnel_direct"] if ref == DIRECT else ref,
+                REF_TAGS.get(ref, ""),
+                *_counts_cells(counts),
+            ]
+            for ref, counts in ordered
+        ]
+        ref_rows.append([TEXT["funnel_total"], "", *_counts_cells(funnel.total)])
+        day_rows = [
+            [day, LOCALE_NAMES.get(locale, locale), *_counts_cells(counts)]
+            for (day, locale), counts in sorted(
+                funnel.by_day.items(), key=lambda item: (item[0][0], item[0][1]), reverse=True
+            )
+        ]
+        out += (
+            f"<h3>{_e(TEXT['funnel_by_ref'])}</h3>"
+            + _table(TEXT["funnel_ref_cols"], ref_rows)
+            + f"<h3>{_e(TEXT['funnel_by_day'])}</h3>"
+            + _table(TEXT["funnel_day_cols"], day_rows)
+        )
+    tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items())
+    out += (
+        f"<details><summary>{_e(TEXT['funnel_tags'])}</summary><p class='muted'>{_e(tags)}</p>"
+        "</details>"
+        f"<p class='muted'>{_e(TEXT['funnel_limits'].format(ref_days=REF_DAYS))}</p>"
+    )
+    return out
+
+
 def panel_page(
     *,
     key: str,
@@ -169,6 +260,7 @@ def panel_page(
     error: str = "",
     reset_link: str = "",
     accounts: int = 0,
+    funnel: str = "",
 ) -> str:
     """The panel after a correct key: the create form, a new code once, the list."""
     shown = ""
@@ -218,7 +310,9 @@ def panel_page(
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(TEXT['reset_create'])}</button></form>"
     )
-    return _shell(err + shown + notice + _refused_table(refused) + create + listing + reset)
+    return _shell(
+        err + shown + notice + _refused_table(refused) + funnel + create + listing + reset
+    )
 
 
 __all__ = [
@@ -228,7 +322,9 @@ __all__ = [
     "MAX_NOTE_CHARS",
     "PANEL_PATH",
     "REFUSAL_REASONS",
+    "LOCALE_NAMES",
     "TEXT",
+    "funnel_section",
     "login_page",
     "panel_page",
 ]
