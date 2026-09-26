@@ -1487,6 +1487,39 @@ def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> 
     assert any(word == "sin cambio claro" for word in lines.values())
     # A dimension that was not measured before is not called better.
     assert not any(k.startswith("Costes") for k in lines)
+    # Dimension lines say "changed": each report carries its own declarations.
+    assert lines["Significación estadística: Débil → Supera"] == "cambió"
+    # Dates that barely overlap: the market of those dates could explain it.
+    dated = {"periods_per_year": 252, "first_timestamp": "2020-01-01T00:00:00Z"}
+    early = dict(old, inputs=dict(dated, last_timestamp="2021-01-01T00:00:00Z"))
+    late = dict(
+        apart,
+        inputs=dict(
+            dated, first_timestamp="2020-11-01T00:00:00Z", last_timestamp="2022-01-01T00:00:00Z"
+        ),
+    )
+    assert sharpe_change(early, late) == "different_periods"
+    same_dates = dict(apart, inputs=dict(dated, last_timestamp="2021-01-01T00:00:00Z"))
+    assert sharpe_change(early, same_dates) == "better"
+
+
+def test_two_daily_files_of_different_length_are_comparable(tmp_path: Path) -> None:
+    """Periods per year are inferred, so two daily files never match exactly."""
+    import json
+
+    from quant_trade.audit.strategies import sharpe_change
+
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    results = []
+    for rows in (750, 760):
+        files = {"equity": ("e.csv", csv_bytes(positive_drift(rows)), "text/csv")}
+        answer = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
+        record = store.get_audit(_audit_id(answer.headers["location"]))  # type: ignore[attr-defined]
+        results.append(json.loads(record.result_json))
+    ppy = [r["inputs"]["periods_per_year"]["value"] for r in results]
+    assert ppy[0] != ppy[1]
+    assert sharpe_change(results[0], results[1]) in ("better", "worse", "unclear")
 
 
 def test_a_strategy_groups_versions_and_says_what_changed(tmp_path: Path) -> None:

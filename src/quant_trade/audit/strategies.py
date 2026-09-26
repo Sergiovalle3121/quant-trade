@@ -7,10 +7,13 @@ before. Only what the audit itself measured is compared, and a figure is
 called better or worse only when the change is larger than its own
 measurement noise:
 
-* the class (A to D) and each dimension's result (pass, weak, fail) are
-  already thresholded by the audit, so a different result is a change;
+* the class (A to D) is already thresholded by the audit, so a different
+  class is better or worse; a dimension's result (pass, weak, fail) is
+  said to have "changed", since each report carries its own declarations;
 * the Sharpe ratio is compared through the bootstrap's 5-95 % band: better
-  or worse only when the two bands do not overlap, else "no clear change".
+  or worse only when the two bands do not overlap, on the same data
+  frequency and mostly the same dates, else "no clear change". On the same
+  dates the rule is cautious, since the two versions share their noise.
 
 A locked preview shows its class only; what changed in each test needs both
 reports complete. Nothing here unlocks, predicts or ranks strategies by
@@ -20,6 +23,7 @@ money: every sentence is fixed text that passes the profit-claim guard.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.report import STATUS_TEXT, _dimension_title
@@ -78,6 +82,12 @@ COPY: dict[str, dict[str, str]] = {
         "same": "igual",
         "unclear": "sin cambio claro",
         "different_frequency": "no comparable (distinta frecuencia de datos)",
+        "different_periods": "periodos distintos (las fechas casi no coinciden)",
+        "changed": "cambió",
+        "tries_note": (
+            "{n} versiones probadas: si eliges la mejor, cuenta como {n} intentos al declarar "
+            "los intentos."
+        ),
         "no_change": "Ninguna prueba cambió de resultado.",
         "side_by_side": "Comparar lado a lado",
         "remove": "Quitar de la estrategia",
@@ -91,7 +101,11 @@ COPY: dict[str, dict[str, str]] = {
         "note": (
             "Cada versión se lee con sus propios archivos y declaraciones. «Mejor» o «peor» en el "
             "Sharpe solo aparece cuando las bandas del bootstrap (5 % a 95 %) no se tocan; si se "
-            "tocan, la diferencia cabe en el ruido de la medición."
+            "tocan, la diferencia cabe en el ruido de la medición; con los mismos datos esta "
+            "regla es muy prudente. Si las fechas de dos versiones casi no coinciden, la "
+            "diferencia puede venir del mercado de esas fechas y no del cambio. Cada prueba se "
+            "lee con las declaraciones de su propio informe (intentos, costes, fuera de "
+            "muestra), por eso sus líneas dicen «cambió» y no «mejor» o «peor»."
         ),
     },
     "en": {
@@ -140,6 +154,12 @@ COPY: dict[str, dict[str, str]] = {
         "same": "same",
         "unclear": "no clear change",
         "different_frequency": "not comparable (different data frequency)",
+        "different_periods": "different periods (the dates barely overlap)",
+        "changed": "changed",
+        "tries_note": (
+            "{n} versions tried: if you pick the best, it counts as {n} trials when you "
+            "declare the trials."
+        ),
         "no_change": "No test changed result.",
         "side_by_side": "Compare side by side",
         "remove": "Remove from strategy",
@@ -153,7 +173,11 @@ COPY: dict[str, dict[str, str]] = {
         "note": (
             "Each version is read from its own files and declarations. 'Better' or 'worse' on "
             "the Sharpe appears only when the bootstrap bands (5 % to 95 %) do not touch; when "
-            "they touch, the difference fits inside the measurement noise."
+            "they touch, the difference fits inside the measurement noise; on the same dates "
+            "this rule is very cautious. When two versions' dates barely overlap, the "
+            "difference may come from the market on those dates rather than from the change. "
+            "Each test is read with its own report's declarations (trials, costs, "
+            "out-of-sample), so its lines say 'changed' rather than 'better' or 'worse'."
         ),
     },
 }
@@ -194,12 +218,54 @@ def class_change(before: str, after: str) -> str:
     return _rank_word(-CLASS_ORDER.index(before), -CLASS_ORDER.index(after))
 
 
+#: Two versions whose shared dates cover less than this share of the shorter
+#: history are not compared: the market of those dates could explain the gap.
+MIN_SHARED_SPAN = 0.8
+#: Without a frequency label, periods per year within this relative gap
+#: count as the same frequency (they are inferred from the timestamps, so two
+#: daily files of different length never match exactly).
+FREQUENCY_TOLERANCE = 0.10
+
+
+def _same_frequency(inputs_a: dict[str, Any], inputs_b: dict[str, Any]) -> bool:
+    label_a, label_b = inputs_a.get("frequency_label"), inputs_b.get("frequency_label")
+    if label_a and label_b:
+        return bool(label_a == label_b)
+    freq_a = _number(inputs_a.get("periods_per_year"))
+    freq_b = _number(inputs_b.get("periods_per_year"))
+    if not freq_a or not freq_b:
+        return True
+    return abs(freq_a - freq_b) <= FREQUENCY_TOLERANCE * max(freq_a, freq_b)
+
+
+def _span(inputs: dict[str, Any]) -> tuple[datetime, datetime] | None:
+    try:
+        first = datetime.fromisoformat(str(inputs["first_timestamp"]).replace("Z", "+00:00"))
+        last = datetime.fromisoformat(str(inputs["last_timestamp"]).replace("Z", "+00:00"))
+    except (KeyError, ValueError):
+        return None
+    return (first, last) if last > first else None
+
+
+def shared_share(inputs_a: dict[str, Any], inputs_b: dict[str, Any]) -> float | None:
+    """The shared dates as a share of the shorter history, or ``None`` if unknown."""
+    span_a, span_b = _span(inputs_a), _span(inputs_b)
+    if span_a is None or span_b is None:
+        return None
+    shared = (min(span_a[1], span_b[1]) - max(span_a[0], span_b[0])).total_seconds()
+    shorter = min((span_a[1] - span_a[0]).total_seconds(), (span_b[1] - span_b[0]).total_seconds())
+    return max(shared, 0.0) / shorter
+
+
 def sharpe_change(before: dict[str, Any], after: dict[str, Any]) -> str:
-    """``better``/``worse`` only when the bootstrap 5-95 % bands do not overlap."""
-    freq_a = _number((before.get("inputs") or {}).get("periods_per_year"))
-    freq_b = _number((after.get("inputs") or {}).get("periods_per_year"))
-    if freq_a and freq_b and abs(freq_a - freq_b) > 1e-6 * freq_a:
+    """``better``/``worse`` only when the bootstrap 5-95 % bands do not overlap,
+    on the same data frequency and mostly the same dates."""
+    inputs_a, inputs_b = before.get("inputs") or {}, after.get("inputs") or {}
+    if not _same_frequency(inputs_a, inputs_b):
         return "different_frequency"
+    share = shared_share(inputs_a, inputs_b)
+    if share is not None and share < MIN_SHARED_SPAN:
+        return "different_periods"
     band_a = ((before.get("bootstrap") or {}).get("sharpe_per_period")) or {}
     band_b = ((after.get("bootstrap") or {}).get("sharpe_per_period")) or {}
     low_a, high_a = _value(band_a.get("p5")), _value(band_a.get("p95"))
@@ -240,7 +306,8 @@ def what_changed(
                 (
                     f"{_dimension_title(name, locale)}: {status_text[status_a]} → "
                     f"{status_text[status_b]}",
-                    copy[_rank_word(STATUS_RANK[status_a], STATUS_RANK[status_b])],
+                    # Each report is read with its own declarations: "changed", not a verdict.
+                    copy["changed"],
                 )
             )
     sharpe_a, sharpe_b = headline(before)["sharpe"], headline(after)["sharpe"]

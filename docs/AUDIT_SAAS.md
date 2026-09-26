@@ -1665,11 +1665,15 @@ changes what a report says.
   (EN `/account/strategies/<id>`) lists the versions oldest first with the
   class, annualised Sharpe, deflated Sharpe and max drawdown (full reports
   only; a preview shows its class and the way to unlock). Next to each
-  version, "Qué cambió frente a la versión N": the class, each dimension
-  whose ranked result changed (pass, weak, fail; not measured is never
-  compared) and the Sharpe, called better or worse only when the bootstrap
-  5-95 % bands do not overlap, "sin cambio claro" otherwise, and "no
-  comparable" across data frequencies. Per-test detail needs both versions
+  version, "Qué cambió frente a la versión N": the class (better or worse),
+  each dimension whose ranked result changed (pass, weak, fail; not
+  measured is never compared), said as "cambió" because each report carries
+  its own declarations, and the Sharpe, called better or worse only when the
+  bootstrap 5-95 % bands do not overlap, "sin cambio claro" otherwise, "no
+  comparable" across data frequencies (the frequency label; periods per year
+  within 10 % without one) and "periodos distintos" when the shared dates
+  cover under 80 % of the shorter history. With two or more versions the
+  page says that picking the best of N counts as N trials. Per-test detail needs both versions
   complete. Rename, remove a version and delete the strategy (its reports
   stay); deleting the account or a report removes its rows. Nothing here
   unlocks anything, so nothing new can be farmed.

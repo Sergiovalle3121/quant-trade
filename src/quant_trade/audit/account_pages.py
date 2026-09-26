@@ -1451,6 +1451,11 @@ def strategy_page(
     body = (
         table
         + "".join(blocks)
+        + (
+            f"<p class='muted'>{_e(copy['tries_note'].format(n=len(versions)))}</p>"
+            if len(versions) > 1
+            else ""
+        )
         + f"<p class='muted'>{_e(copy['note'])}</p>"
         + manage
         + back
