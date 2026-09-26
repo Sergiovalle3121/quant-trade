@@ -858,3 +858,44 @@ def test_platform_time_styles(text: str, expected: datetime) -> None:
     from quant_trade.audit.universal import _times
 
     assert _times([text], False).values == [expected]
+
+
+REVOLUT_HEADER = "Date,Ticker,Type,Quantity,Price per share,Total Amount,Currency,FX Rate"
+
+
+def test_revolut_stocks_statement_pairs_fills_and_follows_splits() -> None:
+    # Revolut's stock account statement, rows shaped as a real one reproduced
+    # in github.com/antonioaversa/taxes (cash rows, "$" prices, a split).
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            '2022-03-30T23:48:44.882381Z,,CASH TOP-UP,,,"$3,000",USD,1.12',
+            '2022-05-10T13:32:24.217636Z,AMZN,BUY - MARKET,0.6,"$2,400.00","$1,440",USD,1.06',
+            "2022-06-02T06:41:50.336664Z,,CUSTODY FEE,,,($1.35),USD,1.07",
+            # A 20-for-1 split adds 11.4 shares to the 0.6 held.
+            "2022-06-06T05:20:46.594417Z,AMZN,STOCK SPLIT,11.4,,$0,USD,1.08",
+            "2022-06-10T04:28:02.657456Z,MSFT,DIVIDEND,,,$10.54,USD,1.07",
+            "2022-06-29T13:45:38.161874Z,CVNA,BUY - LIMIT,10,$23.02,$231.25,USD,1.05",
+            "2022-07-07T15:37:02.604183Z,CVNA,SELL - LIMIT,10,$26.62 ,$266.20 ,USD,1.02",
+            '2022-07-08T15:37:02.604183Z,AMZN,SELL - MARKET,12,$125.00 ,"$1,500.00 ",USD,1.02',
+        ],
+        "trading-account-statement.csv",
+    )
+    trades = report.trades.trades
+    assert [round(trade.pnl, 2) for trade in trades] == [36.0, 60.0]
+    # The split kept the position's cost: 0.6 x 2,400 = 12 x 120.
+    assert round(trades[1].entry_price, 2) == 120.0 and trades[1].quantity == pytest.approx(12)
+    assert report.metadata["column_price"] == "Price per share"
+    assert not any("still open" in warning for warning in report.warnings)
+
+
+def test_a_split_of_shares_not_held_changes_nothing() -> None:
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            "2022-06-06T05:20:46.594417Z,AMZN,STOCK SPLIT,11.4,,$0,USD,1.08",
+            "2022-06-29T13:45:38.161874Z,CVNA,BUY - LIMIT,10,$23.02,$231.25,USD,1.05",
+            "2022-07-07T15:37:02.604183Z,CVNA,SELL - LIMIT,10,$26.62,$266.20,USD,1.02",
+        ]
+    )
+    assert [round(trade.pnl, 2) for trade in report.trades.trades] == [36.0]

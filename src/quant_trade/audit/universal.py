@@ -291,6 +291,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "average filled price",
         "avg. filled price",
         "price / share",
+        "price per share",
         "avg price",
         "average price",
         "execution price",
@@ -1701,6 +1702,26 @@ def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
     )
 
 
+#: A row whose side reads like this changes the shares held, not a trade.
+SPLIT_WORDS = frozenset({"stocksplit"})
+
+
+def _split_lots(
+    open_lots: dict[tuple[str, str], list[list[Any]]], account: str, symbol: str, added: float
+) -> None:
+    """Rescale a long position's lots for a split that added ``added``
+    shares (fewer when negative), keeping each lot's cost."""
+    lots = open_lots.get((account, symbol)) or []
+    held = sum(lot[0] for lot in lots)
+    if held <= 0 or held + added <= 0 or any(lot[0] < 0 for lot in lots):
+        return
+    ratio = (held + added) / held
+    for lot in lots:
+        lot[0] *= ratio
+        lot[1] /= ratio
+        lot[3] /= ratio
+
+
 def _fills(
     draft: imp._Draft, mapping: ColumnMap, rows: list[list[str]], decimal: str, serial: bool
 ) -> int:
@@ -1726,11 +1747,19 @@ def _fills(
     signed = False
     other_coin = 0
     unreadable: list[tuple[str, str]] = []
+    splits: list[tuple[datetime, str, str, float]] = []
     for position, row in enumerate(rows):
         quantity = _amount(_cell(row, columns, "quantity"), decimal)
         price = _amount(_cell(row, columns, "price"), decimal)
         moment = times.values[position]
-        side = _side(_cell(row, columns, "side"), fill=True) if "side" in columns else None
+        side_text = _cell(row, columns, "side") if "side" in columns else ""
+        if normalise(side_text) in SPLIT_WORDS and quantity and moment is not None:
+            # Revolut's STOCK SPLIT row: the shares added (or taken, if negative).
+            account = _cell(row, columns, "account").strip()
+            symbol = " ".join(_cell(row, columns, "symbol").split())
+            splits.append((moment, account, symbol, quantity))
+            continue
+        side = _side(side_text, fill=True) if "side" in columns else None
         if quantity is None or quantity == 0 or price is None or price <= 0 or moment is None:
             draft.invalid_rows += 1
             if moment is None and quantity and price and price > 0:
@@ -1777,7 +1806,12 @@ def _fills(
     newest_first = len(fills) > 1 and fills[0][0] > fills[-1][0]
     if newest_first:
         fills = [(f[0], -f[1], *f[2:]) for f in fills]
+    splits.sort(key=lambda split: split[0])
+    next_split = 0
     for moment, _, account, symbol, signed_qty, price, fee, profit, multiplier in sorted(fills):
+        while next_split < len(splits) and splits[next_split][0] <= moment:
+            _split_lots(open_lots, *splits[next_split][1:])
+            next_split += 1
         lots = open_lots.setdefault((account, symbol), [])
         left = abs(signed_qty)
         fee_per_unit = fee / left
