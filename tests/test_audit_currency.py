@@ -115,6 +115,8 @@ def test_the_series_are_kept_by_the_service_and_bounded() -> None:
         assert key in SERIES
     bad = MarketData(lambda series: "DATE,DEXMXUS\n2024-01-02,17.1\n2024-01-03,99999\n")
     assert bad.refresh("fx_mxn") is False and bad.closes("fx_mxn") is None
+    tiny = MarketData(lambda series: "DATE,DEXMXUS\n2024-01-02,17.1\n2024-01-03,1e-300\n")
+    assert tiny.refresh("fx_mxn") is False and tiny.closes("fx_mxn") is None
     good = MarketData(lambda series: "DATE,DEXMXUS\n2024-01-02,17.1\n2024-01-03,17.2\n")
     assert good.refresh("fx_mxn") is True
 
@@ -185,3 +187,25 @@ def test_an_imported_report_names_the_account_currency() -> None:
     frame = _curve(days, np.full(len(days), 10_000.0))
     out = in_currencies(frame, {"fx_mxn": _daily(days, 20.0, 25.0)}, inputs.account_currency)
     assert "assumption" not in out
+
+
+def test_broken_public_data_never_stops_the_audit() -> None:
+    days = pd.bdate_range("2022-01-03", periods=300)
+    frame = _curve(days, 10_000 * np.cumprod(1 + np.full(len(days), 0.0004)))
+    inputs = build_inputs(csv_bytes(frame), DeclaredMetadata(locale="es"))
+    words = pd.Series(["x"] * len(days), index=days)
+
+    def market(key: str) -> pd.Series | None:
+        return words if key == "vix" or key in series_keys() else None
+
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=market)
+    assert result.in_currencies is not None and result.in_currencies["status"] == "NOT_MEASURED"
+    assert result.vix_regime is not None and result.vix_regime["status"] == "NOT_MEASURED"
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def test_a_long_account_currency_is_cut() -> None:
+    days = pd.date_range("2023-01-02", periods=200, freq="D")
+    frame = _curve(days, np.full(len(days), 10_000.0))
+    out = in_currencies(frame, {}, "<b>" * 2000)
+    assert out["reason"] == OTHER_CURRENCY and len(out["account_currency"]) <= 8

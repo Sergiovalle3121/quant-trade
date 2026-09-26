@@ -56,6 +56,8 @@ MAX_CSV_LINE_BYTES = 32_768
 #: left the report without figures to print.
 MAX_ACCOUNT_VALUE = 1e15
 MAX_PERIOD_RETURN = 1e6
+#: Characters kept of an account currency a report names (``USD``, ``USDT``).
+MAX_CURRENCY_CHARS = 8
 MIN_OBSERVATIONS = 30
 
 TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha", "observation_date")
@@ -988,7 +990,7 @@ def build_inputs(
             "report_metadata": dict(imported.metadata),
             "initial_balance": imported.initial_balance,
             "cash_flows": list(imported.cash_flows),
-            "account_currency": imported.currency,
+            "account_currency": (imported.currency or "")[:MAX_CURRENCY_CHARS] or None,
         }
         variants_in_report = imported.metadata.get("variants", "")
         if variants_in_report.isdigit() and int(variants_in_report) > 1:

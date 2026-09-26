@@ -962,23 +962,24 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             "the dollar levels converted at the Federal Reserve's noon buying rate of each day "
             "(FRED H.10); return a year compounded over the calendar days, shown from one year of"
             " history; worst fall from a peak in that currency; before that currency's own "
-            "inflation"
+            "inflation; a USDT or USDC account is read at one dollar per coin"
         ),
         (
             "los saldos en dólares convertidos al tipo de cambio del mediodía de la Reserva "
             "Federal de cada día (FRED H.10); rentabilidad al año compuesta sobre los días "
             "naturales, mostrada desde un año de historial; peor caída desde un máximo en esa "
-            "moneda; antes de la inflación de esa moneda"
+            "moneda; antes de la inflación de esa moneda; una cuenta en USDT o USDC se lee a un "
+            "dólar por moneda"
         ),
     ),
     (
         (
-            "the dollar levels divided by US consumer prices (FRED CPIAUCSL) of each point's "
+            "the dollar levels divided by US consumer prices (FRED CPIAUCNS) of each point's "
             "month, or the latest month published; US inflation only"
         ),
         (
             "los saldos en dólares divididos entre los precios al consumidor de EE. UU. (FRED "
-            "CPIAUCSL) del mes de cada punto, o del último mes publicado; solo inflación de EE. "
+            "CPIAUCNS) del mes de cada punto, o del último mes publicado; solo inflación de EE. "
             "UU."
         ),
     ),

@@ -1062,12 +1062,13 @@ REPORT: dict[str, Any] = {
             "A diferença de rentabilidade média entre as duas colunas ({z} erros padrão) não "
             "basta para dizer que se comporta de forma diferente conforme o mercado."
         ),
-        "currency": "Quanto foi na sua moeda e depois da inflação?",
+        "currency": "Quanto valeu a conta na sua moeda e depois da inflação?",
         "currency_intro": (
             "Os saldos da curva, em dólares, convertidos pela cotação de cada dia (taxa do "
             "meio-dia em Nova York do Federal Reserve), de {first} a {last}. Se você vive com "
-            "outra moeda, isto é o que a estratégia fez nela: o que a sua moeda subiu ou caiu "
-            "frente ao dólar soma-se ao resultado."
+            "outra moeda, isto é o que a conta valeu nela. A diferença em relação à linha em "
+            "dólares vem do câmbio, não da estratégia: quando o dólar sobe frente à sua moeda, "
+            "o resultado nela sobe, e quando cai, cai."
         ),
         "currency_assumed": (
             "O arquivo não diz em que moeda está a conta, então ela é lida como dólares. Se não"
@@ -1216,7 +1217,10 @@ REPORT: dict[str, Any] = {
         "benchmark": "A comparação com o benchmark que você enviou",
         "holding": "Se ganha de simplesmente comprar e manter o mercado que opera",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado (VIX)",
-        "currency": "Quanto foi em pesos, reais, euros e outras moedas, e depois da inflação",
+        "currency": (
+            "Quanto valeu a conta em pesos, reais, euros e outras moedas, e depois da "
+            "inflação"
+        ),
     },
     "DIMENSION_TITLES": {
         "statistical_significance": "Significância estatística",
@@ -4607,22 +4611,22 @@ RULES: tuple[tuple[str, str], ...] = (
             "the dollar levels converted at the Federal Reserve's noon buying rate of each day "
             "(FRED H.10); return a year compounded over the calendar days, shown from one year of"
             " history; worst fall from a peak in that currency; before that currency's own "
-            "inflation"
+            "inflation; a USDT or USDC account is read at one dollar per coin"
         ),
         (
             "os saldos em dólares convertidos pela taxa do meio-dia do Federal Reserve de cada "
             "dia (FRED H.10); rentabilidade ao ano composta sobre os dias corridos, mostrada a "
             "partir de um ano de histórico; pior queda desde um pico nessa moeda; antes da "
-            "inflação dessa moeda"
+            "inflação dessa moeda; uma conta em USDT ou USDC é lida a um dólar por moeda"
         ),
     ),
     (
         (
-            "the dollar levels divided by US consumer prices (FRED CPIAUCSL) of each point's "
+            "the dollar levels divided by US consumer prices (FRED CPIAUCNS) of each point's "
             "month, or the latest month published; US inflation only"
         ),
         (
-            "os saldos em dólares divididos pelos preços ao consumidor dos EUA (FRED CPIAUCSL) do"
+            "os saldos em dólares divididos pelos preços ao consumidor dos EUA (FRED CPIAUCNS) do"
             " mês de cada ponto, ou do último mês publicado; só inflação dos EUA"
         ),
     ),

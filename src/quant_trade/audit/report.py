@@ -108,7 +108,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "crises": "Cómo le fue en 2008, el covid, 2022 y otras caídas conocidas",
         "holding": "Si le gana a simplemente comprar y mantener el mercado que opera",
         "regime": "Cómo le fue con el mercado tranquilo y con el mercado agitado (VIX)",
-        "currency": "Cuánto fue en pesos, reales, euros y otras monedas, y después de la inflación",
+        "currency": (
+            "Cuánto valió la cuenta en pesos, reales, euros y otras monedas, y después de la "
+            "inflación"
+        ),
         "luck": (
             "Cuánto Sharpe queda al descontar la suerte y cuántos años de historial harían falta"
         ),
@@ -147,7 +150,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "crises": "How it did in 2008, covid, 2022 and other known falls",
         "holding": "Whether it beats simply buying and holding the market it trades",
         "regime": "How it did in calm and in turbulent markets (VIX)",
-        "currency": "What it was in pesos, reais, euros and other currencies, and after inflation",
+        "currency": (
+            "What the account was worth in pesos, reais, euros and other currencies, and after "
+            "inflation"
+        ),
         "luck": "How much Sharpe is left once luck is discounted, and how many years it would take",
         "ride": "Time without new highs, worst day, worst month and months that ended up",
         "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
@@ -733,12 +739,14 @@ LABELS: dict[str, dict[str, str]] = {
             "La diferencia de rentabilidad media entre las dos columnas ({z} errores "
             "estándar) no basta para decir que se comporta distinto según el mercado."
         ),
-        "currency": "¿Cuánto fue en tu moneda y después de la inflación?",
+        "currency": "¿Cuánto valió la cuenta en tu moneda y después de la inflación?",
         "currency_intro": (
             "Los saldos de la curva, en dólares, convertidos al tipo de cambio de cada día "
             "(cotización del mediodía en Nueva York de la Reserva Federal), del {first} al "
-            "{last}. Si vives con otra moneda, esto es lo que la estrategia hizo en ella: lo "
-            "que tu moneda subió o bajó frente al dólar se suma al resultado."
+            "{last}. Si vives con otra moneda, esto es lo que valió la cuenta en ella. La "
+            "diferencia con la fila en dólares viene del tipo de cambio, no de la estrategia: "
+            "cuando el dólar sube frente a tu moneda, el resultado en ella sube, y cuando "
+            "baja, baja."
         ),
         "currency_assumed": (
             "El archivo no dice en qué moneda está la cuenta, así que se lee como dólares. Si "
@@ -1746,12 +1754,13 @@ LABELS: dict[str, dict[str, str]] = {
             "The gap in mean return between the two columns ({z} standard errors) is not "
             "enough to say it behaves differently depending on the market."
         ),
-        "currency": "What was it in your currency and after inflation?",
+        "currency": "What was the account worth in your currency and after inflation?",
         "currency_intro": (
             "The curve's levels, in dollars, converted at each day's exchange rate (the Federal"
             " Reserve's New York noon buying rate), from {first} to {last}. If you live in "
-            "another currency, this is what the strategy made in it: what your currency gained "
-            "or lost against the dollar adds to the result."
+            "another currency, this is what the account was worth in it. The difference from "
+            "the dollar row comes from the exchange rate, not the strategy: when the dollar "
+            "rises against your currency the result in it rises, and when it falls, it falls."
         ),
         "currency_assumed": (
             "The file does not say which currency the account is in, so it is read as dollars. "

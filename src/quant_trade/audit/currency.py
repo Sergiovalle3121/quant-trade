@@ -9,8 +9,8 @@ run time), then reports, per currency, the total return, the return a year
 (only over a year or more of history) and the worst fall. A rate older than
 ``MAX_GAP_DAYS`` before a point leaves that currency out.
 
-It also deflates the dollar result by US consumer prices (``CPIAUCSL``,
-monthly): each point takes its own month's price level, or the latest month
+It also deflates the dollar result by US consumer prices (``CPIAUCNS``, not
+seasonally adjusted, monthly): each point takes its own month's price level, or the latest month
 published (at most ``MAX_CPI_GAP_DAYS`` old; the index comes out about two
 weeks after its month ends). The deflator is US inflation only: FRED carries
 no up-to-date consumer price index for most of the other currencies, so the
@@ -45,15 +45,17 @@ MAX_CPI_GAP_DAYS = 75
 DOLLARS_PER_UNIT = frozenset({"DEXUSEU", "DEXUSUK"})
 #: Account currencies read as dollars.
 DOLLAR_CODES = frozenset({"USD", "USC", "USDT", "USDC"})
+#: Characters kept of a named account currency.
+MAX_CODE_CHARS = 8
 
 NOTE = (
     "the dollar levels converted at the Federal Reserve's noon buying rate of each day "
     "(FRED H.10); return a year compounded over the calendar days, shown from one year "
     "of history; worst fall from a peak in that currency; before that currency's own "
-    "inflation"
+    "inflation; a USDT or USDC account is read at one dollar per coin"
 )
 REAL_NOTE = (
-    "the dollar levels divided by US consumer prices (FRED CPIAUCSL) of each point's "
+    "the dollar levels divided by US consumer prices (FRED CPIAUCNS) of each point's "
     "month, or the latest month published; US inflation only"
 )
 ASSUMED_USD = "no currency is named in the file, so the curve is read as US dollars"
@@ -110,7 +112,7 @@ def in_currencies(
     """The curve in ``frame`` (``timestamp``, ``equity`` in dollars) in each
     currency of ``market.FX`` and after US inflation; ``series`` maps each
     FRED key (``fx_mxn``, ``cpi``) to its values, or None when unread."""
-    code = (account_currency or "").strip().upper() or None
+    code = (account_currency or "").strip().upper()[:MAX_CODE_CHARS] or None
     if code is not None and code not in DOLLAR_CODES:
         return {"status": "NOT_MEASURED", "reason": OTHER_CURRENCY, "account_currency": code}
     stamps = _days(frame["timestamp"])

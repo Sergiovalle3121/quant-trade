@@ -888,7 +888,10 @@ def _currency(
             series[key] = market(key)
         except Exception:  # noqa: BLE001 (public data must never stop an audit)
             series[key] = None
-    return currency_lib.in_currencies(inputs.equity.frame, series, inputs.account_currency)
+    try:
+        return currency_lib.in_currencies(inputs.equity.frame, series, inputs.account_currency)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return {"status": "NOT_MEASURED", "reason": currency_lib.UNAVAILABLE}
 
 
 def _vix_regime(
@@ -910,7 +913,16 @@ def _vix_regime(
             "label": market_lib.VIX.label,
             "source_url": market_lib.VIX.source_url,
         }
-    return regime_lib.by_vix(inputs.equity.frame, vix, inputs.periods_per_year)
+    try:
+        return regime_lib.by_vix(inputs.equity.frame, vix, inputs.periods_per_year)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return {
+            "status": "NOT_MEASURED",
+            "reason": regime_lib.UNAVAILABLE,
+            "series": market_lib.VIX.series,
+            "label": market_lib.VIX.label,
+            "source_url": market_lib.VIX.source_url,
+        }
 
 
 def _holding(
