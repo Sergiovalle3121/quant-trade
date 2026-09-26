@@ -37,7 +37,7 @@ def test_the_plan_says_which_side_of_each_bar_the_numbers_fall() -> None:
     page = _page("es")
     assert "supera con 0.95 o más, y por debajo de 0.5 no supera" in page
     assert "hace falta 0.5 o más (cumple)" in page
-    assert "el máximo es 1.0 (no cumple)" in page
+    assert "se acepta hasta 1.0 (no cumple)" in page
     # The optimisation export was uploaded: no step asks for it again.
     assert "Sube el XML de la optimización" not in page
     assert "El número de intentos ya sale de tus archivos" in page

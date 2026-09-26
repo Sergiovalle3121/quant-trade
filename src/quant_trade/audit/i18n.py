@@ -250,6 +250,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "operaciones, así que no se pueden medir las comprobaciones por operación",
     ),
     (
+        "the trades were read from the table of a PDF statement; check the trade list "
+        "against the statement",
+        "las operaciones se leyeron de la tabla de un estado de cuenta en PDF; compara la "
+        "lista de operaciones con el estado de cuenta",
+    ),
+    (
         "{n} row(s) without a readable date or amount were left out",
         "se dejaron fuera {n} fila(s) sin fecha o cifra legible",
     ),

@@ -309,9 +309,25 @@ the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
 Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
 save it as .xlsx or CSV), an OpenDocument file
-that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
-Excel or HTML history), and a zip with none or several exports
-(`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
+that is not a spreadsheet (`opendocument_sheet`), a PDF statement whose table
+cannot be read with confidence (`pdf_statement`: download the CSV, Excel or
+HTML history), and a zip with none or several exports (`zip_contents`).
+
+A PDF statement (`audit/pdf_tables.py`) is read only as a ruled table
+(pdfplumber's line strategy, web extra) and only through the column screen:
+it is never matched to a known platform, the upload is answered with
+`pdf_columns` and the screen shows the rows with a notice (ES, EN, PT) that
+they were rebuilt from a PDF and should be checked; a saved column choice is
+never applied to a PDF without showing it. The audit read from it carries
+`PDF_ROWS_WARNING`. The extraction runs in a child process killed after
+10 s, with 1 GB of memory and 10 s of CPU; at most 30 pages, 20,000
+characters per page and 200,000 table cells in all. The table's pieces are joined across pages only when
+they all have the same columns (a header repeated on each page is dropped);
+a header with fewer than three named columns or a repeated name, text laid
+out without rules, a scanned page, or any data row filling less than 60 % of
+the named columns (a row cut by a page break) refuses the whole file with
+`pdf_statement`: a refusal costs less than a misread trade. The rows are read
+with a dot as the decimal mark, as a web page's are. An Interactive Brokers Flex Query statement in XML (its
 default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
 `<Trade>` at `EXECUTION` level with the attribute names as columns
 (order-level and summary rows are ignored; parsed with the same no-DOCTYPE
@@ -772,8 +788,8 @@ and report wire them in during the integration step):
   gap (price rounding, currency conversion). The resampled time under the
   peak reads "median" and "in 1 of every 20" instead of p50/p95, and the
   header names the engine version and simulation seed in words.
-- `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
-  the uploaded returns over one year, 2,000 paths by default, capped at
+- `drawdown_risk`: stationary block bootstrap of
+  the uploaded returns (expected block: `resample_block`, see below) over one year, 2,000 paths by default, capped at
   2,000,000 resampled cells. A curve finer than 10,000 periods a year
   (`MAX_RISK_PATH_PERIODS`, about hourly around the clock) is first
   compounded into consecutive blocks so a path stays that short
@@ -785,6 +801,19 @@ and report wire them in during the integration step):
   paths reaching 10/20/30/50 %, the longest time under water p50/p95, and a
   p5–p95 fan of at most 120 points. Every figure is noted "resampled from
   the uploaded history, not a forecast".
+- `resample_block` (both simulations): the expected block is the larger of
+  5 periods and the Politis–White (2004) block length with the Patton,
+  Politis and White (2009) correction (`block_length`), measured on the
+  file, when its returns cluster (flat-top long-run variance above the plain
+  variance); returns that are independent or alternate keep 5, which keeps
+  their numbers unchanged. The block is capped at a quarter of the history
+  and recorded in `method.expected_block_size`. Before, a fixed 5-period
+  block broke up the losing runs of trend-following daily curves and
+  smoothed fund values, so their resampled drawdowns and challenge failure
+  odds came out too mild. On AR(1) returns the measured block is within
+  about 30 % of the theoretical optimum. Informational: neither simulation
+  feeds the class. The seed is unchanged, so a file gives the same numbers
+  on every run.
 - `simulate_challenge`: the same bootstrap over daily closes, 5,000 paths by
   default, checked each day for the daily floor, then the total floor, then
   the target with the minimum days (every day with a non-zero return counts
@@ -2463,6 +2492,15 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Cambiar correo** (`POST /cuenta/correo`): on Mi cuenta, the new
+  sign-in e-mail typed twice plus the current password. No e-mail service
+  confirms the address yet, so the second copy is what catches a typo; an
+  address another account uses is refused without saying whose it is. The
+  other sessions are signed out, as on a password change, and "Actividad
+  reciente" gets an "E-mail changed" line (never either address). Passkeys
+  keep working (they are bound to the account, not the e-mail), though a
+  device may keep showing the old address as the passkey's name. When an
+  e-mail service arrives, this should confirm the new address first.
 - **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
   key, two-step sign-in and a passkey (only where passkeys work), each as
   on or with a link to its card, and counts how many are on. Two-step
@@ -2947,6 +2985,10 @@ Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercad
 Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the dependence line, Jensen's alpha on the account's rate, the fund split), the landing's new "¿Qué tan protegida está mi cuenta?" answer and the fund page's checks at 360 and 390 px. Nothing ran past the screen and no heading was stranded at a PDF page end. The tallest part was the evidence tables (trade statistics, significance, benchmark), where each row was its own card; on a phone each table is now one card with rules between rows, so the same figures take less scrolling and read as a list. Rendered with public data on (FRED), the crisis table gains an index column and ran 27 px past a 360 px screen; on a phone each crisis is now a card with its name, dates and labelled figures. The local-cash Sharpe line under the summary tiles gets a little space above it, and the landing's "Frente al efectivo" card fits at 360 and 390 px in all three languages. With each currency's own inflation (EUR, GBP, CAD, CHF, BRL), the currency table's figures keep a visible gap on narrow phones; the /metodologia list of public data sources uses the page's existing check list and fits at 360 px.
 
 Redesign pass 70 walks the fund-record report after its fund-only sections landed, at 360 and 390 px in ES, EN and PT. The paired figure cards (the fund's own figures, its figures against the index, and a trading report's "Cómo se vivió este historial") were one tall card per figure on a phone; they now sit two per row, with the evidence label under each figure, so the same block takes about half the scroll. Screen only; the PDF keeps its two-per-row print layout.
+
+Redesign pass 71 checks the new «¿Cambió su rentabilidad media en algún momento?» section at 360 and 390 px in ES, EN and PT, with and without a change found, and in the PDF. Its two figures use the paired cards from pass 70; the source line under them gets the same space above it as the line under the summary tiles.
+
+Redesign pass 72 walks the fund report with its new verdict against the file's own index, at 360 and 390 px in ES, EN and PT and in the PDF. The screen needed nothing. In the PDF, the bootstrap table's header row sat alone at the foot of a page and the multiplicity section's opening line was split from its table; a table's first row and a section's opening line now stay with what follows, and the page count is unchanged.
 
 ## Security
 

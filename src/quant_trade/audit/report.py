@@ -1479,6 +1479,8 @@ LABELS: dict[str, dict[str, str]] = {
         "cash_rate_CHF": "tasa de política monetaria de Suiza (BIS)",
         "kpi_hint_pf": "lo ganado por cada 1 perdido",
         "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
+        "kpi_hint_stress": "lo que queda del resultado neto sin esas 5; con todas: {full}",
+        "kpi_hint_stress_curve": "rentabilidad total sin esos 5; con todos: {full}",
         "bps_side": "pb por lado",
         "stress": "Pruebas de estrés: sin los mejores resultados",
         "stress_intro": (
@@ -2753,6 +2755,10 @@ LABELS: dict[str, dict[str, str]] = {
         "cash_rate_CHF": "policy rate of Switzerland (BIS)",
         "kpi_hint_pf": "what was won for every 1 lost",
         "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
+        "kpi_hint_stress": (
+            "what is left of the net result without those 5; with all of them: {full}"
+        ),
+        "kpi_hint_stress_curve": "total return without those 5; with all of them: {full}",
         "bps_side": "bps per side",
         "stress": "Stress tests: without the best outcomes",
         "stress_intro": (
@@ -3751,10 +3757,27 @@ _KPI_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 
-def _kpi_hint(label: str, labels: dict[str, str]) -> str:
+#: The stress tiles, with the stress block they come from: their hint names the
+#: whole result, so a bare "+15,375.41" reads against what the history made.
+_KPI_STRESS_HINTS: tuple[tuple[str, str, str, bool], ...] = (
+    ("kpi_stress", "trades", "kpi_hint_stress", False),
+    ("kpi_stress_curve", "returns", "kpi_hint_stress_curve", True),
+)
+
+
+def _kpi_hint(label: str, labels: dict[str, str], data: dict[str, Any] | None = None) -> str:
     for keys, hint in _KPI_HINTS:
         if any(label == labels[key] or label.startswith(labels[key] + " (") for key in keys):
             return f"<small>{_e(labels[hint])}</small>"
+    for key, block, hint, percent in _KPI_STRESS_HINTS:
+        if label != labels[key]:
+            continue
+        original = ((data or {}).get("stress") or {}).get(block, {}).get("original") or {}
+        full = _ev_value(original)
+        if full is None:
+            return ""
+        shown = _stress_value(full, percent=percent, signed=True)
+        return f"<small>{_e(labels[hint].format(full=shown))}</small>"
     return ""
 
 
@@ -3769,7 +3792,7 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         f"<b aria-hidden='true'>{icon('lock')}<i></i></b><span>{_e(label)}</span></a>"
         if locked
         else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
-        f"<span>{_e(label)}</span>{_kpi_hint(label, labels)}</div>"
+        f"<span>{_e(label)}</span>{_kpi_hint(label, labels, data)}</div>"
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""

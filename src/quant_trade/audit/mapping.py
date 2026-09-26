@@ -18,7 +18,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from quant_trade.audit import importers as imp
@@ -35,6 +35,7 @@ MAPPABLE_CODES = frozenset(
         "universal_unknown_column",
         "universal_column_twice",
         "mapped_curve_unreadable",
+        "pdf_columns",
     }
 )
 #: Rows of the file shown under its header, so each column's content is visible.
@@ -90,6 +91,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "found": "Así se ve tu archivo",
         "found_help": "La cabecera y las primeras filas, tal como las leímos.",
+        "pdf_notice": (
+            "Estas filas vienen de la tabla de un PDF: las reconstruimos a partir de dónde está "
+            "el texto en la página. Revisa que cada columna muestre lo que dice su nombre antes "
+            "de elegirla; si algo no coincide, descarga el historial en CSV o Excel."
+        ),
         "choose": "Elige las columnas",
         "choose_help": (
             "Con una fila por operación: entrada, salida, cantidad y precios. Con una fila por "
@@ -154,6 +160,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "found": "What your file looks like",
         "found_help": "The header and the first rows, as we read them.",
+        "pdf_notice": (
+            "These rows come from a table in a PDF: we rebuilt them from where the text sits on "
+            "the page. Check that each column shows what its name says before you pick it; if "
+            "anything does not match, download the history as CSV or Excel instead."
+        ),
         "choose": "Choose the columns",
         "choose_help": (
             "With one row per trade: entry, exit, quantity and prices. With one row per fill "
@@ -214,6 +225,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "found": "Assim é o seu arquivo",
         "found_help": "O cabeçalho e as primeiras linhas, como os lemos.",
+        "pdf_notice": (
+            "Estas linhas vêm da tabela de um PDF: nós as reconstruímos a partir de onde o texto "
+            "está na página. Confira se cada coluna mostra o que o nome diz antes de escolhê-la; "
+            "se algo não bater, baixe o histórico em CSV ou Excel."
+        ),
         "choose": "Escolha as colunas",
         "choose_help": (
             "Com uma linha por operação: entrada, saída, quantidade e preços. Com uma linha por "
@@ -284,6 +300,8 @@ class Table:
 
     header: list[str]
     samples: list[list[str]]
+    #: The rows were rebuilt from a PDF's table: the screen says to check them.
+    pdf: bool = False
 
     @property
     def names(self) -> list[str]:
@@ -336,6 +354,7 @@ class _Body:
     rows: list[list[str]]
     serial: bool
     decimal: str
+    pdf: bool = False
 
 
 def _body(rows: list[list[str]], *, serial: bool, decimal: str) -> _Body | None:
@@ -355,6 +374,11 @@ def _body(rows: list[list[str]], *, serial: bool, decimal: str) -> _Body | None:
 def _read_body(data: bytes) -> _Body | None:
     try:
         data = imp.unwrap(data)
+        if imp._is_pdf(data):
+            from quant_trade.audit import pdf_tables
+
+            found = _body(pdf_tables.rows(data), serial=False, decimal=".")
+            return None if found is None else replace(found, pdf=True)
         if imp._is_workbook(data):
             for sheet in imp.read_xlsx(data).values():
                 found = _body(
@@ -415,7 +439,7 @@ def read_table(data: bytes) -> Table | None:
     body = _read_body(data)
     if body is None:
         return None
-    return Table(body.header, body.rows[:SAMPLE_ROWS])
+    return Table(body.header, body.rows[:SAMPLE_ROWS], pdf=body.pdf)
 
 
 def header_signature(header: Sequence[str]) -> str:
@@ -674,7 +698,7 @@ def curve_from_columns(
     dropped = len(body.rows) - len(points)
     if len(points) < 2:
         raise imp.ReportFormatError("mapped_curve_unreadable", _few_rows("en"), _few_rows("es"))
-    warnings: list[str] = []
+    warnings: list[str] = [imp.PDF_ROWS_WARNING] if body.pdf else []
     curve: dict[datetime, float] = {}
     if kind == "balance":
         warnings.append(MAPPED_BALANCE_WARNING)
@@ -838,12 +862,16 @@ def mapping_page(
     back = "/pt#subir" if locale == "pt" else f"/?lang={locale}#subir"
     if "locale" not in (carried or {}):
         hidden += f"<input type='hidden' name='locale' value='{locale}'>"
+    pdf_notice = (
+        f"<p class='warning' role='note'>{_e(words['pdf_notice'])}</p>" if table.pdf else ""
+    )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["lead"], dot="warn")
         + "<div class='paper page-main'><div class='wrap'>"
         + _error_card(problem, locale)
         + f"<section class='map-preview' style='margin-top:32px'><h2>{_e(words['found'])}</h2>"
-        f"<p class='help'>{_e(words['found_help'])}</p>{_preview(table, words)}</section>"
+        f"<p class='help'>{_e(words['found_help'])}</p>{pdf_notice}{_preview(table, words)}"
+        "</section>"
         "<form class='map-form' action='/audits' method='post' enctype='multipart/form-data' "
         "style='margin-top:36px'>"
         f"{hidden}<h2>{_e(words['choose'])}</h2><p class='help'>{_e(words['choose_help'])}</p>"
@@ -851,7 +879,7 @@ def mapping_page(
         "<div class='field'><label for='m-report'>"
         f"{_e(words['file'])}</label>"
         "<input id='m-report' type='file' name='report' required "
-        "accept='.csv,.txt,.tsv,.xlsx,.xls,.ods,.htm,.html,.zip,text/csv' "
+        "accept='.csv,.txt,.tsv,.xlsx,.xls,.ods,.htm,.html,.zip,.pdf,text/csv' "
         "aria-describedby='m-report-help'>"
         f"<div class='help' id='m-report-help'>{_e(words['file_help'])}</div></div>"
         f"<p class='help'>{_e(words['remember'])}</p><p class='help'>{_e(words['extra'])}</p>"

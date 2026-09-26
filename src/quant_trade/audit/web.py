@@ -39,7 +39,15 @@ from urllib.parse import quote, urlsplit
 
 from pydantic import ValidationError
 
-from quant_trade.audit import account_pages, funnel, mapping, payments, universal
+from quant_trade.audit import (
+    account_pages,
+    forensics_web,
+    funnel,
+    mapping,
+    payments,
+    track_seal_pages,
+    universal,
+)
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
 from quant_trade.audit import passkeys as pk
@@ -1397,8 +1405,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "sessions_ended",
         "passkey_added",
         "passkey_removed",
+        "email_changed",
     )
     account_errors = (
+        "email_bad",
+        "email_mismatch",
+        "email_same",
+        "email_taken",
         "code_already",
         "code_other",
         "code_unknown",
@@ -2516,6 +2529,48 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
+    def _email_post(path_locale: str) -> Callable[..., Response]:
+        """A new sign-in e-mail, typed twice, with the current password.
+
+        There is no e-mail service yet to confirm the address, so the second
+        copy is what catches a typo; the other sessions are signed out as on
+        a password change.
+        """
+
+        def handler(
+            request: Request,
+            email: Annotated[str, Form(max_length=320)] = "",
+            email_again: Annotated[str, Form(max_length=320)] = "",
+            current: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, session_hash, locale, _ = checked
+            base = account_pages.path("account", locale)
+
+            def refused(error: str) -> Response:
+                return RedirectResponse(f"{base}?error={error}", status_code=303)
+
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return refused("wrong")
+            clean = acct.normalise_email(email)
+            if not acct.valid_email(clean):
+                return refused("email_bad")
+            if clean != acct.normalise_email(email_again):
+                return refused("email_mismatch")
+            if clean == account.email:
+                return refused("email_same")
+            if not db.set_email(account.id, clean):
+                return refused("email_taken")
+            db.delete_sessions(account.id, keep=session_hash)
+            _note_event(request, account.id, "email_changed")
+            return RedirectResponse(f"{base}?done=email_changed", status_code=303)
+
+        return handler
+
     def _delete_post(path_locale: str) -> Callable[..., Response]:
         def handler(
             request: Request,
@@ -2837,6 +2892,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(
             paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]
         )
+        app.add_api_route(paths["account"] + "/correo", _email_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"] + "/borrar", _delete_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"] + "/datos", _account_data(path_locale), methods=["GET"])
         strategies_base = account_pages.strategies_path(path_locale)
@@ -3355,7 +3411,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     return _html_error(
                         request, 400, _sentence(exc.localized(report_loc)), report_loc
                     )
-                # The columns this account chose before for the same header.
+                # The columns this account chose before for the same header;
+                # a PDF's rows are always shown, never read on a saved choice.
                 saved = (
                     mapping.usable_mapping(
                         mapping.loads(
@@ -3363,7 +3420,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         ),
                         table,
                     )
-                    if mapper and not report_columns
+                    if mapper and not report_columns and not table.pdf
                     else {}
                 )
                 if saved:
@@ -4393,6 +4450,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 await run_in_threadpool(payments.fulfil, db, cfg, session, at=datetime.now(UTC))
         return JSONResponse({"received": True})
 
+    # Hidden features mount here with the app's own closures; each module's
+    # switch is a constant, and while it is off nothing is registered.
+    hooks = dict(
+        load=_load,
+        session=_session,
+        cross_site=_cross_site,
+        signed_in_action=_signed_in_action,
+        panel_failures=panel_failures,
+        settings=cfg,
+        store=db,
+        slots=audit_slots,
+    )
+    forensics_web.register(app, **hooks)
+    track_seal_pages.register(app, **hooks)
     return app
 
 
