@@ -191,6 +191,18 @@ class StrategyRecord:
 
 
 @dataclass(frozen=True)
+class SessionView:
+    """One open session on "Sesiones abiertas": never its token or its hash."""
+
+    handle: str
+    device: str
+    network: str
+    created_at: str
+    last_seen: str
+    current: bool
+
+
+@dataclass(frozen=True)
 class InviteSummary:
     """ "Invita a un colega" on one account: who joined, never who they are."""
 
@@ -360,6 +372,19 @@ class Store:
             sa.Column("csrf", sa.String(64), nullable=False),
             sa.Column("created_at", sa.String(40), nullable=False),
             sa.Column("expires_at", sa.String(40), nullable=False),
+        )
+        # "Sesiones abiertas": a short device label (never the raw browser
+        # string), the network (an IPv6 /64) and the last use of a session,
+        # with a random handle to sign it out by. Goes with its session.
+        self.session_info = sa.Table(
+            "session_info",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("handle", sa.String(32), nullable=False, unique=True),
+            sa.Column("device", sa.String(80), nullable=False, default=""),
+            sa.Column("network", sa.String(64), nullable=False, default=""),
+            sa.Column("last_seen", sa.String(40), nullable=False),
         )
         #: One account per audit: the report a customer uploaded or saved.
         self.account_audits = sa.Table(
@@ -1267,6 +1292,7 @@ class Store:
                 self.recovery_keys,
                 self.two_step,
                 self.two_step_challenges,
+                self.session_info,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1479,19 +1505,23 @@ class Store:
                     self.account_sessions.c.token_sha256 == token_sha256
                 )
             )
+            conn.execute(
+                self.session_info.delete().where(self.session_info.c.token_sha256 == token_sha256)
+            )
 
     def delete_sessions(self, account_id: str, *, keep: str = "") -> None:
         """Sign out everywhere, except the session ``keep`` (its hash)."""
-        table = self.account_sessions
         with self.engine.begin() as conn:
-            conn.execute(
-                table.delete()
-                .where(table.c.account_id == account_id)
-                .where(table.c.token_sha256 != keep)
-            )
+            for table in (self.account_sessions, self.session_info):
+                conn.execute(
+                    table.delete()
+                    .where(table.c.account_id == account_id)
+                    .where(table.c.token_sha256 != keep)
+                )
 
     def purge_sessions(self, now: datetime) -> int:
         """Drop expired sessions and reset links; how many rows went."""
+        sa = self._sa
         with self.engine.begin() as conn:
             gone = conn.execute(
                 self.account_sessions.delete().where(
@@ -1501,7 +1531,101 @@ class Store:
             gone += conn.execute(
                 self.account_resets.delete().where(self.account_resets.c.expires_at <= _iso(now))
             ).rowcount
+            # Session details outlive nothing: without a session they go.
+            info = self.session_info
+            conn.execute(
+                info.delete().where(
+                    ~info.c.token_sha256.in_(sa.select(self.account_sessions.c.token_sha256))
+                )
+            )
         return int(gone or 0)
+
+    def touch_session(
+        self,
+        token_sha256: str,
+        account_id: str,
+        *,
+        device: str,
+        network: str,
+        now: datetime,
+        every: timedelta = timedelta(minutes=10),
+    ) -> None:
+        """Note a session's device, network and last use (at most every ``every``)."""
+        sa = self._sa
+        info = self.session_info
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(info.c.last_seen).where(info.c.token_sha256 == token_sha256)
+            ).first()
+        values = {"device": device[:80], "network": network[:64], "last_seen": _iso(now)}
+        if row is not None:
+            if str(row[0]) > _iso(now - every):
+                return
+            with self.engine.begin() as conn:
+                conn.execute(
+                    info.update().where(info.c.token_sha256 == token_sha256).values(**values)
+                )
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    info.insert().values(
+                        token_sha256=token_sha256,
+                        account_id=account_id,
+                        handle=secrets.token_urlsafe(12),
+                        **values,
+                    )
+                )
+        except sa.exc.IntegrityError:
+            pass  # noted by a simultaneous request
+
+    def list_sessions(
+        self, account_id: str, now: datetime, *, current: str = ""
+    ) -> list[SessionView]:
+        """The account's open sessions, newest use first; ``current`` is this browser's hash."""
+        sa = self._sa
+        s_, info = self.account_sessions, self.session_info
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(
+                    s_.c.token_sha256,
+                    s_.c.created_at,
+                    info.c.handle,
+                    info.c.device,
+                    info.c.network,
+                    info.c.last_seen,
+                )
+                .select_from(s_.outerjoin(info, info.c.token_sha256 == s_.c.token_sha256))
+                .where(s_.c.account_id == account_id)
+                .where(s_.c.expires_at > _iso(now))
+            ).all()
+        views = [
+            SessionView(
+                handle=str(row[2] or ""),
+                device=str(row[3] or ""),
+                network=str(row[4] or ""),
+                created_at=str(row[1]),
+                last_seen=str(row[5] or ""),
+                current=bool(current) and str(row[0]) == current,
+            )
+            for row in rows
+        ]
+        return sorted(views, key=lambda v: (v.current, v.last_seen or v.created_at), reverse=True)
+
+    def end_session(self, account_id: str, handle: str) -> str | None:
+        """Sign out the account's session with this handle; its hash, or ``None``."""
+        sa = self._sa
+        info = self.session_info
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(info.c.token_sha256)
+                .where(info.c.handle == handle)
+                .where(info.c.account_id == account_id)
+            ).first()
+        if row is None:
+            return None
+        self.delete_session(str(row[0]))
+        return str(row[0])
 
     # -- password reset links --------------------------------------------
     def create_reset(self, account_id: str, *, token_sha256: str, at: datetime, hours: int) -> None:
@@ -2283,8 +2407,20 @@ class Store:
         if found is None:
             return None
         with self.engine.connect() as conn:
+            info = self.session_info
             sessions = conn.execute(
-                sa.select(self.account_sessions.c.created_at, self.account_sessions.c.expires_at)
+                sa.select(
+                    self.account_sessions.c.created_at,
+                    self.account_sessions.c.expires_at,
+                    info.c.device,
+                    info.c.network,
+                    info.c.last_seen,
+                )
+                .select_from(
+                    self.account_sessions.outerjoin(
+                        info, info.c.token_sha256 == self.account_sessions.c.token_sha256
+                    )
+                )
                 .where(self.account_sessions.c.account_id == account_id)
                 .order_by(self.account_sessions.c.created_at)
             ).all()
@@ -2360,7 +2496,16 @@ class Store:
                 "language": found.locale,
                 "created_at": found.created_at,
             },
-            "sessions": [{"created_at": row[0], "expires_at": row[1]} for row in sessions],
+            "sessions": [
+                {
+                    "created_at": row[0],
+                    "expires_at": row[1],
+                    "device": row[2] or "",
+                    "network": row[3] or "",
+                    "last_used_at": row[4] or None,
+                }
+                for row in sessions
+            ],
             "reports": reports,
             "access_codes": [
                 {

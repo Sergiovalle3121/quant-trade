@@ -1270,7 +1270,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return None
         digest = acct.hash_secret(token)
         found = db.session_account(digest, datetime.now(UTC))
-        return (found[0], found[1], digest) if found else None
+        if not found:
+            return None
+        _note_session(request, digest, found[0].id)
+        return (found[0], found[1], digest)
+
+    def _note_session(request: Request, digest: str, account_id: str) -> None:
+        """Keep "Sesiones abiertas" current; a failure never blocks the page."""
+        try:
+            db.touch_session(
+                digest,
+                account_id,
+                device=acct.device_label(request.headers.get("user-agent", "")),
+                network=acct.network_address(_client_ip(request, cfg.trusted_proxy_hops)),
+                now=datetime.now(UTC),
+            )
+        except Exception:  # pragma: no cover - best effort
+            logger.warning("session note failed", exc_info=True)
 
     def _cookie(response: Any, name: str, value: str, *, max_age: int) -> None:
         response.set_cookie(
@@ -1296,7 +1312,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _anon_ok(request: Request, field: str) -> bool:
         return acct.same_secret(request.cookies.get(acct.CSRF_COOKIE), field)
 
-    def _start_session(response: Any, account: Any) -> None:
+    def _start_session(response: Any, account: Any, request: Request) -> None:
         token = acct.new_secret()
         now = datetime.now(UTC)
         db.create_session(
@@ -1306,6 +1322,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             at=now,
             days=acct.SESSION_DAYS,
         )
+        _note_session(request, acct.hash_secret(token), account.id)
         _cookie(response, acct.SESSION_COOKIE, token, max_age=acct.SESSION_DAYS * 86400)
         response.delete_cookie(acct.CSRF_COOKIE, path="/")
 
@@ -1340,6 +1357,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "two_step_on",
         "two_step_off",
         "two_step_off_by_key",
+        "session_ended",
+        "sessions_ended",
     )
     account_errors = (
         "code_already",
@@ -1473,7 +1492,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 response: Response = RedirectResponse(next_path, status_code=303)
             else:
                 response = _account_redirect(locale, "welcome")
-            _start_session(response, account)
+            _start_session(response, account, request)
             return response
 
         return handler
@@ -1582,7 +1601,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 response = RedirectResponse(next_path, status_code=303)
             else:
                 response = _account_redirect(found[0].locale if lang is None else locale)
-            _start_session(response, found[0])
+            _start_session(response, found[0], request)
             return response
 
         return handler
@@ -1662,7 +1681,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             else:
                 response = _account_redirect(locale, done)
             response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
-            _start_session(response, account)
+            _start_session(response, account, request)
             return response
 
         return handler
@@ -1701,7 +1720,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = _session(request)
             if session is None:
                 return _signin_redirect(locale, next_path=account_pages.path("account", locale))
-            account, csrf, _ = session
+            account, csrf, session_hash = session
             now = datetime.now(UTC)
             return HTMLResponse(
                 account_pages.account_page(
@@ -1735,6 +1754,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     strategies=db.list_strategies(account.id),
                     recovery_created=db.recovery_key_created(account.id) or "",
                     two_step_since=db.two_step_on(account.id),
+                    sessions=db.list_sessions(account.id, now, current=session_hash),
                     invite=(
                         account_pages.InviteView(
                             link=(
@@ -2272,6 +2292,34 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
+    def _session_end(path_locale: str, *, others: bool) -> Callable[..., Response]:
+        """Sign out one session (by its handle) or every session but this one."""
+
+        def handler(
+            request: Request,
+            handle: Annotated[str, Form(max_length=40)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, session_hash, locale, _ = checked
+            base = account_pages.path("account", locale)
+            if others:
+                db.delete_sessions(account.id, keep=session_hash)
+                return RedirectResponse(f"{base}?done=sessions_ended#sesiones", status_code=303)
+            ended = db.end_session(account.id, handle.strip()) if handle.strip() else None
+            if ended is None:
+                return RedirectResponse(f"{base}#sesiones", status_code=303)
+            if ended == session_hash:
+                response = _signin_redirect(locale, done="signed_out")
+                response.delete_cookie(acct.SESSION_COOKIE, path="/")
+                return response
+            return RedirectResponse(f"{base}?done=session_ended#sesiones", status_code=303)
+
+        return handler
+
     def _recovery_post(path_locale: str) -> Callable[..., Response]:
         """Make a new recovery key and show it once; the password confirms it."""
 
@@ -2400,6 +2448,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(
             paths["account"] + "/dos-pasos/desactivar",
             _two_step_stop(path_locale),
+            methods=["POST"],
+        )
+        app.add_api_route(
+            paths["account"] + "/sesiones/cerrar",
+            _session_end(path_locale, others=False),
+            methods=["POST"],
+        )
+        app.add_api_route(
+            paths["account"] + "/sesiones/cerrar-otras",
+            _session_end(path_locale, others=True),
             methods=["POST"],
         )
         two_step = account_pages.two_step_path(path_locale)

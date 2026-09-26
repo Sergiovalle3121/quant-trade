@@ -25,6 +25,7 @@ from quant_trade.audit.store import (
     AccountCode,
     AccountRecord,
     InviteSummary,
+    SessionView,
     StrategyRecord,
 )
 from quant_trade.audit.theme import CLASS_COLOURS, icon
@@ -70,6 +71,7 @@ COPY: dict[str, dict[str, str]] = {
         "have_account": "¿Ya tienes cuenta?",
         "no_account": "¿Aún no tienes cuenta?",
         "signin_link": "Entra",
+        "back_to_signin": "Volver al inicio de sesión",
         "signup_link": "Crea una gratis",
         "forgot_link": "Olvidé mi contraseña",
         "terms_agree": "Al crear la cuenta aceptas los {terms} y la {privacy}.",
@@ -207,6 +209,9 @@ COPY: dict[str, dict[str, str]] = {
             "clave; se borra al usarla o con la cuenta.|"
             "Si activas la verificación en dos pasos, la clave secreta que comparte tu app de "
             "autenticación y el último código usado; se borra al desactivarla o con la cuenta.|"
+            "De cada sesión abierta: una etiqueta corta del dispositivo (como «Chrome · Windows», "
+            "nunca el texto completo del navegador), la red y el último uso, para «Sesiones "
+            "abiertas»; se borra al cerrar la sesión, al caducar o con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -338,6 +343,21 @@ COPY: dict[str, dict[str, str]] = {
             "no la compartas."
         ),
         "recovery_done": "Ya la guardé, volver a Mi cuenta",
+        "sessions_title": "Sesiones abiertas",
+        "sessions_help": (
+            "Dónde está abierta tu cuenta. Si no reconoces una, ciérrala y cambia tu contraseña."
+        ),
+        "col_device": "Dispositivo",
+        "col_network": "Red",
+        "col_last_use": "Último uso",
+        "col_started": "Desde",
+        "col_action": "Acción",
+        "session_this": "este navegador",
+        "session_unknown": "Sin datos todavía",
+        "session_end": "Cerrar",
+        "sessions_end_others": "Cerrar todas las demás",
+        "session_ended": "Sesión cerrada.",
+        "sessions_ended": "Cerramos todas las demás sesiones.",
         "two_step_card": "Verificación en dos pasos",
         "two_of_three": (
             "Con los dos pasos activos, para entrar o recuperar la cuenta necesitas dos de "
@@ -469,6 +489,7 @@ COPY: dict[str, dict[str, str]] = {
         "have_account": "Already have an account?",
         "no_account": "No account yet?",
         "signin_link": "Sign in",
+        "back_to_signin": "Back to sign-in",
         "signup_link": "Create one for free",
         "forgot_link": "I forgot my password",
         "terms_agree": "By creating the account you accept the {terms} and {privacy}.",
@@ -607,6 +628,9 @@ COPY: dict[str, dict[str, str]] = {
             "key; it goes when used or with the account.|"
             "If you turn on two-step sign-in, the secret your authenticator app shares and the "
             "last code used; it goes when you turn it off or with the account.|"
+            "For each open session: a short device label (such as 'Chrome · Windows', never the "
+            "browser's full string), the network and the last use, for 'Open sessions'; it goes "
+            "when the session is signed out, expires or with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -735,6 +759,22 @@ COPY: dict[str, dict[str, str]] = {
             "do not share it."
         ),
         "recovery_done": "I saved it, back to My account",
+        "sessions_title": "Open sessions",
+        "sessions_help": (
+            "Where your account is signed in. If you do not recognise one, sign it out and change "
+            "your password."
+        ),
+        "col_device": "Device",
+        "col_network": "Network",
+        "col_last_use": "Last use",
+        "col_started": "Since",
+        "col_action": "Action",
+        "session_this": "this browser",
+        "session_unknown": "No details yet",
+        "session_end": "Sign out",
+        "sessions_end_others": "Sign out all the others",
+        "session_ended": "Session signed out.",
+        "sessions_ended": "All your other sessions were signed out.",
         "two_step_card": "Two-step sign-in",
         "two_of_three": (
             "With two-step on, signing in or recovering the account takes two of these three: "
@@ -1382,6 +1422,56 @@ def _reports_table(
     )
 
 
+def _stamp(stamp: str) -> str:
+    """``2026-09-26 07:59 UTC`` from a stored ISO time."""
+    return f"{stamp[:10]} {stamp[11:16]} UTC" if len(stamp) >= 16 else _date(stamp)
+
+
+def _sessions_card(
+    copy: dict[str, str], locale: str, csrf: str, sessions: Sequence[SessionView]
+) -> str:
+    """ "Sesiones abiertas": where the account is signed in, to sign any out."""
+    base = path("account", locale)
+    head = "".join(
+        f"<th>{_e(copy[k])}</th>"
+        for k in ("col_device", "col_network", "col_last_use", "col_started", "col_action")
+    )
+    rows = []
+    for item in sessions:
+        device = _e(item.device or copy["session_unknown"])
+        if item.current:
+            device += f" <span class='acct-tag'>{_e(copy['session_this'])}</span>"
+        action = ""
+        if item.handle:
+            action = (
+                f"<form method='post' action='{base}/sesiones/cerrar'>"
+                + _hidden("csrf", csrf)
+                + _hidden("handle", item.handle)
+                + f"<button class='btn btn-ghost btn-sm' type='submit'>"
+                f"{_e(copy['session_end'])}</button></form>"
+            )
+        rows.append(
+            f"<tr><td>{device}</td><td>{_e(item.network or '-')}</td>"
+            f"<td>{_e(_stamp(item.last_seen) or '-')}</td>"
+            f"<td>{_e(_stamp(item.created_at))}</td><td>{action}</td></tr>"
+        )
+    others = sum(1 for item in sessions if not item.current)
+    end_others = (
+        f"<form method='post' action='{base}/sesiones/cerrar-otras'>"
+        + _hidden("csrf", csrf)
+        + f"<button class='btn btn-dark' type='submit'>{_e(copy['sessions_end_others'])}"
+        "</button></form>"
+        if others
+        else ""
+    )
+    return (
+        f"<div class='acct-card acct-sessions' id='sesiones'><h3>{_e(copy['sessions_title'])}</h3>"
+        f"<p class='muted'>{_e(copy['sessions_help'])}</p>"
+        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>{end_others}</div>"
+    )
+
+
 def _codes_table(copy: dict[str, str], codes: Sequence[AccountCode], now: str) -> str:
     if not codes:
         return f"<p class='muted'>{_e(copy['codes_none'])}</p>"
@@ -1508,6 +1598,7 @@ def account_page(
     invite: InviteView | None = None,
     recovery_created: str = "",
     two_step_since: str = "",
+    sessions: Sequence[SessionView] = (),
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
@@ -1691,6 +1782,7 @@ def account_page(
         f"{_e(copy['recovery_new' if recovery_created else 'recovery_make'])}</button></form>"
         + two_step_card
         + "</div>"
+        + (_sessions_card(copy, locale, csrf, sessions) if sessions else "")
         + _stores(copy, retention_days)
         + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
@@ -1842,7 +1934,7 @@ def two_step_page(*, locale: str, csrf: str, next_path: str = "", error: str = "
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(copy['two_step_lost_button'])}"
         "</button></form></details>"
-        + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
+        + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['back_to_signin'])}</a>"
         "</p></div>"
     )
     query = f"?next={_e(_q(next_path))}" if next_path else ""

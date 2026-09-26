@@ -585,6 +585,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "(needed to check its codes) and the last code step used, so a code works "
                     "once. It is deleted when you turn it off, when you use your recovery key "
                     "or with your account.",
+                    "For 'Open sessions' in your account: for each session, a short device "
+                    "label (such as 'Chrome · Windows', never the browser's full string), the "
+                    "network address (an IPv6 address counts as its /64) and when it was last "
+                    "used. It is deleted when the session is signed out or expires, or with your "
+                    "account.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
@@ -726,6 +731,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "de autenticación (necesaria para comprobar sus códigos) y el último paso de "
                 "código usado, para que cada código sirva una vez. Se borra al desactivarla, al "
                 "usar tu clave de recuperación o con tu cuenta.",
+                "Para «Sesiones abiertas» en tu cuenta: de cada sesión, una etiqueta corta del "
+                "dispositivo (como «Chrome · Windows», nunca el texto completo del navegador), la "
+                "dirección de red (una IPv6 cuenta como su /64) y cuándo se usó por última vez. "
+                "Se borra al cerrar la sesión o al caducar, o con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
