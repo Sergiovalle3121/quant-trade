@@ -394,9 +394,17 @@ def test_removing_a_passkey_stops_it(tmp_path: Path) -> None:
     account = store.find_account("ana@example.com")
     [item] = store.list_passkeys(account.id)
     csrf = _csrf(client.get("/cuenta").text)
-    done = client.post(
+    # The session alone is not enough: the password is asked, as when adding.
+    no_password = client.post(
         "/cuenta/llaves/quitar",
         data={"credential": item.credential_id, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "error=wrong" in no_password.headers["location"]
+    assert len(store.list_passkeys(account.id)) == 1
+    done = client.post(
+        "/cuenta/llaves/quitar",
+        data={"credential": item.credential_id, "current": PASSWORD, "csrf": csrf},
         follow_redirects=False,
     )
     assert "done=passkey_removed" in done.headers["location"]
@@ -414,7 +422,7 @@ def test_removing_a_passkey_stops_it(tmp_path: Path) -> None:
     csrf = _csrf(other.get("/cuenta").text)
     other.post(
         "/cuenta/llaves/quitar",
-        data={"credential": item.credential_id, "csrf": csrf},
+        data={"credential": item.credential_id, "current": PASSWORD, "csrf": csrf},
         follow_redirects=False,
     )
     assert len(store.list_passkeys(account.id)) == 1

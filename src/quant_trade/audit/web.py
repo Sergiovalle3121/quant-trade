@@ -1934,6 +1934,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         def handler(
             request: Request,
             credential: Annotated[str, Form(max_length=2000)] = "",
+            current: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
             lang: str | None = None,
         ) -> Response:
@@ -1942,6 +1943,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return checked
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
+            # Like adding one: a borrowed session alone cannot strip them.
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return RedirectResponse(f"{base}?error=wrong#llaves", status_code=303)
             if not db.remove_passkey(account.id, credential):
                 return RedirectResponse(f"{base}#llaves", status_code=303)
             _note_event(request, account.id, "passkey_removed")

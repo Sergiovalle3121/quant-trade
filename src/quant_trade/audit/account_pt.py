@@ -382,6 +382,8 @@ COPY_PT: dict[str, str] = {
     "passkey_name": "Nome da chave (opcional)",
     "passkey_add": "Adicionar uma chave de acesso",
     "passkey_remove": "Remover",
+    "passkey_remove_title": "Remover uma chave de acesso",
+    "passkey_which": "Chave",
     "passkey_added_on": "Adicionada em {date}",
     "passkey_used_on": "último uso em {date}",
     "passkey_never_used": "ainda não usada",

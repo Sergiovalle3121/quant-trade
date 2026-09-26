@@ -421,6 +421,8 @@ COPY: dict[str, dict[str, str]] = {
         "passkey_name": "Nombre de la llave (opcional)",
         "passkey_add": "Añadir una llave de acceso",
         "passkey_remove": "Quitar",
+        "passkey_remove_title": "Quitar una llave de acceso",
+        "passkey_which": "Llave",
         "passkey_added_on": "Añadida el {date}",
         "passkey_used_on": "último uso el {date}",
         "passkey_never_used": "sin usar aún",
@@ -928,6 +930,8 @@ COPY: dict[str, dict[str, str]] = {
         "passkey_name": "Passkey name (optional)",
         "passkey_add": "Add a passkey",
         "passkey_remove": "Remove",
+        "passkey_remove_title": "Remove a passkey",
+        "passkey_which": "Passkey",
         "passkey_added_on": "Added on {date}",
         "passkey_used_on": "last used on {date}",
         "passkey_never_used": "not used yet",
@@ -1211,7 +1215,6 @@ line-height:1.25;white-space:normal;text-align:center}
 padding:10px 0;border-top:1px solid var(--border)}
 .pk-list li:first-child{border-top:0}
 .pk-list strong{display:block;overflow-wrap:anywhere}
-.pk-list form{flex:none}
 .acct-passkey-alt{margin-top:18px}
 @media (max-width:760px){.act-table thead{display:none}
 .paper table.act-table,.act-table{border:0;background:none;box-shadow:none;overflow:visible}
@@ -2283,12 +2286,28 @@ def _passkey_card(
         )
         rows += (
             f"<li><span><strong>{_e(_safe_text(item.label) or copy['passkey_default_name'])}"
-            f"</strong><span class='muted'>{_e(when)} · {_e(used)}</span>{other}</span>"
+            f"</strong><span class='muted'>{_e(when)} · {_e(used)}</span>{other}</span></li>"
+        )
+    remove = ""
+    if passkeys:
+        choices = "".join(
+            f"<option value='{_e(item.credential_id)}'>"
+            f"{_e(_safe_text(item.label) or copy['passkey_default_name'])} · "
+            f"{_e(_date(item.created_at))}</option>"
+            for item in passkeys
+        )
+        remove = (
+            f"<details class='acct-lost'><summary>{_e(copy['passkey_remove_title'])}</summary>"
             f"<form method='post' action='{base}/quitar'>"
             + _hidden("csrf", csrf)
-            + _hidden("credential", item.credential_id)
-            + f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['passkey_remove'])}"
-            "</button></form></li>"
+            + _field(copy["passkey_which"], f"<select name='credential'>{choices}</select>")
+            + _field(
+                copy["password_current"],
+                "<input type='password' name='current' required maxlength='256' "
+                "autocomplete='current-password'>",
+            )
+            + f"<button class='btn btn-ghost' type='submit'>{_e(copy['passkey_remove'])}"
+            "</button></form></details>"
         )
     listing = (
         f"<ul class='pk-list'>{rows}</ul>"
@@ -2318,6 +2337,7 @@ def _passkey_card(
         f"<p class='muted'>{_e(copy['passkey_help'])}</p>"
         + listing
         + add
+        + remove
         + f"<p class='muted'>{_e(copy['passkey_fallback'])}</p></div>"
     )
 

@@ -2283,7 +2283,8 @@ changes what a report says.
 - **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
   `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
   acceso" adds one after the current password (`POST /cuenta/llaves`, then
-  `/cuenta/llaves/guardar`) and removes one (`/cuenta/llaves/quitar`); at
+  `/cuenta/llaves/guardar`) and removes one, also after the password
+  (`/cuenta/llaves/quitar`); at
   most `passkeys.MAX_PER_ACCOUNT` (10). The sign-in page offers "Entrar con
   una llave de acceso" (`/entrar/llave`, EN `/login/passkey`, PT
   `/pt/entrar/chave`): a discoverable credential, so no e-mail is typed, and
