@@ -105,6 +105,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "stress": "Qué queda sin sus mejores operaciones y meses",
         "timing": "En qué horas y días se concentra el resultado",
         "recent": "Si sigue funcionando en el periodo más reciente",
+        "shift": "Si su rentabilidad media cambió en algún momento, y cuándo",
         "crises": "Cómo le fue en 2008, el covid, 2022 y otras caídas conocidas",
         "holding": "Si le gana a simplemente comprar y mantener el mercado que opera",
         "regime": "Cómo le fue con el mercado tranquilo y con el mercado agitado (VIX)",
@@ -147,6 +148,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "stress": "What is left without its best trades and months",
         "timing": "Which hours and days the result comes from",
         "recent": "Whether it still works in the most recent period",
+        "shift": "Whether its average return changed at some point, and when",
         "crises": "How it did in 2008, covid, 2022 and other known falls",
         "holding": "Whether it beats simply buying and holding the market it trades",
         "regime": "How it did in calm and in turbulent markets (VIX)",
@@ -578,6 +580,31 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "recent_badge_faded": "Se apaga",
         "recent_year": "Año de cierre",
+        "shift": "¿Cambió su rentabilidad media en algún momento?",
+        "shift_intro": (
+            "Buscamos el momento en que la rentabilidad media de la curva más cambió y medimos "
+            "si ese cambio es mayor que el vaivén normal de sus retornos (prueba CUSUM, con un "
+            "error que admite retornos encadenados). No cambia la clase."
+        ),
+        "shift_badge_changed": "Cambió",
+        "shift_badge_steady": "Sin cambio claro",
+        "shift_changed": (
+            "La rentabilidad media cambió alrededor del {date} (probablemente entre el {low} y "
+            "el {high}): {before} al año antes y {after} al año después. Con p = {p}, el azar "
+            "difícilmente explica una diferencia así."
+        ),
+        "shift_steady": (
+            "No hay un cambio claro en la rentabilidad media a lo largo del historial "
+            "(p = {p}): las diferencias entre tramos caben en el vaivén normal de sus retornos. "
+            "No prueba que no haya cambiado: un cambio pequeño puede pasar sin verse."
+        ),
+        "shift_edge": (
+            "La mayor desviación está en los primeros o los últimos retornos del historial "
+            "(p = {p}), demasiado cerca del borde para comparar un antes y un después."
+        ),
+        "shift_before": "Rentabilidad media al año antes del {date}",
+        "shift_after": "Rentabilidad media al año desde el {date}",
+        "shift_band": "banda del 90 %: {low} a {high}",
         "fund": "Lo que revisaría quien invierte en un fondo",
         "fund_intro": (
             "Las cifras de una ficha de fondo y dos pruebas que usan los analistas de fondos: "
@@ -1824,6 +1851,32 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "recent_badge_faded": "Fades",
         "recent_year": "Exit year",
+        "shift": "Did its average return change at some point?",
+        "shift_intro": (
+            "We look for the moment the curve's average return changed most and measure "
+            "whether that change is larger than the normal swing of its returns (a CUSUM test, "
+            "with an error that allows for returns that follow on from each other). It does "
+            "not change the class."
+        ),
+        "shift_badge_changed": "Changed",
+        "shift_badge_steady": "No clear change",
+        "shift_changed": (
+            "The average return changed around {date} (probably between {low} and {high}): "
+            "{before} a year before and {after} a year after. With p = {p}, chance alone is "
+            "unlikely to explain a difference like this."
+        ),
+        "shift_steady": (
+            "There is no clear change in the average return across the history (p = {p}): the "
+            "differences between stretches fit the normal swing of its returns. It does not "
+            "prove there was none: a small change can go unseen."
+        ),
+        "shift_edge": (
+            "The largest deviation sits in the first or last returns of the history "
+            "(p = {p}), too close to the edge to compare a before and an after."
+        ),
+        "shift_before": "Average return a year before {date}",
+        "shift_after": "Average return a year since {date}",
+        "shift_band": "90 % band: {low} to {high}",
         "fund": "What a fund investor would check",
         "fund_intro": (
             "A fund factsheet's figures and two tests fund analysts use: whether the monthly "
@@ -5151,6 +5204,65 @@ def _date_text(iso: str, locale: str) -> str:
     return f"{day} {months[month - 1]} {year}"
 
 
+def _p_text(value: float) -> str:
+    return "< 0.001" if value < 0.001 else f"{value:.3f}"
+
+
+def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+    """Whether the average return shifted at some point, with the date's range
+    and the two averages when it did."""
+    p_value = _ev_value(shift.get("p_value"))
+    if p_value is None:
+        return ""
+    out = f"<p class='muted'>{_e(labels['shift_intro'])}</p>"
+    p = _p_text(p_value)
+    before = shift.get("before") or {}
+    after = shift.get("after") or {}
+    before_mean = _ev_value(before.get("mean"))
+    after_mean = _ev_value(after.get("mean"))
+    changed = shift.get("clear") and shift.get("date")
+    if changed and before_mean is not None and after_mean is not None:
+        date = _date_text(str(shift["date"]), locale)
+        text = labels["shift_changed"].format(
+            date=date,
+            low=_date_text(str(shift["date_low"]), locale),
+            high=_date_text(str(shift["date_high"]), locale),
+            before=_pct(before_mean, signed=True),
+            after=_pct(after_mean, signed=True),
+            p=p,
+        )
+        out += (
+            f"<p class='live-verdict lv-WEAK'><span class='badge WEAK'>"
+            f"{_e(labels['shift_badge_changed'])}</span> {_e(text)}</p>"
+        )
+        facts = ""
+        for side, key in ((before, "shift_before"), (after, "shift_after")):
+            mean = _ev_value(side.get("mean"))
+            low = _ev_value(side.get("low"))
+            high = _ev_value(side.get("high"))
+            if mean is None or low is None or high is None:
+                continue
+            band = labels["shift_band"].format(
+                low=_pct(low, signed=True), high=_pct(high, signed=True)
+            )
+            facts += (
+                f"<div class='fact'><b>{_e(_pct(mean, signed=True))}</b>"
+                f"<p>{_e(labels[key].format(date=date))} ({_e(band)}) "
+                f"{_badge('MEASURED')}</p></div>"
+            )
+        out += f"<div class='facts pairs'>{facts}</div>" if facts else ""
+    else:
+        key = "shift_edge" if shift.get("edge") else "shift_steady"
+        out += (
+            f"<p class='live-verdict lv-PASS'><span class='badge PASS'>"
+            f"{_e(labels['shift_badge_steady'])}</span> {_e(labels[key].format(p=p))} "
+            f"{_badge('MEASURED')}</p>"
+        )
+    note = (shift.get("statistic") or {}).get("note", "")
+    out += f"<p class='muted'>{_e(_sentence(localize(note, locale)))}</p>"
+    return out
+
+
 def _signed_z(value: float) -> str:
     text = f"{value:+.1f}"
     return "0.0" if text in ("+0.0", "-0.0") else text
@@ -6832,6 +6944,11 @@ def render_html(
         *(
             [(labels["recent"], _recent_html(data.get("recent"), locale, labels))]
             if (data.get("recent") or {}).get("status") == "MEASURED"
+            else []
+        ),
+        *(
+            [(labels["shift"], _shift_html(data["mean_shift"], locale, labels))]
+            if (data.get("mean_shift") or {}).get("status") == "MEASURED"
             else []
         ),
         *(

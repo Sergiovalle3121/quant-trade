@@ -1033,6 +1033,38 @@ has periods of different sizes; trades are treated as independent, which
 understates the noise of a strategy whose trades cluster; it describes the
 history and says nothing about later periods.
 
+### Did the average return change at some point (`audit/breaks.py`)
+
+`decay.py` compares fixed thirds of closed trades; the rolling and sub-period
+views describe the curve without a test. This section asks one question of
+every curve with 250 or more returns (`breaks.MIN_RETURNS`), trades or not:
+is there a point where the average return shifted by more than the returns'
+noise explains?
+
+- Test: the CUSUM of the returns' deviations from their mean (Ploberger and
+  Krämer, 1992), `max_k |S_k| / (sigma sqrt(n))`, with the Brownian bridge's
+  (Kolmogorov) tail as the p-value. `sigma^2` is the cautious long-run
+  variance: the largest of the plain one, Newey-West (Bartlett, the lag of
+  `alpha.newey_west_lags`) and the plain one widened by `(1 + rho) / (1 - rho)`
+  (Kendall-corrected, clipped to `[0, 0.9]`). On simulated AR(1) returns with
+  t(5) shocks and no shift it passed 5 % in at most about 4.5 % of histories
+  for autocorrelation 0, 0.3 and 0.6 (`tests/test_audit_breaks.py`).
+- `clear` when `p <= 0.05` (`ALPHA_LEVEL`) and at least 30 returns
+  (`MIN_SIDE`) lie on each side of the date; otherwise `edge` says the largest
+  deviation sits too close to either end for a before and an after.
+- The date is where the running sum strays furthest from its line; its
+  range is Bai's (1997) 95 % interval, `11.03 sigma^2 / delta^2` returns on
+  each side (`delta` the shift). On simulated shifts it covered the true date
+  in about 95 % of detected cases.
+- Before and after: each side's average return, annualised, with a 90 %
+  band from its own cautious standard error. All MEASURED.
+
+Informational: no flag, no class change. Limitations: a single shift is
+assumed (several smaller ones read as one, a gradual drift as a date in its
+middle); a small shift in a short history is often missed, which the "Sin
+cambio claro" line says ("no prueba que no haya cambiado"); the date is where
+the change shows most, not its cause; it describes the history only.
+
 ### What is left once luck is discounted (`audit/luck.py`)
 
 The deflated Sharpe gives a probability; this section restates the same

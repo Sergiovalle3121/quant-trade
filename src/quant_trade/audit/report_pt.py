@@ -428,6 +428,31 @@ REPORT: dict[str, Any] = {
             "acompanhá-la."
         ),
         "recent_badge_faded": "Se apaga",
+        "shift": "O retorno médio mudou em algum momento?",
+        "shift_intro": (
+            "Procuramos o momento em que o retorno médio da curva mais mudou e medimos se essa "
+            "mudança é maior que a oscilação normal dos seus retornos (teste CUSUM, com um erro "
+            "que admite retornos encadeados). Não muda a classe."
+        ),
+        "shift_badge_changed": "Mudou",
+        "shift_badge_steady": "Sem mudança clara",
+        "shift_changed": (
+            "O retorno médio mudou por volta de {date} (provavelmente entre {low} e {high}): "
+            "{before} ao ano antes e {after} ao ano depois. Com p = {p}, o acaso dificilmente "
+            "explica uma diferença assim."
+        ),
+        "shift_steady": (
+            "Não há uma mudança clara no retorno médio ao longo do histórico (p = {p}): as "
+            "diferenças entre trechos cabem na oscilação normal dos seus retornos. Não prova "
+            "que não tenha mudado: uma mudança pequena pode passar despercebida."
+        ),
+        "shift_edge": (
+            "O maior desvio está nos primeiros ou nos últimos retornos do histórico (p = {p}), "
+            "perto demais da borda para comparar um antes e um depois."
+        ),
+        "shift_before": "Retorno médio ao ano antes de {date}",
+        "shift_after": "Retorno médio ao ano desde {date}",
+        "shift_band": "banda de 90 %: {low} a {high}",
         "recent_year": "Ano de fechamento",
         "fund": "O que quem investe em um fundo revisaria",
         "fund_intro": (
@@ -1376,6 +1401,7 @@ REPORT: dict[str, Any] = {
         "stress": "O que sobra sem as suas melhores operações e meses",
         "timing": "Em quais horas e dias o resultado se concentra",
         "recent": "Se continua funcionando no período mais recente",
+        "shift": "Se o retorno médio mudou em algum momento, e quando",
         "crises": "Como se saiu em 2008, na covid, em 2022 e em outras quedas conhecidas",
         "luck": (
             "Quanto Sharpe sobra ao descontar a sorte e quantos anos de histórico seriam "
@@ -2428,6 +2454,21 @@ SINGULAR: dict[str, tuple[str, str]] = {
 
 #: (English note template, its Portuguese), the placeholders unchanged.
 RULES: tuple[tuple[str, str], ...] = (
+    (
+        "CUSUM of the returns in time order (Ploberger and Kramer); cautious long-run "
+        "variance; p-value from the Brownian bridge",
+        "CUSUM dos retornos em ordem de tempo (Ploberger e Krämer); variância de longo prazo "
+        "prudente; valor p da ponte browniana",
+    ),
+    (
+        "where the running sum strays furthest from its straight line; 95 % range (Bai)",
+        "onde a soma acumulada mais se afasta da sua linha reta; intervalo de 95 % (Bai)",
+    ),
+    (
+        "average return per period, annualised; 90 % band from its cautious standard error",
+        "retorno médio por período, anualizado; banda de 90 % pelo seu erro-padrão prudente",
+    ),
+    ("fewer than 250 returns", "menos de 250 retornos"),
     (
         "both {a} and {b} present; using {c}",
         "há colunas {a} e {b}; usa-se {c}",
