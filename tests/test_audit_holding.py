@@ -264,7 +264,12 @@ def test_the_report_shows_the_market_beside_the_strategy(locale: str) -> None:
     labels = LABELS[locale]
     assert labels["holding"] in html and "Nasdaq 100" in html
     assert "href='https://fred.stlouisfed.org/series/NASDAQ100'" in html
-    assert labels["holding_rides"].split("({gap}")[0].format(label="Nasdaq 100") in html
+    assert (
+        labels["holding_rides"].format(
+            label="Nasdaq 100", weeks=int(result.holding["weeks"]["value"])
+        )
+        in html
+    )
     assert labels["holding_sharpe"].format(days=int(result.holding["days"]["value"])) in html
     assert untranslated(result.model_dump(mode="json")) == []
     for key, text in labels.items():

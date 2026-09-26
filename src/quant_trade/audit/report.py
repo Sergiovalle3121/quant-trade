@@ -685,8 +685,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "holding_rides": (
             "Se mueve casi al mismo paso que el {label} y no muestra una ventaja clara sobre "
-            "mantenerlo: la diferencia de Sharpe ({gap}) queda dentro del ruido de {weeks} "
-            "semanas (error típico {se}). ¿Qué agrega frente a comprar el mercado y esperar?"
+            "mantenerlo: la diferencia de Sharpe queda dentro del ruido de {weeks} semanas. "
+            "¿Qué agrega frente a comprar el mercado y esperar?"
         ),
         "holding_closed_only": (
             "El archivo solo trae el balance al cerrar operaciones: los días con posiciones "
@@ -1617,8 +1617,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "holding_rides": (
             "It moves almost in step with the {label} and shows no clear edge over holding "
-            "it: the Sharpe gap ({gap}) is within the noise of {weeks} weeks (standard error "
-            "{se}). What does it add over buying the market and waiting?"
+            "it: the Sharpe gap is within the noise of {weeks} weeks. What does it add over "
+            "buying the market and waiting?"
         ),
         "holding_closed_only": (
             "The file only has the balance at each close: days with open positions are not "
@@ -4844,14 +4844,8 @@ def _holding_html(
     out = ""
     days = int(holding["days"]["value"])
     if "rides_the_market" in (holding.get("findings") or []):
-        gap = float(holding["strategy_sharpe_shared_days"]["value"]) - float(
-            holding["market_sharpe"]["value"]
-        )
         rides = labels["holding_rides"].format(
-            label=label,
-            gap=f"{gap:+.2f}",
-            weeks=int(holding["weeks"]["value"]),
-            se=f"{float(holding['sharpe_gap_se']['value']):.2f}",
+            label=label, weeks=int(holding["weeks"]["value"])
         )
         out += (
             f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
