@@ -928,8 +928,8 @@ REPORT: dict[str, Any] = {
         "fund_fees_growth": "Crescimento total",
         "fund_fees_none": "Sem taxa",
         "fund_fees_management": (
-            "Só a taxa de administração. Muitos fundos cobram também uma taxa de performance, "
-            "muitas vezes 20 % dos ganhos, então a linha de 2.5 % não é o pior caso."
+            "As linhas de uma só porcentagem são apenas a taxa de administração. A última soma a "
+            "taxa de performance clássica: 20 % do ganho de cada ano acima do máximo anterior."
         ),
         "fund_fees_break_even": (
             "Com uma taxa de {rate} ao ano ou mais, o fundo teria ficado igual ou abaixo do seu "
@@ -942,6 +942,86 @@ REPORT: dict[str, Any] = {
             "dados públicos do FRED consultados em {as_of} ({sources}). São ações dos EUA e "
             "bitcoin: se a estratégia opera outro mercado (moedas, commodities, outro país), "
             "considere-os só como contexto do que o mercado vivia, não como ponto de comparação."
+        ),
+        "fund_fees_two_twenty": "2 % + 20 % dos ganhos",
+        "ranges_title": "Quanto disso pode ser acaso?",
+        "ranges_intro": (
+            "Com {n} operações, cada número tem uma margem. Com 95 % de confiança, o valor de "
+            "fundo do sistema está entre estes limites, se cada operação for independente das "
+            "demais."
+        ),
+        "ranges_zero": (
+            "A margem da média por operação inclui o zero: com estas operações não é possível "
+            "distinguir o sistema de um que nem ganha nem perde por operação."
+        ),
+        "ranges_open": "sem limite",
+        "lo_line": (
+            "Sharpe corrigido pela autocorrelação (Lo, 2002): {lo}, frente a {plain} do cálculo "
+            "simples."
+        ),
+        "lo_lower": (
+            "Cada retorno tende a se parecer com o anterior (autocorrelação {rho}), algo típico "
+            "de curvas suavizadas ou de preços que se atualizam pouco: o Sharpe simples sai "
+            "inflado."
+        ),
+        "alpha_line": (
+            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica (beta {beta}, t = "
+            "{t}, {n} períodos)."
+        ),
+        "alpha_clear_up": (
+            "Com t acima de 2, é pouco provável que essa diferença seja só acaso. Não diz que vá "
+            "se repetir."
+        ),
+        "alpha_clear_down": (
+            "Com t abaixo de -2, é pouco provável que o atraso frente ao benchmark seja só acaso."
+        ),
+        "alpha_unclear": "Com t entre -2 e 2, a diferença não se distingue do acaso.",
+        "lo_lower_plain": (
+            "Os retornos de períodos próximos tendem a se mover juntos: o Sharpe simples sai "
+            "inflado."
+        ),
+        "lo_not_lower": (
+            "Sharpe corrigido pela autocorrelação (Lo, 2002): não fica abaixo de {plain}, então "
+            "a ordem dos retornos não infla o Sharpe simples. Se a correção o eleva, o relatório "
+            "não o usa: com poucos dados essa alta costuma ser ruído."
+        ),
+        "compare_help": "Cole o link de outro relatório seu para vê-los lado a lado.",
+        "holding": "Ganha de comprar e manter o mercado?",
+        "holding_intro": (
+            "A estratégia opera sobretudo o {label}. Estes são os seus fechamentos diários ao "
+            "lado de simplesmente comprar e manter o {label} nos mesmos dias, de {first} a "
+            "{last} ({days} dias). O Sharpe mede o que cada unidade de risco paga: não muda com "
+            "o tamanho da posição, então compara bem uma estratégia alavancada com o mercado sem "
+            "alavancagem."
+        ),
+        "holding_not_measured": "Sem comparação com o {label}: {reason}.",
+        "holding_strategy": "Estratégia",
+        "holding_market": "Manter o {label}",
+        "holding_return": "Rentabilidade no período",
+        "holding_drawdown": "Pior queda",
+        "holding_sharpe": "Sharpe nos mesmos {days} dias (rentabilidade por unidade de risco)",
+        "holding_together": (
+            "Correlação semanal (de sexta a sexta) com o {label}: {corr}. Para cada 1 % que o "
+            "mercado se moveu em uma semana, a estratégia se moveu em média {beta} %. Usam-se "
+            "semanas porque o horário de fechamento do arquivo e o do mercado podem não "
+            "coincidir."
+        ),
+        "holding_no_clear_edge": (
+            "A diferença de Sharpe ({z} erros padrão, medida com rentabilidades semanais) não "
+            "basta para dizer que ganha do mercado."
+        ),
+        "holding_rides": (
+            "Move-se quase no mesmo passo que o {label} e não mostra vantagem clara sobre "
+            "mantê-lo: a diferença de Sharpe fica dentro do ruído de {weeks} semanas. O que ela "
+            "acrescenta frente a comprar o mercado e esperar?"
+        ),
+        "holding_closed_only": (
+            "O arquivo só traz o saldo ao fechar operações: os dias com posições abertas não "
+            "aparecem, então a correlação e a pior queda da estratégia ficam curtas."
+        ),
+        "holding_source": (
+            "Fechamentos do {label}: dados públicos de {source} lidos ao gerar o relatório. "
+            "Nenhum dos dois Sharpe subtrai a taxa do caixa. Não muda a classe."
         ),
     },
     "LINK_TEXT": {
@@ -1056,6 +1136,7 @@ REPORT: dict[str, Any] = {
         "costs": "O que acontece com custos mais altos",
         "holdout": "O trecho fora da amostra que você declarou, medido à parte",
         "benchmark": "A comparação com o benchmark que você enviou",
+        "holding": "Se ganha de simplesmente comprar e manter o mercado que opera",
     },
     "DIMENSION_TITLES": {
         "statistical_significance": "Significância estatística",
@@ -4263,6 +4344,44 @@ RULES: tuple[tuple[str, str], ...] = (
             "taxa de acerto, t de Student para a média por operação e operações reamostradas "
             "para o fator de lucro"
         ),
+    ),
+    (
+        (
+            "the strategy's closes against the market's public closes (FRED) on the days both "
+            "are seen (the sparser of the two calendars); Sharpe ratios on those days without "
+            "subtracting a cash rate, annualised by the days observed; correlation and beta on "
+            "Friday-to-Friday weekly returns"
+        ),
+        (
+            "os fechamentos da estratégia frente aos fechamentos públicos do mercado (FRED) nos "
+            "dias em que ambos aparecem (o mais escasso dos dois calendários); Sharpe nesses "
+            "dias sem subtrair a taxa do caixa, anualizado pelos dias observados; correlação e "
+            "beta com rentabilidades semanais de sexta a sexta"
+        ),
+    ),
+    (
+        "fewer than 12 weeks shared with the market's public closes",
+        "menos de 12 semanas em comum com os fechamentos públicos do mercado",
+    ),
+    (
+        "no overlapping days",
+        "nenhum dia em comum",
+    ),
+    (
+        "the market's public closes could not be read when the report was made",
+        "os fechamentos públicos do mercado não puderam ser lidos ao gerar o relatório",
+    ),
+    (
+        "fewer than 60 days shared with the market's public closes",
+        "menos de 60 dias em comum com os fechamentos públicos do mercado",
+    ),
+    (
+        "the shared days span less than 90 calendar days",
+        "os dias em comum cobrem menos de 90 dias corridos",
+    ),
+    (
+        "one of the two series never moves",
+        "uma das duas séries nunca se move",
     ),
     (
         "Resampled estimate from the supplied history: it is not a prediction.",
