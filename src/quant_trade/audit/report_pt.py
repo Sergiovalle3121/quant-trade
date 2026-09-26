@@ -476,6 +476,58 @@ REPORT: dict[str, Any] = {
         "fund_bench_beat": "Meses em que superou o índice",
         "fund_bench_te": "Erro de rastreamento anual (índice de informação {ir})",
         "fund_bench_beta": "Beta frente ao índice (correlação {corr})",
+        "skill_title": "Quanto é caixa, quanto é mercado e quanto sobra?",
+        "skill_intro": (
+            "Com {n} meses em comum com o índice, a rentabilidade média anual do fundo se divide "
+            "em três partes que somam o total: o que as letras do Tesouro dos EUA de 3 meses "
+            "pagavam, a exposição ao índice e o que sobra."
+        ),
+        "skill_intro_no_cash": (
+            "Com {n} meses em comum com o índice, a rentabilidade média anual do fundo se divide "
+            "em três partes que somam o total. Não havia taxa do caixa para essas datas: ela é "
+            "tomada como zero, então o alfa inclui também o que o caixa teria pagado."
+        ),
+        "skill_part": "Parte",
+        "skill_year": "Ao ano",
+        "skill_cash": "Caixa (letras do Tesouro)",
+        "skill_exposure": (
+            "Exposição ao índice (beta {beta} vezes o que o índice rendeu acima do caixa)"
+        ),
+        "skill_alpha": "O que sobra (alfa)",
+        "skill_total": "Rentabilidade média do fundo (média aritmética)",
+        "skill_share": (
+            "A exposição ao índice explica {share} da rentabilidade do fundo; o caixa fica à parte."
+        ),
+        "skill_no_share": "Sem proporção da exposição: {reason}.",
+        "skill_range": "Alfa ao ano: {alpha}, faixa de 95 % de {low} a {high} (t = {t}).",
+        "skill_needed": (
+            "Com este alfa e este ruído, um histórico precisaria de uns {m} meses no total (hoje "
+            "tem {n}) para o alfa "
+            "ficar a dois erros padrão de zero. É uma conta, não uma promessa: não diz que o "
+            "alfa exista nem que vá continuar."
+        ),
+        "skill_needed_long": (
+            "Com este alfa e este ruído, nem 50 anos de histórico bastariam para o alfa ficar a "
+            "dois erros padrão de zero. É uma conta, não uma promessa: não diz que o alfa exista "
+            "nem que vá continuar."
+        ),
+        "skill_lagged": (
+            "Somando o retorno do índice do mês anterior (Dimson), o beta sobe de {beta} para "
+            "{lagged}: parte da exposição chega com um mês de atraso, algo típico de preços "
+            "suavizados ou atrasados, e o beta simples não a vê. O alfa com esta correção é "
+            "{alpha} ao ano."
+        ),
+        "skill_timing_up": (
+            "O fundo ganhou mais nos meses de mercado muito agitado do que o seu beta explica "
+            "(Treynor e Mazuy, t = {t}): isso vem de acertar o momento ou de ter posições com "
+            "forma de opção. Descontado isso, o alfa de seleção é {alpha} ao ano."
+        ),
+        "skill_timing_down": (
+            "O fundo ganhou menos nos meses de mercado muito agitado do que o seu beta explica "
+            "(Treynor e Mazuy, t = {t}): isso vem de errar o momento ou de vender opções, e "
+            "tirou rentabilidade."
+        ),
+        "skill_nm": "Sem divisão entre caixa, mercado e alfa: {reason}.",
         "fund_bench_up": "Captura na alta: parte das altas do índice que o fundo acompanha",
         "fund_bench_down": "Captura na baixa: parte das quedas do índice que o fundo acompanha",
         "fund_bench_trails": (

@@ -312,6 +312,10 @@ adds or removes, keeping their cost (a 1-for-10 reverse split of 100 shares
 arrives as -90); a split of shares not held changes nothing, and one that would
 leave no shares is not applied and is counted in `SPLIT_EMPTIES_WARNING`. Prices in USD print without a sign, like every amount.
 
+A column whose name holds `%` (`Profit %`, `% Profit`, `% chg`) never takes a
+role in the universal reader: it is a ratio, and once normalised `Profit %`
+would read as the money result.
+
 Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
 trade_date, exchange, segment, series, trade_type, auction, quantity, price,
 trade_id, order_id, order_execution_time`, header as checked by the open-source
@@ -2615,6 +2619,8 @@ Redesign pass 65 comes from reading a full report on a 360 px phone as an outsid
 
 Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
 
+Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -2812,6 +2818,15 @@ Informational only: none of these moves a class, a dimension or a red flag.
   compounded over the month's days, read once per audit through the same
   lookup as the cash-rate Sharpe. Without it, cash is zero and `cash_basis`
   says so. Informational: no flag, no class, no headline.
+  The report (ES, EN, PT) shows it in the fund-versus-index block as "How
+  much is cash, how much is the market and what is left?": the three parts
+  and the total in a table, the exposure share or why there is none, the
+  alpha with its 95 % range, t and the usual reading of |t| against 2, and
+  the months needed with "arithmetic, not a promise" (past 600 months it
+  says even 50 years would not be enough). The lagged line shows only when
+  the lag's t is 2 or more and the lagged beta is higher; the timing line
+  only when |t| is 2 or more. With the split measured, it replaces the plain
+  Jensen line there, since its alpha is after cash.
 - The risk section carries `versus_shuffle` (the same 30-return floor as the
   resampled risk, and at least five losing periods): the uploaded maximum
   drawdown against up to 1,000 random orders of the same returns (seed

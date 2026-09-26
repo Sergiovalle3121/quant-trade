@@ -997,3 +997,44 @@ def test_a_blank_execution_time_falls_back_to_the_trade_date_and_says_so() -> No
     assert trade.entry_time == datetime(2024, 1, 3, tzinfo=UTC)
     assert round(trade.pnl, 2) == 500.0
     assert DATE_ONLY_FILLS_WARNING.format(n=1) in report.warnings
+
+
+def test_a_percent_column_is_never_read_as_money() -> None:
+    # "Profit %" normalises to "profit": ahead of the money column it was read
+    # as the result (10 instead of 1,000) and a false contract size inferred.
+    header = "Symbol,Type,Entry Time,Exit Time,Size,Entry Price,Exit Price,Profit %,Profit"
+    report = _read(
+        [
+            header,
+            "AAPL,Long,2024-01-02 10:00,2024-01-03 10:00,100,100,110,10.0,1000",
+            "MSFT,Long,2024-01-04 10:00,2024-01-05 10:00,10,400,380,-5.0,-200",
+        ]
+    )
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [1000.0, -200.0]
+    assert not any("contract size" in warning for warning in report.warnings)
+    # With only the ratio, the result is the price move times the size.
+    report = _read(
+        [
+            header.removesuffix(",Profit"),
+            "AAPL,Long,2024-01-02 10:00,2024-01-03 10:00,100,100,110,10.0",
+        ]
+    )
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [1000.0]
+
+
+@pytest.mark.parametrize("header", ["Date,Return %", "Fecha,Rendimiento %", "Data,Retorno %"])
+def test_a_returns_file_never_reaches_the_trade_reader(header: str) -> None:
+    # The %-name rule lives in the trade/fill reader only; a return series
+    # goes to schema.parse_equity_csv, which this change does not touch.
+    data = (header + "\n2024-01-31,1.5%\n2024-02-29,-0.5%\n").encode()
+    from quant_trade.audit.importers import detect_format  # noqa: PLC0415
+
+    assert detect_format(data, "returns.csv") is None
+
+
+def test_the_percent_rule_covers_only_money_and_size_roles() -> None:
+    from quant_trade.audit.universal import AMOUNT_ROLES, _role_of  # noqa: PLC0415
+
+    assert _role_of("Profit %") is None and _role_of("% Profit") is None
+    assert "profit" in AMOUNT_ROLES and "time" not in AMOUNT_ROLES
+    assert _role_of("Profit") == ("profit", 0)
