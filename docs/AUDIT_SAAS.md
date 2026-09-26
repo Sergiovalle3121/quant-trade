@@ -252,7 +252,10 @@ x1,000, Gasoil (G) x100, Sugar No. 11 (SB) x1,120 per cent, Coffee (KC) x375,
 Cotton (CT) x500, Cocoa (CC) x10, Orange juice (OJ) x150 and the US Dollar
 Index (DX) x1,000 in USD; B3 (Brazil, its "Contract Point Value" sheet)
 Ibovespa (IND) x1, Mini Ibovespa (WIN) x0.2, US Dollar (DOL) x50 and Mini US
-Dollar (WDO) x10 in BRL. The report prints amounts without a currency sign,
+Dollar (WDO) x10 in BRL; MexDer (Mexico, its terms and conditions) S&P/BMV
+IPC (IPC) x10, "MINI" IPC (MIP) x2 and the US dollar (DA, USD 10,000 quoted in
+pesos) x10,000 in MXN, read in MexDer's series codes (`IPC DC26`, `MIP MR27`,
+`DA19 DC16`: the Spanish month's first letter and next consonant). The report prints amounts without a currency sign,
 so a file in euros or reais is not shown as dollars. The warning names a non-USD currency, and a file
 that mixes currencies is told the results were added without conversion.
 Other single-letter ICE roots (FTSE 100 `Z`, WTI `T`) are left out because
@@ -2166,6 +2169,8 @@ Redesign pass 58 styles "Mis estrategias". On the account page each strategy is 
 Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
 
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
+
+Redesign pass 57 styles the column-mapping page ("Dinos qué es cada columna"): each group of menus is a white card, the menus stack in one column on a phone so column names are not cut short, the file re-pick sits in a dashed box, and every file input's button matches the site's buttons. Cell rendering and escaping are unchanged. It also gives the account's "what we keep and how to delete it" card a shield and a green edge on /registro and /cuenta, makes the landing's secondary link monochrome, lets the price cards use the full width, stacks the sign-up buttons above the upload form on a phone, keeps the landing mock-up's address on one line, and tightens the timing tables below 380 px so they fit the screen. On the landing's "Trabajo real, no humo" section, each card's proof link sits at the card's foot with an arrow, so the six links line up. The one-year p95 drawdown tile now carries the same minus sign as the maximum drawdown beside it, in the report and on the PDF cover; the resampled-risk section still lists the depths as positive sizes of a fall. Portuguese gets its own site card (`og-pt.png`) and six audience cards (`og-for-*-pt.png`, first sales' texts); its verification and sample links keep the English card until there is a Portuguese class sentence and notice (`OG_PARTIAL_KINDS`).
 
 ## Security
 

@@ -103,7 +103,7 @@ def test_every_link_on_the_portuguese_landing_opens(tmp_path: Path) -> None:
         for href in HREF.findall(page.text)
         if href.startswith("/") and not href.startswith("//")
     }
-    assert "/pt" in links and "/sample?lang=en" in links and "/signup" in links
+    assert "/pt" in links and "/sample?lang=en" in links and "/pt/cadastro" in links
     for href in sorted(links - {""}):
         response = client.get(href, follow_redirects=False)
         assert response.status_code < 400, (href, response.status_code)
@@ -139,7 +139,7 @@ def test_search_engines_see_the_portuguese_landing(tmp_path: Path) -> None:
     pt = client.get("/pt").text
     assert "<link rel='canonical' href='http://testserver/pt'>" in pt
     assert "content='pt_BR'" in pt
-    assert "/static/og-en.png" in pt
+    assert "/static/og-pt.png" in pt
 
 
 @pytest.mark.parametrize("page", AUDIENCE_PAGES, ids=lambda page: page.slug)

@@ -32,8 +32,8 @@ TAGLINE: dict[str, str] = {
 }
 SITE_NAME: dict[str, str] = {locale: f"{BRAND} · {TAGLINE[locale]}" for locale in TAGLINE}
 OG_LOCALE: dict[str, str] = {"es": "es_ES", "en": "en_US", "pt": "pt_BR"}
-#: The share picture per language; Portuguese uses the English one for now.
-OG_IMAGE_LOCALE: dict[str, str] = {"es": "es", "en": "en", "pt": "en"}
+#: The share picture per language.
+OG_IMAGE_LOCALE: dict[str, str] = {"es": "es", "en": "en", "pt": "pt"}
 
 NOINDEX = "noindex, nofollow"
 
@@ -91,17 +91,28 @@ OG_KINDS: tuple[str, ...] = (
 )
 
 
+#: Card kinds a language has only in part: Portuguese has the site card and the
+#: audience cards; its verification and sample cards wait for a Portuguese class
+#: sentence and notice, and show the English card until then.
+OG_PARTIAL_KINDS: dict[str, tuple[str, ...]] = {
+    "pt": ("", *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES))
+}
+
+
 def og_image_name(kind: str, locale: str) -> str:
-    """The file under ``static/`` of the share card ``kind`` in ``locale``. A language
-    with no cards of its own (Portuguese, for now; see ``OG_IMAGE_LOCALE``) gets the
-    English ones."""
+    """The file under ``static/`` of the share card ``kind`` in ``locale``. A card a
+    language does not have yet (see ``OG_PARTIAL_KINDS``) is the English one."""
     kind = kind if kind in OG_KINDS else ""
     locale = OG_IMAGE_LOCALE.get(locale, "en")
+    if locale in OG_PARTIAL_KINDS and kind not in OG_PARTIAL_KINDS[locale]:
+        locale = "en"
     return f"og-{kind}-{locale}.png" if kind else f"og-{locale}.png"
 
 
 OG_IMAGES: tuple[str, ...] = tuple(
-    og_image_name(k, lang) for k in OG_KINDS for lang in sorted(set(OG_IMAGE_LOCALE.values()))
+    dict.fromkeys(
+        og_image_name(k, lang) for k in OG_KINDS for lang in sorted(set(OG_IMAGE_LOCALE.values()))
+    )
 )
 
 

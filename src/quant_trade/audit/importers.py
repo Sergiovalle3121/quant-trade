@@ -2587,7 +2587,23 @@ FUTURES_POINT_VALUE_OTHER: dict[str, tuple[float, str]] = {
     # Ibovespa full and mini, US dollar full and mini, in reais per point.
     "IND": (1.0, "BRL"), "WIN": (0.2, "BRL"), "DOL": (50.0, "BRL"),
     "WDO": (10.0, "BRL"),
+    # MexDer (Mexico), as_of 2026-09-26, its terms and conditions under
+    # http://www.mexder.com.mx/wb3/wb/MEX/MEX_Repositorio/_vtp/MEX/:
+    # S&P/BMV IPC "MXN $10.00 multiplied by the S&P/BMV IPC value"
+    # (1ef4_contratos_futuros/_rid/21/_mto/3/20241014SPBMV_IPC_English.pdf);
+    # "MINI" IPC "MXN $2.00 multiplied by the IPC value"
+    # (1ef4_contratos_futuros/_rid/21/_mto/3/MINI_IPC_Englishvf.pdf); US dollar
+    # (DA) "Contract Size: $10,000 Dollars", quoted in pesos per dollar
+    # (1ef4_presentaciones/_rid/21/_mto/3/MXNUSD_Future.pdf).
+    "IPC": (10.0, "MXN"), "MIP": (2.0, "MXN"), "DA": (10_000.0, "MXN"),
 }  # fmt: skip
+
+#: MexDer series: the root, an optional delivery day (``DA19``), then the
+#: month's first letter and next consonant in Spanish and the year
+#: (``IPC DC26``, ``MIP MR27``, ``DA19 DC16``).
+_MEXDER_SERIES = re.compile(
+    r"(IPC|MIP|DA)(?:\d{2})?\s*(?:EN|FB|MR|AB|MY|JN|JL|AG|SP|OC|NV|DC)\d{2}"
+)
 
 
 def futures_point_value(root: str) -> tuple[float, str] | None:
@@ -2758,6 +2774,9 @@ def _parse_ninjatrader(header: list[str], rows: list[list[str]], delimiter: str)
 
 def _futures_root(instrument: str) -> str:
     """``MES JUN26``, ``MES 03-25`` or the compact ``MNQZ6`` / ``ESH25`` -> the root."""
+    mexder = _MEXDER_SERIES.fullmatch(instrument.strip().upper())
+    if mexder:
+        return mexder.group(1)
     first = instrument.strip().split(" ")[0].upper()
     if futures_point_value(first) is not None:
         return first

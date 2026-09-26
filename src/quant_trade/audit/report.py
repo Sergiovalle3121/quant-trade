@@ -2862,7 +2862,13 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
         # Deeper than the closed-trade curve shows: the buyer sees both, side by side.
         out.append((labels["kpi_dd_platform"], f"{platform_dd:.1%}", "bad"))
     p95 = _ev_value((risk.get("max_drawdown") or {}).get("p95"))
-    add("kpi_dd_p95_closed" if closed else "kpi_dd_p95", p95, _pct(p95) if p95 is not None else "")
+    # Shown with the same sign as the maximum drawdown beside it (a fall, so negative);
+    # the resampled-risk section reads the same depths as positive "caída" sizes.
+    add(
+        "kpi_dd_p95_closed" if closed else "kpi_dd_p95",
+        p95,
+        _pct(-abs(p95)) if p95 is not None else "",
+    )
     sharpe = _ev_value(perf.get("sharpe"))
     add("kpi_sharpe", sharpe, f"{sharpe:.2f}" if sharpe is not None else "")
     pf = _ev_value(stats.get("profit_factor"))

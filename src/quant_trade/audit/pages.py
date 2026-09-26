@@ -1120,6 +1120,15 @@ def _locale(locale: str) -> str:
     return locale if locale in _COPY else "es"
 
 
+#: Sign-up, sign-in and "My account" per language (``account_pages.PATHS``,
+#: which imports this module, so they are spelled here too).
+_ACCOUNT_PATHS: dict[str, tuple[str, str, str]] = {
+    "es": ("/registro", "/entrar", "/cuenta"),
+    "en": ("/signup", "/login", "/account"),
+    "pt": ("/pt/cadastro", "/pt/entrar", "/pt/conta"),
+}
+
+
 def _home(locale: str) -> str:
     return {"en": "/en", "pt": "/pt"}.get(locale, "/")
 
@@ -1200,7 +1209,7 @@ def _nav(
     ui = _UI[locale]
     home = _home(locale)
     linked = link_locale(locale)
-    account = "/account" if linked == "en" else "/cuenta"
+    account = _ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS["es"])[2]
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
         f"<a href='{_sample_url(linked)}'>{_e(ui['nav_sample'])}</a>"
@@ -2001,7 +2010,7 @@ def _prices_html(
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted refund-note' data-reveal>{_e(copy['refund_note'])}</p>"
             + f"<p class='muted account-note' data-reveal>{_e(copy['account_note'])} "
-            f"<a href='{'/registro' if locale == 'es' else '/signup'}'>"
+            f"<a href='{_ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS['es'])[0]}'>"
             f"{_e(copy['account_link'])}</a></p>"
             + f"<p class='method-link' data-reveal><a href='{_e(method_url(link_locale(locale)))}'>"
             f"{_e(_method_title(locale))}{icon('arrow')}</a></p>"
@@ -2064,7 +2073,7 @@ def _field(label: str, control: str, help_text: str = "") -> str:
 
 def _signin_first(copy: dict[str, Any], locale: str) -> str:
     """Before the file: the upload needs an account (or a bought code)."""
-    signup, signin = ("/registro", "/entrar") if locale == "es" else ("/signup", "/login")
+    signup, signin, _ = _ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS["es"])
     return (
         f"<div class='signin-first'><p>{_e(copy['signin_first'])}</p>"
         "<div class='inline-form'>"
