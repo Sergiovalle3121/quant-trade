@@ -5497,7 +5497,7 @@ def _currency_html(
         ("worst_fall", labels["currency_fall"]),
     )
 
-    def row(name: str, figures: dict[str, Any]) -> str:
+    def row(name: str, figures: dict[str, Any], kind: str = "") -> str:
         cells = ""
         for key, head in heads:
             field = figures.get(key)
@@ -5507,17 +5507,18 @@ def _currency_html(
             value = float(field["value"])
             neg = " neg" if value < 0 else ""
             cells += f"<td class='val{neg}' data-l='{_e(head)}'>{_e(_fund_pct(value))}</td>"
-        return f"<tr><td>{_e(name)}</td>{cells}</tr>"
+        mark = f" class='{kind}'" if kind else ""
+        return f"<tr{mark}><td>{_e(name)}</td>{cells}</tr>"
 
-    body = row(labels["currency_dollars"], section.get("dollars") or {})
+    body = row(labels["currency_dollars"], section.get("dollars") or {}, "cur-base")
     real = section.get("real") or {}
     if real.get("status") == "MEASURED":
-        body += row(labels["currency_real"], real)
+        body += row(labels["currency_real"], real, "cur-real")
     for item in section.get("currencies") or []:
         code = str(item.get("code", ""))
         body += row(labels.get(f"currency_{code}", code), item)
     out += (
-        "<table class='timing holding'><thead><tr>"
+        "<table class='timing holding currency'><thead><tr>"
         f"<th>{_e(labels['currency_head'])}</th>"
         + "".join(f"<th class='val'>{_e(head)}</th>" for _, head in heads)
         + f"</tr></thead><tbody>{body}</tbody></table>"

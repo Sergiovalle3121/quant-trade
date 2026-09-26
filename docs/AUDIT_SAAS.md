@@ -2477,6 +2477,8 @@ Redesign pass 62 styles two new account pieces. The strategy summary PDF ("Desca
 
 Redesign pass 63 styles the report's new statistics blocks. The 95 % ranges ("¿Cuánto de esto podría ser azar?") showed each range at headline size, split over two lines; they now read on one line per card, smaller than the headline figures, with room before the trade table. The reading under the calm/turbulent market split, under the shuffled worst fall and under the ranges (break-even and wholly-below lines) is a ruled line that stands apart from the grey notes. The 2 % + 20 % row of the fund fee table is set off from the flat-rate rows. In the PDF, grey notes were set larger than the body text; they are now slightly smaller, which also saves a page.
 
+Redesign pass 64 styles the currency section ("¿Cuánto valió la cuenta en tu moneda y después de la inflación?"). The account's own dollar row is shaded as the reference, and a rule separates the two dollar rows from the other currencies. On a phone, currency names had wrapped to four lines; they now keep a wider first column, as do the rows of the calm/turbulent market table. In the PDF the table is set smaller, so the section fits one page.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
