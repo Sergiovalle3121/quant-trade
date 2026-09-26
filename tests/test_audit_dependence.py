@@ -30,6 +30,7 @@ KEYS = (
     "dependence_line",
     "dependence_track",
     "dependence_track_long",
+    "dependence_track_reached",
     "dependence_pass_rests",
     "dependence_none",
     "dependence_info",
@@ -144,6 +145,10 @@ def test_the_line_reads_the_block(locale: str) -> None:
     significance["dependence"]["min_track_record_length"] = measured(5001.0)
     shown = html.unescape(report._dependence_html(significance, labels))
     assert labels["dependence_track_long"].format(n="500") in shown and "5,001" not in shown
+    # A count already within the history says the history reaches it.
+    significance["dependence"]["min_track_record_length"] = measured(310.4)
+    shown = html.unescape(report._dependence_html(significance, labels))
+    assert labels["dependence_track_reached"].format(n="500", track="311") in shown
     significance["dependence"]["min_track_record_length"] = measured(981.1)
     # A probability that stays above 95 % has nothing resting on independence.
     significance["dependence"]["psr"] = measured(0.96)

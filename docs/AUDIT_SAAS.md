@@ -2754,7 +2754,8 @@ How the report shows them (ES, EN and PT):
   plain ones when `ratio` is 1.1 or more (with one more sentence when the
   plain probability reaches 95 % and this one does not; a track record over
   ten times the history's length is not printed, only that ten times would
-  not reach 95 %), or one line saying
+  not reach 95 %, and one within it says the history already reaches it),
+  or one line saying
   dependence does not change it. The class never reads either.
 - Under the benchmark table and in the fund-versus-index block, Jensen's
   alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to

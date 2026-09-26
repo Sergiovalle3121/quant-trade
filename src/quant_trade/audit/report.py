@@ -703,6 +703,9 @@ LABELS: dict[str, dict[str, str]] = {
             "Harían falta unos {track} retornos en total (hoy hay {n}) para que llegara al 95% "
             "(con la cuenta simple, {plain_track})."
         ),
+        "dependence_track_reached": (
+            "Ya llega al 95% con los {n} retornos que hay (bastarían unos {track})."
+        ),
         "dependence_track_long": "Ni con diez veces los {n} retornos que hay llegaría al 95%.",
         "dependence_pass_rests": (
             "Con la cuenta simple la probabilidad supera el 95%; sin tomar los retornos como "
@@ -1819,6 +1822,9 @@ LABELS: dict[str, dict[str, str]] = {
         "dependence_track": (
             "It would take about {track} returns in all (it has {n} now) to reach 95% (the "
             "plain count says {plain_track})."
+        ),
+        "dependence_track_reached": (
+            "It already reaches 95% with the {n} returns it has (about {track} would do)."
         ),
         "dependence_track_long": "Not even ten times the {n} returns it has would take it to 95%.",
         "dependence_pass_rests": (
@@ -3708,6 +3714,10 @@ def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> st
         # only says the history would have to be far longer.
         if track > 10 * count:
             out += " " + labels["dependence_track_long"].format(n=n)
+        elif track <= count:
+            out += " " + labels["dependence_track_reached"].format(
+                n=n, track=f"{math.ceil(track):,}"
+            )
         else:
             out += " " + labels["dependence_track"].format(
                 track=f"{math.ceil(track):,}", n=n, plain_track=f"{math.ceil(plain_track):,}"

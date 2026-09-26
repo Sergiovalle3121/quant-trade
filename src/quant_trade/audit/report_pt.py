@@ -1000,6 +1000,9 @@ REPORT: dict[str, Any] = {
             "Seriam necessários uns {track} retornos no total (hoje tem {n}) para que chegasse "
             "a 95% (com a conta simples, {plain_track})."
         ),
+        "dependence_track_reached": (
+            "Já chega a 95% com os {n} retornos que tem (bastariam uns {track})."
+        ),
         "dependence_track_long": "Nem com dez vezes os {n} retornos que tem chegaria a 95%.",
         "dependence_pass_rests": (
             "Com a conta simples a probabilidade supera 95%; sem tomar os retornos como "
