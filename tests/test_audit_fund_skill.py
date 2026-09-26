@@ -214,3 +214,16 @@ def test_jensen_and_the_skill_block_agree_on_the_same_fund() -> None:
     split = skill_review(fund, index, None)
     assert plain["alpha"]["value"] == pytest.approx(split["alpha"]["value"])
     assert plain["alpha_t_stat"]["value"] == pytest.approx(split["alpha_t_stat"]["value"])
+
+
+def test_every_skill_and_alpha_sentence_reads_in_portuguese() -> None:
+    from quant_trade.audit import alpha
+    from quant_trade.audit.i18n import localize
+
+    texts = [
+        value
+        for module in (skill, alpha)
+        for name, value in vars(module).items()
+        if name.isupper() and isinstance(value, str) and " " in value
+    ]
+    assert [text for text in texts if localize(text, "pt") == text] == []
