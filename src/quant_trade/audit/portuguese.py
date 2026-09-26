@@ -56,13 +56,14 @@ COPY_PT: dict[str, Any] = {
     ),
     "form_title": "Pedir uma auditoria",
     "report": "Relatório da sua plataforma (recomendado)",
-    "report_short": "Do jeito que a sua plataforma salva: HTML, XLSX ou CSV, até 10 MB.",
+    "report_short": "Do jeito que a sua plataforma salva: HTML, XLSX, CSV ou PDF, até 10 MB.",
     "report_help": (
         "O arquivo como está: relatório HTML do testador ou do histórico do MetaTrader 5 ou 4 "
         "(ou o XLSX que o MetaTrader 5 exporta), a lista de operações do TradingView (CSV ou "
         "XLSX), o CSV de operações do NinjaTrader, QuantConnect, backtesting.py ou vectorbt, ou "
         "o histórico de operações em CSV ou Excel de qualquer outra corretora ou exchange. "
-        "Reconhece o formato de exportação de " + PLATFORMS_PT + ". Até 10 MB."
+        "Reconhece o formato de exportação de " + PLATFORMS_PT + ". Também um extrato em PDF "
+        "com a tabela de operações: antes de medir você revisa as colunas. Até 10 MB."
     ),
     "live": "Extrato da conta real ou demo (opcional)",
     "live_help": (
@@ -237,7 +238,8 @@ COPY_PT: dict[str, Any] = {
             "da MQL5 exportam. Da sua corretora, exchange ou diário, o histórico de operações em "
             "CSV ou Excel: reconhece o formato de exportação de " + PLATFORMS_PT + ", e em "
             "qualquer outro as colunas são reconhecidas pelo nome. Uma curva de equity em CSV "
-            "também serve.",
+            "também serve, ou um extrato em PDF com a tabela de operações, cujas colunas você "
+            "revisa antes de medir.",
         ),
         (
             "Serve para ações, cripto, futuros ou um fundo?",

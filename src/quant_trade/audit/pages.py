@@ -165,14 +165,15 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "form_title": "Solicitar una auditoría",
         "report": "Informe de tu plataforma (recomendado)",
-        "report_short": "Tal cual lo guarda tu plataforma: HTML, XLSX o CSV, hasta 10 MB.",
+        "report_short": "Tal cual lo guarda tu plataforma: HTML, XLSX, CSV o PDF, hasta 10 MB.",
         "report_help": (
             "El archivo tal cual: informe HTML del probador o del historial de MetaTrader 5 o 4 "
             "(o el XLSX que exporta MetaTrader 5), "
             "lista de operaciones de TradingView (CSV o XLSX), el CSV de operaciones de "
             "NinjaTrader, QuantConnect, backtesting.py o vectorbt, o el historial de "
             "operaciones en CSV o Excel de cualquier otro bróker o exchange. Reconoce el "
-            "formato de exportación de " + PLATFORMS_ES + ". Hasta 10 MB."
+            "formato de exportación de " + PLATFORMS_ES + ". También un estado de cuenta en PDF "
+            "con su tabla de operaciones: antes de medir revisas las columnas. Hasta 10 MB."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -349,7 +350,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "FX Blue o una señal de MQL5. De tu bróker, exchange o diario, "
                 "su historial de operaciones en CSV o Excel: reconoce el formato de exportación "
                 "de " + PLATFORMS_ES + ", y en cualquier otro las columnas se reconocen por su "
-                "nombre. También sirve una curva de equity en CSV.",
+                "nombre. También sirve una curva de equity en CSV, o un estado de cuenta en PDF "
+                "con su tabla de operaciones, cuyas columnas revisas antes de medir.",
             ),
             (
                 "¿Sirve para acciones, cripto, futuros o un fondo?",
@@ -471,7 +473,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "form_title": "Request an audit",
         "report": "Your platform report (recommended)",
-        "report_short": "As your platform saves it: HTML, XLSX or CSV, up to 10 MB.",
+        "report_short": "As your platform saves it: HTML, XLSX, CSV or PDF, up to 10 MB.",
         "report_help": (
             "The file as it is: a MetaTrader 5 or 4 tester or history HTML report (or the "
             "XLSX MetaTrader 5 exports), a "
@@ -479,7 +481,8 @@ _COPY: dict[str, dict[str, Any]] = {
             "QuantConnect, backtesting.py or vectorbt, or the CSV or Excel trade history of "
             "any other broker or exchange. It recognises the export format of "
             + PLATFORMS_EN
-            + ". Up to 10 MB."
+            + ". A PDF statement with its trade table works too: you check the columns "
+            "before it measures. Up to 10 MB."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -648,7 +651,8 @@ _COPY: dict[str, dict[str, Any]] = {
                 "signal. From your broker, exchange or journal, its trade history as CSV "
                 "or Excel: it recognises the export format of " + PLATFORMS_EN + ", and in any "
                 "other the columns are recognised by their names. An equity curve in CSV "
-                "works too.",
+                "works too, or a PDF statement with its trade table, whose columns you check "
+                "before it measures.",
             ),
             (
                 "Does it work for stocks, crypto, futures or a fund?",

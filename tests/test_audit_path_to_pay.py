@@ -208,3 +208,17 @@ def test_the_fund_page_says_its_own_index_cannot_make_an_a(locale: str) -> None:
     # verdict.overall_class(own_index=True) never lets the file's own index give an A.
     assert "24" in text and {"es": "clase A", "en": "class A", "pt": "classe A"}[locale] in text
     assert not find_claims(f"{title} {text}")
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_landing_says_a_pdf_statement_is_accepted(locale: str) -> None:
+    page = html.unescape(landing(locale=locale, free_mode=False, price_usd=29, access_codes=True))
+    phrase = {
+        "es": "un estado de cuenta en PDF con su tabla de operaciones",
+        "en": "a PDF statement with its trade table",
+        "pt": "um extrato em PDF com a tabela de operações",
+    }[locale]
+    # pdf_tables.py reads only a ruled trade table, and the column screen always opens.
+    assert phrase in page.replace("\n", " ")
+    assert "accept='.htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf'" in page
+    assert not find_claims(page)
