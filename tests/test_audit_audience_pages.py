@@ -101,7 +101,7 @@ def test_trader_pages_link_the_universal_csv_guide(tmp_path: Path) -> None:
 def test_named_platforms_match_the_universal_guide_and_show_on_the_pages(tmp_path: Path) -> None:
     from quant_trade.audit.audiences import RECOGNISED_PLATFORMS
 
-    assert len(RECOGNISED_PLATFORMS) == 22
+    assert len(RECOGNISED_PLATFORMS) == 23
     guide = GUIDES_BY_SLUG["csv-universal"]
     for locale in ("es", "en"):
         tips = " ".join(guide.text[locale].tips)

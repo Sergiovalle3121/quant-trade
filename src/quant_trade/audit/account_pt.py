@@ -42,6 +42,7 @@ COPY_PT: dict[str, str] = {
     "have_account": "Já tem conta?",
     "no_account": "Ainda não tem conta?",
     "signin_link": "Entrar",
+    "back_to_signin": "Voltar ao login",
     "signup_link": "Crie uma grátis",
     "forgot_link": "Esqueci minha senha",
     "terms_agree": "Ao criar a conta você aceita os {terms} e a {privacy}.",
@@ -178,6 +179,9 @@ COPY_PT: dict[str, str] = {
         "a chave; ela sai ao ser usada ou com a conta.|"
         "Se você ativar a verificação em duas etapas, a chave secreta que seu app "
         "autenticador compartilha e o último código usado; ela sai ao desativar ou com a conta.|"
+        "De cada sessão aberta: um rótulo curto do dispositivo (como «Chrome · Windows», nunca o "
+        "texto completo do navegador), a rede e o último uso, para «Sessões abertas»; sai ao "
+        "encerrar a sessão, ao expirar ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -306,6 +310,21 @@ COPY_PT: dict[str, str] = {
         "não a compartilhe."
     ),
     "recovery_done": "Já guardei, voltar para Minha conta",
+    "sessions_title": "Sessões abertas",
+    "sessions_help": (
+        "Onde sua conta está aberta. Se não reconhecer alguma, encerre-a e troque sua senha."
+    ),
+    "col_device": "Dispositivo",
+    "col_network": "Rede",
+    "col_last_use": "Último uso",
+    "col_started": "Desde",
+    "col_action": "Ação",
+    "session_this": "este navegador",
+    "session_unknown": "Sem dados ainda",
+    "session_end": "Encerrar",
+    "sessions_end_others": "Encerrar todas as outras",
+    "session_ended": "Sessão encerrada.",
+    "sessions_ended": "Encerramos todas as outras sessões.",
     "two_step_card": "Verificação em duas etapas",
     "two_of_three": (
         "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "

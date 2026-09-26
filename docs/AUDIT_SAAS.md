@@ -302,6 +302,16 @@ per import; the column screen offers a web table only up to
 `mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
+Revolut's stocks account statement (`Date, Ticker, Type, Quantity, Price per
+share, Total Amount, Currency, FX Rate`, rows as reproduced from a real file in
+github.com/antonioaversa/taxes) is read by the universal fill reader:
+`BUY - MARKET`/`SELL - LIMIT` are the sides, cash rows (top-ups, custody fees,
+dividends) have no price and are dropped, and a `STOCK SPLIT` row
+(`universal.SPLIT_WORDS`) rescales a long position's open lots by the shares it
+adds or removes, keeping their cost (a 1-for-10 reverse split of 100 shares
+arrives as -90); a split of shares not held changes nothing, and one that would
+leave no shares is not applied and is counted in `SPLIT_EMPTIES_WARNING`. Prices in USD print without a sign, like every amount.
+
 B3's Área do Investidor Negociação extract is read by column name only
 (`tests/test_audit_b3.py`): `Data do Negócio` is the fill time and always day
 first (`universal.DAY_FIRST_NAMES`), `Tipo de Movimentação` the side
@@ -2120,6 +2130,17 @@ changes what a report says.
   `quant-trade audit account-two-step-off EMAIL --yes` after checking the
   request. The secret is stored as is (a code check needs it); the export
   shows only when it was turned on.
+- **Open sessions** (`session_info` table, "Sesiones abiertas" in Mi cuenta,
+  `/cuenta/sesiones/cerrar` and `/cerrar-otras`): each session keeps a short
+  device label (`accounts.device_label`, such as "Chrome · Windows"; the full
+  browser string is never stored), its network (`accounts.network_address`)
+  and its last use, updated at most every 10 minutes, with a random handle
+  to sign it out by (never the token or its hash). The list marks this
+  browser; signing out this browser's own row signs it out. Sessions opened
+  before the table existed fill in on their next use. Rows go with their
+  session (sign-out, "sign out the others", password change, expiry through
+  `purge_sessions`) and with the account; the export lists each session's
+  device, network and last use.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2555,6 +2576,8 @@ Redesign pass 62 styles two new account pieces. The strategy summary PDF ("Desca
 Redesign pass 63 styles the report's new statistics blocks. The 95 % ranges ("¿Cuánto de esto podría ser azar?") showed each range at headline size, split over two lines; they now read on one line per card, smaller than the headline figures, with room before the trade table. The reading under the calm/turbulent market split, under the shuffled worst fall and under the ranges (break-even and wholly-below lines) is a ruled line that stands apart from the grey notes. The 2 % + 20 % row of the fund fee table is set off from the flat-rate rows. In the PDF, grey notes were set larger than the body text; they are now slightly smaller, which also saves a page.
 
 Redesign pass 64 styles the currency section ("¿Cuánto valió la cuenta en tu moneda y después de la inflación?"). The account's own dollar row is shaded as the reference, and a rule separates the two dollar rows from the other currencies. On a phone, currency names had wrapped to four lines; they now keep a wider first column, as do the rows of the calm/turbulent market table. In the PDF the table is set smaller, so the section fits one page.
+
+Redesign pass 65 comes from reading a full report on a 360 px phone as an outside customer would. Charts and wide tables that scroll sideways looked cut off with no sign there was more; they now fade at the right edge until scrolled to the end (only elements that actually scroll, and only in browsers with scroll-driven animations; others look as before). In the evidence rows (trade statistics, benchmark, declared values) the tag sat between the name and the value and squeezed names onto three lines; the value now sits beside the name and the tag goes underneath. Prop-firm cards now read the challenge name as the card's title, with the number of phases below it. The same pass styles the two-step pages: on /cuenta/dos-pasos the note's shield icon had no size and filled the screen; it is now icon-sized beside the note, the QR code sits on a white card, the six-digit code field reads as a code (monospaced, spaced, centred) on both that page and /entrar/codigo, and "¿Perdiste el teléfono?" opens from a card.
 
 ## Security
 

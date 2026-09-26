@@ -162,6 +162,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "no incluye el movimiento de las acciones",
     ),
     (
+        "{n} stock split(s) that would leave no shares held were not applied; the positions they "
+        "touch may be read wrong",
+        "no se aplicaron {n} split(s) que dejarían la posición sin acciones; las posiciones que "
+        "tocan pueden leerse mal",
+    ),
+    (
         "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
         "positions they change may be read wrong",
         "se dejaron fuera {n} movimiento(s) de acciones que no son operaciones (traspasos, "
@@ -1943,6 +1949,13 @@ _SINGULAR: dict[str, tuple[str, str]] = {
         "{n} opción asignada o ejercida cuyas acciones entregadas no están en el archivo (ninguna "
         "operación de acciones al precio de ejercicio en esos días), así que su resultado no "
         "incluye el movimiento de las acciones",
+    ),
+    "{n} stock split(s) that would leave no shares held were not applied; the positions they touch "
+    "may be read wrong": (
+        "{n} stock split that would leave no shares held was not applied; the position it touches "
+        "may be read wrong",
+        "no se aplicó {n} split que dejaría la posición sin acciones; la posición que toca puede "
+        "leerse mal",
     ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (
