@@ -136,3 +136,25 @@ def test_a_curve_with_one_comma_cell_keeps_its_scale() -> None:
     )
     assert curve.frame["equity"].iloc[0] == 10010.5
     assert curve.unparseable_rows == 1
+
+
+@pytest.mark.parametrize(
+    ("header", "values"),
+    [
+        ("Fecha;Saldo", ["10.000,00", "10.007,77", "9.950,10"]),
+        ("Data;Patrimônio", ["10.000,00", "10.007,77", "9.950,10"]),
+        ("Fecha,Patrimonio", ["10000.00", "10007.77", "9950.10"]),
+        ("Data;Valor da cota", ["1,000000", "1,000777", "0,995010"]),
+        ("Fecha;Valor cuotaparte", ["1,000000", "1,000777", "0,995010"]),
+        ("Date,Balance", ["10000.00", "10007.77", "9950.10"]),
+    ],
+)
+def test_spanish_and_portuguese_balance_headers_are_read_as_the_curve(
+    header: str, values: list[str]
+) -> None:
+    mark = ";" if ";" in header else ","
+    rows = [f"2024-01-{day:02d}{mark}{value}" for day, value in zip((2, 3, 4), values, strict=True)]
+    series = parse_equity_csv("\n".join([header, *rows]).encode())
+    assert series.source == "equity"
+    first, last = float(series.frame["equity"].iloc[0]), float(series.frame["equity"].iloc[-1])
+    assert round(last / first, 6) == 0.99501

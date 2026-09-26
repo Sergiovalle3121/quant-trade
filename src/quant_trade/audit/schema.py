@@ -71,7 +71,23 @@ TIMESTAMP_ALIASES = (
     # Portuguese "Data"; last, so an English file's "date" always wins.
     "data",
 )
-EQUITY_ALIASES = ("equity", "nav", "balance", "value", "portfolio_value", "close", "capital")
+EQUITY_ALIASES = (
+    "equity",
+    "nav",
+    "balance",
+    "value",
+    "portfolio_value",
+    "close",
+    "capital",
+    # Spanish and Portuguese: the account balance, and a fund's value per share
+    # (Brazil's "valor da cota", Argentina's "valor cuotaparte").
+    "saldo",
+    "patrimonio",
+    "patrimônio",
+    "valor_da_cota",
+    "valor_cuota",
+    "valor_cuotaparte",
+)
 RETURN_ALIASES = (
     "return",
     "returns",
