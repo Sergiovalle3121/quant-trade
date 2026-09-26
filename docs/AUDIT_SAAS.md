@@ -1194,6 +1194,27 @@ line and the audit goes on. The CLI's `--public-data` reads the three series
 first. The result JSON always carries a `holding` key: `null` when the file
 trades none of these markets or public data is off.
 
+Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
+report adds one line under the key figures: the Sharpe ratio of the returns
+after subtracting what the 3-month US Treasury bill paid over the same days
+(FRED `DTB3`, read in the background with the market closes; zeros are
+real rates and kept, and a reply with a rate above 25 % a year, `MAX_RATE`,
+is taken as broken). FRED quotes a bank-discount rate `d`, so it is turned
+into the yield a 91-day bill compounds to over a year,
+`(1 - d·91/360)^(-365/91) - 1` (5.234 % for `d` = 5 %). Each return spans
+the days from the previous point to its own, and the bill's rate on or before
+the start of that stretch (at most 10 days old, `MAX_GAP_DAYS`) is
+compounded over those days; the result is annualised like the headline
+Sharpe, which stays as it is and subtracts nothing. The line also gives the
+average rate over the history and says it is a dollar rate (another
+currency's own cash rate is the fair one). When the strategy's compound return a year is below the
+average rate, or the excess Sharpe is below -3 (`BELOW_CASH_SHARPE`, a curve
+that barely moves), the line says in words that it earned less than cash
+(both yearly figures) instead of printing a large negative Sharpe
+(`below_cash`). It needs 10 returns and rates
+covering the whole history, otherwise it is NOT_MEASURED and not shown. It
+never changes the class.
+
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section
 "How did it do in the known crises?". The curve is taken at month ends. On
