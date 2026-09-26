@@ -695,6 +695,76 @@ MONTHS_PT: tuple[str, ...] = (
 )
 METHOD_LINK_PT = "Metodologia (em inglês)"
 
+#: The service's own messages (``web.MESSAGES``) in Portuguese: the refusals
+#: an upload from ``/pt`` and the errors of a Portuguese page show.
+MESSAGES_PT: dict[str, str] = {
+    "consent_required": "Você precisa aceitar as condições para enviar a auditoria.",
+    "cross_site": "Este envio não vem do formulário deste site. Abra a página e envie por lá.",
+    "rate_limited": "Auditorias demais a partir deste endereço na última hora; tente mais tarde.",
+    "too_large": (
+        "O arquivo {what} passa de {limit}, o máximo que aceitamos: envie uma versão "
+        "menor (por exemplo, um período mais curto ou menos passagens de otimização)."
+    ),
+    "optimization_too_large": (
+        "O XML de otimização passa de {limit} (cerca de {passes} passagens), o "
+        "máximo que aceitamos: otimize de novo com o algoritmo genético ou com faixas de "
+        "parâmetros mais curtas e exporte outra vez. Você também pode enviar o relatório sem o "
+        "XML e escrever o número de passagens em «Configurações testadas»."
+    ),
+    "equity_required": (
+        "Falta o arquivo: envie o relatório da sua plataforma (MetaTrader, "
+        "TradingView...) ou uma curva de equity."
+    ),
+    "invalid_declared": (
+        "Algum dado declarado não é válido: o número de tentativas deve ser 1 ou "
+        "mais, o custo não pode ser negativo, o saldo inicial deve ser positivo, o desafio deve "
+        "ser um da lista, a descrição tem no máximo 2000 caracteres e a data fora da amostra vai "
+        "como AAAA-MM-DD."
+    ),
+    "invalid_form": (
+        "O formulário chegou incompleto ou com um valor inválido; revise-o e envie de novo."
+    ),
+    "invalid_upload": (
+        "Não foi possível auditar o que você enviou do jeito que está; confira o formato dos "
+        "arquivos."
+    ),
+    "page_missing": "Esta página não existe. Confira o endereço ou volte ao início.",
+    "not_found": "Não encontramos essa auditoria. Confira se o link está completo.",
+    "purged": "Esta auditoria foi apagada ao fim do prazo de conservação.",
+    "payment_required": "O detalhe completo desta auditoria requer pagamento.",
+    "payments_disabled": "Os pagamentos não estão ativados neste serviço.",
+    "card_paid": (
+        "Pagamento recebido: este é o relatório completo. A Stripe envia o recibo por e-mail."
+    ),
+    "card_pending": (
+        "Estamos confirmando o seu pagamento com a Stripe. Recarregue esta página em "
+        "alguns segundos; não pague de novo."
+    ),
+    "card_cancelled": "Pagamento cancelado: nada foi cobrado. Esta é a prévia.",
+    "code_applied": "Código de acesso aplicado: este é o relatório completo.",
+    "codes_disabled": "Este serviço não aceita códigos de acesso.",
+    "busy": (
+        "O serviço está calculando outras auditorias neste momento; envie o arquivo de novo "
+        "em um minuto."
+    ),
+    "pdf_busy": "Estamos preparando outros PDFs neste momento. Tente de novo em alguns segundos.",
+    "pdf_limit": "Você preparou vários PDFs há pouco. Tente de novo em alguns minutos.",
+    "pdf_unavailable": (
+        "O download em PDF não está disponível agora. Use o botão de imprimir da "
+        "página do relatório e escolha salvar como PDF."
+    ),
+    "server_error": (
+        "Algo falhou do nosso lado ao processar o pedido. Nada novo foi salvo; tente "
+        "de novo e, se acontecer outra vez, fale conosco."
+    ),
+    "body_too_large": (
+        "O envio passa de {limit} no total, o tamanho máximo que aceitamos: envie "
+        "menos arquivos de uma vez ou versões menores."
+    ),
+    "publish_locked": "Só um relatório completo pode publicar uma verificação.",
+}
+
+
 __all__ = [
     "AUDIENCES_PT",
     "CLASS_B_PT",
