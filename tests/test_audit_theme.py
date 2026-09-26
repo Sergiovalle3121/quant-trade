@@ -1242,3 +1242,15 @@ def test_evidence_rows_read_as_one_list_on_phones() -> None:
     # between them, instead of a stack of separate cards.
     assert ".metrics.ev tbody{gap:0;background:#fff;border:1px solid var(--border)" in phone
     assert ".metrics.ev tr:first-child{border-top:0}" in phone
+
+
+def test_crisis_rows_read_as_cards_on_phones() -> None:
+    # With public data on, the crisis table has four columns and ran past a
+    # 360 px screen; on a phone each crisis is a card with labelled figures.
+    assert ".paper table.crises{display:block" in STYLE
+    assert ".crises td.val::before{content:attr(data-l)" in STYLE
+    assert ".paper table:not(.ev):not(.firms):not(.crises){animation:scroll-cue" in STYLE
+
+
+def test_the_line_under_the_summary_tiles_has_room() -> None:
+    assert ".kpis+p{margin-top:14px}" in STYLE
