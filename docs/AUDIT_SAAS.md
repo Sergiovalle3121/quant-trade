@@ -1865,14 +1865,19 @@ customers" without any third-party analytics.
   The row goes with `delete_account`.
 - **Visits.** A `GET` answered 200 on the landing (`/`, `/en`, `/pt`) or a
   case page (`/para`, `/for`, `/pt/para`) adds one to a counter keyed by day,
-  language and tag (`funnel_visits`). No address, cookie or user agent is
+  language and tag (`funnel_visits`). A browser counts once a day: the
+  `rigor_seen` cookie holds only the date. No address or user agent is
   stored. Link previews, robots, prefetches and `HEAD` requests do not count.
-  A failed counter never breaks the page.
+  A request only adds to an in-memory counter (`funnel.VisitCounter`); a
+  background thread writes the totals every minute, `/panel` flushes before
+  it reads, and shutdown flushes the rest, so a slow or failing database
+  never holds up a page. Counts that fail to write are kept for the next
+  flush.
 - **The other stages** are read from the tables the service already keeps
   (`accounts`, `welcome_reports`, `free_previews`, and paid `audits` with
   their payment reference), with the language and tag of the account
   involved. An event with no account shows language `-`.
-- **Limits.** Visits count page views, not people. A report deleted by the
+- **Limits.** Visits count browsers per day, not people. A report deleted by the
   retention purge stops counting. A tag counts only if the owner used it in
   the link.
 

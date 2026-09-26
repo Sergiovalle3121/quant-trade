@@ -806,15 +806,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     pdf_ok = pdf_lib.available()
     db = store or make_store(cfg.database_url)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
+    visits = funnel.VisitCounter(db)
 
     @contextlib.asynccontextmanager
     async def lifespan(_: Any) -> AsyncIterator[None]:
         if cfg.auto_purge:
             retention.start()
+        visits.start()
         try:
             yield
         finally:
             retention.stop()
+            visits.stop()
 
     app = FastAPI(
         title=BRAND,
@@ -826,6 +829,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.settings = cfg
     app.state.store = db
     app.state.retention = retention
+    app.state.visits = visits
     app.state.checkout_factory = payments.stripe_checkout
     app.state.session_lookup = payments.stripe_session
     upload_attempts = AttemptLog()
@@ -901,9 +905,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
 
-        Only a counter per day, language and tag is stored. The tag of the
-        first listed link a browser arrives with is kept in a cookie that
-        holds nothing else, so an account created later carries it.
+        Only a counter per day, language and tag is kept, in memory until
+        the background flush: nothing here waits on the database. A browser
+        counts once a day (a cookie holds only the date), and the tag of the
+        first listed link it arrives with is kept in a cookie that holds
+        nothing else, so an account created later carries it.
         """
         if request.method != "GET" or response.status_code != 200:
             return
@@ -917,12 +923,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return
         if request.headers.get("sec-purpose") or request.headers.get("purpose"):
             return  # a prefetch, not a visit
-        if path == "/" and request.query_params.get("lang") in LOCALES:
+        today = funnel.day_of(datetime.now(UTC))
+        if request.cookies.get(funnel.SEEN_COOKIE) == today:
+            return  # this browser was already counted today
+        _cookie(response, funnel.SEEN_COOKIE, today, max_age=86400)
+        if path == "/" and request.query_params.get("lang") in ("es", "en", "pt"):
             locale = request.query_params["lang"]
-        try:
-            db.count_visit(day=funnel.day_of(datetime.now(UTC)), locale=locale, ref=kept or arrived)
-        except Exception:  # noqa: BLE001 - a counter never breaks the page
-            logger.warning("could not count a visit")
+        visits.add(day=today, locale=locale, ref=kept or arrived)
 
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
@@ -1099,6 +1106,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 reset_path = account_pages.path("reset", account.locale)
                 reset_link = f"{_site_url(request)}{reset_path}?token={secret}"
+        visits.flush()
         return HTMLResponse(
             panel_page(
                 key=key,

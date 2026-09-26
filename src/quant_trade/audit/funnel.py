@@ -8,20 +8,32 @@ visits, accounts, free first reports, free previews and paid reports.
 
 Only tags listed in :data:`REF_TAGS` count; anything else is "directo", so a
 stranger cannot fill the table with made-up tags. Visits are aggregate
-counters (day, language, tag, count): no address, no cookie and no user agent
-is stored, and link previews and known robots are not counted. Everything
+counters (day, language, tag, count): no address and no user agent is
+stored, and link previews and known robots are not counted. A browser counts
+once a day (a ``rigor_seen`` cookie holds only the date), and the counters are
+written by a background thread, never during a request. Everything
 else is read from the tables the service already keeps. The page is for the
 owner only, so it is in Spanish.
 """
 
 from __future__ import annotations
 
+import logging
 import re
+import threading
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 REF_COOKIE = "rigor_ref"
 REF_DAYS = 30
+#: Holds only the day a browser was last counted, so it counts once a day.
+SEEN_COOKIE = "rigor_seen"
+#: How often the in-memory visit counters are written to the database.
+FLUSH_SECONDS = 60.0
 DIRECT = "directo"
 #: How far back /panel looks.
 FUNNEL_DAYS = 30
@@ -144,15 +156,72 @@ def build(events: dict[str, list[tuple[str, str, str, int]]]) -> Funnel:
     return funnel
 
 
+class VisitCounter:
+    """Visits counted in memory and written to the database off the request path.
+
+    A request only adds to a ``Counter`` under a lock; a daemon thread (like
+    ``retention.RetentionWorker``) writes the totals every
+    :data:`FLUSH_SECONDS`, and ``/panel`` flushes before it reads, so a slow
+    database never holds up a page. Counts that fail to write are kept for
+    the next flush.
+    """
+
+    def __init__(self, store: Any, *, interval_seconds: float = FLUSH_SECONDS) -> None:
+        self._store = store
+        self._interval = interval_seconds
+        self._lock = threading.Lock()
+        self._pending: Counter[tuple[str, str, str]] = Counter()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def add(self, *, day: str, locale: str, ref: str) -> None:
+        with self._lock:
+            self._pending[(day, locale[:8], ref[:MAX_REF_CHARS])] += 1
+
+    def flush(self) -> None:
+        with self._lock:
+            batch, self._pending = self._pending, Counter()
+        failed: Counter[tuple[str, str, str]] = Counter()
+        for (day, locale, ref), amount in batch.items():
+            try:
+                self._store.count_visit(day=day, locale=locale, ref=ref, amount=amount)
+            except Exception:  # noqa: BLE001 - kept for the next flush
+                failed[(day, locale, ref)] += amount
+        if failed:
+            logger.warning("could not write %d visit counters; kept for later", len(failed))
+            with self._lock:
+                self._pending.update(failed)
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._interval):
+            self.flush()
+
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._loop, name="audit-visits", daemon=True)
+        self._thread.start()
+
+    def stop(self, timeout: float = 5.0) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout)
+            self._thread = None
+        self.flush()
+
+
 __all__ = [
     "DIRECT",
+    "FLUSH_SECONDS",
     "FUNNEL_DAYS",
     "MAX_REF_CHARS",
     "REF_COOKIE",
     "REF_DAYS",
     "REF_TAGS",
+    "SEEN_COOKIE",
     "STAGES",
     "STAGE_LABELS",
+    "VisitCounter",
     "Funnel",
     "FunnelCounts",
     "build",

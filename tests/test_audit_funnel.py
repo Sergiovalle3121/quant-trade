@@ -44,8 +44,9 @@ def _today() -> str:
     return funnel.day_of(datetime.now(UTC))
 
 
-def _visits(store: object) -> dict[tuple[str, str], int]:
-    rows = store.funnel_events(_today())["visits"]  # type: ignore[attr-defined]
+def _visits(client: TestClient) -> dict[tuple[str, str], int]:
+    client.app.state.visits.flush()  # type: ignore[attr-defined]
+    rows = client.app.state.store.funnel_events(_today())["visits"]  # type: ignore[attr-defined]
     return {(locale, ref): count for _, locale, ref, count in rows}
 
 
@@ -82,30 +83,66 @@ def test_robots_and_link_previews_are_not_people() -> None:
         assert not funnel.is_person(agent)
 
 
+def _browser(client: TestClient) -> TestClient:
+    """A new browser (no cookies) on the same app."""
+    return TestClient(client.app, headers=BROWSER)
+
+
 def test_visits_are_bare_counters_per_day_language_and_tag(tmp_path: Path) -> None:
     client, store = _client(tmp_path)
     assert client.get("/").status_code == 200
-    first = client.get("/para/retos-prop-firm?ref=f6")
+    tagged = _browser(client)
+    first = tagged.get("/para/retos-prop-firm?ref=f6")
     assert first.cookies.get(funnel.REF_COOKIE) == "f6"
-    # The first tag stays: a later link with another tag keeps f6.
-    assert client.get("/pt?ref=f4").status_code == 200
-    assert client.get("/en").status_code == 200
-    assert client.get("/?lang=en").status_code == 200
-    assert _visits(store) == {("es", ""): 1, ("es", "f6"): 1, ("pt", "f6"): 1, ("en", "f6"): 2}
+    assert first.cookies.get(funnel.SEEN_COOKIE) == _today()
+    # The first tag stays, and the same browser counts once a day.
+    for _ in range(5):
+        assert tagged.get("/pt?ref=f4").status_code == 200
+    later = _browser(client)
+    later.cookies.set(funnel.REF_COOKIE, "f6")
+    assert later.get("/pt?ref=f4").status_code == 200
+    assert _browser(client).get("/en").status_code == 200
+    assert _browser(client).get("/?lang=en").status_code == 200
+    assert _browser(client).get("/?lang=pt").status_code == 200
+    assert _visits(client) == {
+        ("es", ""): 1,
+        ("es", "f6"): 1,
+        ("pt", "f6"): 1,
+        ("en", ""): 2,
+        ("pt", ""): 1,
+    }
     columns = {column.name for column in store.funnel_visits.columns}  # type: ignore[attr-defined]
     assert columns == {"day", "locale", "ref", "visits"}
 
 
 def test_unknown_tags_robots_and_other_pages_do_not_count(tmp_path: Path) -> None:
-    client, store = _client(tmp_path)
+    client, _ = _client(tmp_path)
     unknown = client.get("/?ref=spam-tag")
     assert funnel.REF_COOKIE not in unknown.cookies
-    client.get("/", headers={"User-Agent": "WhatsApp/2.23"})
-    client.get("/", headers={"Sec-Purpose": "prefetch"})
-    client.head("/")
-    client.get("/guias")
-    client.get("/metodologia")
-    assert _visits(store) == {("es", ""): 1}
+    _browser(client).get("/", headers={"User-Agent": "WhatsApp/2.23"})
+    _browser(client).get("/", headers={"Sec-Purpose": "prefetch"})
+    _browser(client).head("/")
+    _browser(client).get("/guias")
+    _browser(client).get("/metodologia")
+    assert _visits(client) == {("es", ""): 1}
+
+
+def test_a_slow_or_failing_database_never_touches_a_page(tmp_path: Path) -> None:
+    client, store = _client(tmp_path)
+    calls: list[int] = []
+
+    def broken(**kwargs: object) -> None:
+        calls.append(1)
+        raise RuntimeError("database away")
+
+    store.count_visit = broken  # type: ignore[attr-defined]
+    for _ in range(3):
+        assert _browser(client).get("/").status_code == 200
+    assert calls == []  # nothing is written during a request
+    client.app.state.visits.flush()  # type: ignore[attr-defined]
+    assert calls == [1]  # one batched write, which failed and is kept
+    del store.count_visit  # type: ignore[attr-defined]
+    assert _visits(client) == {("es", ""): 3}
 
 
 def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
@@ -120,9 +157,10 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
     )
     assert store.redeem_for_audit(preview_id, code, at=datetime.now(UTC))  # type: ignore[attr-defined]
 
-    other = TestClient(client.app, headers=BROWSER)
+    other = _browser(client)
     _signup(other, "bea@example.com")
 
+    client.app.state.visits.flush()  # type: ignore[attr-defined]
     built = funnel.build(store.funnel_events(_today()))  # type: ignore[attr-defined]
     f6 = built.by_ref["f6"].counts
     assert f6 == {
@@ -206,3 +244,12 @@ def test_my_data_download_carries_the_tag(tmp_path: Path) -> None:
     other = TestClient(client.app, headers=BROWSER)
     _signup(other, "bea@example.com")
     assert json.loads(other.get("/cuenta/datos").text)["arrived_through_link_tag"] == ""
+
+
+def test_the_background_writer_flushes_on_shutdown(tmp_path: Path) -> None:
+    _, store = _client(tmp_path)
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", admin_key=KEY)
+    with TestClient(create_app(settings, store), headers=BROWSER) as client:
+        assert client.get("/").status_code == 200
+    rows = store.funnel_events(_today())["visits"]  # type: ignore[attr-defined]
+    assert [(locale, ref, count) for _, locale, ref, count in rows] == [("es", "", 1)]

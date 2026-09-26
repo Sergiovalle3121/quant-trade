@@ -21,7 +21,7 @@ import html
 from dataclasses import dataclass
 
 from quant_trade.audit.accounts import DEVICE_COOKIE, FREE_PREVIEWS_PER_MONTH
-from quant_trade.audit.funnel import REF_COOKIE, REF_DAYS
+from quant_trade.audit.funnel import REF_COOKIE, REF_DAYS, SEEN_COOKIE
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
@@ -573,7 +573,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "without your e-mail, so the offer cannot be repeated.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
-                    "?ref=f4 in a link we posted), with no address and no cookie. When you "
+                    "?ref=f4 in a link we posted), with no address; a cookie named "
+                    f"{SEEN_COOKIE} holds only today's date so a browser counts once a day. "
+                    "When you "
                     f"arrive from a tagged link, a cookie named {REF_COOKIE} keeps only that "
                     f"tag for {REF_DAYS} days, and if you create an account the tag is kept "
                     "with it until you delete the account.",
@@ -586,8 +588,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "passwords or card details. There is no third-party analytics or "
                     "advertising on these pages. The only cookies are our own: one that keeps "
                     "you signed in, one that protects the sign-in forms, one that marks "
-                    "your browser for the free first report and one that remembers which of "
-                    "our links brought you; none tracks you across sites "
+                    "your browser for the free first report, one that remembers which of "
+                    "our links brought you and one with today's date to count a visit once; "
+                    "none tracks you across sites "
                     "or is shared. Our own access "
                     "log keeps only a shortened address (the last part of the IP is "
                     "removed) and never the report link's secret. Our hosting provider may "
@@ -697,10 +700,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "oferta no se repita.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
-                "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección ni "
-                f"cookie. Si llegas desde un enlace con etiqueta, una cookie llamada {REF_COOKIE} "
-                f"guarda solo esa etiqueta durante {REF_DAYS} días y, si creas una cuenta, la "
-                "etiqueta se queda con ella hasta que la borres.",
+                "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
+                f"cookie llamada {SEEN_COOKIE} guarda solo la fecha de hoy para contar cada "
+                "navegador una vez al día. Si llegas desde un enlace con etiqueta, una cookie "
+                f"llamada {REF_COOKIE} guarda solo esa etiqueta durante {REF_DAYS} días y, si "
+                "creas una cuenta, la etiqueta se queda con ella hasta que la borres.",
             ),
         ),
         (
@@ -710,8 +714,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "cuentas de trading ni datos de tarjeta. No hay analítica ni publicidad de "
                 "terceros en estas páginas. Las únicas cookies son nuestras: una que mantiene "
                 "tu sesión iniciada, otra que protege los formularios de acceso, otra que "
-                "marca tu navegador para el primer informe gratis y otra que recuerda cuál de "
-                "nuestros enlaces te trajo; ninguna te sigue por otros "
+                "marca tu navegador para el primer informe gratis, otra que recuerda cuál de "
+                "nuestros enlaces te trajo y otra con la fecha de hoy para contar una visita "
+                "una sola vez; ninguna te sigue por otros "
                 "sitios ni se comparte. Nuestro propio "
                 "registro de accesos guarda solo una dirección acortada (se quita la última "
                 "parte de la IP) y nunca el secreto del enlace al informe. Nuestro proveedor "

@@ -2007,22 +2007,24 @@ class Store:
             return False
 
     # -- the owner's funnel ------------------------------------------------
-    def count_visit(self, *, day: str, locale: str, ref: str) -> None:
-        """Add one visit to the counter of ``(day, locale, ref)``."""
+    def count_visit(self, *, day: str, locale: str, ref: str, amount: int = 1) -> None:
+        """Add ``amount`` visits to the counter of ``(day, locale, ref)``."""
         sa = self._sa
         table = self.funnel_visits
         key = (table.c.day == day) & (table.c.locale == locale[:8]) & (table.c.ref == ref[:24])
         for _ in range(2):
             with self.engine.begin() as conn:
                 bumped = conn.execute(
-                    table.update().where(key).values(visits=table.c.visits + 1)
+                    table.update().where(key).values(visits=table.c.visits + amount)
                 ).rowcount
                 if bumped:
                     return
             try:
                 with self.engine.begin() as conn:
                     conn.execute(
-                        table.insert().values(day=day, locale=locale[:8], ref=ref[:24], visits=1)
+                        table.insert().values(
+                            day=day, locale=locale[:8], ref=ref[:24], visits=amount
+                        )
                     )
                 return
             except sa.exc.IntegrityError:  # pragma: no cover - another request inserted it
