@@ -1996,6 +1996,47 @@ SINGULAR: dict[str, tuple[str, str]] = {
         "{n} position still open at the end of the report; excluded from the closed trades",
         "{n} posição continuava aberta no fim do relatório; fica fora das operações fechadas",
     ),
+    "{n} closing trade(s) of positions the file never shows being opened (opened before "
+    "its first date or transferred in) left out; download the full history to include them": (
+        "{n} closing trade of a position the file never shows being opened (opened before "
+        "its first date or transferred in) left out; download the full history to include it",
+        "ficou de fora {n} fechamento de uma posição cuja abertura não aparece no arquivo "
+        "(aberta antes da primeira data ou transferida); baixe o histórico completo para "
+        "incluí-lo",
+    ),
+    "{n} option(s) expired: each closes at no premium, so its result is the whole premium, and its "
+    "exit price shows 0.01 (the smallest option tick) because a trade needs a positive price": (
+        "{n} option expired: it closes at no premium, so its result is the whole premium, and its "
+        "exit price shows 0.01 (the smallest option tick) because a trade needs a positive price",
+        "{n} opção venceu: fecha sem prêmio, então o resultado é o prêmio inteiro, e o preço de "
+        "saída aparece como 0.01 (o mínimo de uma opção) porque uma operação precisa de um preço "
+        "positivo",
+    ),
+    "{n} option(s) assigned or exercised: each closes at no premium and the shares it delivers "
+    "open at the strike as their own trade, so the total result is right but the win rate and "
+    "average trade count one position as two": (
+        "{n} option assigned or exercised: it closes at no premium and the shares it delivers open "
+        "at the strike as their own trade, so the total result is right but the win rate and "
+        "average trade count one position as two",
+        "{n} opção atribuída ou exercida: fecha sem prêmio e as ações que entrega abrem no preço "
+        "de exercício como uma operação à parte, então o resultado total está correto, mas a % de "
+        "acerto e a operação média contam uma posição como duas",
+    ),
+    "{n} option(s) assigned or exercised whose delivered shares are not in the file (no share "
+    "trade at the strike within a few days), so their result leaves out the stock move": (
+        "{n} option assigned or exercised whose delivered shares are not in the file (no share "
+        "trade at the strike within a few days), so its result leaves out the stock move",
+        "{n} opção atribuída ou exercida cujas ações entregues não estão no arquivo (nenhuma "
+        "operação de ações no preço de exercício nesses dias), então o resultado não inclui o "
+        "movimento das ações",
+    ),
+    "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+    "positions they change may be read wrong": (
+        "{n} share movement that is not a trade (transfer, merger, split) left out; the "
+        "position it changes may be read wrong",
+        "ficou de fora {n} movimento de ações que não é uma operação (transferência, fusão, "
+        "desdobramento); a posição que ele altera pode ser lida errado",
+    ),
     "{n} deal(s) closed by the tester at the end of the test": (
         "{n} deal closed by the tester at the end of the test",
         "o testador fechou {n} operação no fim do teste",
@@ -2236,6 +2277,52 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "{n} posição(ões) ainda estavam abertas no fim do relatório; ficam fora das "
             "operações fechadas"
+        ),
+    ),
+    (
+        "{n} closing trade(s) of positions the file never shows being opened (opened before "
+        "its first date or transferred in) left out; download the full history to include them",
+        (
+            "ficaram de fora {n} fechamento(s) de posições cuja abertura não aparece no "
+            "arquivo (abertas antes da primeira data ou transferidas); baixe o histórico "
+            "completo para incluí-los"
+        ),
+    ),
+    (
+        "{n} option(s) expired: each closes at no premium, so its result is the whole premium, and "
+        "its exit price shows 0.01 (the smallest option tick) because a trade needs a positive "
+        "price",
+        (
+            "{n} opção(ões) venceram: cada uma fecha sem prêmio, então o resultado é o prêmio "
+            "inteiro, e o preço de saída aparece como 0.01 (o mínimo de uma opção) porque uma "
+            "operação precisa de um preço positivo"
+        ),
+    ),
+    (
+        "{n} option(s) assigned or exercised: each closes at no premium and the shares it delivers "
+        "open at the strike as their own trade, so the total result is right but the win rate and "
+        "average trade count one position as two",
+        (
+            "{n} opção(ões) atribuídas ou exercidas: cada uma fecha sem prêmio e as ações que "
+            "entrega abrem no preço de exercício como uma operação à parte, então o resultado "
+            "total está correto, mas a % de acerto e a operação média contam uma posição como duas"
+        ),
+    ),
+    (
+        "{n} option(s) assigned or exercised whose delivered shares are not in the file (no share "
+        "trade at the strike within a few days), so their result leaves out the stock move",
+        (
+            "{n} opção(ões) atribuídas ou exercidas cujas ações entregues não estão no arquivo "
+            "(nenhuma operação de ações no preço de exercício nesses dias), então o resultado não "
+            "inclui o movimento das ações"
+        ),
+    ),
+    (
+        "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+        "positions they change may be read wrong",
+        (
+            "ficaram de fora {n} movimento(s) de ações que não são operações (transferências, "
+            "fusões, desdobramentos); as posições que eles alteram podem ser lidas errado"
         ),
     ),
     (
