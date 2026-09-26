@@ -2083,6 +2083,11 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
     )
 
 
+#: What the file pickers offer for a platform file: web pages (and the tables
+#: brokers save as .xls), text tables, workbooks and a zip holding one export.
+REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.zip"
+
+
 def _upload_form(
     copy: dict[str, Any],
     locale: str,
@@ -2198,7 +2203,7 @@ def _upload_form(
         + _drop(
             "report",
             copy["report"],
-            ".htm,.html,.csv,.xlsx",
+            REPORT_ACCEPT,
             report_help,
             locale,
             main=True,
@@ -2219,7 +2224,7 @@ def _upload_form(
         "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
         "<div class='form-grid'>"
         + _drop("optimization", copy["optimization"], ".xml", optimization_help, locale)
-        + _drop("live", copy["live"], ".htm,.html,.csv,.xlsx", _e(copy["live_help"]), locale)
+        + _drop("live", copy["live"], REPORT_ACCEPT, _e(copy["live_help"]), locale)
         + "</div>"
         + _field(
             copy["challenge"],
