@@ -1801,6 +1801,124 @@ class Store:
             for row in rows
         ]
 
+    def account_export(self, account_id: str) -> dict[str, Any] | None:
+        """Everything the service keeps about one account, for "Descargar mis datos".
+
+        Only rows keyed to ``account_id``. Never the password hash, a session
+        or reset token, a report link's token or a code in clear (none is kept
+        in clear); a code's private note is the owner's, not the customer's.
+        """
+        sa = self._sa
+        found = self.get_account(account_id)
+        if found is None:
+            return None
+        with self.engine.connect() as conn:
+            sessions = conn.execute(
+                sa.select(self.account_sessions.c.created_at, self.account_sessions.c.expires_at)
+                .where(self.account_sessions.c.account_id == account_id)
+                .order_by(self.account_sessions.c.created_at)
+            ).all()
+            link = self.account_audits
+            ips = dict(
+                conn.execute(
+                    sa.select(self.audits.c.id, self.audits.c.client_ip)
+                    .select_from(link.join(self.audits, self.audits.c.id == link.c.audit_id))
+                    .where((link.c.account_id == account_id) & link.c.via.in_(OWN_VIAS))
+                ).all()
+            )
+            previews = conn.execute(
+                sa.select(
+                    self.free_previews.c.audit_id,
+                    self.free_previews.c.created_at,
+                    self.free_previews.c.client_ip,
+                )
+                .where(self.free_previews.c.account_id == account_id)
+                .order_by(self.free_previews.c.created_at)
+            ).all()
+            welcome = (
+                conn.execute(
+                    sa.select(self.welcome_reports).where(
+                        self.welcome_reports.c.account_id == account_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            maps = conn.execute(
+                sa.select(
+                    self.column_maps.c.header_sha256,
+                    self.column_maps.c.columns_json,
+                    self.column_maps.c.updated_at,
+                ).where(self.column_maps.c.account_id == account_id)
+            ).all()
+        reports = [
+            {
+                "audit_id": item.audit_id,
+                "created_at": item.created_at,
+                "added_to_account_at": item.linked_at,
+                "uploaded_by_this_account": item.own,
+                "class": item.overall_class,
+                "paid": item.paid,
+                "paid_at": item.paid_at,
+                "paid_with": item.paid_with,
+                "files_deleted": item.purged,
+                "public_verification_page": item.public_id or None,
+                # A report saved from someone else's link keeps its uploader's
+                # words private unless this account paid for it.
+                "description": item.description if item.own or item.paid else "",
+                "upload_ip": ips.get(item.audit_id, "") if item.own else "",
+            }
+            for item in self.account_audits_list(account_id)
+        ]
+        return {
+            "account": {
+                "email": found.email,
+                "language": found.locale,
+                "created_at": found.created_at,
+            },
+            "sessions": [{"created_at": row[0], "expires_at": row[1]} for row in sessions],
+            "reports": reports,
+            "access_codes": [
+                {
+                    "id": item.code.id,
+                    "credits_total": item.code.credits_total,
+                    "credits_used": item.code.credits_used,
+                    "created_at": item.code.created_at,
+                    "expires_at": item.code.expires_at,
+                    "disabled": item.code.disabled,
+                    "added_to_account_at": item.linked_at,
+                }
+                for item in self.account_codes_list(account_id)
+            ],
+            "strategies": [
+                {
+                    "id": strategy.id,
+                    "name": strategy.name,
+                    "created_at": strategy.created_at,
+                    "reports": list(strategy.audit_ids),
+                }
+                for strategy in self.list_strategies(account_id)
+            ],
+            "free_previews": [
+                {"audit_id": row[0], "created_at": row[1], "upload_ip": row[2]} for row in previews
+            ],
+            "free_first_report": (
+                {
+                    "audit_id": welcome["audit_id"],
+                    "created_at": welcome["created_at"],
+                    "upload_ip": welcome["client_ip"],
+                    "browser_mark_sha256": welcome["device_sha256"],
+                    "file_fingerprint_sha256": welcome["file_sha256"],
+                }
+                if welcome is not None
+                else None
+            ),
+            "column_maps": [
+                {"header_sha256": row[0], "columns": json.loads(row[1]), "updated_at": row[2]}
+                for row in maps
+            ],
+        }
+
     def account_credits(self, account_id: str, now: datetime) -> int:
         """Audits the account's usable codes can still unlock."""
         stamp = _iso(now)

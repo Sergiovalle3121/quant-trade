@@ -1774,6 +1774,17 @@ changes what a report says.
   no audit kept). A failed upload gives its claims back. Network keys hold
   a hash of the address and the retention purge deletes them.
 
+- **Descargar mis datos**: `/cuenta/datos` (EN `/account/datos`, PT
+  `/pt/conta/datos`), a GET for the signed-in account only, returns a JSON
+  file (`no-store`) with the account's e-mail, language and dates, session
+  dates, reports (class, payment, description, upload IP while kept),
+  codes (never the code or the owner's note), strategies, free previews,
+  the free first report's hashes and IP, and the column maps. Never the
+  password hash, a session, reset or report token. Backs the "Qué
+  guardamos" block and the right of access in /privacidad. A browser-flagged
+  cross-site request is sent back to the account page; a report saved from
+  someone else's link shows its description only once paid
+  (`store.account_export`).
 - **Mis estrategias** (`audit/strategies.py`, tables `strategies` and
   `strategy_reports`): an account names a strategy and files reports of its
   own list under it (one strategy per report, 50 strategies per account),
@@ -2236,6 +2247,8 @@ Redesign pass 55 makes each locked figure in a preview's summary a link to the u
 
 Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
 
+Redesign pass 58 styles "Mis estrategias". On the account page each strategy is a card with its latest class, name and version count; on a phone the count goes under the name and "Ver estrategia" spans the card. On a strategy's page the version table uses tabular figures, its "Quitar de la estrategia" buttons sit quietly at the right, and on a phone each version becomes a card with every figure under its column name (`data-label`). In "Qué cambió" each line ends in a chip coloured by its meaning only: green for "mejor", red for "peor", grey for "cambió", "igual" or "sin cambio claro". The wording and the rules behind each word are unchanged.
+
 Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
 
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
@@ -2409,3 +2422,18 @@ Informational only: none of these moves a class, a dimension or a red flag.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
+- The risk section carries `versus_shuffle` (the same 30-return floor as the
+  resampled risk, and at least five losing periods): the uploaded maximum
+  drawdown against up to 1,000 random orders of the same returns (seed
+  20260926). A shuffle keeps the Sharpe, the volatility and the final
+  result exactly, so the random orders show the drawdown this Sharpe and
+  volatility usually bring over this many periods. `position` is
+  `SHALLOWER` when at most 5 % of orders fall no deeper than the upload
+  (losses rarely follow losses, as in smoothed or averaged-down curves),
+  `DEEPER` when at most 5 % fall at least as deep (losses cluster), and
+  `TYPICAL` otherwise. The upload counts as one of the orders. Curves longer
+  than 10,000 periods are compounded into blocks first. When more than half
+  of the orders tie the uploaded fall (a few losses fall the same in any
+  order), it is `NOT_MEASURED` rather than `TYPICAL`, so a smoothed curve is
+  never called normal. Informational: it
+  moves no flag and no class.
