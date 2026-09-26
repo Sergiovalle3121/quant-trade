@@ -1067,6 +1067,19 @@ line-height:1.25;white-space:normal;text-align:center}
 .sess-table .sess-act:empty{display:none}
 .sess-table .sess-act{padding-top:10px}
 .sess-table .sess-act .btn,.acct-sessions>form .btn{width:100%;justify-content:center}}
+.acct-activity{margin-top:36px}
+.act-table td:nth-child(2){font-weight:600}
+@media (max-width:760px){.act-table thead{display:none}
+.paper table.act-table,.act-table{border:0;background:none;box-shadow:none;overflow:visible}
+.act-table,.act-table tbody{display:block}
+.act-table tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;
+padding:11px 2px;border-bottom:1px solid var(--border)}
+.act-table tr:last-child{border-bottom:0}
+.act-table td{padding:0;border:0;font-size:.84rem;color:var(--text-2)}
+.act-table td:nth-child(2){grid-column:1/-1;font-size:.93rem;color:var(--text)}
+.act-table td:nth-child(1){grid-area:2/1/3/-1}
+.act-table td:nth-child(3){grid-area:3/1}
+.act-table td:nth-child(4){grid-area:3/2;text-align:right;overflow-wrap:anywhere}}
 """
 
 
@@ -1576,8 +1589,8 @@ def _activity_card(copy: dict[str, str], events: Sequence[AccountEvent]) -> str:
         f"<div class='acct-card acct-activity' id='actividad'>"
         f"<h3>{_e(copy['activity_title'])}</h3>"
         f"<p class='muted'>{_e(copy['activity_help'])}</p>"
-        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}</tr></thead>"
-        f"<tbody>{rows}</tbody></table></div></div>"
+        f"<div class='acct-scroll'><table class='acct-table act-table'>"
+        f"<thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table></div></div>"
     )
 
 

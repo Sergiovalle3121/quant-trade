@@ -2591,7 +2591,7 @@ Redesign pass 65 comes from reading a full report on a 360 px phone as an outsid
 
 Redesign pass 66 styles the landing's feature cards after the three new ones (against cash, calm and agitated markets, your currency and inflation). With seven cards the two-column grid left an empty slot beside the last one; an odd last card now spans the row. On a phone each card puts its icon beside its title, so the list of seven reads much shorter.
 
-Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card.
+Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
 
 ## Security
 

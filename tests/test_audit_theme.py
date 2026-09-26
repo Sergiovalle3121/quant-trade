@@ -1199,3 +1199,8 @@ def test_open_sessions_read_as_cards_on_phones() -> None:
     # inside their card instead of running past it.
     assert ".acct-grid{grid-template-columns:minmax(0,1fr)}" in ACCOUNT_CSS
     assert ".acct-card .btn-dark{max-width:100%;height:auto" in ACCOUNT_CSS
+    # "Actividad reciente": on a phone each event reads as what happened, then
+    # when, then the device and network, with no sideways scroll.
+    activity = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){.act-table thead") :]
+    assert ".act-table td:nth-child(2){grid-column:1/-1" in activity
+    assert ".act-table td:nth-child(1){grid-area:2/1/3/-1}" in activity
