@@ -697,11 +697,15 @@ LABELS: dict[str, dict[str, str]] = {
         "dependence_line": (
             "Si los retornos no se toman como independientes entre sí, la varianza del Sharpe "
             "se multiplica por {ratio}: la probabilidad de que el Sharpe real sea mayor que cero "
-            "pasa de {plain} a {psr}, y harían falta unos {track} retornos para que llegara al "
-            "95 % (con la cuenta simple, {plain_track})."
+            "pasa de {plain} a {psr}."
         ),
+        "dependence_track": (
+            "Harían falta unos {track} retornos en total (hoy hay {n}) para que llegara al 95% "
+            "(con la cuenta simple, {plain_track})."
+        ),
+        "dependence_track_long": "Ni con diez veces los {n} retornos que hay llegaría al 95%.",
         "dependence_pass_rests": (
-            "Con la cuenta simple la probabilidad supera el 95 %; sin tomar los retornos como "
+            "Con la cuenta simple la probabilidad supera el 95%; sin tomar los retornos como "
             "independientes, no llega."
         ),
         "dependence_none": (
@@ -1810,11 +1814,15 @@ LABELS: dict[str, dict[str, str]] = {
         "dependence_line": (
             "When the returns are not taken as independent of each other, the Sharpe's "
             "variance grows {ratio} times: the probability that the true Sharpe is above zero "
-            "goes from {plain} to {psr}, and about {track} returns would be needed for it to "
-            "reach 95 % (the plain count says {plain_track})."
+            "goes from {plain} to {psr}."
         ),
+        "dependence_track": (
+            "It would take about {track} returns in all (it has {n} now) to reach 95% (the "
+            "plain count says {plain_track})."
+        ),
+        "dependence_track_long": "Not even ten times the {n} returns it has would take it to 95%.",
         "dependence_pass_rests": (
-            "The plain count puts the probability above 95 %; without taking the returns as "
+            "The plain count puts the probability above 95%; without taking the returns as "
             "independent, it falls short."
         ),
         "dependence_none": (
@@ -3677,20 +3685,33 @@ def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> st
     track = _ev_value(block.get("min_track_record_length"))
     plain = _ev_value(significance.get("psr"))
     plain_track = _ev_value(significance.get("min_track_record_length"))
-    if ratio is None or psr is None or track is None or plain is None or plain_track is None:
+    count = _ev_value(significance.get("observations"))
+    if (
+        ratio is None
+        or psr is None
+        or track is None
+        or plain is None
+        or plain_track is None
+        or count is None
+    ):
         return ""
     # A widening under a tenth moves the probability by less than the table's
     # rounding says anything about.
     if ratio < 1.1:
         out = labels["dependence_none"]
     else:
+        n = f"{int(count):,}"
         out = labels["dependence_line"].format(
-            ratio=f"{ratio:.1f}",
-            plain=_table_pct(plain),
-            psr=_table_pct(psr),
-            track=f"{math.ceil(track):,}",
-            plain_track=f"{math.ceil(plain_track):,}",
+            ratio=f"{ratio:.1f}", plain=_table_pct(plain), psr=_table_pct(psr)
         )
+        # A count far beyond the history reads as noise; beyond ten times it
+        # only says the history would have to be far longer.
+        if track > 10 * count:
+            out += " " + labels["dependence_track_long"].format(n=n)
+        else:
+            out += " " + labels["dependence_track"].format(
+                track=f"{math.ceil(track):,}", n=n, plain_track=f"{math.ceil(plain_track):,}"
+            )
         if plain >= 0.95 > psr:
             out += " " + labels["dependence_pass_rests"]
         out += " " + labels["dependence_info"]

@@ -994,11 +994,15 @@ REPORT: dict[str, Any] = {
         "dependence_line": (
             "Se os retornos não forem tomados como independentes entre si, a variância do "
             "Sharpe se multiplica por {ratio}: a probabilidade de que o Sharpe real seja maior "
-            "que zero passa de {plain} para {psr}, e seriam necessários uns {track} retornos "
-            "para que chegasse a 95 % (com a conta simples, {plain_track})."
+            "que zero passa de {plain} para {psr}."
         ),
+        "dependence_track": (
+            "Seriam necessários uns {track} retornos no total (hoje tem {n}) para que chegasse "
+            "a 95% (com a conta simples, {plain_track})."
+        ),
+        "dependence_track_long": "Nem com dez vezes os {n} retornos que tem chegaria a 95%.",
         "dependence_pass_rests": (
-            "Com a conta simples a probabilidade supera 95 %; sem tomar os retornos como "
+            "Com a conta simples a probabilidade supera 95%; sem tomar os retornos como "
             "independentes, não chega."
         ),
         "dependence_none": (

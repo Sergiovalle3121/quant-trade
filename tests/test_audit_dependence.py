@@ -26,7 +26,14 @@ from quant_trade.metrics.statistics import (
 
 LOCALES = ("es", "en", "pt")
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
-KEYS = ("dependence_line", "dependence_pass_rests", "dependence_none", "dependence_info")
+KEYS = (
+    "dependence_line",
+    "dependence_track",
+    "dependence_track_long",
+    "dependence_pass_rests",
+    "dependence_none",
+    "dependence_info",
+)
 
 
 def _ar1(n: int, phi: float, *, mean: float, seed: int) -> pd.Series:
@@ -119,6 +126,7 @@ def test_short_or_losing_histories_are_not_measured(returns: pd.Series, reason: 
 def test_the_line_reads_the_block(locale: str) -> None:
     labels = report.LABELS[locale]
     significance = {
+        "observations": measured(500),
         "psr": measured(0.97),
         "min_track_record_length": measured(420.2),
         "dependence": {
@@ -129,8 +137,14 @@ def test_the_line_reads_the_block(locale: str) -> None:
     }
     shown = html.unescape(report._dependence_html(significance, labels))
     assert "2.3" in shown and "97.00%" in shown and "88.00%" in shown
-    assert "982" in shown and "421" in shown
+    assert "982" in shown and "421" in shown and "500" in shown
+    assert labels["dependence_track_long"].split("{")[0] not in shown
     assert labels["dependence_pass_rests"] in shown and labels["dependence_info"] in shown
+    # A count beyond ten times the history is not printed: it only reads as noise.
+    significance["dependence"]["min_track_record_length"] = measured(5001.0)
+    shown = html.unescape(report._dependence_html(significance, labels))
+    assert labels["dependence_track_long"].format(n="500") in shown and "5,001" not in shown
+    significance["dependence"]["min_track_record_length"] = measured(981.1)
     # A probability that stays above 95 % has nothing resting on independence.
     significance["dependence"]["psr"] = measured(0.96)
     shown = html.unescape(report._dependence_html(significance, labels))
