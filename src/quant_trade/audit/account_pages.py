@@ -967,7 +967,7 @@ border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:14px 
 font-size:.92rem;background:var(--surface-2)}
 .acct-box form{margin:0}
 .acct-box .btn{margin:0}
-@media (max-width:760px){.acct-grid{grid-template-columns:1fr}
+@media (max-width:760px){.acct-grid{grid-template-columns:minmax(0,1fr)}
 .acct-kpis{gap:8px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .acct-gift.is-on{grid-column:1/-1}.acct-gift b{font-size:1.15rem}
 .acct-gate .btn{width:100%;justify-content:center}
@@ -995,6 +995,29 @@ border-radius:14px;background:#fff}
 grid-column:1/-1}
 .acct-reports.pick td:nth-child(4){color:inherit;font-size:inherit}
 .acct-reports.pick td:nth-child(5){color:var(--text-2);font-size:.88rem}}
+.sess-table .acct-tag{margin:0 0 0 6px;border-color:var(--text);color:var(--text);font-weight:600}
+.sess-table td:first-child{font-weight:600}
+.sess-table form{margin:0}
+.acct-sessions{margin-top:36px}
+.acct-sessions>form .btn{margin-top:4px}
+@media (max-width:760px){.sess-table thead{display:none}
+.paper table.sess-table,.sess-table{border:0;background:none;box-shadow:none;overflow:visible}
+.sess-table,.sess-table tbody{display:block}
+.sess-table tr:has(.acct-tag){border-color:var(--text)}
+.sess-table .acct-tag{display:table;margin:6px 0 0}
+.sess-table tr{display:block;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border);
+border-radius:16px;background:var(--surface)}
+.sess-table td{display:block;padding:0;border:0}
+.sess-table td:first-child{font-size:1rem;line-height:1.4;margin-bottom:6px}
+.sess-table .sess-fig{display:flex;justify-content:space-between;align-items:baseline;
+gap:12px;padding:8px 0;border-top:1px solid var(--border);font-size:.84rem;white-space:nowrap}
+.sess-table .sess-fig::before{content:attr(data-label);color:var(--text-2);font-family:var(--sans);
+font-size:.8rem;white-space:normal}
+.acct-card .btn-dark{max-width:100%;height:auto;min-height:var(--h);padding:12px 24px;
+line-height:1.25;white-space:normal;text-align:center}
+.sess-table .sess-act:empty{display:none}
+.sess-table .sess-act{padding-top:10px}
+.sess-table .sess-act .btn,.acct-sessions>form .btn{width:100%;justify-content:center}}
 """
 
 
@@ -1463,9 +1486,13 @@ def _sessions_card(
                 f"{_e(copy['session_end'])}</button></form>"
             )
         rows.append(
-            f"<tr><td>{device}</td><td>{_e(item.network or '-')}</td>"
-            f"<td>{_e(_stamp(item.last_seen) or '-')}</td>"
-            f"<td>{_e(_stamp(item.created_at))}</td><td>{action}</td></tr>"
+            f"<tr><td>{device}</td>"
+            f"<td class='sess-fig' data-label='{_e(copy['col_network'])}'>"
+            f"{_e(item.network or '-')}</td>"
+            f"<td class='sess-fig' data-label='{_e(copy['col_last_use'])}'>"
+            f"{_e(_stamp(item.last_seen) or '-')}</td>"
+            f"<td class='sess-fig' data-label='{_e(copy['col_started'])}'>"
+            f"{_e(_stamp(item.created_at))}</td><td class='sess-act'>{action}</td></tr>"
         )
     others = sum(1 for item in sessions if not item.current)
     end_others = (
@@ -1479,7 +1506,8 @@ def _sessions_card(
     return (
         f"<div class='acct-card acct-sessions' id='sesiones'><h3>{_e(copy['sessions_title'])}</h3>"
         f"<p class='muted'>{_e(copy['sessions_help'])}</p>"
-        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}</tr></thead>"
+        f"<div class='acct-scroll'><table class='acct-table sess-table'>"
+        f"<thead><tr>{head}</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>{end_others}</div>"
     )
 
