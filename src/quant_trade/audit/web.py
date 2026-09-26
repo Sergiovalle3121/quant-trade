@@ -2174,7 +2174,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
-        loc = link_locale(report_loc)
         if _cross_site(request):
             return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
