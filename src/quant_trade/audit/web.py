@@ -2223,15 +2223,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         rows, to name them. Nothing is spent: no preview, no free report."""
         if exc.code in ("unknown_format", "universal_columns_missing"):
             # Said on this page, not as "name them on the form".
-            text = (
-                mapping.missing_fields(chosen, locale)
-                if chosen
-                else mapping.COPY[locale]["unknown"]
-            )
+            if chosen:
+                text = mapping.missing_fields(chosen, locale)
+            elif "profit" in mapping.preselected(table)[0]:
+                text = mapping.COPY[locale]["results"]
+            else:
+                text = mapping.COPY[locale]["unknown"]
         elif exc.code == "equity_not_positive":
             text = mapping.COPY[locale]["results"]
         elif exc.code in ("missing_value", "missing_timestamp"):
-            text = mapping.COPY[locale]["unknown"]
+            results = "profit" in chosen or "profit" in mapping.preselected(table)[0]
+            text = mapping.COPY[locale]["results" if results else "unknown"]
         else:
             text = _sentence(exc.localized(locale))
         if _wants_json(request):
