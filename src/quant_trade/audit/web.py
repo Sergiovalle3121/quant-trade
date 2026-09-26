@@ -254,6 +254,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "es": "Estamos preparando otros PDF en este momento. Vuelve a intentarlo en unos segundos.",
         "en": "Other PDFs are being prepared right now. Try again in a few seconds.",
     },
+    "pdf_limit": {
+        "es": "Preparaste varios PDF hace poco. Vuelve a intentarlo en unos minutos.",
+        "en": "You prepared several PDFs a moment ago. Try again in a few minutes.",
+    },
     "pdf_unavailable": {
         "es": (
             "La descarga en PDF no está disponible ahora mismo. Usa el botón de imprimir de la "
@@ -337,6 +341,12 @@ PDF_WAIT_SECONDS = 60.0
 #: Finished PDFs kept in memory, so a double click or a second download of
 #: the same report does not render again.
 PDF_CACHE_SIZE = 16
+#: Strategy summaries one account may render in the window below; a cached
+#: one does not count. They share the report PDFs' render slots.
+#: The page's "skip to content" link, which a PDF does not need.
+_SKIP_LINK = re.compile(r"<a class='skip' href='#main'>[^<]*</a>")
+STRATEGY_PDFS_PER_WINDOW = 10
+STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
 UPLOAD_FIELDS = 7
 #: The fields that may carry a platform report, and how much larger than
@@ -1161,6 +1171,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_ip_failures = StoredAttemptLog(db, "signin_ip")
     signup_attempts = StoredAttemptLog(db, "signup")
     account_actions = AttemptLog()
+    strategy_pdf_renders = AttemptLog(window=STRATEGY_PDF_WINDOW)
+    strategy_pdf_cache: OrderedDict[tuple[Any, ...], bytes] = OrderedDict()
+    strategy_pdf_lock = threading.Lock()
 
     def _session(request: Request) -> tuple[Any, str, str] | None:
         """``(account, csrf, session hash)`` for a signed-in request, else ``None``."""
@@ -1565,6 +1578,25 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 versions.append((item, result))
             now = datetime.now(UTC)
+            # The same strategy, versions, unlocks and day print the same PDF.
+            pdf_key = (
+                account.id,
+                strategy.id,
+                strategy.name,
+                locale,
+                now.date().isoformat(),
+                tuple((item.audit_id, item.paid, result is None) for item, result in versions),
+            )
+            if as_pdf:
+                with strategy_pdf_lock:
+                    cached = strategy_pdf_cache.get(pdf_key)
+                    if cached is not None:
+                        strategy_pdf_cache.move_to_end(pdf_key)
+                if cached is not None:
+                    return _strategy_pdf_answer(cached, strategy.id)
+                if strategy_pdf_renders.hit(account.id, now) >= STRATEGY_PDFS_PER_WINDOW:
+                    view = link_locale(locale)
+                    return _html_error(request, 429, message("pdf_limit", view), view)
             page = guard_page(
                 account_pages.strategy_page(
                     locale=locale,
@@ -1578,6 +1610,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
             if not as_pdf:
                 return HTMLResponse(page)
+            page = _SKIP_LINK.sub("", page, count=1)
             # The summary as a PDF: the owner's own page, laid out like a report
             # PDF (no network, the shared render slots), never cached.
             view = link_locale(locale)
@@ -1594,18 +1627,25 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _html_error(request, 503, message("pdf_busy", view), view)
             except pdf_lib.PdfUnavailable:
                 return _html_error(request, 503, message("pdf_unavailable", view), view)
-            name = pdf_lib.filename(f"strategy{strategy.id}")
-            return Response(
-                content=content,
-                media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{name}"',
-                    "Cache-Control": "private, no-store",
-                    "X-Robots-Tag": "noindex",
-                },
-            )
+            with strategy_pdf_lock:
+                strategy_pdf_cache[pdf_key] = content
+                while len(strategy_pdf_cache) > PDF_CACHE_SIZE:
+                    strategy_pdf_cache.popitem(last=False)
+            return _strategy_pdf_answer(content, strategy.id)
 
         return handler
+
+    def _strategy_pdf_answer(content: bytes, strategy_id: str) -> Response:
+        name = pdf_lib.filename(f"strategy{strategy_id}")
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{name}"',
+                "Cache-Control": "private, no-store",
+                "X-Robots-Tag": "noindex",
+            },
+        )
 
     def _strategy_action(path_locale: str, action: str) -> Callable[..., Response]:
         def handler(

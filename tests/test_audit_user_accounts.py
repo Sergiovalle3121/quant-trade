@@ -1828,6 +1828,7 @@ def test_a_strategy_summary_prints_without_forms_and_only_for_its_owner(tmp_path
     assert "<form" not in printable and "x" * 30 not in printable
     assert "generado el 2026-09-26" in printable and "No es asesoría de inversión" in printable
     assert "Qué cambió frente a la versión 1" in printable
+    assert "href='/audits/" not in printable  # a PDF carries no links to reports
     assert not find_claims(re.sub(r"<[^>]+>", " ", printable))
     # Only the owner, signed in.
     other = TestClient(client.app)
@@ -1839,3 +1840,41 @@ def test_a_strategy_summary_prints_without_forms_and_only_for_its_owner(tmp_path
         assert answer.status_code == 200 and answer.content.startswith(b"%PDF")
         assert "no-store" in answer.headers["cache-control"]
         assert "attachment;" in answer.headers["content-disposition"]
+
+
+def test_strategy_pdfs_are_cached_and_limited_per_account(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import pdf as pdf_lib
+    from quant_trade.audit import web
+
+    pages: list[str] = []
+
+    def fake_pdf(page: str, **_: object) -> bytes:
+        pages.append(page)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(pdf_lib, "report_pdf", fake_pdf)
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    audit_id = _audit_id(_upload(client).headers["location"])
+    csrf = _csrf(client.get("/cuenta").text)
+    where = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": audit_id, "strategy": "new", "name": "EA Oro", "csrf": csrf},
+        follow_redirects=False,
+    ).headers["location"]
+    for _ in range(3):
+        assert client.get(f"{where}/pdf").content == b"%PDF-fake"
+    assert len(pages) == 1  # the same summary renders once
+    assert "class='skip'" not in pages[0] and "href='/audits/" not in pages[0]
+    # A change (a rename) renders again; past the window's limit, a 429.
+    for n in range(web.STRATEGY_PDFS_PER_WINDOW):
+        client.post(f"{where}/nombre", data={"name": f"EA {n}", "csrf": csrf})
+        client.get(f"{where}/pdf")
+    refused = client.get(f"{where}/pdf")
+    assert refused.status_code == 429 and "PDF" in refused.text
+    assert len(pages) == web.STRATEGY_PDFS_PER_WINDOW
+    # The cached one still downloads.
+    client.post(f"{where}/nombre", data={"name": "EA 0", "csrf": csrf})
+    assert client.get(f"{where}/pdf").status_code == 200

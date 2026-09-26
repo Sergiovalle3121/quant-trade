@@ -1413,9 +1413,18 @@ def strategy_page(
             cells = (
                 "<td class='strat-locked' colspan='3'>"
                 f"<span class='acct-tag'>{_e(copy['locked'])}</span> "
-                f"<a href='{_e(report_href(item.audit_id, locale))}'>{_e(copy['unlock'])}</a>"
-                "</td>"
+                + (
+                    _e(copy["unlock"])
+                    if printable
+                    else f"<a href='{_e(report_href(item.audit_id, locale))}'>"
+                    f"{_e(copy['unlock'])}</a>"
+                )
+                + "</td>"
             )
+        # A PDF carries no links, like a report's: they would point nowhere.
+        badge = _class_badge(item.overall_class)
+        if not printable:
+            badge = f"<a href='{_e(report_href(item.audit_id, locale))}'>{badge}</a>"
         remove = (
             f"<form method='post' action='{base}/quitar'>"
             + _hidden("csrf", csrf)
@@ -1425,8 +1434,7 @@ def strategy_page(
         )
         rows.append(
             f"<tr><td>v{number}</td><td class='strat-date'>{_e(_date(item.created_at))}</td>"
-            f"<td class='strat-cls'><a href='{_e(report_href(item.audit_id, locale))}'>"
-            f"{_class_badge(item.overall_class)}</a></td>{cells}"
+            f"<td class='strat-cls'>{badge}</td>{cells}"
             + ("" if printable else f"<td class='strat-rm'>{remove}</td>")
             + "</tr>"
         )
