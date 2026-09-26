@@ -2243,7 +2243,9 @@ and a report paid with an access code work without one, and an account never
 changes what a report says.
 
 - **Free tier** (`accounts.FREE_PREVIEWS_PER_MONTH = 3`,
-  `FREE_PREVIEWS_PER_IP_PER_MONTH = 10`; not in free mode). An upload
+  `FREE_PREVIEWS_PER_IP_PER_MONTH = 10` per IPv6 /64,
+  `FREE_PREVIEWS_PER_IPV4_PER_MONTH = 30` per IPv4 address; not in free
+  mode). An upload
   without a working access code needs a signed-in account (401 page with
   "Crear cuenta gratis" otherwise; `{"error": "free_tier_signin"}` for JSON).
   Each account gets 3 free previews per calendar month (UTC), counted in
@@ -2259,7 +2261,15 @@ changes what a report says.
   5 sign-ups per hour per address only slow that down. E-mail confirmation
   (needs a mail provider) would close it.
 - **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
-  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3`; not in free mode). A signed-in
+  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
+  `WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10` per IPv4 address; not in free
+  mode). Why IPv4 gets more (`accounts.network_cap`): mobile carriers in
+  Mexico, Brazil and elsewhere put many customers behind one shared IPv4
+  address (carrier-grade NAT), so a cap of 3 would turn a stranger's very
+  first upload on a phone into a preview. The cost: someone on one IPv4
+  connection who clears cookies and opens accounts with made-up addresses
+  and different files can get up to 10 free reports a month instead of 3.
+  E-mail confirmation (needs a mail provider) would close that. A signed-in
   account's first upload comes out as a full report with PDF and a
   publishable verification page, paid with the reference `welcome:<id>`
   (`paid_with = "welcome"`, `acct=welcome` shows the notice). It does not
