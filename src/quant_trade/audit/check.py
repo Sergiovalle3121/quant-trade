@@ -305,7 +305,7 @@ def check_result(found: IssuedFile | None, digest: str, locale: str) -> str:
             text = copy["found_no_class"].format(kind=kind, date=date)
         if found.public_id:
             # The public page has no Portuguese yet; it opens in English.
-            href = f"/v/{_e(found.public_id)}?lang={'en' if locale == 'pt' else locale}"
+            href = f"/v/{_e(found.public_id)}?lang={locale}"
             link = (
                 f"<a class='btn btn-ghost btn-sm' href='{href}'>{_e(copy['public'])}"
                 f"{icon('arrow')}</a>"
