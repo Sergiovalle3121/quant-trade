@@ -863,15 +863,18 @@ def _bill_rates(market: Callable[[str], pd.Series | None] | None) -> pd.Series |
 
 
 def _usable_rates(rates: pd.Series | None) -> pd.Series | None:
-    """The finite numeric rates on readable dates; None when nothing is left or
-    the reply is not a dated series at all (a broken download or cache), so the
-    lines that need them say the rates were unavailable instead of failing."""
+    """The finite numeric rates up to ``market.MAX_RATE`` on readable dates; None
+    when nothing is left or the reply is not a dated series at all (a broken
+    download or cache), so the lines that need them say the rates were
+    unavailable instead of failing."""
     if rates is None:
         return None
     try:
         index = pd.DatetimeIndex(pd.to_datetime(rates.index))
         values = pd.to_numeric(pd.Series(rates.to_numpy(), index=index), errors="coerce")
-        values = values[np.isfinite(values.to_numpy(dtype=float))]
+        numbers = values.to_numpy(dtype=float)
+        # The ceiling MarketData applies to a download; a cache or stub can skip it.
+        values = values[np.isfinite(numbers) & (numbers <= market_lib.MAX_RATE)]
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         return None
     return None if values.empty else values.astype(float)

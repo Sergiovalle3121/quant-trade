@@ -1265,9 +1265,17 @@ STATS = """
 .read-line{border-left:3px solid var(--text);padding:2px 0 2px 14px;margin:14px 0;font-weight:500;color:var(--text)}
 table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
 @media (max-width:420px){.facts.ranges .fact b{white-space:normal}}
+table.currency tr.cur-base td{background:var(--surface-2);font-weight:600}
+table.currency tr.cur-real td{border-bottom:2px solid var(--border-2)}
+@media screen and (max-width:420px){.paper table.holding td:first-child{min-width:8.6em}
+.paper table.holding td{padding-left:4px!important;padding-right:4px!important}}
 @media print{.facts.ranges{margin-bottom:12pt}.facts.ranges .fact b{font-size:13pt!important;line-height:1.2;letter-spacing:-.02em}
 .read-line{border-left:2px solid #000;padding:0 0 0 8pt;margin:8pt 0;break-inside:avoid}
-table.timing tr.fee-classic td{border-top:1.5px solid #999}}
+table.timing tr.fee-classic td{border-top:1.5px solid #999}
+table.currency tr.cur-base td{background:#f4f4f5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+table.currency tr.cur-real td{border-bottom:1.5px solid #999}
+.paper table.currency{width:100%;font-size:8.5pt}table.currency td:first-child{width:40%}
+table.currency th,table.currency td{padding:6px 8px!important}}
 """
 
 #: The full stylesheet, inlined in every page.
