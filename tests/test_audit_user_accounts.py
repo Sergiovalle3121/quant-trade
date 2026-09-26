@@ -2141,3 +2141,56 @@ def test_a_preview_says_why_it_was_not_the_free_full_report(tmp_path: Path) -> N
     assert (
         "welcome_refused" not in again.get(same_browser.replace("preview_device", "preview_x")).text
     )
+
+
+def test_ipv6_counts_by_its_64_in_the_free_tier_and_invites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    assert accounts.network_address("2001:db8:1:2::abcd") == "2001:db8:1:2::/64"
+    assert accounts.network_address("2001:db8:1:2:ffff::1") == "2001:db8:1:2::/64"
+    assert accounts.network_address("::ffff:203.0.113.9") == "203.0.113.9"
+    assert accounts.network_address("203.0.113.9") == "203.0.113.9"
+    assert accounts.network_address("not an ip") == "not an ip"
+    assert accounts.network_key("2001:db8:1:2::1") == accounts.network_key("2001:db8:1:2::2")
+    assert accounts.network_key("2001:db8:1:3::1") != accounts.network_key("2001:db8:1:2::1")
+
+    # Rotating addresses inside one /64 does not pass the free reports' network cap.
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 1)
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client, welcome=True)
+    first = client.post(
+        "/audits",
+        files=_seeded_file(71),
+        data={"consent": "on"},
+        headers={"X-Forwarded-For": "2001:db8:1:2::10"},
+        follow_redirects=False,
+    )
+    assert "acct=welcome" in first.headers["location"]
+    token = _invite_token(client)
+    other = TestClient(client.app)
+    _join(other, "bea@example.com", token)
+    rotated = other.post(
+        "/audits",
+        files=_seeded_file(72),
+        data={"consent": "on"},
+        headers={"X-Forwarded-For": "2001:db8:1:2::99"},
+        follow_redirects=False,
+    )
+    assert "acct=welcome" not in rotated.headers["location"]
+    assert "acct=preview_network" in rotated.headers["location"]
+    # ...and with the cap raised, the same /64 is the inviter's own network: no credit.
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 3)
+    carl = TestClient(client.app)
+    _join(carl, "carl@example.com", token)
+    carl.post(
+        "/audits",
+        files=_seeded_file(73),
+        data={"consent": "on"},
+        headers={"X-Forwarded-For": "2001:db8:1:2:aaaa::5"},
+    )
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 0  # type: ignore[attr-defined]
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert "self" in [item["outcome"] for item in data["invites"]["joined"]]

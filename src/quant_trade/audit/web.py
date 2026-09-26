@@ -2248,6 +2248,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         device_sha256 = acct.hash_secret(device)
         reservation = acct.new_secret()
         fingerprint = ""
+        # The free tier counts networks: an IPv6 address stands for its /64.
+        net = acct.network_address(ip) if ip else ""
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.
         welcome_refused = ""
@@ -2256,7 +2258,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             """The first look at the monthly previews and the credits."""
             nonlocal free_preview, spend_credit
             used = db.free_previews_since(start, account_id=account_id)
-            network = db.free_previews_since(start, client_ip=ip)
+            network = db.free_previews_since(start, client_ip=net)
             if (
                 used < acct.FREE_PREVIEWS_PER_MONTH
                 and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
@@ -2278,9 +2280,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 ]
             }
             if ip:
-                net = acct.network_key(ip)
+                net_key = acct.network_key(ip)
                 slots["network"] = [
-                    f"preview:ip:{net}:{month}:{n}"
+                    f"preview:ip:{net_key}:{month}:{n}"
                     for n in range(acct.FREE_PREVIEWS_PER_IP_PER_MONTH)
                 ]
             return db.claim_free(reservation, keys=(), slots=slots, at=now)
@@ -2294,7 +2296,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     account_id,
                     device_sha256=device_sha256,
                     file_sha256=fingerprint,
-                    client_ip=ip,
+                    client_ip=net,
                     since=start,
                     per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
                 )
@@ -2339,7 +2341,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     gate_account.id,
                     device_sha256=device_sha256,
                     file_sha256="",
-                    client_ip=ip,
+                    client_ip=net,
                     since=start,
                     per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
                 )
@@ -2571,12 +2573,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     gate_account.id,
                     device_sha256=device_sha256,
                     file_sha256=fingerprint,
-                    client_ip=ip,
+                    client_ip=net,
                     at=now,
                 )
                 paid = welcomed
                 if welcomed:
-                    _reward_invite(gate_account.id, device_sha256, ip, now)
+                    _reward_invite(gate_account.id, device_sha256, net, now)
             elif spend_credit:
                 credit_used = db.redeem_with_account(
                     audit_id, gate_account.id, at=datetime.now(UTC)
@@ -2594,7 +2596,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
                 free_preview = True
             if free_preview:
-                db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
+                db.record_free_preview(audit_id, gate_account.id, client_ip=net, at=now)
         if paid or _session(request) is not None:
             linked = db.get_audit(audit_id)
             _link_to_session(
