@@ -1027,6 +1027,12 @@ REPORT: dict[str, Any] = {
             "dos dois lados o que a letra do Tesouro dos EUA de 3 meses pagou (beta {beta}, "
             "t = {t}, {n} períodos)."
         ),
+        "alpha_line_local": (
+            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, depois de subtrair "
+            "da estratégia o que o caixa na moeda da conta pagou ({code}: {name}) e do "
+            "benchmark, tomado como cotado em dólares, o que a letra do Tesouro dos EUA de 3 "
+            "meses pagou (beta {beta}, t = {t}, {n} períodos)."
+        ),
         "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, sem subtrair o que "
             "o caixa pagou (beta {beta}, t = {t}, {n} períodos)."
@@ -4821,6 +4827,20 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "the moments leave no variance to scale by",
         "os momentos não deixam variância para escalar",
+    ),
+    (
+        (
+            "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+            "standard error; what cash in the account's currency paid subtracted from the "
+            "strategy and what the 3-month US Treasury bill paid subtracted from the benchmark, "
+            "taken as priced in US dollars"
+        ),
+        (
+            "retorno além dos movimentos do benchmark (alfa de Jensen), anualizado; erro "
+            "padrão prudente; subtraído da estratégia o que o caixa na moeda da conta pagou e "
+            "do benchmark, tomado como cotado em dólares, o que a letra do Tesouro dos EUA de 3 "
+            "meses pagou"
+        ),
     ),
     (
         "first-order autocorrelation of the returns",
