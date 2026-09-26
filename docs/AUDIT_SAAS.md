@@ -1131,6 +1131,20 @@ that open losses do not show. Hidden on fund records, whose own section
 already shows months and time under water. The depth itself is not repeated:
 the summary tiles show it.
 
+The same section lists the five deepest falls, the way a fund fact sheet
+does: each runs from the last point at a high to its lowest point and ends on
+the first date back at that high (or stays open at the file's end), with its
+depth, the days down, the days back and the total. It also shows the Calmar
+ratio (compound annual return over the depth of the deepest fall, from 365
+days of history, the same return the summary prints) and the expected
+shortfall: the average of the worst 5 % of daily returns (from 40 days, and
+only when the curve has a point on most days) and of monthly returns (from
+40 months), so the 5 % always holds at least two. On a fund record the
+falls, the Calmar ratio and the monthly figure appear in the fund's own
+section, in months. A first month that holds only the starting point (a fund
+record's opening value) is the base, not a month with a return of zero. All
+are MEASURED and informational: none enters a dimension, a flag or the class.
+
 ### Losing streaks next to chance (`audit/streaks.py`)
 
 The trade statistics put the longest losing run next to the one chance

@@ -1992,6 +1992,30 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("the curve has no point on most days", "la curva no tiene puntos en la mayoría de los días"),
     ("fewer than three calendar months", "menos de tres meses naturales"),
     (
+        "fewer than 81 days; the worst 5 % would hold fewer than 5",
+        "menos de 81 días; el peor 5 % tendría menos de 5",
+    ),
+    (
+        "fewer than 40 months; the worst 5 % would hold fewer than 2",
+        "menos de 40 meses; el peor 5 % tendría menos de 2",
+    ),
+    (
+        "average of the worst 5 % of the days",
+        "media del peor 5 % de los días",
+    ),
+    (
+        "average of the worst 5 % of the months",
+        "media del peor 5 % de los meses",
+    ),
+    (
+        "compound annual return over the depth of the deepest fall",
+        "retorno anual compuesto dividido entre la profundidad de la mayor caída",
+    ),
+    (
+        "under a year of history; it divides an annual return",
+        "menos de un año de historial; divide un retorno anual",
+    ),
+    (
         "calendar days from the uploaded equity curve; months from each month's last point",
         "días naturales de la curva de equity aportada; meses con el último punto de cada mes",
     ),
