@@ -461,7 +461,9 @@ def looks_like_platform_report(filename: str | None, data: bytes) -> bool:
     """
     name = (filename or "").lower()
     head = data[:4096]
-    if head.startswith(b"PK\x03\x04") or name.endswith(".xlsx"):
+    if head.startswith((b"PK\x03\x04", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")) or name.endswith(
+        (".xlsx", ".ods")
+    ):
         # A workbook is a report only when an importer knows it; a sheet
         # with a date and an equity column stays an equity curve.
         return detect_format(data) is not None

@@ -207,10 +207,12 @@ RULES: tuple[tuple[str, str], ...] = (
      "not swapped",
      "todas as operações fecham antes de abrir: confira se as colunas de hora de entrada "
      "e de saída não estão trocadas"),
-    ("this is an old Excel workbook (.xls), which cannot be read: open it in Excel, "
-     "LibreOffice or Google Sheets and save it as .xlsx or CSV, then upload that file",
-     "esta é uma planilha antiga do Excel (.xls), que não pode ser lida: abra-a no Excel, "
-     "LibreOffice ou Google Sheets, salve como .xlsx ou CSV e envie esse arquivo"),
+    ("this file could not be read as an old Excel workbook (.xls); it may be damaged, "
+     "password-protected or not a spreadsheet: open it in Excel, LibreOffice or Google "
+     "Sheets and save it as .xlsx or CSV, then upload that file",
+     "este arquivo não pôde ser lido como uma planilha antiga do Excel (.xls); pode estar "
+     "danificado, protegido por senha ou não ser uma planilha: abra-o no Excel, LibreOffice "
+     "ou Google Sheets, salve como .xlsx ou CSV e envie esse arquivo"),
     ("a PDF is a printed statement, not data that can be read: download the history from "
      "the platform as CSV, Excel or HTML instead (the guides show where)",
      "um PDF é um extrato impresso, não dados que possam ser lidos: baixe o histórico da "
