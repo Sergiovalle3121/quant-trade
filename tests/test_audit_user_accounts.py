@@ -2879,6 +2879,7 @@ def test_the_open_sessions_list_exists_in_every_language(tmp_path: Path) -> None
     ):
         page = client.get(prefix).text
         assert words in page and "Safari · iPhone" in page, prefix
+        assert "testclient" not in page, prefix
         assert not find_claims(re.sub(r"<[^>]+>", " ", page))
     ctx = LegalContext(
         operator_name="Op",

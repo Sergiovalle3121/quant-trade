@@ -1277,12 +1277,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _note_session(request: Request, digest: str, account_id: str) -> None:
         """Keep "Sesiones abiertas" current; a failure never blocks the page."""
+        client_ip = _client_ip(request, cfg.trusted_proxy_hops)
+        try:
+            ipaddress.ip_address(client_ip.strip())
+        except ValueError:
+            client_ip = ""  # only a real address is stored and shown
         try:
             db.touch_session(
                 digest,
                 account_id,
                 device=acct.device_label(request.headers.get("user-agent", "")),
-                network=acct.network_address(_client_ip(request, cfg.trusted_proxy_hops)),
+                network=acct.network_address(client_ip) if client_ip else "",
                 now=datetime.now(UTC),
             )
         except Exception:  # pragma: no cover - best effort
