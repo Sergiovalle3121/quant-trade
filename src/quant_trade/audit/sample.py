@@ -10,6 +10,7 @@ an unflattering class when the synthetic data earns one.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import numpy as np
@@ -285,8 +286,17 @@ def synthetic_mt5_optimization(passes: int = SAMPLE_PASSES) -> bytes:
     ).encode("utf-8")
 
 
-def sample_result(locale: str = "es", *, bootstrap_samples: int = SAMPLE_BOOTSTRAP) -> AuditResult:
-    """The sample audit in ``locale``; deterministic for a given sample size."""
+def sample_result(
+    locale: str = "es",
+    *,
+    bootstrap_samples: int = SAMPLE_BOOTSTRAP,
+    market: Callable[[str], pd.Series | None] | None = None,
+) -> AuditResult:
+    """The sample audit in ``locale``; deterministic for a given sample size.
+
+    ``market`` reads public series already in memory (the service's cache),
+    so the sample shows the same public-data lines an upload gets; without
+    it the sample is built offline."""
     declared = DeclaredMetadata(
         trials=SAMPLE_PASSES,
         cost_bps_per_side=1.0,
@@ -305,7 +315,7 @@ def sample_result(locale: str = "es", *, bootstrap_samples: int = SAMPLE_BOOTSTR
         live_bytes=synthetic_live_statement(),
         live_filename="SyntheticSampleLive.csv",
     )
-    return run_audit(inputs, bootstrap_samples=bootstrap_samples, now=SAMPLE_NOW)
+    return run_audit(inputs, bootstrap_samples=bootstrap_samples, now=SAMPLE_NOW, market=market)
 
 
 __all__ = [

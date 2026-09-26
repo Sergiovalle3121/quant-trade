@@ -114,7 +114,7 @@ COPY_PT: dict[str, str] = {
     "welcome_available": "Disponível",
     "welcome_used": "Usado",
     "welcome_refused_file": (
-        "Este arquivo já recebeu um relatório completo grátis em outra conta, então desta vez "
+        "Este arquivo já recebeu um relatório completo grátis, então desta vez "
         "é uma prévia. Seu relatório grátis continua disponível para outro arquivo."
     ),
     "welcome_refused_device": (

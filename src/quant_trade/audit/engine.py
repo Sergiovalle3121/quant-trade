@@ -569,7 +569,9 @@ def _holdout(
 
 
 def _benchmark(
-    strategy: IngestedSeries, benchmark: IngestedSeries | None
+    strategy: IngestedSeries,
+    benchmark: IngestedSeries | None,
+    rates: pd.Series | None = None,
 ) -> tuple[dict[str, Any], dict[str, float | None], str | None]:
     empty: dict[str, float | None] = {
         "excess_return": None,
@@ -631,9 +633,10 @@ def _benchmark(
             else not_measured("benchmark has no drawdown")
         ),
     }
-    s_returns = s_eq["equity"].astype(float).pct_change().dropna().to_numpy()
-    b_returns = b_eq["equity"].astype(float).pct_change().dropna().to_numpy()
-    section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy)
+    s_returns = s_eq["equity"].astype(float).pct_change().to_numpy()[1:]
+    b_returns = b_eq["equity"].astype(float).pct_change().to_numpy()[1:]
+    cash = cashrate_lib.span_cash(joined["timestamp"], rates)
+    section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
     return section, values, None
 
 
@@ -1101,7 +1104,10 @@ def run_audit(
     subperiods = _subperiods(frame)
     rolling = _rolling(frame, ppy)
     holdout, oos_sharpe, gap, holdout_reason = _holdout(frame, inputs.declared.oos_start, ppy)
-    benchmark, benchmark_values, benchmark_reason = _benchmark(inputs.equity, inputs.benchmark)
+    bill_rates = _bill_rates(market)
+    benchmark, benchmark_values, benchmark_reason = _benchmark(
+        inputs.equity, inputs.benchmark, bill_rates
+    )
     cscv, pbo = _cscv(inputs.variants)
     costs, rows, reference, assumed, gross = _costs(inputs)
     measured_trials = trials_used if trials_evidence == MEASURED else 0
@@ -1199,7 +1205,6 @@ def run_audit(
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
     bench_months, bench_source = _fund_benchmark(inputs)
-    bill_rates = _bill_rates(market)
     fund = fund_lib.fund_review(
         inputs.equity.frame, inputs.periods_per_year, bench_months, bench_source, bill_rates
     )

@@ -58,6 +58,42 @@ def _days(stamps: pd.Series) -> pd.DatetimeIndex:
     return index.tz_convert("UTC").tz_localize(None).astype("datetime64[ns]")
 
 
+def _span_rates(stamps: pd.DatetimeIndex, rates: pd.Series) -> tuple[np.ndarray, np.ndarray] | str:
+    """The bill's annual yield at the start of each span between consecutive
+    ``stamps`` and the span's length in days, or why they are missing."""
+    starts = stamps[:-1]
+    span_days = np.clip(
+        np.asarray((stamps[1:] - stamps[:-1]).total_seconds(), dtype=float) / 86400.0, 0.0, None
+    )
+    known = rates.copy()
+    known.index = pd.DatetimeIndex(known.index).tz_localize(None).astype("datetime64[ns]")
+    known = known[~known.index.duplicated(keep="last")].sort_index()
+    if known.empty:
+        return UNAVAILABLE
+    paired = pd.merge_asof(
+        pd.DataFrame({"day": starts.floor("D")}),
+        pd.DataFrame({"day": known.index, "rate": known.to_numpy(), "seen": known.index}),
+        on="day",
+        direction="backward",
+    )
+    stale = paired["seen"].isna() | ((paired["day"] - paired["seen"]).dt.days > MAX_GAP_DAYS)
+    if bool(stale.any()):
+        return NOT_COVERED
+    return annual_yield(paired["rate"].to_numpy(dtype=float) / 100.0), span_days
+
+
+def span_cash(stamps: pd.Series, rates: pd.Series | None) -> np.ndarray | None:
+    """What the bill paid over each span between consecutive ``stamps``;
+    ``None`` when the rates are missing or do not cover every span's start."""
+    if rates is None or rates.empty or len(stamps) < 2:
+        return None
+    paired = _span_rates(_days(stamps), rates)
+    if isinstance(paired, str):
+        return None
+    yearly, span_days = paired
+    return np.asarray((1.0 + yearly) ** (span_days / 365.0) - 1.0, dtype=float)
+
+
 def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str, Any]:
     """The Sharpe ratio of the returns in ``frame`` (``timestamp``, ``equity``)
     after the bill's rate over each return's days."""
@@ -67,29 +103,16 @@ def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str
     if len(equity) < MIN_RETURNS + 1:
         return {"status": "NOT_MEASURED", "reason": TOO_FEW, **base}
     returns = equity[1:] / equity[:-1] - 1.0
-    starts = stamps[:-1]
-    span_days = np.asarray((stamps[1:] - stamps[:-1]).total_seconds(), dtype=float) / 86400.0
-    known = rates.copy()
-    known.index = pd.DatetimeIndex(known.index).tz_localize(None).astype("datetime64[ns]")
-    known = known[~known.index.duplicated(keep="last")].sort_index()
-    if known.empty:
-        return {"status": "NOT_MEASURED", "reason": UNAVAILABLE, **base}
-    paired = pd.merge_asof(
-        pd.DataFrame({"day": starts.floor("D")}),
-        pd.DataFrame({"day": known.index, "rate": known.to_numpy(), "seen": known.index}),
-        on="day",
-        direction="backward",
-    )
-    stale = paired["seen"].isna() | ((paired["day"] - paired["seen"]).dt.days > MAX_GAP_DAYS)
-    if bool(stale.any()):
-        return {"status": "NOT_MEASURED", "reason": NOT_COVERED, **base}
-    yearly = annual_yield(paired["rate"].to_numpy(dtype=float) / 100.0)
-    cash = (1.0 + yearly) ** (np.clip(span_days, 0.0, None) / 365.0) - 1.0
+    paired = _span_rates(stamps, rates)
+    if isinstance(paired, str):
+        return {"status": "NOT_MEASURED", "reason": paired, **base}
+    yearly, span_days = paired
+    cash = (1.0 + yearly) ** (span_days / 365.0) - 1.0
     excess = returns - cash
     spread = float(excess.std(ddof=1))
     if not math.isfinite(spread) or spread <= 0:
         return {"status": "NOT_MEASURED", "reason": FLAT, **base}
-    weights = np.clip(span_days, 0.0, None)
+    weights = span_days
     mean_rate = float(np.average(yearly, weights=weights)) if weights.sum() > 0 else 0.0
     sharpe = float(excess.mean() / spread * math.sqrt(ppy))
     years = float(weights.sum()) / 365.0
@@ -112,4 +135,4 @@ def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str
     }
 
 
-__all__ = ["NOTE", "UNAVAILABLE", "annual_yield", "excess_sharpe"]
+__all__ = ["NOTE", "UNAVAILABLE", "annual_yield", "excess_sharpe", "span_cash"]

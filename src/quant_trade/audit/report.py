@@ -701,6 +701,11 @@ LABELS: dict[str, dict[str, str]] = {
             "al archivo."
         ),
         "alpha_line": (
+            "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, después "
+            "de restar a ambos lo que pagó la letra del Tesoro de EE. UU. a 3 meses (beta "
+            "{beta}, t = {t}, {n} periodos)."
+        ),
+        "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, sin restar "
             "lo que pagó el efectivo (beta {beta}, t = {t}, {n} periodos)."
         ),
@@ -1794,6 +1799,11 @@ LABELS: dict[str, dict[str, str]] = {
             "file."
         ),
         "alpha_line": (
+            "Jensen's alpha: {alpha} a year beyond what the benchmark explains, after "
+            "subtracting from both what the 3-month US Treasury bill paid (beta {beta}, "
+            "t = {t}, {n} periods)."
+        ),
+        "alpha_line_no_cash": (
             "Jensen's alpha: {alpha} a year beyond what the benchmark explains, without "
             "subtracting what cash paid (beta {beta}, t = {t}, {n} periods)."
         ),
@@ -3606,7 +3616,8 @@ def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str
 
 
 def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
-    """Jensen's alpha against the uploaded benchmark, with its cautious t (no cash subtracted)."""
+    """Jensen's alpha against the uploaded benchmark, with its cautious t; the line
+    says whether the Treasury bill's return was subtracted from both sides."""
     block = benchmark.get("jensen") or {}
     if block.get("status") != "MEASURED":
         return ""
@@ -3615,7 +3626,8 @@ def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
     t_stat = _ev_value(block.get("alpha_t_stat"))
     if alpha is None or beta is None or t_stat is None:
         return ""
-    line = labels["alpha_line"].format(
+    name = "alpha_line" if block.get("cash_subtracted") else "alpha_line_no_cash"
+    line = labels[name].format(
         alpha=_pct(alpha, signed=True),
         beta=f"{beta:.2f}",
         t=f"{t_stat:.2f}",
