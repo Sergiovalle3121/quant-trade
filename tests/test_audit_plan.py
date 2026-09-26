@@ -149,3 +149,31 @@ def test_report_shows_the_plan_and_locks_its_figures_until_paid() -> None:
         assert step.finding not in locked
     english = render_html(result, watermark=False, free_mode=False, locale="en")
     assert "Plan to reach a better class" in english
+
+
+@pytest.mark.parametrize(
+    ("locale", "expected"),
+    [
+        ("es", "Caída máxima 1.40 veces la de la referencia; se acepta hasta 1.0 veces"),
+        ("en", "Drawdown 1.40 times the reference's; up to 1.0 times is accepted"),
+        ("pt", "Queda máxima 1.40 vezes a da referência; aceita-se até 1.0 vez"),
+    ],
+)
+def test_benchmark_step_says_the_drawdown_bar_in_times_and_whether_it_is_met(
+    locale: str, expected: str
+) -> None:
+    from quant_trade.audit.plan import _benchmark_step
+
+    data = {
+        "benchmark": {
+            "source": "upload",
+            "excess_return": {"value": 0.02},
+            "drawdown_ratio": {"value": 1.4},
+        }
+    }
+    finding, actions = _benchmark_step(data, "WEAK", locale)
+    assert expected in finding
+    assert ("no cumple" if locale == "es" else "not met" if locale == "en" else "não cumpre") in (
+        finding
+    )
+    assert find_claims(" ".join([finding, *actions])) == []

@@ -911,11 +911,11 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
         parts.append(
             _say(
                 locale,
-                f"Diferencia dentro/fuera {_fmt(gap)}; el máximo es 1.0 "
+                f"Sharpe dentro de muestra menos el de fuera: {_fmt(gap)}; se acepta hasta 1.0 "
                 f"({'cumple' if gap <= 1.0 else 'no cumple'}).",
-                f"In/out gap {_fmt(gap)}; the maximum is 1.0 "
+                f"In-sample Sharpe minus out-of-sample Sharpe: {_fmt(gap)}; up to 1.0 is accepted "
                 f"({'met' if gap <= 1.0 else 'not met'}).",
-                f"Diferença dentro/fora {_fmt(gap)}; o máximo é 1.0 "
+                f"Sharpe dentro da amostra menos o de fora: {_fmt(gap)}; aceita-se até 1.0 "
                 f"({'cumpre' if gap <= 1.0 else 'não cumpre'}).",
             )
         )
@@ -1016,9 +1016,13 @@ def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str
         parts.append(
             _say(
                 locale,
-                f"Drawdown {_fmt(ratio)} veces el de la referencia; el máximo es 1.0.",
-                f"Drawdown {_fmt(ratio)} times the reference's; the maximum is 1.0.",
-                f"Drawdown {_fmt(ratio)} vezes o da referência; o máximo é 1.0.",
+                f"Caída máxima {_fmt(ratio)} veces la de la referencia; se acepta hasta 1.0 "
+                f"veces, es decir, no caer más que ella "
+                f"({'cumple' if ratio <= 1.0 else 'no cumple'}).",
+                f"Drawdown {_fmt(ratio)} times the reference's; up to 1.0 times is accepted, "
+                f"that is, falling no further than it ({'met' if ratio <= 1.0 else 'not met'}).",
+                f"Queda máxima {_fmt(ratio)} vezes a da referência; aceita-se até 1.0 vez, ou "
+                f"seja, não cair mais que ela ({'cumpre' if ratio <= 1.0 else 'não cumpre'}).",
             )
         )
     actions = _say(
