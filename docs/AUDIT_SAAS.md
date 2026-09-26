@@ -2141,6 +2141,16 @@ changes what a report says.
   session (sign-out, "sign out the others", password change, expiry through
   `purge_sessions`) and with the account; the export lists each session's
   device, network and last use.
+- **Recent activity** (`account_events` table, "Actividad reciente" in Mi
+  cuenta): each sign-in (password only, with the app's code, or with the
+  recovery key), sign-up, password change (in the account, with the recovery
+  key or with an owner reset link), two-step on or off (also by the owner's
+  `audit account-two-step-off`), new recovery key and session signed out,
+  with its time, device label and network (the same values as "Sesiones
+  abiertas"). The latest 50 per account are kept (`store.ACCOUNT_EVENT_MAX`);
+  older than 90 days (`ACCOUNT_EVENT_DAYS`) they go with `purge_sessions`,
+  which every sign-in runs. They go with the account, and the export lists
+  them under `activity`. Failed sign-ins are not listed.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

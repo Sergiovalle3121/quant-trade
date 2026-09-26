@@ -590,6 +590,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "network address (an IPv6 address counts as its /64) and when it was last "
                     "used. It is deleted when the session is signed out or expires, or with your "
                     "account.",
+                    "For 'Recent activity' in your account: each sign-in (with or without a "
+                    "code), each change of password, two-step sign-in or recovery key and each "
+                    "session signed out, with its date, the short device label and the network "
+                    "address. We keep the latest 50, and delete them after 90 days and with your "
+                    "account.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
@@ -735,6 +740,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "dispositivo (como «Chrome · Windows», nunca el texto completo del navegador), la "
                 "dirección de red (una IPv6 cuenta como su /64) y cuándo se usó por última vez. "
                 "Se borra al cerrar la sesión o al caducar, o con tu cuenta.",
+                "Para «Actividad reciente» en tu cuenta: cada entrada (con o sin código), cada "
+                "cambio de contraseña, de verificación en dos pasos o de clave de recuperación "
+                "y cada sesión cerrada, con su fecha, la etiqueta corta del dispositivo y la "
+                "dirección de red. Guardamos las últimas 50, las borramos a los 90 días y "
+                "con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
