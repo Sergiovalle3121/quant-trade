@@ -844,18 +844,27 @@ def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[st
     return out
 
 
-def _cash_rate(
-    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
-) -> dict[str, Any] | None:
-    """The Sharpe ratio after what a US Treasury bill paid over the same days,
-    when public data is on."""
+def _bill_rates(market: Callable[[str], pd.Series | None] | None) -> pd.Series | None:
+    """The US Treasury bill rates, read once per audit, when public data is on."""
     if market is None:
         return None
     try:
         rates = market(market_lib.CASH.key)
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         rates = None
-    if rates is None or rates.empty:
+    return None if rates is None or rates.empty else rates
+
+
+def _cash_rate(
+    inputs: AuditInputs,
+    market: Callable[[str], pd.Series | None] | None,
+    rates: pd.Series | None,
+) -> dict[str, Any] | None:
+    """The Sharpe ratio after what a US Treasury bill paid over the same days,
+    when public data is on."""
+    if market is None:
+        return None
+    if rates is None:
         return {
             "status": "NOT_MEASURED",
             "reason": cashrate_lib.UNAVAILABLE,
@@ -1162,8 +1171,9 @@ def run_audit(
         else {"status": "NOT_MEASURED", "reason": "no trades uploaded"}
     )
     bench_months, bench_source = _fund_benchmark(inputs)
+    bill_rates = _bill_rates(market)
     fund = fund_lib.fund_review(
-        inputs.equity.frame, inputs.periods_per_year, bench_months, bench_source
+        inputs.equity.frame, inputs.periods_per_year, bench_months, bench_source, bill_rates
     )
     if fund.get("status") == "MEASURED":
         # Titles the report as a fund's track record rather than a backtest.
@@ -1184,7 +1194,7 @@ def run_audit(
         )
     )
     holding = None if fund.get("status") == "MEASURED" else _holding(inputs, market)
-    cash_rate = _cash_rate(inputs, market)
+    cash_rate = _cash_rate(inputs, market, bill_rates)
     vix_regime = _vix_regime(inputs, market)
     instruments = (
         instruments_lib.instrument_review(

@@ -92,7 +92,8 @@ class ParseError(ValueError):
     """The upload cannot be audited as supplied; the message says why.
 
     ``str(error)`` is the English message; ``message_es`` is its Spanish
-    twin and ``code`` a stable machine-readable reason. Callers that raise
+    twin and ``code`` a stable machine-readable reason; ``localized("pt")``
+    reads the English through ``errors_pt``. Callers that raise
     without a Spanish message (older code, third-party importers) fall back
     to the English text, so a page never shows an empty error.
     """
@@ -103,6 +104,11 @@ class ParseError(ValueError):
         self.message_es = message_es or message
 
     def localized(self, locale: str) -> str:
+        if locale == "pt":
+            # Imported here: ``errors_pt`` is a table of rules with no imports of ours.
+            from quant_trade.audit.errors_pt import portuguese
+
+            return portuguese(str(self)) or str(self)
         return self.message_es if locale == "es" else str(self)
 
 

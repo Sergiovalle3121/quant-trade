@@ -1828,7 +1828,7 @@ def _trust(
     words = TRUST_COPY[locale]
     linked = link_locale(locale)
     hrefs = {
-        "sample": _sample_url(linked),
+        "sample": _sample_url(locale),
         "method": method_url(linked),
         "check": _check_url(linked),
         "privacy": legal_url("privacy", linked),
@@ -2708,17 +2708,19 @@ def check_page(content: str, *, locale: str = "es", base_url: str = "") -> str:
 _ERROR_TITLES = {
     "es": {"page": "Página no encontrada", "server": "Algo falló"},
     "en": {"page": "Page not found", "server": "Something went wrong"},
+    "pt": {"page": "Página não encontrada", "server": "Algo falhou"},
 }
 
 
 #: Where an importer's message starts listing the formats it reads.
-_EXPECTED_MARKERS = ("Se espera:", "Expected:")
+_EXPECTED_MARKERS = ("Se espera:", "Expected:", "Esperado:")
 #: "...: sube la optimización del mismo robot" reads as the fix, so it gets its own line.
 _ACTION = re.compile(
-    r"[:;]\s+(?=(?:sube|vuelve|exp[oó]rta\w*|revisa|pide|upload|export|check|ask|re-export|optimi[sz]e)\b)",
+    r"[:;]\s+(?=(?:sube|vuelve|exp[oó]rta\w*|revisa|pide|upload|export|check|ask|re-export"
+    r"|optimi[sz]e|envie|exporte\w*|confira|informe|baixe|salve|otimize)\b)",
     re.I,
 )
-_ACTION_LABEL = {"es": "Qué hacer:", "en": "What to do:"}
+_ACTION_LABEL = {"es": "Qué hacer:", "en": "What to do:", "pt": "O que fazer:"}
 
 
 def _error_card(message: str, locale: str = "es") -> str:
@@ -2762,16 +2764,25 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     ui = _UI[locale]
     other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
+    # "/" has no Portuguese: the Portuguese form is at /pt.
+    back = LANDING_PATHS["pt"] if locale == "pt" else f"/?lang={locale}"
+    # A Portuguese page offers both other languages in the bar, not a third button.
+    switch = (
+        ""
+        if locale == "pt"
+        else f"<a class='btn btn-ghost' href='/?lang={other}' hreflang='{other}'>"
+        f"{_other_name(locale)}</a>"
+    )
     body = (
         _page_hero(ui["error_eyebrow"], title, dot="warn")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"{_error_card(message, locale)}<div class='back-row'>"
-        f"<a class='btn btn-dark' href='/?lang={_e(locale)}#subir'>{_e(copy['back'])}</a>"
+        f"<a class='btn btn-dark' href='{_e(back)}#subir'>{_e(copy['back'])}</a>"
         f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
-        f"{_e(GUIDES_COPY[locale]['title'])}</a>"
-        f"<a class='btn btn-ghost' href='/?lang={other}' hreflang='{other}'>{_other_name(locale)}"
-        "</a></div></div></div>"
+        f"{_e(GUIDES_COPY[locale]['title'])}</a>{switch}</div></div></div>"
     )
+    if locale == "pt":
+        return _page(title, locale, body, alternates=LANDING_PATHS, solid_nav=True)
     return _page(title, locale, body, switch_href=f"/?lang={other}", solid_nav=True)
 
 

@@ -48,6 +48,7 @@ from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
+from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
@@ -79,7 +80,7 @@ from quant_trade.audit.pages import (
     verification_page,
 )
 from quant_trade.audit.payments import stripe_checkout
-from quant_trade.audit.portuguese import link_locale
+from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
@@ -298,6 +299,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Only a full report can publish a verification.",
     },
 }
+for _key, _text in MESSAGES_PT.items():
+    MESSAGES[_key].setdefault("pt", _text)
 
 #: The only routes a browser or CDN may cache: public by design, no token.
 PUBLIC_CACHE_CONTROL = "public, max-age=300"
@@ -377,6 +380,9 @@ UPLOAD_NAMES: dict[str, dict[str, str]] = {
     "optimization": {"es": "de optimización", "en": "optimisation"},
     "live": {"es": "de la cuenta real", "en": "live statement"},
 }
+for _what, _name in FILES_PT.items():
+    if _what in UPLOAD_NAMES:
+        UPLOAD_NAMES[_what]["pt"] = _name
 
 
 def _megabytes(size: int) -> str:
@@ -943,7 +949,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request.cookies.get(funnel.SEEN_COOKIE) == today:
             return  # this browser was already counted today
         _cookie(response, funnel.SEEN_COOKIE, today, max_age=86400)
-        if path == "/" and request.query_params.get("lang") in ("es", "en", "pt"):
+        # "/" renders Spanish or English; Portuguese lives at /pt.
+        if path == "/" and request.query_params.get("lang") in ("es", "en"):
             locale = request.query_params["lang"]
         visits.add(day=today, locale=locale, ref=kept or arrived)
 
@@ -979,6 +986,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _locale(value: str | None) -> str:
         return value if value in LOCALES else "es"
 
+    def _error_locale(request: Request) -> str:
+        """The language of an error page: ``?lang=``, else Portuguese under ``/pt``."""
+        lang = request.query_params.get("lang")
+        if lang in REPORT_LOCALES:
+            return str(lang)
+        path = request.url.path
+        return "pt" if path == "/pt" or path.startswith("/pt/") else "es"
+
     def _html_error(
         request: Request, status: int, message: str, locale: str, *, kind: str = "audit"
     ) -> Response:
@@ -991,14 +1006,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.exception_handler(RequestValidationError)
     async def form_error(request: Request, exc: RequestValidationError) -> Response:
-        locale = _locale(request.query_params.get("lang"))
+        locale = _error_locale(request)
         return _html_error(request, 400, message("invalid_form", locale), locale)
 
     @app.exception_handler(Exception)
     async def server_error(request: Request, exc: Exception) -> Response:
         # Logged with the path only: the query string may hold the token.
         logger.exception("unhandled error on %s %s", request.method, request.url.path)
-        locale = _locale(request.query_params.get("lang"))
+        locale = _error_locale(request)
         return _secure(
             _html_error(request, 500, message("server_error", locale), locale, kind="server"),
             path=request.url.path,
@@ -1011,7 +1026,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         key = str(exc.detail) if str(exc.detail) in MESSAGES else "page_missing"
         if exc.status_code == 400 and request.url.path.startswith("/webhooks/"):
             return JSONResponse({"error": str(exc.detail)}, status_code=400)
-        locale = _locale(request.query_params.get("lang"))
+        locale = _error_locale(request)
         kind = "page" if key == "page_missing" else "audit"
         return _html_error(request, exc.status_code, message(key, locale), locale, kind=kind)
 
@@ -1313,8 +1328,50 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "strategy_full",
     )
 
+    def _referrals_on() -> bool:
+        # The reward is paid when the invitee's free first report exists.
+        return not cfg.free_mode and acct.WELCOME_FULL_REPORT
+
+    def _note_invite(request: Request, account_id: str, token: str, now: datetime) -> None:
+        """Note who invited a new account; a failure never breaks the sign-up."""
+        try:
+            inviter = db.inviter_for_token(token)
+            signed_in = _session(request)
+            if inviter is None or (signed_in is not None and signed_in[0].id == inviter):
+                return  # the inviter's own browser, still signed in
+            device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+            db.record_referral(
+                account_id,
+                inviter,
+                device_sha256=acct.hash_secret(device) if 0 < len(device) <= 128 else "",
+                at=now,
+            )
+        except Exception:  # noqa: BLE001 - an invite never breaks a sign-up
+            logger.warning("could not note an invite")
+
+    def _invite(token: str) -> str:
+        """An invite token that names an account, else ``""``."""
+        token = token.strip()[:40]
+        return token if token and db.inviter_for_token(token) else ""
+
+    def _reward_invite(account_id: str, device_sha256: str, ip: str, now: datetime) -> None:
+        """Credit whoever invited this account, now that its free report exists."""
+        try:
+            db.reward_referral(
+                account_id,
+                device_sha256=device_sha256,
+                client_ip=ip,
+                at=now,
+                credits=acct.REFERRAL_CREDITS,
+                monthly_cap=acct.REFERRAL_MONTHLY_CAP,
+            )
+        except Exception:  # noqa: BLE001 - the customer's report comes first
+            logger.warning("could not settle an invite")
+
     def _signup_get(path_locale: str) -> Callable[..., Response]:
-        def handler(request: Request, lang: str | None = None, next: str = "") -> Response:
+        def handler(
+            request: Request, lang: str | None = None, next: str = "", invita: str = ""
+        ) -> Response:
             locale = _account_locale(path_locale, lang)
             if _session(request):
                 return _account_redirect(locale)
@@ -1324,6 +1381,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 locale=locale,
                 csrf=csrf,
                 next_path=acct.safe_next(next),
+                invite=_invite(invita) if _referrals_on() else "",
             )
             return _anon_page(page, csrf)
 
@@ -1336,12 +1394,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             password: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
             next: Annotated[str, Form(max_length=1000)] = "",
+            invite: Annotated[str, Form(max_length=40)] = "",
             lang: str | None = None,
         ) -> Response:
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
             clean = acct.normalise_email(email)
             new_csrf = _anon_csrf(request)
+            invite = _invite(invite) if _referrals_on() else ""
 
             def again(error: str, status: int) -> Response:
                 page = account_pages.signup_page(
@@ -1351,6 +1411,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     error=error,
                     email=clean if acct.valid_email(clean) else "",
                     next_path=next_path,
+                    invite=invite,
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -1370,6 +1431,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
             if account is None:
                 return again("taken", 409)
+            if invite:
+                _note_invite(request, account.id, invite, now)
             ref = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
             if ref:
                 try:
@@ -1533,6 +1596,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         else ("used" if db.welcome_used(account.id) else "available")
                     ),
                     strategies=db.list_strategies(account.id),
+                    invite=(
+                        account_pages.InviteView(
+                            link=(
+                                f"{_site_url(request)}{account_pages.path('signup', locale)}"
+                                f"?{acct.INVITE_PARAM}={db.invite_token(account.id, at=now)}"
+                            ),
+                            summary=db.invite_summary(account.id, now),
+                            credits=acct.REFERRAL_CREDITS,
+                            monthly_cap=acct.REFERRAL_MONTHLY_CAP,
+                        )
+                        if _referrals_on()
+                        else None
+                    ),
                 )
             )
 
@@ -1623,7 +1699,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, csrf, _ = session
             strategy = db.get_strategy(account.id, strategy_id[:64])
             if strategy is None:
-                raise _not_found()
+                return HTMLResponse(account_pages.strategy_missing_page(locale), status_code=404)
             listed = {item.audit_id: item for item in db.account_audits_list(account.id)}
             versions = []
             for audit_id in strategy.audit_ids:
@@ -1723,7 +1799,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             here = f"{account_pages.strategies_path(locale)}/{strategy_id}"
             strategy = db.get_strategy(account.id, strategy_id[:64])
             if strategy is None:
-                raise _not_found()
+                return HTMLResponse(account_pages.strategy_missing_page(locale), status_code=404)
             if action == "remove" and audit_id in strategy.audit_ids:
                 db.file_report(account.id, audit_id, "", at=datetime.now(UTC))
             elif action == "rename":
@@ -2096,13 +2172,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         access_code: Annotated[str, Form()] = "",
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
-        # The report's language; the upload's own screens show Portuguese readers English.
+        # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
         loc = link_locale(report_loc)
         if _cross_site(request):
-            return _html_error(request, 403, message("cross_site", loc), loc)
+            return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
-            return _html_error(request, 400, message("consent_required", loc), loc)
+            return _html_error(request, 400, message("consent_required", report_loc), report_loc)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         now = datetime.now(UTC)
         since = now - timedelta(hours=1)
@@ -2112,7 +2188,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             recent >= cfg.max_uploads_per_hour_per_ip
             or attempts >= cfg.max_uploads_per_hour_per_ip * UPLOAD_ATTEMPTS_PER_UPLOAD
         ):
-            return _html_error(request, 429, message("rate_limited", loc), loc)
+            return _html_error(request, 429, message("rate_limited", report_loc), report_loc)
         # The free tier: without a code that still works, an upload needs an
         # account, and each account gets FREE_PREVIEWS_PER_MONTH previews a
         # calendar month (also capped per network address). Past it, a
@@ -2130,7 +2206,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
             session = _session(request)
             if not usable and session is None:
-                return _gate(request, loc, "code" if typed else "signin", 401)
+                return _gate(request, report_loc, "code" if typed else "signin", 401)
             if not usable and session is not None:
                 gate_account = session[0]
         try:
@@ -2149,15 +2225,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 count = limit // OPTIMIZATION_PASS_BYTES
                 passes = f"{round(count, -3) if count >= 1_000 else count:,}"
                 text = message(
-                    "optimization_too_large", loc, limit=_megabytes(limit), passes=passes
+                    "optimization_too_large", report_loc, limit=_megabytes(limit), passes=passes
                 )
             else:
                 text = message(
-                    "too_large", loc, what=UPLOAD_NAMES[exc.what][loc], limit=_megabytes(limit)
+                    "too_large",
+                    report_loc,
+                    what=UPLOAD_NAMES[exc.what][report_loc],
+                    limit=_megabytes(limit),
                 )
-            return _html_error(request, 413, text, loc)
+            return _html_error(request, 413, text, report_loc)
         if not uploads["equity"] and not uploads["report"]:
-            return _html_error(request, 400, message("equity_required", loc), loc)
+            return _html_error(request, 400, message("equity_required", report_loc), report_loc)
         # A new account's first file is a free full report (once per account,
         # browser and file); then the month's free previews; then a credit;
         # else the way to buy. This first look answers at once; the claims
@@ -2182,7 +2261,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 spend_credit = True
             else:
                 reason = "quota" if used >= acct.FREE_PREVIEWS_PER_MONTH else "network"
-                return _gate(request, loc, reason, 402)
+                return _gate(request, report_loc, reason, 402)
             return None
 
         def claim_preview(account_id: str) -> str:
@@ -2245,7 +2324,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if db.account_credits(account_id, now) > 0:
                     spend_credit = True
                     return None
-                return _gate(request, loc, "quota" if full == "account" else "network", 402)
+                return _gate(request, report_loc, "quota" if full == "account" else "network", 402)
             return None
 
         if gate_account is not None:
@@ -2278,7 +2357,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
             )
         except (ValidationError, ValueError):
-            return _html_error(request, 400, message("invalid_declared", loc), loc)
+            return _html_error(request, 400, message("invalid_declared", report_loc), report_loc)
         report_filename = report.filename if report is not None and uploads["report"] else None
         # A platform report dropped in the equity-curve field is read as the
         # report, instead of failing as a malformed CSV.
@@ -2398,14 +2477,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         )
                         # A curve file with no date in sight keeps its plain refusal.
                         if "date" in guess or exc.code == "equity_not_positive":
-                            return _mapping_answer(request, results, exc, loc, carried, guess)
+                            return _mapping_answer(
+                                request, results, exc, report_loc, carried, guess
+                            )
                 table = (
                     mapping.read_table(uploads["report"])
                     if uploads["report"] and exc.code in mapping.MAPPABLE_CODES
                     else None
                 )
                 if table is None:
-                    return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
+                    return _html_error(
+                        request, 400, _sentence(exc.localized(report_loc)), report_loc
+                    )
                 # The columns this account chose before for the same header.
                 saved = (
                     mapping.usable_mapping(
@@ -2423,16 +2506,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     except Exception:
                         # A saved choice that no longer reads the file is offered again.
                         logger.info("a saved column mapping did not read the file")
-                        return _mapping_answer(request, table, exc, loc, carried, saved)
+                        return _mapping_answer(request, table, exc, report_loc, carried, saved)
                 else:
-                    return _mapping_answer(request, table, exc, loc, carried, report_columns)
+                    return _mapping_answer(request, table, exc, report_loc, carried, report_columns)
             except ValueError:
-                return _html_error(request, 400, message("invalid_upload", loc), loc)
+                return _html_error(request, 400, message("invalid_upload", report_loc), report_loc)
             except Exception:
                 # A file no importer anticipated: the customer gets the
                 # format message, the operator gets the traceback.
                 logger.exception("upload could not be parsed")
-                return _html_error(request, 400, message("invalid_upload", loc), loc)
+                return _html_error(request, 400, message("invalid_upload", report_loc), report_loc)
             if gate_account is not None:
                 refusal = claim_free_use(gate_account.id, inputs)
                 if refusal is not None:
@@ -2443,12 +2526,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
             except Exception:
                 logger.exception("audit failed")
-                return _html_error(request, 500, message("server_error", loc), loc)
+                return _html_error(request, 500, message("server_error", report_loc), report_loc)
 
         # The slot bounds CPU and memory: a burst of uploads waits here and,
         # past the queue time, is told the service is busy instead of piling up.
         if not await _take_slot(audit_slots, cfg.audit_queue_seconds):
-            return _html_error(request, 503, message("busy", loc), loc)
+            return _html_error(request, 503, message("busy", report_loc), report_loc)
         try:
             outcome = await run_in_threadpool(parse_and_audit)
         finally:
@@ -2480,6 +2563,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     at=now,
                 )
                 paid = welcomed
+                if welcomed:
+                    _reward_invite(gate_account.id, device_sha256, ip, now)
             elif spend_credit:
                 credit_used = db.redeem_with_account(
                     audit_id, gate_account.id, at=datetime.now(UTC)
@@ -2492,7 +2577,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 full = claim_preview(gate_account.id)
                 if full:
                     db.delete_audit(audit_id)
-                    return _gate(request, loc, "quota" if full == "account" else "network", 402)
+                    return _gate(
+                        request, report_loc, "quota" if full == "account" else "network", 402
+                    )
                 free_preview = True
             if free_preview:
                 db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
