@@ -155,6 +155,9 @@ COPY_PT: dict[str, str] = {
         "o pagamento com cartão é processado pela Stripe.|"
         "Uma marca aleatória do seu navegador e a impressão digital do arquivo, só para dar o "
         "relatório grátis uma vez. Elas ficam mesmo se você apagar a conta, sem o seu e-mail.|"
+        "Se você entrou pelo link de um colega ou alguém entra pelo seu: a data, se já houve o "
+        "primeiro relatório e uma marca aleatória do navegador (um hash), para evitar "
+        "autoconvites. Ninguém vê quem entrou; é apagado com qualquer uma das duas contas.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -186,6 +189,32 @@ COPY_PT: dict[str, str] = {
         "Nunca inclui sua senha nem os links privados."
     ),
     "export_button": "Baixar meus dados (JSON)",
+    "invite_title": "Convide um colega",
+    "invite_help": (
+        "Compartilhe seu link pessoal. Quando alguém cria a conta com ele e recebe o primeiro "
+        "relatório grátis, você recebe {credits} {unit} para um relatório completo, até {cap} "
+        "por mês."
+    ),
+    "invite_unit_one": "crédito",
+    "invite_unit_many": "créditos",
+    "invite_label": "Seu link pessoal",
+    "invite_share": "Enviar pelo WhatsApp",
+    "invite_share_text": (
+        "Conheça o Rigor: você envia seu backtest ou histórico e recebe uma auditoria "
+        "independente. O primeiro relatório completo é grátis:"
+    ),
+    "invite_joined": "Entraram com seu link",
+    "invite_waiting": "Aguardam o primeiro relatório",
+    "invite_credited": "Créditos recebidos",
+    "invite_month": "Este mês: {n} de {cap}",
+    "invite_rules": (
+        "Só contam contas novas de outras pessoas: não do seu mesmo navegador nem da sua "
+        "mesma rede. O crédito aparece em «Seus códigos de acesso» e é usado como qualquer "
+        "outro. Nunca mostramos quem entrou."
+    ),
+    "invited_banner": (
+        "Um colega convidou você. Crie sua conta e o primeiro relatório completo é grátis."
+    ),
     "change_password": "Trocar senha",
     "password_changed": "Senha trocada. Suas outras sessões foram encerradas.",
     "delete_title": "Apagar minha conta",

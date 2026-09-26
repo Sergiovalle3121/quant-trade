@@ -9,7 +9,9 @@ site's shell (``pages._page``) so the redesign styles them with the rest.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
@@ -18,7 +20,13 @@ from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _disclaimer, _e, _field, _home, _page, _page_hero
 from quant_trade.audit.portuguese import link_locale
 from quant_trade.audit.seo import BRAND
-from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord, StrategyRecord
+from quant_trade.audit.store import (
+    AccountAudit,
+    AccountCode,
+    AccountRecord,
+    InviteSummary,
+    StrategyRecord,
+)
 from quant_trade.audit.theme import CLASS_COLOURS, icon
 
 #: Spanish paths are the default; English paths show the same page in English.
@@ -176,6 +184,10 @@ COPY: dict[str, dict[str, str]] = {
             "tarjeta: el pago con tarjeta lo procesa Stripe.|"
             "Una marca aleatoria de tu navegador y la huella del archivo, solo para dar el "
             "informe gratis una vez. Se conservan aunque borres la cuenta, sin tu correo.|"
+            "Si te uniste con el enlace de un colega o alguien se une con el tuyo: la fecha, "
+            "si ya hubo primer informe y una marca aleatoria del navegador (un hash), para "
+            "evitar autoinvitaciones. Nadie ve quién se unió; se borra con cualquiera de las "
+            "dos cuentas.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -208,6 +220,32 @@ COPY: dict[str, dict[str, str]] = {
             "no se borraron. Nunca incluye tu contraseña ni los enlaces privados."
         ),
         "export_button": "Descargar mis datos (JSON)",
+        "invite_title": "Invita a un colega",
+        "invite_help": (
+            "Comparte tu enlace personal. Cuando alguien crea su cuenta con él y recibe su "
+            "primer informe gratis, tú recibes {credits} {unit} para un informe completo, "
+            "hasta {cap} al mes."
+        ),
+        "invite_unit_one": "crédito",
+        "invite_unit_many": "créditos",
+        "invite_label": "Tu enlace personal",
+        "invite_share": "Enviar por WhatsApp",
+        "invite_share_text": (
+            "Te paso Rigor: subes tu backtest o tu historial y te da una auditoría "
+            "independiente. Tu primer informe completo es gratis:"
+        ),
+        "invite_joined": "Se unieron con tu enlace",
+        "invite_waiting": "Esperan su primer informe",
+        "invite_credited": "Créditos recibidos",
+        "invite_month": "Este mes: {n} de {cap}",
+        "invite_rules": (
+            "Solo cuentan cuentas nuevas de otras personas: no desde tu mismo navegador ni tu "
+            "misma red. El crédito aparece en «Tus códigos de acceso» y se usa como cualquier "
+            "otro. Nunca mostramos quién se unió."
+        ),
+        "invited_banner": (
+            "Un colega te invitó. Crea tu cuenta y tu primer informe completo es gratis."
+        ),
         "change_password": "Cambiar contraseña",
         "password_changed": "Contraseña cambiada. Cerramos las demás sesiones.",
         "delete_title": "Borrar mi cuenta",
@@ -416,6 +454,9 @@ COPY: dict[str, dict[str, str]] = {
             "payments are processed by Stripe.|"
             "A random mark of your browser and the file's fingerprint, only to give the free "
             "report once. They stay even if you delete the account, without your e-mail.|"
+            "If you joined through a colleague's link, or someone joins through yours: the "
+            "date, whether the first report happened and a random browser mark (a hash), to "
+            "stop self-invites. Nobody sees who joined; it goes with either account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -446,6 +487,32 @@ COPY: dict[str, dict[str, str]] = {
             "It never includes your password or the private links."
         ),
         "export_button": "Download my data (JSON)",
+        "invite_title": "Invite a colleague",
+        "invite_help": (
+            "Share your personal link. When someone creates their account with it and gets "
+            "their free first report, you get {credits} {unit} for a full report, up to {cap} "
+            "a month."
+        ),
+        "invite_unit_one": "credit",
+        "invite_unit_many": "credits",
+        "invite_label": "Your personal link",
+        "invite_share": "Send on WhatsApp",
+        "invite_share_text": (
+            "Try Rigor: upload your backtest or track record and get an independent audit. "
+            "Your first full report is free:"
+        ),
+        "invite_joined": "Joined with your link",
+        "invite_waiting": "Waiting for their first report",
+        "invite_credited": "Credits received",
+        "invite_month": "This month: {n} of {cap}",
+        "invite_rules": (
+            "Only new accounts of other people count: not from your own browser or network. "
+            "The credit shows under 'Your access codes' and is used like any other. We never "
+            "show who joined."
+        ),
+        "invited_banner": (
+            "A colleague invited you. Create your account and your first full report is free."
+        ),
         "change_password": "Change password",
         "password_changed": "Password changed. Your other sessions were signed out.",
         "delete_title": "Delete my account",
@@ -692,6 +759,7 @@ def signup_page(
     email: str = "",
     next_path: str = "",
     retention_days: int = 30,
+    invite: str = "",
 ) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
@@ -700,10 +768,12 @@ def signup_page(
     legal = link_locale(locale)  # the terms are not in Portuguese yet
     signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
-        _alert(copy, error)
+        (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
+        + _alert(copy, error)
         + f"<form method='post' action='{path('signup', locale)}'>"
         + _hidden("csrf", csrf)
         + _hidden("next", next_path)
+        + (_hidden("invite", invite) if invite else "")
         + _email_field(copy, email)
         + _field(
             copy["password"],
@@ -1043,6 +1113,49 @@ def _purchases_table(copy: dict[str, str], locale: str, audits: Sequence[Account
     )
 
 
+@dataclass(frozen=True)
+class InviteView:
+    """What "Invita a un colega" shows on "Mi cuenta"."""
+
+    link: str
+    summary: InviteSummary
+    credits: int
+    monthly_cap: int
+
+
+def invite_section(locale: str, invite: InviteView) -> str:
+    """The account's invite link, how the reward works and what it has earned."""
+    copy = COPY[_locale(locale)]
+    unit = copy["invite_unit_one" if invite.credits == 1 else "invite_unit_many"]
+    share = "https://wa.me/?text=" + quote(f"{copy['invite_share_text']} {invite.link}")
+    summary = invite.summary
+    kpis = (
+        "<div class='acct-kpis'>"
+        f"<div class='acct-kpi'><b>{summary.joined}</b><span>{_e(copy['invite_joined'])}</span>"
+        "</div>"
+        f"<div class='acct-kpi'><b>{summary.waiting}</b>"
+        f"<span>{_e(copy['invite_waiting'])}</span></div>"
+        f"<div class='acct-kpi'><b>{summary.credited}</b><span>{_e(copy['invite_credited'])}. "
+        + _e(copy["invite_month"].format(n=summary.credited_this_month, cap=invite.monthly_cap))
+        + "</span></div></div>"
+    )
+    return (
+        f"<section class='acct-sec' id='invitar'><h2>{_e(copy['invite_title'])}</h2>"
+        + "<p class='muted'>"
+        + _e(copy["invite_help"].format(credits=invite.credits, unit=unit, cap=invite.monthly_cap))
+        + "</p>"
+        + _field(
+            copy["invite_label"],
+            f"<input type='text' readonly value='{_e(invite.link)}' "
+            "spellcheck='false' autocomplete='off'>",
+        )
+        + f"<p><a class='btn btn-dark' href='{_e(share)}' rel='noopener noreferrer' "
+        f"target='_blank'>{icon('chat')}{_e(copy['invite_share'])}</a></p>"
+        + kpis
+        + f"<p class='muted'>{_e(copy['invite_rules'])}</p></section>"
+    )
+
+
 def account_page(
     *,
     locale: str,
@@ -1065,6 +1178,7 @@ def account_page(
     welcome: str = "",
     retention_days: int = 30,
     strategies: Sequence[StrategyRecord] = (),
+    invite: InviteView | None = None,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
@@ -1204,6 +1318,7 @@ def account_page(
         + (buy if credits == 0 else "")
         + reports
         + strategies_section(locale=locale, csrf=csrf, strategies=strategies, audits=audits)
+        + (invite_section(locale, invite) if invite is not None else "")
         + codes_html
         + (buy if credits > 0 else "")
         + purchases

@@ -190,6 +190,16 @@ class StrategyRecord:
 
 
 @dataclass(frozen=True)
+class InviteSummary:
+    """ "Invita a un colega" on one account: who joined, never who they are."""
+
+    joined: int = 0
+    waiting: int = 0
+    credited: int = 0
+    credited_this_month: int = 0
+
+
+@dataclass(frozen=True)
 class AccountCode:
     """An access code on an account: its record plus when it was added."""
 
@@ -446,6 +456,36 @@ class Store:
             sa.Column("strategy_id", sa.String(32), nullable=False, index=True),
             sa.Column("account_id", sa.String(32), nullable=False, index=True),
             sa.Column("added_at", sa.String(40), nullable=False),
+        )
+        #: "Invita a un colega": each account's invite token, made the first
+        #: time "Mi cuenta" shows it, and one row per account that signed up
+        #: through someone's link. Only a random mark of the new account's
+        #: browser is kept (a hash), to refuse a self-invite; the inviter is
+        #: credited once the new account's free first report exists, through
+        #: an access code linked to the inviter. Both go with either account.
+        self.invite_links = sa.Table(
+            "invite_links",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("token", sa.String(32), nullable=False, unique=True),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        self.referrals = sa.Table(
+            "referrals",
+            self.metadata,
+            sa.Column("invitee_id", sa.String(32), primary_key=True),
+            sa.Column("inviter_id", sa.String(32), nullable=False, index=True),
+            sa.Column("device_sha256", sa.String(64), nullable=False, default=""),
+            sa.Column("joined_at", sa.String(40), nullable=False),
+            #: ``""`` while the new account has no free report yet; then
+            #: ``credited``, ``self`` (the same browser or address as the
+            #: inviter) or ``cap`` (the inviter's month was full).
+            sa.Column("outcome", sa.String(8), nullable=False, default=""),
+            sa.Column("decided_at", sa.String(40)),
+            #: ``<inviter>:<YYYY-MM>:<n>``: unique, so the monthly cap holds
+            #: when two invitees get their first report at once.
+            sa.Column("reward_slot", sa.String(80), unique=True),
+            sa.Column("code_id", sa.String(32)),
         )
         #: Failed sign-ins, sign-ups and panel keys in the last hour, so a
         #: deploy does not reset the limits. Keys are hashed (they hold an
@@ -1175,6 +1215,15 @@ class Store:
                 self.strategy_reports,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
+            conn.execute(
+                self.invite_links.delete().where(self.invite_links.c.account_id == account_id)
+            )
+            conn.execute(
+                self.referrals.delete().where(
+                    (self.referrals.c.invitee_id == account_id)
+                    | (self.referrals.c.inviter_id == account_id)
+                )
+            )
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
         return deleted
 
@@ -1458,6 +1507,207 @@ class Store:
                 )
         except sa.exc.IntegrityError:
             return
+
+    # -- invites ("Invita a un colega") -------------------------------------
+    def invite_token(self, account_id: str, *, at: datetime) -> str:
+        """The account's invite token, made on first use."""
+        sa = self._sa
+        table = self.invite_links
+        for _ in range(3):
+            with self.engine.connect() as conn:
+                found = conn.execute(
+                    sa.select(table.c.token).where(table.c.account_id == account_id)
+                ).first()
+            if found is not None:
+                return str(found[0])
+            try:
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        table.insert().values(
+                            account_id=account_id,
+                            token=secrets.token_urlsafe(12),
+                            created_at=_iso(at),
+                        )
+                    )
+            except sa.exc.IntegrityError:
+                continue  # made by a simultaneous request (or a token clash): read again
+        raise RuntimeError("could not make an invite token")  # pragma: no cover
+
+    def inviter_for_token(self, token: str) -> str | None:
+        """The account behind an invite token, or ``None``."""
+        if not (8 <= len(token) <= 32) or not all(c.isalnum() or c in "-_" for c in token):
+            return None
+        sa = self._sa
+        table = self.invite_links
+        with self.engine.connect() as conn:
+            found = conn.execute(
+                sa.select(table.c.account_id)
+                .select_from(table.join(self.accounts, self.accounts.c.id == table.c.account_id))
+                .where(table.c.token == token)
+            ).first()
+        return str(found[0]) if found is not None else None
+
+    def _inviter_marks(self, conn: Any, inviter_id: str) -> tuple[set[str], set[str]]:
+        """The inviter's browser marks and addresses that are still kept."""
+        sa = self._sa
+        w, fp, aa = self.welcome_reports, self.free_previews, self.account_audits
+        devices: set[str] = set()
+        addresses: set[str] = set()
+        for device, address in conn.execute(
+            sa.select(w.c.device_sha256, w.c.client_ip).where(w.c.account_id == inviter_id)
+        ).all():
+            devices.add(str(device or ""))
+            addresses.add(str(address or ""))
+        for (address,) in conn.execute(
+            sa.select(fp.c.client_ip).where(fp.c.account_id == inviter_id)
+        ).all():
+            addresses.add(str(address or ""))
+        for (address,) in conn.execute(
+            sa.select(self.audits.c.client_ip)
+            .select_from(aa.join(self.audits, self.audits.c.id == aa.c.audit_id))
+            .where(aa.c.account_id == inviter_id)
+            .where(aa.c.via.in_(OWN_VIAS))
+        ).all():
+            addresses.add(str(address or ""))
+        devices.discard("")
+        addresses.discard("")
+        return devices, addresses
+
+    def record_referral(
+        self, invitee_id: str, inviter_id: str, *, device_sha256: str, at: datetime
+    ) -> bool:
+        """Note that a new account signed up through ``inviter_id``'s link.
+
+        ``False`` (nothing noted) for the inviter itself, an unknown
+        inviter, a browser the inviter used for its own free report, or an
+        account that was already noted.
+        """
+        if not invitee_id or invitee_id == inviter_id:
+            return False
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                if (
+                    conn.execute(
+                        sa.select(self.accounts.c.id).where(self.accounts.c.id == inviter_id)
+                    ).first()
+                    is None
+                ):
+                    return False
+                devices, _ = self._inviter_marks(conn, inviter_id)
+                if device_sha256 and device_sha256 in devices:
+                    return False
+                conn.execute(
+                    self.referrals.insert().values(
+                        invitee_id=invitee_id,
+                        inviter_id=inviter_id,
+                        device_sha256=device_sha256,
+                        joined_at=_iso(at),
+                        outcome="",
+                    )
+                )
+        except sa.exc.IntegrityError:
+            return False
+        return True
+
+    def reward_referral(
+        self,
+        invitee_id: str,
+        *,
+        device_sha256: str,
+        client_ip: str,
+        at: datetime,
+        credits: int,
+        monthly_cap: int,
+    ) -> str:
+        """Credit the inviter once ``invitee_id`` got its free first report.
+
+        Call it only after :meth:`grant_welcome` succeeded for the invitee.
+        Returns ``credited``, ``self`` (the invitee's browser or address is
+        one the inviter used), ``cap`` (the inviter's calendar month already
+        holds ``monthly_cap`` credited invites) or ``""`` (no pending invite).
+        """
+        if credits < 1:
+            raise ValueError("credits must be at least 1")
+        sa = self._sa
+        r = self.referrals
+        now = _iso(at)
+        month = now[:7]
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                sa.select(r.c.inviter_id, r.c.device_sha256)
+                .where(r.c.invitee_id == invitee_id)
+                .where(r.c.outcome == "")
+            ).first()
+            if row is None:
+                return ""
+            inviter_id, signup_device = str(row[0]), str(row[1] or "")
+            devices, addresses = self._inviter_marks(conn, inviter_id)
+            marks = {device_sha256, signup_device} - {""}
+            outcome = ""
+            if marks & devices or (client_ip and client_ip in addresses):
+                outcome = "self"
+            slot = ""
+            if not outcome:
+                for n in range(monthly_cap):
+                    candidate = f"{inviter_id}:{month}:{n}"
+                    try:
+                        with conn.begin_nested():
+                            conn.execute(
+                                r.update()
+                                .where(r.c.invitee_id == invitee_id)
+                                .values(reward_slot=candidate)
+                            )
+                    except sa.exc.IntegrityError:
+                        continue
+                    slot = candidate
+                    break
+                outcome = "credited" if slot else "cap"
+            code_id = None
+            if outcome == "credited":
+                code_id = secrets.token_hex(6)
+                # A code no one ever sees: its credits show on the inviter's
+                # account and are spent from there like any other code's.
+                conn.execute(
+                    self.access_codes.insert().values(
+                        id=code_id,
+                        code_sha256=hash_access_code(new_access_code()),
+                        credits_total=credits,
+                        credits_used=0,
+                        note="invite",
+                        created_at=now,
+                        expires_at=None,
+                        disabled=False,
+                    )
+                )
+                conn.execute(
+                    self.account_codes.insert().values(
+                        code_id=code_id, account_id=inviter_id, linked_at=now
+                    )
+                )
+            conn.execute(
+                r.update()
+                .where(r.c.invitee_id == invitee_id)
+                .where(r.c.outcome == "")
+                .values(outcome=outcome, decided_at=now, code_id=code_id)
+            )
+        return outcome
+
+    def invite_summary(self, inviter_id: str, now: datetime) -> InviteSummary:
+        sa = self._sa
+        r = self.referrals
+        month = _iso(now)[:7]
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(r.c.outcome, r.c.decided_at).where(r.c.inviter_id == inviter_id)
+            ).all()
+        credited = [row for row in rows if row[0] == "credited"]
+        return InviteSummary(
+            joined=len(rows),
+            waiting=sum(1 for row in rows if not row[0]),
+            credited=len(credited),
+            credited_this_month=sum(1 for row in credited if str(row[1] or "")[:7] == month),
+        )
 
     # -- strategies ("Mis estrategias") ------------------------------------
     MAX_STRATEGIES_PER_ACCOUNT = 50
@@ -1851,6 +2101,20 @@ class Store:
                     self.column_maps.c.updated_at,
                 ).where(self.column_maps.c.account_id == account_id)
             ).all()
+            invite = conn.execute(
+                sa.select(self.invite_links.c.token).where(
+                    self.invite_links.c.account_id == account_id
+                )
+            ).first()
+            r = self.referrals
+            invited = conn.execute(
+                sa.select(r.c.joined_at, r.c.outcome, r.c.decided_at)
+                .where(r.c.inviter_id == account_id)
+                .order_by(r.c.joined_at)
+            ).all()
+            joined_through = conn.execute(
+                sa.select(r.c.invitee_id).where(r.c.invitee_id == account_id)
+            ).first()
         reports = [
             {
                 "audit_id": item.audit_id,
@@ -1917,6 +2181,16 @@ class Store:
                 {"header_sha256": row[0], "columns": json.loads(row[1]), "updated_at": row[2]}
                 for row in maps
             ],
+            # Who joined through this account's link stays theirs: only dates
+            # and outcomes, never the other account.
+            "invites": {
+                "link_token": invite[0] if invite is not None else "",
+                "joined": [
+                    {"joined_at": row[0], "outcome": row[1] or "waiting", "decided_at": row[2]}
+                    for row in invited
+                ],
+                "joined_through_an_invite": joined_through is not None,
+            },
         }
 
     def account_credits(self, account_id: str, now: datetime) -> int:

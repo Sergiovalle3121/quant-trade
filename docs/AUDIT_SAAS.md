@@ -1808,6 +1808,24 @@ changes what a report says.
   carries no links. The same summary on the same day is served from memory;
   an account renders at most 10 in 10 minutes (then 429), since they share
   the report PDFs' render slots.
+- **Invita a un colega** (`store.invite_*`, `record_referral`,
+  `reward_referral`; tables `invite_links` and `referrals`): "Mi cuenta"
+  shows a personal link `/registro?invita=<token>` (EN `/signup`, PT
+  `/pt/cadastro`) with a WhatsApp share, how many joined, how many wait for
+  their first report and the credits received (this month out of the cap).
+  A sign-up through the link is noted unless the token is unknown, the
+  inviter is still signed in in that browser, or the browser carries the
+  mark of the inviter's own free report. The inviter gets
+  `accounts.REFERRAL_CREDITS` (1) full-report credit, as an access code no
+  one sees linked to the inviter, only when the new account's free first
+  report is granted, so the free tier's browser, file and address limits
+  already held; it is refused as `self` when that upload's browser mark or
+  address is one the inviter used (its free report, previews, own uploads),
+  and as `cap` past `accounts.REFERRAL_MONTHLY_CAP` (5) credited invites in
+  the calendar month (unique slots, so simultaneous rewards cannot pass it).
+  The inviter never sees who joined. Rows go with either account and show
+  in "Descargar mis datos". Off in free mode or without the free first
+  report.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.

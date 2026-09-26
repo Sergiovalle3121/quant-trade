@@ -1259,8 +1259,50 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "strategy_full",
     )
 
+    def _referrals_on() -> bool:
+        # The reward is paid when the invitee's free first report exists.
+        return not cfg.free_mode and acct.WELCOME_FULL_REPORT
+
+    def _note_invite(request: Request, account_id: str, token: str, now: datetime) -> None:
+        """Note who invited a new account; a failure never breaks the sign-up."""
+        try:
+            inviter = db.inviter_for_token(token)
+            signed_in = _session(request)
+            if inviter is None or (signed_in is not None and signed_in[0].id == inviter):
+                return  # the inviter's own browser, still signed in
+            device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+            db.record_referral(
+                account_id,
+                inviter,
+                device_sha256=acct.hash_secret(device) if 0 < len(device) <= 128 else "",
+                at=now,
+            )
+        except Exception:  # noqa: BLE001 - an invite never breaks a sign-up
+            logger.warning("could not note an invite")
+
+    def _invite(token: str) -> str:
+        """An invite token that names an account, else ``""``."""
+        token = token.strip()[:40]
+        return token if token and db.inviter_for_token(token) else ""
+
+    def _reward_invite(account_id: str, device_sha256: str, ip: str, now: datetime) -> None:
+        """Credit whoever invited this account, now that its free report exists."""
+        try:
+            db.reward_referral(
+                account_id,
+                device_sha256=device_sha256,
+                client_ip=ip,
+                at=now,
+                credits=acct.REFERRAL_CREDITS,
+                monthly_cap=acct.REFERRAL_MONTHLY_CAP,
+            )
+        except Exception:  # noqa: BLE001 - the customer's report comes first
+            logger.warning("could not settle an invite")
+
     def _signup_get(path_locale: str) -> Callable[..., Response]:
-        def handler(request: Request, lang: str | None = None, next: str = "") -> Response:
+        def handler(
+            request: Request, lang: str | None = None, next: str = "", invita: str = ""
+        ) -> Response:
             locale = _account_locale(path_locale, lang)
             if _session(request):
                 return _account_redirect(locale)
@@ -1270,6 +1312,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 locale=locale,
                 csrf=csrf,
                 next_path=acct.safe_next(next),
+                invite=_invite(invita) if _referrals_on() else "",
             )
             return _anon_page(page, csrf)
 
@@ -1282,12 +1325,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             password: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
             next: Annotated[str, Form(max_length=1000)] = "",
+            invite: Annotated[str, Form(max_length=40)] = "",
             lang: str | None = None,
         ) -> Response:
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
             clean = acct.normalise_email(email)
             new_csrf = _anon_csrf(request)
+            invite = _invite(invite) if _referrals_on() else ""
 
             def again(error: str, status: int) -> Response:
                 page = account_pages.signup_page(
@@ -1297,6 +1342,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     error=error,
                     email=clean if acct.valid_email(clean) else "",
                     next_path=next_path,
+                    invite=invite,
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -1316,6 +1362,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
             if account is None:
                 return again("taken", 409)
+            if invite:
+                _note_invite(request, account.id, invite, now)
             if next_path:
                 response: Response = RedirectResponse(next_path, status_code=303)
             else:
@@ -1473,6 +1521,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         else ("used" if db.welcome_used(account.id) else "available")
                     ),
                     strategies=db.list_strategies(account.id),
+                    invite=(
+                        account_pages.InviteView(
+                            link=(
+                                f"{_site_url(request)}{account_pages.path('signup', locale)}"
+                                f"?{acct.INVITE_PARAM}={db.invite_token(account.id, at=now)}"
+                            ),
+                            summary=db.invite_summary(account.id, now),
+                            credits=acct.REFERRAL_CREDITS,
+                            monthly_cap=acct.REFERRAL_MONTHLY_CAP,
+                        )
+                        if _referrals_on()
+                        else None
+                    ),
                 )
             )
 
@@ -2418,6 +2479,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     at=now,
                 )
                 paid = welcomed
+                if welcomed:
+                    _reward_invite(gate_account.id, device_sha256, ip, now)
             elif spend_credit:
                 credit_used = db.redeem_with_account(
                     audit_id, gate_account.id, at=datetime.now(UTC)
