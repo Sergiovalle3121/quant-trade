@@ -366,8 +366,8 @@ def same_secret(a: str | None, b: str | None) -> bool:
 
 
 #: Where a form may send the customer back after signing in.
-_NEXT_PREFIXES = ("/audits/", "/cuenta", "/account")
-_NEXT_HOMES = ("/", "/en")
+_NEXT_PREFIXES = ("/audits/", "/cuenta", "/account", "/pt/conta")
+_NEXT_HOMES = ("/", "/en", "/pt")
 
 
 def safe_next(value: str | None) -> str:

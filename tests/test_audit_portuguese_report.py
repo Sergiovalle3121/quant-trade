@@ -241,3 +241,18 @@ def test_the_sample_report_has_a_portuguese_address(tmp_path: Any) -> None:
     # The Portuguese landing links it, and search engines see all three languages.
     assert "href='/pt/exemplo'" in client.get("/pt").text
     assert "/pt/exemplo" in client.get("/sitemap.xml").text
+
+
+def test_a_portuguese_report_speaks_of_the_account_in_portuguese(tmp_path: Any) -> None:
+    from audit_fixtures import csv_bytes, positive_drift
+
+    client = _web_client(tmp_path)
+    files = {"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")}
+    posted = client.post(
+        "/audits", files=files, data={"consent": "on", "locale": "pt"}, follow_redirects=False
+    )
+    page = client.get(posted.headers["location"] + "&acct=saved").text
+    assert "<html lang='pt'>" in page
+    assert "Relatório salvo na sua conta." in page
+    assert "href='/pt/conta'" in page
+    assert "Report saved to your account." not in page

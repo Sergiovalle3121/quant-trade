@@ -1228,10 +1228,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return found.email if found is not None else ""
 
     def _account_locale(path_locale: str, lang: str | None) -> str:
-        if lang in LOCALES:
-            return _locale(lang)
-        # Portuguese visitors get the English account screens until they exist in pt.
-        return "en" if lang == "pt" else path_locale
+        # The account screens exist in Portuguese too (``/pt/conta``).
+        return lang if lang in account_pages.LANGUAGES else path_locale
 
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
     signin_flashes = ("signed_out", "deleted", "reset_done")
@@ -1599,20 +1597,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     return RedirectResponse(f"{base}?error=compare_pick", status_code=303)
                 result = AuditResult.model_validate_json(record.result_json)
                 results.append(result.model_dump(mode="json"))
+            # The comparison itself is not in Portuguese yet: it reads in English.
+            view = link_locale(locale)
             body = comparison_body(
                 results[0],
                 results[1],
                 href_a=account_pages.report_href(picked[0], locale),
                 href_b=account_pages.report_href(picked[1], locale),
-                locale=locale,
+                locale=view,
             )
-            copy = account_pages.COPY[locale]
+            copy = account_pages.COPY[view]
             body += f"<p><a class='btn btn-ghost' href='{base}'>{copy['compare_back']}</a></p>"
-            other = account_pages.path("account", "en" if locale == "es" else "es")
+            other = account_pages.path("account", "en" if view == "es" else "es")
             query = "&".join(f"id={audit_id}" for audit_id in picked)
             page = compare_page(
                 body,
-                locale=locale,
+                locale=view,
                 lead=copy["compare_lead"],
                 switch_href=f"{other}/comparar?{query}",
             )
@@ -1772,7 +1772,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
-    for path_locale in LOCALES:
+    for path_locale in account_pages.LANGUAGES:
         paths = account_pages.PATHS[path_locale]
         html_get = {"methods": ["GET"], "response_class": HTMLResponse}
         app.add_api_route(paths["signup"], _signup_get(path_locale), **html_get)
@@ -2527,7 +2527,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> str:
         record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
-        ui = link_locale(locale)
+        ui = locale
         # Only known values are shown, so the query cannot inject text.
         notice = None
         if session_id and cfg.stripe_enabled:
@@ -2578,7 +2578,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not token:
                 return ""
             return account_pages.report_box(
-                locale=link_locale(locale),
+                locale=locale,
                 state="anon",
                 audit_id=record.id,
                 query=query,
@@ -2588,7 +2588,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
         credits = db.account_credits(account.id, datetime.now(UTC)) if locked else 0
         return account_pages.report_box(
-            locale=link_locale(locale),
+            locale=locale,
             state=state,
             audit_id=record.id,
             query=query,

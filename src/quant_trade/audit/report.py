@@ -5715,7 +5715,7 @@ def render_html(
             "<button type='button' class='print-btn' "
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
-    account_href = "/cuenta" if locale == "es" else "/account"
+    account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
