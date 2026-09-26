@@ -169,3 +169,48 @@ def test_every_skill_sentence_has_a_spanish_rule() -> None:
     ]
     assert texts
     assert [text for text in texts if spanish(text) is None] == []
+
+
+def test_cash_is_its_own_line_not_part_of_following_the_market() -> None:
+    # Mostly bills: beta 0.1 on a volatile index, 0.4 % a month of cash.
+    rng = np.random.default_rng(18)
+    index = rng.normal(0.008, 0.045, 60)
+    cash = np.full(60, 0.004)
+    fund = cash + 0.1 * (index - cash) + rng.normal(0, 0.0005, 60)
+    out = skill_review(fund, index, cash)
+    parts = out["attribution"]
+    assert parts["cash"]["value"] > 0.8 * parts["total"]["value"]
+    assert parts["exposure_share"]["value"] < 0.2
+
+
+def test_an_exposure_larger_than_the_whole_return_is_not_a_share() -> None:
+    rng = np.random.default_rng(19)
+    index = rng.normal(0.015, 0.04, 60)
+    fund = -0.008 + 1.0 * index + rng.normal(0, 0.003, 60)
+    out = skill_review(fund, index)
+    assert out["attribution"]["total"]["value"] > 0
+    share = out["attribution"]["exposure_share"]
+    assert share["evidence"] == "NOT_MEASURED"
+    assert share["note"] == skill.EXPOSURE_ABOVE_TOTAL
+
+
+def test_an_exposure_that_took_away_from_the_return_is_not_a_share() -> None:
+    rng = np.random.default_rng(20)
+    index = rng.normal(-0.01, 0.04, 60)
+    fund = 0.02 + 0.8 * index + rng.normal(0, 0.003, 60)
+    out = skill_review(fund, index)
+    assert out["attribution"]["total"]["value"] > 0
+    share = out["attribution"]["exposure_share"]
+    assert share["evidence"] == "NOT_MEASURED"
+    assert share["note"] == skill.EXPOSURE_NEGATIVE
+
+
+def test_jensen_and_the_skill_block_agree_on_the_same_fund() -> None:
+    from quant_trade.audit.alpha import jensen_alpha
+
+    index = _index(21, 60)
+    fund = 0.001 + 0.9 * index + np.random.default_rng(22).normal(0, 0.02, 60)
+    plain = jensen_alpha(fund, index, 12.0)
+    split = skill_review(fund, index, None)
+    assert plain["alpha"]["value"] == pytest.approx(split["alpha"]["value"])
+    assert plain["alpha_t_stat"]["value"] == pytest.approx(split["alpha_t_stat"]["value"])

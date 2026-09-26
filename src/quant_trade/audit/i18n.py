@@ -1150,20 +1150,20 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "exposure with last month's benchmark return added (Dimson, 1979); late or smoothed "
         "prices hide part of the exposure from the plain beta",
         "exposición sumando el retorno del índice del mes anterior (Dimson, 1979); los precios "
-        "tardíos o suavizados esconden parte de la exposición a la beta simple",
+        "tardíos o suavizados hacen que la beta simple no vea parte de la exposición",
     ),
     (
         "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more "
         "of the market before rises than before falls",
         "término del índice al cuadrado (Treynor y Mazuy, 1966); por encima de cero, el fondo "
-        "tuvo más mercado antes de las subidas que antes de las caídas",
+        "tuvo más exposición al mercado antes de las subidas que antes de las caídas",
     ),
     (
         "alpha over its cautious standard error (the largest of HC3, Newey-West and one "
         "widened for autocorrelated misses); beyond about 2 it is unlikely to be chance",
         "alfa entre su error estándar prudente (el mayor entre HC3, Newey-West y uno ampliado "
         "por errores autocorrelacionados); por encima de 2, más o menos, es poco probable que "
-        "sea casualidad",
+        "sea solo azar",
     ),
     (
         "95 % range of the yearly alpha, cautious standard error and Student's t",
@@ -1188,6 +1188,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "el reparto no se muestra como proporción",
     ),
     ("beta over its cautious standard error", "beta entre su error estándar prudente"),
+    (
+        "the exposure alone is larger than the fund's whole return",
+        "la exposición por sí sola es mayor que todo el retorno del fondo",
+    ),
+    (
+        "the exposure took away from the fund's return rather than adding to it",
+        "la exposición restó al retorno del fondo en lugar de sumarle",
+    ),
     (
         "the benchmark's returns take too few distinct values for the regressions",
         "los retornos del índice de referencia toman muy pocos valores distintos para las "
@@ -1225,15 +1233,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "(marca de agua)",
     ),
     (
-        "return beyond the benchmark's moves (Jensen's alpha), annualised; Newey-West "
+        "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
         "standard error; no cash rate subtracted",
         "rentabilidad más allá de los movimientos del benchmark (alfa de Jensen), anualizada; "
-        "error estándar de Newey-West; sin restar tasa de efectivo",
-    ),
-    (
-        "alpha over its Newey-West standard error; beyond about 2 it is unlikely to be chance",
-        "alfa entre su error estándar de Newey-West; por encima de 2, aproximadamente, es "
-        "poco probable que sea azar",
+        "error estándar prudente; sin restar tasa de efectivo",
     ),
     (
         "fewer than 24 periods shared with the benchmark",

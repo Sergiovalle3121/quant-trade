@@ -9,8 +9,9 @@ with three regressions of the fund's return over cash on the index's:
   average yearly return into cash, exposure (``beta`` times the index's
   return over cash) and skill (``alpha``). With ordinary least squares the
   three add up exactly to the fund's average, so the report can say how much
-  of it following the market explains; that share is given only when beta is
-  at least two standard errors from zero.
+  of it following the market explains (cash is its own line); that share is
+  given only when beta is at least two standard errors from zero and the
+  share lies between 0 and 1.
 * **Lagged exposure** (Dimson, 1979). Funds whose holdings are priced late or
   smoothed react to the market a month later; the plain ``beta`` misses that
   part and the missing exposure shows up as alpha. Adding last month's index
@@ -47,15 +48,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from quant_trade.audit.alpha import newey_west_lags
+from quant_trade.audit.alpha import cautious_fit, newey_west_lags
 from quant_trade.audit.analytics import _t_quantile
 from quant_trade.audit.cashrate import annual_yield
 from quant_trade.audit.schema import measured, not_measured
 
 #: Shared months needed for the regressions.
 MIN_MONTHS = 36
-#: Cap on the misses' autocorrelation used to widen the alpha's error.
-MAX_RHO = 0.9
 #: Standard errors an alpha needs to be told apart from zero ("months needed").
 SIGNIFICANT_T = 2.0
 CONFIDENCE = 0.95
@@ -94,39 +93,28 @@ NO_CLEAR_EXPOSURE = (
     "the exposure to the benchmark is not two standard errors from zero, so the split is "
     "not shown as a share"
 )
+NOT_POSITIVE_TOTAL = "the fund's average return is not above zero"
+EXPOSURE_ABOVE_TOTAL = "the exposure alone is larger than the fund's whole return"
+EXPOSURE_NEGATIVE = "the exposure took away from the fund's return rather than adding to it"
 BETA_T_NOTE = "beta over its cautious standard error"
 SINGULAR = "the benchmark's returns take too few distinct values for the regressions"
 
 
-def _fit(y: np.ndarray, columns: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-    """OLS coefficients (constant first) and their cautious variances: the
-    largest of HC3 and Newey-West, and for the constant also the plain
-    variance scaled for autocorrelated misses."""
-    n = len(y)
-    design = np.column_stack([np.ones(n), *columns])
-    k = design.shape[1]
-    xtx_inv = np.linalg.inv(design.T @ design)
-    coef = xtx_inv @ design.T @ y
-    resid = y - design @ coef
-    leverage = np.einsum("ij,jk,ik->i", design, xtx_inv, design)
-    hc3_scores = design * (resid / np.clip(1.0 - leverage, 1e-12, None))[:, None]
-    hc3 = xtx_inv @ (hc3_scores.T @ hc3_scores) @ xtx_inv
-    lags = newey_west_lags(n)
-    scores = design * resid[:, None]
-    meat = scores.T @ scores
-    for lag in range(1, lags + 1):
-        weight = 1.0 - lag / (lags + 1.0)
-        cross = scores[lag:].T @ scores[:-lag]
-        meat += weight * (cross + cross.T)
-    newey_west = xtx_inv @ meat @ xtx_inv * n / (n - k)
-    variances = np.maximum(np.diag(hc3), np.diag(newey_west))
-    sum_sq = float(resid @ resid)
-    if sum_sq > 0:
-        rho = float(resid[1:] @ resid[:-1]) / sum_sq
-        rho = min(max(rho + (1.0 + 3.0 * rho) / n, 0.0), MAX_RHO)
-        plain = float(xtx_inv[0, 0]) * sum_sq / (n - k)
-        variances[0] = max(float(variances[0]), plain * (1.0 + rho) / (1.0 - rho))
-    return coef, variances
+def _exposure_share(
+    exposure: float, total: float, beta_t: float | None, note: str
+) -> dict[str, Any]:
+    """The share of the fund's return that exposure to the benchmark explains
+    (cash is its own line), only when it is a share at all."""
+    if beta_t is None or beta_t < SIGNIFICANT_T:
+        return not_measured(NO_CLEAR_EXPOSURE)
+    if total <= 0:
+        return not_measured(NOT_POSITIVE_TOTAL)
+    share = exposure / total
+    if share > 1.0:
+        return not_measured(EXPOSURE_ABOVE_TOTAL)
+    if share < 0.0:
+        return not_measured(EXPOSURE_NEGATIVE)
+    return measured(share, note)
 
 
 def _t(value: float, variance: float) -> float | None:
@@ -189,7 +177,7 @@ def _review(
 ) -> dict[str, Any]:
     f = fund
 
-    coef, var = _fit(y, [x])
+    coef, var = cautious_fit(y, [x])
     alpha, beta = float(coef[0]), float(coef[1])
     alpha_t = _t(alpha, float(var[0]))
     beta_t = _t(beta, float(var[1]))
@@ -204,13 +192,7 @@ def _review(
         "cash": measured(cash_year, note),
         "exposure": measured(exposure_year, note),
         "alpha": measured(alpha_year, note),
-        "exposure_share": (
-            not_measured(NO_CLEAR_EXPOSURE)
-            if beta_t is None or beta_t < SIGNIFICANT_T
-            else measured((cash_year + exposure_year) / total_year, note)
-            if total_year > 0
-            else not_measured("the fund's average return is not above zero")
-        ),
+        "exposure_share": _exposure_share(exposure_year, total_year, beta_t, note),
     }
     if alpha_t is None:
         needed: dict[str, Any] = not_measured("the fund moves exactly with the benchmark")
@@ -221,12 +203,12 @@ def _review(
     else:
         needed = measured(int(math.ceil(n * (SIGNIFICANT_T / alpha_t) ** 2)), MONTHS_NOTE)
 
-    lag_coef, lag_var = _fit(y[1:], [x[1:], x[:-1]])
+    lag_coef, lag_var = cautious_fit(y[1:], [x[1:], x[:-1]])
     dimson_beta = float(lag_coef[1] + lag_coef[2])
     lag_t = _t(float(lag_coef[2]), float(lag_var[2]))
     dimson_alpha_t = _t(float(lag_coef[0]), float(lag_var[0]))
 
-    tm_coef, tm_var = _fit(y, [x, x**2])
+    tm_coef, tm_var = cautious_fit(y, [x, x**2])
     gamma_t = _t(float(tm_coef[2]), float(tm_var[2]))
     tm_alpha_t = _t(float(tm_coef[0]), float(tm_var[0]))
 
