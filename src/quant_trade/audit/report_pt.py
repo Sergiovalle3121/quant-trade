@@ -36,6 +36,7 @@ REPORT: dict[str, Any] = {
     "LABELS": {
         "title": "Rigor · Auditoria de backtest",
         "title_fund": "Rigor · Auditoria de histórico de fundo",
+        "title_account": "Rigor · Auditoria de histórico de conta",
         "fund_net": (
             "Rentabilidades declaradas líquidas de taxas: são os números do próprio fundo após "
             "suas taxas, e o Rigor não mediu os custos."
@@ -813,14 +814,29 @@ REPORT: dict[str, Any] = {
             "estão."
         ),
         "next_questions": "Leve ao vendedor as perguntas deste relatório.",
+        "next_questions_fund": (
+            "Leve as perguntas deste relatório ao gestor ou a quem oferece o fundo a você."
+        ),
         "next_keep": (
             "Guarde este relatório e seu identificador; se o robô mudar, peça uma nova auditoria."
+        ),
+        "next_intro_fund": (
+            "Se você investe ou vai investir neste fundo, isto é o que convém esclarecer "
+            "primeiro, segundo o que a auditoria encontrou."
+        ),
+        "next_fund_fees": (
+            "Pergunte se as rentabilidades são líquidas de todas as taxas: a tabela de taxas "
+            "mostra quanto mudariam se não forem."
+        ),
+        "next_keep_fund": (
+            "Guarde este relatório e seu identificador; se o fundo mudar de gestor ou de "
+            "estratégia, peça uma nova auditoria."
         ),
         "next_link": "Ir para a seção",
         "meaning": "O que isso significa para você",
         "ladder": "O que cada classe exige",
         "ladder_intro": (
-            "A classe não mede quanto o backtest ganhou, e sim quantas perguntas seus arquivos "
+            "A classe não mede quanto se ganhou, e sim quantas perguntas seus arquivos "
             "respondem. Uma classe melhor não significa que a estratégia vá funcionar."
         ),
         "ladder_class": "Classe",
@@ -1357,8 +1373,7 @@ REPORT: dict[str, Any] = {
         "holding": "Se ganha de simplesmente comprar e manter o mercado que opera",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado (VIX)",
         "currency": (
-            "Quanto valeu a conta em pesos, reais, euros e outras moedas, e depois da "
-            "inflação"
+            "Quanto valeu a conta em pesos, reais, euros e outras moedas, e depois da inflação"
         ),
     },
     "DIMENSION_TITLES": {
@@ -5088,6 +5103,46 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "The firm's rules are those posted on the date shown; they may have changed.",
         "As regras da mesa são as publicadas na data indicada; podem ter mudado.",
+    ),
+    (
+        (
+            "Are the returns net of all fees (management, performance, entry and exit)? "
+            "Which share class are they for?"
+        ),
+        (
+            "As rentabilidades são líquidas de todas as taxas (administração, performance, "
+            "entrada e saída)? De qual classe de cotas são?"
+        ),
+    ),
+    (
+        (
+            "Is the whole record the same fund, with the same manager and strategy, or does "
+            "it include simulated years or another vehicle's?"
+        ),
+        (
+            "Todo o histórico é do mesmo fundo, com o mesmo gestor e a mesma estratégia, ou "
+            "inclui anos simulados ou de outro veículo?"
+        ),
+    ),
+    (
+        (
+            "Does the manager run other funds or accounts with the same strategy? Ask for "
+            "the ones that were closed too: showing only the one that went well is common."
+        ),
+        (
+            "O gestor tem outros fundos ou contas com a mesma estratégia? Peça também os que "
+            "foram encerrados: mostrar só o que deu certo é comum."
+        ),
+    ),
+    (
+        (
+            "Who calculates the net asset value and who audits the fund's accounts? Ask for "
+            "the names of the independent administrator and auditor."
+        ),
+        (
+            "Quem calcula o valor da cota e quem audita as contas do fundo? Peça o nome do "
+            "administrador e do auditor independentes."
+        ),
     ),
     (
         (
