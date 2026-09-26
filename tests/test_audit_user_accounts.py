@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -1786,3 +1787,94 @@ def test_download_my_data_refuses_cross_site_and_hides_others_descriptions(
     store.mark_paid(theirs, stripe_session_id="cs_saved", at=NOW)  # type: ignore[attr-defined]
     data = json.loads(client.get("/cuenta/datos").text)
     assert "mi robot secreto" in json.dumps(data, ensure_ascii=False)
+
+
+def test_a_strategy_summary_prints_without_forms_and_only_for_its_owner(tmp_path: Path) -> None:
+    from quant_trade.audit import pdf as pdf_lib
+
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    ids = [_audit_id(_upload(client).headers["location"]) for _ in range(2)]
+    for audit_id in ids:
+        store.mark_paid(audit_id, stripe_session_id=f"cs_{audit_id}", at=NOW)  # type: ignore[attr-defined]
+    csrf = _csrf(client.get("/cuenta").text)
+    where = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": ids[0], "strategy": "new", "name": "EA Oro", "csrf": csrf},
+        follow_redirects=False,
+    ).headers["location"]
+    client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": ids[1], "strategy": where.rsplit("/", 1)[1], "csrf": csrf},
+    )
+    view = client.get(where).text
+    assert f"href='{where}/pdf'" in view and "Descargar resumen en PDF" in view
+    # The printable page: same content, no forms or buttons, the date and the notice.
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    strategy = store.list_strategies(account.id)[0]  # type: ignore[attr-defined]
+    listed = {a.audit_id: a for a in store.account_audits_list(account.id)}  # type: ignore[attr-defined]
+    versions = [
+        (listed[i], json.loads(store.get_audit(i).result_json))  # type: ignore[attr-defined]
+        for i in ids
+    ]
+    printable = account_pages.strategy_page(
+        locale="es",
+        csrf="x" * 30,
+        strategy=strategy,
+        versions=versions,
+        printable=True,
+        generated_at="2026-09-26T01:00:00Z",
+    )
+    assert "<form" not in printable and "x" * 30 not in printable
+    assert "generado el 2026-09-26" in printable and "No es asesoría de inversión" in printable
+    assert "Qué cambió frente a la versión 1" in printable
+    assert "href='/audits/" not in printable  # a PDF carries no links to reports
+    assert not find_claims(re.sub(r"<[^>]+>", " ", printable))
+    # Only the owner, signed in.
+    other = TestClient(client.app)
+    _signup(other, "bea@example.com")
+    assert other.get(f"{where}/pdf").status_code == 404
+    assert TestClient(client.app).get(f"{where}/pdf", follow_redirects=False).status_code == 303
+    if pdf_lib.available():
+        answer = client.get(f"{where}/pdf")
+        assert answer.status_code == 200 and answer.content.startswith(b"%PDF")
+        assert "no-store" in answer.headers["cache-control"]
+        assert "attachment;" in answer.headers["content-disposition"]
+
+
+def test_strategy_pdfs_are_cached_and_limited_per_account(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import pdf as pdf_lib
+    from quant_trade.audit import web
+
+    pages: list[str] = []
+
+    def fake_pdf(page: str, **_: object) -> bytes:
+        pages.append(page)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(pdf_lib, "report_pdf", fake_pdf)
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    audit_id = _audit_id(_upload(client).headers["location"])
+    csrf = _csrf(client.get("/cuenta").text)
+    where = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": audit_id, "strategy": "new", "name": "EA Oro", "csrf": csrf},
+        follow_redirects=False,
+    ).headers["location"]
+    for _ in range(3):
+        assert client.get(f"{where}/pdf").content == b"%PDF-fake"
+    assert len(pages) == 1  # the same summary renders once
+    assert "class='skip'" not in pages[0] and "href='/audits/" not in pages[0]
+    # A change (a rename) renders again; past the window's limit, a 429.
+    for n in range(web.STRATEGY_PDFS_PER_WINDOW):
+        client.post(f"{where}/nombre", data={"name": f"EA {n}", "csrf": csrf})
+        client.get(f"{where}/pdf")
+    refused = client.get(f"{where}/pdf")
+    assert refused.status_code == 429 and "PDF" in refused.text
+    assert len(pages) == web.STRATEGY_PDFS_PER_WINDOW
+    # The cached one still downloads.
+    client.post(f"{where}/nombre", data={"name": "EA 0", "csrf": csrf})
+    assert client.get(f"{where}/pdf").status_code == 200

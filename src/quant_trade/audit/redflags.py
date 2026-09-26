@@ -21,6 +21,7 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit import report_pt
 from quant_trade.audit.schema import (
     MIN_OBSERVATIONS,
     DeclaredMetadata,
@@ -832,6 +833,9 @@ def flag_title(code: str, locale: str) -> str:
         return code
     return titles.get(locale, titles["en"])
 
+
+# The Portuguese of the tables above, over their English (see ``report_pt``).
+report_pt.install(globals(), report_pt.REDFLAGS)
 
 __all__ = [
     "FLAG_TITLES",

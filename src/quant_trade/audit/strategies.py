@@ -99,6 +99,11 @@ COPY: dict[str, dict[str, str]] = {
         "delete": "Borrar estrategia",
         "delete_help": "Los informes siguen en tu lista; solo se quita la agrupación.",
         "back": "Volver a mi cuenta",
+        "pdf_button": "Descargar resumen en PDF",
+        "pdf_generated": (
+            "Resumen de la estrategia generado el {date} a partir de los informes guardados. "
+            "Cada informe completo tiene su propio PDF con el detalle."
+        ),
         "empty": "Esta estrategia aún no tiene informes. Guárdalos desde tu cuenta.",
         "note": (
             "Cada versión se lee con sus propios archivos y declaraciones. «Mejor» o «peor» en el "
@@ -171,6 +176,11 @@ COPY: dict[str, dict[str, str]] = {
         "delete": "Delete strategy",
         "delete_help": "The reports stay on your list; only the grouping goes.",
         "back": "Back to my account",
+        "pdf_button": "Download PDF summary",
+        "pdf_generated": (
+            "Strategy summary made on {date} from the saved reports. Each full report has its "
+            "own PDF with the detail."
+        ),
         "empty": "This strategy has no reports yet. File them from your account.",
         "note": (
             "Each version is read from its own files and declarations. 'Better' or 'worse' on "

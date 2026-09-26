@@ -41,7 +41,7 @@ NOINDEX = "noindex, nofollow"
 #: Spanish and English exist for every page; Portuguese only where translated.
 PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/", "en": "/en", "pt": "/pt"},
-    {"es": "/ejemplo", "en": "/sample"},
+    {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"},
     {lang: guides_index_url(lang) for lang in ("es", "en", "pt")},
     *({lang: guide_url(g.slug, lang) for lang in ("es", "en", "pt")} for g in GUIDES),
     dict(METHOD_PATH),

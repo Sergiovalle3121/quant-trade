@@ -85,6 +85,8 @@ def test_an_mt5_report_alone_gives_trades_and_a_balance_curve() -> None:
 def test_report_digest_names_keep_only_known_extensions() -> None:
     assert report_digest_name("a.HTM") == "report.htm"
     assert report_digest_name("list.xlsx") == "report.xlsx"
+    assert report_digest_name("history.ZIP") == "report.zip"
+    assert report_digest_name("movimientos.xls") == "report.xls"
     assert report_digest_name("x.exe") == "report.bin"
     assert report_digest_name(None) == "report.bin"
 
@@ -212,14 +214,14 @@ def test_trades_outside_the_curve_dates_are_flagged() -> None:
     assert "TRADES_OUTSIDE_EQUITY" in {flag.code for flag in flags}
 
 
-def test_every_red_flag_code_has_a_title_in_both_languages() -> None:
+def test_every_red_flag_code_has_a_title_in_every_language() -> None:
     source = (ROOT / "src/quant_trade/audit/redflags.py").read_text(encoding="utf-8")
     codes = set(re.findall(r'"([A-Z][A-Z_]{5,})",\n\s+"(?:FAIL|WARN)', source))
     codes |= set(re.findall(r'RedFlag\("([A-Z_]+)"', source))
     assert codes, "no flag codes found"
     assert codes <= set(redflags.FLAG_TITLES)
     for titles in redflags.FLAG_TITLES.values():
-        assert set(titles) == {"es", "en"}
+        assert set(titles) == {"es", "en", "pt"}
         assert find_claims(" ".join(titles.values())) == []
 
 

@@ -319,6 +319,11 @@ STRATEGIES_PT: dict[str, str] = {
     "delete": "Apagar estratégia",
     "delete_help": "Os relatórios continuam na sua lista; só o agrupamento sai.",
     "back": "Voltar à minha conta",
+    "pdf_button": "Baixar resumo em PDF",
+    "pdf_generated": (
+        "Resumo da estratégia gerado em {date} a partir dos relatórios salvos. Cada relatório "
+        "completo tem seu próprio PDF com o detalhe."
+    ),
     "empty": "Esta estratégia ainda não tem relatórios. Guarde-os a partir da sua conta.",
     "note": (
         "Cada versão é lida com seus próprios arquivos e declarações. «Melhor» ou «pior» no "

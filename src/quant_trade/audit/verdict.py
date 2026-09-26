@@ -21,12 +21,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from quant_trade.audit import report_pt
 from quant_trade.audit.costs import RecostRow, reference_note
 from quant_trade.audit.redflags import RedFlag, flag_title
 from quant_trade.audit.schema import Dimension, Verdict, measured, not_measured
 
 Status = Literal["PASS", "WEAK", "FAIL", "NOT_MEASURED", "NOT_APPLICABLE"]
-Locale = Literal["es", "en"]
+Locale = Literal["es", "en", "pt"]
 
 STATISTICAL = "statistical_significance"
 MULTIPLICITY = "multiplicity"
@@ -169,6 +170,13 @@ def trials_phrase(trials: int, evidence: str, locale: str) -> str:
             "DECLARED": "declarado" if one else "declarados",
             "MEASURED": "contado en los archivos" if one else "contados en los archivos",
         }.get(evidence, TRIAL_SOURCE["es"]["NOT_MEASURED"])
+        return f"{trials} {noun} {source}"
+    if locale == "pt":
+        noun = "tentativa" if one else "tentativas"
+        source = {
+            "DECLARED": "declarada" if one else "declaradas",
+            "MEASURED": "contada nos arquivos" if one else "contadas nos arquivos",
+        }.get(evidence, TRIAL_SOURCE["pt"]["NOT_MEASURED"])
         return f"{trials} {noun} {source}"
     noun = "trial" if one else "trials"
     if evidence == "DECLARED":
@@ -948,6 +956,9 @@ def build_verdict(
         dimensions=dimensions,
     )
 
+
+# The Portuguese of the tables above, over their English (see ``report_pt``).
+report_pt.install(globals(), report_pt.VERDICT)
 
 __all__ = [
     "BENCHMARK",
