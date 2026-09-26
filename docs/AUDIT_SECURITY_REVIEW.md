@@ -72,6 +72,12 @@ Every change below has an offline, deterministic test in
 
 ## Limits that remain
 
+- Old Excel workbooks (.xls) are parsed by xlrd 2.x, a third-party parser of
+  a binary format. It is opened from memory with no formatting and each sheet
+  on demand. Any exception it raises becomes the plain `legacy_xls` refusal.
+  Its time is bounded by the 10 MB report limit and the 5,000,000-cell cap,
+  not by a timeout.
+
 - The attempt tables and the audit slots are per process. Railway runs one
   replica; with several, each would count separately.
 - An audit that has started cannot be interrupted: Python cannot stop a

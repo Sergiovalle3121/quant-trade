@@ -299,10 +299,16 @@ same member, inflated-size and cell limits: numbers, currency and percentages
 come from the cell's stored value, dates and times from its ISO value, and the
 blank rows and cells a sheet repeats to its edge are never laid out (a repeated
 row with values counts toward the cell limit). It goes through the same
-detection and column screen as a workbook, so no layout is guessed;
-if no importer knows it, the column screen offers its columns. Files that
+detection and column screen as a workbook, so no layout is guessed. An
+Excel 97-2003 workbook (`.xls`, an OLE2 compound file) is read the same way
+with xlrd 2.x (the web extra; it reads only this format and never runs
+macros), with no formatting, each sheet loaded on demand and unloaded after,
+the same cell and column limits, and date cells turned into ISO text in the
+workbook's own date system (1900 or 1904). If no importer knows the sheet,
+the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
+save it as .xlsx or CSV), an OpenDocument file
 that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
@@ -337,7 +343,13 @@ An equity curve or return series (`schema.parse_equity_csv`) takes a return
 column named with a `%` (`Return %`, `Rendimiento %`, `Retorno (%)`) and reads
 it as percentages, whatever the size of its values (a money-market fund's
 `0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
-column, taken only when no `date` or `fecha` column exists. A column whose
+column, taken only when no `date` or `fecha` column exists. Spanish and
+Portuguese curves are read by a fund's value per share (`Valor da cota`,
+`Valor cuota`, `Valor cuotaparte`) or, without one, the balance column `Saldo`
+(after the English names, so `equity` or `balance` wins when both exist).
+`Patrimonio`/`Patrimônio` is not read on its own: in a fund file it is the net
+assets, which move with subscriptions and redemptions, so it goes to the
+column screen. A column whose
 numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
 throughout (one plainly decimal-comma cell decides the column, so a `1,234`
 beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
@@ -2256,6 +2268,24 @@ changes what a report says.
   events. They go after 90 days with `purge_sessions`, with the account, and
   the export lists them under `failed_signins`. Rate-limited tries (429) are
   not counted.
+- **Since your last visit** (`account_seen` table, one row per account and
+  browser, keyed by the hash of the browser's `rigor_device` cookie, minted
+  on the first view when missing): each view of Mi cuenta marks the time for
+  this browser (`store.take_visit_notice`) and, when something happened
+  since its previous view, shows a notice on top once: wrong-password tries
+  added since (each line's count at that view is kept in `failed_json`, so a
+  line that spans it counts only the newer tries) and sign-ins from another
+  device label the account had not used before that view. Per browser, so
+  an intruder who signs in and opens Mi cuenta, even with the owner's
+  label, never clears the owner's notice; a browser's first view shows
+  nothing, so a newcomer learns nothing. At most `store.SEEN_DEVICES_MAX`
+  rows: past it a newcomer is not stored rather than pushing anyone out;
+  rows unseen for 90 days go with `purge_sessions`. Limits: clearing
+  cookies makes the next view a first view; labels are coarse, so an
+  intruder with the owner's label is never a "new device" (their tries
+  still show); tabs opened at the same instant may each show it. The rows
+  go with the account and the export lists device and time as
+  `account_page_seen` (never the browser hash).
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

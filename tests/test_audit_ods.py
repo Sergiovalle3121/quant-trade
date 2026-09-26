@@ -170,8 +170,14 @@ def test_a_document_that_is_not_a_spreadsheet_is_still_refused() -> None:
 
 
 def test_a_time_a_hair_under_the_minute_rounds_up_as_a_whole() -> None:
-    rows = [[("time", "PT15H29M59.999999997S", "15:30"), ("time", "PT09H05M01.4S", "09:05")]]
-    assert read_xlsx(_ods(rows))["Hoja1"] == [["15:30:00", "09:05:01"]]
+    rows = [
+        [
+            ("time", "PT15H29M59.999999997S", "15:30"),
+            ("time", "PT09H05M01.4S", "09:05"),
+            ("time", "PT23H59M59.6S", "23:59"),
+        ]
+    ]
+    assert read_xlsx(_ods(rows))["Hoja1"] == [["15:30:00", "09:05:01", "23:59:59"]]
 
 
 def test_a_table_inside_a_cell_is_not_read_into_the_outer_sheet() -> None:

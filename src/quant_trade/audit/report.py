@@ -184,6 +184,7 @@ LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
         "title_fund": f"{BRAND} · Auditoría de historial de fondo",
+        "title_account": f"{BRAND} · Auditoría de historial de cuenta",
         "fund_net": (
             "Rentabilidades declaradas netas de comisiones: son las cifras del propio fondo "
             "tras sus comisiones y Rigor no midió los costes."
@@ -1255,16 +1256,31 @@ LABELS: dict[str, dict[str, str]] = {
             "Revisa las banderas rojas: señalan cifras que no se pueden tomar tal cual."
         ),
         "next_questions": "Lleva al vendedor las preguntas de este informe.",
+        "next_questions_fund": (
+            "Lleva las preguntas de este informe al gestor o a quien te ofrece el fondo."
+        ),
         "next_keep": (
             "Guarda este informe y su identificador; si el robot cambia, pide que se audite "
             "de nuevo."
+        ),
+        "next_intro_fund": (
+            "Si inviertes o vas a invertir en este fondo, esto es lo que conviene aclarar "
+            "primero, según lo que encontró la auditoría."
+        ),
+        "next_fund_fees": (
+            "Pregunta si las rentabilidades son netas de todas las comisiones: la tabla de "
+            "comisiones muestra cuánto cambiarían si no lo son."
+        ),
+        "next_keep_fund": (
+            "Guarda este informe y su identificador; si el fondo cambia de gestor o de "
+            "estrategia, pide que se audite de nuevo."
         ),
         "next_link": "Ir al apartado",
         "meaning": "Qué significa para ti",
         "ladder": "Qué pide cada clase",
         "ladder_intro": (
-            "La clase no mide cuánto ganó el backtest, sino cuántas preguntas responden tus "
-            "archivos. Una clase mejor no significa que la estrategia vaya a funcionar."
+            "La clase no mide cuánto se ganó, sino cuántas preguntas responden tus archivos. "
+            "Una clase mejor no significa que la estrategia vaya a funcionar."
         ),
         "ladder_class": "Clase",
         "ladder_needs": "Qué hace falta",
@@ -1453,6 +1469,7 @@ LABELS: dict[str, dict[str, str]] = {
     "en": {
         "title": f"{BRAND} · Backtest audit",
         "title_fund": f"{BRAND} · Fund track record audit",
+        "title_account": f"{BRAND} · Account history audit",
         "fund_net": (
             "Returns declared net of fees: they are the fund's own figures after its fees, "
             "and Rigor did not measure costs."
@@ -2490,15 +2507,30 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "next_flags": "Read the red flags: they mark figures that cannot be taken as they stand.",
         "next_questions": "Take this report's questions to the seller.",
+        "next_questions_fund": (
+            "Take this report's questions to the manager or whoever offers you the fund."
+        ),
         "next_keep": (
             "Keep this report and its identifier; if the robot changes, ask for a new audit."
+        ),
+        "next_intro_fund": (
+            "If you invest or are about to invest in this fund, this is what is worth clearing "
+            "up first, going by what the audit found."
+        ),
+        "next_fund_fees": (
+            "Ask whether the returns are net of all fees: the fee table shows how much they "
+            "would change if they are not."
+        ),
+        "next_keep_fund": (
+            "Keep this report and its identifier; if the fund changes manager or strategy, "
+            "ask for a new audit."
         ),
         "next_link": "Go to the section",
         "meaning": "What this means for you",
         "ladder": "What each class requires",
         "ladder_intro": (
-            "The class does not measure how much the backtest made, but how many questions "
-            "your files answer. A better class does not mean the strategy will work."
+            "The class does not measure how much was made, but how many questions your files "
+            "answer. A better class does not mean the strategy will work."
         ),
         "ladder_class": "Class",
         "ladder_needs": "What it takes",
@@ -3446,11 +3478,14 @@ def _charts_html(data: dict[str, Any], locale: str) -> str:
                 paths, locale=locale, horizon_label=LABELS.get(locale, LABELS["es"])["horizon"]
             )
         )
-    figures.append(
-        charts.monthly_heatmap(
-            series["month_end_timestamps"], series["month_end_equity"], locale=locale
+    if not _fund_record(data):
+        # A fund's own calendar, read from its file, is in the fund section; one
+        # rebuilt from the curve here would repeat it and differ by rounding.
+        figures.append(
+            charts.monthly_heatmap(
+                series["month_end_timestamps"], series["month_end_equity"], locale=locale
+            )
         )
-    )
     return "".join(figures)
 
 
@@ -3779,13 +3814,22 @@ def _stress_table(
     )
 
 
-def _stress_html(stress: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+def _stress_html(
+    stress: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    *,
+    fund_record: bool = False,
+) -> str:
     if not stress:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     blocks = [
         (labels["stress_curve"], stress.get("returns") or {}, True),
         (labels["stress_trades"], stress.get("trades") or {}, False),
     ]
+    if fund_record:
+        # A fund's record has no trades to take out: say nothing rather than "not measured".
+        blocks = [block for block in blocks if block[1].get("status") == "MEASURED"]
     measured_rows = [
         row
         for _, block, _ in blocks
@@ -5854,9 +5898,7 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
-def _currency_html(
-    section: dict[str, Any] | None, locale: str, labels: dict[str, str]
-) -> str:
+def _currency_html(section: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """The dollar curve in other currencies and after US inflation."""
     if not section:
         return ""
@@ -6288,9 +6330,22 @@ def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> s
 
 
 def _title(data: dict[str, Any], labels: dict[str, str]) -> str:
-    """The report's name: a fund's track record, or a backtest."""
-    fund = data.get("fund") or {}
-    return labels["title_fund" if fund.get("track_record") else "title"]
+    """The report's name: a fund's track record, an account history or a backtest."""
+    if _fund_record(data):
+        return labels["title_fund"]
+    return labels["title_account" if is_account_history(data) else "title"]
+
+
+def _fund_record(data: dict[str, Any]) -> bool:
+    """A fund's monthly track record: no trades, no robot, no platform report."""
+    return bool((data.get("fund") or {}).get("track_record"))
+
+
+def _trade_section_shown(data: dict[str, Any], key: str) -> bool:
+    """A section that needs trades or daily data: a fund's monthly record
+    skips it when it could not be measured, instead of a "not measured" line
+    about trades a fund never has. Every other upload keeps the line."""
+    return not _fund_record(data) or (data.get(key) or {}).get("status") == "MEASURED"
 
 
 #: What each class requires, in the words of ``verdict.overall_class``.
@@ -6791,6 +6846,9 @@ def render_html(
             ("challenge", data.get("challenge") or {}),
         )
         if section.get("status") == "NOT_MEASURED"
+        # A monthly fund record never has the daily data a prop-firm
+        # challenge needs, and its section is not shown either.
+        and (name != "challenge" or _trade_section_shown(data, "challenge"))
     ]
     nm_html = (
         "<ul class='nm-list'>" + "".join(_nm_item(item) for item in not_measured) + "</ul>"
@@ -6827,7 +6885,10 @@ def render_html(
             if (data.get("test_data") or {}).get("status") == "MEASURED"
             else []
         ),
-        (labels["stress"], _stress_html(data.get("stress"), locale, labels)),
+        (
+            labels["stress"],
+            _stress_html(data.get("stress"), locale, labels, fund_record=_fund_record(data)),
+        ),
         *(
             [
                 (
@@ -6845,7 +6906,11 @@ def render_html(
             and (data.get("fund") or {}).get("status") != "MEASURED"
             else []
         ),
-        (labels["timing"], _timing_html(data.get("timing"), locale, labels)),
+        *(
+            [(labels["timing"], _timing_html(data.get("timing"), locale, labels))]
+            if _trade_section_shown(data, "timing")
+            else []
+        ),
         *(
             [(labels["recent"], _recent_html(data.get("recent"), locale, labels))]
             if (data.get("recent") or {}).get("status") == "MEASURED"
@@ -6896,7 +6961,11 @@ def render_html(
             if (data.get("instruments") or {}).get("status") == "MEASURED"
             else []
         ),
-        (labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels)),
+        *(
+            [(labels["trade_stats"], _trade_stats_html(data.get("trade_stats"), labels))]
+            if _trade_section_shown(data, "trade_stats")
+            else []
+        ),
         (labels["risk"], _risk_html(data.get("risk"), locale, labels, hidden)),
         *(
             [(labels["plateau"], _plateau_html(data.get("plateau"), labels))]
@@ -6951,15 +7020,21 @@ def render_html(
             if _capital_shown(data.get("capital"))
             else []
         ),
-        (
-            labels["challenge"],
-            _challenge_html(
-                data.get("challenge"),
-                locale,
-                labels,
-                _ev_value((data.get("performance") or {}).get("platform_equity_drawdown")),
-                hidden,
-            ),
+        *(
+            [
+                (
+                    labels["challenge"],
+                    _challenge_html(
+                        data.get("challenge"),
+                        locale,
+                        labels,
+                        _ev_value((data.get("performance") or {}).get("platform_equity_drawdown")),
+                        hidden,
+                    ),
+                )
+            ]
+            if _trade_section_shown(data, "challenge")
+            else []
         ),
         (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
         # The dimension reasons repeat the verdict in thresholds, so they open the
@@ -7266,8 +7341,9 @@ def _pdf_cover(
         f"<div class='pc-kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
         for label, shown, tone in _kpi_list(data, labels)[:4]
     )
-    steps = [key for key, _ in _next_steps(data, verdict, labels) if key != "next_keep"][:3]
-    next_html = "".join(f"<li>{_e(labels[key])}</li>" for key in steps or ["next_keep"])
+    keep = "next_keep_fund" if _fund_record(data) else "next_keep"
+    steps = [key for key, _ in _next_steps(data, verdict, labels) if key != keep][:3]
+    next_html = "".join(f"<li>{_e(labels[key])}</li>" for key in steps or [keep])
     return (
         "<section class='pdf-cover'>"
         f"<div class='pc-top'><span class='pc-brand'>{logo_mark(22)}{_e(BRAND)}</span>"
@@ -7297,6 +7373,18 @@ def _next_steps(
     open_ = {"WEAK", "FAIL"}
     account = is_account_history(data)
     steps: list[tuple[str, str]] = []
+    if _fund_record(data):
+        # A fund's record is its real history: no robot, no optimisation, no
+        # per-side cost. What an investor clears up first is the fees.
+        fund = data.get("fund") or {}
+        if status.get("data_quality") == "FAIL":
+            steps.append(("next_flags", labels["red_flags"]))
+        if (fund.get("fees") or {}).get("status") == "MEASURED":
+            steps.append(("next_fund_fees", labels["fund"]))
+        if data.get("vendor_questions"):
+            steps.append(("next_questions_fund", labels["questions"]))
+        steps.append(("next_keep_fund", ""))
+        return steps
     live = data.get("live") or {}
     if live.get("status") == "MEASURED" and live.get("outcome") != "CONSISTENT":
         steps.append(("next_live", labels["live"]))
@@ -7328,6 +7416,7 @@ def _next_steps_html(
     The class plan speaks to whoever builds the robot; this speaks to whoever
     runs it. Questions to ask and checks to make, never a trading instruction."""
     steps = _next_steps(data, verdict, labels)
+    intro = labels["next_intro_fund" if _fund_record(data) else "next_intro"]
 
     def item(key: str, section: str) -> str:
         anchor = anchors.get(section, "")
@@ -7335,7 +7424,7 @@ def _next_steps_html(
         return f"<li>{_e(labels[key])}{link}</li>"
 
     return (
-        f"<p class='muted'>{_e(labels['next_intro'])}</p>"
+        f"<p class='muted'>{_e(intro)}</p>"
         f"<ol class='next-steps'>{''.join(item(key, section) for key, section in steps)}</ol>"
     )
 
