@@ -61,3 +61,19 @@ def test_figures_that_were_not_measured_are_left_out() -> None:
     assert "Without the best 5 trades" not in labels
     assert "Without the best 5 periods" in labels
     assert "Total return" in labels
+
+
+def test_stress_tiles_name_the_whole_result_they_are_read_against() -> None:
+    # "+15,375.41" alone says nothing: the tile names what all the trades made.
+    result = _result()
+    data = result.model_dump(mode="json")
+    trades_full = data["stress"]["trades"]["original"]["value"]
+    curve_full = data["stress"]["returns"]["original"]["value"]
+    for locale in ("es", "en", "pt"):
+        labels = LABELS[locale]
+        page = render_html(result, watermark=False, free_mode=False, locale=locale)
+        hint = labels["kpi_hint_stress"].format(full=f"{trades_full:+,.2f}")
+        assert f"<small>{hint}</small>" in page
+        curve_hint = labels["kpi_hint_stress_curve"].format(full=f"{curve_full:+.1%}")
+        assert f"<small>{curve_hint}</small>" in page
+        assert find_claims(page) == []
