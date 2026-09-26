@@ -1011,8 +1011,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "average return per period, annualised; 90 % band from its cautious standard error",
-        "rentabilidad media por periodo, anualizada; banda del 90 % con su error estándar "
-        "prudente",
+        "rentabilidad media por periodo, anualizada; banda del 90 % con su error estándar prudente",
     ),
     ("fewer than 250 returns", "menos de 250 retornos"),
     (
@@ -1130,18 +1129,19 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "no se pudieron leer los cierres públicos del mercado al generar el informe",
     ),
     (
-        "no public source of this market's closes has a licence that allows reuse in a paid "
-        "report; to compare, upload its closes as the benchmark file",
-        "ninguna fuente pública de los cierres de este mercado tiene una licencia que permita "
-        "reutilizarlos en un informe de pago; para compararlo, sube sus cierres como archivo "
-        "de benchmark",
+        "no public source of this market's closes that we know of has a licence that allows "
+        "reuse in a paid report; to compare, upload its closes as the benchmark file",
+        "ninguna fuente pública de los cierres de este mercado que conozcamos tiene una "
+        "licencia que permita reutilizarlos en un informe de pago; para compararlo, sube sus "
+        "cierres como archivo de benchmark",
     ),
     (
-        "no public source of this market's closes has a licence that allows reuse in a paid "
-        "report; the benchmark section compares the strategy with the file you uploaded",
-        "ninguna fuente pública de los cierres de este mercado tiene una licencia que permita "
-        "reutilizarlos en un informe de pago; la sección del benchmark compara la estrategia "
-        "con el archivo que subiste",
+        "no public source of this market's closes that we know of has a licence that allows "
+        "reuse in a paid report; the benchmark section compares the strategy with the file "
+        "you uploaded",
+        "ninguna fuente pública de los cierres de este mercado que conozcamos tiene una "
+        "licencia que permita reutilizarlos en un informe de pago; la sección del benchmark "
+        "compara la estrategia con el archivo que subiste",
     ),
     (
         "fewer than 60 days shared with the market's public closes",

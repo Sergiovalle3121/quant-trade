@@ -66,12 +66,12 @@ MAX_GAP_DAYS = 5
 UNAVAILABLE = "the market's public closes could not be read when the report was made"
 #: A market the file trades whose closes no public source lets a paid report reuse.
 UNLICENSED = (
-    "no public source of this market's closes has a licence that allows reuse in a paid "
-    "report; to compare, upload its closes as the benchmark file"
+    "no public source of this market's closes that we know of has a licence that allows "
+    "reuse in a paid report; to compare, upload its closes as the benchmark file"
 )
 UNLICENSED_WITH_BENCHMARK = (
-    "no public source of this market's closes has a licence that allows reuse in a paid "
-    "report; the benchmark section compares the strategy with the file you uploaded"
+    "no public source of this market's closes that we know of has a licence that allows "
+    "reuse in a paid report; the benchmark section compares the strategy with the file you uploaded"
 )
 NOTE = (
     "the strategy's closes against the market's public closes (FRED) on the days both are "

@@ -23,7 +23,7 @@ from quant_trade.audit.holding import (
     sharpe_gap_se,
     versus_holding,
 )
-from quant_trade.audit.i18n import untranslated
+from quant_trade.audit.i18n import localize, untranslated
 from quant_trade.audit.market import BY_KEY, MarketData, asset_of, dominant_asset, parse_fred_csv
 from quant_trade.audit.market import _download as real_download
 from quant_trade.audit.report import LABELS, _holding_html, render
@@ -504,3 +504,13 @@ def test_a_higher_sharpe_inside_the_noise_says_it_is_not_enough(locale: str) -> 
     rides["sharpe_gap_in_se"] = {**holding["sharpe_gap_in_se"], "value": 0.84}
     assert labels["holding_no_clear_edge"].split("(")[0] not in _holding_html(rides, locale, labels)
     assert "FRED ," not in shown and "FRED</a>," not in shown
+
+
+def test_the_unlicensed_reason_speaks_of_the_sources_we_know_in_each_language() -> None:
+    # Not a legal absolute: only the sources known to us.
+    for reason in (UNLICENSED, UNLICENSED_WITH_BENCHMARK):
+        assert "that we know of" in reason
+        assert "que conozcamos" in localize(reason, "es")
+        assert "que conheçamos" in localize(reason, "pt")
+        for locale in ("es", "pt"):
+            assert find_claims(localize(reason, locale)) == []

@@ -1346,10 +1346,10 @@ or bitcoin (by symbol name: `US500`, `SPX500`, `ES` futures; `US100`,
 suffixes dropped), or a tester report names one of them, the market is
 recognised but its closes are not read: FRED's `SP500`, `NASDAQ100` and
 `CBBTCUSD` need the written permission of S&P Dow Jones Indices, Nasdaq and
-Coinbase, and no public source allows their reuse in a paid report
+Coinbase, and no public source we know of allows their reuse in a paid report
 (`Asset.licensed` is false, so `MarketData` never downloads them). The
 section is one NOT_MEASURED line: "no public source of this market's closes
-has a licence that allows reuse in a paid report; to compare, upload its
+that we know of has a licence that allows reuse in a paid report; to compare, upload its
 closes as the benchmark file" (`holding.UNLICENSED`), or, when a benchmark
 file was uploaded, that the benchmark section compares the strategy with it
 (`UNLICENSED_WITH_BENCHMARK`). A benchmark column inside an equity or return
@@ -1398,9 +1398,14 @@ https one), and values that are not finite are dropped. Only one refresh of
 a series runs at a time, and after a failure (down, slow, rate limited, not
 a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`). A network failure (a timeout or a reset connection) is read again up to twice, after 1.5 and 3 seconds, before it counts as failed (`READ_ATTEMPTS`, `READ_PAUSE`); a reply that arrives but cannot be read is not.
 So that a rerun of the same file reads the same values, a reply never
-replaces a kept copy it covers less of: one that starts later, ends earlier
-or has fewer points inside the kept copy's span (a short or truncated reply)
-is refused and the kept copy stays (`_check_not_shorter`). Every monthly
+replaces a kept copy it covers less of: one that ends earlier, or holds under
+90 % of the kept copy's points inside the kept copy's span (`MIN_KEPT_SHARE`;
+a short or truncated reply), is refused and the kept copy stays
+(`_check_not_shorter`). A reply that starts later but keeps that share is
+taken, so a publisher that trims its early years does not pin the kept copy
+for good. Each refused or failed refresh logs one warning with the series key,
+its provider and the error's class and message (at most 200 characters; no
+reply body, address or key). Every monthly
 series (US and local consumer prices, Brazil's Selic, the BIS policy rates;
 `Asset.monthly`) must also hold each month from its first to its last once,
 or the reply is refused (`_check_months`), except the gaps its publisher

@@ -1023,7 +1023,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "crises_market": "Mercado en esas fechas",
         "crises_market_note": (
-            "Mercado: variación del cierre del mes previo a la ventana al cierre de su último "
+            "Mercado: variación entre el cierre del mes previo a la ventana y el de su último "
             "mes, una cifra histórica fija comprobada el {as_of} con los niveles del índice en "
             "FRED ({sources}); no se lee ni se muestra ningún otro dato de esos índices. Son "
             "acciones de EE. UU. y bitcoin: si la estrategia opera otro mercado (divisas, "

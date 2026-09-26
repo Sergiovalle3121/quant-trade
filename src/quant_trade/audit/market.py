@@ -28,6 +28,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 import math
 import re
 import threading
@@ -39,6 +40,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+
+LOGGER = logging.getLogger(__name__)
 
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 FRED_PAGE = "https://fred.stlouisfed.org/series/{series}"
@@ -135,6 +138,8 @@ READ_ATTEMPTS = 3
 READ_PAUSE = 1.5
 #: How long a downloaded series is reused before it is read again.
 MAX_AGE = 6 * 3600.0
+#: Share of a kept copy's points a new reply must hold inside the kept span.
+MIN_KEPT_SHARE = 0.9
 #: Highest rate in percent a year a rate series may hold; above it the reply is
 #: taken as broken (US bills peaked near 16 % in 1981).
 MAX_RATE = 25.0
@@ -607,13 +612,15 @@ def _check_months(series: pd.Series, gaps: tuple[tuple[str, str], ...] = ()) -> 
 
 
 def _check_not_shorter(series: pd.Series, kept: pd.Series) -> None:
-    """Raise when a new reply covers less than the copy already kept: it starts
-    later, ends earlier or has fewer points inside the kept copy's span (a
-    partial or truncated reply), so the kept copy stays and a rerun of the same
-    file reads the same values."""
+    """Raise when a new reply covers less than the copy already kept: it ends
+    earlier, or holds under ``MIN_KEPT_SHARE`` of the kept copy's points inside
+    the kept copy's span (a partial or truncated reply), so the kept copy stays
+    and a rerun of the same file reads the same values. A reply that starts
+    later but keeps that share is taken: a publisher may trim its early years,
+    and refusing it would pin the kept copy for good."""
     first, last = kept.index[0], kept.index[-1]
     inside = int(((series.index >= first) & (series.index <= last)).sum())
-    if series.index[0] > first or series.index[-1] < last or inside < len(kept):
+    if series.index[-1] < last or inside < MIN_KEPT_SHARE * len(kept):
         raise ValueError("the reply covers less than the kept copy")
 
 
@@ -755,7 +762,15 @@ class MarketData:
             kept = self._cache.get(key)
             if kept is not None:
                 _check_not_shorter(series, kept[1])
-        except Exception:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
+        except Exception as exc:  # noqa: BLE001 (no network, slow, bad reply: keep what we had)
+            # Key, provider and the error only: no reply body, no address.
+            LOGGER.warning(
+                "public series %s (%s) refused or failed: %s: %s",
+                key,
+                asset.provider,
+                type(exc).__name__,
+                str(exc)[:200],
+            )
             self._failed[key] = self._clock()
             return False
         finally:

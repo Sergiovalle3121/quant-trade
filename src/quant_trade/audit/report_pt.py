@@ -1031,8 +1031,8 @@ REPORT: dict[str, Any] = {
         "fund_fees_behind": "O fundo já fica abaixo do seu benchmark antes de qualquer taxa.",
         "crises_market": "Mercado nessas datas",
         "crises_market_note": (
-            "Mercado: variação do fechamento do mês anterior à janela até o fechamento do seu "
-            "último mês, um número histórico fixo conferido em {as_of} com os níveis do índice "
+            "Mercado: variação entre o fechamento do mês anterior à janela e o do seu último "
+            "mês, um número histórico fixo conferido em {as_of} com os níveis do índice "
             "no FRED ({sources}); nenhum outro dado desses índices é lido ou mostrado. São ações "
             "dos EUA e bitcoin: se a estratégia opera outro mercado (moedas, commodities, outro "
             "país), considere-os só como contexto do que o mercado vivia, não como ponto de "
@@ -5237,24 +5237,25 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "no public source of this market's closes has a licence that allows reuse in a "
-            "paid report; to compare, upload its closes as the benchmark file"
+            "no public source of this market's closes that we know of has a licence that "
+            "allows reuse in a paid report; to compare, upload its closes as the benchmark file"
         ),
         (
-            "nenhuma fonte pública dos fechamentos deste mercado tem uma licença que permita "
-            "reutilizá-los em um relatório pago; para comparar, envie os fechamentos como "
-            "arquivo de benchmark"
+            "nenhuma fonte pública dos fechamentos deste mercado que conheçamos tem uma licença "
+            "que permita reutilizá-los em um relatório pago; para comparar, envie os "
+            "fechamentos como arquivo de benchmark"
         ),
     ),
     (
         (
-            "no public source of this market's closes has a licence that allows reuse in a "
-            "paid report; the benchmark section compares the strategy with the file you uploaded"
+            "no public source of this market's closes that we know of has a licence that "
+            "allows reuse in a paid report; the benchmark section compares the strategy with "
+            "the file you uploaded"
         ),
         (
-            "nenhuma fonte pública dos fechamentos deste mercado tem uma licença que permita "
-            "reutilizá-los em um relatório pago; a seção do benchmark compara a estratégia com o "
-            "arquivo que você enviou"
+            "nenhuma fonte pública dos fechamentos deste mercado que conheçamos tem uma licença "
+            "que permita reutilizá-los em um relatório pago; a seção do benchmark compara a "
+            "estratégia com o arquivo que você enviou"
         ),
     ),
     (

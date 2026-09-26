@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import zipfile
 from dataclasses import replace
 from html import escape
@@ -530,6 +531,57 @@ def test_a_truncated_reply_leaves_the_kept_series_in_place() -> None:
     assert data.refresh("cpi_cad") is True
     fresh = data.closes("cpi_cad")
     assert fresh is not None and fresh is not kept and len(fresh) == len(YEAR) + 1
+
+
+def test_a_reply_that_trims_early_years_but_keeps_nine_tenths_replaces_the_copy() -> None:
+    longer = [f"2024-{m:02d}" for m in range(1, 13)] + [f"2025-{m:02d}" for m in range(1, 9)]
+    history = [*longer, *YEAR]  # 32 months kept
+    # The publisher drops its first three months (29 of 32 kept, over nine tenths)
+    # and adds one: the reply is taken.
+    replies = [_boc([*history[3:], "2026-09"]), _boc(history)]
+    data = MarketData(lambda series: replies.pop())
+    assert data.refresh("cpi_cad") is True and data.refresh("cpi_cad") is True
+    fresh = data.closes("cpi_cad")
+    assert fresh is not None and fresh.index[0] == pd.Timestamp("2024-04-01")
+    assert fresh.index[-1] == pd.Timestamp("2026-09-01")
+
+
+def test_a_reply_that_trims_too_much_or_ends_earlier_is_refused_and_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    longer = [f"2024-{m:02d}" for m in range(1, 13)] + [f"2025-{m:02d}" for m in range(1, 9)]
+    history = [*longer, *YEAR]
+    for reply in (
+        _boc([*history[4:], "2026-09"]),  # 28 of 32 kept: under nine tenths
+        _boc(history[:-1]),  # ends a month earlier
+    ):
+        replies = [reply, _boc(history)]
+        data = MarketData(lambda series, replies=replies: replies.pop())
+        assert data.refresh("cpi_cad") is True
+        kept = data.closes("cpi_cad")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="quant_trade.audit.market"):
+            assert data.refresh("cpi_cad") is False
+        assert data.closes("cpi_cad") is kept
+        (record,) = caplog.records
+        assert record.getMessage() == (
+            "public series cpi_cad (boc) refused or failed: "
+            "ValueError: the reply covers less than the kept copy"
+        )
+
+
+def test_a_failed_read_is_logged_with_key_provider_and_error_only(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def down(series: str) -> str:
+        raise TimeoutError("FRED too slow")
+
+    data = MarketData(down, sleep=lambda seconds: None)
+    with caplog.at_level(logging.WARNING, logger="quant_trade.audit.market"):
+        assert data.refresh("cash_eur") is False
+    assert [record.getMessage() for record in caplog.records] == [
+        "public series cash_eur (fred) refused or failed: TimeoutError: FRED too slow"
+    ]
 
 
 def test_every_monthly_series_must_have_consecutive_months() -> None:
