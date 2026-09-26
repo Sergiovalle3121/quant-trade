@@ -525,6 +525,12 @@ SHUFFLE_NOTE = (
     "only the order changes"
 )
 NO_LOSING_PERIOD_DRAWDOWN = "no losing period; the drawdown is zero in any order"
+#: Losing returns needed, and the most shuffles that may tie the uploaded
+#: fall: with a handful of losses every order falls about the same, and a
+#: "typical" reading would call a smoothed curve normal.
+SHUFFLE_MIN_LOSSES = 5
+SHUFFLE_MAX_TIE_SHARE = 0.5
+TOO_FEW_LOSSES_FOR_ORDER = "too few losing periods for their order to matter"
 
 
 def _deepest_fall(values: np.ndarray) -> float:
@@ -562,8 +568,11 @@ def shuffled_drawdown(
                 f"{supplied} supplied"
             ),
         }
-    if not bool((values < 0).any()):
+    losses = int((values < 0).sum())
+    if losses == 0:
         return {"status": "NOT_MEASURED", "reason": NO_LOSING_PERIOD_DRAWDOWN}
+    if losses < SHUFFLE_MIN_LOSSES:
+        return {"status": "NOT_MEASURED", "reason": TOO_FEW_LOSSES_FOR_ORDER}
     if samples < 1:
         raise ValueError("samples must be positive")
     step = math.ceil(supplied / MAX_RISK_PATH_PERIODS) if supplied > MAX_RISK_PATH_PERIODS else 1
@@ -580,6 +589,14 @@ def shuffled_drawdown(
     # Ties count on both sides, and the uploaded order counts as one of the
     # orders, so neither share can reach zero.
     tolerance = 1e-12
+    # Most orders falling exactly as the upload does, or exactly as each
+    # other does (one loss sets the fall wherever it lands), leaves nothing
+    # for the order to say.
+    typical = float(np.median(falls))
+    ties_upload = float((np.abs(falls - observed) <= tolerance).mean())
+    ties_median = float((np.abs(falls - typical) <= 1e-9).mean())
+    if max(ties_upload, ties_median) > SHUFFLE_MAX_TIE_SHARE:
+        return {"status": "NOT_MEASURED", "reason": TOO_FEW_LOSSES_FOR_ORDER}
     shallower = (float((falls <= observed + tolerance).sum()) + 1.0) / (used + 1.0)
     deeper = (float((falls >= observed - tolerance).sum()) + 1.0) / (used + 1.0)
     if shallower <= SHUFFLE_TAIL:

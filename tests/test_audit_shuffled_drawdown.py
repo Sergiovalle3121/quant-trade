@@ -17,9 +17,11 @@ def test_the_same_seed_gives_the_same_answer() -> None:
 
 
 def test_the_uploaded_fall_counts_a_loss_on_the_first_period() -> None:
-    returns = np.r_[-0.2, np.full(60, 0.01), np.tile([0.01, -0.005], 20)]
+    noise = np.random.default_rng(7).normal(0.001, 0.005, 300)
+    returns = np.r_[-0.2, noise]
     out = shuffled_drawdown(returns)
-    assert out["observed"]["value"] == pytest.approx(-0.2)
+    assert out["status"] == "MEASURED"
+    assert out["observed"]["value"] <= -0.2
 
 
 def test_alternating_small_losses_read_shallower_than_random_orders() -> None:
@@ -82,3 +84,27 @@ def test_the_audit_carries_the_comparison_beside_the_risk_section() -> None:
     risk = _risk(pd.Series(returns), 252.0, samples=200, seed=1)
     assert risk["versus_shuffle"]["status"] == "MEASURED"
     assert risk["versus_shuffle"]["position"] in {"SHALLOWER", "TYPICAL", "DEEPER"}
+
+
+def test_a_handful_of_losses_is_not_measured_rather_than_typical() -> None:
+    # Four losses among many gains: nearly any order falls about the same.
+    returns = np.r_[np.full(200, 0.01), [-0.02, -0.01, -0.015, -0.03]]
+    out = shuffled_drawdown(returns)
+    assert out["status"] == "NOT_MEASURED"
+    assert out["reason"] == analytics.TOO_FEW_LOSSES_FOR_ORDER
+
+
+def test_losses_that_tie_in_most_orders_are_not_measured() -> None:
+    # One loss dwarfs the rest, so it sets the fall in nearly every order.
+    returns = np.r_[np.full(400, 0.02), [-0.3, -0.001, -0.001, -0.001, -0.001, -0.001]]
+    out = shuffled_drawdown(returns)
+    assert out["status"] == "NOT_MEASURED"
+    assert out["reason"] == analytics.TOO_FEW_LOSSES_FOR_ORDER
+
+
+def test_curves_whose_orders_all_fall_like_the_upload_are_not_measured() -> None:
+    # Every loss is one deep drop followed by a full recovery: any order
+    # falls exactly as the upload does.
+    returns = np.r_[np.tile(np.r_[-0.05, np.full(50, 0.01)], 6)]
+    out = shuffled_drawdown(returns)
+    assert out["status"] == "NOT_MEASURED"

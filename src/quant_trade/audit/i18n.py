@@ -1090,6 +1090,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("deepest fall of the uploaded order", "caída más profunda en el orden aportado"),
     (
+        "too few losing periods for their order to matter",
+        "muy pocos periodos perdedores para que su orden importe",
+    ),
+    (
         "no losing period; the drawdown is zero in any order",
         "ningún periodo perdedor; la caída es cero en cualquier orden",
     ),
