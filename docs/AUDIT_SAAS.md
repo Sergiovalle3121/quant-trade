@@ -1363,9 +1363,14 @@ start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
 average or the latest published). These series may be negative (the franc,
 euro and yen rates were); a reply outside -5 % to 200 % a year
 (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
-taken as broken. When the currency has no series here, or its rates cannot
-be read or do not cover the history, the
-line stays the US bill's, with its note. Jensen's alpha takes the same local
+taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
+`currency.DOLLAR_CODES`) or with no named currency gets the US bill's line.
+Another named currency with no series here (`AUD`, `ARS`…), or whose rates
+cannot be read or do not cover the history, gets no line: the section is
+`NOT_MEASURED` (`NO_LOCAL_CASH`), since the bill is not what cash in that
+currency paid (for pesos argentinos the gap is tens of points a year). The
+code is read like the currency section (trimmed, upper case, 8 characters),
+so the three currency-aware pieces agree on it. Jensen's alpha takes the same local
 rate for the strategy's side (the benchmark keeps the bill; see the benchmark
 section).
 It never changes the class.
@@ -2880,7 +2885,9 @@ Informational only: none of these moves a class, a dimension or a red flag.
   benchmark, taken as priced in US dollars (the note and the line say so; a
   local index uploaded as the benchmark is not detected), the bill's: each side over its own
   currency's cash. `cash_currency` then names the currency and the line names
-  both rates. Otherwise a dollar account's bill on both sides stays. With
+  both rates. Otherwise a dollar account's bill on both sides stays, and an
+  account in another named currency has nothing subtracted (the line says
+  so), never the bill. With
   the bill on both sides, a simulated account in reais holding Brazilian cash
   at 12 % and 0.2 of the index, with the bill at 5 %, showed about 7 % a year
   of alpha that was only Brazil's cash premium over the bill.
