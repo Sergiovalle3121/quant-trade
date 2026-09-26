@@ -232,6 +232,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "filled time",
         "exec time",
         "execution time",
+        # Zerodha Console's tradebook: a full timestamp beside a date-only trade_date.
+        "order execution time",
         "trade time",
         "transaction date",
         "transactiondate",
@@ -1148,6 +1150,27 @@ def header_zone(name: str) -> int | None:
     return offset if sign == "+" else -offset
 
 
+def _dated_blanks(
+    values: list[str], rows: list[list[str]] | None, date_column: int | None
+) -> list[int]:
+    """Rows whose full timestamp is blank while the other date column holds a
+    date with no clock (Zerodha leaves ``order_execution_time`` empty on some
+    rows beside ``trade_date``): those rows take that date, read as its start."""
+    if rows is None or date_column is None:
+        return []
+    filled = [value for value in values if value]
+    if not filled or all(_CLOCK.match(value.strip()) for value in filled):
+        return []
+    if all(re.fullmatch(r"\d{10}(\d{3})?", value) for value in filled):
+        return []
+    dates = [row[date_column].strip() if date_column < len(row) else "" for row in rows]
+    return [
+        index
+        for index, (value, date) in enumerate(zip(values, dates, strict=True))
+        if not value and date and ":" not in date
+    ]
+
+
 def _times(
     values: list[str],
     serial: bool,
@@ -1176,6 +1199,11 @@ def _times(
                 for value, clock in zip(values, clocks, strict=True)
             ]
             filled = [value for value in values if value]
+    blanks = _dated_blanks(values, rows, date_column)
+    if blanks and rows is not None and date_column is not None:
+        values = list(values)
+        for index in blanks:
+            values[index] = rows[index][date_column].strip()
     if filled and all(re.fullmatch(r"\d{10}(\d{3})?", value) for value in filled):
         parsed: list[datetime | None] = [
             datetime.fromtimestamp(int(value) / (1000 if len(value) == 13 else 1), tz=UTC)
@@ -1304,6 +1332,10 @@ UNREADABLE_TRADE_WARNING = (
     "results"
 )
 UNREADABLE_MORE_WARNING = "{n} more row(s) with an unreadable time were left out"
+DATE_ONLY_FILLS_WARNING = (
+    "{n} fill(s) had no time, only a date; each was placed at the start of that day, so its "
+    "order among that day's fills may be wrong"
+)
 #: Rows named one by one before the rest are only counted.
 UNREADABLE_NAMED = 5
 
@@ -1751,6 +1783,10 @@ def _fills(
         dayfirst=normalise(mapping.names.get("time", "")) in DAY_FIRST_NAMES or None,
     )
     draft.naive_times = times.naive
+    time_cells = [_cell(row, columns, "time") for row in rows]
+    dated = len(_dated_blanks(time_cells, rows, mapping.date_column))
+    if dated:
+        draft.warnings.append(DATE_ONLY_FILLS_WARNING.format(n=dated))
     fills: list[tuple[datetime, int, str, str, float, float, float, float | None, float]] = []
     signed = False
     other_coin = 0

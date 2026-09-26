@@ -2101,6 +2101,13 @@ SINGULAR: dict[str, tuple[str, str]] = {
         "operação de ações no preço de exercício nesses dias), então o resultado não inclui o "
         "movimento das ações",
     ),
+    "{n} fill(s) had no time, only a date; each was placed at the start of that day, so its "
+    "order among that day's fills may be wrong": (
+        "{n} fill had no time, only a date; it was placed at the start of that day, so its "
+        "order among that day's fills may be wrong",
+        "{n} execução sem horário, só com a data; foi colocada no início desse dia, então sua "
+        "ordem entre as execuções desse dia pode estar errada",
+    ),
     "{n} stock split(s) that would leave no shares held were not applied; the positions they touch "
     "may be read wrong": (
         "{n} stock split that would leave no shares held was not applied; the position it touches "
@@ -2393,6 +2400,14 @@ RULES: tuple[tuple[str, str], ...] = (
             "{n} opção(ões) atribuídas ou exercidas cujas ações entregues não estão no arquivo "
             "(nenhuma operação de ações no preço de exercício nesses dias), então o resultado não "
             "inclui o movimento das ações"
+        ),
+    ),
+    (
+        "{n} fill(s) had no time, only a date; each was placed at the start of that day, so its "
+        "order among that day's fills may be wrong",
+        (
+            "{n} execuções sem horário, só com a data; cada uma foi colocada no início desse "
+            "dia, então sua ordem entre as execuções desse dia pode estar errada"
         ),
     ),
     (
