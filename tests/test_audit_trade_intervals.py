@@ -64,3 +64,11 @@ def test_no_losing_trade_leaves_the_profit_factor_range_unmeasured() -> None:
 def test_the_same_trades_give_the_same_ranges() -> None:
     pnl = np.random.default_rng(2).normal(1.0, 10.0, 80)
     assert _ranges(pnl) == _ranges(pnl.copy())
+
+
+def test_a_range_that_reaches_infinity_is_unbounded_not_nan() -> None:
+    # One loss in ten: about a third of the resamples have no loss at all.
+    pnl = np.array([5.0, 3.0, 4.0, 2.0, 6.0, 1.0, 3.0, 2.0, 4.0, -3.0])
+    pf = _ranges(pnl)["profit_factor"]
+    assert pf["high"]["evidence"] == "NOT_MEASURED"
+    assert math.isfinite(pf["low"]["value"])
