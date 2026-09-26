@@ -265,6 +265,20 @@ gross reading exactly (one trade per symbol) is read the way that gives a
 round contract size. Fees in another coin than an exchange pair's quote
 currency are left out; fees of shares or futures always count.
 
+Containers (`importers.unwrap`, used by the import, format detection and
+the column screen): a zip that is not a workbook is opened when it holds
+exactly one CSV, TXT, TSV, HTML or Excel file (`__MACOSX/` copies and hidden
+files are ignored; the file inside obeys the same size limit). A web page
+that is not a MetaTrader report is read as a trade or fill table with the
+universal reader, which covers the tables brokers save with a `.xls` name;
+if no importer knows it, the column screen offers its columns. Files that
+cannot be read are refused with how to get one that can: an old binary
+Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
+(`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
+Excel or HTML history), and a zip with none or several exports
+(`zip_contents`). The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
+.xls .zip` (`pages.REPORT_ACCEPT`).
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating
