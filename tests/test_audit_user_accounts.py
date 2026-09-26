@@ -2817,7 +2817,7 @@ def test_open_sessions_list_devices_and_sign_out_one_or_all_others(tmp_path: Pat
     )
     assert "done=sessions_ended" in others.headers["location"]
     assert tablet.get("/cuenta", follow_redirects=False).status_code == 303
-    page = client.get("/cuenta").text
+    page = client.get("/cuenta").text.split("id='actividad'")[0]  # the sessions card
     assert "Cerrar todas las demás" not in page and "Safari · iPhone" not in page
     data = json.loads(client.get("/cuenta/datos").text)
     assert data["sessions"][0]["device"] == "Firefox · Windows"
@@ -2888,5 +2888,175 @@ def test_the_open_sessions_list_exists_in_every_language(tmp_path: Path) -> None
         jurisdiction="Leyes de México",
     )
     for locale, words in (("es", "Sesiones abiertas"), ("en", "Open sessions")):
+        privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
+        assert words in privacy and not find_claims(privacy)
+
+
+def _kinds(store: object, email: str = "ana@example.com") -> list[str]:
+    account = store.find_account(email)  # type: ignore[attr-defined]
+    return [e.kind for e in store.list_events(account.id)]  # type: ignore[attr-defined]
+
+
+def test_recent_activity_lists_sign_ins_and_security_changes(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": LAPTOP_UA, "X-Forwarded-For": "2001:db8:5:5::9"})
+    _signup(client)
+    phone = TestClient(client.app)
+    phone.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.7"})
+    _signin(phone, "ana@example.com")
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post(
+        "/cuenta/contrasena",
+        data={"current": PASSWORD, "password": NEW_PASSWORD, "csrf": csrf},
+    )
+    _signin(phone, "ana@example.com", NEW_PASSWORD)
+    _make_recovery_key(client, password=NEW_PASSWORD)
+    client.post("/cuenta/sesiones/cerrar-otras", data={"csrf": csrf})
+    assert _kinds(store) == [
+        "sessions_ended",
+        "recovery_key_created",
+        "signin",
+        "password_changed",
+        "signin",
+        "signup",
+    ]
+    page = client.get("/cuenta").text
+    assert "Actividad reciente" in page and "id='actividad'" in page
+    card = page.split("id='actividad'")[1]
+    for words in (
+        "Cuenta creada",
+        "Entrada con contraseña",
+        "Contraseña cambiada",
+        "Clave de recuperación nueva",
+        "Se cerraron todas las demás sesiones",
+        "Safari · iPhone",
+        "203.0.113.7",
+        "Firefox · Windows",
+        "2001:db8:5:5::/64",
+    ):
+        assert words in card, words
+    assert "2001:db8:5:5::9" not in page and "Mozilla" not in page
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    activity = json.loads(client.get("/cuenta/datos").text)["activity"]
+    assert [a["event"] for a in activity][0] == "sessions_ended"
+    assert activity[-1] == {
+        "event": "signup",
+        "at": activity[-1]["at"],
+        "device": "Firefox · Windows",
+        "network": "2001:db8:5:5::/64",
+    }
+    # Closing one session is listed too.
+    _signin(phone, "ana@example.com", NEW_PASSWORD)
+    page = client.get("/cuenta").text
+    handle = re.findall(r"name='handle' value='([^']+)'", page.split("id='actividad'")[0])[-1]
+    client.post("/cuenta/sesiones/cerrar", data={"handle": handle, "csrf": _csrf(page)})
+    assert _kinds(store)[0] == "session_ended"
+    assert "Se cerró una sesión" in client.get("/cuenta").text
+
+
+def test_recent_activity_lists_two_step_and_recovery_events(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, store, settings = _client(tmp_path)
+    monkeypatch.setenv("DATABASE_URL", settings.database_url)
+    _signup(client)
+    secret = _turn_on_two_step(client)
+    other = TestClient(client.app)
+    _signin(other, "ana@example.com")
+    assert _kinds(store)[0] == "two_step_on"  # the password alone opens no session
+    _enter_code(other, _code(secret, 1))
+    assert _kinds(store)[0] == "signin_two_step"
+    key = KEY_SHAPE.search(_make_recovery_key(client).text).group(1)  # type: ignore[union-attr]
+    lost = TestClient(client.app)
+    _signin(lost, "ana@example.com")
+    _enter_code(lost, key=key)
+    assert _kinds(store)[:2] == ["signin_recovery_key", "recovery_key_created"]
+    assert "Entrada con la clave de recuperación" in lost.get("/cuenta").text
+    key = KEY_SHAPE.search(_make_recovery_key(client).text).group(1)  # type: ignore[union-attr]
+    back = _recover(TestClient(client.app), "ana@example.com", key, password=PASSWORD)
+    assert back.status_code == 303
+    assert _kinds(store)[0] == "password_recovered"
+    fresh = TestClient(client.app)
+    _signin(fresh, "ana@example.com")
+    secret = _turn_on_two_step(fresh)
+    csrf = _csrf(fresh.get("/cuenta").text)
+    fresh.post("/cuenta/dos-pasos/desactivar", data={"code": _code(secret, 1), "csrf": csrf})
+    assert _kinds(store)[0] == "two_step_off"
+    _turn_on_two_step(fresh)
+    CliRunner().invoke(cli_app, ["audit", "account-two-step-off", "ana@example.com", "--yes"])
+    assert _kinds(store)[0] == "two_step_off_by_owner"
+    page = fresh.get("/cuenta").text
+    assert "Verificación en dos pasos desactivada por soporte" in page
+    assert "Contraseña nueva con la clave de recuperación" in page
+
+
+def test_recent_activity_is_capped_expires_and_goes_with_the_account(tmp_path: Path) -> None:
+    from quant_trade.audit.store import ACCOUNT_EVENT_DAYS, ACCOUNT_EVENT_MAX
+
+    client, store, _ = _client(tmp_path)
+    _signup(client, "n@example.com")
+    ana = store.find_account("n@example.com")  # type: ignore[attr-defined]
+    with pytest.raises(ValueError):
+        store.note_event(ana.id, "made_up", now=NOW)  # type: ignore[attr-defined]
+    old = datetime.now(UTC) - timedelta(days=ACCOUNT_EVENT_DAYS + 1)
+    store.note_event(ana.id, "signin", now=old)  # type: ignore[attr-defined]
+    for _ in range(ACCOUNT_EVENT_MAX + 5):
+        store.note_event(ana.id, "signin", now=datetime.now(UTC))  # type: ignore[attr-defined]
+    assert len(store.list_events(ana.id)) == ACCOUNT_EVENT_MAX  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = conn.execute(store.account_events.select()).all()  # type: ignore[attr-defined]
+    assert len(rows) == ACCOUNT_EVENT_MAX  # the oldest went, signup and the old one included
+    store.note_event(ana.id, "signin", now=old)  # type: ignore[attr-defined]
+    store.purge_sessions(datetime.now(UTC))  # type: ignore[attr-defined]
+    assert all(  # type: ignore[attr-defined]
+        e.at > old.isoformat()[:10]
+        for e in store.list_events(ana.id)  # type: ignore[attr-defined]
+    )
+    # An owner reset link is listed.
+    panel = client.post(
+        "/panel", data={"key": ADMIN_KEY, "action": "reset", "email": "n@example.com"}
+    )
+    token = re.search(r"/restablecer\?token=([A-Za-z0-9_-]+)", panel.text).group(1)  # type: ignore[union-attr]
+    visitor = TestClient(client.app)
+    form = visitor.get(f"/restablecer?token={token}")
+    visitor.post(
+        "/restablecer",
+        data={"token": token, "password": NEW_PASSWORD, "csrf": _csrf(form.text)},
+    )
+    assert _kinds(store, "n@example.com")[0] == "password_reset"
+    _signin(visitor, "n@example.com", NEW_PASSWORD)
+    csrf = _csrf(visitor.get("/cuenta").text)
+    visitor.post("/cuenta/borrar", data={"current": NEW_PASSWORD, "csrf": csrf})
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.account_events.select()).all() == []  # type: ignore[attr-defined]
+
+
+def test_recent_activity_exists_in_every_language(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client)
+    for prefix, words in (
+        ("/account", ("Recent activity", "Account created")),
+        (account_pages.path("account", "pt"), ("Atividade recente", "Conta criada")),
+    ):
+        page = client.get(prefix).text
+        assert all(w in page for w in words), prefix
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    for locale, copy in (
+        ("es", account_pages.COPY["es"]),
+        ("en", account_pages.COPY["en"]),
+        ("pt", account_pages.COPY["pt"]),
+    ):
+        from quant_trade.audit.store import ACCOUNT_EVENT_KINDS
+
+        for kind in ACCOUNT_EVENT_KINDS:
+            label = copy["event_" + kind]
+            assert label and not find_claims(label), (locale, kind)
+    ctx = LegalContext(
+        operator_name="Op",
+        operator_contact="op@example.com",
+        operator_address="México",
+        jurisdiction="Leyes de México",
+    )
+    for locale, words in (("es", "Actividad reciente"), ("en", "Recent activity")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
         assert words in privacy and not find_claims(privacy)
