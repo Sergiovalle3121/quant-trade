@@ -26,14 +26,17 @@ def _text(page: str) -> str:
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_start_free_goes_to_sign_up_when_an_upload_needs_an_account(locale: str) -> None:
     page = landing(locale=locale, free_mode=False, signed_in=False, access_codes=True)
-    assert "href='#subir'" not in page
-    assert page.count(f"href='{SIGNUP[locale]}'") >= 3  # hero, prices and the closing call
+    home = {"es": "/", "en": "/en", "pt": "/pt"}[locale]
+    assert "href='#subir'" not in page and f"href='{home}#subir'" not in page
+    # Hero, prices, the closing call, the top bar and the phone menu.
+    assert page.count(f"href='{SIGNUP[locale]}'") >= 5
     # Signed in, or in free mode, the same buttons still open the form on the page.
     for kwargs in (
         {"free_mode": False, "signed_in": True},
         {"free_mode": True, "signed_in": False},
     ):
-        assert "href='#subir'" in landing(locale=locale, access_codes=True, **kwargs)
+        other = landing(locale=locale, access_codes=True, **kwargs)
+        assert "href='#subir'" in other and other.count(f"href='{home}#subir'") == 2
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))

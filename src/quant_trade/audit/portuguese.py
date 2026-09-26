@@ -455,7 +455,8 @@ UI_PT: dict[str, Any] = {
         (
             "globe",
             "Na sua moeda e depois da inflação",
-            "Se a conta está em dólares, você vê o resultado em reais, pesos, euros e mais "
+            "Se a conta está em dólares, você vê o resultado em reais, pesos mexicanos, "
+            "euros e mais "
             "quatro moedas ao câmbio de cada dia, e depois da inflação dos EUA (dados públicos "
             "do FRED).",
         ),

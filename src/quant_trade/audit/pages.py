@@ -844,7 +844,8 @@ _UI: dict[str, dict[str, Any]] = {
             (
                 "globe",
                 "En tu moneda y tras la inflación",
-                "Si la cuenta está en dólares, ves su resultado en pesos, reales, euros y otras "
+                "Si la cuenta está en dólares, ves su resultado en pesos mexicanos, "
+                "reales, euros y otras "
                 "cuatro monedas al tipo de cambio de cada día, y después de la inflación de "
                 "EE. UU. (datos públicos de FRED).",
             ),
@@ -1060,7 +1061,8 @@ _UI: dict[str, dict[str, Any]] = {
             (
                 "globe",
                 "In your currency and after inflation",
-                "If the account is in dollars, you see its result in pesos, reais, euros and "
+                "If the account is in dollars, you see its result in Mexican pesos, "
+                "reais, euros and "
                 "four more currencies at each day's exchange rate, and after US inflation "
                 "(public FRED data).",
             ),
@@ -2439,7 +2441,11 @@ def landing(
         # "Start free" goes straight to sign-up: the form would only send a visitor
         # without an account there, a screen further down.
         body = body.replace("href='#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
-    return _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
+    page = _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
+    if signin_first:
+        # The top bar and the phone menu carry the same button.
+        page = page.replace(f"href='{_home(locale)}#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
+    return page
 
 
 def _evidence_value(item: Any) -> str:
