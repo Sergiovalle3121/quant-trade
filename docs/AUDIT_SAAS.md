@@ -1215,6 +1215,26 @@ that barely moves), the line says in words that it earned less than cash
 covering the whole history, otherwise it is NOT_MEASURED and not shown. It
 never changes the class.
 
+Calm and turbulent markets (`audit/regime.py`). With public data on, every
+report adds the section "How did it do in calm and in turbulent markets?".
+Each return is placed by the VIX (CBOE, FRED `VIXCLS`, read in the
+background with the other series; a reply above 200, `MAX_VIX`, is taken as
+broken) at the close of the last market day *before* the day its stretch
+starts, at most 5 days old (`MAX_GAP_DAYS`), so the regime was known before
+the return: calm below 20, turbulent at 20 or above (`TURBULENT_AT`; 20 is
+close to the index's long-run average, and since 1990 it has closed at 20 or
+more on about a third of the days). For each regime it shows the share of
+the time, the returns counted, the return per month compounded over that
+regime's days only (`exp(Σ log(1+r) · 30.44 / days) - 1`) and the Sharpe
+ratio annualised like the headline one ("—" for a flat side). The two mean
+returns are compared in Welch standard errors: at 2 or more (`CLEAR_GAP`)
+the report says in which regime it did better, otherwise that the gap is not
+enough to say it behaves differently. It needs 90 days of history
+(`MIN_SPAN_DAYS`), 20 returns in each regime (`MIN_RETURNS`) and VIX closes
+covering the whole history; otherwise it is NOT_MEASURED with the reason in
+words. The note says the VIX measures US equities and, for another market,
+is read as a general gauge of fear. It never changes the class.
+
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section
 "How did it do in the known crises?". The curve is taken at month ends. On

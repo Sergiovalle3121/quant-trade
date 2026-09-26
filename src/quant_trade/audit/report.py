@@ -37,6 +37,7 @@ from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
+from quant_trade.audit.regime import CLEAR_GAP as REGIME_CLEAR_GAP
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
@@ -107,6 +108,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "recent": "Si sigue funcionando en el periodo más reciente",
         "crises": "Cómo le fue en 2008, el covid, 2022 y otras caídas conocidas",
         "holding": "Si le gana a simplemente comprar y mantener el mercado que opera",
+        "regime": "Cómo le fue con el mercado tranquilo y con el mercado agitado (VIX)",
         "luck": (
             "Cuánto Sharpe queda al descontar la suerte y cuántos años de historial harían falta"
         ),
@@ -144,6 +146,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "recent": "Whether it still works in the most recent period",
         "crises": "How it did in 2008, covid, 2022 and other known falls",
         "holding": "Whether it beats simply buying and holding the market it trades",
+        "regime": "How it did in calm and in turbulent markets (VIX)",
         "luck": "How much Sharpe is left once luck is discounted, and how many years it would take",
         "ride": "Time without new highs, worst day, worst month and months that ended up",
         "behaviour": "Whether it raises risk after a loss (martingale, averaging down)",
@@ -701,6 +704,38 @@ LABELS: dict[str, dict[str, str]] = {
         "holding_source": (
             "Cierres del {label}: datos públicos de {source} leídos al generar el "
             "informe. Ninguno de los dos Sharpe resta la tasa del efectivo. No cambia la clase."
+        ),
+        "regime": "¿Cómo le fue con el mercado tranquilo y con el mercado agitado?",
+        "regime_intro": (
+            "Cada rentabilidad del archivo se asigna según el VIX (cuánto espera el mercado de "
+            "opciones que se mueva el S&P 500 el mes siguiente) al cierre del día de mercado "
+            "anterior a que empiece: mercado tranquilo por debajo de 20, agitado desde 20. "
+            "Desde 1990 el VIX cerró en 20 o más más o menos un día de cada tres. Periodo: del "
+            "{first} al {last}."
+        ),
+        "regime_not_measured": "Sin separación por el VIX: {reason}.",
+        "regime_calm": "Mercado tranquilo (VIX < 20)",
+        "regime_turbulent": "Mercado agitado (VIX ≥ 20)",
+        "regime_time": "Parte del tiempo",
+        "regime_returns": "Rentabilidades contadas",
+        "regime_monthly": "Rentabilidad por mes (compuesta)",
+        "regime_sharpe": "Sharpe (rentabilidad por unidad de riesgo)",
+        "regime_better_calm": (
+            "Le fue mejor con el mercado tranquilo: la diferencia de rentabilidad media "
+            "({z} errores estándar) es mayor que el ruido."
+        ),
+        "regime_better_turbulent": (
+            "Le fue mejor con el mercado agitado: la diferencia de rentabilidad media "
+            "({z} errores estándar) es mayor que el ruido."
+        ),
+        "regime_no_clear_gap": (
+            "La diferencia de rentabilidad media entre las dos columnas ({z} errores "
+            "estándar) no basta para decir que se comporta distinto según el mercado."
+        ),
+        "regime_source": (
+            "VIX: datos públicos de {source} (serie VIXCLS, de CBOE) leídos al generar el "
+            "informe. Mide acciones de EE. UU.: si la estrategia opera otro mercado, tómelo "
+            "como termómetro general del miedo en los mercados. No cambia la clase."
         ),
         "crises_market": "Mercado en esas fechas",
         "crises_market_note": (
@@ -1648,6 +1683,37 @@ LABELS: dict[str, dict[str, str]] = {
         "holding_source": (
             "{label} closes: public {source} data read when the report was made. No "
             "cash rate is subtracted in either Sharpe ratio. It does not change the class."
+        ),
+        "regime": "How did it do in calm and in turbulent markets?",
+        "regime_intro": (
+            "Each return in the file is placed by the VIX (how much the options market expects "
+            "the S&P 500 to move over the next month) at the close of the market day before it "
+            "starts: a calm market below 20, a turbulent one from 20. Since 1990 the VIX has "
+            "closed at 20 or more on about one day in three. Period: {first} to {last}."
+        ),
+        "regime_not_measured": "No split by the VIX: {reason}.",
+        "regime_calm": "Calm market (VIX < 20)",
+        "regime_turbulent": "Turbulent market (VIX ≥ 20)",
+        "regime_time": "Share of the time",
+        "regime_returns": "Returns counted",
+        "regime_monthly": "Return per month (compounded)",
+        "regime_sharpe": "Sharpe (return per unit of risk)",
+        "regime_better_calm": (
+            "It did better in calm markets: the gap in mean return ({z} standard errors) "
+            "is larger than the noise."
+        ),
+        "regime_better_turbulent": (
+            "It did better in turbulent markets: the gap in mean return ({z} standard "
+            "errors) is larger than the noise."
+        ),
+        "regime_no_clear_gap": (
+            "The gap in mean return between the two columns ({z} standard errors) is not "
+            "enough to say it behaves differently depending on the market."
+        ),
+        "regime_source": (
+            "VIX: public data from {source} (series VIXCLS, from CBOE) read when the report "
+            "was made. It measures US equities: if the strategy trades another market, read "
+            "it as a general gauge of fear in markets. It does not change the class."
         ),
         "crises_market": "Market over those months",
         "crises_market_note": (
@@ -4983,6 +5049,58 @@ def _holding_html(
     return out
 
 
+def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """The returns split by calm and turbulent markets, by the VIX known before each."""
+    if not regime:
+        return ""
+    if regime.get("status") != "MEASURED":
+        text = labels["regime_not_measured"].format(
+            reason=localize(str(regime.get("reason", "")), locale)
+        )
+        return f"<p class='muted'>{_e(text)} {_badge('NOT_MEASURED')}</p>"
+    intro = labels["regime_intro"].format(
+        first=regime.get("first", ""), last=regime.get("last", "")
+    )
+    out = f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
+    heads = (("calm", labels["regime_calm"]), ("turbulent", labels["regime_turbulent"]))
+
+    def row(name: str, key: str, text: Callable[[float], str], signed: bool) -> str:
+        cells = ""
+        for side, head in heads:
+            field = (regime.get(side) or {}).get(key)
+            if field is None:
+                cells += f"<td class='val' data-l='{_e(head)}'>—</td>"
+                continue
+            value = float(field["value"])
+            neg = " neg" if signed and value < 0 else ""
+            cells += f"<td class='val{neg}' data-l='{_e(head)}'>{_e(text(value))}</td>"
+        return f"<tr><td>{_e(labels[name])}</td>{cells}</tr>"
+
+    body = (
+        row("regime_time", "time_share", lambda v: _pct(v, places=0), False)
+        + row("regime_returns", "returns", lambda v: f"{int(v)}", False)
+        + row("regime_monthly", "monthly_return", lambda v: _pct(v, places=2), True)
+        + row("regime_sharpe", "sharpe", lambda v: f"{v:.2f}", False)
+    )
+    out += (
+        "<table class='timing holding'><thead><tr><th></th>"
+        + "".join(f"<th class='val'>{_e(head)}</th>" for _, head in heads)
+        + f"</tr></thead><tbody>{body}</tbody></table>"
+    )
+    gap = regime.get("gap_in_se")
+    if gap is not None:
+        z = float(gap["value"])
+        if abs(z) >= REGIME_CLEAR_GAP:
+            name = "regime_better_calm" if z > 0 else "regime_better_turbulent"
+        else:
+            name = "regime_no_clear_gap"
+        out += f"<p>{_e(labels[name].format(z=f'{abs(z):.2f}'))} {_badge('MEASURED')}</p>"
+    link = f"<a href='{_e(str(regime.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    source = _e(labels["regime_source"].format(source="\x00"))
+    out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
+    return out
+
+
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
     return bool(stress) and (stress or {}).get("status") == "MEASURED"
 
@@ -5772,6 +5890,11 @@ def render_html(
                 )
             ]
             if data.get("holding")
+            else []
+        ),
+        *(
+            [(labels["regime"], _regime_html(data.get("vix_regime"), locale, labels))]
+            if data.get("vix_regime")
             else []
         ),
         *(

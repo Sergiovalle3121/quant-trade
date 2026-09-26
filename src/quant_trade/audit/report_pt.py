@@ -1035,6 +1035,38 @@ REPORT: dict[str, Any] = {
             "O Sharpe acima não subtrai nenhuma taxa. Se a conta não é em dólares, o justo "
             "seria subtrair a taxa da sua própria moeda. Fonte: {source}."
         ),
+        "regime": "Como foi com o mercado tranquilo e com o mercado agitado?",
+        "regime_intro": (
+            "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
+            "espera que o S&P 500 se mova no mês seguinte) no fechamento do dia de mercado "
+            "anterior ao seu início: mercado tranquilo abaixo de 20, agitado a partir de 20. "
+            "Desde 1990 o VIX fechou em 20 ou mais mais ou menos um dia em cada três. Período: "
+            "de {first} a {last}."
+        ),
+        "regime_not_measured": "Sem separação pelo VIX: {reason}.",
+        "regime_calm": "Mercado tranquilo (VIX < 20)",
+        "regime_turbulent": "Mercado agitado (VIX ≥ 20)",
+        "regime_time": "Parte do tempo",
+        "regime_returns": "Rentabilidades contadas",
+        "regime_monthly": "Rentabilidade por mês (composta)",
+        "regime_sharpe": "Sharpe (rentabilidade por unidade de risco)",
+        "regime_better_calm": (
+            "Foi melhor com o mercado tranquilo: a diferença de rentabilidade média ({z} erros "
+            "padrão) é maior que o ruído."
+        ),
+        "regime_better_turbulent": (
+            "Foi melhor com o mercado agitado: a diferença de rentabilidade média ({z} erros "
+            "padrão) é maior que o ruído."
+        ),
+        "regime_no_clear_gap": (
+            "A diferença de rentabilidade média entre as duas colunas ({z} erros padrão) não "
+            "basta para dizer que se comporta de forma diferente conforme o mercado."
+        ),
+        "regime_source": (
+            "VIX: dados públicos de {source} (série VIXCLS, da CBOE) lidos ao gerar o "
+            "relatório. Mede ações dos EUA: se a estratégia opera outro mercado, leia-o como "
+            "um termômetro geral do medo nos mercados. Não muda a classe."
+        ),
     },
     "LINK_TEXT": {
         "terms": "Termos de serviço",
@@ -1149,6 +1181,7 @@ REPORT: dict[str, Any] = {
         "holdout": "O trecho fora da amostra que você declarou, medido à parte",
         "benchmark": "A comparação com o benchmark que você enviou",
         "holding": "Se ganha de simplesmente comprar e manter o mercado que opera",
+        "regime": "Como foi com o mercado tranquilo e com o mercado agitado (VIX)",
     },
     "DIMENSION_TITLES": {
         "statistical_significance": "Significância estatística",
@@ -4394,6 +4427,44 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "the returns never move",
         "os retornos nunca se movem",
+    ),
+    (
+        (
+            "each return placed by the VIX close of the last market day before it starts (calm "
+            "below 20, turbulent at 20 or above); return per month compounded over each "
+            "regime's days; Sharpe annualised like the headline Sharpe; gap in mean returns in "
+            "Welch standard errors"
+        ),
+        (
+            "cada retorno atribuído segundo o fechamento do VIX do último dia de mercado "
+            "anterior ao seu início (tranquilo abaixo de 20, agitado a partir de 20); "
+            "rentabilidade por mês composta sobre os dias de cada regime; Sharpe anualizado "
+            "como o Sharpe principal; diferença de retornos médios em erros padrão de Welch"
+        ),
+    ),
+    (
+        "the VIX closes could not be read when the report was made",
+        "os fechamentos do VIX não puderam ser lidos ao gerar o relatório",
+    ),
+    (
+        "the VIX closes do not cover the whole history",
+        "os fechamentos do VIX não cobrem todo o histórico",
+    ),
+    (
+        "the history covers fewer than 90 days",
+        "o histórico cobre menos de 90 dias",
+    ),
+    (
+        "fewer than 20 returns in calm markets (VIX below 20)",
+        "menos de 20 retornos com o mercado tranquilo (VIX abaixo de 20)",
+    ),
+    (
+        "fewer than 20 returns in turbulent markets (VIX at 20 or above)",
+        "menos de 20 retornos com o mercado agitado (VIX em 20 ou mais)",
+    ),
+    (
+        "the curve reaches zero",
+        "a curva chega a zero",
     ),
     (
         "the strategy's compound return a year",
