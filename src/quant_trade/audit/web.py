@@ -3116,17 +3116,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale=_locale(link_locale(lang or "es")),
         )
 
-    sample_cache: dict[tuple[str, str], str] = {}
+    sample_cache: dict[tuple[str, str, tuple[str, ...]], str] = {}
     sample_lock = threading.Lock()
 
+    def _sample_market() -> tuple[Callable[[str], Any] | None, tuple[str, ...]]:
+        """The public series already in memory for the sample, never waiting on
+        the network; none (the offline sample) until the first download lands."""
+        ready = market_data.ready() if market_data is not None else ()
+        return (market_data.closes if market_data is not None and ready else None), ready
+
     def _sample_html(locale: str, base_url: str) -> str:
-        """Built once per locale and address and kept: the input and the clock
-        are fixed."""
+        """Built once per locale, address and set of public series in memory, and
+        kept: the input and the clock are fixed."""
+        market, ready = _sample_market()
         with sample_lock:
-            key = (locale, base_url)
+            key = (locale, base_url, ready)
             if key not in sample_cache:
                 html_text, _ = render(
-                    sample_result(locale),
+                    sample_result(locale, market=market),
                     watermark=False,
                     free_mode=True,
                     notice=SAMPLE_BANNER[locale],
@@ -3139,14 +3146,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 sample_cache[key] = html_text
             return sample_cache[key]
 
-    sample_pdfs: dict[str, bytes] = {}
+    sample_pdfs: dict[tuple[str, tuple[str, ...]], bytes] = {}
 
     def _sample_pdf(locale: str) -> Response:
-        """The sample report as the PDF a buyer gets, built once per language."""
+        """The sample report as the PDF a buyer gets, built once per language and
+        set of public series in memory."""
+        market, ready = _sample_market()
         with sample_lock:
-            if locale not in sample_pdfs:
+            key = (locale, ready)
+            if key not in sample_pdfs:
                 page, _ = render(
-                    sample_result(locale),
+                    sample_result(locale, market=market),
                     watermark=False,
                     free_mode=True,
                     notice=SAMPLE_BANNER[locale],
@@ -3154,14 +3164,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     locale=locale,
                 )
                 try:
-                    sample_pdfs[locale] = pdf_lib.report_pdf(
+                    sample_pdfs[key] = pdf_lib.report_pdf(
                         page,
                         audit_id=SAMPLE_PDF_NAMES[locale],
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
                     _record_issued(
-                        sample_pdfs[locale], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
+                        sample_pdfs[key], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
                     )
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(
@@ -3169,7 +3179,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
         name = f"rigor-{SAMPLE_PDF_NAMES[locale]}.pdf"
         return Response(
-            content=sample_pdfs[locale],
+            content=sample_pdfs[key],
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'attachment; filename="{name}"',
