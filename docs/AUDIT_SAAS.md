@@ -312,6 +312,10 @@ symbol or per option contract (the contract is taken from the Description,
 that expires (`OEXP`), is assigned (`OASGN`) or exercised (`OEXER`) closes at
 no premium; its record shows `EXPIRED_OPTION_PRICE` (0.01) as the exit price
 because a trade needs a positive price, and its result is computed at zero.
+Contract sizes are stated, not inferred (`_Draft.known_sizes`: 100 per option
+contract, 1 per share), so an expiry never changes an option's size and no
+currency-drift warning applies. Open lots are queues, and pairing stops with
+`too_many_trades` as soon as it passes `MAX_TRADES`.
 The shares an assignment delivers come on their own row. Regulatory fees are
 the gap between `Amount` and the fill's value, as commission. A split
 (`SPR`) or symbol exchange (`SXCH`), whose leaving shares carry an `S`

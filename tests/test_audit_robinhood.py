@@ -161,3 +161,48 @@ def test_the_new_warnings_read_in_every_language(template: str, n: int) -> None:
         assert text != english and str(n) in text, (locale, text)
         assert find_claims(text) == []
     assert find_claims(i18n.localize(english, "en")) == []
+
+
+@pytest.mark.parametrize("premium", ["0.01", "0.02", "0.05", "0.30"])
+def test_an_expired_option_keeps_its_hundred_shares_a_contract(premium: str) -> None:
+    for code, leg in (("BTO", "3"), ("STO", "3S")):
+        rows = [
+            _row("2/10/2024", "SPY", SPY_CALL, code, "3", f"${premium}", ""),
+            _row("3/15/2024", "SPY", f"Option Expiration for {SPY_CALL}", "OEXP", leg),
+        ]
+        report = import_report(_report(rows), "Robinhood.csv")
+        (trade,) = report.trades.trades
+        assert trade.quantity == pytest.approx(300.0)  # 3 contracts x 100 shares
+        sign = -1 if code == "BTO" else 1
+        assert trade.pnl == pytest.approx(sign * float(premium) * 300)
+        assert not any("per point" in warning for warning in report.warnings)
+
+
+def test_an_expiry_with_an_odd_quantity_closes_what_is_open_without_a_drift_warning() -> None:
+    for leg in ("0S", "-5S"):
+        rows = [
+            _row("2/10/2024", "SPY", SPY_CALL, "BTO", "2", "$1.00", "($200.00)"),
+            _row("3/15/2024", "SPY", f"Option Expiration for {SPY_CALL}", "OEXP", leg),
+        ]
+        report = import_report(_report(rows), "Robinhood.csv")
+        assert [trade.quantity for trade in report.trades.trades] == [pytest.approx(200.0)]
+        assert not any("per point" in warning for warning in report.warnings)
+
+
+def test_many_small_buys_closed_by_one_sale_are_paired_quickly() -> None:
+    import time  # noqa: PLC0415
+
+    from quant_trade.audit.importers import MAX_TRADES, ReportFormatError  # noqa: PLC0415
+
+    def rows(count: int) -> list[list[str]]:
+        buys = [_row("1/05/2026", "AAPL", "Apple", "Buy", "1", "$1.00", "($1.00)")] * count
+        return [*buys, _row("1/06/2026", "AAPL", "Apple", "Sell", str(count), "$2.00", "")]
+
+    started = time.perf_counter()
+    report = import_report(_report(rows(MAX_TRADES)), "Robinhood.csv")
+    assert len(report.trades.trades) == MAX_TRADES
+    # Past the limit, pairing stops at the limit instead of walking the whole file.
+    with pytest.raises(ReportFormatError) as refused:
+        import_report(_report(rows(120_000)), "Robinhood.csv")
+    assert refused.value.code == "too_many_trades"
+    assert time.perf_counter() - started < 30

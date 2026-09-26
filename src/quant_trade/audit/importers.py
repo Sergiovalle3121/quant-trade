@@ -54,6 +54,7 @@ import re
 import statistics
 import zipfile
 import zlib
+from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
@@ -572,6 +573,9 @@ class _Draft:
     sized: bool = False
     #: Positions the parser saw opened and never closed (fill lists).
     open_positions: int = 0
+    #: Contract sizes the file states (an option's 100 shares), used as they
+    #: are instead of being inferred from each trade's profit.
+    known_sizes: dict[str, float] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -3099,15 +3103,25 @@ def _snap(size: float) -> float:
     return _significant(size)
 
 
+def _too_many_trades(count: int) -> ReportFormatError:
+    return ReportFormatError(
+        "too_many_trades",
+        f"the file has {count:,} closed trades; the limit is {MAX_TRADES:,}",
+        f"el archivo tiene {count:,} operaciones cerradas; el límite es {MAX_TRADES:,}",
+    )
+
+
 def _contract_sizes(trips: list[_Trip]) -> dict[str, float]:
     ratios: dict[str, list[float]] = {}
+    by_symbol: dict[str, list[_Trip]] = {}
     for trip in trips:
+        by_symbol.setdefault(trip.symbol, []).append(trip)
         move = abs(trip.exit_price - trip.entry_price)
         if move > 0 and trip.volume > 0 and trip.gross != 0:
             ratios.setdefault(trip.symbol, []).append(abs(trip.gross) / (move * trip.volume))
     sizes = {symbol: _snap(statistics.median(values)) for symbol, values in ratios.items()}
     for symbol in sizes:
-        if _unit_size_fits([trip for trip in trips if trip.symbol == symbol]):
+        if _unit_size_fits(by_symbol[symbol]):
             sizes[symbol] = 1.0
     return {trip.symbol: sizes.get(trip.symbol, 1.0) for trip in trips}
 
@@ -3381,14 +3395,11 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
             "el archivo no contiene operaciones cerradas",
         )
     if len(draft.trips) > MAX_TRADES:
-        raise ReportFormatError(
-            "too_many_trades",
-            f"the file has {len(draft.trips):,} closed trades; the limit is {MAX_TRADES:,}",
-            f"el archivo tiene {len(draft.trips):,} operaciones cerradas; el límite es "
-            f"{MAX_TRADES:,}",
-        )
+        raise _too_many_trades(len(draft.trips))
     trips = sorted(draft.trips, key=lambda trip: (trip.exit_time, trip.entry_time))
-    sizes = _contract_sizes(trips)
+    known = draft.known_sizes
+    sizes = _contract_sizes([trip for trip in trips if trip.symbol not in known])
+    sizes.update({trip.symbol: known[trip.symbol] for trip in trips if trip.symbol in known})
     warnings = list(draft.warnings)
     unusual = sorted(
         {(trip.symbol, sizes[trip.symbol]) for trip in trips if abs(sizes[trip.symbol] - 1) > 0.005}
@@ -3402,7 +3413,8 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     trade_fees: list[float] = []
     trade_symbols: list[str] = []
     invalid = draft.invalid_rows
-    drifting = _drifting_symbols(trips, sizes) if draft.itemised else set()
+    unknown = [trip for trip in trips if trip.symbol not in known]
+    drifting = _drifting_symbols(unknown, sizes) if draft.itemised else set()
     if drifting:
         warnings.append(f"{CONVERSION_DRIFT_WARNING}: {', '.join(sorted(drifting))}")
     backwards = 0
@@ -3904,16 +3916,19 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
         return 1 if item.code in {"buy", "bto", "sto"} else 2
 
     listed.sort(key=lambda item: (item.day, stage(item)))
-    lots: dict[str, list[list[Any]]] = {}
+    lots: dict[str, deque[list[Any]]] = {}
     unopened = moves = 0
 
     def close(symbol: str, signed: float, price: float, moment: datetime, fee: float) -> float:
         """Close open lots against a fill; returns the quantity left over."""
-        held = lots.setdefault(symbol, [])
+        held = lots.setdefault(symbol, deque())
         left = abs(signed)
         fee_per_unit = fee / left
-        multiplier = OPTION_MULTIPLIER if _ROBINHOOD_OPTION.search(symbol) else 1.0
+        multiplier = draft.known_sizes[symbol]
         while left > 1e-12 and held and (held[0][0] > 0) != (signed > 0):
+            if len(draft.trips) >= MAX_TRADES:
+                # Stop pairing at the limit instead of after the whole file.
+                raise _too_many_trades(len(draft.trips) + 1)
             lot = held[0]
             closed = min(left, abs(lot[0]))
             side = "long" if lot[0] > 0 else "short"
@@ -3934,7 +3949,7 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
             lot[0] -= closed if lot[0] > 0 else -closed
             left -= closed
             if abs(lot[0]) <= 1e-12:
-                held.pop(0)
+                held.popleft()
         return left if left > 1e-12 else 0.0
 
     events: dict[tuple[datetime, str], list[_RobinhoodRow]] = {}
@@ -3950,6 +3965,7 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
                 continue
             sign = _ROBINHOOD_TRADES[item.code]
             multiplier = OPTION_MULTIPLIER if item.option is not None else 1.0
+            draft.known_sizes[symbol] = multiplier
             notional = abs(quantity) * price * multiplier
             # Robinhood charges no commission; regulatory fees are the gap
             # between the cash that moved and the fill's value.
@@ -3977,7 +3993,7 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
         elif item.code in _ROBINHOOD_SHARE_EVENTS:
             group = events.pop((item.day, item.code), None)
             if group is not None:
-                moves += _robinhood_share_event(group, lots)
+                moves += _robinhood_share_event(group, lots, draft.known_sizes)
         elif item.quantity:
             moves += 1
     draft.trips.sort(key=lambda trip: (trip.exit_time, trip.entry_time))
@@ -3995,7 +4011,9 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
     return draft
 
 
-def _robinhood_share_event(group: list[_RobinhoodRow], lots: dict[str, list[list[Any]]]) -> int:
+def _robinhood_share_event(
+    group: list[_RobinhoodRow], lots: dict[str, deque[list[Any]]], sizes: dict[str, float]
+) -> int:
     """Rescale the shares held for a split, or move them to the new symbol
     for an exchange; returns how many rows could not be read that way."""
     code = group[0].code
@@ -4022,12 +4040,13 @@ def _robinhood_share_event(group: list[_RobinhoodRow], lots: dict[str, list[list
     for old, new in pairs:
         assert old.quantity and new.quantity  # checked above
         ratio = abs(new.quantity) / abs(old.quantity)
-        held = lots.pop(old.symbol, [])
+        held = lots.pop(old.symbol, deque())
         for lot in held:
             lot[0] *= ratio
             lot[1] /= ratio
             lot[3] /= ratio
-        lots.setdefault(new.symbol, []).extend(held)
+        lots.setdefault(new.symbol, deque()).extend(held)
+        sizes.setdefault(new.symbol, 1.0)
     return 0
 
 
