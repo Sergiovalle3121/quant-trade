@@ -252,6 +252,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "timestamp",
         "trade time",
         "trade date",
+        # B3's Área do Investidor, Negociação extract.
+        "data do negocio",
         "execution time",
         "exec time",
         "fill time",
@@ -327,6 +329,8 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
     ),
     "symbol": _names(
         "symbol",
+        # B3's ticker column, ahead of its "Mercado" (Mercado à Vista, Fracionário).
+        "codigo de negociacao",
         "instrument",
         "ticker",
         "pair",
@@ -361,6 +365,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
     ),
     "side": _names(
         "opening direction",
+        "tipo de movimentacao",
         "side",
         "buy/sell",
         "b/s",
@@ -960,6 +965,34 @@ def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
     return [row for row in rows if "fill" in (row[kinds[0]] if kinds[0] < len(row) else "").lower()]
 
 
+#: Time columns whose dates are always day first: B3 writes Brazilian dates.
+DAY_FIRST_NAMES = frozenset({"datadonegocio"})
+
+_FRACTIONAL_TICKER = re.compile(r"[A-Z]{4}\d{1,2}F")
+
+
+def whole_lot_tickers(
+    header: Sequence[str], rows: list[list[str]], columns: Mapping[str, int]
+) -> list[list[str]]:
+    """B3 lists a fractional-market trade under its ticker with an F
+    (``PETR4F``, Mercado Fracionário): the same shares as ``PETR4``, so they
+    pair together. Only for B3's own column names."""
+    names = [normalise(str(name)) for name in header]
+    symbol = columns.get("symbol")
+    if symbol is None or names[symbol] != "codigodenegociacao" or "mercado" not in names:
+        return rows
+    market = names.index("mercado")
+    kept: list[list[str]] = []
+    for row in rows:
+        ticker = row[symbol].strip() if symbol < len(row) else ""
+        fractional = market < len(row) and "fracion" in normalise(row[market])
+        if fractional and _FRACTIONAL_TICKER.fullmatch(ticker):
+            row = [*row]
+            row[symbol] = ticker[:-1]
+        kept.append(row)
+    return kept
+
+
 def _amount(value: str, decimal: str) -> float | None:
     """A number, also when a unit follows it (``0.0015 BTC``, ``12.5USDT``)."""
     value = re.sub(r"^([-+]?)\s*[$€£¥]\s*", r"\1", (value or "").strip())
@@ -1121,6 +1154,7 @@ def _times(
     column: int | None = None,
     date_column: int | None = None,
     zone: int | None = None,
+    dayfirst: bool | None = None,
 ) -> imp._TimeColumn:
     """A time column; whole-number Unix times (seconds or milliseconds),
     zone suffixes and a clock-only column joined to ``date_column`` too.
@@ -1163,6 +1197,8 @@ def _times(
     cleaned = [_clean_time(value) for value in values]
     texts = [text for text, _ in cleaned]
     hint = _dayfirst_hint(texts, rows, column) if rows is not None else None
+    if hint is None:
+        hint = dayfirst
     column_times = imp._parse_times(texts, serial_numbers=serial, dayfirst_hint=hint)
     shifted: list[datetime | None] = []
     zoned = 0
@@ -1341,6 +1377,7 @@ def parse(
     if repeated:
         draft.warnings.append(REPEATED_ROWS_WARNING.format(n=repeated))
     rows = only_fills(header, rows)
+    rows = whole_lot_tickers(header, rows, mapping.columns)
     if mapping.shape == UNIVERSAL_TRADES_CSV:
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:
@@ -1682,6 +1719,7 @@ def _fills(
         columns["time"],
         mapping.date_column,
         header_zone(mapping.names.get("time", "")),
+        dayfirst=normalise(mapping.names.get("time", "")) in DAY_FIRST_NAMES or None,
     )
     draft.naive_times = times.naive
     fills: list[tuple[datetime, int, str, str, float, float, float, float | None, float]] = []
