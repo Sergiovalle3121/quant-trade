@@ -302,6 +302,17 @@ per import; the column screen offers a web table only up to
 `mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
+B3's Área do Investidor Negociação extract is read by column name only
+(`tests/test_audit_b3.py`): `Data do Negócio` is the fill time and always day
+first (`universal.DAY_FIRST_NAMES`), `Tipo de Movimentação` the side
+(Compra/Venda), `Código de Negociação` the ticker (ranked above `Mercado`,
+which holds Mercado à Vista or Fracionário), and a fractional-market ticker
+with a trailing F (`PETR4F`) pairs with `PETR4`
+(`universal.whole_lot_tickers`, only with B3's own column names). The first
+two names and the F come from open-source importers of real files; the rest
+is inferred, so B3 is not a named platform or guide until a real export
+confirms it. A wrong guess falls back to the column screen.
+
 Robinhood's Account Activity report (`robinhood_csv`, the columns `Activity
 Date`, `Instrument`, `Description`, `Trans Code`, `Quantity`, `Price`,
 `Amount`, as Robinhood's help centre and open-source importers describe it;
