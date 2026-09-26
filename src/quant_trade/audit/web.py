@@ -1248,6 +1248,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_email_failures = StoredAttemptLog(db, "signin_email")
     signin_ip_failures = StoredAttemptLog(db, "signin_ip")
     signup_attempts = StoredAttemptLog(db, "signup")
+    recovery_attempts = StoredAttemptLog(db, "recovery")
     account_actions = AttemptLog()
     strategy_pdf_renders = AttemptLog(window=STRATEGY_PDF_WINDOW)
     strategy_pdf_cache: OrderedDict[tuple[Any, ...], bytes] = OrderedDict()
@@ -1321,7 +1322,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return lang if lang in account_pages.LANGUAGES else path_locale
 
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
-    signin_flashes = ("signed_out", "deleted", "reset_done")
+    signin_flashes = ("signed_out", "deleted", "reset_done", "recovered")
     account_flashes = ("welcome", "code_linked", "password_changed", "filed")
     account_errors = (
         "code_already",
@@ -1606,6 +1607,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         else ("used" if db.welcome_used(account.id) else "available")
                     ),
                     strategies=db.list_strategies(account.id),
+                    recovery_created=db.recovery_key_created(account.id) or "",
                     invite=(
                         account_pages.InviteView(
                             link=(
@@ -1968,10 +1970,83 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return handler
 
     def _forgot_get(path_locale: str) -> Callable[..., Response]:
-        def handler(lang: str | None = None) -> Response:
+        def handler(request: Request, lang: str | None = None) -> Response:
             locale = _account_locale(path_locale, lang)
+            csrf = _anon_csrf(request)
+            page = account_pages.forgot_page(locale=locale, contact_url=cfg.contact_url, csrf=csrf)
+            return _anon_page(page, csrf)
+
+        return handler
+
+    def _forgot_post(path_locale: str) -> Callable[..., Response]:
+        """A new password with the account's recovery key, no e-mail needed."""
+
+        def handler(
+            request: Request,
+            email: Annotated[str, Form(max_length=320)] = "",
+            key: Annotated[str, Form(max_length=200)] = "",
+            password: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            new_csrf = _anon_csrf(request)
+            clean = acct.normalise_email(email)
+
+            def again(error: str, status: int) -> Response:
+                page = account_pages.forgot_page(
+                    locale=locale,
+                    contact_url=cfg.contact_url,
+                    csrf=new_csrf,
+                    error=error,
+                    email=clean if acct.valid_email(clean) else "",
+                )
+                return _anon_page(page, new_csrf, status)
+
+            if not _anon_ok(request, csrf) or _cross_site(request):
+                return again("csrf", 400)
+            now = datetime.now(UTC)
+            net = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
+            # Every try counts, per network and per e-mail: a key has 100
+            # random bits, and this keeps guessing out of reach anyway.
+            by_net = recovery_attempts.hit(net, now)
+            by_email = recovery_attempts.hit("email:" + acct.hash_secret(clean), now)
+            if max(by_net, by_email) >= acct.MAX_RECOVERY_TRIES_PER_HOUR:
+                return again("too_many", 429)
+            problem = acct.password_problem(password, email=clean)
+            if problem:
+                return again(problem, 400)
+            account = db.find_account(clean) if acct.valid_email(clean) else None
+            if account is None or not db.use_recovery_key(account.id, acct.recovery_key_hash(key)):
+                return again("recovery_bad", 400)
+            db.set_password(account.id, acct.hash_password(password))
+            db.delete_sessions(account.id)
+            return _signin_redirect(locale, done="recovered")
+
+        return handler
+
+    def _recovery_post(path_locale: str) -> Callable[..., Response]:
+        """Make a new recovery key and show it once; the password confirms it."""
+
+        def handler(
+            request: Request,
+            current: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return RedirectResponse(f"{base}?error=wrong#recuperacion", status_code=303)
+            key = acct.new_recovery_key()
+            db.set_recovery_key(account.id, acct.recovery_key_hash(key), at=datetime.now(UTC))
+            page = account_pages.recovery_key_page(locale=locale, key=key)
             return HTMLResponse(
-                account_pages.forgot_page(locale=locale, contact_url=cfg.contact_url)
+                page,
+                headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
             )
 
         return handler
@@ -2063,6 +2138,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 methods=["POST"],
             )
         app.add_api_route(paths["forgot"], _forgot_get(path_locale), **html_get)
+        app.add_api_route(paths["forgot"], _forgot_post(path_locale), methods=["POST"])
+        app.add_api_route(
+            paths["account"] + "/recuperacion", _recovery_post(path_locale), methods=["POST"]
+        )
         app.add_api_route(paths["reset"], _reset_get(path_locale), **html_get)
         app.add_api_route(paths["reset"], _reset_post(path_locale), methods=["POST"])
 

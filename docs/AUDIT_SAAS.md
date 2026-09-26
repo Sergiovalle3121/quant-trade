@@ -1987,6 +1987,20 @@ changes what a report says.
   mail provider (for example Resend, Postmark or Amazon SES), a verified
   sending domain, and its API key as a Railway variable; the hooks are listed
   in `accounts.EMAIL_HOOKS`.
+- **Recovery key** (`recovery_keys` table, `/cuenta/recuperacion`, `POST
+  /olvide`): so a customer who forgets the password needs no one, "Mi
+  cuenta" makes a recovery key after the current password: 20 characters
+  from 32 unambiguous ones (100 random bits, `accounts.new_recovery_key`),
+  shown once with `Cache-Control: no-store`; only its SHA-256 and date are
+  kept, and making a new one replaces the old. Mi cuenta nudges accounts
+  without one. On `/olvide`, e-mail + key + new password sets the password,
+  spends the key (a delete that names its hash, so it works once) and signs
+  out every session. Every try counts toward
+  `accounts.MAX_RECOVERY_TRIES_PER_HOUR` (10) per network and per e-mail; an
+  unknown e-mail and a wrong key give the same answer (someone spamming an
+  e-mail can hold its recovery for an hour; the key itself is untouched and
+  the owner's reset link still works). The key's date is in
+  the data export; the row goes with the account.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

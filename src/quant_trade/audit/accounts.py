@@ -364,6 +364,23 @@ def new_secret() -> str:
     return secrets.token_urlsafe(32)
 
 
+#: A recovery key: 20 characters from 32 unambiguous ones (100 random bits),
+#: shown once in groups of five. Tries are limited per network and per e-mail.
+RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+RECOVERY_KEY_CHARS = 20
+MAX_RECOVERY_TRIES_PER_HOUR = 10
+
+
+def new_recovery_key() -> str:
+    raw = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(RECOVERY_KEY_CHARS))
+    return "-".join(raw[i : i + 5] for i in range(0, RECOVERY_KEY_CHARS, 5))
+
+
+def recovery_key_hash(text: str) -> str:
+    """The stored form of a recovery key, however it was typed (case, dashes, spaces)."""
+    return hash_secret("recovery:" + re.sub(r"[^A-Z0-9]", "", text.upper()))
+
+
 def hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
 
