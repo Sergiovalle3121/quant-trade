@@ -404,11 +404,12 @@ def load_snapshot(text: str) -> Snapshot:
 
 
 def trades_sha256(snap: Snapshot) -> str:
-    """SHA-256 of the sorted closed trades and cash rows up to the cutoff:
-    one hash per set of operations, whatever the row order of the file."""
+    """SHA-256 of the sorted closed trades, cash rows and months up to the
+    cutoff: one hash per set of operations, whatever the row order of the
+    file."""
     settled = [
         record.as_dict()
-        for record in snap.closed + snap.cash
+        for record in snap.closed + snap.cash + snap.months
         if record.end and record.end <= snap.cutoff
     ]
     settled.sort(key=canonical_dumps)
