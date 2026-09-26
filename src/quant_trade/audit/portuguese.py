@@ -588,6 +588,70 @@ INVESTOR_PT: dict[str, Any] = {
     "cta": "Como revisar a conta",
 }
 
+#: Why trust Rigor before paying, each point with the page that proves it.
+TRUST_PT: dict[str, Any] = {
+    "eyebrow": "Trabalho real, não fumaça",
+    "title": ("Sem robôs, sem sinais,", "sem promessas."),
+    "lead": (
+        "O Rigor não vende estratégias nem resultados: mede o arquivo que você envia e mostra "
+        "como mede. Tudo desta seção você pode conferir antes de pagar."
+    ),
+    "items": [
+        (
+            "eye",
+            "Veja um relatório inteiro antes de pagar",
+            "O exemplo é um relatório completo, com o PDF, feito com dados sintéticos: você vê "
+            "exatamente o que recebe (em inglês).",
+            "Ver o exemplo",
+            "sample",
+        ),
+        (
+            "layers",
+            "Métodos publicados, não uma caixa-preta",
+            "Sharpe probabilístico e deflacionado (Bailey e López de Prado), probabilidade de "
+            "sobreajuste e bootstrap estacionário (Politis e Romano). Cada teste e cada limite "
+            "estão escritos.",
+            "Ler a metodologia (em inglês)",
+            "method",
+        ),
+        (
+            "shield",
+            "Não vendemos robôs nem sinais",
+            "Não executamos ordens nem pedimos as chaves da sua corretora, e nenhum relatório "
+            "promete resultados: um filtro automático barra qualquer texto que o faça.",
+            "",
+            "",
+        ),
+        (
+            "hash",
+            "Um relatório que não pode ser retocado",
+            "Cada relatório leva a impressão SHA-256 dos seus arquivos e do resultado; qualquer "
+            "pessoa pode conferir que um PDF ou um JSON não foi editado.",
+            "Conferir um relatório (em inglês)",
+            "check",
+        ),
+        (
+            "lock",
+            "O seu arquivo é seu",
+            "Nunca é publicado. Se você não desbloquear o relatório, é apagado após {retention} "
+            "dias, e você pode apagar a sua conta e os seus relatórios quando quiser.",
+            "Política de privacidade (em inglês)",
+            "privacy",
+        ),
+        (
+            "card",
+            "Se ler mal o seu arquivo, devolvemos o valor",
+            "Se as operações, o saldo ou as datas não batem com a sua plataforma e não "
+            "conseguimos corrigir, devolvemos o que você pagou por esse relatório.",
+            "Termos do serviço (em inglês)",
+            "terms",
+        ),
+    ],
+    "who": "Quem está por trás: {name}, {address}.",
+    "ask": "Dúvidas antes de enviar? Escreva pelo WhatsApp; responde uma pessoa.",
+    "ask_link": "Escrever pelo WhatsApp",
+}
+
 #: Report words the landing shows (the illustration, the dimension cards).
 DIMENSION_TITLES_PT: dict[str, str] = {
     "statistical_significance": "Significância estatística",
@@ -643,6 +707,7 @@ __all__ = [
     "METHOD_LINK_PT",
     "MONTHS_PT",
     "STATUS_TEXT_PT",
+    "TRUST_PT",
     "UI_PT",
     "link_locale",
 ]

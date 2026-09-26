@@ -470,6 +470,7 @@ rgba(31,94,255,.06),transparent 45%)}
 .audience p+p{margin-top:10px}
 .audience strong{color:var(--text)}
 .audience-also{margin:22px 0 0;text-align:center}
+.trust-foot{margin:28px auto 0;max-width:720px;text-align:center}.trust-foot p{margin:6px 0;color:var(--text-3)}
 .icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
 color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
 .icon svg{width:22px;height:22px}
