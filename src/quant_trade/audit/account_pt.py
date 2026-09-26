@@ -1,0 +1,325 @@
+"""Portuguese (Brazil) words for the account screens.
+
+Sign-up, sign-in, "Minha conta", password recovery, the upload gates and
+"Minhas estratégias" read in Portuguese at ``/pt/cadastro``, ``/pt/entrar``
+and ``/pt/conta``. The report itself, its PDF and the compare page still open
+in English from here, as ``portuguese.link_locale`` says. Every sentence
+keeps the limits of the Spanish and English text and passes the
+profit-claim guard.
+"""
+
+from __future__ import annotations
+
+from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
+from quant_trade.audit.seo import BRAND
+
+PATHS_PT: dict[str, str] = {
+    "signup": "/pt/cadastro",
+    "signin": "/pt/entrar",
+    "signout": "/pt/sair",
+    "account": "/pt/conta",
+    "forgot": "/pt/esqueci",
+    "reset": "/pt/redefinir",
+}
+
+COPY_PT: dict[str, str] = {
+    "eyebrow": "Sua conta",
+    "signup_title": "Crie sua conta",
+    "signup_lead": (
+        "Ao criar sua conta, seu primeiro relatório completo é grátis, com o PDF. Depois "
+        f"você tem {FREE_PREVIEWS_PER_MONTH} prévias grátis por mês, e seus relatórios, "
+        "créditos e compras num só lugar."
+    ),
+    "signin_title": "Entre na sua conta",
+    "signin_lead": "Seus relatórios, créditos e compras estão aqui.",
+    "email": "E-mail",
+    "password": "Senha",
+    "password_new": "Nova senha",
+    "password_current": "Senha atual",
+    "password_help": f"Pelo menos {MIN_PASSWORD_CHARS} caracteres. Uma frase longa serve.",
+    "signup_button": "Criar conta",
+    "signin_button": "Entrar",
+    "have_account": "Já tem conta?",
+    "no_account": "Ainda não tem conta?",
+    "signin_link": "Entrar",
+    "signup_link": "Crie uma grátis",
+    "forgot_link": "Esqueci minha senha",
+    "terms_agree": "Ao criar a conta você aceita os {terms} e a {privacy}.",
+    "terms_link": "termos de serviço",
+    "privacy_link": "política de privacidade",
+    "benefits": (
+        "Todos os seus relatórios numa lista, com a classe|"
+        "Seus créditos de acesso à vista, sem procurar códigos|"
+        "Desbloqueie um relatório com um clique usando seus créditos|"
+        "Suas compras com cartão e com código, com data"
+    ),
+    "email_bad": "Esse e-mail não parece válido.",
+    "password_short": f"A senha precisa de pelo menos {MIN_PASSWORD_CHARS} caracteres.",
+    "password_long": "A senha é longa demais (no máximo 256 caracteres).",
+    "password_bad": "A senha tem um caractere que não pode ser usado.",
+    "password_common": (
+        "Essa senha está entre as primeiras que qualquer lista de tentativas testa. Use uma "
+        "frase sua, por exemplo três ou quatro palavras que só você juntaria."
+    ),
+    "taken": (
+        "Não foi possível criar uma conta com esse e-mail. Se você já tem uma, entre com sua senha."
+    ),
+    "wrong": "O e-mail ou a senha não conferem.",
+    "too_many": "Tentativas demais. Espere uma hora e tente de novo.",
+    "csrf": "O formulário expirou. Recarregue a página e envie de novo.",
+    "signed_out": "Você saiu da conta.",
+    "welcome": "Conta criada. Envie um arquivo agora: o relatório fica salvo aqui.",
+    "account_title": "Meus relatórios",
+    "account_lead": "Tudo o que você auditou com esta conta, num só lugar.",
+    "signed_in_as": "Conectado como",
+    "signout_button": "Sair",
+    "credits": "Créditos disponíveis",
+    "credits_help": "Cada crédito desbloqueia um relatório completo.",
+    "reports": "Relatórios",
+    "paid_reports": "Relatórios completos",
+    "new_audit": "Auditar outro arquivo",
+    "first_audit": "Enviar meu primeiro arquivo",
+    "reports_title": "Seus relatórios",
+    "reports_none": (
+        "Ainda não há relatórios na sua conta. Envie um arquivo com a sessão iniciada, ou abra "
+        "um relatório que você já tem e toque em “Salvar na minha conta”."
+    ),
+    "col_date": "Data",
+    "col_class": "Classe",
+    "col_status": "Estado",
+    "col_what": "Descrição",
+    "open": "Abrir",
+    "pdf": "PDF",
+    "public_page": "Página pública",
+    "compare_pick_label": "Escolher para comparar",
+    "compare_button": "Comparar os dois escolhidos",
+    "compare_help": "Marque dois relatórios completos e compare lado a lado, sem colar links.",
+    "compare_pick": "Escolha exatamente dois relatórios completos da sua lista para comparar.",
+    "compare_back": "Voltar aos meus relatórios",
+    "compare_mine": "São relatórios da sua conta? Compare a partir da sua lista, sem links.",
+    "compare_mine_button": "Escolher dos meus relatórios",
+    "compare_lead": (
+        "Dois relatórios da sua conta. Serve para ver o que mudou entre duas versões de uma "
+        "estratégia ou entre dois robôs."
+    ),
+    "status_full": "Completo",
+    "status_preview": "Prévia",
+    "status_purged": "Arquivos apagados",
+    "status_published": "Página pública",
+    "status_saved": "Salvo de um link",
+    "paid_card": "cartão",
+    "paid_code": "código",
+    "paid_welcome": "grátis, primeiro relatório",
+    "welcome_kpi": "Primeiro relatório completo grátis",
+    "welcome_available": "Disponível",
+    "welcome_used": "Usado",
+    "welcome_notice": (
+        "Seu primeiro relatório completo é grátis por criar a conta, com o PDF e a página de "
+        "verificação. Para os próximos arquivos você tem {limit} prévias grátis por mês; o "
+        "relatório completo custa {price} ({pack} o pacote de 3)."
+    ),
+    "no_description": "Sem descrição",
+    "codes_title": "Seus códigos de acesso",
+    "codes_none": "Ainda não há códigos na sua conta.",
+    "codes_help": (
+        "Um código que você usa com a sessão iniciada fica salvo aqui sozinho. Você também "
+        "pode adicionar um que já tenha."
+    ),
+    "code_label": "Código de acesso",
+    "code_add": "Adicionar à minha conta",
+    "code_linked": "Código adicionado à sua conta.",
+    "code_already": "Esse código já está na sua conta.",
+    "code_other": "Esse código já está salvo em outra conta.",
+    "code_unknown": "Não encontramos esse código. Confira se está completo.",
+    "col_code": "Código",
+    "col_added": "Adicionado",
+    "col_left": "Restam",
+    "col_used": "Usados",
+    "col_expires": "Expira",
+    "code_ref": "nº",
+    "code_off": "desativado",
+    "code_expired": "expirado",
+    "code_empty": "esgotado",
+    "never": "nunca",
+    "purchases_title": "Suas compras",
+    "purchases_none": "Ainda não há compras na sua conta.",
+    "col_report": "Relatório",
+    "stores_title": "O que guardamos e como apagar",
+    "stores": (
+        "Seu e-mail e uma impressão digital da sua senha (scrypt): nunca a senha em si.|"
+        "Seus relatórios e os arquivos que você envia. Dos não pagos apagamos arquivos e "
+        "relatório após {days} dias (fica só a impressão digital); os pagos e seu relatório "
+        "grátis ficam para você continuar abrindo.|"
+        "O endereço IP de cada envio, para os limites de uso; apagamos após {days} dias.|"
+        "Seus códigos e compras, com data. Nunca vemos nem guardamos os dados do seu cartão: "
+        "o pagamento com cartão é processado pela Stripe.|"
+        "Uma marca aleatória do seu navegador e a impressão digital do arquivo, só para dar o "
+        "relatório grátis uma vez. Elas ficam mesmo se você apagar a conta, sem o seu e-mail.|"
+        "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
+        "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
+    ),
+    "col_paid": "Pago",
+    "col_method": "Com",
+    "buy_title": "Precisa de créditos?",
+    "buy_code": "Comprar pelo WhatsApp",
+    "buy_code_how": (
+        "Você nos escreve pelo WhatsApp; a mensagem já diz que é para a sua conta.|"
+        "Respondemos com os dados para o pagamento.|"
+        "Com o pagamento confirmado você recebe um código: digite-o em Código de acesso e os "
+        "créditos entram na sua conta."
+    ),
+    "buy_code_wait": (
+        "Quem responde é uma pessoa. Se você escrever à noite ou no fim de semana, "
+        "respondemos assim que virmos."
+    ),
+    "buy_prices_single": "Um relatório completo: {price}.",
+    "buy_prices_pack": "Pacote de 3 créditos: {price}.",
+    "buy_message": (
+        "Olá, quero créditos para a minha conta: um relatório completo ou o pacote de 3."
+    ),
+    "buy_card": "Pague com cartão a partir da prévia de qualquer relatório.",
+    "security_title": "Senha e dados",
+    "change_password": "Trocar senha",
+    "password_changed": "Senha trocada. Suas outras sessões foram encerradas.",
+    "delete_title": "Apagar minha conta",
+    "delete_help": (
+        "Apaga seu e-mail, senha, sessões e a lista dos seus relatórios e códigos. Os "
+        "relatórios continuam abrindo com o link privado até o fim do prazo de conservação, "
+        "a menos que você marque a caixa para apagar também os que enviou com esta conta. Os "
+        "que você salvou ou pagou a partir do link de outra pessoa só saem da sua lista."
+    ),
+    "delete_reports": "Apagar também os relatórios que enviei (não pode ser desfeito)",
+    "delete_button": "Apagar minha conta",
+    "deleted": "Sua conta foi apagada.",
+    "forgot_title": "Recuperar sua senha",
+    "forgot_lead": (
+        "Ainda não enviamos e-mails. Escreva para nós a partir do e-mail da sua conta e "
+        "enviamos um link de uso único para criar uma nova senha."
+    ),
+    "forgot_contact": "Escrever pelo WhatsApp",
+    "forgot_message": f"Olá, esqueci a senha da minha conta {BRAND}. Meu e-mail é: ",
+    "reset_title": "Criar uma nova senha",
+    "reset_lead": "Este link funciona uma vez e expira em 24 horas.",
+    "reset_button": "Salvar senha",
+    "reset_bad": "Este link já foi usado ou expirou. Peça um novo.",
+    "reset_done": "Senha salva. Entre com ela.",
+    "saved_box": "Salvo na sua conta.",
+    "saved_link": "Ver meus relatórios",
+    "save_box": "Salve este relatório na sua conta para encontrá-lo sem o link.",
+    "save_button": "Salvar na minha conta",
+    "save_other": "Este relatório está salvo em outra conta.",
+    "anon_box": "Crie uma conta grátis para salvar este relatório e encontrá-lo sem o link.",
+    "anon_signup": "Criar conta",
+    "anon_signin": "Entrar",
+    "credit_button": "Desbloquear com 1 crédito da sua conta",
+    "credit_left": "Você tem {n} créditos.",
+    "credit_left_one": "Você tem 1 crédito.",
+    "credit_used": "Crédito usado: este é o relatório completo.",
+    "free_left": "Prévias grátis este mês",
+    "free_left_value": "{left} de {limit}",
+    "gate_signin_title": "Crie sua conta grátis: seu primeiro relatório completo é por nossa conta",
+    "gate_signin_lead": (
+        "Ao criar sua conta, o primeiro arquivo que você enviar sai como relatório completo, "
+        "com o PDF, sem custo. Depois você tem {limit} prévias grátis por mês: a classe de A a "
+        "D, os gráficos e as bandeiras vermelhas. Seu arquivo não foi guardado: com a conta "
+        "criada você volta ao formulário para enviá-lo de novo. Se você já tem um código de "
+        "acesso, digite-o no formulário e não precisa de conta."
+    ),
+    "gate_code_title": "Esse código não funciona",
+    "gate_code_lead": (
+        "Não encontramos esse código ou ele não tem mais créditos. Confira, ou crie uma conta "
+        "grátis para ter {limit} prévias por mês."
+    ),
+    "gate_quota_title": "Você usou suas {limit} prévias grátis deste mês",
+    "gate_quota_lead": (
+        "Elas renovam no dia 1º de cada mês. Para auditar agora, adicione créditos à sua "
+        "conta: com créditos, cada arquivo novo sai como relatório completo."
+    ),
+    "gate_network_title": "Esta rede usou suas prévias grátis deste mês",
+    "gate_network_lead": (
+        "Também contamos as prévias grátis por rede, para frear contas descartáveis. Você pode "
+        "auditar com um código ou com créditos na sua conta, ou voltar no dia 1º."
+    ),
+    "gate_signup": "Criar uma conta grátis",
+    "gate_signin": "Já tenho conta",
+    "gate_buy": "Ver preços e adicionar créditos",
+    "gate_back": "Voltar à página inicial",
+    "credit_on_upload": "Usamos 1 crédito da sua conta: este é o relatório completo.",
+    "credit_none": "Não restam créditos na sua conta.",
+    "saved_notice": "Relatório salvo na sua conta.",
+    "nav_account": "Minha conta",
+}
+
+#: "Minhas estratégias", the Portuguese of ``strategies.COPY``.
+STRATEGIES_PT: dict[str, str] = {
+    "section_title": "Minhas estratégias",
+    "section_lead": (
+        "Agrupe as versões de uma mesma estratégia ou robô. Cada estratégia mostra seus "
+        "relatórios em ordem e, ao lado de cada versão, o que mudou em relação à anterior."
+    ),
+    "none": "Você ainda não tem estratégias. Crie uma e guarde nela seus relatórios.",
+    "no_reports": "Envie um arquivo primeiro: depois poderá guardá-lo numa estratégia.",
+    "versions": "{n} versões",
+    "version_one": "1 versão",
+    "latest": "Última classe",
+    "open": "Ver estratégia",
+    "file_title": "Guardar um relatório numa estratégia",
+    "report": "Relatório",
+    "strategy": "Estratégia",
+    "new_strategy": "Nova estratégia…",
+    "new_name": "Nome da nova estratégia",
+    "new_name_help": "Por exemplo: EA Ouro, versão com stop mais curto.",
+    "file_button": "Guardar na estratégia",
+    "filed": "Relatório guardado na estratégia.",
+    "file_bad": "Escolha um relatório da sua lista e uma estratégia, ou escreva um nome.",
+    "strategy_full": "Você chegou ao máximo de estratégias de uma conta.",
+    "page_lead": (
+        "As versões desta estratégia em ordem, com o que cada relatório mediu. Uma diferença "
+        "diz quais testes mudaram, não como a estratégia vai se sair."
+    ),
+    "col_version": "Versão",
+    "col_date": "Data",
+    "col_class": "Classe",
+    "col_sharpe": "Sharpe anualizado",
+    "col_dsr": "Sharpe deflacionado",
+    "col_dd": "Queda máxima",
+    "locked": "Prévia",
+    "unlock": "Desbloquear para ver os números",
+    "changed_title": "O que mudou em relação à versão {n}",
+    "changed_locked": (
+        "Classe {a} → {b}. Para ver o que mudou em cada teste, as duas versões precisam ser "
+        "relatórios completos."
+    ),
+    "class_line": "Classe: {a} → {b}",
+    "sharpe_line": "Sharpe: {a} → {b}",
+    "better": "melhor",
+    "worse": "pior",
+    "same": "igual",
+    "unclear": "sem mudança clara",
+    "different_frequency": "não comparável (frequência de dados diferente)",
+    "different_periods": "períodos diferentes (as datas quase não coincidem)",
+    "changed": "mudou",
+    "tries_note": (
+        "{n} versões testadas: se você escolher a melhor, conta como {n} tentativas ao "
+        "declarar as tentativas."
+    ),
+    "no_change": "Nenhum teste mudou de resultado.",
+    "side_by_side": "Comparar lado a lado",
+    "remove": "Tirar da estratégia",
+    "rename": "Trocar nome",
+    "rename_button": "Salvar nome",
+    "name_label": "Nome",
+    "delete": "Apagar estratégia",
+    "delete_help": "Os relatórios continuam na sua lista; só o agrupamento sai.",
+    "back": "Voltar à minha conta",
+    "empty": "Esta estratégia ainda não tem relatórios. Guarde-os a partir da sua conta.",
+    "note": (
+        "Cada versão é lida com seus próprios arquivos e declarações. «Melhor» ou «pior» no "
+        "Sharpe só aparece quando as faixas do bootstrap (5 % a 95 %) não se tocam; se se "
+        "tocam, a diferença cabe no ruído da medição; com as mesmas datas esta regra é muito "
+        "prudente. Se as datas de duas versões quase não coincidem, a diferença pode vir do "
+        "mercado dessas datas e não da mudança. Cada teste é lido com as declarações do seu "
+        "próprio relatório (tentativas, custos, fora da amostra), por isso as suas linhas "
+        "dizem «mudou» e não «melhor» ou «pior»."
+    ),
+}
