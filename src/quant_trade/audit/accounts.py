@@ -27,6 +27,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import re
 import secrets
 from datetime import UTC, datetime
@@ -427,6 +428,7 @@ __all__ = [
     "hash_password",
     "hash_secret",
     "month_start",
+    "network_address",
     "network_key",
     "new_secret",
     "normalise_email",
@@ -457,6 +459,24 @@ def claim_month(at: datetime) -> str:
     return at.strftime("%Y-%m")
 
 
+def network_address(client_ip: str) -> str:
+    """The network an address stands for in the free tier's limits.
+
+    An IPv6 customer gets a whole /64 and can rotate addresses inside it at
+    will, so an IPv6 address counts as its /64 (``2001:db8:1:2::/64``); an
+    IPv4 address counts as itself. Anything unparsable is kept as given.
+    """
+    try:
+        address = ipaddress.ip_address(client_ip.strip())
+    except ValueError:
+        return client_ip
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None:
+            return str(address.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{address}/64", strict=False))
+    return str(address)
+
+
 def network_key(client_ip: str) -> str:
-    """The address as it goes into a claim key: hashed, never in clear."""
-    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()[:32]
+    """The address's network as it goes into a claim key: hashed, never in clear."""
+    return hashlib.sha256(network_address(client_ip).encode("utf-8")).hexdigest()[:32]

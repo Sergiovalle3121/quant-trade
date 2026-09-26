@@ -141,6 +141,18 @@ COPY: dict[str, dict[str, str]] = {
         "welcome_kpi": "Primer informe completo gratis",
         "welcome_available": "Disponible",
         "welcome_used": "Usado",
+        "welcome_refused_file": (
+            "Este archivo ya recibió un informe completo gratis en otra cuenta, así que esta "
+            "vez es una vista previa. Tu informe gratis sigue disponible para otro archivo."
+        ),
+        "welcome_refused_device": (
+            "Este navegador ya usó un informe completo gratis en otra cuenta, así que esta vez "
+            "es una vista previa: así la oferta no se repite con cuentas nuevas."
+        ),
+        "welcome_refused_network": (
+            "Esta red ya usó los informes completos gratis de este mes, así que esta vez es una "
+            "vista previa. Tu informe gratis sigue disponible desde otra red o el mes próximo."
+        ),
         "welcome_notice": (
             "Tu primer informe completo es gratis por crear tu cuenta, con PDF y página de "
             "verificación. Para tus siguientes archivos tienes {limit} vistas previas gratis al "
@@ -414,6 +426,18 @@ COPY: dict[str, dict[str, str]] = {
         "welcome_kpi": "Free first full report",
         "welcome_available": "Available",
         "welcome_used": "Used",
+        "welcome_refused_file": (
+            "This file already got a free full report on another account, so this time it is a "
+            "preview. Your free report is still available for another file."
+        ),
+        "welcome_refused_device": (
+            "This browser already used a free full report on another account, so this time it "
+            "is a preview: that way the offer is not repeated with new accounts."
+        ),
+        "welcome_refused_network": (
+            "This network already used this month's free full reports, so this time it is a "
+            "preview. Your free report is still available from another network or next month."
+        ),
         "welcome_notice": (
             "Your first full report is free for creating your account, with the PDF and the "
             "verification page. For your next files you have {limit} free previews a month; "

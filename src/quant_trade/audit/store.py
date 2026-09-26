@@ -1598,7 +1598,10 @@ class Store:
             addresses.add(str(address or ""))
         devices.discard("")
         addresses.discard("")
-        return devices, addresses
+        # Compared as networks, like the free tier's limits (an IPv6 /64).
+        from quant_trade.audit.accounts import network_address
+
+        return devices, {network_address(address) for address in addresses}
 
     def record_referral(
         self, invitee_id: str, inviter_id: str, *, device_sha256: str, at: datetime
@@ -1656,6 +1659,8 @@ class Store:
         """
         if credits < 1:
             raise ValueError("credits must be at least 1")
+        from quant_trade.audit.accounts import network_address
+
         sa = self._sa
         r = self.referrals
         now = _iso(at)
@@ -1672,7 +1677,7 @@ class Store:
             devices, addresses = self._inviter_marks(conn, inviter_id)
             marks = {device_sha256, signup_device} - {""}
             outcome = ""
-            if marks & devices or (client_ip and client_ip in addresses):
+            if marks & devices or (client_ip and network_address(client_ip) in addresses):
                 outcome = "self"
             slot = ""
             if not outcome:
