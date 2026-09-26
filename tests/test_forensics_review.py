@@ -135,7 +135,13 @@ def test_decide_applies_the_one_rule(monkeypatch: pytest.MonkeyPatch) -> None:
         assert decide("BALANCE_CHAIN", "mt5_tester", RawOutcome(hits=5)) == STATUS_INFO
 
 
-def test_calibration_line_and_clopper_pearson() -> None:
+def test_calibration_line_and_clopper_pearson(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The line's bound counts accounts or strategies, not files: 40 files of 8
+    # accounts give the 8-trial bound.
+    cell = calibration.Cell(n=40, n_reserved=5, unexplained=0, frozen="2026-10-01", groups=8)
+    monkeypatch.setitem(calibration.CALIBRATION, ("ROW_ORDER", "mt4_statement"), cell)
+    line = dict(review_module.calibration_line("ROW_ORDER", "mt4_statement"))
+    assert line["n"] == "40" and line["groups"] == "8" and line["cp95_upper_pct"] == "36.9"
     assert calibration.clopper_pearson_upper_pct(0, 8) == "36.9"
     assert calibration.clopper_pearson_upper_pct(0, 16) == "20.6"
     assert calibration.clopper_pearson_upper_pct(0, 20) == "16.8"

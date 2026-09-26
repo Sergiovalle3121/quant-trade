@@ -655,9 +655,19 @@ the grid's tolerance. Fewer values: `too_few_values`.
 Clopper-Pearson: the two-sided 95 % upper bound of the false-signal rate,
 `BetaInv(0.975, x + 1, n − x)`, exactly `1 − 0.025^(1/n)` for `x = 0`
 (`calibration.clopper_pearson_upper_pct`): 0/5 → 52.2 %, 0/13 → 24.7 %,
-0/20 → 16.8 %, 0/26 → 13.2 %, 0/39 → 9.0 %, 0/65 → 5.5 %. The page's
-calibration line uses `n` (calibration files) and `unexplained` (reserved
-hits included).
+0/20 → 16.8 %, 0/26 → 13.2 %, 0/39 → 9.0 %, 0/65 → 5.5 %.
+
+The page's calibration line prints `n` (calibration files), `groups` (accounts
+or strategies among them), `unexplained` (hits without an explanation, reserved
+hits included) and the bound computed on `min(n, groups)`: the binomial assumes
+independent trials and the independent unit is the account or strategy, so 65
+MT4 statements from 8 accounts publish 0/8 → 36.9 %, the 20 MQL5 signal files
+from 16 strategies 0/16 → 20.6 %, and the MT5 tester cells (one file per
+strategy) keep 0/26 → 13.2 %. Counting reserved hits in `unexplained` while
+`n` counts calibration files only is conservative (1/11 → 41.3 % rather than
+1/13 → 36.0 %) and is kept so. These are in-sample bounds: the page says, in
+the three languages, that the accounts were used to tune the method and that
+the false-signal rate could be as high as the bound (math review, 2026-09-26).
 
 ### 5.2 Honesty note
 
@@ -672,6 +682,11 @@ every discrepancy, which is some evidence that the modules were not tuned
 file by file; still, the bounds below are bounds on files already seen by
 the authors, not on unseen files. They are false-signal rates on real files,
 never detection rates; 0 of 39 still leaves 9.0 %.
+
+The one blind figure: across the reserved third, 1 of 40 files produced a hit
+on a `SIGNAL_CAPABLE` check (the reader defect of section 5.6): 1/40, 95 %
+upper bound 13.2 %. It is the only out-of-sample evidence and belongs next
+to the in-sample bounds above.
 
 ### 5.3 Results: `SIGNAL_CAPABLE` check × family
 
@@ -898,7 +913,12 @@ run is 1.5 s and byte-identical across two runs.
 `mt4_statement_html`), 0 errors, 760 s. Over every (seed, family) cell with
 an expected check: applicable 1909, found 1882, missed 27, rate 0.986 (a
 plain ratio, no interval); 764 further applications under documented limits
-(0 found, as documented; unexpected finders logged). Every (seed × family)
+(0 found, as documented; unexpected finders logged); counting those too,
+1882 of 2673 applications were found (70.4 %), and both figures belong
+together: of the edits the method is built to see it found 98.6 %, of all
+the edits tried, 70 %. The seeds are a designed set, not a sample of real
+forgeries, so the ratios carry no interval; they count one edit at a time,
+on public files, HTML and delimited text only. Every (seed × family)
 cell is 1.000 except:
 
 | seed × family | found | why the misses |
@@ -986,6 +1006,15 @@ calibration changes that:
 12. Another file type: screenshots, PDFs and hand-retyped spreadsheets carry
     none of the terminal's hidden cells, links or copies; the audit reports
     those formats with fewer measured checks.
+13. XLSX files were never edited (`not_editable`): there is no detection
+    figure for the XLSX variants of the MT5 families.
+14. The 8 corpus files over 2 MB were skipped by the lab.
+15. TradingView, NinjaTrader and monthly grids were seeded on synthetic
+    fixtures only (no public file of those families in the corpus).
+16. Editing more than a third of one symbol's rows makes `PRICE_IMPLIED_PNL`
+    answer `symbols_no_fit`: nothing is flagged.
+17. The totals tolerance grows as 0.011 × rows, so an edit smaller than that
+    passes (+1.00, or +3.64, on a 331-row statement).
 
 Also outside the method: excluding another account (the battery does not
 see other accounts); a statement exported for a chosen period (only the
