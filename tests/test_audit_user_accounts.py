@@ -2419,3 +2419,301 @@ def test_password_guesses_on_account_forms_count_a_64_and_the_account(tmp_path: 
     assert "error=too_many" in guess("203.0.113.77")
     ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
     assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
+
+
+SECRET_SHAPE = re.compile(r"<p class='acct-key'><code>([A-Z2-7 ]{32,40})</code></p>")
+
+
+#: The step each test secret was confirmed with, so later codes are counted
+#: from it and a test never depends on crossing a 30-second boundary.
+_CONFIRMED_STEP: dict[str, int] = {}
+
+
+def _code(secret: str, offset: int = 0) -> str:
+    """The app's code ``offset`` steps after the confirming one (or after now)."""
+    from quant_trade.audit import accounts
+
+    base = _CONFIRMED_STEP.get(secret, accounts.totp_step(datetime.now(UTC)))
+    return accounts.totp_code(secret, base + offset)
+
+
+def _turn_on_two_step(client: TestClient, prefix: str = "/cuenta") -> str:
+    """Make a recovery key, turn two-step on and return the app secret."""
+    _make_recovery_key(client, prefix=prefix)
+    csrf = _csrf(client.get(prefix).text)
+    shown = client.post(
+        f"{prefix}/dos-pasos", data={"current": PASSWORD, "csrf": csrf}, follow_redirects=False
+    )
+    assert shown.status_code == 200 and "<svg" in shown.text
+    match = SECRET_SHAPE.search(shown.text)
+    assert match, "the secret is shown as text"
+    secret = match.group(1).replace(" ", "")
+    from quant_trade.audit import accounts
+
+    step = accounts.totp_step(datetime.now(UTC))
+    # The confirm form carries the session's own CSRF token.
+    assert _csrf(shown.text) == csrf
+    done = client.post(
+        f"{prefix}/dos-pasos/confirmar",
+        data={"code": accounts.totp_code(secret, step), "csrf": _csrf(shown.text)},
+        follow_redirects=False,
+    )
+    assert "done=two_step_on" in done.headers["location"]
+    _CONFIRMED_STEP[secret] = step
+    return secret
+
+
+def _enter_code(client: TestClient, code: str = "", key: str = "", path: str = "/entrar/codigo"):
+    csrf = _csrf(client.get(path).text)
+    return client.post(path, data={"code": code, "key": key, "csrf": csrf}, follow_redirects=False)
+
+
+def test_totp_codes_follow_rfc_6238() -> None:
+    import base64
+
+    from quant_trade.audit import accounts
+
+    # RFC 6238 appendix B (SHA-1): T = 59 s is step 1, code 94287082 (8 digits).
+    secret = base64.b32encode(b"12345678901234567890").decode()
+    assert accounts.totp_code(secret, 1) == "287082"
+    assert accounts.totp_code(secret, 1111111109 // 30) == "081804"
+    at = datetime(2033, 5, 18, 3, 33, 20, tzinfo=UTC)  # 2000000000 s
+    step = accounts.totp_step(at)
+    assert accounts.totp_match(secret, accounts.totp_code(secret, step), at) == step
+    assert accounts.totp_match(secret, accounts.totp_code(secret, step - 1), at) == step - 1
+    assert accounts.totp_match(secret, accounts.totp_code(secret, step + 1), at) == step + 1
+    assert accounts.totp_match(secret, accounts.totp_code(secret, step + 2), at) is None
+    assert accounts.totp_match(secret, "12 34 5a", at) is None
+    code = accounts.totp_code(secret, step)
+    assert accounts.totp_match(secret, f"{code[:3]} {code[3:]}", at) == step
+    uri = accounts.totp_uri(secret, "ana@example.com", "Rigor")
+    assert uri.startswith("otpauth://totp/Rigor:ana@example.com?secret=") and "digits=6" in uri
+
+
+def test_two_step_turns_on_only_after_a_code_and_needs_a_recovery_key(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    page = client.get("/cuenta").text
+    assert "Verificación en dos pasos" in page and "Primero crea tu clave" in page
+    csrf = _csrf(page)
+    no_key = client.post(
+        "/cuenta/dos-pasos", data={"current": PASSWORD, "csrf": csrf}, follow_redirects=False
+    )
+    assert "error=two_step_needs_key" in no_key.headers["location"]
+    _make_recovery_key(client)
+    laptop = TestClient(client.app)
+    _signin(laptop, "ana@example.com")
+    wrong = client.post(
+        "/cuenta/dos-pasos", data={"current": "no es", "csrf": csrf}, follow_redirects=False
+    )
+    assert "error=wrong" in wrong.headers["location"]
+    shown = client.post("/cuenta/dos-pasos", data={"current": PASSWORD, "csrf": csrf})
+    assert shown.headers["cache-control"] == "no-store"
+    assert "Escanea el código QR" in shown.text and "<svg" in shown.text
+    assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
+    secret = SECRET_SHAPE.search(shown.text).group(1).replace(" ", "")  # type: ignore[union-attr]
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+    # Pending until a first code confirms it; a wrong code keeps it pending.
+    bad = client.post("/cuenta/dos-pasos/confirmar", data={"code": "000000", "csrf": csrf})
+    assert bad.status_code == 400 and "no es válido" in bad.text and "<svg" in bad.text
+    assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+    client.post("/cuenta/dos-pasos/confirmar", data={"code": _code(secret), "csrf": csrf})
+    assert store.two_step_on(ana.id)  # type: ignore[attr-defined]
+    page = client.get("/cuenta").text
+    assert "Activada desde el" in page and secret not in page
+    # A browser signed in with the password alone is signed out; this one stays.
+    assert laptop.get("/cuenta", follow_redirects=False).status_code == 303
+    # A second start while on changes nothing and shows no secret.
+    again = client.post(
+        "/cuenta/dos-pasos", data={"current": PASSWORD, "csrf": csrf}, follow_redirects=False
+    )
+    assert again.status_code == 303
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert data["two_step_on_since"] and secret not in json.dumps(data)
+
+
+def test_signing_in_with_two_step_needs_a_fresh_code_from_the_app(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client)
+    secret = _turn_on_two_step(client)
+    other = TestClient(client.app)
+    first = _signin(other, "ana@example.com")
+    assert first.status_code == 303 and first.headers["location"] == "/entrar/codigo"
+    assert "rigor_session" not in other.cookies
+    assert other.get("/cuenta", follow_redirects=False).status_code == 303
+    page = other.get("/entrar/codigo").text
+    assert "Escribe el código de tu app" in page and "Perdiste el teléfono" in page
+    assert _enter_code(other, "000000").status_code == 400
+    # The code that confirmed the setup was used; it does not sign in.
+    assert _enter_code(other, _code(secret)).status_code == 400
+    code = _code(secret, 1)
+    done = _enter_code(other, code)
+    assert done.status_code == 303 and done.headers["location"] == "/cuenta"
+    assert other.get("/cuenta", follow_redirects=False).status_code == 200
+    # The same code never works twice, even on a new sign-in.
+    third = TestClient(client.app)
+    _signin(third, "ana@example.com")
+    replay = _enter_code(third, code)
+    assert replay.status_code == 400 and "ya se usó" in replay.text
+    # Without the challenge cookie the code page sends back to the password.
+    fresh = TestClient(client.app)
+    gone = fresh.get("/entrar/codigo", follow_redirects=False)
+    assert "done=two_step_expired" in gone.headers["location"]
+    # The requested page survives the code step.
+    nexted = TestClient(client.app)
+    csrf = _csrf(nexted.get("/entrar").text)
+    step = nexted.post(
+        "/entrar",
+        data={
+            "email": "ana@example.com",
+            "password": PASSWORD,
+            "csrf": csrf,
+            "next": "/cuenta/datos",
+        },
+        follow_redirects=False,
+    )
+    assert step.headers["location"] == "/entrar/codigo?next=%2Fcuenta%2Fdatos"
+    csrf = _csrf(nexted.get(step.headers["location"]).text)
+    last = nexted.post(
+        "/entrar/codigo",
+        data={"code": _code(secret, -1), "csrf": csrf, "next": "/cuenta/datos"},
+        follow_redirects=False,
+    )
+    assert last.status_code == 400  # older than the last step used
+    assert "/cuenta/datos" not in (last.headers.get("location") or "")
+
+
+def test_a_lost_phone_signs_in_with_the_recovery_key_and_turns_two_step_off(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    _turn_on_two_step(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    # The recovery key was made inside _turn_on_two_step; make a known one.
+    key = KEY_SHAPE.search(_make_recovery_key(client).text).group(1)  # type: ignore[union-attr]
+    other = TestClient(client.app)
+    _signin(other, "ana@example.com")
+    assert _enter_code(other, key="AAAAA-BBBBB-CCCCC-DDDDD").status_code == 400
+    done = _enter_code(other, key=key)
+    assert done.headers["location"] == "/cuenta?done=two_step_off_by_key"
+    assert "la verificación en dos pasos quedó" in other.get(done.headers["location"]).text
+    assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+    assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
+    # /olvide with a recovery key turns it off too.
+    _turn_on_two_step(other)
+    key = KEY_SHAPE.search(_make_recovery_key(other).text).group(1)  # type: ignore[union-attr]
+    assert _recover(TestClient(client.app), "ana@example.com", key).status_code == 303
+    assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+
+
+def test_turning_two_step_off_needs_a_current_code(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    secret = _turn_on_two_step(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    csrf = _csrf(client.get("/cuenta").text)
+    used = client.post(
+        "/cuenta/dos-pasos/desactivar",
+        data={"code": _code(secret), "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "error=code_bad" in used.headers["location"]  # the confirming code was used
+    assert store.two_step_on(ana.id)  # type: ignore[attr-defined]
+    off = client.post(
+        "/cuenta/dos-pasos/desactivar",
+        data={"code": _code(secret, 1), "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "done=two_step_off" in off.headers["location"]
+    assert store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+    assert _signin(TestClient(client.app), "ana@example.com").headers["location"] == "/cuenta"
+
+
+def test_two_step_code_tries_are_limited_per_account_and_per_network(tmp_path: Path) -> None:
+    from quant_trade.audit import accounts
+
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    secret = _turn_on_two_step(client)
+    other = TestClient(client.app)
+    _signin(other, "ana@example.com")
+    limit = accounts.MAX_TOTP_TRIES_PER_HOUR
+    csrf = _csrf(other.get("/entrar/codigo").text)
+
+    def attempt(code: str, ip: str) -> int:
+        return other.post(
+            "/entrar/codigo",
+            data={"code": code, "csrf": csrf},
+            headers={"X-Forwarded-For": ip},
+            follow_redirects=False,
+        ).status_code
+
+    # The confirming code counted one try for the account.
+    for n in range(limit - 1):
+        assert attempt("000000", f"198.51.100.{n + 1}") == 400
+    assert attempt(_code(secret, 1), "203.0.113.5") == 429
+
+
+def test_deleting_the_account_or_the_owner_command_removes_two_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, store, settings = _client(tmp_path)
+    monkeypatch.setenv("DATABASE_URL", settings.database_url)
+    _signup(client)
+    _turn_on_two_step(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    runner = CliRunner()
+    shown = runner.invoke(cli_app, ["audit", "account-two-step-off", "ana@example.com"])
+    assert "pass --yes" in shown.output and store.two_step_on(ana.id)  # type: ignore[attr-defined]
+    done = runner.invoke(cli_app, ["audit", "account-two-step-off", "ana@example.com", "--yes"])
+    assert "turned off" in done.output and store.two_step_on(ana.id) == ""  # type: ignore[attr-defined]
+    _turn_on_two_step(client)
+    other = TestClient(client.app)
+    _signin(other, "ana@example.com")  # leaves a challenge row
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post("/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf})
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.two_step.select()).all() == []  # type: ignore[attr-defined]
+        assert conn.execute(store.two_step_challenges.select()).all() == []  # type: ignore[attr-defined]
+
+
+def test_the_two_step_screens_exist_in_every_language(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client)
+    for prefix, words in (
+        ("/account", "Scan the QR code"),
+        (account_pages.path("account", "pt"), "Escaneie o código QR"),
+    ):
+        _make_recovery_key(client, prefix=prefix)
+        csrf = _csrf(client.get(prefix).text)
+        shown = client.post(f"{prefix}/dos-pasos", data={"current": PASSWORD, "csrf": csrf})
+        assert words in shown.text, prefix
+        assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
+    secret = SECRET_SHAPE.search(shown.text).group(1).replace(" ", "")  # type: ignore[union-attr]
+    csrf = _csrf(client.get("/pt/conta").text)
+    client.post("/pt/conta/dos-pasos/confirmar", data={"code": _code(secret), "csrf": csrf})
+    for signin, code_path, words in (
+        ("/login", "/login/code", "Type the code from your app"),
+        (account_pages.path("signin", "pt"), account_pages.two_step_path("pt"), "Digite o código"),
+    ):
+        other = TestClient(client.app)
+        csrf = _csrf(other.get(signin).text)
+        answer = other.post(
+            signin,
+            data={"email": "ana@example.com", "password": PASSWORD, "csrf": csrf},
+            follow_redirects=False,
+        )
+        assert answer.headers["location"] == code_path
+        page = other.get(code_path).text
+        assert words in page and not find_claims(re.sub(r"<[^>]+>", " ", page))
+    ctx = LegalContext(
+        operator_name="Op",
+        operator_contact="op@example.com",
+        operator_address="México",
+        jurisdiction="Leyes de México",
+    )
+    for locale, words in (("es", "verificación en dos pasos"), ("en", "two-step sign-in")):
+        privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
+        assert words in privacy and not find_claims(privacy)

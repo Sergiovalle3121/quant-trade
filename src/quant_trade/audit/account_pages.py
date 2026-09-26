@@ -205,6 +205,8 @@ COPY: dict[str, dict[str, str]] = {
             "etiqueta, para saber qué enlace funciona; se borra con la cuenta.|"
             "Si creas una clave de recuperación, solo su huella (un hash) y la fecha, nunca la "
             "clave; se borra al usarla o con la cuenta.|"
+            "Si activas la verificación en dos pasos, la clave secreta que comparte tu app de "
+            "autenticación y el último código usado; se borra al desactivarla o con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -329,6 +331,58 @@ COPY: dict[str, dict[str, str]] = {
             "no la compartas."
         ),
         "recovery_done": "Ya la guardé, volver a Mi cuenta",
+        "two_step_card": "Verificación en dos pasos",
+        "two_step_is_off": (
+            "Desactivada. Actívala para que, además de tu contraseña, se pida un código de "
+            "6 dígitos de una app de autenticación (Google Authenticator, Microsoft "
+            "Authenticator, 1Password u otra) al entrar."
+        ),
+        "two_step_is_on": (
+            "Activada desde el {date}. Para desactivarla, escribe un código actual de tu app."
+        ),
+        "two_step_needs_key": (
+            "Primero crea tu clave de recuperación: es tu salida si pierdes el teléfono."
+        ),
+        "two_step_turn_on": "Activar verificación en dos pasos",
+        "two_step_turn_off": "Desactivar",
+        "two_step_code": "Código de 6 dígitos",
+        "two_step_code_help": "Lo muestra tu app de autenticación y cambia cada 30 segundos.",
+        "two_step_setup_title": "Activa la verificación en dos pasos",
+        "two_step_setup_lead": (
+            "Conecta tu app de autenticación y confirma con un código. Hasta entonces no "
+            "cambia nada."
+        ),
+        "two_step_setup_how": (
+            "Abre tu app de autenticación y elige añadir una cuenta.|"
+            "Escanea el código QR o escribe la clave de abajo.|"
+            "Escribe el código de 6 dígitos que aparece para confirmar."
+        ),
+        "two_step_secret": "¿No puedes escanear? Escribe esta clave en la app:",
+        "two_step_confirm": "Confirmar y activar",
+        "two_step_cancel": "Cancelar y volver a Mi cuenta",
+        "two_step_title": "Escribe el código de tu app",
+        "two_step_lead": (
+            "Tu contraseña es correcta. Falta el código de 6 dígitos de tu app de autenticación."
+        ),
+        "two_step_lost": "¿Perdiste el teléfono?",
+        "two_step_lost_help": (
+            "Entra con tu clave de recuperación. Sirve una sola vez y desactiva la verificación "
+            "en dos pasos; después crea una clave nueva y vuelve a activarla."
+        ),
+        "two_step_lost_button": "Entrar con mi clave de recuperación",
+        "code_bad": (
+            "El código no es válido o ya se usó. Espera al siguiente código de tu app y revisa "
+            "que la hora del teléfono sea automática."
+        ),
+        "two_step_on": (
+            "Verificación en dos pasos activada. Desde ahora se pide el código al entrar."
+        ),
+        "two_step_off": "Verificación en dos pasos desactivada.",
+        "two_step_off_by_key": (
+            "Entraste con tu clave de recuperación y la verificación en dos pasos quedó "
+            "desactivada. Crea una clave nueva y vuelve a activarla."
+        ),
+        "two_step_expired": "El paso del código caducó. Entra otra vez con tu contraseña.",
         "reset_title": "Pon una contraseña nueva",
         "reset_lead": "Este enlace funciona una sola vez y caduca en 24 horas.",
         "reset_button": "Guardar contraseña",
@@ -539,6 +593,8 @@ COPY: dict[str, dict[str, str]] = {
             "to know which link works; it goes with the account.|"
             "If you make a recovery key, only its fingerprint (a hash) and the date, never the "
             "key; it goes when used or with the account.|"
+            "If you turn on two-step sign-in, the secret your authenticator app shares and the "
+            "last code used; it goes when you turn it off or with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -660,6 +716,51 @@ COPY: dict[str, dict[str, str]] = {
             "do not share it."
         ),
         "recovery_done": "I saved it, back to My account",
+        "two_step_card": "Two-step sign-in",
+        "two_step_is_off": (
+            "Off. Turn it on so that, besides your password, signing in asks for a 6-digit "
+            "code from an authenticator app (Google Authenticator, Microsoft Authenticator, "
+            "1Password or another)."
+        ),
+        "two_step_is_on": "On since {date}. To turn it off, type a current code from your app.",
+        "two_step_needs_key": (
+            "First make your recovery key: it is your way back in if you lose your phone."
+        ),
+        "two_step_turn_on": "Turn on two-step sign-in",
+        "two_step_turn_off": "Turn off",
+        "two_step_code": "6-digit code",
+        "two_step_code_help": "Your authenticator app shows it; it changes every 30 seconds.",
+        "two_step_setup_title": "Turn on two-step sign-in",
+        "two_step_setup_lead": (
+            "Connect your authenticator app and confirm with a code. Nothing changes until then."
+        ),
+        "two_step_setup_how": (
+            "Open your authenticator app and choose to add an account.|"
+            "Scan the QR code or type the key below.|"
+            "Type the 6-digit code it shows to confirm."
+        ),
+        "two_step_secret": "Can't scan? Type this key in the app:",
+        "two_step_confirm": "Confirm and turn on",
+        "two_step_cancel": "Cancel and go back to My account",
+        "two_step_title": "Type the code from your app",
+        "two_step_lead": "Your password is right. One step left: the 6-digit code from your app.",
+        "two_step_lost": "Lost your phone?",
+        "two_step_lost_help": (
+            "Sign in with your recovery key. It works once and turns two-step sign-in off; then "
+            "make a new key and turn it on again."
+        ),
+        "two_step_lost_button": "Sign in with my recovery key",
+        "code_bad": (
+            "The code is not valid or was already used. Wait for the next code in your app and "
+            "check that your phone's time is set automatically."
+        ),
+        "two_step_on": "Two-step sign-in is on. Signing in now asks for the code.",
+        "two_step_off": "Two-step sign-in is off.",
+        "two_step_off_by_key": (
+            "You signed in with your recovery key and two-step sign-in was turned off. Make a "
+            "new key and turn it on again."
+        ),
+        "two_step_expired": "The code step expired. Sign in again with your password.",
         "reset_title": "Set a new password",
         "reset_lead": "This link works once and expires in 24 hours.",
         "reset_button": "Save password",
@@ -756,6 +857,9 @@ margin:18px 0 28px}
 .acct-gift b{font-size:1.3rem;line-height:1.5}
 .acct-nudge{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;
 padding:12px 16px;border:1px solid var(--border);border-radius:14px}
+.acct-qr{display:flex;justify-content:center;margin:12px 0}
+.acct-qr svg{max-width:100%;height:auto;border-radius:10px}
+.acct-lost{margin-top:18px}.acct-lost summary{cursor:pointer}
 .acct-key code{display:block;font-size:1.35rem;letter-spacing:.06em;padding:18px;
 border:1px dashed var(--border);border-radius:14px;text-align:center;
 overflow-wrap:anywhere;user-select:all}
@@ -1372,6 +1476,7 @@ def account_page(
     strategies: Sequence[StrategyRecord] = (),
     invite: InviteView | None = None,
     recovery_created: str = "",
+    two_step_since: str = "",
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
@@ -1482,6 +1587,33 @@ def account_page(
         else f"<p class='acct-nudge'>{icon('shield')}<span>{_e(copy['recovery_nudge'])}</span> "
         f"<a href='#recuperacion'>{_e(copy['recovery_make'])}</a></p>"
     )
+    if two_step_since:
+        two_step_card = (
+            f"<form class='acct-card' id='dos-pasos' method='post' "
+            f"action='{path('account', locale)}/dos-pasos/desactivar'>"
+            f"<h3>{_e(copy['two_step_card'])}</h3>"
+            f"<p class='muted'>{_e(copy['two_step_is_on'].format(date=_date(two_step_since)))}</p>"
+            + _hidden("csrf", csrf)
+            + _field(copy["two_step_code"], _code_input())
+            + f"<button class='btn btn-ghost' type='submit'>{_e(copy['two_step_turn_off'])}"
+            "</button></form>"
+        )
+    else:
+        two_step_card = (
+            f"<form class='acct-card' id='dos-pasos' method='post' "
+            f"action='{path('account', locale)}/dos-pasos'>"
+            f"<h3>{_e(copy['two_step_card'])}</h3>"
+            f"<p class='muted'>{_e(copy['two_step_is_off'])}</p>"
+            + ("" if recovery_created else f"<p class='muted'>{_e(copy['two_step_needs_key'])}</p>")
+            + _hidden("csrf", csrf)
+            + _field(
+                copy["password_current"],
+                "<input type='password' name='current' required maxlength='256' "
+                "autocomplete='current-password'>",
+            )
+            + f"<button class='btn btn-dark' type='submit'>{_e(copy['two_step_turn_on'])}"
+            "</button></form>"
+        )
     security = (
         f"<section class='acct-sec'><h2>{_e(copy['security_title'])}</h2>"
         "<div class='acct-grid'>"
@@ -1526,7 +1658,10 @@ def account_page(
         )
         + f"<button class='btn btn-dark' type='submit'>"
         f"{_e(copy['recovery_new' if recovery_created else 'recovery_make'])}</button></form>"
-        "</div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
+        + two_step_card
+        + "</div>"
+        + _stores(copy, retention_days)
+        + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
         f"<a class='btn btn-ghost' href='{path('account', locale)}/datos' download>"
         f"{icon('file')} {_e(copy['export_button'])}</a></div>"
@@ -1637,6 +1772,93 @@ __all__ = [
 
 
 # -- "Mis estrategias" -------------------------------------------------------------
+def two_step_path(locale: str) -> str:
+    """Where a two-step account types its app's code after the password."""
+    return path("signin", locale) + ("/code" if _locale(locale) == "en" else "/codigo")
+
+
+def _code_input() -> str:
+    return (
+        "<input type='text' name='code' inputmode='numeric' pattern='[0-9 ]{6,8}' "
+        "maxlength='8' autocomplete='one-time-code' spellcheck='false' required>"
+    )
+
+
+def two_step_page(*, locale: str, csrf: str, next_path: str = "", error: str = "") -> str:
+    """After a correct password: the code from the app, or the recovery key."""
+    locale = _locale(locale)
+    copy = COPY[locale]
+    action = two_step_path(locale)
+    body = (
+        "<div class='wrap-narrow'>"
+        + _alert(copy, error)
+        + f"<form method='post' action='{action}'>"
+        + _hidden("csrf", csrf)
+        + _hidden("next", next_path)
+        + _field(copy["two_step_code"], _code_input(), copy["two_step_code_help"])
+        + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signin_button'])}"
+        "</button></form>"
+        f"<details class='acct-lost'><summary>{_e(copy['two_step_lost'])}</summary>"
+        f"<p class='muted'>{_e(copy['two_step_lost_help'])}</p>"
+        f"<form method='post' action='{action}' autocomplete='off'>"
+        + _hidden("csrf", csrf)
+        + _hidden("next", next_path)
+        + _field(
+            copy["recovery_key"],
+            "<input type='text' name='key' required maxlength='40' autocomplete='off' "
+            "spellcheck='false' autocapitalize='characters' "
+            "placeholder='XXXXX-XXXXX-XXXXX-XXXXX'>",
+        )
+        + f"<button class='btn btn-dark' type='submit'>{_e(copy['two_step_lost_button'])}"
+        "</button></form></details>"
+        + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
+        "</p></div>"
+    )
+    query = f"?next={_e(_q(next_path))}" if next_path else ""
+    return _shell(
+        locale,
+        copy["two_step_title"],
+        copy["two_step_lead"],
+        body,
+        switch={lang: two_step_path(lang) + query for lang in LANGUAGES},
+    )
+
+
+def two_step_setup_page(
+    *, locale: str, csrf: str, secret: str, qr_svg: str, error: str = ""
+) -> str:
+    """Turning two-step on: scan the QR code (or type the secret), then confirm a code.
+
+    ``qr_svg`` is markup made here from the secret, never from user input.
+    """
+    locale = _locale(locale)
+    copy = COPY[locale]
+    grouped = " ".join(secret[i : i + 4] for i in range(0, len(secret), 4))
+    steps = "".join(f"<li>{_e(step)}</li>" for step in copy["two_step_setup_how"].split("|"))
+    body = (
+        "<div class='wrap-narrow'>"
+        + _alert(copy, error)
+        + f"<ol class='buy-steps'>{steps}</ol>"
+        + f"<div class='acct-qr'>{qr_svg}</div>"
+        + f"<p class='muted'>{_e(copy['two_step_secret'])}</p>"
+        + f"<p class='acct-key'><code>{_e(grouped)}</code></p>"
+        + f"<form method='post' action='{path('account', locale)}/dos-pasos/confirmar'>"
+        + _hidden("csrf", csrf)
+        + _field(copy["two_step_code"], _code_input(), copy["two_step_code_help"])
+        + f"<button class='btn btn-primary btn-lg' type='submit'>"
+        f"{_e(copy['two_step_confirm'])}</button></form>"
+        + f"<p class='acct-alt'><a href='{path('account', locale)}'>{_e(copy['two_step_cancel'])}"
+        "</a></p></div>"
+    )
+    return _shell(
+        locale,
+        copy["two_step_setup_title"],
+        copy["two_step_setup_lead"],
+        body,
+        switch={lang: path("account", lang) for lang in LANGUAGES},
+    )
+
+
 def strategies_path(locale: str) -> str:
     return path("account", locale) + ("/strategies" if _locale(locale) == "en" else "/estrategias")
 

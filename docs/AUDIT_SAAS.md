@@ -2059,6 +2059,25 @@ changes what a report says.
   the data export; the row goes with the account. The account forms that ask
   for the current password (recovery key, password change, deletion) share
   `accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR` per network and per account.
+- **Two-step sign-in** (`two_step` and `two_step_challenges` tables,
+  `/cuenta/dos-pasos`, `/entrar/codigo`, EN `/login/code`): optional, with an
+  authenticator app (TOTP, RFC 6238: HMAC-SHA1, 6 digits, 30 s, one step of
+  drift, `accounts.totp_match`). Turning it on asks for the password and needs
+  a recovery key first; the page shows the 160-bit secret once, as a QR code
+  drawn in the page (`segno`, inline SVG, nothing loaded from outside) and as
+  text, and nothing changes until a first code confirms it (which also signs
+  out the account's other browsers). After a correct
+  password, a two-step account gets a 5-minute challenge cookie
+  (`rigor_2step`, only its hash stored) instead of a session; the code page
+  accepts a code only if its step is newer than the last one used (an
+  update that names the step, so a code never works twice, even at once).
+  Code tries count toward `accounts.MAX_TOTP_TRIES_PER_HOUR` (10) per network
+  and per account. A lost phone: the recovery key on the code page (or on
+  `/olvide`) signs in once and turns two-step off. Turning it off in Mi
+  cuenta asks for a current code. The owner can turn it off with
+  `quant-trade audit account-two-step-off EMAIL --yes` after checking the
+  request. The secret is stored as is (a code check needs it); the export
+  shows only when it was turned on.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

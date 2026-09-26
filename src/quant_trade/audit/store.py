@@ -480,6 +480,26 @@ class Store:
             sa.Column("key_sha256", sa.String(64), nullable=False),
             sa.Column("created_at", sa.String(40), nullable=False),
         )
+        # Two-step sign-in (TOTP): the secret an authenticator app shares,
+        # pending until a first code confirms it (``enabled_at`` empty), and
+        # the last step used so a code never works twice.
+        self.two_step = sa.Table(
+            "two_step",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("secret", sa.String(64), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("enabled_at", sa.String(40), nullable=False, default=""),
+            sa.Column("last_step", sa.BigInteger, nullable=False, default=0),
+        )
+        # A correct password on a two-step account waits here for its code.
+        self.two_step_challenges = sa.Table(
+            "two_step_challenges",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("expires_at", sa.String(40), nullable=False),
+        )
         self.referrals = sa.Table(
             "referrals",
             self.metadata,
@@ -1245,6 +1265,8 @@ class Store:
                 self.strategy_reports,
                 self.account_refs,
                 self.recovery_keys,
+                self.two_step,
+                self.two_step_challenges,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1307,6 +1329,107 @@ class Store:
                 .where(table.c.account_id == account_id)
                 .where(table.c.key_sha256 == key_sha256)
             )
+        return bool(result.rowcount)
+
+    # -- two-step sign-in ------------------------------------------------
+    def two_step_state(self, account_id: str) -> tuple[str, str, int] | None:
+        """``(secret, enabled_at, last_step)``; ``enabled_at`` is empty while pending."""
+        sa = self._sa
+        t = self.two_step
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(t.c.secret, t.c.enabled_at, t.c.last_step).where(
+                    t.c.account_id == account_id
+                )
+            ).first()
+        return (str(row[0]), str(row[1] or ""), int(row[2] or 0)) if row is not None else None
+
+    def two_step_on(self, account_id: str) -> str:
+        """When two-step sign-in was turned on, or ``""`` when it is off."""
+        state = self.two_step_state(account_id)
+        return state[1] if state is not None else ""
+
+    def start_two_step(self, account_id: str, secret: str, *, at: datetime) -> bool:
+        """Keep a new pending secret; refused while two-step is already on."""
+        t = self.two_step
+        with self.engine.begin() as conn:
+            conn.execute(t.delete().where((t.c.account_id == account_id) & (t.c.enabled_at == "")))
+            try:
+                with conn.begin_nested():
+                    conn.execute(
+                        t.insert().values(
+                            account_id=account_id,
+                            secret=secret,
+                            created_at=_iso(at),
+                            enabled_at="",
+                            last_step=0,
+                        )
+                    )
+            except self._sa.exc.IntegrityError:
+                return False  # already on
+        return True
+
+    def use_two_step_step(
+        self, account_id: str, step: int, *, enable_at: datetime | None = None
+    ) -> bool:
+        """Record ``step`` as used if it is newer than the last one (one winner).
+
+        With ``enable_at`` it also turns a pending secret on; without it the
+        secret must already be on.
+        """
+        t = self.two_step
+        query = t.update().where(t.c.account_id == account_id).where(t.c.last_step < step)
+        if enable_at is not None:
+            query = query.where(t.c.enabled_at == "").values(
+                last_step=step, enabled_at=_iso(enable_at)
+            )
+        else:
+            query = query.where(t.c.enabled_at != "").values(last_step=step)
+        with self.engine.begin() as conn:
+            result = conn.execute(query)
+        return bool(result.rowcount)
+
+    def stop_two_step(self, account_id: str) -> bool:
+        t = self.two_step
+        with self.engine.begin() as conn:
+            result = conn.execute(t.delete().where(t.c.account_id == account_id))
+            conn.execute(
+                self.two_step_challenges.delete().where(
+                    self.two_step_challenges.c.account_id == account_id
+                )
+            )
+        return bool(result.rowcount)
+
+    def create_two_step_challenge(
+        self, account_id: str, token_sha256: str, *, at: datetime, minutes: int
+    ) -> None:
+        c = self.two_step_challenges
+        with self.engine.begin() as conn:
+            conn.execute(c.delete().where(c.c.expires_at <= _iso(at)))
+            conn.execute(
+                c.insert().values(
+                    token_sha256=token_sha256,
+                    account_id=account_id,
+                    expires_at=_iso(at + timedelta(minutes=minutes)),
+                )
+            )
+
+    def two_step_challenge(self, token_sha256: str, now: datetime) -> str | None:
+        """The account a still-valid challenge belongs to."""
+        sa = self._sa
+        c = self.two_step_challenges
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(c.c.account_id)
+                .where(c.c.token_sha256 == token_sha256)
+                .where(c.c.expires_at > _iso(now))
+            ).first()
+        return str(row[0]) if row is not None else None
+
+    def end_two_step_challenge(self, token_sha256: str) -> bool:
+        c = self.two_step_challenges
+        with self.engine.begin() as conn:
+            result = conn.execute(c.delete().where(c.c.token_sha256 == token_sha256))
         return bool(result.rowcount)
 
     # -- account sessions ------------------------------------------------
@@ -2281,6 +2404,8 @@ class Store:
             "arrived_through_link_tag": self.account_ref(account_id),
             # Only when it was made: the key's hash never leaves the database.
             "recovery_key_created_at": self.recovery_key_created(account_id),
+            # When two-step sign-in was turned on; never its secret.
+            "two_step_on_since": self.two_step_on(account_id) or None,
         }
 
     def account_credits(self, account_id: str, now: datetime) -> int:

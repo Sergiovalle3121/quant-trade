@@ -433,6 +433,33 @@ def account_reset(
     typer.echo(f"{base}{path('reset', account.locale)}?token={secret}")
 
 
+@audit_app.command("account-two-step-off")
+def account_two_step_off(
+    email: Annotated[str, typer.Argument(help="The account's e-mail")],
+    yes: Annotated[bool, typer.Option("--yes", help="Really turn it off")] = False,
+) -> None:
+    """Turn off two-step sign-in for a customer who lost the phone and the recovery key.
+
+    Do it only after checking the request comes from the account's e-mail;
+    the password is still needed to sign in.
+    """
+    from quant_trade.audit.accounts import normalise_email
+
+    store = _store()
+    account = store.find_account(normalise_email(email))
+    if account is None:
+        typer.echo("no account with that e-mail", err=True)
+        raise typer.Exit(code=1)
+    if not store.two_step_on(account.id):
+        typer.echo("two-step sign-in is already off")
+        return
+    if not yes:
+        typer.echo("would turn off two-step sign-in; pass --yes")
+        return
+    store.stop_two_step(account.id)
+    typer.echo("two-step sign-in turned off")
+
+
 def _store() -> Any:
     try:
         from quant_trade.audit.settings import AuditSettings
