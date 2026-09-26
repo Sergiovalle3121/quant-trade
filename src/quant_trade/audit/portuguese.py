@@ -1,8 +1,8 @@
 """Portuguese (Brazil and Portugal) words for the public pages.
 
 The landing, its prices and its questions exist in Portuguese at ``/pt``.
-Pages that are not translated yet (the report, the PDF, the account screens,
-the sample, the terms) open in English from a Portuguese page, so a visitor
+Pages that are not translated yet (the terms, the privacy policy, the
+public verification page) open in English from a Portuguese page, so a visitor
 never meets a broken or half-Spanish page. The copy keeps the same honest
 limits as the Spanish and English versions and passes the profit-claim
 guard, which reads Portuguese too.
@@ -693,7 +693,6 @@ MONTHS_PT: tuple[str, ...] = (
     "nov",
     "dez",
 )
-METHOD_LINK_PT = "Metodologia (em inglês)"
 
 #: The service's own messages (``web.MESSAGES``) in Portuguese: the refusals
 #: an upload from ``/pt`` and the errors of a Portuguese page show.
@@ -774,7 +773,6 @@ __all__ = [
     "FALLBACK",
     "INVESTOR_PT",
     "LANGUAGE_NAMES",
-    "METHOD_LINK_PT",
     "MONTHS_PT",
     "STATUS_TEXT_PT",
     "TRUST_PT",
