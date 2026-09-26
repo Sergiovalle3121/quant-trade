@@ -77,10 +77,13 @@ hidden default). Limits: 5 MB and 200,000 rows per file, 50,000 trades, 500 vari
 at least 30 return observations. Platform reports and the MT5 optimisation export
 may be 10 MB (about 11,000 optimisation passes at some 900 bytes each).
 A web page may hold at most 100,000 table rows (`MAX_HTML_ROWS`, two per
-trade at the trade limit); the rows are counted before the page is parsed,
+trade at the trade limit) and 1,500,000 table cells (`MAX_HTML_CELLS`; a
+MetaTrader report at the size limit holds about a million); both are counted
+before the page is parsed,
 so a longer page is refused at once (`too_many_rows`, in ES, EN and PT). A
-list with one trade per row counts the rows that have both times, a quantity
-and both prices before reading any date, and refuses with `too_many_trades`
+list with one trade per row counts the rows that have both times, a quantity,
+both prices above zero and, when the file has them, a readable side and
+result, before reading any date, and refuses with `too_many_trades`
 when they pass 50,000; a 60,000-trade web table is now refused in about 6 s
 instead of 9 s, most of it reading the page itself.
 A larger optimisation export is refused with what to do instead: optimise

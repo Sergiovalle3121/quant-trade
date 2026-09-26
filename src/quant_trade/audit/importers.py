@@ -137,6 +137,9 @@ MAX_XLSX_CELLS = 5_000_000
 #: page is parsed, so a longer page is refused at once instead of after
 #: seconds of parsing.
 MAX_HTML_ROWS = 2 * MAX_TRADES
+#: And at most this many table cells: a MetaTrader report at the size limit
+#: holds about a million (75,000 rows of 13 cells).
+MAX_HTML_CELLS = 1_500_000
 
 #: Report metadata the balance curve writes when a trade closed on the little
 #: a withdrawal left was measured on the balance before it: how many days, and
@@ -694,7 +697,16 @@ class _TableReader(HTMLParser):
 
 
 def _read_html(text: str) -> _TableReader:
-    if text.lower().count("<tr") > MAX_HTML_ROWS:
+    lowered = text.lower()
+    if lowered.count("<td") + lowered.count("<th") > MAX_HTML_CELLS:
+        raise ReportFormatError(
+            "too_many_rows",
+            f"the page has more than {MAX_HTML_CELLS:,} table cells; export a shorter period "
+            "and upload that file",
+            f"la página tiene más de {MAX_HTML_CELLS:,} celdas de tabla; exporta un periodo "
+            "más corto y sube ese archivo",
+        )
+    if lowered.count("<tr") > MAX_HTML_ROWS:
         raise ReportFormatError(
             "too_many_rows",
             f"the page has more than {MAX_HTML_ROWS:,} table rows; export a shorter period "

@@ -1524,17 +1524,28 @@ def _trades(
     columns = mapping.columns
     if len(rows) > imp.MAX_TRADES:
         # One trade per row: count the rows that carry both times, a
-        # quantity and both prices before reading any date, so a list past
-        # the limit is refused without reading the rest of it.
-        closed = sum(
-            1
-            for row in rows
-            if _cell(row, columns, "entry_time").strip()
-            and _cell(row, columns, "exit_time").strip()
-            and _amount(_cell(row, columns, "quantity"), decimal)
-            and _amount(_cell(row, columns, "entry_price"), decimal) is not None
-            and _amount(_cell(row, columns, "exit_price"), decimal) is not None
-        )
+        # quantity, both prices above zero and, when the file has them, a
+        # side and a result, before reading any date, so a list past the
+        # limit is refused without reading the rest of it.
+        def complete(row: list[str]) -> bool:
+            entry_price = _amount(_cell(row, columns, "entry_price"), decimal)
+            exit_price = _amount(_cell(row, columns, "exit_price"), decimal)
+            return bool(
+                _cell(row, columns, "entry_time").strip()
+                and _cell(row, columns, "exit_time").strip()
+                and _amount(_cell(row, columns, "quantity"), decimal)
+                and entry_price is not None
+                and entry_price > 0
+                and exit_price is not None
+                and exit_price > 0
+                and ("side" not in columns or _side(_cell(row, columns, "side")) is not None)
+                and (
+                    "profit" not in columns
+                    or _amount(_cell(row, columns, "profit"), decimal) is not None
+                )
+            )
+
+        closed = sum(1 for row in rows if complete(row))
         if closed > imp.MAX_TRADES:
             raise imp._too_many_trades(closed)
     entry_times = _times(

@@ -73,3 +73,28 @@ def test_rows_without_a_quantity_do_not_count_toward_the_limit(
     data = "\n".join([HEADER, *rows]).encode()
     report = import_report(data, "trades.csv", initial_balance=10_000)
     assert len(report.trades.trades) == 5
+
+
+def test_a_page_with_more_cells_than_the_limit_is_refused_before_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(importers, "MAX_HTML_CELLS", 5)
+    page = "<html><table><tr>" + "<td>1</td>" * 6 + "</tr></table></html>"
+    with pytest.raises(ReportFormatError) as refused:
+        import_report(page.encode(), "trades.html", initial_balance=10_000)
+    assert refused.value.code == "too_many_rows"
+    assert "more than 5 table cells" in str(refused.value)
+    assert "más de 5 celdas" in refused.value.message_es
+    assert "mais de 5 células" in refused.value.localized("pt")
+
+
+def test_rows_the_reader_drops_do_not_count_toward_the_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(importers, "MAX_TRADES", 5)
+    unknown_side = "2026-08-10 10:00,2026-08-10 10:00,ES,Hold,1,2,1,1"
+    no_result = "2026-08-11 10:00,2026-08-11 10:00,ES,Buy,1,2,1,n/a"
+    rows = [_row(day) for day in range(1, 6)] + [unknown_side, no_result]
+    data = "\n".join([HEADER, *rows]).encode()
+    report = import_report(data, "trades.csv", initial_balance=10_000)
+    assert len(report.trades.trades) == 5
