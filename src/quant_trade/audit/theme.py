@@ -796,6 +796,9 @@ animation:spin .9s linear infinite}
 color:#a3a3aa;padding:8px 12px;border-radius:999px}
 .lang-switch:hover,.nav-end>.nav-account:hover{color:#fff}
 @media (max-width:520px){.nav-end>.nav-account{display:none}}
+@media (max-width:400px){.nav-end>.lang-switch{padding:8px 6px}.nav-in>.logo{flex:none}
+.nav-end>.lang-switch[data-short]{font-size:0}
+.nav-end>.lang-switch[data-short]::before{content:attr(data-short);font-size:.8rem}}
 .report-hero h1{font-weight:640;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.05em;
 line-height:1;margin:16px 0 18px}
 .meta-line{display:flex;flex-wrap:wrap;gap:8px;margin:0}
@@ -1047,7 +1050,10 @@ background:radial-gradient(90% 120% at 50% -20%,rgba(255,255,255,.12),transparen
 line-height:1.2;margin:0 0 28px;color:#fff}
 .lockbox ul{list-style:none;padding:0;margin:0 0 28px;display:grid;
 grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px}
-@media (max-width:620px){.lockbox ul{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:620px){.lockbox ul{grid-template-columns:minmax(0,1fr)}
+/* On a phone the price and the buy button come right after the heading, before the list. */
+.lockbox{display:flex;flex-direction:column}.lockbox>p:first-child{order:-2}
+.lockbox>.paybox:not(.redeem){order:-1;margin:0 0 28px}}
 .lockbox .lock-sample{margin:-12px 0 24px;font-size:.93rem}
 .lockbox .lock-sample a{color:var(--text);text-underline-offset:3px}
 .lockbox li{display:flex;gap:10px;align-items:flex-start;color:#c8c8ce;font-size:.93rem;line-height:1.5}
