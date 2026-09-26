@@ -67,6 +67,7 @@ def test_a_strategy_that_loses_when_fear_rises_is_split_that_way() -> None:
     assert calm["monthly_return"]["value"] > 0 > turbulent["monthly_return"]["value"]
     assert calm["sharpe"]["value"] > 0 > turbulent["sharpe"]["value"]
     assert out["gap_in_se"]["value"] > CLEAR_GAP
+    assert out["better"] == "calm"
 
 
 def test_the_regime_is_the_one_known_before_the_return_started() -> None:
@@ -110,6 +111,28 @@ def test_equal_regimes_rarely_read_as_different() -> None:
         out = by_vix(_curve(days, returns), vix, 252.0)
         hits += abs(out["gap_in_se"]["value"]) >= CLEAR_GAP
     assert hits / 200 < 0.1
+
+
+def test_a_gap_the_monthly_figures_contradict_names_no_side() -> None:
+    """Higher arithmetic mean in a jumpy turbulent regime, lower compounded month:
+    the test's sign and the table disagree, so no side is said to do better."""
+    days = pd.bdate_range("2012-01-02", periods=3000)
+    levels = _blocks(len(days))
+    known = np.r_[15.0, 15.0, levels[:-2]]
+    rng = np.random.default_rng(11)
+    shocks = rng.standard_normal(len(days))
+    turbulent = known >= TURBULENT_AT
+    # Calm: +0.05 % a day, 1 % spread. Turbulent: +0.12 % a day, 6 % spread,
+    # whose drag (about 0.18 % a day) makes its compounded month the lower one.
+    returns = np.where(turbulent, 0.0012 + 0.06 * shocks, 0.0005 + 0.01 * shocks)
+    returns[0] = 0.0
+    for side, mean in ((turbulent, 0.0012), (~turbulent, 0.0005)):
+        part = returns[1:][side[1:]]
+        returns[1:][side[1:]] = part - part.mean() + mean
+    out = by_vix(_curve(days, returns), _vix(days, levels), 252.0)
+    assert out["gap_in_se"]["value"] < 0  # arithmetic: turbulent ahead
+    assert out["turbulent"]["monthly_return"]["value"] < out["calm"]["monthly_return"]["value"]
+    assert "better" not in out
 
 
 def test_too_few_turbulent_returns_uncovered_or_short_histories_are_not_measured() -> None:

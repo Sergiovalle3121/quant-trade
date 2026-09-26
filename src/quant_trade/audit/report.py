@@ -37,7 +37,6 @@ from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
-from quant_trade.audit.regime import CLEAR_GAP as REGIME_CLEAR_GAP
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
@@ -5090,10 +5089,12 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
     gap = regime.get("gap_in_se")
     if gap is not None:
         z = float(gap["value"])
-        if abs(z) >= REGIME_CLEAR_GAP:
-            name = "regime_better_calm" if z > 0 else "regime_better_turbulent"
-        else:
-            name = "regime_no_clear_gap"
+        better = regime.get("better")
+        name = (
+            f"regime_better_{better}"
+            if better in ("calm", "turbulent")
+            else "regime_no_clear_gap"
+        )
         out += f"<p>{_e(labels[name].format(z=f'{abs(z):.2f}'))} {_badge('MEASURED')}</p>"
     link = f"<a href='{_e(str(regime.get('source_url', '')))}' rel='noopener'>FRED</a>"
     source = _e(labels["regime_source"].format(source="\x00"))

@@ -15,7 +15,9 @@ before the return happened. For each regime the report gives the share of the
 time, the number of returns, the return per month compounded over that
 regime's days only, and the Sharpe ratio annualised like the headline one.
 The two mean returns are compared in Welch standard errors; a gap under
-``CLEAR_GAP`` reads as "no clear difference", never as a finding. The VIX is a
+``CLEAR_GAP``, or one whose sign disagrees with the order of the two monthly
+figures (volatility drag in a jumpy regime), reads as "no clear difference",
+never as a finding. The VIX is a
 US equity measure: for other markets it is a general gauge of fear, and the
 note says so. Nothing here changes the class.
 """
@@ -135,7 +137,14 @@ def by_vix(frame: pd.DataFrame, vix: pd.Series, ppy: float) -> dict[str, Any]:
     a, b = returns[calm], returns[turbulent]
     se = math.sqrt(float(a.var(ddof=1)) / len(a) + float(b.var(ddof=1)) / len(b))
     if math.isfinite(se) and se > FLAT_SPREAD:
-        out["gap_in_se"] = measured(float((a.mean() - b.mean()) / se), NOTE)
+        gap = float((a.mean() - b.mean()) / se)
+        out["gap_in_se"] = measured(gap, NOTE)
+        # The test is on arithmetic means and the table on compounded months; in a
+        # volatile regime the two can disagree in sign, and then neither side "did
+        # better" in a way the reader can see.
+        order = out["calm"]["monthly_return"]["value"] - out["turbulent"]["monthly_return"]["value"]
+        if abs(gap) >= CLEAR_GAP and gap * order > 0:
+            out["better"] = "calm" if gap > 0 else "turbulent"
     return out
 
 

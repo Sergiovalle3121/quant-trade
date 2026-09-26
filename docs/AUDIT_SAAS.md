@@ -1227,8 +1227,10 @@ more on about a third of the days). For each regime it shows the share of
 the time, the returns counted, the return per month compounded over that
 regime's days only (`exp(Σ log(1+r) · 30.44 / days) - 1`) and the Sharpe
 ratio annualised like the headline one ("—" for a flat side). The two mean
-returns are compared in Welch standard errors: at 2 or more (`CLEAR_GAP`)
-the report says in which regime it did better, otherwise that the gap is not
+returns are compared in Welch standard errors: at 2 or more (`CLEAR_GAP`),
+and only when that gap has the same sign as the difference of the two
+monthly figures (volatility drag can flip them in a jumpy regime), the
+report says in which regime it did better, otherwise that the gap is not
 enough to say it behaves differently. It needs 90 days of history
 (`MIN_SPAN_DAYS`), 20 returns in each regime (`MIN_RETURNS`) and VIX closes
 covering the whole history; otherwise it is NOT_MEASURED with the reason in
