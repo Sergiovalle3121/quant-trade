@@ -1279,7 +1279,7 @@ STATS = """
 .facts.ranges .fact b{font-size:1.55rem;font-size:clamp(1.3rem,2vw,1.7rem);letter-spacing:-.03em;white-space:nowrap}
 .read-line{border-left:3px solid var(--text);padding:2px 0 2px 14px;margin:14px 0;font-weight:500;color:var(--text)}
 table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
-.kpis+p{margin-top:14px}
+.kpis+p,.facts+p.muted{margin-top:14px}
 @media screen and (max-width:620px){.facts.pairs{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .facts.pairs .fact{padding:16px 16px 14px;border-radius:16px}
 .facts.pairs .fact b{font-size:1.5rem;overflow-wrap:anywhere}
