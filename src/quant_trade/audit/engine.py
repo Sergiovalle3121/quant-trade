@@ -22,7 +22,7 @@ import math
 import re
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from statistics import NormalDist
 from typing import Any
@@ -91,6 +91,9 @@ from quant_trade.research.splits import date_based_split
 
 ENGINE_NAME = "quant_trade.audit"
 NET_OF_FEES_NOTE = "the fund's own returns after its fees; costs were not measured"
+#: The benchmark dimension reads the index rows or column the file itself
+#: carries when no benchmark file was uploaded.
+FILE_BENCHMARK_NOTE = "the index the file itself carries"
 NET_OF_FEES_IGNORED = (
     "the net-of-fees declaration applies only to a monthly fund track record; "
     "costs are checked as usual"
@@ -835,10 +838,29 @@ def fund_record(inputs: AuditInputs) -> bool:
     )
 
 
+def _file_benchmark(equity: IngestedSeries) -> IngestedSeries | None:
+    """The index the file carries (a column beside the returns, or a
+    factsheet's benchmark rows) as a curve on the strategy's own timestamps,
+    or None when it does not give a return for every point after the first
+    (the first is the base both curves start from)."""
+    rows = equity.benchmark
+    if rows is None or rows.empty:
+        return None
+    by_stamp = rows.drop_duplicates("timestamp", keep="last").set_index("timestamp")["ret"]
+    frame = equity.frame[["timestamp"]].copy()
+    ret = frame["timestamp"].map(by_stamp).astype(float).to_numpy().copy()
+    if len(ret) < 3 or not bool(np.isfinite(ret[1:]).all()) or bool((ret[1:] <= -1.0).any()):
+        return None
+    ret[0] = ret[0] if np.isfinite(ret[0]) and ret[0] > -1.0 else 0.0
+    frame["equity"] = 100.0 * np.cumprod(1.0 + ret)
+    frame["ret"] = frame["equity"].pct_change()
+    return replace(equity, frame=frame, source="equity", benchmark=None, warnings=[])
+
+
 def _fund_benchmark(inputs: AuditInputs) -> tuple[pd.Series | None, str]:
     """The benchmark the fund section compares with: an uploaded benchmark
     file first (the customer chose it), else the one the fund's file carries.
-    Only the fund section reads it; the benchmark dimension reads the upload."""
+    The benchmark dimension reads the same index through :func:`_file_benchmark`."""
     if inputs.benchmark is not None:
         return fund_lib.monthly_returns(inputs.benchmark.frame), "upload"
     if inputs.equity.benchmark is not None:
@@ -1329,14 +1351,24 @@ def run_audit(
     subperiods = _subperiods(frame)
     rolling = _rolling(frame, ppy)
     holdout, oos_sharpe, gap, holdout_reason = _holdout(frame, inputs.declared.oos_start, ppy)
+    if holdout_reason == "no out-of-sample start declared" and fund_record(inputs):
+        # A fund's record has no optimisation to end; what it lacks is the date
+        # since when the manager's process has not changed.
+        holdout_reason = verdict.FUND_OOS_REASON
+        holdout = {**holdout, "reason": holdout_reason}
     bill_rates = _bill_rates(market)
+    file_benchmark = _file_benchmark(inputs.equity) if inputs.benchmark is None else None
     benchmark, benchmark_values, benchmark_reason = _benchmark(
         inputs.equity,
-        inputs.benchmark,
+        inputs.benchmark if inputs.benchmark is not None else file_benchmark,
         bill_rates,
         _local_cash_rates(inputs, market),
         _other_currency(inputs),
     )
+    if file_benchmark is not None and benchmark.get("status") == "MEASURED":
+        benchmark["source"] = "file"
+        share = benchmark["overlap_share"]["value"]
+        benchmark["overlap_share"] = measured(share, FILE_BENCHMARK_NOTE)
     cscv, pbo = _cscv(inputs.variants)
     costs, rows, reference, assumed, gross = _costs(inputs)
     measured_trials = trials_used if trials_evidence == MEASURED else 0
@@ -1349,6 +1381,7 @@ def run_audit(
         variants_columns=measured_trials,
         real_fills=_real_fills(inputs),
         net_of_fees=net_of_fees(inputs),
+        fund_record=fund_record(inputs),
     )
     if inputs.trades is not None:
         flags.extend(
@@ -1549,6 +1582,8 @@ def run_audit(
         trials_evidence=trials_evidence,
         thresholds=thresholds,
         account=_real_fills(inputs),
+        fund=fund_record(inputs),
+        own_index=benchmark.get("source") == "file",
     )
     mintrl = significance.get("min_track_record_length", {})
     mintrl_value = mintrl.get("value") if mintrl.get("evidence") == MEASURED else None

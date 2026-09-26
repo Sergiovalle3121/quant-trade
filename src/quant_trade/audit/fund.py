@@ -198,6 +198,9 @@ def _capture(fund: np.ndarray, index: np.ndarray) -> float | None:
     return float(np.prod(1.0 + fund) ** (1.0 / k) - 1.0) / index_mean
 
 
+FULL_LOSS_MONTH = "a month in the fund or its benchmark loses 100% or more"
+
+
 def compare_with_benchmark(
     fund: pd.Series, index: pd.Series, source: str, rates: pd.Series | None = None
 ) -> dict[str, Any]:
@@ -216,6 +219,10 @@ def compare_with_benchmark(
     n = len(f)
     if not float(b.std(ddof=1)) > 0:
         return {"status": "NOT_MEASURED", "reason": "the benchmark's monthly returns do not vary"}
+    if bool((b <= -1.0).any() or (f <= -1.0).any()):
+        # A month that loses everything leaves nothing to compound from, and a
+        # typo in a factsheet is the likelier cause than an index at zero.
+        return {"status": "NOT_MEASURED", "reason": FULL_LOSS_MONTH}
     active = f - b
     fund_cagr = float(np.prod(1.0 + f) ** (12.0 / n) - 1.0)
     index_cagr = float(np.prod(1.0 + b) ** (12.0 / n) - 1.0)

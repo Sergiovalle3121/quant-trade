@@ -195,3 +195,11 @@ def test_summary_is_free_of_profit_claims(locale: str, overall: str) -> None:
         assert find_claims(text) == []
         if status != "NOT_MEASURED":
             assert "7" in text
+
+
+def test_a_pass_against_the_files_own_index_cannot_complete_an_a() -> None:
+    # The manager chose the index the file prints; beating it is not an independent check.
+    assert overall_class(_dims()) == "A"
+    assert overall_class(_dims(), own_index=True) == "B"
+    assert overall_class(_dims(benchmark="NOT_APPLICABLE"), own_index=True) == "A"
+    assert overall_class(_dims(benchmark="FAIL"), own_index=True) == "C"
