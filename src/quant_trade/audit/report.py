@@ -3423,6 +3423,12 @@ def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         )
     text = first + " " + labels["cash_note" + suffix].format(source="\x00", code=code)
     link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    if cash.get("history_source_url"):
+        # The spliced older series (the euro's before €STR) gets its own link.
+        link += (
+            f" (<a href='{_e(str(cash['history_source_url']))}' rel='noopener'>"
+            f"{_e(str(cash.get('history_series', '')))}</a>)"
+        )
     return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
 

@@ -209,11 +209,13 @@ def local_excess_sharpe(
     if local.history is not None:
         older = _clean(history, local.history)
         older = older[older.index < values.index[0]]
-        if not older.empty:
-            starts = _days(frame["timestamp"])[:-1].floor("D")
-            max_gap = np.where(starts < values.index[0], MAX_MONTHLY_GAP_DAYS, local.max_gap)
+        starts = _days(frame["timestamp"])[:-1].floor("D")
+        early = np.asarray(starts < values.index[0])
+        if not older.empty and bool(early.any()):
+            max_gap = np.where(early, MAX_MONTHLY_GAP_DAYS, local.max_gap)
             values = pd.concat([older, values])
             base["history_series"] = local.history.series
+            base["history_source_url"] = local.history.source_url
     return _excess(frame, values, ppy, base, NOTE_LOCAL, max_gap, local.yearly)
 
 

@@ -161,6 +161,10 @@ def test_older_euro_dates_take_the_oecd_monthly_rate_and_only_those() -> None:
     assert local_excess_sharpe(frame, estr, 252.0, "EUR")["status"] == "NOT_MEASURED"
     out = local_excess_sharpe(frame, estr, 252.0, "EUR", oecd)
     assert out["status"] == "MEASURED" and out["history_series"] == "IRSTCI01EZM156N"
+    assert out["history_source_url"].endswith("IRSTCI01EZM156N")
+    # A history that starts after €STR does not name the older series.
+    recent = frame[frame["timestamp"] >= pd.Timestamp("2020-01-01", tz="UTC")]
+    assert "history_series" not in local_excess_sharpe(recent, estr, 252.0, "EUR", oecd)
     # The mean mixes -0.36 % before October 2019 and -0.5 % after.
     low, high = (float(LOCAL["EUR"].yearly(np.array([v]))[0]) for v in (-0.5, -0.36))
     assert low < out["mean_rate"]["value"] < high
@@ -181,3 +185,5 @@ def test_the_engine_reads_the_euro_history_for_an_old_euro_account() -> None:
     result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=series.get)
     assert result.cash_rate is not None and result.cash_rate["currency"] == "EUR"
     assert result.cash_rate["label"] == "EUR cash rate (FRED ECBESTRVOLWGTTRMDMNRT)"
+    html = render(result, watermark=False)[0]
+    assert "href='https://fred.stlouisfed.org/series/IRSTCI01EZM156N'" in html
