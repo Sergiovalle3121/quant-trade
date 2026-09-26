@@ -287,6 +287,25 @@ COPY: dict[str, dict[str, str]] = {
             "Un colega te invitó. Crea tu cuenta y tu primer informe completo es gratis."
         ),
         "change_password": "Cambiar contraseña",
+        "change_email": "Cambiar correo",
+        "email_now": "Ahora entras con {email}. Desde el cambio entrarás con el correo nuevo.",
+        "email_new": "Correo nuevo",
+        "email_again": "Repite el correo nuevo",
+        "email_help": (
+            "Todavía no enviamos correos para confirmarlo: revisa que esté bien escrito. Cerramos"
+            " las demás sesiones."
+        ),
+        "email_passkey_note": (
+            "Tus llaves de acceso siguen funcionando; tu teléfono o computadora puede seguir "
+            "mostrando el correo anterior como nombre."
+        ),
+        "email_changed": (
+            "Correo cambiado. Desde ahora entras con el nuevo. Cerramos las demás sesiones."
+        ),
+        "email_mismatch": "Los dos correos nuevos no coinciden. Escríbelos otra vez.",
+        "email_same": "Ese ya es tu correo.",
+        "email_taken": "No se pudo usar ese correo. Prueba con otro.",
+        "event_email_changed": "Correo cambiado",
         "password_changed": "Contraseña cambiada. Cerramos las demás sesiones.",
         "delete_title": "Borrar mi cuenta",
         "delete_help": (
@@ -811,6 +830,26 @@ COPY: dict[str, dict[str, str]] = {
             "A colleague invited you. Create your account and your first full report is free."
         ),
         "change_password": "Change password",
+        "change_email": "Change e-mail",
+        "email_now": "You sign in with {email}. After the change you sign in with the new address.",
+        "email_new": "New e-mail",
+        "email_again": "Repeat the new e-mail",
+        "email_help": (
+            "We do not send e-mails to confirm it yet: check that it is spelled right. Your other"
+            " sessions are signed out."
+        ),
+        "email_passkey_note": (
+            "Your passkeys keep working; your phone or computer may still show the old e-mail as "
+            "their name."
+        ),
+        "email_changed": (
+            "E-mail changed. From now on you sign in with the new one. Your other sessions were "
+            "signed out."
+        ),
+        "email_mismatch": "The two new e-mails do not match. Type them again.",
+        "email_same": "That is already your e-mail.",
+        "email_taken": "That e-mail cannot be used. Try another one.",
+        "event_email_changed": "E-mail changed",
         "password_changed": "Password changed. Your other sessions were signed out.",
         "delete_title": "Delete my account",
         "delete_help": (
@@ -1922,6 +1961,40 @@ def invite_section(locale: str, invite: InviteView) -> str:
     )
 
 
+def _email_card(
+    copy: dict[str, str], locale: str, csrf: str, email: str, *, has_passkeys: bool
+) -> str:
+    """ "Cambiar correo": the new address twice (no e-mail confirms it yet) and the password."""
+    shown = f"<b>{_e(_safe_text(email))}</b>"
+    before, _, after = copy["email_now"].partition("{email}")
+    return (
+        "<form class='acct-card' id='correo' method='post' "
+        f"action='{path('account', locale)}/correo'>"
+        f"<h3>{_e(copy['change_email'])}</h3>"
+        f"<p class='muted'>{_e(before)}{shown}{_e(after)}</p>"
+        + _hidden("csrf", csrf)
+        + _field(
+            copy["email_new"],
+            "<input type='email' name='email' required maxlength='254' autocomplete='email' "
+            "autocapitalize='none' spellcheck='false'>",
+        )
+        + _field(
+            copy["email_again"],
+            "<input type='email' name='email_again' required maxlength='254' autocomplete='off' "
+            "autocapitalize='none' spellcheck='false'>",
+            copy["email_help"],
+        )
+        + _field(
+            copy["password_current"],
+            "<input type='password' name='current' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + (f"<p class='muted'>{_e(copy['email_passkey_note'])}</p>" if has_passkeys else "")
+        + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_email'])}</button>"
+        "</form>"
+    )
+
+
 def account_page(
     *,
     locale: str,
@@ -2109,7 +2182,8 @@ def account_page(
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_password'])}</button>"
         "</form>"
-        "<form class='acct-card acct-danger' method='post' "
+        + _email_card(copy, locale, csrf, account.email, has_passkeys=bool(passkeys))
+        + "<form class='acct-card acct-danger' method='post' "
         f"action='{path('account', locale)}/borrar'>"
         f"<h3>{_e(copy['delete_title'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
         + _hidden("csrf", csrf)

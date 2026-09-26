@@ -57,8 +57,12 @@ class MarketMove:
 
 
 #: What public indices did over each window, for context beside the file's own
-#: figures. Computed once from FRED's daily closes (last close of each month),
-#: never from the upload and never used in any finding or class. The S&P 500
+#: figures: a dozen fixed historical facts (how far each index fell over the
+#: window), worked out once from the month-end levels FRED shows and cited with
+#: those pages, never a data feed. No index series is read at run time or shown
+#: beyond these figures (S&P Dow Jones Indices, Nasdaq and Coinbase do not allow
+#: their data to be reproduced without permission; see ``market.ASSETS``). They
+#: never come from the upload and never enter a finding or the class. The S&P 500
 #: series on FRED starts in 2016, so older windows show the Nasdaq Composite only.
 MARKET_AS_OF = "2026-09-25"
 _SP500 = "https://fred.stlouisfed.org/series/SP500"

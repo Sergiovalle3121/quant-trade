@@ -716,6 +716,8 @@ border-color:color-mix(in srgb,var(--info) 30%,transparent);font-weight:560}
 .notice.ok{display:flex;gap:10px;align-items:flex-start;color:var(--ok);
 background:color-mix(in srgb,var(--ok) 9%,transparent);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
 .notice.ok svg{width:18px;height:18px;flex:none;margin-top:2px}
+.warning{color:var(--text);background:color-mix(in srgb,var(--warn) 7%,#fff);
+border-color:color-mix(in srgb,var(--warn) 30%,transparent);border-left:3px solid var(--warn)}
 .banner{color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent);
 border-color:color-mix(in srgb,var(--warn) 32%,transparent);font-weight:600;letter-spacing:.01em}
 .disclaimer{border:1px solid var(--border);border-radius:16px;padding:18px 20px;

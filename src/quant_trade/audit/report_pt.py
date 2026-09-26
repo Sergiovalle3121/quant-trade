@@ -1033,10 +1033,12 @@ REPORT: dict[str, Any] = {
         "fund_fees_behind": "O fundo já fica abaixo do seu benchmark antes de qualquer taxa.",
         "crises_market": "Mercado nessas datas",
         "crises_market_note": (
-            "Mercado: fechamento do mês anterior à janela contra o fechamento do seu último mês, "
-            "dados públicos do FRED consultados em {as_of} ({sources}). São ações dos EUA e "
-            "bitcoin: se a estratégia opera outro mercado (moedas, commodities, outro país), "
-            "considere-os só como contexto do que o mercado vivia, não como ponto de comparação."
+            "Mercado: variação entre o fechamento do mês anterior à janela e o do seu último "
+            "mês, um número histórico fixo conferido em {as_of} com os níveis do índice "
+            "no FRED ({sources}); nenhum outro dado desses índices é lido ou mostrado. São ações "
+            "dos EUA e bitcoin: se a estratégia opera outro mercado (moedas, commodities, outro "
+            "país), considere-os só como contexto do que o mercado vivia, não como ponto de "
+            "comparação."
         ),
         "fund_fees_two_twenty": "2 % + 20 % dos ganhos",
         "ranges_title": "Quanto disso pode ser acaso?",
@@ -1208,15 +1210,17 @@ REPORT: dict[str, Any] = {
             "O Sharpe acima não subtrai nenhuma taxa. A conta está em {code}, então aqui se "
             "subtrai a taxa dessa moeda, não a dos EUA. Fonte: {source}."
         ),
-        "cash_rate_MXN": "taxa interbancária de um dia do México (OCDE)",
-        "cash_rate_BRL": "taxa interbancária de um dia do Brasil (OCDE)",
+        "cash_rate_MXN": "taxa de política monetária do México (BIS)",
+        "cash_rate_BRL": "taxa Selic mensal do Brasil (Banco Central do Brasil)",
         "cash_rate_EUR": (
-            "taxa de um dia do euro, €STR do BCE (antes de outubro de 2019, a da OCDE)"
+            "taxa de um dia do euro, €STR do BCE (antes de outubro de 2019, a taxa das "
+            "operações principais de refinanciamento do BCE até outubro de 2008 e sua taxa "
+            "de depósito depois)"
         ),
         "cash_rate_GBP": "taxa de um dia da libra, SONIA (Banco da Inglaterra)",
-        "cash_rate_JPY": "taxa interbancária de um dia do Japão (OCDE)",
-        "cash_rate_CAD": "taxa interbancária de um dia do Canadá (OCDE)",
-        "cash_rate_CHF": "taxa interbancária de 3 meses da Suíça (OCDE)",
+        "cash_rate_JPY": "taxa de política monetária do Japão (BIS)",
+        "cash_rate_CAD": "taxa de um dia do Canadá, CORRA (Banco do Canadá)",
+        "cash_rate_CHF": "taxa de política monetária da Suíça (BIS)",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado?",
         "regime_intro": (
             "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
@@ -1396,8 +1400,22 @@ REPORT: dict[str, Any] = {
         "refs_title": "Fontes",
         "data_title": "Dados públicos que usamos",
         "data": [
-            "Cotações, taxas e preços dos EUA, fechamentos de mercados e outras taxas de caixa: "
-            "FRED, Federal Reserve Bank of St. Louis.",
+            "Cotações do Federal Reserve, letra do Tesouro e preços ao consumidor dos EUA: "
+            "FRED, Federal Reserve Bank of St. Louis. O VIX é da Cboe Global Markets, via FRED.",
+            "Taxa de um dia do euro (€STR, via FRED) e, antes de outubro de 2019, a taxa das "
+            "operações principais de refinanciamento do BCE (a taxa fixa ou, nos leilões de "
+            "taxa variável, a taxa mínima de proposta) até outubro de 2008 e a taxa da "
+            "facilidade de depósito do BCE depois. Fonte: estatísticas do BCE; esses dados estão "
+            "disponíveis grátis no site do BCE (ecb.europa.eu).",
+            "Taxa de um dia da libra (via FRED): SONIA data licensed under the Open Government "
+            "Licence v3.0 and copyright the Governor and Company of the Bank of England.",
+            "Taxa de um dia do Canadá (CORRA): Banco do Canadá; nós a convertemos em rendimento "
+            "anual, e esses dados estão disponíveis grátis em bankofcanada.ca.",
+            "Taxa Selic mensal do Brasil: Banco Central do Brasil, série 4189, sob a Open "
+            "Database License (ODbL).",
+            "Taxas de política monetária do México, do Japão e da Suíça. Fonte: BIS (Banco de "
+            "Compensações Internacionais). São as taxas oficiais de cada banco central, não "
+            "taxas de mercado.",
             "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
             "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
             "Government Licence v3.0.",
@@ -1410,6 +1428,9 @@ REPORT: dict[str, Any] = {
             "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
             "via e-Stat.",
             "Todos são lidos ao gerar o relatório e nenhum muda a classe.",
+            "Não mostramos fechamentos do S&P 500, do Nasdaq 100 nem do bitcoin: nenhuma fonte "
+            "pública permite reutilizá-los em um relatório pago. As quedas históricas da tabela "
+            "de crises são fatos fixos, não dados que lemos.",
         ],
     },
     "TAGLINE": "Auditoria estatística independente de backtests e históricos",
@@ -5068,13 +5089,15 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         (
             "Sharpe ratio of the returns after subtracting what cash in the account's own "
-            "currency paid over the same days (the short rate FRED publishes for that currency, "
-            "converted to an annual yield by its own quote), annualised like the headline Sharpe"
+            "currency paid over the same days (that currency's overnight or central bank policy "
+            "rate, from its publisher, converted to an annual yield by its own quote), "
+            "annualised like the headline Sharpe"
         ),
         (
             "Sharpe dos retornos após subtrair o que o caixa na moeda da conta pagou nos mesmos "
-            "dias (a taxa de curto prazo que o FRED publica para essa moeda, convertida em "
-            "rendimento anual conforme a sua cotação), anualizado como o Sharpe principal"
+            "dias (a taxa de um dia ou a taxa de política monetária dessa moeda, de quem a "
+            "publica, convertida em rendimento anual conforme a sua cotação), anualizado como o "
+            "Sharpe principal"
         ),
     ),
     (
@@ -5223,6 +5246,29 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "the market's public closes could not be read when the report was made",
         "os fechamentos públicos do mercado não puderam ser lidos ao gerar o relatório",
+    ),
+    (
+        (
+            "no public source of this market's closes that we know of has a licence that "
+            "allows reuse in a paid report; to compare, upload its closes as the benchmark file"
+        ),
+        (
+            "nenhuma fonte pública dos fechamentos deste mercado que conheçamos tem uma licença "
+            "que permita reutilizá-los em um relatório pago; para comparar, envie os "
+            "fechamentos como arquivo de benchmark"
+        ),
+    ),
+    (
+        (
+            "no public source of this market's closes that we know of has a licence that "
+            "allows reuse in a paid report; the benchmark section compares the strategy with "
+            "the file you uploaded"
+        ),
+        (
+            "nenhuma fonte pública dos fechamentos deste mercado que conheçamos tem uma licença "
+            "que permita reutilizá-los em um relatório pago; a seção do benchmark compara a "
+            "estratégia com o arquivo que você enviou"
+        ),
     ),
     (
         "fewer than 60 days shared with the market's public closes",
