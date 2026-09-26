@@ -98,7 +98,7 @@ def test_an_account_in_another_currency_is_left_out_and_cents_count_as_dollars()
     days = pd.date_range("2023-01-02", periods=200, freq="D")
     frame = _curve(days, np.full(len(days), 10_000.0))
     series = {"fx_mxn": _daily(days, 20.0, 25.0)}
-    assert in_currencies(frame, series, "EUR")["reason"] == OTHER_CURRENCY
+    assert in_currencies(frame, series, "AUD")["reason"] == OTHER_CURRENCY
     assert in_currencies(frame, series, "usc")["status"] == "MEASURED"
 
 
