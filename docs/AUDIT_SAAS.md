@@ -312,6 +312,10 @@ adds or removes, keeping their cost (a 1-for-10 reverse split of 100 shares
 arrives as -90); a split of shares not held changes nothing, and one that would
 leave no shares is not applied and is counted in `SPLIT_EMPTIES_WARNING`. Prices in USD print without a sign, like every amount.
 
+A column whose name holds `%` (`Profit %`, `% Profit`, `% chg`) never takes a
+role in the universal reader: it is a ratio, and once normalised `Profit %`
+would read as the money result.
+
 Zerodha Console's tradebook (Reports > Tradebook, CSV: `symbol, isin,
 trade_date, exchange, segment, series, trade_type, auction, quantity, price,
 trade_id, order_id, order_execution_time`, header as checked by the open-source
