@@ -35,11 +35,13 @@ Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
 `/pt/para/` moves there), and every export guide at `/pt/guias` and
 `/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
 fields). The language switch on these pages offers the other two languages.
-Pages not translated yet (the report and its PDF, the account screens, the
-sample, the comparison and check pages, the methodology, the terms and the
-privacy policy) open in English from a Portuguese page, never in Spanish, and
-the report language on the Portuguese upload form starts on English with a line
-saying so. The profit-claim guard reads Portuguese too
+The methodology (`/pt/metodologia`), the report check (`/pt/comprovar`) and
+the comparison of two reports (`/pt/comparar`) have Portuguese pages, linked
+from every Portuguese page and offered in the language bar of their Spanish and
+English twins (`tests/test_audit_trust_pages_pt.py`). Pages not translated yet
+(the terms and the privacy policy, until the Spanish ones have had their legal
+review, and the public verification page) open in English from a Portuguese
+page, never in Spanish. The profit-claim guard reads Portuguese too
 (`guard.PORTUGUESE_CLAIM_PATTERNS`: lucrativo, rentável, garantido, sem risco,
 "vai ganhar", aprovado…, with "não", "nem" and "sem" as negations), and
 `tests/test_audit_portuguese.py` runs it over the page and opens every link on it.
@@ -1864,7 +1866,16 @@ changes what a report says.
   file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
   a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
   and returns rounded to 5 decimals), so a trailing newline, other line
-  endings or renamed columns do not make a new file.
+  endings or renamed columns do not make a new file. When the account's
+  free report is unused but an upload becomes a preview for one of these
+  reasons (file, browser, network), the preview says why
+  (`account_pages.COPY["welcome_refused_*"]`).
+- **Networks** (`accounts.network_address`): every free-tier limit that
+  counts an address (free reports and previews per network, their claim
+  keys, and the invite self-check) counts an IPv6 address as its /64, since
+  a customer can rotate addresses inside it at will; an IPv4 address (or an
+  IPv4-mapped IPv6 one) counts as itself. The free-tier tables keep that
+  network, not the exact IPv6 address.
 - **Limits under simultaneous uploads** (`free_claims` table). The checks
   above are a first look that answers at once; after parsing, the upload
   takes its claims in one transaction, all or nothing: the free report takes
@@ -2628,3 +2639,30 @@ Informational only: none of these moves a class, a dimension or a red flag.
   order), it is `NOT_MEASURED` rather than `TYPICAL`, so a smoothed curve is
   never called normal. Informational: it
   moves no flag and no class.
+
+How the report shows them (ES, EN and PT):
+
+- "How much of this could be chance?" under the trade statistics: the three
+  ranges side by side, and one line when the range of the average per trade
+  includes zero or the profit factor's includes one (either is enough, so a
+  disagreement between them never stays silent in the file's favour). When a
+  range lies wholly below break-even (and neither straddles it), one line says
+  the system loses per trade with these trades and chance does not explain it. The
+  intro calls it a 95 % range of values consistent with the trades, not a
+  prediction.
+- Under the significance table, Lo's Sharpe only when it is lower than the
+  plain one by more than a tenth (with the first-order autocorrelation when
+  it is 0.1 or more). A higher corrected figure is never printed: with small
+  samples it mostly adds noise and would flatter the file. The report says
+  the plain figure is not inflated instead.
+- Under the benchmark table and in the fund-versus-index block, Jensen's
+  alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to
+  be chance alone (with "it does not say it will repeat" for a positive
+  alpha), below that as not distinguishable from chance.
+- The fee table's last row is "2 % + 20 % of gains".
+- In the risk section, "Is the file's worst fall normal for these returns?":
+  the uploaded worst fall beside the 5th to 95th percentile of the same
+  returns in random order, and one sentence for `TYPICAL`, `SHALLOWER`
+  (losses rarely follow losses; the file's fall may understate the risk) or
+  `DEEPER` (losses came in streaks). It says it is not the one-year fall
+  above. Nothing shows when it is `NOT_MEASURED`.

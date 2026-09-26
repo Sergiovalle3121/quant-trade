@@ -113,6 +113,18 @@ COPY_PT: dict[str, str] = {
     "welcome_kpi": "Primeiro relatório completo grátis",
     "welcome_available": "Disponível",
     "welcome_used": "Usado",
+    "welcome_refused_file": (
+        "Este arquivo já recebeu um relatório completo grátis em outra conta, então desta vez "
+        "é uma prévia. Seu relatório grátis continua disponível para outro arquivo."
+    ),
+    "welcome_refused_device": (
+        "Este navegador já usou um relatório completo grátis em outra conta, então desta vez é "
+        "uma prévia: assim a oferta não se repete com contas novas."
+    ),
+    "welcome_refused_network": (
+        "Esta rede já usou os relatórios completos grátis deste mês, então desta vez é uma "
+        "prévia. Seu relatório grátis continua disponível de outra rede ou no mês que vem."
+    ),
     "welcome_notice": (
         "Seu primeiro relatório completo é grátis por criar a conta, com o PDF e a página de "
         "verificação. Para os próximos arquivos você tem {limit} prévias grátis por mês; o "

@@ -6,7 +6,7 @@ page does, and shows the class, the six dimensions, the key figures and the
 stress tests in two columns. Only reports that are paid (or every report in
 free mode) can be compared, so nothing locked is revealed. The page is
 private (``noindex``), the links travel in a POST body, never in a URL, and
-every text is fixed and passes the profit-claim guard.
+every text is fixed and passes the profit-claim guard in every language.
 """
 
 from __future__ import annotations
@@ -107,7 +107,56 @@ COPY: dict[str, dict[str, Any]] = {
             ("The key figures", "Every figure with its evidence tag, side by side."),
         ),
     },
+    "pt": {
+        "eyebrow": "Comparar relatórios",
+        "title": "Dois relatórios, lado a lado",
+        "lead": (
+            "Cole os links de dois dos seus relatórios (o endereço da página do relatório, com "
+            "o seu token). Serve para ver o que mudou entre duas versões de uma estratégia ou "
+            "entre dois robôs. Só se comparam relatórios completos."
+        ),
+        "link_a": "Link do primeiro relatório",
+        "link_b": "Link do segundo relatório",
+        "placeholder": "https://…/audits/…?token=…",
+        "submit": "Comparar",
+        "bad_link": "Não reconhecemos um dos links: copie o endereço completo do relatório.",
+        "not_found": "Não encontramos um dos relatórios, ou o link não é o correto.",
+        "locked": (
+            "Um dos relatórios ainda não está desbloqueado; só se comparam relatórios completos."
+        ),
+        "same": "Você colou o mesmo relatório duas vezes.",
+        "class": "Classe",
+        "figure": "Número",
+        "report_a": "Relatório 1",
+        "report_b": "Relatório 2",
+        "dimensions": "Dimensões",
+        "figures": "Números principais",
+        "period": "Período",
+        "source": "Arquivo",
+        "open": "Abrir relatório",
+        "again": "Comparar outros",
+        "note": (
+            "Cada relatório é lido com os seus próprios arquivos e declarações. Uma diferença "
+            "de classe diz quais testes mudaram, não que uma versão vá funcionar melhor."
+        ),
+        "from_report": "Comparar com outro relatório seu",
+        "from_report_help": "Cole o link de outro relatório seu para vê-los lado a lado.",
+        "shows_title": "O que você vai ver",
+        "shows": (
+            ("A classe de cada relatório", "A, B, C ou D, uma ao lado da outra."),
+            ("As dimensões que mudaram", "Quais testes mudaram de resultado."),
+            ("Os números principais", "Cada número com a sua etiqueta de evidência, lado a lado."),
+        ),
+    },
 }
+
+#: The page's path in each language.
+COMPARE_PATH: dict[str, str] = {"es": "/comparar", "en": "/compare", "pt": "/pt/comparar"}
+
+
+def _locale(locale: str) -> str:
+    return locale if locale in COPY else "es"
+
 
 COMPARE_CSS = (
     ".cmp-form{display:grid;gap:14px;max-width:720px}"
@@ -198,7 +247,7 @@ def comparison_body(
     a: dict[str, Any], b: dict[str, Any], *, href_a: str, href_b: str, locale: str
 ) -> str:
     """The comparison's main content for two stored results."""
-    locale = "en" if locale == "en" else "es"
+    locale = _locale(locale)
     copy = COPY[locale]
     labels = LABELS[locale]
     head = (
@@ -237,9 +286,9 @@ def comparison_body(
 
 def compare_form(locale: str, *, link_a: str = "", error: str = "") -> str:
     """The form with two link fields (``link_a`` prefilled from a report)."""
-    locale = "en" if locale == "en" else "es"
+    locale = _locale(locale)
     copy = COPY[locale]
-    action = "/comparar" if locale == "es" else "/compare"
+    action = COMPARE_PATH[locale]
     error_html = f"<div class='error'>{_e(error)}</div>" if error else ""
     form = (
         f"<form class='cmp-form' method='post' action='{action}'>{error_html}"
@@ -270,6 +319,7 @@ def guard_page(page: str) -> str:
 
 __all__ = [
     "COMPARE_CSS",
+    "COMPARE_PATH",
     "COPY",
     "MAX_LINK_CHARS",
     "compare_form",

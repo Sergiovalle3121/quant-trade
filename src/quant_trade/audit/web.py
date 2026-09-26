@@ -45,8 +45,14 @@ from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
+from quant_trade.audit.compare import (
+    COMPARE_PATH,
+    compare_form,
+    comparison_body,
+    guard_page,
+    parse_report_link,
+)
 from quant_trade.audit.compare import COPY as COMPARE_COPY
-from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
@@ -353,6 +359,9 @@ PDF_CACHE_SIZE = 16
 #: one does not count. They share the report PDFs' render slots.
 #: The page's "skip to content" link, which a PDF does not need.
 _SKIP_LINK = re.compile(r"<a class='skip' href='#main'>[^<]*</a>")
+#: Why an account's upload became a preview although its free full report is
+#: unused: the file or the browser already had one, or the network's month is full.
+WELCOME_REFUSALS = ("file", "device", "network")
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -563,7 +572,7 @@ def request_body_limit(max_upload_bytes: int) -> int:
 # The report check takes one file of at most ``check.MAX_CHECK_BYTES``, so its
 # body limit is that plus the form overhead: a bigger upload is refused before
 # it is spooled, not after.
-CHECK_PATHS = {"/comprobar": "es", "/check": "en"}
+CHECK_PATHS = {"/comprobar": "es", "/check": "en", "/pt/comprovar": "pt"}
 
 
 def check_body_limit() -> int:
@@ -2245,12 +2254,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         device_sha256 = acct.hash_secret(device)
         reservation = acct.new_secret()
         fingerprint = ""
+        # The free tier counts networks: an IPv6 address stands for its /64.
+        net = acct.network_address(ip) if ip else ""
+        #: Why this upload was not the account's free full report, when it
+        #: could have been: told on the preview it becomes.
+        welcome_refused = ""
 
         def preview_or_credit(account_id: str) -> Response | None:
             """The first look at the monthly previews and the credits."""
             nonlocal free_preview, spend_credit
             used = db.free_previews_since(start, account_id=account_id)
-            network = db.free_previews_since(start, client_ip=ip)
+            network = db.free_previews_since(start, client_ip=net)
             if (
                 used < acct.FREE_PREVIEWS_PER_MONTH
                 and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
@@ -2272,23 +2286,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 ]
             }
             if ip:
-                net = acct.network_key(ip)
+                net_key = acct.network_key(ip)
                 slots["network"] = [
-                    f"preview:ip:{net}:{month}:{n}"
+                    f"preview:ip:{net_key}:{month}:{n}"
                     for n in range(acct.FREE_PREVIEWS_PER_IP_PER_MONTH)
                 ]
             return db.claim_free(reservation, keys=(), slots=slots, at=now)
 
         def claim_free_use(account_id: str, inputs: Any) -> Response | None:
             """Take the free full report or a free preview, atomically."""
-            nonlocal welcome, free_preview, spend_credit, fingerprint
+            nonlocal welcome, free_preview, spend_credit, fingerprint, welcome_refused
             fingerprint = acct.content_fingerprint(inputs.equity.frame)
             if welcome:
                 refused = db.welcome_refusal(
                     account_id,
                     device_sha256=device_sha256,
                     file_sha256=fingerprint,
-                    client_ip=ip,
+                    client_ip=net,
                     since=start,
                     per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
                 )
@@ -2312,6 +2326,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
                         return None
                 welcome = False
+                welcome_refused = refused
                 refusal = preview_or_credit(account_id)
                 if refusal is not None:
                     return refusal
@@ -2327,16 +2342,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return None
 
         if gate_account is not None:
-            if acct.WELCOME_FULL_REPORT and not db.welcome_refusal(
-                gate_account.id,
-                device_sha256=device_sha256,
-                file_sha256="",
-                client_ip=ip,
-                since=start,
-                per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
-            ):
+            first_look = (
+                db.welcome_refusal(
+                    gate_account.id,
+                    device_sha256=device_sha256,
+                    file_sha256="",
+                    client_ip=net,
+                    since=start,
+                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                )
+                if acct.WELCOME_FULL_REPORT
+                else "off"
+            )
+            if not first_look:
                 welcome = True
             else:
+                welcome_refused = first_look
                 refusal = preview_or_credit(gate_account.id)
                 if refusal is not None:
                     return refusal
@@ -2558,12 +2579,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     gate_account.id,
                     device_sha256=device_sha256,
                     file_sha256=fingerprint,
-                    client_ip=ip,
+                    client_ip=net,
                     at=now,
                 )
                 paid = welcomed
                 if welcomed:
-                    _reward_invite(gate_account.id, device_sha256, ip, now)
+                    _reward_invite(gate_account.id, device_sha256, net, now)
             elif spend_credit:
                 credit_used = db.redeem_with_account(
                     audit_id, gate_account.id, at=datetime.now(UTC)
@@ -2581,7 +2602,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
                 free_preview = True
             if free_preview:
-                db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
+                db.record_free_preview(audit_id, gate_account.id, client_ip=net, at=now)
         if paid or _session(request) is not None:
             linked = db.get_audit(audit_id)
             _link_to_session(
@@ -2592,6 +2613,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             location += "&acct=welcome"
         elif credit_used:
             location += "&acct=upload_credit"
+        elif free_preview and welcome_refused in WELCOME_REFUSALS:
+            location += f"&acct=preview_{welcome_refused}"
         elif code:
             location += "&code=" + ("applied" if paid else "rejected")
         if _wants_json(request):
@@ -2820,6 +2843,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         elif acct_done == "saved":
             notice = account_pages.COPY[ui]["saved_notice"]
+        elif (
+            acct_done
+            and acct_done.startswith("preview_")
+            and acct_done[8:] in WELCOME_REFUSALS
+            and not record.paid
+        ):
+            notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
         elif acct_done == "nocredit" and not record.paid:
             notice = account_pages.COPY[ui]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.
@@ -3069,7 +3099,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             overall=record.overall_class,
             public_id=publication.public_id,
             audited_on=record.created_at[:10],
-            locale=_locale(lang),
+            locale=_locale(link_locale(lang or "es")),
         )
         return Response(content=svg, media_type="image/svg+xml")
 
@@ -3082,7 +3112,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             published_at=publication.created_at,
             result_sha256=digest,
             base_url=_site_url(request),
-            locale=_locale(lang),
+            # The public page has Spanish and English; a Portuguese reader gets English.
+            locale=_locale(link_locale(lang or "es")),
         )
 
     sample_cache: dict[tuple[str, str], str] = {}
@@ -3181,6 +3212,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/methodology", response_class=HTMLResponse)
     def method_en(request: Request, lang: str | None = None) -> str:
         return method_page(locale=_locale(lang or "en"), base_url=_site_url(request))
+
+    @app.get("/pt/metodologia", response_class=HTMLResponse)
+    def method_pt(request: Request) -> str:
+        return method_page(locale="pt", base_url=_site_url(request))
 
     @app.get("/guides", response_class=HTMLResponse)
     def guides_en(request: Request, lang: str | None = None) -> str:
@@ -3306,8 +3341,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def compare_en(request: Request, lang: str | None = None) -> Response:
         return _compare_form_page(_locale(lang or "en"), request=request)
 
+    @app.get("/pt/comparar", response_class=HTMLResponse)
+    def compare_pt(request: Request) -> Response:
+        return _compare_form_page("pt", request=request)
+
     def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
-        locale = _locale(lang or default)
+        locale = "pt" if default == "pt" else _locale(lang or default)
         copy = COMPARE_COPY[locale]
         first, second = parse_report_link(link_a), parse_report_link(link_b)
         if first is None or second is None:
@@ -3337,8 +3376,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             href_b=f"{href_b}&lang={locale}",
             locale=locale,
         )
-        again = "/comparar" if locale == "es" else "/compare"
-        body += f"<p><a class='btn btn-ghost' href='{again}?lang={locale}'>{copy['again']}</a></p>"
+        again = COMPARE_PATH[locale] + ("" if locale == "pt" else f"?lang={locale}")
+        body += f"<p><a class='btn btn-ghost' href='{again}'>{copy['again']}</a></p>"
         return HTMLResponse(guard_page(compare_page(body, locale=locale)))
 
     @app.post("/comparar", response_class=HTMLResponse)
@@ -3357,6 +3396,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         return _compare(link_a, link_b, lang, "en")
 
+    @app.post("/pt/comparar", response_class=HTMLResponse)
+    def compare_post_pt(
+        link_a: Annotated[str, Form(max_length=1000)],
+        link_b: Annotated[str, Form(max_length=1000)],
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return _compare(link_a, link_b, lang, "pt")
+
     def _check_page(request: Request, locale: str, content: str, status: int = 200) -> Response:
         page = check_page(content, locale=locale, base_url=_site_url(request))
         return HTMLResponse(guard_page(page), status_code=status)
@@ -3370,6 +3417,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def check_en(request: Request, lang: str | None = None) -> Response:
         locale = _locale(lang or "en")
         return _check_page(request, locale, check_lib.check_form(locale))
+
+    @app.get("/pt/comprovar", response_class=HTMLResponse)
+    def check_pt(request: Request) -> Response:
+        return _check_page(request, "pt", check_lib.check_form("pt"))
 
     async def _check(request: Request, report: UploadFile | None, locale: str) -> Response:
         copy = check_lib.COPY[locale]
@@ -3412,6 +3463,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
         return await _check(request, report, _locale(lang or "en"))
+
+    @app.post("/pt/comprovar", response_class=HTMLResponse)
+    async def check_post_pt(
+        request: Request,
+        report: Annotated[UploadFile | None, File()] = None,
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return await _check(request, report, "pt")
 
     @app.get("/terminos", response_class=HTMLResponse)
     def terms_es(request: Request, lang: str | None = None) -> str:
