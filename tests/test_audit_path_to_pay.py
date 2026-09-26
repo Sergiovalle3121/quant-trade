@@ -98,8 +98,9 @@ def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
     from quant_trade.audit.pages import _COPY
 
     words = {"es": "clave de recuperación", "en": "recovery key", "pt": "chave de recuperação"}
-    answers = [answer for _, answer in _COPY[locale]["faq"] if words[locale] in answer]
-    assert len(answers) == 1
+    forgot = {"es": "olvido", "en": "forget", "pt": "esquecer"}[locale]
+    answers = [answer for question, answer in _COPY[locale]["faq"] if forgot in question]
+    assert len(answers) == 1 and words[locale] in answers[0]
     assert not find_claims(answers[0])
     # Two-step sign-in: the reset also asks for the code from the app.
     two_step = {"es": "dos pasos", "en": "two-step", "pt": "duas etapas"}
@@ -108,14 +109,50 @@ def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
-def test_the_cash_card_uses_the_accounts_currency_and_keeps_alpha_on_us_bills(
+def test_the_cash_card_uses_the_accounts_currency_for_the_sharpe_and_the_alpha(
     locale: str,
 ) -> None:
     cash = next(text for icon, _, text in _UI[locale]["diffs"] if icon == "percent")
-    currency, us_bills = {
-        "es": ("moneda de tu cuenta", "frente a las letras de EE. UU."),
-        "en": ("your account's currency", "against US bills"),
-        "pt": ("moeda da sua conta", "frente às letras dos EUA"),
+    currency, alpha = {
+        "es": ("moneda de tu cuenta", "el alfa también"),
+        "en": ("your account's currency", "the alpha too"),
+        "pt": ("moeda da sua conta", "o alfa também"),
     }[locale]
-    assert currency in cash and us_bills in cash
+    # Since #347 the alpha subtracts the account currency's cash rate too.
+    assert currency in cash and alpha in cash
     assert not find_claims(cash)
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_landing_says_how_an_account_is_protected(locale: str) -> None:
+    from quant_trade.audit.pages import _COPY
+
+    two_of_three, sessions = {
+        "es": ("dos de estas tres", "cierras cada sesión"),
+        "en": ("two of these three", "sign out each session"),
+        "pt": ("duas destas três", "encerra cada sessão"),
+    }[locale]
+    answers = [answer for _, answer in _COPY[locale]["faq"] if two_of_three in answer]
+    assert len(answers) == 1 and sessions in answers[0] and "90" in answers[0]
+    assert not find_claims(answers[0])
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_full_report_list_names_the_fund_split(locale: str) -> None:
+    words = {
+        "es": ("cuánto es efectivo", "cuánto es mercado"),
+        "en": ("how much is cash", "how much is the market"),
+        "pt": ("quanto é caixa", "quanto é mercado"),
+    }[locale]
+    items = " ".join(_UI[locale]["full_items"])
+    assert all(word in items for word in words)
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_fund_page_names_the_cash_market_and_alpha_split(locale: str) -> None:
+    from quant_trade.audit.audiences import AUDIENCE_PAGES
+
+    page = next(p for p in AUDIENCE_PAGES if p.slug == "inversores-gestores-fondos")
+    checks = " ".join(f"{title} {text}" for title, text in page.text[locale].checks)
+    assert "36" in checks and {"es": "alfa", "en": "alpha", "pt": "alfa"}[locale] in checks
+    assert not find_claims(checks)
