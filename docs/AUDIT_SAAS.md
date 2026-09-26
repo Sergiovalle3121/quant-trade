@@ -322,7 +322,9 @@ it as percentages, whatever the size of its values (a money-market fund's
 `0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
 column, taken only when no `date` or `fecha` column exists. A column whose
 numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
-throughout; `10,000.50` and an ambiguous `10,000` keep the comma as thousands.
+throughout (one plainly decimal-comma cell decides the column, so a `1,234`
+beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
+as thousands.
 Currency signs (`$`, `R$`, `US$`, `€`, `£`, `¥`, `₹`) are dropped and `(1,5)`
 reads as a negative.
 
