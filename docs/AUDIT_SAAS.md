@@ -2376,6 +2376,15 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Cambiar correo** (`POST /cuenta/correo`): on Mi cuenta, the new
+  sign-in e-mail typed twice plus the current password. No e-mail service
+  confirms the address yet, so the second copy is what catches a typo; an
+  address another account uses is refused without saying whose it is. The
+  other sessions are signed out, as on a password change, and "Actividad
+  reciente" gets an "E-mail changed" line (never either address). Passkeys
+  keep working (they are bound to the account, not the e-mail), though a
+  device may keep showing the old address as the passkey's name. When an
+  e-mail service arrives, this should confirm the new address first.
 - **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
   key, two-step sign-in and a passkey (only where passkeys work), each as
   on or with a link to its card, and counts how many are on. Two-step

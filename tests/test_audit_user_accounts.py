@@ -3314,3 +3314,98 @@ def test_a_flood_of_new_devices_lists_three_and_counts_the_rest() -> None:
         )
         assert one.count("<li>") == 4 and "{count}" not in one
         assert account_pages.COPY[locale]["notice_more_devices_one"] in one
+
+
+# -- changing the e-mail -----------------------------------------------------------
+def _change_email(client: TestClient, new: str, again: str | None = None, current: str = PASSWORD):
+    csrf = _csrf(client.get("/cuenta").text)
+    return client.post(
+        "/cuenta/correo",
+        data={
+            "email": new,
+            "email_again": new if again is None else again,
+            "current": current,
+            "csrf": csrf,
+        },
+    )
+
+
+def test_changing_the_email_moves_the_sign_in_and_signs_out_other_sessions(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, "old@example.com")
+    account_id = store.find_account("old@example.com").id  # type: ignore[attr-defined]
+    laptop = TestClient(client.app)
+    _signin(laptop, "old@example.com")
+    page = client.get("/cuenta").text
+    assert "id='correo'" in page and "action='/cuenta/correo'" in page
+    assert "Ahora entras con <b>old@example.com</b>" in page
+    done = _change_email(client, "  New@Example.com ")
+    assert "Correo cambiado. Desde ahora entras con el nuevo" in done.text
+    assert "Sesión iniciada como <b>new@example.com</b>" in done.text
+    assert "Correo cambiado</" in done.text  # the line in "Actividad reciente"
+    assert laptop.get("/cuenta", follow_redirects=False).status_code == 303
+    assert store.find_account("old@example.com") is None  # type: ignore[attr-defined]
+    assert store.find_account("new@example.com").id == account_id  # type: ignore[attr-defined]
+    fresh = TestClient(client.app)
+    assert _signin(fresh, "old@example.com").status_code == 401
+    assert _signin(fresh, "new@example.com").headers["location"] == "/cuenta"
+    events = store.list_events(account_id)  # type: ignore[attr-defined]
+    assert "email_changed" in [event.kind for event in events]
+    export = json.dumps(store.account_export(account_id))  # type: ignore[attr-defined]
+    assert "new@example.com" in export and "old@example.com" not in export
+
+
+def test_changing_the_email_refuses_mistakes_and_keeps_the_old_one(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, "other@example.com")
+    client.cookies.clear()
+    _signup(client, "mine@example.com")
+    for args, message in (
+        (("x@example.com",), None),
+        (("x@example.com", "y@example.com"), "Los dos correos nuevos no coinciden"),
+        (("not an address",), "Ese correo no parece válido"),
+        (("MINE@example.com",), "Ese ya es tu correo"),
+        (("other@example.com",), "No se pudo usar ese correo"),
+    ):
+        if message is None:
+            refused = _change_email(client, *args, current="la contraseña equivocada")
+            message = "El correo o la contraseña no coinciden"
+        else:
+            refused = _change_email(client, *args)
+        assert message in refused.text, args
+        assert "Correo cambiado." not in refused.text
+    assert store.find_account("mine@example.com") is not None  # type: ignore[attr-defined]
+    other = store.find_account("other@example.com")  # type: ignore[attr-defined]
+    assert other is not None and store.set_email(other.id, "mine@example.com") is False  # type: ignore[attr-defined]
+
+
+def test_changing_the_email_needs_the_form_token_and_a_session(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, "t2@example.com")
+    forged = client.post(
+        "/cuenta/correo",
+        data={"email": "z@example.com", "email_again": "z@example.com", "current": PASSWORD},
+    )
+    assert "Correo cambiado." not in forged.text
+    stranger = TestClient(client.app)
+    anonymous = stranger.post(
+        "/cuenta/correo",
+        data={"email": "z@example.com", "email_again": "z@example.com", "current": PASSWORD},
+        follow_redirects=False,
+    )
+    assert anonymous.status_code in (303, 400, 403)
+    assert store.find_account("z@example.com") is None  # type: ignore[attr-defined]
+
+
+def test_the_email_card_exists_in_every_language(tmp_path: Path) -> None:
+    for locale, account, title in (
+        ("en", "/account", "Change e-mail"),
+        ("pt", "/pt/conta", "Trocar e-mail"),
+    ):
+        client, _, _ = _client(tmp_path / locale)
+        _signup(client, f"{locale}@example.com")
+        page = client.get(account).text
+        assert title in page and f"action='{account}/correo'" in page
+    assert set(account_pages.COPY["pt"]) == set(account_pages.COPY["es"])
