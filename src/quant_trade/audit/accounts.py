@@ -70,6 +70,14 @@ FREE_PREVIEWS_PER_IP_PER_MONTH = 10
 #: on another account, and each network address gets a few a month.
 WELCOME_FULL_REPORT = True
 WELCOME_REPORTS_PER_IP_PER_MONTH = 3
+#: "Invita a un colega": an account whose invite link brings a new account
+#: gets this many full-report credits once the new account's free first
+#: report exists (so the free tier's browser, file and address limits
+#: already held), at most ``REFERRAL_MONTHLY_CAP`` times a calendar month.
+REFERRAL_CREDITS = 1
+REFERRAL_MONTHLY_CAP = 5
+#: The sign-up query parameter that carries an invite token.
+INVITE_PARAM = "invita"
 DEVICE_COOKIE = "rigor_device"
 DEVICE_DAYS = 400
 
@@ -403,6 +411,9 @@ __all__ = [
     "MAX_ACCOUNT_ACTIONS_PER_HOUR",
     "MAX_SIGNUPS_PER_HOUR",
     "MIN_PASSWORD_CHARS",
+    "INVITE_PARAM",
+    "REFERRAL_CREDITS",
+    "REFERRAL_MONTHLY_CAP",
     "RESET_HOURS",
     "SESSION_COOKIE",
     "SIGNIN_TRIES_PAST_EMAIL_CEILING",
