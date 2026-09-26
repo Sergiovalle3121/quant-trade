@@ -693,6 +693,11 @@ LABELS: dict[str, dict[str, str]] = {
             "al archivo."
         ),
         "alpha_line": (
+            "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, después "
+            "de restar a ambos lo que pagó la letra del Tesoro de EE. UU. a 3 meses (beta "
+            "{beta}, t = {t}, {n} periodos)."
+        ),
+        "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, sin restar "
             "lo que pagó el efectivo (beta {beta}, t = {t}, {n} periodos)."
         ),
@@ -1749,6 +1754,11 @@ LABELS: dict[str, dict[str, str]] = {
             "file."
         ),
         "alpha_line": (
+            "Jensen's alpha: {alpha} a year beyond what the benchmark explains, after "
+            "subtracting from both what the 3-month US Treasury bill paid (beta {beta}, "
+            "t = {t}, {n} periods)."
+        ),
+        "alpha_line_no_cash": (
             "Jensen's alpha: {alpha} a year beyond what the benchmark explains, without "
             "subtracting what cash paid (beta {beta}, t = {t}, {n} periods)."
         ),
@@ -3481,7 +3491,7 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     out = (
         f"<h3>{_e(labels['ranges_title'])}</h3>"
         f"<p class='muted'>{_e(labels['ranges_intro'].format(n=trades))}</p>"
-        f"<div class='facts'>{''.join(facts)}</div>"
+        f"<div class='facts ranges'>{''.join(facts)}</div>"
     )
     average = ranges.get("expectancy") or {}
     low = _ev_value(average.get("low"))
@@ -3499,9 +3509,9 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     if average_even or factor_even:
         # When one range straddles break-even and the other lies below it, the
         # straddle is the cautious reading.
-        out += f"<p>{_e(labels['ranges_zero'])}</p>"
+        out += f"<p class='read-line'>{_e(labels['ranges_zero'])}</p>"
     elif average_below or factor_below:
-        out += f"<p>{_e(labels['ranges_below'])}</p>"
+        out += f"<p class='read-line'>{_e(labels['ranges_below'])}</p>"
     return out
 
 
@@ -3525,7 +3535,8 @@ def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str
 
 
 def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
-    """Jensen's alpha against the uploaded benchmark, with its cautious t (no cash subtracted)."""
+    """Jensen's alpha against the uploaded benchmark, with its cautious t; the line
+    says whether the Treasury bill's return was subtracted from both sides."""
     block = benchmark.get("jensen") or {}
     if block.get("status") != "MEASURED":
         return ""
@@ -3534,7 +3545,8 @@ def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
     t_stat = _ev_value(block.get("alpha_t_stat"))
     if alpha is None or beta is None or t_stat is None:
         return ""
-    line = labels["alpha_line"].format(
+    name = "alpha_line" if block.get("cash_subtracted") else "alpha_line_no_cash"
+    line = labels[name].format(
         alpha=_pct(alpha, signed=True),
         beta=f"{beta:.2f}",
         t=f"{t_stat:.2f}",
@@ -3658,7 +3670,7 @@ def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str
     return (
         f"<h3>{_e(labels['shuffle_title'])}</h3>"
         f"<p>{_e(line)} {_badge('MEASURED')}</p>"
-        f"<p>{_e(verdict)}</p>"
+        f"<p class='read-line'>{_e(verdict)}</p>"
         f"<p class='muted'>{_e(labels['shuffle_intro'])}</p>"
     )
 
@@ -5370,7 +5382,10 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
             if better in ("calm", "turbulent")
             else "regime_no_clear_gap"
         )
-        out += f"<p>{_e(labels[name].format(z=f'{abs(z):.2f}'))} {_badge('MEASURED')}</p>"
+        out += (
+            f"<p class='read-line'>{_e(labels[name].format(z=f'{abs(z):.2f}'))} "
+            f"{_badge('MEASURED')}</p>"
+        )
     link = f"<a href='{_e(str(regime.get('source_url', '')))}' rel='noopener'>FRED</a>"
     source = _e(labels["regime_source"].format(source="\x00"))
     out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
@@ -5475,7 +5490,7 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
     classic_growth = _ev_value(classic.get("growth"))
     if classic_cagr is not None and classic_growth is not None:
         body += (
-            f"<tr><td>{_e(labels['fund_fees_two_twenty'])}</td>"
+            f"<tr class='fee-classic'><td>{_e(labels['fund_fees_two_twenty'])}</td>"
             f"<td class='val'>{_e(_fund_pct(classic_cagr))}</td>"
             f"<td class='val'>{_e(_fund_pct(classic_growth))}</td></tr>"
         )
