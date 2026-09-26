@@ -112,6 +112,10 @@ CHALLENGE_SAMPLES = 5000
 CHALLENGE_MIN_PERIODS_PER_YEAR = 200.0
 SERIES_MAX_POINTS = 400
 WITHHELD_TEXT = "[withheld: promotional wording]"
+NO_LOCAL_CASH = (
+    "the account is not in US dollars and what cash in its currency paid could not be "
+    "read for the whole history"
+)
 
 
 def _package_version() -> str:
@@ -662,6 +666,7 @@ def _benchmark(
     benchmark: IngestedSeries | None,
     rates: pd.Series | None = None,
     local_cash: LocalCashRates | None = None,
+    other_currency: bool = False,
 ) -> tuple[dict[str, Any], dict[str, float | None], str | None]:
     empty: dict[str, float | None] = {
         "excess_return": None,
@@ -730,8 +735,9 @@ def _benchmark(
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         cash = None
     # The account's own currency's cash comes off the strategy when its rate
-    # covers every period and the bill's covers the benchmark's; otherwise both
-    # sides lose the bill's, as for a dollar account.
+    # covers every period and the bill's covers the benchmark's; otherwise a
+    # dollar account's two sides lose the bill's, and an account in another
+    # currency loses none: the bill is not what its cash paid.
     own = None
     if local_cash is not None and cash is not None:
         try:
@@ -744,6 +750,8 @@ def _benchmark(
         section["jensen"] = alpha_lib.jensen_alpha(
             s_returns, b_returns, joined_ppy, own, cash, local_cash.currency
         )
+    elif other_currency:
+        section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy)
     else:
         section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
     return section, values, None
@@ -759,12 +767,23 @@ class LocalCashRates:
     history: pd.Series | None = None
 
 
+def _account_code(inputs: AuditInputs) -> str:
+    """The account currency as the currency section reads it ("" when unnamed)."""
+    return (inputs.account_currency or "").strip().upper()[: currency_lib.MAX_CODE_CHARS]
+
+
+def _other_currency(inputs: AuditInputs) -> bool:
+    """Whether the file names a currency that is not a form of the US dollar."""
+    code = _account_code(inputs)
+    return bool(code) and code not in currency_lib.DOLLAR_CODES
+
+
 def _local_cash_rates(
     inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
 ) -> LocalCashRates | None:
     """The account currency's cash rates when public data is on and the
     currency has one here; ``None`` otherwise or when they cannot be read."""
-    code = (inputs.account_currency or "").strip().upper()
+    code = _account_code(inputs)
     if market is None or code not in cashrate_lib.LOCAL:
         return None
     local = cashrate_lib.LOCAL[code]
@@ -1027,12 +1046,21 @@ def _cash_rate(
 ) -> dict[str, Any] | None:
     """The Sharpe ratio after what cash paid over the same days, when public
     data is on: the account currency's own rate when a report names a currency
-    with one, else (or when that rate cannot be used) the US Treasury bill's."""
+    with one; the US Treasury bill's for a dollar account or one with no named
+    currency; not measured for another currency whose rate cannot be used."""
     if market is None:
         return None
     local = _local_cash_rate(inputs, market)
     if local is not None:
         return local
+    if _other_currency(inputs):
+        # The bill is what dollars paid: after it, another currency's Sharpe
+        # would mix two currencies' cash.
+        return {
+            "status": "NOT_MEASURED",
+            "reason": NO_LOCAL_CASH,
+            "currency": _account_code(inputs),
+        }
     if rates is None:
         return {
             "status": "NOT_MEASURED",
@@ -1316,7 +1344,11 @@ def run_audit(
     holdout, oos_sharpe, gap, holdout_reason = _holdout(frame, inputs.declared.oos_start, ppy)
     bill_rates = _bill_rates(market)
     benchmark, benchmark_values, benchmark_reason = _benchmark(
-        inputs.equity, inputs.benchmark, bill_rates, _local_cash_rates(inputs, market)
+        inputs.equity,
+        inputs.benchmark,
+        bill_rates,
+        _local_cash_rates(inputs, market),
+        _other_currency(inputs),
     )
     cscv, pbo = _cscv(inputs.variants)
     costs, rows, reference, assumed, gross = _costs(inputs)
@@ -1551,6 +1583,7 @@ def run_audit(
             float(mintrl_value) / ppy * 12.0 if mintrl_value is not None and ppy > 0 else None
         ),
         findings=findings,
+        fund_record=bool(fund.get("track_record")),
     )
     oos = inputs.declared.oos_start
     report_metadata = {

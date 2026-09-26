@@ -217,6 +217,9 @@ ACCOUNT_EVENT_KINDS = (
     "recovery_key_created",
     "session_ended",
     "sessions_ended",
+    "signin_passkey",
+    "passkey_added",
+    "passkey_removed",
 )
 #: How long an account event is kept, and how many at most per account.
 ACCOUNT_EVENT_DAYS = 90
@@ -224,6 +227,35 @@ ACCOUNT_EVENT_MAX = 50
 #: Wrong-password lines kept per account: their own cap, so a flood of
 #: failures never pushes real events out of the ACCOUNT_EVENT_MAX.
 FAILED_SIGNIN_MAX = 20
+#: Browsers whose last view of Mi cuenta is kept per account.
+SEEN_DEVICES_MAX = 20
+
+
+@dataclass(frozen=True)
+class VisitNotice:
+    """ "Desde tu última visita": what happened on the account while it was away."""
+
+    failed_attempts: int = 0
+    new_devices: tuple[str, ...] = ()
+
+
+#: The event kinds that open a session, for "a sign-in from a new device".
+SIGNIN_KINDS = ("signin", "signin_two_step", "signin_recovery_key", "signin_passkey")
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class PasskeyRecord:
+    """A passkey on "Mi cuenta": its name and dates; the public key stays in the store."""
+
+    credential_id: str
+    label: str
+    rp_id: str
+    created_at: str
+    last_used_at: str
 
 
 @dataclass(frozen=True)
@@ -450,6 +482,23 @@ class Store:
             sa.Column("last_at", sa.String(40), nullable=False, index=True),
             sa.UniqueConstraint("account_id", "network", "hour"),
         )
+        # "Desde tu última visita": when each browser (the hash of its
+        # rigor_device cookie) last opened Mi cuenta, with its device label
+        # for display, and how many tries each wrong-password line had then
+        # (JSON, at most FAILED_SIGNIN_MAX ids), so only newer tries are
+        # counted. Kept per browser so a sign-in elsewhere, even with the
+        # same label, never clears the owner's notice. At most
+        # SEEN_DEVICES_MAX rows (a newcomer past it is not stored), 90 days
+        # without a view; goes with the account.
+        self.account_seen = sa.Table(
+            "account_seen",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("browser", sa.String(64), primary_key=True),
+            sa.Column("device", sa.String(80), nullable=False, default=""),
+            sa.Column("seen_at", sa.String(40), nullable=False),
+            sa.Column("failed_json", sa.Text, nullable=False, default="{}"),
+        )
         #: One account per audit: the report a customer uploaded or saved.
         self.account_audits = sa.Table(
             "account_audits",
@@ -580,6 +629,36 @@ class Store:
             sa.Column("created_at", sa.String(40), nullable=False),
             sa.Column("enabled_at", sa.String(40), nullable=False, default=""),
             sa.Column("last_step", sa.BigInteger, nullable=False, default=0),
+        )
+        # Passkeys (WebAuthn): only the credential id, its public key and the
+        # device's counter; ``rp_id`` is the host it was made for (a new
+        # domain needs new passkeys). Goes with the account.
+        self.passkeys = sa.Table(
+            "passkeys",
+            self.metadata,
+            sa.Column("credential_sha256", sa.String(64), primary_key=True),
+            sa.Column("credential_id", sa.Text, nullable=False),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("public_key", sa.Text, nullable=False),
+            sa.Column("sign_count", sa.BigInteger, nullable=False, default=0),
+            sa.Column("label", sa.String(80), nullable=False, default=""),
+            sa.Column("rp_id", sa.String(255), nullable=False),
+            sa.Column("transports", sa.String(200), nullable=False, default=""),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("last_used_at", sa.String(40), nullable=False, default=""),
+        )
+        # An open passkey page: the random challenge the browser must sign,
+        # for whom (empty on the sign-in page, where the device chooses) and
+        # what for. Five minutes, used once.
+        self.passkey_challenges = sa.Table(
+            "passkey_challenges",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("challenge", sa.String(64), nullable=False),
+            sa.Column("account_id", sa.String(32), nullable=False, default="", index=True),
+            sa.Column("purpose", sa.String(8), nullable=False),
+            sa.Column("label", sa.String(80), nullable=False, default=""),
+            sa.Column("expires_at", sa.String(40), nullable=False),
         )
         # A correct password on a two-step account waits here for its code.
         self.two_step_challenges = sa.Table(
@@ -1356,9 +1435,12 @@ class Store:
                 self.recovery_keys,
                 self.two_step,
                 self.two_step_challenges,
+                self.passkeys,
+                self.passkey_challenges,
                 self.session_info,
                 self.account_events,
                 self.failed_signins,
+                self.account_seen,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1502,6 +1584,149 @@ class Store:
             )
         return bool(result.rowcount)
 
+    # -- passkeys --------------------------------------------------------------
+    def add_passkey(
+        self,
+        account_id: str,
+        *,
+        credential_id: str,
+        public_key: str,
+        sign_count: int,
+        label: str,
+        rp_id: str,
+        transports: str,
+        at: datetime,
+        limit: int,
+    ) -> bool:
+        """Store a new passkey; ``False`` if the account is full or it is already stored."""
+        sa = self._sa
+        p = self.passkeys
+        with self.engine.begin() as conn:
+            count = conn.execute(
+                sa.select(sa.func.count()).select_from(p).where(p.c.account_id == account_id)
+            ).scalar_one()
+            if count >= limit:
+                return False
+            try:
+                with conn.begin_nested():
+                    conn.execute(
+                        p.insert().values(
+                            credential_sha256=_sha256(credential_id),
+                            credential_id=credential_id,
+                            account_id=account_id,
+                            public_key=public_key,
+                            sign_count=sign_count,
+                            label=label[:80],
+                            rp_id=rp_id[:255],
+                            transports=transports[:200],
+                            created_at=_iso(at),
+                            last_used_at="",
+                        )
+                    )
+            except sa.exc.IntegrityError:
+                return False
+        return True
+
+    def list_passkeys(self, account_id: str) -> list[PasskeyRecord]:
+        sa = self._sa
+        p = self.passkeys
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(p.c.credential_id, p.c.label, p.c.rp_id, p.c.created_at, p.c.last_used_at)
+                .where(p.c.account_id == account_id)
+                .order_by(p.c.created_at)
+            ).all()
+        return [
+            PasskeyRecord(str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4] or "")) for r in rows
+        ]
+
+    def passkey_ids(self, account_id: str, rp_id: str) -> list[str]:
+        """Credential ids of an account's passkeys made for ``rp_id``."""
+        return [p.credential_id for p in self.list_passkeys(account_id) if p.rp_id == rp_id]
+
+    def find_passkey(self, credential_id: str, rp_id: str) -> tuple[str, str, int] | None:
+        """``(account id, public key, counter)`` of a passkey made for ``rp_id``."""
+        sa = self._sa
+        p = self.passkeys
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(p.c.account_id, p.c.public_key, p.c.sign_count)
+                .where(p.c.credential_sha256 == _sha256(credential_id))
+                .where(p.c.credential_id == credential_id)
+                .where(p.c.rp_id == rp_id)
+            ).first()
+        return (str(row[0]), str(row[1]), int(row[2])) if row is not None else None
+
+    def use_passkey(
+        self, credential_id: str, *, old_count: int, new_count: int, at: datetime
+    ) -> bool:
+        """Record a sign-in; the counter moves only from the value just checked (one winner)."""
+        p = self.passkeys
+        query = (
+            p.update()
+            .where(p.c.credential_sha256 == _sha256(credential_id))
+            .where(p.c.sign_count == old_count)
+            .values(sign_count=new_count, last_used_at=_iso(at))
+        )
+        with self.engine.begin() as conn:
+            result = conn.execute(query)
+        return bool(result.rowcount)
+
+    def remove_passkey(self, account_id: str, credential_id: str) -> bool:
+        p = self.passkeys
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                p.delete()
+                .where(p.c.account_id == account_id)
+                .where(p.c.credential_sha256 == _sha256(credential_id))
+            )
+        return bool(result.rowcount)
+
+    def create_passkey_challenge(
+        self,
+        token_sha256: str,
+        *,
+        challenge: str,
+        purpose: str,
+        account_id: str = "",
+        label: str = "",
+        at: datetime,
+        minutes: int,
+    ) -> None:
+        c = self.passkey_challenges
+        with self.engine.begin() as conn:
+            conn.execute(c.delete().where(c.c.expires_at <= _iso(at)))
+            conn.execute(
+                c.insert().values(
+                    token_sha256=token_sha256,
+                    challenge=challenge,
+                    account_id=account_id,
+                    purpose=purpose,
+                    label=label[:80],
+                    expires_at=_iso(at + timedelta(minutes=minutes)),
+                )
+            )
+
+    def take_passkey_challenge(
+        self, token_sha256: str, purpose: str, now: datetime
+    ) -> tuple[str, str, str] | None:
+        """``(challenge, account id, label)`` of a still-valid page, used up on reading."""
+        sa = self._sa
+        c = self.passkey_challenges
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                sa.select(c.c.challenge, c.c.account_id, c.c.label)
+                .where(c.c.token_sha256 == token_sha256)
+                .where(c.c.purpose == purpose)
+                .where(c.c.expires_at > _iso(now))
+            ).first()
+            if row is None:
+                return None
+            gone = conn.execute(c.delete().where(c.c.token_sha256 == token_sha256)).rowcount
+        if not gone:
+            return None  # pragma: no cover - read twice at once
+        return (str(row[0]), str(row[1]), str(row[2]))
+
     def create_two_step_challenge(
         self, account_id: str, token_sha256: str, *, at: datetime, minutes: int
     ) -> None:
@@ -1605,6 +1830,7 @@ class Store:
                 )
             )
             cutoff = _iso(now - timedelta(days=ACCOUNT_EVENT_DAYS))
+            conn.execute(self.account_seen.delete().where(self.account_seen.c.seen_at < cutoff))
             conn.execute(self.account_events.delete().where(self.account_events.c.at < cutoff))
             conn.execute(self.failed_signins.delete().where(self.failed_signins.c.last_at < cutoff))
         return int(gone or 0)
@@ -1683,6 +1909,96 @@ class Store:
             if ids:
                 conn.execute(fs.delete().where(fs.c.id.in_(ids)))
 
+    def take_visit_notice(
+        self, account_id: str, now: datetime, *, browser: str, device: str = ""
+    ) -> VisitNotice | None:
+        """What happened since this browser last opened Mi cuenta, and mark it seen now.
+
+        ``browser`` is the hash of the browser's own random cookie. Counts
+        wrong-password tries added since and sign-ins from other device
+        labels the account had not used before. Each browser keeps its own
+        last view, so whoever signs in elsewhere never clears the owner's
+        notice. A browser's first view shows nothing (and so tells a
+        newcomer nothing). ``None`` when nothing happened.
+        """
+        sa = self._sa
+        seen_t, ev, fs = self.account_seen, self.account_events, self.failed_signins
+        mine = (seen_t.c.account_id == account_id) & (seen_t.c.browser == browser[:64])
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(seen_t.c.seen_at, seen_t.c.failed_json).where(mine)
+            ).first()
+            lines = {
+                str(r[0]): int(r[1])
+                for r in conn.execute(
+                    sa.select(fs.c.id, fs.c.attempts).where(fs.c.account_id == account_id)
+                ).all()
+            }
+            viewed = [
+                (str(r[0]), str(r[1]))
+                for r in conn.execute(
+                    sa.select(seen_t.c.device, seen_t.c.seen_at).where(
+                        seen_t.c.account_id == account_id
+                    )
+                ).all()
+            ]
+        values = {
+            "device": device[:80],
+            "seen_at": _iso(now),
+            "failed_json": json.dumps(lines, sort_keys=True),
+        }
+        try:
+            with self.engine.begin() as conn:
+                if row is None:
+                    # Past the cap a newcomer is not stored (its first view
+                    # shows nothing anyway), so nobody can push the owner out.
+                    if len(viewed) < SEEN_DEVICES_MAX:
+                        conn.execute(
+                            seen_t.insert().values(
+                                account_id=account_id, browser=browser[:64], **values
+                            )
+                        )
+                else:
+                    conn.execute(seen_t.update().where(mine).values(**values))
+        except sa.exc.IntegrityError:
+            pass  # another tab marked it at the same moment
+        if row is None:
+            return None
+        seen = str(row[0])
+        try:
+            before = {str(k): int(v) for k, v in json.loads(str(row[1] or "{}")).items()}
+        except (ValueError, TypeError, AttributeError):
+            before = {}
+        # Only tries newer than the last view: a line that spans it counts
+        # the tries added since.
+        failed = sum(max(0, n - before.get(line, 0)) for line, n in lines.items())
+        with self.engine.connect() as conn:
+            # Devices that had opened Mi cuenta before this device's last view.
+            known = {label for label, at in viewed if at <= seen} | {
+                str(r[0])
+                for r in conn.execute(
+                    sa.select(ev.c.device)
+                    .where(ev.c.account_id == account_id)
+                    .where(ev.c.at <= seen)
+                    .distinct()
+                ).all()
+            }
+            recent = conn.execute(
+                sa.select(ev.c.device)
+                .where(ev.c.account_id == account_id)
+                .where(ev.c.at > seen)
+                .where(ev.c.kind.in_(SIGNIN_KINDS))
+                .order_by(ev.c.id)
+            ).all()
+        new_devices: list[str] = []
+        for (dev,) in recent:
+            label = str(dev)
+            if label == device or label in known or label in new_devices:
+                continue
+            new_devices.append(label)
+        notice = VisitNotice(failed_attempts=int(failed or 0), new_devices=tuple(new_devices))
+        return notice if notice.failed_attempts or notice.new_devices else None
+
     def list_failed_signins(
         self, account_id: str, *, limit: int = FAILED_SIGNIN_MAX
     ) -> list[AccountEvent]:
@@ -1706,6 +2022,17 @@ class Store:
             )
             for r in rows
         ]
+
+    def _seen_list(self, account_id: str) -> list[dict[str, str]]:
+        sa = self._sa
+        seen_t = self.account_seen
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(seen_t.c.device, seen_t.c.seen_at)
+                .where(seen_t.c.account_id == account_id)
+                .order_by(seen_t.c.seen_at.desc())
+            ).all()
+        return [{"device": str(r[0]), "seen_at": str(r[1])} for r in rows]
 
     def list_events(self, account_id: str, *, limit: int = ACCOUNT_EVENT_MAX) -> list[AccountEvent]:
         """The account's events, newest first."""
@@ -2693,6 +3020,17 @@ class Store:
                 {"event": e.kind, "at": e.at, "device": e.device, "network": e.network}
                 for e in self.list_events(account_id)
             ],
+            "account_page_seen": self._seen_list(account_id),
+            # The public half only; the private key never left the device.
+            "passkeys": [
+                {
+                    "name": p.label,
+                    "site": p.rp_id,
+                    "created_at": p.created_at,
+                    "last_used_at": p.last_used_at or None,
+                }
+                for p in self.list_passkeys(account_id)
+            ],
             "failed_signins": [
                 {"last_at": e.at, "attempts": e.count, "device": e.device, "network": e.network}
                 for e in self.list_failed_signins(account_id)
@@ -3086,6 +3424,7 @@ __all__ = [
     "CODE_REFERENCE_PREFIX",
     "WELCOME_REFERENCE_PREFIX",
     "AccountAudit",
+    "PasskeyRecord",
     "AccountCode",
     "AccountRecord",
     "OWN_VIAS",

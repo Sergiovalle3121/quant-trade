@@ -1234,3 +1234,38 @@ def test_the_fund_split_is_styled() -> None:
     assert ".skill-intro{break-after:avoid;page-break-after:avoid}" in STYLE
     # On a narrow phone the 2 % + 20 % label wraps instead of widening the page.
     assert "table.timing tr.fee-classic td:first-child{white-space:normal}" in STYLE
+
+
+def test_evidence_rows_read_as_one_list_on_phones() -> None:
+    phone = STYLE[STYLE.index("@keyframes scroll-cue") :]
+    # On a phone the rows of an evidence table share one card with rules
+    # between them, instead of a stack of separate cards.
+    assert ".metrics.ev tbody{gap:0;background:#fff;border:1px solid var(--border)" in phone
+    assert ".metrics.ev tr:first-child{border-top:0}" in phone
+
+
+def test_crisis_rows_read_as_cards_on_phones() -> None:
+    # With public data on, the crisis table has four columns and ran past a
+    # 360 px screen; on a phone each crisis is a card with labelled figures.
+    assert ".paper table.crises{display:block" in STYLE
+    assert ".crises td.val::before{content:attr(data-l)" in STYLE
+    assert ".paper table:not(.ev):not(.firms):not(.crises){animation:scroll-cue" in STYLE
+
+
+def test_currency_figures_keep_a_gap_on_phones() -> None:
+    # The local-inflation rows put three figures beside a two-line name; on
+    # a narrow phone the figures keep a visible gap between them.
+    assert ".paper table.currency td.val,.paper table.currency th.val{padding-left:9px" in STYLE
+    assert ".paper table.currency td:first-child{min-width:7.4em}" in STYLE
+
+
+def test_paired_figures_sit_two_per_row_on_phones() -> None:
+    # The fund's figures and "Cómo se vivió este historial" were one tall card
+    # per figure on a phone; two per row halves the scroll.
+    phone = STYLE[STYLE.index("@media screen and (max-width:620px){.facts.pairs") :]
+    assert phone.startswith(".facts.pairs{grid-template-columns:repeat(2,minmax(0,1fr))", 36)
+    assert ".facts.pairs .fact b{font-size:1.5rem;overflow-wrap:anywhere}" in phone
+
+
+def test_the_line_under_the_summary_tiles_has_room() -> None:
+    assert ".kpis+p{margin-top:14px}" in STYLE

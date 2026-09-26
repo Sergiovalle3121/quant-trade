@@ -11,7 +11,7 @@ import pytest
 from audit_fixtures import csv_bytes
 
 from quant_trade.audit.cashrate import LOCAL, NOTE_LOCAL, local_excess_sharpe
-from quant_trade.audit.engine import run_audit
+from quant_trade.audit.engine import NO_LOCAL_CASH, run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.market import CASH, LOCAL_CASH, SERIES, MarketData, parse_rates
@@ -127,12 +127,11 @@ def test_a_euro_account_subtracts_the_euro_rate(locale: str) -> None:
     assert untranslated(result.model_dump(mode="json")) == []
 
 
-def test_without_a_usable_local_rate_the_dollar_line_stays() -> None:
+def test_without_a_usable_local_rate_only_a_dollar_account_gets_the_bill_line() -> None:
     days = pd.bdate_range("2023-01-02", periods=300)
     bill = _daily(days, 5.0)
-    # A euro account whose euro rates start after the history: the bill line.
     late = pd.Series(3.0, index=pd.bdate_range("2023-06-01", periods=200))
-    for currency, local in (("EUR", late), ("EUR", None), ("AUD", None), ("USD", None)):
+    for currency, local in (("USD", None), ("USC", None), ("usdt", None), (None, None)):
         inputs = _inputs(days, "es", currency)
 
         def market(key: str, local: pd.Series | None = local) -> pd.Series | None:
@@ -142,6 +141,21 @@ def test_without_a_usable_local_rate_the_dollar_line_stays() -> None:
         cash = result.cash_rate
         assert cash is not None and cash["status"] == "MEASURED", currency
         assert cash["series"] == "DTB3" and "currency" not in cash, currency
+    # A euro account whose euro rates start after the history, or none, and a
+    # currency with no rate here: the bill is not what their cash paid.
+    for currency, local in (("EUR", late), ("EUR", None), ("AUD", None), ("ars", None)):
+        inputs = _inputs(days, "es", currency)
+
+        def other(key: str, local: pd.Series | None = local) -> pd.Series | None:
+            return {"cash_eur": local, CASH.key: bill}.get(key)
+
+        result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=other)
+        cash = result.cash_rate
+        assert cash is not None and cash["status"] == "NOT_MEASURED", currency
+        assert cash["reason"] == NO_LOCAL_CASH and cash["currency"] == currency.upper()
+        assert untranslated(result.model_dump(mode="json")) == []
+        page, _ = render(result, watermark=False)
+        assert LABELS["es"]["cash_sharpe"].split("{")[0] not in page
 
 
 def test_a_broken_local_series_never_stops_the_audit() -> None:

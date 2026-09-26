@@ -585,19 +585,28 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "(needed to check its codes) and the last code step used, so a code works "
                     "once. It is deleted when you turn it off, when you use your recovery key "
                     "or with your account.",
+                    "If you add a passkey: its credential id, its public key (never the "
+                    "private key, which stays on your device), the name you give it, the site "
+                    "address it was made for, the device's counter and when it was added and "
+                    "last used. It is deleted when you remove it or with your account.",
                     "For 'Open sessions' in your account: for each session, a short device "
                     "label (such as 'Chrome · Windows', never the browser's full string), the "
                     "network address (an IPv6 address counts as its /64) and when it was last "
                     "used. It is deleted when the session is signed out or expires, or with your "
                     "account.",
                     "For 'Recent activity' in your account: each sign-in (with or without a "
-                    "code), each change of password, two-step sign-in or recovery key and each "
+                    "code, or with a passkey), each change of password, two-step sign-in, "
+                    "recovery key or passkeys and each "
                     "session signed out, with its date, the short device label and the network "
                     "address. We keep the latest 50, and delete them after 90 days and with your "
                     "account. Separately, when someone types a wrong password for your account: "
                     "how many tries there were per network and hour, the device label and the "
                     "time of the last one, never the e-mail or password typed; we keep the "
-                    "latest 20 lines, and delete them after 90 days and with your account.",
+                    "latest 20 lines, and delete them after 90 days and with your account. And "
+                    "for each browser you open 'My account' with, the time of its last visit and "
+                    "its label, kept under the hash of its random mark (the same cookie as the "
+                    "free report), only to tell you what happened since; it is deleted after 90 "
+                    "days without a visit or with your account.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
@@ -739,18 +748,27 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "de autenticación (necesaria para comprobar sus códigos) y el último paso de "
                 "código usado, para que cada código sirva una vez. Se borra al desactivarla, al "
                 "usar tu clave de recuperación o con tu cuenta.",
+                "Si añades una llave de acceso: su identificador, su clave pública (nunca la "
+                "privada, que se queda en tu dispositivo), el nombre que le pongas, la dirección "
+                "del sitio para la que se creó, el contador del dispositivo y cuándo se añadió y "
+                "se usó por última vez. Se borra al quitarla o con tu cuenta.",
                 "Para «Sesiones abiertas» en tu cuenta: de cada sesión, una etiqueta corta del "
                 "dispositivo (como «Chrome · Windows», nunca el texto completo del navegador), la "
                 "dirección de red (una IPv6 cuenta como su /64) y cuándo se usó por última vez. "
                 "Se borra al cerrar la sesión o al caducar, o con tu cuenta.",
-                "Para «Actividad reciente» en tu cuenta: cada entrada (con o sin código), cada "
-                "cambio de contraseña, de verificación en dos pasos o de clave de recuperación "
+                "Para «Actividad reciente» en tu cuenta: cada entrada (con o sin código, o con "
+                "llave de acceso), cada cambio de contraseña, de verificación en dos pasos, de "
+                "clave de recuperación o de llaves de acceso "
                 "y cada sesión cerrada, con su fecha, la etiqueta corta del dispositivo y la "
                 "dirección de red. Guardamos las últimas 50, las borramos a los 90 días y "
                 "con tu cuenta. Aparte, cuando alguien escribe una contraseña incorrecta para "
                 "tu cuenta: cuántos intentos hubo por red y por hora, la etiqueta del "
                 "dispositivo y la hora del último, nunca el correo ni la contraseña escritos; "
-                "guardamos las últimas 20 líneas, las borramos a los 90 días y con tu cuenta.",
+                "guardamos las últimas 20 líneas, las borramos a los 90 días y con tu cuenta. "
+                "Y, por cada navegador con el que abres «Mi cuenta», la hora de su última visita "
+                "y su etiqueta, guardado bajo el hash de su marca aleatoria (la misma cookie del "
+                "informe gratis), solo para avisarte de lo que pasó desde entonces; se borra a "
+                "los 90 días sin visitas o con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
