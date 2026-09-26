@@ -3435,7 +3435,7 @@ def test_new_customers_behind_one_carrier_ipv4_still_get_their_free_report(
     from quant_trade.audit import accounts
 
     monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 100)
-    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1, max_uploads_per_hour_per_ip=100)
 
     def first_upload(n: int, address: str) -> str:
         browser = TestClient(client.app)
