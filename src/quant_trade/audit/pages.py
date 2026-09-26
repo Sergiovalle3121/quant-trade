@@ -841,6 +841,13 @@ _UI: dict[str, dict[str, Any]] = {
                 "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
                 "depende de un solo tipo de mercado.",
             ),
+            (
+                "globe",
+                "En tu moneda y tras la inflación",
+                "Si la cuenta está en dólares, ves su resultado en pesos, reales, euros y otras "
+                "cuatro monedas al tipo de cambio de cada día, y después de la inflación de "
+                "EE. UU. (datos públicos de FRED).",
+            ),
         ],
         "how_eyebrow": "Proceso",
         "pricing_eyebrow": "Precios",
@@ -868,6 +875,7 @@ _UI: dict[str, dict[str, Any]] = {
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
             "VIX tranquilo o agitado y crisis conocidas",
+            "Si la cuenta está en dólares: el resultado en tu moneda y tras la inflación",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -1049,6 +1057,13 @@ _UI: dict[str, dict[str, Any]] = {
                 "crisis your history covers is measured on its own: you see whether the result "
                 "depends on one kind of market.",
             ),
+            (
+                "globe",
+                "In your currency and after inflation",
+                "If the account is in dollars, you see its result in pesos, reais, euros and "
+                "four more currencies at each day's exchange rate, and after US inflation "
+                "(public FRED data).",
+            ),
         ],
         "how_eyebrow": "Process",
         "pricing_eyebrow": "Pricing",
@@ -1076,6 +1091,7 @@ _UI: dict[str, dict[str, Any]] = {
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Against cash and the market: the Sharpe without what cash paid, calm or "
             "agitated VIX and known crises",
+            "If the account is in dollars: the result in your currency and after inflation",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",

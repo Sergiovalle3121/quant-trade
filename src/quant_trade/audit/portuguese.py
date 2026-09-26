@@ -452,6 +452,13 @@ UI_PT: dict[str, Any] = {
             "pública que o seu histórico cobre é medida à parte: você vê se o resultado depende "
             "de um só tipo de mercado.",
         ),
+        (
+            "globe",
+            "Na sua moeda e depois da inflação",
+            "Se a conta está em dólares, você vê o resultado em reais, pesos, euros e mais "
+            "quatro moedas ao câmbio de cada dia, e depois da inflação dos EUA (dados públicos "
+            "do FRED).",
+        ),
     ],
     "how_eyebrow": "Processo",
     "pricing_eyebrow": "Preços",
@@ -479,6 +486,7 @@ UI_PT: dict[str, Any] = {
         "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
         "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
         "agitado e crises conhecidas",
+        "Se a conta está em dólares: o resultado na sua moeda e depois da inflação",
         "Página pública de verificação com selo",
     ],
     "upload_eyebrow": "Comece aqui",

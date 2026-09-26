@@ -40,8 +40,12 @@ def test_start_free_goes_to_sign_up_when_an_upload_needs_an_account(locale: str)
 def test_the_landing_sells_what_the_full_report_now_measures(locale: str) -> None:
     ui = _UI[locale]
     titles = [title for _, title, _ in ui["diffs"]]
-    assert len(titles) == 6
-    words = {"es": ("efectivo", "VIX"), "en": ("cash", "VIX"), "pt": ("caixa", "VIX")}[locale]
+    assert len(titles) == 7
+    words = {
+        "es": ("efectivo", "VIX", "inflación"),
+        "en": ("cash", "VIX", "inflation"),
+        "pt": ("caixa", "VIX", "inflação"),
+    }[locale]
     text = _text(landing(locale=locale, free_mode=False, signed_in=False))
     for word in words:
         assert word in " ".join(t for _, _, t in ui["diffs"]), word
