@@ -4289,6 +4289,18 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
+            "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+            "standard error; what the 3-month US Treasury bill paid over the same periods "
+            "subtracted from both sides"
+        ),
+        (
+            "rentabilidade além dos movimentos do benchmark (alfa de Jensen), anualizada; erro "
+            "padrão prudente; subtraído dos dois lados o que a letra do Tesouro dos EUA de 3 "
+            "meses pagou nos mesmos períodos"
+        ),
+    ),
+    (
+        (
             "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious standard "
             "error; no cash rate subtracted"
         ),

@@ -1237,6 +1237,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+        "standard error; what the 3-month US Treasury bill paid over the same periods "
+        "subtracted from both sides",
+        "rentabilidad más allá de los movimientos del benchmark (alfa de Jensen), anualizada; "
+        "error estándar prudente; restado de ambos lados lo que pagó la letra del Tesoro de "
+        "EE. UU. a 3 meses en los mismos periodos",
+    ),
+    (
+        "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
         "standard error; no cash rate subtracted",
         "rentabilidad más allá de los movimientos del benchmark (alfa de Jensen), anualizada; "
         "error estándar prudente; sin restar tasa de efectivo",

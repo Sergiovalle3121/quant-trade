@@ -2536,7 +2536,13 @@ Informational only: none of these moves a class, a dimension or a red flag.
   (24 shared periods or more): Jensen's alpha from regressing the
   strategy's period returns on the benchmark's, annualised, with a
   Newey-West t-statistic (lag `floor(4 (n/100)^(2/9))`), beta and R squared.
-  No cash rate is subtracted.
+  When public data is on and FRED's DTB3 covers every period, what the
+  3-month US Treasury bill paid over each period (the rate on or before its
+  start, at most 10 days old, converted to an annual yield) is subtracted
+  from both sides first; the fund comparison uses the month's mean rate.
+  Without it nothing is subtracted, `cash_subtracted` is false and the note
+  says so, because then a strategy with beta `b` shows `(1 - b)` times what
+  cash paid as alpha.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
