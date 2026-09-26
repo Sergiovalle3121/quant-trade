@@ -546,3 +546,48 @@ def test_the_script_address_changes_with_its_content(tmp_path: Path) -> None:
     script = client.get(SCRIPT_SRC)
     assert script.status_code == 200 and "data-passkey" in script.text
     assert "navigator.credentials.get" in script.text
+
+
+PROTECT = "id='proteccion'"
+
+
+def test_the_protection_card_counts_what_is_on_and_links_what_is_off(tmp_path: Path) -> None:
+    client = _passkey_client(tmp_path)
+    _signup(client)
+    page = client.get("/cuenta").text
+    card = page.split(PROTECT)[1].split("</ul>")[0]
+    assert "0 de 3 activas" in card
+    # Two-step needs the recovery key first, so its link goes there.
+    assert "Primero crea tu clave de recuperación." in card
+    assert card.count("href='#recuperacion'") == 2 and "href='#llaves'" in card
+    # It sits above the reports, where a new customer looks first.
+    assert page.index(PROTECT) < page.index("id='llaves'")
+    assert find_claims(page) == []
+
+    _turn_on_two_step(client)
+    card = client.get("/cuenta").text.split(PROTECT)[1].split("</ul>")[0]
+    assert "2 de 3 activas" in card and "href='#dos-pasos'" not in card
+
+    _add_passkey(client, Device())
+    page = client.get("/cuenta").text
+    assert PROTECT not in page
+    assert "Tienes activas todas las protecciones que ofrecemos." in page
+
+
+def test_the_protection_card_leaves_out_passkeys_where_they_cannot_work(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path, base_url="http://rigor.example")
+    _signup(client)
+    card = client.get("/cuenta").text.split(PROTECT)[1].split("</ul>")[0]
+    assert "0 de 2 activas" in card and "Llave de acceso" not in card
+
+
+def test_the_protection_card_exists_in_every_language(tmp_path: Path) -> None:
+    for locale, prefix, count in (
+        ("en", "/account", "0 of 3 on"),
+        ("pt", "/pt/conta", "0 de 3 ativas"),
+    ):
+        client = _passkey_client(tmp_path / locale)
+        _signup(client, f"{locale}@example.com")
+        page = client.get(prefix).text
+        assert PROTECT in page and count in page
+        assert find_claims(page) == []

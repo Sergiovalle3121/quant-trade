@@ -1061,6 +1061,38 @@ has periods of different sizes; trades are treated as independent, which
 understates the noise of a strategy whose trades cluster; it describes the
 history and says nothing about later periods.
 
+### Did the average return change at some point (`audit/breaks.py`)
+
+`decay.py` compares fixed thirds of closed trades; the rolling and sub-period
+views describe the curve without a test. This section asks one question of
+every curve with 250 or more returns (`breaks.MIN_RETURNS`), trades or not:
+is there a point where the average return shifted by more than the returns'
+noise explains?
+
+- Test: the CUSUM of the returns' deviations from their mean (Ploberger and
+  Krämer, 1992), `max_k |S_k| / (sigma sqrt(n))`, with the Brownian bridge's
+  (Kolmogorov) tail as the p-value. `sigma^2` is the cautious long-run
+  variance: the largest of the plain one, Newey-West (Bartlett, the lag of
+  `alpha.newey_west_lags`) and the plain one widened by `(1 + rho) / (1 - rho)`
+  (Kendall-corrected, clipped to `[0, 0.9]`). On simulated AR(1) returns with
+  t(5) shocks and no shift it passed 5 % in at most about 4.5 % of histories
+  for autocorrelation 0, 0.3 and 0.6 (`tests/test_audit_breaks.py`).
+- `clear` when `p <= 0.05` (`ALPHA_LEVEL`) and at least 30 returns
+  (`MIN_SIDE`) lie on each side of the date; otherwise `edge` says the largest
+  deviation sits too close to either end for a before and an after.
+- The date is where the running sum strays furthest from its line; its
+  range is Bai's (1997) 95 % interval, `11.03 sigma^2 / delta^2` returns on
+  each side (`delta` the shift). On simulated shifts it covered the true date
+  in about 95 % of detected cases.
+- Before and after: each side's average return, annualised, with a 90 %
+  band from its own cautious standard error. All MEASURED.
+
+Informational: no flag, no class change. Limitations: a single shift is
+assumed (several smaller ones read as one, a gradual drift as a date in its
+middle); a small shift in a short history is often missed, which the "Sin
+cambio claro" line says ("no prueba que no haya cambiado"); the date is where
+the change shows most, not its cause; it describes the history only.
+
 ### What is left once luck is discounted (`audit/luck.py`)
 
 The deflated Sharpe gives a probability; this section restates the same
@@ -2305,6 +2337,12 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
+  key, two-step sign-in and a passkey (only where passkeys work), each as
+  on or with a link to its card, and counts how many are on. Two-step
+  links to the recovery key while there is none, since it needs one. With
+  everything on, it shrinks to one line. It reads existing rows only and
+  stores nothing.
 - **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
   `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
   acceso" adds one after the current password (`POST /cuenta/llaves`, then
@@ -2781,6 +2819,8 @@ Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-co
 Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?". The yearly figures sit right-aligned, the fund's average return is a shaded total row set off by a rule, and the alpha's range and reading is a ruled line like the other readings. In the PDF the table and its introduction stay on one page instead of leaving the total row alone on the next. On a 360 px phone the fee table's "2 % + 20 %" label ran the page 15 px wide; it now wraps.
 
 Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the dependence line, Jensen's alpha on the account's rate, the fund split), the landing's new "¿Qué tan protegida está mi cuenta?" answer and the fund page's checks at 360 and 390 px. Nothing ran past the screen and no heading was stranded at a PDF page end. The tallest part was the evidence tables (trade statistics, significance, benchmark), where each row was its own card; on a phone each table is now one card with rules between rows, so the same figures take less scrolling and read as a list. Rendered with public data on (FRED), the crisis table gains an index column and ran 27 px past a 360 px screen; on a phone each crisis is now a card with its name, dates and labelled figures. The local-cash Sharpe line under the summary tiles gets a little space above it, and the landing's "Frente al efectivo" card fits at 360 and 390 px in all three languages. With each currency's own inflation (EUR, GBP, CAD, CHF, BRL), the currency table's figures keep a visible gap on narrow phones; the /metodologia list of public data sources uses the page's existing check list and fits at 360 px.
+
+Redesign pass 70 walks the fund-record report after its fund-only sections landed, at 360 and 390 px in ES, EN and PT. The paired figure cards (the fund's own figures, its figures against the index, and a trading report's "Cómo se vivió este historial") were one tall card per figure on a phone; they now sit two per row, with the evidence label under each figure, so the same block takes about half the scroll. Screen only; the PDF keeps its two-per-row print layout.
 
 ## Security
 
