@@ -5737,7 +5737,7 @@ def _falls_html(
         cells = (
             (" val neg", _pct(float(fall["depth"]["value"]), signed=True)),
             ("", down),
-            ("" if end else " muted", back),
+            ("", back),
             (" val", total),
         )
         rows += "<tr>" + "".join(

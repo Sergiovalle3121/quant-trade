@@ -4747,6 +4747,10 @@ RULES: tuple[tuple[str, str], ...] = (
         "menos de um ano de histórico; ele divide um retorno anual",
     ),
     (
+        "the deepest fall is under 1 %, too shallow to divide by",
+        "a maior queda é de menos de 1 %, pouco demais para dividir por ela",
+    ),
+    (
         "calendar days from the uploaded equity curve; months from each month's last point",
         "dias corridos da curva de patrimônio enviada; meses com o último ponto de cada mês",
     ),

@@ -1136,7 +1136,8 @@ does: each runs from the last point at a high to its lowest point and ends on
 the first date back at that high (or stays open at the file's end), with its
 depth, the days down, the days back and the total. It also shows the Calmar
 ratio (compound annual return over the depth of the deepest fall, from 365
-days of history, the same return the summary prints) and the expected
+days of history and a deepest fall of at least 1 %, the same return the
+summary prints) and the expected
 shortfall: the average of the worst 5 % of daily returns (from 40 days, and
 only when the curve has a point on most days) and of monthly returns (from
 40 months), so the 5 % always holds at least two. On a fund record the

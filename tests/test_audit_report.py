@@ -163,7 +163,10 @@ def test_stress_tables_mark_scenarios_that_fall_to_zero_or_below() -> None:
         for row in block.get("rows", [])
         if row["result"]["value"] <= 0
     )
-    assert page.count("<td class='val neg' data-l=") == below
+    shown = "".join(
+        part.split("</table>", 1)[0] for part in page.split("<table class='stress'>")[1:]
+    )
+    assert shown.count("<td class='val neg' data-l=") == below
 
 
 def test_locked_preview_links_the_full_sample_in_a_new_tab() -> None:

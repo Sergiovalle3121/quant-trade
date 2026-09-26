@@ -46,6 +46,9 @@ MAX_DAY_GAP = 4
 WORST_FALLS = 5
 #: Calendar days of history before the Calmar ratio (it divides an annual return).
 MIN_CALMAR_DAYS = 365
+#: A deepest fall shallower than this leaves the Calmar ratio dividing by
+#: almost nothing: a too-smooth curve would print it in the tens of thousands.
+MIN_CALMAR_FALL = 0.01
 #: Share of the worst days or months the tail average covers.
 TAIL_SHARE = 0.05
 #: Days needed so the worst 5 % holds at least five of them, and months so it
@@ -233,6 +236,8 @@ def ride_review(frame: pd.DataFrame) -> dict[str, Any]:
     span = (last - stamps.iloc[0]).days
     if not fell:
         review["calmar"] = not_measured("the curve never falls below a previous high")
+    elif float(depth.iloc[low]) > -MIN_CALMAR_FALL:
+        review["calmar"] = not_measured("the deepest fall is under 1 %, too shallow to divide by")
     elif span < MIN_CALMAR_DAYS:
         review["calmar"] = not_measured("under a year of history; it divides an annual return")
     else:

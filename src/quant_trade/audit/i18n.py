@@ -2016,6 +2016,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "menos de un año de historial; divide un retorno anual",
     ),
     (
+        "the deepest fall is under 1 %, too shallow to divide by",
+        "la mayor caída es de menos del 1 %, demasiado poco para dividir entre ella",
+    ),
+    (
         "calendar days from the uploaded equity curve; months from each month's last point",
         "días naturales de la curva de equity aportada; meses con el último punto de cada mes",
     ),

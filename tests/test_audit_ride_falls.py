@@ -157,3 +157,11 @@ def test_the_report_lists_the_falls_and_ratios_in_every_language(upload, locale:
     key = "ride_tail_month" if fund else "ride_tail_day"
     assert labels[key].format(k=tail["count"], n=tail["of"]) in shown
     assert find_claims(shown) == []
+
+
+def test_calmar_leaves_out_a_fall_too_shallow_to_divide_by() -> None:
+    values = [100.0 + 0.01 * i for i in range(800)]
+    values[400] = values[399] * 0.9999
+    ride = ride_review(_frame(values))
+    assert ride["worst_falls"]
+    assert ride["calmar"]["evidence"] == "NOT_MEASURED"
