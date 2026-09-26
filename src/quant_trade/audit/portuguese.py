@@ -398,7 +398,7 @@ UI_PT: dict[str, Any] = {
         ("6", "dimensões auditadas"),
         ("{flags}", "bandeiras vermelhas revisadas em cada arquivo"),
         ("{presets}", "desafios de prop firms para simular"),
-        ("{platforms}", "plataformas lidas como estão"),
+        ("{platforms}", "formatos de plataforma que reconhece"),
     ],
     "evidence_eyebrow": "Evidência",
     "evidence_title": ("Cada número diz", "de onde vem."),
