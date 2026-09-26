@@ -185,13 +185,14 @@ def _codes(result) -> set[str]:  # type: ignore[no-untyped-def]
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])
-def test_a_fund_declared_net_of_fees_skips_the_zero_cost_flag(locale: str) -> None:
+def test_a_fund_record_never_gets_the_zero_cost_flag(locale: str) -> None:
     data = _grid_csv(_returns(120, seed=7))
     plain = run_audit(build_inputs(data, DeclaredMetadata(locale=locale)), bootstrap_samples=200)
     net = run_audit(
         build_inputs(data, DeclaredMetadata(locale=locale, net_of_fees=True)), bootstrap_samples=200
     )
-    assert "ZERO_DECLARED_COSTS" in _codes(plain)
+    # A monthly fund record has no per-side cost to declare, net of fees or not.
+    assert "ZERO_DECLARED_COSTS" not in _codes(plain)
     assert "ZERO_DECLARED_COSTS" not in _codes(net)
     assert net.fund is not None and net.fund["net_of_fees"]["evidence"] == "DECLARED"
     html, _ = render(net, watermark=False)

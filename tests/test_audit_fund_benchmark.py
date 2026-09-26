@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant_trade.audit.engine import run_audit
+from quant_trade.audit.engine import FILE_BENCHMARK_NOTE, run_audit
 from quant_trade.audit.fund import compare_with_benchmark, fund_review
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
@@ -135,7 +135,7 @@ def test_every_benchmark_label_passes_the_guard() -> None:
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])
-def test_the_section_shows_the_benchmark_and_the_class_does_not_move(locale: str) -> None:
+def test_the_file_index_feeds_the_section_and_the_benchmark_dimension(locale: str) -> None:
     fund, index = _pair(72)
     with_bench = _labelled_grid(fund, index, "alternating")
     alone = (
@@ -148,11 +148,22 @@ def test_the_section_shows_the_benchmark_and_the_class_does_not_move(locale: str
     a = run_audit(build_inputs(with_bench, DeclaredMetadata(locale=locale)), bootstrap_samples=200)
     b = run_audit(build_inputs(alone, DeclaredMetadata(locale=locale)), bootstrap_samples=200)
     assert a.fund is not None and a.fund["benchmark"]["status"] == "MEASURED"
-    assert a.verdict.model_dump() == b.verdict.model_dump()
+    # The benchmark dimension reads the same index, and says where it came from.
+    status = {d.name: d.status for d in a.verdict.dimensions}
+    alone_status = {d.name: d.status for d in b.verdict.dimensions}
+    assert status["benchmark"] in {"PASS", "WEAK", "FAIL"}
+    assert alone_status["benchmark"] == "NOT_MEASURED"
+    assert {k: v for k, v in status.items() if k != "benchmark"} == {
+        k: v for k, v in alone_status.items() if k != "benchmark"
+    }
+    assert a.benchmark["source"] == "file"
+    assert a.benchmark["overlap_share"]["note"] == FILE_BENCHMARK_NOTE
     assert [f["code"] for f in a.red_flags] == [f["code"] for f in b.red_flags]
     html, _ = render(a, watermark=False)
     assert_report_clean(html)
     assert LABELS[locale]["fund_bench"] in html
+    note = "el índice que trae el propio archivo" if locale == "es" else FILE_BENCHMARK_NOTE
+    assert note in html
     assert ("esta comparación lo favorece" if locale == "es" else "comparison flatters it") in html
     assert untranslated(a.model_dump(mode="json")) == []
 

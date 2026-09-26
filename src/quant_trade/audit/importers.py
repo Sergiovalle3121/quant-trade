@@ -4427,6 +4427,17 @@ def _is_legacy_xls(data: bytes) -> bool:
     return data.startswith(OLE_SIGNATURE)
 
 
+def _is_pdf(data: bytes) -> bool:
+    return data.lstrip()[:5] == b"%PDF-"
+
+
+#: Every audit read from a PDF says so: its rows were rebuilt from a printed page.
+PDF_ROWS_WARNING = (
+    "the trades were read from the table of a PDF statement; check the trade list "
+    "against the statement"
+)
+
+
 def _is_workbook(data: bytes) -> bool:
     """A workbook ``read_xlsx`` reads: .xlsx or .ods (a zip) or .xls."""
     return _is_zip(data) or _is_legacy_xls(data)
@@ -4439,18 +4450,13 @@ _ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls", "
 def unwrap(data: bytes) -> bytes:
     """The export itself: a zip holding one export (not a workbook) gives
     that file; an OpenDocument spreadsheet or an old Excel workbook is read
-    like a workbook; another OpenDocument file or a PDF is
+    like a workbook, and a PDF is passed on to ``pdf_tables``; another
+    OpenDocument file is
     refused with the way to get a file that can be read."""
     if _is_legacy_xls(data):
         return data  # read_xlsx reads the old workbook, or refuses it
     if data.lstrip()[:5] == b"%PDF-":
-        raise ReportFormatError(
-            "pdf_statement",
-            "a PDF is a printed statement, not data that can be read: download the history "
-            "from the platform as CSV, Excel or HTML instead (the guides show where)",
-            "un PDF es un estado de cuenta impreso, no datos que se puedan leer: descarga el "
-            "historial de la plataforma en CSV, Excel o HTML (las guías muestran dónde)",
-        )
+        return data  # read only through the column screen (``pdf_tables``)
     if not _is_zip(data):
         flex = _flex_trades(data)
         return flex if flex is not None else data
@@ -4602,6 +4608,16 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
     """The customer's table read with their own column mapping."""
     from quant_trade.audit import universal
 
+    if _is_pdf(data):
+        from quant_trade.audit import pdf_tables
+
+        table = pdf_tables.rows(data)
+        header_at = _mapped_header(table, columns)
+        if header_at is None:
+            raise _mapped_not_found(table, columns)
+        draft = universal.parse(table[header_at], table[header_at + 1 :], ",", columns)
+        draft.warnings.append(PDF_ROWS_WARNING)
+        return draft
     if _is_workbook(data):
         sheets = read_xlsx(data)
         for sheet in sheets.values():
@@ -4779,6 +4795,17 @@ def import_report(
         )
     if columns:
         return _assemble(_mapped_draft(data, columns), initial_balance)
+    if _is_pdf(data):
+        # A PDF is never matched to a platform: once its table reads cleanly
+        # (or is refused), the customer names the columns on the screen.
+        from quant_trade.audit import pdf_tables
+
+        pdf_tables.rows(data)
+        raise ReportFormatError(
+            "pdf_columns",
+            "the trades in a PDF are read only once you name its columns",
+            "las operaciones de un PDF se leen solo cuando indicas sus columnas",
+        )
     if _is_workbook(data):
         # Read the workbook here so that its own errors (too large, damaged)
         # reach the client instead of a generic "unknown format".

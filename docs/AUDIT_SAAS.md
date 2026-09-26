@@ -309,9 +309,25 @@ the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
 Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
 save it as .xlsx or CSV), an OpenDocument file
-that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
-Excel or HTML history), and a zip with none or several exports
-(`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
+that is not a spreadsheet (`opendocument_sheet`), a PDF statement whose table
+cannot be read with confidence (`pdf_statement`: download the CSV, Excel or
+HTML history), and a zip with none or several exports (`zip_contents`).
+
+A PDF statement (`audit/pdf_tables.py`) is read only as a ruled table
+(pdfplumber's line strategy, web extra) and only through the column screen:
+it is never matched to a known platform, the upload is answered with
+`pdf_columns` and the screen shows the rows with a notice (ES, EN, PT) that
+they were rebuilt from a PDF and should be checked; a saved column choice is
+never applied to a PDF without showing it. The audit read from it carries
+`PDF_ROWS_WARNING`. The extraction runs in a child process killed after
+10 s, with 1 GB of memory and 10 s of CPU; at most 30 pages, 20,000
+characters per page and 200,000 table cells in all. The table's pieces are joined across pages only when
+they all have the same columns (a header repeated on each page is dropped);
+a header with fewer than three named columns or a repeated name, text laid
+out without rules, a scanned page, or any data row filling less than 60 % of
+the named columns (a row cut by a page break) refuses the whole file with
+`pdf_statement`: a refusal costs less than a misread trade. The rows are read
+with a dot as the decimal mark, as a web page's are. An Interactive Brokers Flex Query statement in XML (its
 default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
 `<Trade>` at `EXECUTION` level with the attribute names as columns
 (order-level and summary rows are ignored; parsed with the same no-DOCTYPE
@@ -1238,11 +1254,23 @@ fees, so the upload form has a box for it ("Son rentabilidades de un fondo,
 ya netas de sus comisiones"). It is honoured only for a fund track record: a
 hand-made return or NAV file (or factsheet table) at 13 or fewer periods a
 year, with no trades, platform report or live history (`engine.fund_record`).
-There it drops `ZERO_DECLARED_COSTS`, the section shows the declaration as
+There it drops `ZERO_DECLARED_COSTS` (which no fund record raises now: its
+trading costs are inside each month), the section shows the declaration as
 DECLARED and says Rigor did not measure costs, and the report is titled
 "Auditoría de historial de fondo". Anywhere else the box is ignored with a
 warning and costs are checked as usual. The observation thresholds do not
 change, and the costs dimension stays NOT_MEASURED.
+
+A fund record in the verdict and the plan. With no out-of-sample start
+declared, the out-of-sample reason reads "a fund's record does not say since
+when its process has run unchanged" (`verdict.FUND_OOS_REASON`). The
+dimension card, the summary and the plan ask the manager since when the
+process has been unchanged and whether any stretch is simulated (pro forma),
+not for an optimisation date or an unchanged robot. The costs step asks
+whether the figures are net of the management and performance fees, instead
+of a platform report. Undeclared trials read as how many funds or strategies
+the same manager runs. The caps do not change: out of sample and costs stay
+NOT_MEASURED, and the best class without them is B.
 
 Against its benchmark. Factsheets print the benchmark's months next to the
 fund's, so the equity file may carry it:
@@ -1285,9 +1313,23 @@ benchmark's; each needs 6 such months). Findings, as questions:
 No index data is bundled: the benchmark is the customer's, as supplied, and
 the note says Rigor did not check it against the index. When the fund's
 figures are not declared net of fees, the section says the comparison
-flatters a fund whose figures are before fees. It never feeds the benchmark
-dimension (that reads only the uploaded benchmark file, as before), so the
-class does not move.
+flatters a fund whose figures are before fees. When no benchmark file is
+uploaded, the same index also feeds the benchmark dimension
+(`engine._file_benchmark`): it is laid on the curve's own dates, the first
+point is the base both start from, and it is used only when it gives a return
+for every later point (else the dimension stays NOT_MEASURED). The section
+then carries `source: "file"`, the overlap row says "the index the file
+itself carries", and the plan step says the reference is the file's own
+index. A fund that trails its own index fails the dimension like any other
+upload. An uploaded benchmark file still wins, and a declared "no applicable
+benchmark" still makes it NOT_APPLICABLE. A month in which the fund or its
+index loses 100 % or more (most often a typo in a factsheet) leaves the
+section NOT_MEASURED ("a month in the fund or its benchmark loses 100% or
+more") instead of dividing by a compound growth of zero.
+The index in the file is the one the manager chose to print, so a PASS
+against it is not an independent check: `verdict.overall_class(own_index=True)`
+lets it complete a B but never an A (a FAIL or WEAK counts as usual), and the
+plan's "what would change the class" follows the same rule.
 
 What fees would take (`fund.fee_drag`). On a fund record not declared net
 of fees, a table shows the yearly return and total growth with a yearly fee
@@ -2334,6 +2376,12 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
+  key, two-step sign-in and a passkey (only where passkeys work), each as
+  on or with a link to its card, and counts how many are on. Two-step
+  links to the recovery key while there is none, since it needs one. With
+  everything on, it shrinks to one line. It reads existing rows only and
+  stores nothing.
 - **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
   `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
   acceso" adds one after the current password (`POST /cuenta/llaves`, then
@@ -2812,6 +2860,10 @@ Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercad
 Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the dependence line, Jensen's alpha on the account's rate, the fund split), the landing's new "¿Qué tan protegida está mi cuenta?" answer and the fund page's checks at 360 and 390 px. Nothing ran past the screen and no heading was stranded at a PDF page end. The tallest part was the evidence tables (trade statistics, significance, benchmark), where each row was its own card; on a phone each table is now one card with rules between rows, so the same figures take less scrolling and read as a list. Rendered with public data on (FRED), the crisis table gains an index column and ran 27 px past a 360 px screen; on a phone each crisis is now a card with its name, dates and labelled figures. The local-cash Sharpe line under the summary tiles gets a little space above it, and the landing's "Frente al efectivo" card fits at 360 and 390 px in all three languages. With each currency's own inflation (EUR, GBP, CAD, CHF, BRL), the currency table's figures keep a visible gap on narrow phones; the /metodologia list of public data sources uses the page's existing check list and fits at 360 px.
 
 Redesign pass 70 walks the fund-record report after its fund-only sections landed, at 360 and 390 px in ES, EN and PT. The paired figure cards (the fund's own figures, its figures against the index, and a trading report's "Cómo se vivió este historial") were one tall card per figure on a phone; they now sit two per row, with the evidence label under each figure, so the same block takes about half the scroll. Screen only; the PDF keeps its two-per-row print layout.
+
+Redesign pass 71 checks the new «¿Cambió su rentabilidad media en algún momento?» section at 360 and 390 px in ES, EN and PT, with and without a change found, and in the PDF. Its two figures use the paired cards from pass 70; the source line under them gets the same space above it as the line under the summary tiles.
+
+Redesign pass 72 walks the fund report with its new verdict against the file's own index, at 360 and 390 px in ES, EN and PT and in the PDF. The screen needed nothing. In the PDF, the bootstrap table's header row sat alone at the foot of a page and the multiplicity section's opening line was split from its table; a table's first row and a section's opening line now stay with what follows, and the page count is unchanged.
 
 ## Security
 

@@ -1476,6 +1476,8 @@ LABELS: dict[str, dict[str, str]] = {
         "cash_rate_CHF": "tasa interbancaria a 3 meses de Suiza (OCDE)",
         "kpi_hint_pf": "lo ganado por cada 1 perdido",
         "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
+        "kpi_hint_stress": "lo que queda del resultado neto sin esas 5; con todas: {full}",
+        "kpi_hint_stress_curve": "rentabilidad total sin esos 5; con todos: {full}",
         "bps_side": "pb por lado",
         "stress": "Pruebas de estrés: sin los mejores resultados",
         "stress_intro": (
@@ -2265,7 +2267,7 @@ LABELS: dict[str, dict[str, str]] = {
             "does not change the class."
         ),
         "currency_note_mixed": (
-            "The rows \"after its own inflation\" divide by each country's official consumer "
+            'The rows "after its own inflation" divide by each country\'s official consumer '
             "price index of each month, or that of the latest month published; a currency "
             "without a current official index shows only its row before inflation. The "
             "return a year is shown from one year of "
@@ -2277,8 +2279,7 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_attrib_EUR": "euro, Eurostat (through FRED)",
         "currency_attrib_CHF": "Swiss franc, Eurostat's harmonised index",
         "currency_attrib_GBP": (
-            "pound, Office for National Statistics, licensed under the Open Government Licence "
-            "v3.0"
+            "pound, Office for National Statistics, licensed under the Open Government Licence v3.0"
         ),
         "currency_attrib_CAD": (
             "Canadian dollar, Bank of Canada (Statistics Canada's CPI, available free of charge "
@@ -2747,6 +2748,10 @@ LABELS: dict[str, dict[str, str]] = {
         "cash_rate_CHF": "3-month interbank rate of Switzerland (OECD)",
         "kpi_hint_pf": "what was won for every 1 lost",
         "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
+        "kpi_hint_stress": (
+            "what is left of the net result without those 5; with all of them: {full}"
+        ),
+        "kpi_hint_stress_curve": "total return without those 5; with all of them: {full}",
         "bps_side": "bps per side",
         "stress": "Stress tests: without the best outcomes",
         "stress_intro": (
@@ -3467,18 +3472,21 @@ def _dimension_title(name: str, locale: str) -> str:
     return DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]).get(name, name)
 
 
-def _meaning_html(verdict: dict[str, Any], locale: str, *, account: bool = False) -> str:
+def _meaning_html(
+    verdict: dict[str, Any], locale: str, *, account: bool = False, fund: bool = False
+) -> str:
     by_name = {d["name"]: d for d in verdict["dimensions"]}
     items = []
     for name in DIMENSION_ORDER:
         dimension = by_name.get(name)
         if dimension is None:
             continue
+        text = meaning(name, dimension["status"], locale, account=account, fund=fund)
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
             f"<h3>{_e(_dimension_title(name, locale))} "
             f"{_status_badge(dimension['status'], locale)}</h3>"
-            f"<p>{_e(meaning(name, dimension['status'], locale, account=account))}</p></div>"
+            f"<p>{_e(text)}</p></div>"
         )
     return "<div class='meaning'>" + "".join(items) + "</div>"
 
@@ -3742,10 +3750,27 @@ _KPI_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 
-def _kpi_hint(label: str, labels: dict[str, str]) -> str:
+#: The stress tiles, with the stress block they come from: their hint names the
+#: whole result, so a bare "+15,375.41" reads against what the history made.
+_KPI_STRESS_HINTS: tuple[tuple[str, str, str, bool], ...] = (
+    ("kpi_stress", "trades", "kpi_hint_stress", False),
+    ("kpi_stress_curve", "returns", "kpi_hint_stress_curve", True),
+)
+
+
+def _kpi_hint(label: str, labels: dict[str, str], data: dict[str, Any] | None = None) -> str:
     for keys, hint in _KPI_HINTS:
         if any(label == labels[key] or label.startswith(labels[key] + " (") for key in keys):
             return f"<small>{_e(labels[hint])}</small>"
+    for key, block, hint, percent in _KPI_STRESS_HINTS:
+        if label != labels[key]:
+            continue
+        original = ((data or {}).get("stress") or {}).get(block, {}).get("original") or {}
+        full = _ev_value(original)
+        if full is None:
+            return ""
+        shown = _stress_value(full, percent=percent, signed=True)
+        return f"<small>{_e(labels[hint].format(full=shown))}</small>"
     return ""
 
 
@@ -3760,7 +3785,7 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         f"<b aria-hidden='true'>{icon('lock')}<i></i></b><span>{_e(label)}</span></a>"
         if locked
         else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
-        f"<span>{_e(label)}</span>{_kpi_hint(label, labels)}</div>"
+        f"<span>{_e(label)}</span>{_kpi_hint(label, labels, data)}</div>"
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""
@@ -4517,6 +4542,7 @@ def _summary_in(data: dict[str, Any], locale: str) -> str:
         trials=int(trials.get("value") or 1),
         trials_evidence=str(trials.get("evidence") or "DECLARED"),
         account=is_account_history(data),
+        fund=_fund_record(data),
     )
 
 
@@ -7350,7 +7376,9 @@ def render_html(
         section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
         section(
             labels["meaning"],
-            _meaning_html(verdict, locale, account=is_account_history(data)),
+            _meaning_html(
+                verdict, locale, account=is_account_history(data), fund=_fund_record(data)
+            ),
             "r-meaning",
         ),
         section(
