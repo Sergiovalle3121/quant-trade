@@ -265,6 +265,7 @@ def test_a_flex_xml_without_executions_says_how_to_add_them() -> None:
     error = refused.value
     assert error.code == "flex_no_trades"
     assert "Execution" in str(error) and "Execution" in error.localized("es")
+    assert error.localized("pt").startswith("o extrato da Interactive Brokers não tem operações")
     assert find_claims(str(error)) == [] and find_claims(error.localized("es")) == []
 
 
@@ -281,6 +282,7 @@ def test_a_flex_xml_with_made_up_attribute_names_is_refused_quickly() -> None:
     with pytest.raises(ReportFormatError) as refused:
         import_report(_flex_xml(*trades), "flex.xml")
     assert refused.value.code == "flex_too_large"
+    assert refused.value.localized("pt").startswith("o extrato da Interactive Brokers é grande")
     assert time.perf_counter() - started < 5
     assert find_claims(str(refused.value)) == []
     assert find_claims(refused.value.localized("es")) == []
