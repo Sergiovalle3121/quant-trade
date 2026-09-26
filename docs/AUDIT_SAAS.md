@@ -2832,6 +2832,8 @@ Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the depe
 
 Redesign pass 70 walks the fund-record report after its fund-only sections landed, at 360 and 390 px in ES, EN and PT. The paired figure cards (the fund's own figures, its figures against the index, and a trading report's "Cómo se vivió este historial") were one tall card per figure on a phone; they now sit two per row, with the evidence label under each figure, so the same block takes about half the scroll. Screen only; the PDF keeps its two-per-row print layout.
 
+Redesign pass 71 checks the new «¿Cambió su rentabilidad media en algún momento?» section at 360 and 390 px in ES, EN and PT, with and without a change found, and in the PDF. Its two figures use the paired cards from pass 70; the source line under them gets the same space above it as the line under the summary tiles.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
