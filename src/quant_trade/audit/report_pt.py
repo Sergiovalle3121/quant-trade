@@ -4747,6 +4747,16 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        (
+            "the trades were read from the table of a PDF statement; check the trade list "
+            "against the statement"
+        ),
+        (
+            "as operações foram lidas da tabela de um extrato em PDF; compare a lista de "
+            "operações com o extrato"
+        ),
+    ),
+    (
         "{n} row(s) without a readable date or amount were left out",
         "ficaram de fora {n} linha(s) sem data ou valor legível",
     ),

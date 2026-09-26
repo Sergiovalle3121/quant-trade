@@ -3363,7 +3363,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     return _html_error(
                         request, 400, _sentence(exc.localized(report_loc)), report_loc
                     )
-                # The columns this account chose before for the same header.
+                # The columns this account chose before for the same header;
+                # a PDF's rows are always shown, never read on a saved choice.
                 saved = (
                     mapping.usable_mapping(
                         mapping.loads(
@@ -3371,7 +3372,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         ),
                         table,
                     )
-                    if mapper and not report_columns
+                    if mapper and not report_columns and not table.pdf
                     else {}
                 )
                 if saved:
