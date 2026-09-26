@@ -772,8 +772,8 @@ and report wire them in during the integration step):
   gap (price rounding, currency conversion). The resampled time under the
   peak reads "median" and "in 1 of every 20" instead of p50/p95, and the
   header names the engine version and simulation seed in words.
-- `drawdown_risk`: stationary block bootstrap (expected block 5 periods) of
-  the uploaded returns over one year, 2,000 paths by default, capped at
+- `drawdown_risk`: stationary block bootstrap of
+  the uploaded returns (expected block: `resample_block`, see below) over one year, 2,000 paths by default, capped at
   2,000,000 resampled cells. A curve finer than 10,000 periods a year
   (`MAX_RISK_PATH_PERIODS`, about hourly around the clock) is first
   compounded into consecutive blocks so a path stays that short
@@ -785,6 +785,19 @@ and report wire them in during the integration step):
   paths reaching 10/20/30/50 %, the longest time under water p50/p95, and a
   p5–p95 fan of at most 120 points. Every figure is noted "resampled from
   the uploaded history, not a forecast".
+- `resample_block` (both simulations): the expected block is the larger of
+  5 periods and the Politis–White (2004) block length with the Patton,
+  Politis and White (2009) correction (`block_length`), measured on the
+  file, when its returns cluster (flat-top long-run variance above the plain
+  variance); returns that are independent or alternate keep 5, which keeps
+  their numbers unchanged. The block is capped at a quarter of the history
+  and recorded in `method.expected_block_size`. Before, a fixed 5-period
+  block broke up the losing runs of trend-following daily curves and
+  smoothed fund values, so their resampled drawdowns and challenge failure
+  odds came out too mild. On AR(1) returns the measured block is within
+  about 30 % of the theoretical optimum. Informational: neither simulation
+  feeds the class. The seed is unchanged, so a file gives the same numbers
+  on every run.
 - `simulate_challenge`: the same bootstrap over daily closes, 5,000 paths by
   default, checked each day for the daily floor, then the total floor, then
   the target with the minimum days (every day with a non-zero return counts

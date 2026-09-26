@@ -44,7 +44,12 @@ MAX_RESAMPLED_CELLS = 2_000_000
 #: compounded into consecutive blocks so a path stays this short; without
 #: it a curve logged every second asks for hundreds of gigabytes.
 MAX_RISK_PATH_PERIODS = 10_000
+#: Smallest expected block of the resampling. The block length measured on
+#: each file (``block_length``) can only lengthen it.
 DEFAULT_BLOCK_SIZE = 5.0
+#: A block never covers more than this share of the history, so a resample
+#: still mixes several stretches of it.
+MAX_BLOCK_SHARE = 0.25
 BUSINESS_DAYS_PER_CALENDAR_DAY = 5.0 / 7.0
 
 NO_TRADES = "no trades uploaded"
@@ -393,11 +398,94 @@ def _clean(returns: pd.Series | np.ndarray | Sequence[float]) -> np.ndarray:
     return np.clip(values, -1.0, None)
 
 
-def _paths(
-    values: np.ndarray, *, length: int, samples: int, block_size: float, seed: int
-) -> np.ndarray:
+def _flat_top(t: np.ndarray) -> np.ndarray:
+    """Politis' trapezoidal flat-top lag window."""
+    t = np.abs(t)
+    return np.where(t <= 0.5, 1.0, np.where(t <= 1.0, 2.0 * (1.0 - t), 0.0))
+
+
+def block_length(values: np.ndarray | Sequence[float]) -> float:
+    """Expected block length for the stationary bootstrap (see ``_block_parts``)."""
+    return _block_parts(values)[0]
+
+
+def _block_parts(values: np.ndarray | Sequence[float]) -> tuple[float, float]:
+    """Expected block length for the stationary bootstrap, measured on the data.
+
+    Politis and White (2004) with the correction of Patton, Politis and
+    White (2009): the smallest lag ``m`` after which ``K`` consecutive
+    autocorrelations stay inside ``2 * sqrt(log10(n) / n)`` sets the window
+    ``M = 2m``; with the flat-top window, ``G = sum |k| R(k)`` and
+    ``g = sum R(k)`` over ``|k| <= M``, the block is
+    ``(G / g) ** (2/3) * n ** (1/3)``. It grows with the dependence between
+    consecutive returns and is 1 for independent ones (no dependence found).
+    Also returns ``g / R(0)``, the long-run variance over the plain one: above
+    1 when the dependence makes runs of the same sign longer than chance.
+    Returns ``(1.0, 1.0)`` when fewer than 10 finite values or no spread.
+    """
+    x = np.asarray(values, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < 10:
+        return 1.0, 1.0
+    with np.errstate(over="ignore", invalid="ignore"):
+        x = x - x.mean()
+        gamma0 = float(np.dot(x, x) / n)
+    if not math.isfinite(gamma0) or gamma0 <= 0:
+        return 1.0, 1.0
+    runs = max(5, int(math.ceil(math.sqrt(math.log10(n)))))
+    m_max = min(n - 1, int(math.ceil(math.sqrt(n))) + runs)
+    # Autocovariances at lags 1..m_max through the FFT (zero-padded, so no wrap).
+    size = 1 << int(math.ceil(math.log2(2 * n)))
+    spectrum = np.fft.rfft(x, size)
+    with np.errstate(over="ignore", invalid="ignore"):
+        gamma = np.fft.irfft(spectrum * np.conj(spectrum), size)[1 : m_max + 1] / n
+    if not np.isfinite(gamma).all():
+        return 1.0, 1.0
+    rho = gamma / gamma0
+    bound = 2.0 * math.sqrt(math.log10(n) / n)
+    inside = np.abs(rho) < bound
+    m_hat = None
+    for m in range(0, m_max - runs + 1):
+        if inside[m : m + runs].all():
+            m_hat = m
+            break
+    if m_hat is None:
+        m_hat = m_max - runs
+    window = min(2 * max(m_hat, 1), m_max)
+    k = np.arange(1, window + 1)
+    weights = _flat_top(k / window)
+    g = gamma0 + 2.0 * float(np.sum(weights * gamma[:window]))
+    big_g = 2.0 * float(np.sum(weights * k * gamma[:window]))
+    if not math.isfinite(g) or g <= 0 or not math.isfinite(big_g):
+        return 1.0, 1.0
+    b = (abs(big_g) / g) ** (2.0 / 3.0) * n ** (1.0 / 3.0)
+    return float(max(1.0, b)), g / gamma0
+
+
+def resample_block(values: np.ndarray, block_size: float | None) -> float:
+    """The expected block the resampling uses.
+
+    ``None`` (the default) takes the larger of ``DEFAULT_BLOCK_SIZE`` and
+    ``block_length(values)`` when the file's returns cluster (long-run
+    variance above the plain one), so losing runs stay together. Returns
+    that alternate keep ``DEFAULT_BLOCK_SIZE``: longer blocks would keep the
+    alternation and make the resampled drawdowns milder. Either way
+    the block is at least 1 and at most ``MAX_BLOCK_SHARE`` of the history
+    (and never past the history itself).
+    """
+    n = float(len(values))
+    if block_size is None:
+        measured_block, ratio = _block_parts(values)
+        block = max(DEFAULT_BLOCK_SIZE, measured_block) if ratio > 1.0 else DEFAULT_BLOCK_SIZE
+        block = min(block, max(DEFAULT_BLOCK_SIZE, MAX_BLOCK_SHARE * n))
+    else:
+        block = float(block_size)
+    return min(max(block, 1.0), n)
+
+
+def _paths(values: np.ndarray, *, length: int, samples: int, block: float, seed: int) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    block = min(max(float(block_size), 1.0), float(len(values)))
     idx = stationary_bootstrap_indices(
         len(values), length=length, samples=samples, expected_block_size=block, rng=rng
     )
@@ -438,14 +526,15 @@ def drawdown_risk(
     periods_per_year: float,
     samples: int = 2000,
     seed: int = 0,
-    block_size: float = DEFAULT_BLOCK_SIZE,
+    block_size: float | None = None,
     horizon_years: float = 1.0,
     thresholds: Sequence[float] = DRAWDOWN_THRESHOLDS,
 ) -> dict[str, Any]:
     """Maximum drawdown over ``horizon_years`` of resampled paths.
 
     Stationary block bootstrap of the uploaded returns (expected block
-    ``block_size`` periods, blocks wrap), ``samples`` paths of one horizon
+    ``block_size`` periods, by default measured on the file with
+    ``resample_block``; blocks wrap), ``samples`` paths of one horizon
     each. Reports drawdown quantiles, the share of paths whose drawdown
     reaches each threshold, the longest time under water, and a fan of the
     equity path (p5 to p95, at most ``MAX_FAN_POINTS`` points, equity
@@ -483,7 +572,8 @@ def drawdown_risk(
     if samples < 1:
         raise ValueError("samples must be positive")
     used = int(min(samples, max(100, MAX_RESAMPLED_CELLS // length)))
-    equity = _paths(values, length=length, samples=used, block_size=block_size, seed=seed)
+    block = resample_block(values, block_size)
+    equity = _paths(values, length=length, samples=used, block=block, seed=seed)
     drawdowns = _max_drawdowns(equity)
     underwater = _longest_underwater(equity) * step
     note = RESAMPLED_NOTE
@@ -500,7 +590,7 @@ def drawdown_risk(
         "fan": {"evidence": "MEASURED", "note": note, **_fan(equity, step=step)},
         "method": {
             "bootstrap": "stationary",
-            "expected_block_size": min(max(float(block_size), 1.0), float(len(values))),
+            "expected_block_size": block,
             "samples": used,
             "samples_requested": int(samples),
             "seed": int(seed),
@@ -702,7 +792,7 @@ def simulate_challenge(
     *,
     samples: int = 5000,
     seed: int = 0,
-    block_size: float = DEFAULT_BLOCK_SIZE,
+    block_size: float | None = None,
     max_days: int = 250,
 ) -> dict[str, Any]:
     """Walk resampled daily paths through one challenge phase.
@@ -740,7 +830,7 @@ def simulate_challenge(
 
     horizon = _day_limit(rules, max_days)
     rng = np.random.default_rng(seed)
-    block = min(max(float(block_size), 1.0), float(len(values)))
+    block = resample_block(values, block_size)
     idx = stationary_bootstrap_indices(
         len(values), length=horizon, samples=samples, expected_block_size=block, rng=rng
     )
