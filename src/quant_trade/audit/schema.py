@@ -71,7 +71,24 @@ TIMESTAMP_ALIASES = (
     # Portuguese "Data"; last, so an English file's "date" always wins.
     "data",
 )
-EQUITY_ALIASES = ("equity", "nav", "balance", "value", "portfolio_value", "close", "capital")
+EQUITY_ALIASES = (
+    "equity",
+    "nav",
+    "balance",
+    "value",
+    "portfolio_value",
+    "close",
+    "capital",
+    # Spanish and Portuguese: a fund's value per share (Brazil's "valor da
+    # cota", Argentina's "valor cuotaparte") before the account balance, so a
+    # file carrying both reads the share value. "Patrimonio" is left out: in a
+    # fund file it is the net assets, which move with subscriptions and
+    # redemptions, so it goes to the column screen instead.
+    "valor_da_cota",
+    "valor_cuota",
+    "valor_cuotaparte",
+    "saldo",
+)
 RETURN_ALIASES = (
     "return",
     "returns",
@@ -316,7 +333,7 @@ def _as_utf8_csv(data: bytes) -> bytes:
     # Imported here: the importers build on this module's types.
     from quant_trade.audit.importers import decode_text, xlsx_as_csv
 
-    if data.startswith(b"PK\x03\x04"):
+    if data.startswith((b"PK\x03\x04", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")):
         return xlsx_as_csv(data, TIMESTAMP_ALIASES)
     if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:4000]:
         return decode_text(data).encode("utf-8")

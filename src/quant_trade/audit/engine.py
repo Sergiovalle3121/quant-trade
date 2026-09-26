@@ -1574,6 +1574,7 @@ def run_audit(
             float(mintrl_value) / ppy * 12.0 if mintrl_value is not None and ppy > 0 else None
         ),
         findings=findings,
+        fund_record=bool(fund.get("track_record")),
     )
     oos = inputs.declared.oos_start
     report_metadata = {

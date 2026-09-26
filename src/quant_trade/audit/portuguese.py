@@ -460,8 +460,9 @@ UI_PT: dict[str, Any] = {
             "Subtraímos o que o caixa pagava nas mesmas datas, na moeda da sua conta quando o "
             "seu relatório a indica e é uma destas (reais, pesos "
             "mexicanos, euros, libras, ienes, dólares "
-            "canadenses ou francos suíços) e, se não, em dólares (letras do Tesouro dos EUA de "
-            "3 meses). Dados públicos oficiais. Você vê o Sharpe sem o que o caixa já pagava "
+            "canadenses ou francos suíços); se não indicar moeda ou estiver em dólares, em "
+            "dólares (letras do Tesouro dos EUA de 3 meses); em outra moeda, essa linha não é "
+            "calculada. Dados públicos oficiais. Você vê o Sharpe sem o que o caixa já pagava "
             "e, se enviar um benchmark, o alfa também.",
         ),
         (

@@ -355,7 +355,7 @@ def _body(rows: list[list[str]], *, serial: bool, decimal: str) -> _Body | None:
 def _read_body(data: bytes) -> _Body | None:
     try:
         data = imp.unwrap(data)
-        if imp._is_zip(data):
+        if imp._is_workbook(data):
             for sheet in imp.read_xlsx(data).values():
                 found = _body(
                     [[imp._as_text(cell) for cell in row] for row in sheet],

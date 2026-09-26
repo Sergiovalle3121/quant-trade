@@ -80,6 +80,10 @@ def _say(locale: str, es: _T, en: _T, pt: _T) -> _T:
     return {"es": es, "pt": pt}.get(locale, en)
 
 
+#: Past this multiple of the history it has, the plan stops counting what is missing.
+NEED_CAP = 10
+
+
 def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
@@ -398,7 +402,21 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             "Não há dados suficientes para medir se o resultado supera o acaso.",
         )
         return finding, [FLAG_HINTS["TOO_FEW_OBSERVATIONS"][locale]]
-    if psr is not None and need is not None and need > n:
+    if psr is not None and need is not None and need > NEED_CAP * n:
+        # Hundreds of years of history is not an ask anyone can meet: say so plainly.
+        finding = _say(
+            locale,
+            f"PSR {_fmt(psr, 3)} con {n:.0f} observaciones. Con el mismo comportamiento, ni "
+            f"con {NEED_CAP} veces más historial llegaría a 0.95: con estos datos el resultado "
+            "no se distingue del azar.",
+            f"PSR {_fmt(psr, 3)} with {n:.0f} observations. With the same behaviour, not even "
+            f"{NEED_CAP} times more history would take it to 0.95: on this data the result "
+            "cannot be told apart from chance.",
+            f"PSR {_fmt(psr, 3)} com {n:.0f} observações. Com o mesmo comportamento, nem com "
+            f"{NEED_CAP} vezes mais histórico chegaria a 0.95: com estes dados o resultado não "
+            "se distingue do acaso.",
+        )
+    elif psr is not None and need is not None and need > n:
         extra = need - n
         span = _duration(extra, ppy, locale)
         span_text = f" ({span})" if span else ""
@@ -426,6 +444,30 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             f"{p5_text} is not above zero.",
             f"O PSR é {_fmt(psr or 0.0, 3)}, mas o percentil 5 do Sharpe no bootstrap"
             f"{p5_text} não fica acima de zero.",
+        )
+    if (data.get("fund") or {}).get("track_record"):
+        # A fund's record has no parameters or demo account: more of it is the
+        # manager's full history, or the months still to come.
+        return finding, _say(
+            locale,
+            [
+                "Pide al gestor el historial completo del fondo desde su inicio, sin años "
+                "recortados.",
+                "Vuelve a auditarlo cuando el fondo publique más meses: cada mes nuevo cuenta "
+                "como datos que nadie eligió de antemano.",
+            ],
+            [
+                "Ask the manager for the fund's full record since inception, with no years "
+                "left out.",
+                "Audit it again once the fund publishes more months: each new month counts as "
+                "data nobody picked in advance.",
+            ],
+            [
+                "Peça ao gestor o histórico completo do fundo desde o início, sem anos "
+                "cortados.",
+                "Audite de novo quando o fundo publicar mais meses: cada mês novo conta como "
+                "dados que ninguém escolheu de antemão.",
+            ],
         )
     actions = _say(
         locale,

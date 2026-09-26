@@ -18,6 +18,7 @@ from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHA
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _disclaimer, _e, _field, _home, _page, _page_hero
+from quant_trade.audit.passkeys import MAX_PER_ACCOUNT as PASSKEYS_MAX
 from quant_trade.audit.portuguese import link_locale
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.store import (
@@ -26,6 +27,7 @@ from quant_trade.audit.store import (
     AccountEvent,
     AccountRecord,
     InviteSummary,
+    PasskeyRecord,
     SessionView,
     StrategyRecord,
     VisitNotice,
@@ -211,11 +213,15 @@ COPY: dict[str, dict[str, str]] = {
             "clave; se borra al usarla o con la cuenta.|"
             "Si activas la verificación en dos pasos, la clave secreta que comparte tu app de "
             "autenticación y el último código usado; se borra al desactivarla o con la cuenta.|"
+            "Si añades una llave de acceso: su identificador, su clave pública (nunca la "
+            "privada, que no sale de tu dispositivo), el nombre que le pongas, el sitio para el "
+            "que se creó, un contador y sus fechas; se borra al quitarla o con la cuenta.|"
             "De cada sesión abierta: una etiqueta corta del dispositivo (como «Chrome · Windows», "
             "nunca el texto completo del navegador), la red y el último uso, para «Sesiones "
             "abiertas»; se borra al cerrar la sesión, al caducar o con la cuenta.|"
             "Para «Actividad reciente»: cada entrada y cada cambio de seguridad (contraseña, "
-            "dos pasos, clave de recuperación, sesiones cerradas) con su fecha, la etiqueta del "
+            "dos pasos, clave de recuperación, llaves de acceso, sesiones cerradas) con su "
+            "fecha, la etiqueta del "
             "dispositivo y la red; las últimas 50, borradas a los 90 días o con la cuenta. "
             "Aparte, los intentos con contraseña incorrecta en tu cuenta: cuántos por red y "
             "hora, con la etiqueta del dispositivo (nunca lo que se escribió); los últimos 20, "
@@ -401,6 +407,55 @@ COPY: dict[str, dict[str, str]] = {
         "notice_more_devices": "Y {count} entradas más desde otros dispositivos nuevos.",
         "notice_help": "Si no fuiste tú, cambia tu contraseña y cierra las demás sesiones.",
         "notice_link": "Ver la actividad reciente",
+        "passkey_card": "Llaves de acceso",
+        "passkey_help": (
+            "Entra con la huella, la cara o el PIN de tu teléfono o computadora, sin escribir "
+            "la contraseña. La llave privada nunca sale de tu dispositivo."
+        ),
+        "passkey_none": "Aún no tienes llaves de acceso.",
+        "passkey_fallback": (
+            "Tu contraseña, el código de dos pasos y la clave de recuperación siguen "
+            "funcionando. Si el sitio cambia de dirección, las llaves se crean de nuevo y "
+            "mientras tanto entras con ellos."
+        ),
+        "passkey_name": "Nombre de la llave (opcional)",
+        "passkey_add": "Añadir una llave de acceso",
+        "passkey_remove": "Quitar",
+        "passkey_remove_title": "Quitar una llave de acceso",
+        "passkey_which": "Llave",
+        "passkey_added_on": "Añadida el {date}",
+        "passkey_used_on": "último uso el {date}",
+        "passkey_never_used": "sin usar aún",
+        "passkey_other_site": "Solo funciona en {site}",
+        "passkey_default_name": "Llave de acceso",
+        "passkey_signin": "Entrar con una llave de acceso",
+        "passkey_step": "Usar una llave de acceso",
+        "passkey_add_title": "Crea tu llave de acceso",
+        "passkey_add_lead": "Tu dispositivo te pedirá la huella, la cara o el PIN para crearla.",
+        "passkey_get_title": "Entra con tu llave de acceso",
+        "passkey_get_lead": (
+            "Elige la llave en tu dispositivo y confirma con la huella, la cara o el PIN."
+        ),
+        "passkey_go_create": "Crear la llave",
+        "passkey_go_get": "Usar mi llave",
+        "passkey_browser_error": (
+            "Tu navegador no pudo usar la llave de acceso. Inténtalo de nuevo o entra con tu "
+            "contraseña."
+        ),
+        "passkey_back": "Volver",
+        "passkey_added": "Llave de acceso añadida. Ya puedes entrar con ella.",
+        "passkey_removed": "Llave de acceso quitada.",
+        "passkey_failed": (
+            "No pudimos comprobar la llave de acceso. Inténtalo de nuevo o entra con tu contraseña."
+        ),
+        "passkey_expired": "La página de la llave de acceso caducó. Vuelve a empezar.",
+        "passkey_full": (
+            "Ya tienes el máximo de llaves de acceso (10) o esa llave ya está añadida."
+        ),
+        "passkey_unavailable": "Las llaves de acceso no funcionan en esta dirección del sitio.",
+        "event_signin_passkey": "Entrada con llave de acceso",
+        "event_passkey_added": "Llave de acceso añadida",
+        "event_passkey_removed": "Llave de acceso quitada",
         "two_step_card": "Verificación en dos pasos",
         "two_of_three": (
             "Con los dos pasos activos, para entrar o recuperar la cuenta necesitas dos de "
@@ -671,11 +726,15 @@ COPY: dict[str, dict[str, str]] = {
             "key; it goes when used or with the account.|"
             "If you turn on two-step sign-in, the secret your authenticator app shares and the "
             "last code used; it goes when you turn it off or with the account.|"
+            "If you add a passkey: its id, its public key (never the private one, which "
+            "never leaves your device), the name you give it, the site it was made for, a "
+            "counter and its dates; it goes when you remove it or with the account.|"
             "For each open session: a short device label (such as 'Chrome · Windows', never the "
             "browser's full string), the network and the last use, for 'Open sessions'; it goes "
             "when the session is signed out, expires or with the account.|"
             "For 'Recent activity': each sign-in and security change (password, two-step, "
-            "recovery key, sessions signed out) with its date, device label and network; the "
+            "recovery key, passkeys, sessions signed out) with its date, device label and "
+            "network; the "
             "latest 50, deleted after 90 days or with the account. Separately, wrong-password "
             "tries on your account: how many per network and hour, with the device label "
             "(never what was typed); the latest 20, deleted after 90 days or with the account. And "
@@ -857,6 +916,53 @@ COPY: dict[str, dict[str, str]] = {
         "notice_more_devices": "And {count} more sign-ins from other new devices.",
         "notice_help": "If it was not you, change your password and sign out the other sessions.",
         "notice_link": "See recent activity",
+        "passkey_card": "Passkeys",
+        "passkey_help": (
+            "Sign in with your phone's or computer's fingerprint, face or PIN, without typing "
+            "the password. The private key never leaves your device."
+        ),
+        "passkey_none": "You have no passkeys yet.",
+        "passkey_fallback": (
+            "Your password, the two-step code and the recovery key keep working. If the site "
+            "moves to a new address, passkeys are made again and you sign in with those "
+            "meanwhile."
+        ),
+        "passkey_name": "Passkey name (optional)",
+        "passkey_add": "Add a passkey",
+        "passkey_remove": "Remove",
+        "passkey_remove_title": "Remove a passkey",
+        "passkey_which": "Passkey",
+        "passkey_added_on": "Added on {date}",
+        "passkey_used_on": "last used on {date}",
+        "passkey_never_used": "not used yet",
+        "passkey_other_site": "Works only on {site}",
+        "passkey_default_name": "Passkey",
+        "passkey_signin": "Sign in with a passkey",
+        "passkey_step": "Use a passkey",
+        "passkey_add_title": "Create your passkey",
+        "passkey_add_lead": "Your device will ask for your fingerprint, face or PIN to create it.",
+        "passkey_get_title": "Sign in with your passkey",
+        "passkey_get_lead": "Pick the passkey on your device and confirm with your fingerprint, "
+        "face or PIN.",
+        "passkey_go_create": "Create the passkey",
+        "passkey_go_get": "Use my passkey",
+        "passkey_browser_error": (
+            "Your browser could not use the passkey. Try again or sign in with your password."
+        ),
+        "passkey_back": "Back",
+        "passkey_added": "Passkey added. You can sign in with it now.",
+        "passkey_removed": "Passkey removed.",
+        "passkey_failed": (
+            "We could not check the passkey. Try again or sign in with your password."
+        ),
+        "passkey_expired": "The passkey page expired. Please start again.",
+        "passkey_full": (
+            "You already have the most passkeys (10), or that passkey is already added."
+        ),
+        "passkey_unavailable": "Passkeys do not work at this address of the site.",
+        "event_signin_passkey": "Signed in with a passkey",
+        "event_passkey_added": "Passkey added",
+        "event_passkey_removed": "Passkey removed",
         "two_step_card": "Two-step sign-in",
         "two_of_three": (
             "With two-step on, signing in or recovering the account takes two of these three: "
@@ -1104,6 +1210,12 @@ line-height:1.25;white-space:normal;text-align:center}
 .acct-notice{margin-bottom:24px;border-color:var(--bad)}
 .acct-notice ul{margin:8px 0 8px 18px}
 .act-table td:nth-child(2){font-weight:600}
+.pk-list{list-style:none;margin:10px 0 14px;padding:0}
+.pk-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;
+padding:10px 0;border-top:1px solid var(--border)}
+.pk-list li:first-child{border-top:0}
+.pk-list strong{display:block;overflow-wrap:anywhere}
+.acct-passkey-alt{margin-top:18px}
 @media (max-width:760px){.act-table thead{display:none}
 .paper table.act-table,.act-table{border:0;background:none;box-shadow:none;overflow:visible}
 .act-table,.act-table tbody{display:block}
@@ -1253,6 +1365,7 @@ def signin_page(
     flash: str = "",
     email: str = "",
     next_path: str = "",
+    passkeys: bool = False,
 ) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
@@ -1270,6 +1383,13 @@ def signin_page(
         )
         + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signin_button'])}"
         "</button></form>"
+        + (
+            _passkey_start_form(
+                copy, passkey_signin_path(locale), csrf, next_path, "passkey_signin"
+            )
+            if passkeys
+            else ""
+        )
         + f"<p class='acct-alt'><a href='{path('forgot', locale)}'>{_e(copy['forgot_link'])}"
         "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])} "
         f"<a href='{_e(signup)}'>{_e(copy['signup_link'])}</a></p>"
@@ -1796,6 +1916,8 @@ def account_page(
     sessions: Sequence[SessionView] = (),
     events: Sequence[AccountEvent] = (),
     notice: VisitNotice | None = None,
+    passkeys: Sequence[PasskeyRecord] = (),
+    passkey_site: str = "",
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
@@ -1978,6 +2100,11 @@ def account_page(
         + f"<button class='btn btn-dark' type='submit'>"
         f"{_e(copy['recovery_new' if recovery_created else 'recovery_make'])}</button></form>"
         + two_step_card
+        + (
+            _passkey_card(copy, locale, csrf, passkeys, passkey_site)
+            if passkey_site or passkeys
+            else ""
+        )
         + "</div>"
         + (_sessions_card(copy, locale, csrf, sessions) if sessions else "")
         + (_activity_card(copy, events) if events else "")
@@ -2088,6 +2215,10 @@ __all__ = [
     "report_box",
     "report_href",
     "reset_page",
+    "passkey_page",
+    "passkey_signin_path",
+    "passkey_step_path",
+    "passkeys_path",
     "signin_page",
     "signup_page",
 ]
@@ -2099,6 +2230,160 @@ def two_step_path(locale: str) -> str:
     return path("signin", locale) + ("/code" if _locale(locale) == "en" else "/codigo")
 
 
+def _passkey_suffix(locale: str) -> str:
+    return {"en": "/passkey", "pt": "/chave"}.get(_locale(locale), "/llave")
+
+
+def passkey_signin_path(locale: str) -> str:
+    """Where the sign-in page opens a passkey page (no e-mail needed)."""
+    return path("signin", locale) + _passkey_suffix(locale)
+
+
+def passkey_step_path(locale: str) -> str:
+    """A passkey in place of the app's code, after a correct password."""
+    return two_step_path(locale) + _passkey_suffix(locale)
+
+
+def passkeys_path(locale: str) -> str:
+    """Adding and removing passkeys on "Mi cuenta"."""
+    return path("account", locale) + "/llaves"
+
+
+def _passkey_start_form(
+    copy: dict[str, str], action: str, csrf: str, next_path: str, label: str
+) -> str:
+    return (
+        f"<form class='acct-passkey-alt' method='post' action='{action}'>"
+        + _hidden("csrf", csrf)
+        + _hidden("next", next_path)
+        + f"<button class='btn btn-ghost btn-lg' type='submit'>{icon('shield')}"
+        f"{_e(copy[label])}</button></form>"
+    )
+
+
+def _passkey_card(
+    copy: dict[str, str],
+    locale: str,
+    csrf: str,
+    passkeys: Sequence[PasskeyRecord],
+    site: str,
+) -> str:
+    """ "Llaves de acceso": the account's passkeys, removing one, adding one."""
+    base = passkeys_path(locale)
+    rows = ""
+    for item in passkeys:
+        when = copy["passkey_added_on"].format(date=_date(item.created_at))
+        used = (
+            copy["passkey_used_on"].format(date=_date(item.last_used_at))
+            if item.last_used_at
+            else copy["passkey_never_used"]
+        )
+        other = (
+            f"<br><span class='muted'>{_e(copy['passkey_other_site'].format(site=item.rp_id))}"
+            "</span>"
+            if item.rp_id != site
+            else ""
+        )
+        rows += (
+            f"<li><span><strong>{_e(_safe_text(item.label) or copy['passkey_default_name'])}"
+            f"</strong><span class='muted'>{_e(when)} · {_e(used)}</span>{other}</span></li>"
+        )
+    remove = ""
+    if passkeys:
+        choices = "".join(
+            f"<option value='{_e(item.credential_id)}'>"
+            f"{_e(_safe_text(item.label) or copy['passkey_default_name'])} · "
+            f"{_e(_date(item.created_at))}</option>"
+            for item in passkeys
+        )
+        remove = (
+            f"<details class='acct-lost'><summary>{_e(copy['passkey_remove_title'])}</summary>"
+            f"<form method='post' action='{base}/quitar'>"
+            + _hidden("csrf", csrf)
+            + _field(copy["passkey_which"], f"<select name='credential'>{choices}</select>")
+            + _field(
+                copy["password_current"],
+                "<input type='password' name='current' required maxlength='256' "
+                "autocomplete='current-password'>",
+            )
+            + f"<button class='btn btn-ghost' type='submit'>{_e(copy['passkey_remove'])}"
+            "</button></form></details>"
+        )
+    listing = (
+        f"<ul class='pk-list'>{rows}</ul>"
+        if rows
+        else f"<p class='muted'>{_e(copy['passkey_none'])}</p>"
+    )
+    add = ""
+    if site and len(passkeys) < PASSKEYS_MAX:
+        add = (
+            f"<form method='post' action='{base}'>"
+            + _hidden("csrf", csrf)
+            + _field(
+                copy["passkey_name"],
+                "<input type='text' name='label' maxlength='60' autocomplete='off'>",
+            )
+            + _field(
+                copy["password_current"],
+                "<input type='password' name='current' required maxlength='256' "
+                "autocomplete='current-password'>",
+            )
+            + f"<button class='btn btn-dark' type='submit'>{_e(copy['passkey_add'])}</button>"
+            "</form>"
+        )
+    return (
+        "<div class='acct-card' id='llaves'>"
+        f"<h3>{_e(copy['passkey_card'])}</h3>"
+        f"<p class='muted'>{_e(copy['passkey_help'])}</p>"
+        + listing
+        + add
+        + remove
+        + f"<p class='muted'>{_e(copy['passkey_fallback'])}</p></div>"
+    )
+
+
+def passkey_page(
+    *,
+    locale: str,
+    csrf: str,
+    mode: str,
+    options: str,
+    action: str,
+    back: str,
+    next_path: str = "",
+) -> str:
+    """The page that asks the device for its passkey.
+
+    ``options`` is JSON made here (never customer text); ``app.js`` hands it
+    to the browser and posts the answer back in ``credential``. Without
+    script the button does nothing useful and the password still works.
+    """
+    locale = _locale(locale)
+    copy = COPY[locale]
+    create = mode == "create"
+    body = (
+        "<div class='wrap-narrow'>"
+        + f"<form method='post' action='{action}' data-passkey='{'create' if create else 'get'}' "
+        f"data-options='{_e(options)}'>"
+        + _hidden("csrf", csrf)
+        + _hidden("next", next_path)
+        + "<input type='hidden' name='credential' value=''>"
+        + f"<p class='error' role='alert' data-passkey-error hidden>"
+        f"{_e(copy['passkey_browser_error'])}</p>"
+        + f"<button class='btn btn-primary btn-lg' type='submit' data-passkey-go>{icon('shield')}"
+        f"{_e(copy['passkey_go_create' if create else 'passkey_go_get'])}</button></form>"
+        + f"<noscript><p class='error'>{_e(copy['passkey_browser_error'])}</p></noscript>"
+        + f"<p class='acct-alt'><a href='{_e(back)}'>{_e(copy['passkey_back'])}</a></p></div>"
+    )
+    return _shell(
+        locale,
+        copy["passkey_add_title" if create else "passkey_get_title"],
+        copy["passkey_add_lead" if create else "passkey_get_lead"],
+        body,
+        switch={lang: back for lang in LANGUAGES},
+    )
+
+
 def _code_input() -> str:
     return (
         "<input type='text' name='code' inputmode='numeric' pattern='[0-9 ]{6,8}' "
@@ -2106,7 +2391,9 @@ def _code_input() -> str:
     )
 
 
-def two_step_page(*, locale: str, csrf: str, next_path: str = "", error: str = "") -> str:
+def two_step_page(
+    *, locale: str, csrf: str, next_path: str = "", error: str = "", passkeys: bool = False
+) -> str:
     """After a correct password: the code from the app, or the recovery key."""
     locale = _locale(locale)
     copy = COPY[locale]
@@ -2120,7 +2407,12 @@ def two_step_page(*, locale: str, csrf: str, next_path: str = "", error: str = "
         + _field(copy["two_step_code"], _code_input(), copy["two_step_code_help"])
         + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signin_button'])}"
         "</button></form>"
-        f"<details class='acct-lost'><summary>{_e(copy['two_step_lost'])}</summary>"
+        + (
+            _passkey_start_form(copy, passkey_step_path(locale), csrf, next_path, "passkey_step")
+            if passkeys
+            else ""
+        )
+        + f"<details class='acct-lost'><summary>{_e(copy['two_step_lost'])}</summary>"
         f"<p class='muted'>{_e(copy['two_step_lost_help'])}</p>"
         f"<form method='post' action='{action}' autocomplete='off'>"
         + _hidden("csrf", csrf)

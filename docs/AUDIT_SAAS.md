@@ -299,10 +299,16 @@ same member, inflated-size and cell limits: numbers, currency and percentages
 come from the cell's stored value, dates and times from its ISO value, and the
 blank rows and cells a sheet repeats to its edge are never laid out (a repeated
 row with values counts toward the cell limit). It goes through the same
-detection and column screen as a workbook, so no layout is guessed;
-if no importer knows it, the column screen offers its columns. Files that
+detection and column screen as a workbook, so no layout is guessed. An
+Excel 97-2003 workbook (`.xls`, an OLE2 compound file) is read the same way
+with xlrd 2.x (the web extra; it reads only this format and never runs
+macros), with no formatting, each sheet loaded on demand and unloaded after,
+the same cell and column limits, and date cells turned into ISO text in the
+workbook's own date system (1900 or 1904). If no importer knows the sheet,
+the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
+save it as .xlsx or CSV), an OpenDocument file
 that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
@@ -337,7 +343,13 @@ An equity curve or return series (`schema.parse_equity_csv`) takes a return
 column named with a `%` (`Return %`, `Rendimiento %`, `Retorno (%)`) and reads
 it as percentages, whatever the size of its values (a money-market fund's
 `0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
-column, taken only when no `date` or `fecha` column exists. A column whose
+column, taken only when no `date` or `fecha` column exists. Spanish and
+Portuguese curves are read by a fund's value per share (`Valor da cota`,
+`Valor cuota`, `Valor cuotaparte`) or, without one, the balance column `Saldo`
+(after the English names, so `equity` or `balance` wins when both exist).
+`Patrimonio`/`Patrimônio` is not read on its own: in a fund file it is the net
+assets, which move with subscriptions and redemptions, so it goes to the
+column screen. A column whose
 numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
 throughout (one plainly decimal-comma cell decides the column, so a `1,234`
 beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma
@@ -1462,18 +1474,27 @@ site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
 Central do Brasil's SGS series 433, monthly changes chained into an index
 from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
 month, refuses the reply, since a broken link would leave its inflation out of
-every later level). The IMF's CPI
-dataset, which covers every currency, needs written permission for
-commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
-official APIs need a registered key, so the peso and the yen show no row
-after inflation yet, and the note says so. Each row after inflation credits
+every later level), Mexico's INPC (INEGI's open-data zip of the 2018 base,
+from January 2003; its terms allow commercial use with the credit "Fuente:
+INEGI" and the product name; the zip is opened in memory and its table
+refused above `MAX_BYTES`) and Japan's CPI (the Statistics Bureau's
+long-term national file on e-Stat, file id `000040482943`, from 1970, base
+2025, read as Shift_JIS; the Public Data License 1.0 and e-Stat's terms
+allow commercial use, and the credit says the figures are edited from the
+survey). The e-Stat file id is pinned: if e-Stat publishes later months under
+a new id, the yen rows first say "prices through {month}" and then drop to
+the row before inflation, and the id needs updating. A month that appears
+twice in either file refuses the reply. The IMF's CPI dataset, which covers
+every currency, needs written permission for commercial reuse, so it is not
+used; Banxico's and INEGI's APIs need a registered key, while the files used
+here do not. Each row after inflation credits
 its source by name and link, as each licence asks; `/metodologia` lists
 them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
 refuses Python's default); FRED keeps the default. It runs for a dollar
 account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
 read at one dollar per coin, which the note says), or a file that names no
 currency, in which case a line says it is read as dollars. When a report
-names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+names EUR, GBP, CAD, CHF, BRL, MXN or JPY, the section shows the account in that
 currency and after that currency's inflation, with the local inflation over
 the dates; without those prices it is NOT_MEASURED with the reason. Another
 named currency leaves it NOT_MEASURED. A price index reply below 1 or above
@@ -1868,6 +1889,9 @@ with an empty value):
    custom domain you attach (it is also the address in the badge embed code
    of `/v/…` pages), and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
    hourly limit counts the visitor's address and not Railway's proxy.
+   Moving `AUDIT_BASE_URL` to another domain later leaves existing passkeys
+   behind (see "Passkeys" under customer accounts); sign-in by password,
+   code and recovery key is unaffected.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
    `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
@@ -2297,6 +2321,37 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
+  `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
+  acceso" adds one after the current password (`POST /cuenta/llaves`, then
+  `/cuenta/llaves/guardar`) and removes one, also after the password
+  (`/cuenta/llaves/quitar`); at
+  most `passkeys.MAX_PER_ACCOUNT` (10). The sign-in page offers "Entrar con
+  una llave de acceso" (`/entrar/llave`, EN `/login/passkey`, PT
+  `/pt/entrar/chave`): a discoverable credential, so no e-mail is typed, and
+  the device must check its owner (fingerprint, face or PIN, user
+  verification required); device plus that check are two factors, so on a
+  two-step account the passkey is enough. After a correct password, the
+  code page also offers the account's passkeys in place of the code
+  (`/entrar/codigo/llave`). Each passkey page stores a random 32-byte
+  challenge for 5 minutes behind the `rigor_passkey` cookie (only its hash
+  is the key), used once; `passkeys.MAX_STARTS_PER_HOUR` pages per network.
+  The options are embedded in the page and `app.js` posts the device's
+  answer in an ordinary form, so the CSP stays `connect-src 'none'`. The
+  store keeps the credential id, the public key, the counter (a counter
+  that goes backwards is refused; synced passkeys report zero), the name,
+  the host it was made for and dates; never a private key. Events
+  `signin_passkey`, `passkey_added`, `passkey_removed`; the export lists
+  name, site and dates as `passkeys`; the rows go with the account.
+  The relying party is the host of `AUDIT_BASE_URL`, and the buttons show
+  only on requests that reached that host. **Changing the domain**: a
+  passkey is bound by the browser to the host it was made on, so after
+  `AUDIT_BASE_URL` moves to a new domain the old passkeys stop working
+  there. Nothing else changes: the password, the two-step code and the
+  recovery key keep working, the card lists each old passkey as "Solo
+  funciona en <old host>", and customers add a new one on the new domain
+  and remove the old. Announce it before the switch; there is no way to
+  move a passkey between domains.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2740,6 +2795,8 @@ Redesign pass 66 styles the landing's feature cards after the three new ones (ag
 Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
 
 Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?". The yearly figures sit right-aligned, the fund's average return is a shaded total row set off by a rule, and the alpha's range and reading is a ruled line like the other readings. In the PDF the table and its introduction stay on one page instead of leaving the total row alone on the next. On a 360 px phone the fee table's "2 % + 20 %" label ran the page 15 px wide; it now wraps.
+
+Redesign pass 69 is a phone walk of the longer report (Lo's Sharpe with the dependence line, Jensen's alpha on the account's rate, the fund split), the landing's new "¿Qué tan protegida está mi cuenta?" answer and the fund page's checks at 360 and 390 px. Nothing ran past the screen and no heading was stranded at a PDF page end. The tallest part was the evidence tables (trade statistics, significance, benchmark), where each row was its own card; on a phone each table is now one card with rules between rows, so the same figures take less scrolling and read as a list. Rendered with public data on (FRED), the crisis table gains an index column and ran 27 px past a 360 px screen; on a phone each crisis is now a card with its name, dates and labelled figures. The local-cash Sharpe line under the summary tiles gets a little space above it, and the landing's "Frente al efectivo" card fits at 360 and 390 px in all three languages. With each currency's own inflation (EUR, GBP, CAD, CHF, BRL), the currency table's figures keep a visible gap on narrow phones; the /metodologia list of public data sources uses the page's existing check list and fits at 360 px.
 
 ## Security
 
