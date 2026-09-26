@@ -267,8 +267,17 @@ def test_the_methodology_page_credits_every_public_source(locale: str) -> None:
         "INEGI",
         "Statistics Bureau",
         "e-Stat",
+        "BIS",
+        "Cboe",
+        "ecb.europa.eu",
+        "Open Government Licence v3.0 and copyright the Governor and Company of the Bank of "
+        "England",
+        "ODbL",
+        "CORRA",
     ):
         assert name in page
+    # No market closes whose owner forbids reproduction are credited as a source.
+    assert "Coinbase" not in page and "OCDE" not in page and "OECD" not in page
 
 
 def test_new_texts_make_no_claims_and_every_series_is_read() -> None:
