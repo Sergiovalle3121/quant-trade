@@ -302,6 +302,16 @@ per import; the column screen offers a web table only up to
 `mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
+Revolut's stocks account statement (`Date, Ticker, Type, Quantity, Price per
+share, Total Amount, Currency, FX Rate`, rows as reproduced from a real file in
+github.com/antonioaversa/taxes) is read by the universal fill reader:
+`BUY - MARKET`/`SELL - LIMIT` are the sides, cash rows (top-ups, custody fees,
+dividends) have no price and are dropped, and a `STOCK SPLIT` row
+(`universal.SPLIT_WORDS`) rescales a long position's open lots by the shares it
+adds or removes, keeping their cost (a 1-for-10 reverse split of 100 shares
+arrives as -90); a split of shares not held changes nothing, and one that would
+leave no shares is not applied and is counted in `SPLIT_EMPTIES_WARNING`. Prices in USD print without a sign, like every amount.
+
 B3's Área do Investidor Negociação extract is read by column name only
 (`tests/test_audit_b3.py`): `Data do Negócio` is the fill time and always day
 first (`universal.DAY_FIRST_NAMES`), `Tipo de Movimentação` the side
