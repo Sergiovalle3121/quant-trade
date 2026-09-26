@@ -318,7 +318,10 @@ trade_id, order_id, order_execution_time`, header as checked by the open-source
 github.com/prabusw/beancount-importers-india importer) is read by the universal
 fill reader. Fills are timed by `order_execution_time`, ranked above the
 date-only `trade_date`, so intraday trades pair in the order they happened
-whatever the row order. No F&O lot multiplier is applied (the result is the
+whatever the row order. A clock-only execution time joins `trade_date`, and a
+blank one falls back to `trade_date` at the start of that day
+(`universal.DATE_ONLY_FILLS_WARNING` counts those fills, since their order
+within the day is unknown). No F&O lot multiplier is applied (the result is the
 price move times the stated quantity, and the report says so). The XLSX
 download is not named: its layout is unconfirmed.
 

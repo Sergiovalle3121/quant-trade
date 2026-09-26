@@ -965,3 +965,35 @@ def test_zerodha_tradebook_pairs_fills_by_execution_time() -> None:
     assert trades[0].entry_time == datetime(2024, 1, 2, 9, 30, tzinfo=UTC)
     assert trades[0].exit_time == datetime(2024, 1, 2, 14, 30, tzinfo=UTC)
     assert trades[2].exit_time == datetime(2024, 1, 5, 11, 0, tzinfo=UTC)
+
+
+def test_a_clock_only_execution_time_is_joined_to_the_trade_date() -> None:
+    # A clock with no date must never be read as today: it joins trade_date.
+    report = _read(
+        [
+            ZERODHA_HEADER,
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,sell,false,10,1550,1001,2001,09:30:00",
+            "INFY,INE009A01021,2024-01-02,NSE,EQ,EQ,buy,false,10,1500,1002,2002,14:30:00",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_time == datetime(2024, 1, 2, 9, 30, tzinfo=UTC)
+    assert trade.exit_time == datetime(2024, 1, 2, 14, 30, tzinfo=UTC)
+    assert round(trade.pnl, 2) == 500.0
+
+
+def test_a_blank_execution_time_falls_back_to_the_trade_date_and_says_so() -> None:
+    from quant_trade.audit.universal import DATE_ONLY_FILLS_WARNING  # noqa: PLC0415
+
+    # Zerodha leaves order_execution_time blank on some rows (auction, expiry).
+    report = _read(
+        [
+            ZERODHA_HEADER,
+            "TCS,INE467B01029,2024-01-03,NSE,EQ,EQ,buy,false,5,3500,1003,2003,",
+            "TCS,INE467B01029,2024-01-04,NSE,EQ,EQ,sell,false,5,3600,1004,2004,2024-01-04T10:00:00",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_time == datetime(2024, 1, 3, tzinfo=UTC)
+    assert round(trade.pnl, 2) == 500.0
+    assert DATE_ONLY_FILLS_WARNING.format(n=1) in report.warnings
