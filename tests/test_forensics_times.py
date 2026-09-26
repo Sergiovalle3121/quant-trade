@@ -385,6 +385,50 @@ def test_row_order_statement_keeps_the_monotonic_key() -> None:
     assert _figure(outcome, "direction") == "asc"
 
 
+def test_row_order_statement_sorted_by_a_printed_column() -> None:
+    # The grid can be sorted by any column before "Save as Report": tickets,
+    # open and close times all zigzag, but the T/P column rises and its
+    # tied rows keep the tickets' direction, so the table is in order.
+    data = (FIXTURES / "mt4_statement.htm").read_bytes()
+    head, _sep, tail = data.rpartition(b"2024.03.04 10:00:00")  # the third trade's open
+    zigzag = (head + b"2024.03.01 09:00:00" + tail).replace(b"1000005", b"1000000")
+    second = b"<td>0.00</td><td>0.00</td><td class=msdate nowrap>2024.03.04 13:02:44"
+    third = b"<td>2083.00</td><td>0.00</td><td class=msdate nowrap>2024.03.06 09:30:00"
+    assert zigzag.count(second) == 1 and zigzag.count(third) == 1
+    by_tp = zigzag.replace(
+        second, second.replace(b"<td>0.00</td><td>0.00", b"<td>0.00</td><td>1.09000")
+    )
+    by_tp = by_tp.replace(third, third.replace(b"<td>0.00", b"<td>1.10000"))
+    outcome = _run(times.run_ROW_ORDER, _table(by_tp))
+    assert outcome.hits == 0 and outcome.examples == ()
+    assert ("order_key", "column", "DECLARED") in outcome.figures
+    assert _figure(outcome, "sorted_column") == "7" and _figure(outcome, "direction") == "asc"
+    assert _figure(outcome, "n_rows") == "3" and _figure(outcome, "ties") == "0"
+    # Descending is a sorted grid too (the header clicked twice).
+    down = zigzag.replace(
+        second, second.replace(b"<td>0.00</td><td>0.00", b"<td>0.00</td><td>1.08000")
+    )
+    down = down.replace(third, third.replace(b"<td>0.00", b"<td>1.07000"))
+    outcome = _run(times.run_ROW_ORDER, _table(down))
+    assert outcome.hits == 0 and _figure(outcome, "direction") == "desc"
+    assert _figure(outcome, "sorted_column") == "7"
+    # A tie whose tickets run against their own direction is not a stable
+    # sort of the grid: the ticket key reports the zigzag as before.
+    tied = zigzag.replace(
+        second, second.replace(b"<td>0.00</td><td>0.00", b"<td>0.00</td><td>1.09000")
+    )
+    tied = tied.replace(third, third.replace(b"<td>0.00", b"<td>1.09000"))
+    outcome = _run(times.run_ROW_ORDER, _table(tied))
+    assert outcome.hits == 1 and outcome.examples == (7,)
+    assert ("order_key", "ticket", "DECLARED") in outcome.figures
+    assert all(key != "sorted_column" for key, _v, _e in outcome.figures)
+    # A column whose values all tie (Taxes) never counts as the sort key,
+    # nor does one with a cell that is not a number.
+    words = by_tp.replace(b"<td>1.10000", b"<td>n/a")
+    outcome = _run(times.run_ROW_ORDER, _table(words))
+    assert outcome.hits == 1 and ("order_key", "ticket", "DECLARED") in outcome.figures
+
+
 def test_row_order_needs_two_rows() -> None:
     table = _table(FXBLUE.split(b"\n")[0] + b"\n" + FXBLUE.split(b"\n")[2] + b"\n")
     outcome = _run(times.run_ROW_ORDER, table)

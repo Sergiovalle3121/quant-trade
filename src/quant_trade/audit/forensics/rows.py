@@ -139,6 +139,15 @@ class RawTable:
     account_label_present: bool = False
     header_texts: tuple[tuple[int, tuple[str, ...]], ...] = ()
     """``(raw index, texts)`` of every header row, so a check can map columns."""
+    layout_widths: tuple[tuple[str, int], ...] = ()
+    """Per section, the widest MT5 deal row once trailing blanks are dropped:
+    a header-less workbook keeps its layout even on rows with no comment."""
+
+    def layout_width(self, section: str) -> int:
+        for name, width in self.layout_widths:
+            if name == section:
+                return width
+        return 0
 
     def label(self, name: str) -> str | None:
         for key, value in self.labels:
@@ -372,6 +381,11 @@ def _from_reader(
         rows.append(RawRow(index, texts, cells, section, kind, header_row))
     labels = _labels(reader, family)
     title = getattr(reader, "title", "") or ""
+    widths: dict[str, int] = {}
+    for row in rows:
+        if row.kind == KIND_MT5_DEAL:
+            width = _trimmed_width(row.texts)
+            widths[row.section] = max(widths.get(row.section, 0), width)
     return RawTable(
         source_format=source_format or "",
         family=family,
@@ -385,7 +399,15 @@ def _from_reader(
         title_present=bool(title.strip()),
         account_label_present=_account_present(reader, family, title),
         header_texts=tuple(header_texts),
+        layout_widths=tuple(sorted(widths.items())),
     )
+
+
+def _trimmed_width(texts: tuple[str, ...]) -> int:
+    width = len(texts)
+    while width > 0 and not texts[width - 1]:
+        width -= 1
+    return width
 
 
 def _labels(reader: Any, family: str) -> tuple[tuple[str, str], ...]:
@@ -587,12 +609,11 @@ def mt5_columns(table: RawTable, row: RawRow) -> dict[str, int]:
     """The deals column map of the header above ``row`` (visible cells).
 
     A workbook may store one blank trailing cell past the comment; the
-    width that picks the layout ignores trailing blanks.
+    width that picks the layout ignores trailing blanks, and a header-less
+    row with no comment takes the widest row of its section.
     """
     header = table.header_of(row)
-    width = len(row.texts)
-    while width > 0 and not row.texts[width - 1]:
-        width -= 1
+    width = max(_trimmed_width(row.texts), table.layout_width(row.section))
     return importers._mt5_column_map(list(header) if header else None, width)
 
 

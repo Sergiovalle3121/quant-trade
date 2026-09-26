@@ -2459,6 +2459,37 @@ Telegram, forums and videos. The guard refuses "verificado", "certificado",
 "aprobado", "pasarás", "certified", "approved" and "verified track record"
 unless directly negated, which is what lets the fixed wording through.
 
+### File consistency page (`audit/forensics_web.py`, behind a switch)
+
+Planned and hidden: `forensics_web.FORENSICS_ENABLED` is a constant in the
+repository (not a Railway variable) and, while it is `False`, `register`
+mounts nothing and every path answers 404. When on, `GET
+/audits/{audit_id}/coherencia` (Spanish), `/consistency` (English) and
+`/coerencia` (Portuguese; `?lang=` overrides the path's language as on the
+report) shows the private "Coherencia del archivo" page: it opens exactly
+like the report (its token or the signed-in owner, 404 for a stranger, 410
+once purged) and only for a paid report or in free mode (402 otherwise),
+re-reads the stored platform file (the `report.*` blob, else `live.*`, else
+a monthly table uploaded as the equity file) after checking its SHA-256
+against the digest recorded at upload, runs the battery
+(`audit/forensics/review`) under an audit slot (503 with a retry note when
+none is free), keeps results in an in-process LRU of 256 keyed by audit,
+`METHOD_VERSION` and file hash, and limits uncached reviews to 30 per client
+address and hour (429). The page shows the file's family, format and method
+version, a summary (a sentence per SIGNAL or INFO check made of the measured
+fact, "puede tener explicaciones legítimas; conviene aclararlo con quien
+generó el archivo" and, for INFO, why it is not a signal; with no finding,
+"no encontramos las huellas que revisamos; eso no prueba que el archivo sea
+original"), the table of every check with its status chip ("Señal", "Dato",
+"Sin hallazgo", "No medido"; never "limpio"), its figures with their
+evidence tags, the reason of every `NOT_MEASURED` in words, the calibration
+line per check, and the limits (a carefully edited file passes; nothing
+proves the broker issued the file). Every sentence lives in
+`audit/forensics/copy.py` with identical keys in es, en and pt and passes
+the guard; figures are counts, codes, dates and row indexes, so no text of
+the file reaches the page, and nothing here changes a class. The report's
+link to the page is added by the report's owner later.
+
 ### Export guides, search engines and link previews
 
 Every platform the importers read has a short export guide in Spanish and

@@ -129,6 +129,20 @@ def test_mt5_columns_ignore_a_blank_trailing_cell() -> None:
     wide = texts[:12] + ("note", "10000.00")
     row = rows.RawRow(0, wide, tuple(rows.RawCell(t) for t in wide), "deals", "mt5_deal", -1)
     assert rows.mt5_columns(table, row)["balance"] == 12
+    # A header-less 14-column row with no comment keeps its section's layout.
+    narrow = texts[:11] + ("", "", "", "")  # 15 cells: Fee at 9, blank comment, blank tail
+    row = rows.RawRow(0, narrow, tuple(rows.RawCell(t) for t in narrow), "deals", "mt5_deal", -1)
+    kept = rows.RawTable("mt5_history_xlsx", families.MT5_HISTORY, (row,), (), "none", "none",
+                         "none", 0, False, layout_widths=(("deals", 14),))  # fmt: skip
+    assert rows.mt5_columns(kept, row)["balance"] == 12 and rows.mt5_columns(kept, row)["fee"] == 9
+    assert rows.mt5_columns(table, row)["balance"] == 11  # no layout width known
+    assert kept.layout_width("deals") == 14 and kept.layout_width("orders") == 0
+
+
+def test_layout_widths_are_read_from_the_widest_deal_row() -> None:
+    table = _load("mt5_history.html")
+    assert table.layout_width("deals") >= 13
+    assert table.layout_width("positions") == 0
 
 
 def test_mt4_statement_rows_are_classified() -> None:

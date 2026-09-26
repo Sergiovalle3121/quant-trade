@@ -53,3 +53,6 @@ MONTHLY_REPEAT_MIN = 3
 
 #: Genuine files a cell needs before its check may answer SIGNAL.
 CALIBRATION_MIN_FILES = 20
+#: ...from at least this many distinct accounts or strategies: forty daily
+#: exports of one account are one account.
+CALIBRATION_MIN_GROUPS = 10

@@ -147,11 +147,15 @@ def calibration_line(check_id: str, family: str) -> tuple[tuple[str, str], ...]:
     cell = CALIBRATION.get((check_id, family))
     if cell is None:
         return ()
+    # The binomial bound assumes independent trials: the unit is the account or
+    # strategy (``groups``), never the file, so re-exports of one account do not
+    # shrink the bound (math review, 2026-09-26).
     return (
         ("n", str(cell.n)),
+        ("groups", str(cell.groups)),
         ("n_reserved", str(cell.n_reserved)),
         ("unexplained", str(cell.unexplained)),
-        ("cp95_upper_pct", clopper_pearson_upper_pct(cell.unexplained, cell.n)),
+        ("cp95_upper_pct", clopper_pearson_upper_pct(cell.unexplained, min(cell.n, cell.groups))),
         ("frozen", cell.frozen),
     )
 

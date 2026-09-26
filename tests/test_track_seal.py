@@ -844,6 +844,15 @@ def test_monthly_snapshot_and_comparison() -> None:
     assert seal.compare_uploads(prev, prev, now=LATER, prev_key=None, new_key=None) == seal.Refusal(
         "already_recorded"
     )
+    # A revised past month with no new month is not "already recorded": the
+    # cutoff did not advance, and the two grids never share one hash.
+    retyped = seal.snapshot_monthly(_grid({"2024-01": 0.014, "2024-02": -0.005}))
+    again = seal.compare_uploads(prev, retyped, now=LATER, prev_key=None, new_key=None)
+    assert again == seal.Refusal("cutoff_not_advanced")
+    assert seal.trades_sha256(prev) != seal.trades_sha256(retyped)
+    assert seal.trades_sha256(prev) == seal.trades_sha256(
+        seal.snapshot_monthly(_grid({"2024-02": -0.005, "2024-01": 0.012}))
+    )
 
 
 # ---------------------------------------------------------------------------
