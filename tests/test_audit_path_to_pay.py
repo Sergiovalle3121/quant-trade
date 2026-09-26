@@ -101,4 +101,7 @@ def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
     answers = [answer for _, answer in _COPY[locale]["faq"] if words[locale] in answer]
     assert len(answers) == 1
     assert not find_claims(answers[0])
+    # Two-step sign-in: the reset also asks for the code from the app.
+    two_step = {"es": "dos pasos", "en": "two-step", "pt": "duas etapas"}
+    assert two_step[locale] in answers[0]
     assert words[locale] in _text(landing(locale=locale, free_mode=False, signed_in=False))
