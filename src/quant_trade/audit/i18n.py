@@ -964,6 +964,15 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "anual), anualizado como el Sharpe principal; es una tasa en dólares",
     ),
     (
+        "Sharpe ratio of the returns after subtracting what cash in the account's own currency "
+        "paid over the same days (the short rate FRED publishes for that currency, converted "
+        "to an annual yield by its own quote), annualised like the headline Sharpe",
+        "Sharpe de los retornos tras restar lo que pagó el efectivo en la moneda de la cuenta "
+        "en los mismos días (la tasa a corto plazo que FRED publica para esa moneda, "
+        "convertida a rendimiento anual según su forma de cotizar), anualizado como el Sharpe "
+        "principal",
+    ),
+    (
         "the Treasury bill rates could not be read when the report was made",
         "no se pudieron leer las tasas de las letras del Tesoro al generar el informe",
     ),
