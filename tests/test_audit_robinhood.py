@@ -12,6 +12,7 @@ from quant_trade.audit import i18n
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.importers import (
     ROBINHOOD_CSV,
+    ROBINHOOD_EXPIRED_WARNING,
     ROBINHOOD_MOVES_WARNING,
     ROBINHOOD_UNOPENED_WARNING,
     detect_format,
@@ -153,7 +154,9 @@ def test_a_position_still_open_at_the_end_is_left_out() -> None:
 
 
 @pytest.mark.parametrize("n", [1, 4])
-@pytest.mark.parametrize("template", [ROBINHOOD_UNOPENED_WARNING, ROBINHOOD_MOVES_WARNING])
+@pytest.mark.parametrize(
+    "template", [ROBINHOOD_UNOPENED_WARNING, ROBINHOOD_MOVES_WARNING, ROBINHOOD_EXPIRED_WARNING]
+)
 def test_the_new_warnings_read_in_every_language(template: str, n: int) -> None:
     english = template.format(n=n)
     for locale in ("es", "pt"):
@@ -173,6 +176,8 @@ def test_an_expired_option_keeps_its_hundred_shares_a_contract(premium: str) -> 
         report = import_report(_report(rows), "Robinhood.csv")
         (trade,) = report.trades.trades
         assert trade.quantity == pytest.approx(300.0)  # 3 contracts x 100 shares
+        # The report says why the exit shows 0.01 and the result is the whole premium.
+        assert ROBINHOOD_EXPIRED_WARNING.format(n=1) in report.warnings
         sign = -1 if code == "BTO" else 1
         assert trade.pnl == pytest.approx(sign * float(premium) * 300)
         assert not any("per point" in warning for warning in report.warnings)

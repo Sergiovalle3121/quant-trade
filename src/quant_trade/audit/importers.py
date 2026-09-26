@@ -3831,6 +3831,11 @@ ROBINHOOD_UNOPENED_WARNING = (
     "{n} closing trade(s) of positions the file never shows being opened (opened before its "
     "first date or transferred in) left out; download the full history to include them"
 )
+ROBINHOOD_EXPIRED_WARNING = (
+    "{n} option(s) expired, assigned or exercised: each closes at no premium, so its result "
+    "is the whole premium, and its exit price shows 0.01 (the smallest option tick) because "
+    "a trade needs a positive price"
+)
 ROBINHOOD_MOVES_WARNING = (
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong"
@@ -3917,7 +3922,7 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
 
     listed.sort(key=lambda item: (item.day, stage(item)))
     lots: dict[str, deque[list[Any]]] = {}
-    unopened = moves = 0
+    unopened = moves = expired = 0
 
     def close(symbol: str, signed: float, price: float, moment: datetime, fee: float) -> float:
         """Close open lots against a fill; returns the quantity left over."""
@@ -3989,7 +3994,9 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
                 continue
             open_quantity = sum(lot[0] for lot in held)
             quantity = min(abs(item.quantity or open_quantity), abs(open_quantity))
+            before = len(draft.trips)
             close(item.option, -math.copysign(quantity, open_quantity), 0.0, item.day, 0.0)
+            expired += len(draft.trips) > before
         elif item.code in _ROBINHOOD_SHARE_EVENTS:
             group = events.pop((item.day, item.code), None)
             if group is not None:
@@ -4001,6 +4008,8 @@ def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
         draft.warnings.append(ROBINHOOD_UNOPENED_WARNING.format(n=unopened))
     if moves:
         draft.warnings.append(ROBINHOOD_MOVES_WARNING.format(n=moves))
+    if expired:
+        draft.warnings.append(ROBINHOOD_EXPIRED_WARNING.format(n=expired))
     still_open = sum(1 for held in lots.values() if held)
     draft.open_positions = still_open
     if still_open:

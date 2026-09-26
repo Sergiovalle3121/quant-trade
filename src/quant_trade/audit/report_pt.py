@@ -1966,6 +1966,16 @@ SINGULAR: dict[str, tuple[str, str]] = {
         "(aberta antes da primeira data ou transferida); baixe o histórico completo para "
         "incluí-lo",
     ),
+    "{n} option(s) expired, assigned or exercised: each closes at no premium, so its "
+    "result is the whole premium, and its exit price shows 0.01 (the smallest option "
+    "tick) because a trade needs a positive price": (
+        "{n} option expired, was assigned or was exercised: it closes at no premium, so its "
+        "result is the whole premium, and its exit price shows 0.01 (the smallest option "
+        "tick) because a trade needs a positive price",
+        "{n} opção venceu, foi atribuída ou exercida: fecha sem prêmio, então o resultado é o "
+        "prêmio inteiro, e o preço de saída aparece como 0.01 (o mínimo de uma opção) porque "
+        "uma operação precisa de um preço positivo",
+    ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (
         "{n} share movement that is not a trade (transfer, merger, split) left out; the "
@@ -2222,6 +2232,16 @@ RULES: tuple[tuple[str, str], ...] = (
             "ficaram de fora {n} fechamento(s) de posições cuja abertura não aparece no "
             "arquivo (abertas antes da primeira data ou transferidas); baixe o histórico "
             "completo para incluí-los"
+        ),
+    ),
+    (
+        "{n} option(s) expired, assigned or exercised: each closes at no premium, so its "
+        "result is the whole premium, and its exit price shows 0.01 (the smallest option "
+        "tick) because a trade needs a positive price",
+        (
+            "{n} opção(ões) venceram, foram atribuídas ou exercidas: cada uma fecha sem "
+            "prêmio, então o resultado é o prêmio inteiro, e o preço de saída aparece como "
+            "0.01 (o mínimo de uma opção) porque uma operação precisa de um preço positivo"
         ),
     ),
     (

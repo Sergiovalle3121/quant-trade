@@ -138,6 +138,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "para incluirlos",
     ),
     (
+        "{n} option(s) expired, assigned or exercised: each closes at no premium, so its "
+        "result is the whole premium, and its exit price shows 0.01 (the smallest option "
+        "tick) because a trade needs a positive price",
+        "{n} opción(es) vencieron, se asignaron o se ejercieron: cada una cierra sin prima, así "
+        "que su resultado es toda la prima, y su precio de salida figura como 0.01 (el mínimo "
+        "de una opción) porque una operación necesita un precio positivo",
+    ),
+    (
         "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
         "positions they change may be read wrong",
         "se dejaron fuera {n} movimiento(s) de acciones que no son operaciones (traspasos, "
@@ -1828,6 +1836,16 @@ _SINGULAR: dict[str, tuple[str, str]] = {
         "se dejó fuera {n} cierre de una posición cuya apertura no aparece en el archivo "
         "(abierta antes de su primera fecha o traspasada); descarga el historial completo "
         "para incluirlo",
+    ),
+    "{n} option(s) expired, assigned or exercised: each closes at no premium, so its "
+    "result is the whole premium, and its exit price shows 0.01 (the smallest option "
+    "tick) because a trade needs a positive price": (
+        "{n} option expired, was assigned or was exercised: it closes at no premium, so its "
+        "result is the whole premium, and its exit price shows 0.01 (the smallest option "
+        "tick) because a trade needs a positive price",
+        "{n} opción venció, se asignó o se ejerció: cierra sin prima, así que su resultado es "
+        "toda la prima, y su precio de salida figura como 0.01 (el mínimo de una opción) "
+        "porque una operación necesita un precio positivo",
     ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (
