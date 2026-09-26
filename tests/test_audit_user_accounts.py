@@ -1446,13 +1446,51 @@ def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> N
     assert "even if you delete your account and without your e-mail" in en
 
 
-def test_portuguese_visitors_get_the_account_screens_in_english(tmp_path: Path) -> None:
+def test_the_account_screens_exist_in_portuguese(tmp_path: Path) -> None:
     from quant_trade.audit import account_pages
 
-    assert account_pages.path("signup", "pt") == "/signup"
-    client, _, _ = _client(tmp_path)
-    page = client.get("/registro?lang=pt").text
-    assert "<html lang='en'" in page and "Create" in page
+    assert set(account_pages.COPY["pt"]) == set(account_pages.COPY["en"])
+    client, store, _ = _client(tmp_path)
+    page = client.get("/pt/cadastro").text
+    assert "<html lang='pt'" in page and "Crie sua conta" in page
+    assert "O que guardamos e como apagar" in page
+    assert "href='/registro'" in page and "href='/signup'" in page  # language switch
+    assert "/terms?lang=en" in page  # the terms are not in Portuguese yet
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    # ?lang=pt on a Spanish path reads in Portuguese too.
+    assert "Crie sua conta" in client.get("/registro?lang=pt").text
+    # The Portuguese landing sends its visitors to the Portuguese sign-up.
+    assert "/pt/cadastro" in client.get("/pt").text
+    csrf = _csrf(page)
+    answer = client.post(
+        "/pt/cadastro",
+        data={"email": "ana@example.com", "password": PASSWORD, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert answer.headers["location"].startswith("/pt/conta")
+    audit_id = _audit_id(_upload(client).headers["location"])
+    store.mark_paid(audit_id, stripe_session_id="cs_pt", at=NOW)  # type: ignore[attr-defined]
+    page = client.get("/pt/conta").text
+    assert "Meus relatórios" in page and "Minhas estratégias" in page
+    assert f"/audits/{audit_id}?lang=en" in page  # the report itself reads in English
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    where = client.post(
+        "/pt/conta/estrategias/guardar",
+        data={"audit_id": audit_id, "strategy": "new", "name": "EA Ouro", "csrf": _csrf(page)},
+        follow_redirects=False,
+    ).headers["location"]
+    assert where.startswith("/pt/conta/estrategias/")
+    view = client.get(where).text
+    assert "<html lang='pt'" in view and "Versão" in view and "EA Ouro" in view
+    assert not find_claims(re.sub(r"<[^>]+>", " ", view))
+    # A wrong password on the Portuguese sign-in stays in Portuguese.
+    client.post("/pt/sair", data={"csrf": _csrf(page)})
+    csrf = _csrf(client.get("/pt/entrar").text)
+    wrong = client.post(
+        "/pt/entrar",
+        data={"email": "ana@example.com", "password": "not the password", "csrf": csrf},
+    )
+    assert "O e-mail ou a senha não conferem" in wrong.text
 
 
 # -- "Mis estrategias" -------------------------------------------------------------
@@ -1487,6 +1525,9 @@ def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> 
     assert any(word == "sin cambio claro" for word in lines.values())
     # A dimension that was not measured before is not called better.
     assert not any(k.startswith("Costes") for k in lines)
+    pt = dict(what_changed(old, overlap, "pt"))
+    assert pt["Classe: C → B"] == "melhor" and "sem mudança clara" in pt.values()
+    assert "Significância estatística: Fraca → Passa" in pt
     # Dimension lines say "changed": each report carries its own declarations.
     assert lines["Significación estadística: Débil → Supera"] == "cambió"
     # Dates that barely overlap: the market of those dates could explain it.

@@ -1,6 +1,7 @@
 """The account pages: sign up, sign in, "My reports", password and deletion.
 
-Every page exists in Spanish (default) and English. Forms post back to the
+Every page exists in Spanish (default), English and Portuguese
+(``account_pt``). Forms post back to the
 same paths with a CSRF token; nothing here runs script. The pages reuse the
 site's shell (``pages._page``) so the redesign styles them with the rest.
 """
@@ -10,10 +11,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
-from quant_trade.audit.pages import _e, _field, _page, _page_hero
+from quant_trade.audit.pages import _e, _field, _home, _page, _page_hero
+from quant_trade.audit.portuguese import link_locale
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord, StrategyRecord
 from quant_trade.audit.theme import CLASS_COLOURS, icon
@@ -500,6 +503,10 @@ COPY: dict[str, dict[str, str]] = {
         "nav_account": "My account",
     },
 }
+COPY["pt"] = COPY_PT
+PATHS["pt"] = PATHS_PT
+#: The languages every account screen exists in.
+LANGUAGES = ("es", "en", "pt")
 
 ACCOUNT_CSS = """
 .acct-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:36px;
@@ -586,15 +593,8 @@ grid-column:1/-1}
 
 
 def _locale(locale: str) -> str:
-    # A language the account screens do not have yet (Portuguese) reads in
-    # English, never in Spanish; anything unknown keeps the Spanish default.
-    if locale in COPY:
-        return locale
-    return "en" if locale in _ENGLISH_FALLBACK else "es"
-
-
-#: Languages whose visitors see the account screens in English for now.
-_ENGLISH_FALLBACK = ("pt",)
+    # Anything unknown keeps the Spanish default.
+    return locale if locale in COPY else "es"
 
 
 def path(kind: str, locale: str) -> str:
@@ -605,7 +605,7 @@ def _hidden(name: str, value: str) -> str:
     return f"<input type='hidden' name='{name}' value='{_e(value)}'>"
 
 
-def _shell(locale: str, title: str, lead: str, body: str, *, switch: str) -> str:
+def _shell(locale: str, title: str, lead: str, body: str, *, switch: dict[str, str]) -> str:
     content = (
         _page_hero(COPY[locale]["eyebrow"], title, lead)
         + f"<div class='paper page-main'><div class='wrap'><style>{ACCOUNT_CSS}</style>"
@@ -614,7 +614,7 @@ def _shell(locale: str, title: str, lead: str, body: str, *, switch: str) -> str
     )
     # Customer text (an e-mail, a description) is passed through ``_safe_text``
     # before it gets here; the guard is the last check, as on other pages.
-    return guard_page(_page(title, locale, content, switch_href=switch, solid_nav=True))
+    return guard_page(_page(title, locale, content, alternates=switch, solid_nav=True))
 
 
 def _alert(copy: dict[str, str], error: str = "", flash: str = "") -> str:
@@ -660,10 +660,10 @@ def _q(next_path: str) -> str:
     return quote(next_path, safe="/")
 
 
-def _switch(kind: str, locale: str, next_path: str = "") -> str:
-    other = "en" if locale == "es" else "es"
+def _switch(kind: str, locale: str, next_path: str = "") -> dict[str, str]:
+    """This screen's address in every language, for the language switch."""
     query = f"?next={_e(_q(next_path))}" if next_path else ""
-    return path(kind, other) + query
+    return {lang: path(kind, lang) + query for lang in LANGUAGES}
 
 
 def signup_page(
@@ -679,6 +679,7 @@ def signup_page(
     copy = COPY[locale]
     from quant_trade.audit.legal import legal_url
 
+    legal = link_locale(locale)  # the terms are not in Portuguese yet
     signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
         _alert(copy, error)
@@ -694,8 +695,8 @@ def signup_page(
         )
         + "<p class='muted acct-terms'>"
         + _e(copy["terms_agree"]).format(
-            terms=f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a>",
-            privacy=f"<a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a>",
+            terms=f"<a href='{_e(legal_url('terms', legal))}'>{_e(copy['terms_link'])}</a>",
+            privacy=f"<a href='{_e(legal_url('privacy', legal))}'>{_e(copy['privacy_link'])}</a>",
         )
         + "</p>"
         + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signup_button'])}"
@@ -801,7 +802,7 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
     reason = reason if reason in ("signin", "code", "quota", "network") else "signin"
-    home = "/en" if locale == "en" else "/"
+    home = _home(locale)
     if reason in ("signin", "code"):
         # After signing up or in, back to the upload form: the file was not kept.
         back = "?next=" + _e(_q(home + "#subir"))
@@ -826,7 +827,7 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
         copy[f"gate_{reason}_title"].format(limit=limit),
         copy[f"gate_{reason}_lead"].format(limit=limit),
         body,
-        switch=path("signup", "en" if locale == "es" else "es"),
+        switch={lang: path("signup", lang) for lang in LANGUAGES},
     )
 
 
@@ -871,7 +872,7 @@ def _class_badge(overall: str) -> str:
 
 
 def report_href(audit_id: str, locale: str) -> str:
-    return f"/audits/{audit_id}?lang={locale}"
+    return f"/audits/{audit_id}?lang={link_locale(locale)}"
 
 
 def _usd(cents: int) -> str:
@@ -918,9 +919,9 @@ def _reports_table(
         if not item.purged:
             links.append((report_href(item.audit_id, locale), copy["open"]))
         if comparable(item, free_mode=free_mode):
-            links.append((f"/audits/{item.audit_id}/pdf?lang={locale}", copy["pdf"]))
+            links.append((f"/audits/{item.audit_id}/pdf?lang={link_locale(locale)}", copy["pdf"]))
         if item.public_id:
-            links.append((f"/v/{item.public_id}?lang={locale}", copy["public_page"]))
+            links.append((f"/v/{item.public_id}?lang={link_locale(locale)}", copy["public_page"]))
         opener = (
             "<div class='acct-links'>"
             + "".join(
@@ -1050,7 +1051,7 @@ def account_page(
     """ "My reports": the reports, credits, codes and purchases of one account."""
     locale = _locale(locale)
     copy = COPY[locale]
-    home = "/en" if locale == "en" else "/"
+    home = _home(locale)
     signout = (
         f"<form method='post' action='{path('signout', locale)}'>{_hidden('csrf', csrf)}"
         f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['signout_button'])}"
@@ -1191,7 +1192,7 @@ def account_page(
         copy["account_title"],
         copy["account_lead"],
         body,
-        switch=path("account", "en" if locale == "es" else "es"),
+        switch={lang: path("account", lang) for lang in LANGUAGES},
     )
 
 
@@ -1461,13 +1462,12 @@ def strategy_page(
         + back
         + f"<style>{STRATEGY_CSS}</style>"
     )
-    other = "en" if locale == "es" else "es"
     return _shell(
         locale,
         strategy.name,
         copy["page_lead"],
         body,
-        switch=f"{strategies_path(other)}/{strategy.id}",
+        switch={lang: f"{strategies_path(lang)}/{strategy.id}" for lang in LANGUAGES},
     )
 
 
