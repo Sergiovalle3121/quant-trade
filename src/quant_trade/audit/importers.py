@@ -3831,7 +3831,7 @@ def _is_zip(data: bytes) -> bool:
 
 
 #: What an archive may hold for its one export to be read.
-_ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls")
+_ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls", ".xml")
 
 
 def unwrap(data: bytes) -> bytes:
@@ -3855,7 +3855,8 @@ def unwrap(data: bytes) -> bytes:
             "historial de la plataforma en CSV, Excel o HTML (las guías muestran dónde)",
         )
     if not _is_zip(data):
-        return data
+        flex = _flex_trades(data)
+        return flex if flex is not None else data
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except (zipfile.BadZipFile, EOFError, OSError, ValueError):
@@ -3912,6 +3913,37 @@ def unwrap(data: bytes) -> bytes:
             ) from exc
     # An old workbook or a PDF inside gets its own answer; a zip inside is read as a workbook.
     return inner if _is_zip(inner) else unwrap(inner)
+
+
+def _flex_trades(data: bytes) -> bytes | None:
+    """An Interactive Brokers Flex Query statement in XML (its default
+    format) as a CSV of its executions, one ``<Trade>`` per row with the
+    attribute names as columns, for the same reader as the Flex CSV;
+    ``None`` for any other file."""
+    head = data[:4000]
+    if b"<FlexQueryResponse" not in head and b"<FlexStatements" not in head:
+        return None
+    root = _xml(data)
+    trades = [
+        element.attrib
+        for element in root.iter()
+        if _local(element.tag) == "Trade"
+        and element.get("levelOfDetail", "EXECUTION").upper() == "EXECUTION"
+    ]
+    if not trades:
+        raise ReportFormatError(
+            "flex_no_trades",
+            "the Interactive Brokers statement has no trades: add the Trades section at "
+            "Execution level to the Flex Query, run it again and upload that file",
+            "el estado de Interactive Brokers no tiene operaciones: añade la sección Trades "
+            "a nivel Execution a la Flex Query, vuelve a ejecutarla y sube ese archivo",
+        )
+    columns = list(dict.fromkeys(name for trade in trades for name in trade))
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(columns)
+    writer.writerows([trade.get(name, "") for name in columns] for trade in trades)
+    return buffer.getvalue().encode("utf-8")
 
 
 def _html_table(reader: _TableReader) -> tuple[list[str], list[list[str]]] | None:

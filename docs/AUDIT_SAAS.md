@@ -276,7 +276,12 @@ cannot be read are refused with how to get one that can: an old binary
 Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
 (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
-(`zip_contents`). A member is unpacked in bounded chunks and never past
+(`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
+default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
+`<Trade>` at `EXECUTION` level with the attribute names as columns
+(order-level and summary rows are ignored; parsed with the same no-DOCTYPE
+guard as workbooks); a statement with no executions is refused with
+`flex_no_trades`, naming the Trades section to add. A member is unpacked in bounded chunks and never past
 the limit, whatever size it declares, and only stored or deflated members
 are opened (the same holds for workbook members). A web page is parsed once
 per import; the column screen offers a web table only up to

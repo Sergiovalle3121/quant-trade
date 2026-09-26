@@ -218,6 +218,63 @@ def test_interactive_brokers_flex_trades_with_compact_times() -> None:
     assert trades[0].entry_time == datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
 
 
+def _flex_xml(*elements: str, doctype: str = "") -> bytes:
+    body = "\n".join(elements)
+    return (
+        f'<?xml version="1.0" encoding="UTF-8"?>{doctype}\n'
+        '<FlexQueryResponse queryName="trades" type="AF"><FlexStatements count="1">'
+        '<FlexStatement accountId="U1" fromDate="20260101" toDate="20260131">'
+        f"<Trades>\n{body}\n</Trades></FlexStatement></FlexStatements></FlexQueryResponse>"
+    ).encode()
+
+
+_FLEX_FILLS = (
+    '<Trade accountId="U1" currency="USD" assetCategory="STK" symbol="AAPL" '
+    'dateTime="20260115;093000" tradeDate="20260115" quantity="100" tradePrice="200" '
+    'ibCommission="-1" ibCommissionCurrency="USD" multiplier="1" fifoPnlRealized="0" '
+    'buySell="BUY" levelOfDetail="EXECUTION" />',
+    '<Trade accountId="U1" currency="USD" assetCategory="STK" symbol="AAPL" '
+    'dateTime="20260116;100000" tradeDate="20260116" quantity="-100" tradePrice="205" '
+    'ibCommission="-1" ibCommissionCurrency="USD" multiplier="1" fifoPnlRealized="498" '
+    'buySell="SELL" levelOfDetail="EXECUTION" />',
+    # An order-level summary row repeats the executions: never read.
+    '<Order accountId="U1" symbol="AAPL" dateTime="20260116;100000" quantity="-100" '
+    'tradePrice="205" buySell="SELL" levelOfDetail="ORDER" />',
+)
+
+
+def test_interactive_brokers_flex_xml_reads_like_the_flex_csv() -> None:
+    import io  # noqa: PLC0415
+    import zipfile  # noqa: PLC0415
+
+    report = _read([_flex_xml(*_FLEX_FILLS).decode()], "flex.xml")
+    assert report.source_format == UNIVERSAL_FILLS_CSV
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [500.0]
+    assert report.trades.trades[0].entry_time == datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
+    assert any("read as net" in warning for warning in report.warnings)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("flex.xml", _flex_xml(*_FLEX_FILLS))
+    zipped = import_report(buffer.getvalue(), "flex.zip")
+    assert [round(t.pnl, 2) for t in zipped.trades.trades] == [500.0]
+
+
+def test_a_flex_xml_without_executions_says_how_to_add_them() -> None:
+    with pytest.raises(ReportFormatError) as refused:
+        import_report(_flex_xml(_FLEX_FILLS[2]), "flex.xml")
+    error = refused.value
+    assert error.code == "flex_no_trades"
+    assert "Execution" in str(error) and "Execution" in error.localized("es")
+    assert find_claims(str(error)) == [] and find_claims(error.localized("es")) == []
+
+
+def test_a_flex_xml_with_a_document_type_is_refused() -> None:
+    doctype = '<!DOCTYPE r [<!ENTITY x "y">]>'
+    with pytest.raises(ReportFormatError) as refused:
+        import_report(_flex_xml(*_FLEX_FILLS, doctype=doctype), "flex.xml")
+    assert refused.value.code == "xml_doctype"
+
+
 def test_interactive_brokers_activity_statement_trades_section() -> None:
     lines = [
         "Statement,Header,Field Name,Field Value",
