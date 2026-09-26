@@ -42,6 +42,7 @@ COPY_PT: dict[str, str] = {
     "have_account": "Já tem conta?",
     "no_account": "Ainda não tem conta?",
     "signin_link": "Entrar",
+    "back_to_signin": "Voltar ao login",
     "signup_link": "Crie uma grátis",
     "forgot_link": "Esqueci minha senha",
     "terms_agree": "Ao criar a conta você aceita os {terms} e a {privacy}.",
@@ -176,6 +177,11 @@ COPY_PT: dict[str, str] = {
         "para saber qual link funciona; ela sai com a conta.|"
         "Se você criar uma chave de recuperação, só a impressão dela (um hash) e a data, nunca "
         "a chave; ela sai ao ser usada ou com a conta.|"
+        "Se você ativar a verificação em duas etapas, a chave secreta que seu app "
+        "autenticador compartilha e o último código usado; ela sai ao desativar ou com a conta.|"
+        "De cada sessão aberta: um rótulo curto do dispositivo (como «Chrome · Windows», nunca o "
+        "texto completo do navegador), a rede e o último uso, para «Sessões abertas»; sai ao "
+        "encerrar a sessão, ao expirar ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -262,6 +268,13 @@ COPY_PT: dict[str, str] = {
         "senha. A chave funciona uma única vez; depois crie outra em Minha conta."
     ),
     "recovery_key": "Chave de recuperação",
+    "recover_code": "Código do seu app (só com verificação em duas etapas)",
+    "recover_code_help": "Deixe vazio se você não ativou a verificação em duas etapas.",
+    "code_bad_reset": (
+        "Sua conta tem verificação em duas etapas: digite também um código atual do seu app. Se "
+        "você perdeu o telefone, entre com sua senha e use a chave na etapa do código, ou "
+        "escreva para nós."
+    ),
     "recover_button": "Salvar nova senha",
     "recover_none_title": "Não tem chave?",
     "recovery_bad": (
@@ -297,6 +310,71 @@ COPY_PT: dict[str, str] = {
         "não a compartilhe."
     ),
     "recovery_done": "Já guardei, voltar para Minha conta",
+    "sessions_title": "Sessões abertas",
+    "sessions_help": (
+        "Onde sua conta está aberta. Se não reconhecer alguma, encerre-a e troque sua senha."
+    ),
+    "col_device": "Dispositivo",
+    "col_network": "Rede",
+    "col_last_use": "Último uso",
+    "col_started": "Desde",
+    "col_action": "Ação",
+    "session_this": "este navegador",
+    "session_unknown": "Sem dados ainda",
+    "session_end": "Encerrar",
+    "sessions_end_others": "Encerrar todas as outras",
+    "session_ended": "Sessão encerrada.",
+    "sessions_ended": "Encerramos todas as outras sessões.",
+    "two_step_card": "Verificação em duas etapas",
+    "two_of_three": (
+        "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "
+        "três coisas: sua senha, o código do seu app ou sua chave de recuperação. Guarde a chave "
+        "longe da sua senha."
+    ),
+    "two_step_is_off": (
+        "Desativada. Ative-a para que, além da sua senha, o login peça um código de 6 dígitos "
+        "de um app autenticador (Google Authenticator, Microsoft Authenticator, 1Password ou "
+        "outro)."
+    ),
+    "two_step_is_on": "Ativada desde {date}. Para desativá-la, digite um código atual do seu app.",
+    "two_step_needs_key": (
+        "Primeiro crie sua chave de recuperação: é sua saída se você perder o telefone."
+    ),
+    "two_step_turn_on": "Ativar verificação em duas etapas",
+    "two_step_turn_off": "Desativar",
+    "two_step_code": "Código de 6 dígitos",
+    "two_step_code_help": "Seu app autenticador o mostra; ele muda a cada 30 segundos.",
+    "two_step_setup_title": "Ative a verificação em duas etapas",
+    "two_step_setup_lead": (
+        "Conecte seu app autenticador e confirme com um código. Até lá nada muda."
+    ),
+    "two_step_setup_how": (
+        "Abra seu app autenticador e escolha adicionar uma conta.|"
+        "Escaneie o código QR ou digite a chave abaixo.|"
+        "Digite o código de 6 dígitos que aparece para confirmar."
+    ),
+    "two_step_secret": "Não consegue escanear? Digite esta chave no app:",
+    "two_step_confirm": "Confirmar e ativar",
+    "two_step_cancel": "Cancelar e voltar para Minha conta",
+    "two_step_title": "Digite o código do seu app",
+    "two_step_lead": "Sua senha está certa. Falta o código de 6 dígitos do seu app autenticador.",
+    "two_step_lost": "Perdeu o telefone?",
+    "two_step_lost_help": (
+        "Entre com sua chave de recuperação. Ela funciona uma única vez e desativa a "
+        "verificação em duas etapas; depois crie uma chave nova e ative-a de novo."
+    ),
+    "two_step_lost_button": "Entrar com minha chave de recuperação",
+    "code_bad": (
+        "O código não é válido ou já foi usado. Espere o próximo código do seu app e confira "
+        "se a hora do telefone está automática."
+    ),
+    "two_step_on": "Verificação em duas etapas ativada. Agora o login pede o código.",
+    "two_step_off": "Verificação em duas etapas desativada.",
+    "two_step_off_by_key": (
+        "Você entrou com sua chave de recuperação e a verificação em duas etapas foi "
+        "desativada. Crie uma chave nova e ative-a de novo."
+    ),
+    "two_step_expired": "A etapa do código expirou. Entre de novo com sua senha.",
     "reset_title": "Criar uma nova senha",
     "reset_lead": "Este link funciona uma vez e expira em 24 horas.",
     "reset_button": "Salvar senha",

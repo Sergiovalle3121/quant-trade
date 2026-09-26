@@ -1340,7 +1340,8 @@ GUIDES: tuple[Guide, ...] = (
                     "E*TRADE, Webull, Robinhood (informe Account Activity; las opciones a 100 "
                     "acciones por contrato), tastytrade, eToro (posiciones cerradas), XTB "
                     "(xStation 5, historial de posiciones cerradas), DEGIRO (Transacciones, en "
-                    "cualquier idioma), Trading 212 (historial), cTrader (History), Rithmic "
+                    "cualquier idioma), Trading 212 (historial), Revolut (estado de cuenta de "
+                    "acciones), cTrader (History), Rithmic "
                     "(Completed Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, "
                     "Coinbase y KuCoin (historial de ejecuciones).",
                     "Los costes de DEGIRO vienen en euros y se restan tal cual, también en "
@@ -1391,7 +1392,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Fidelity, E*TRADE, Webull, Robinhood (Account Activity report; options at "
                     "100 shares a contract), tastytrade, eToro (closed positions), XTB "
                     "(xStation 5 closed position history), DEGIRO (Transactions, in any "
-                    "language), Trading 212 (history), cTrader (History), Rithmic (Completed "
+                    "language), Trading 212 (history), Revolut (stocks account statement), "
+                    "cTrader (History), Rithmic (Completed "
                     "Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, Coinbase and "
                     "KuCoin (filled orders history).",
                     "DEGIRO's costs come in euros and are subtracted as they are, also on "
@@ -1442,7 +1444,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Fidelity, E*TRADE, Webull, Robinhood (relatório Account Activity; as opções a "
                     "100 ações por contrato), tastytrade, eToro (posições fechadas), XTB "
                     "(histórico de posições fechadas do xStation 5), DEGIRO (Transações, em "
-                    "qualquer idioma), Trading 212 (histórico), cTrader (History), Rithmic "
+                    "qualquer idioma), Trading 212 (histórico), Revolut (extrato da conta de "
+                    "ações), cTrader (History), Rithmic "
                     "(Completed Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, "
                     "Coinbase e KuCoin (histórico de ordens executadas).",
                     "Os custos da DEGIRO vêm em euros e são descontados como estão, também em "

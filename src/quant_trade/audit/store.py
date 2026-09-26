@@ -191,6 +191,18 @@ class StrategyRecord:
 
 
 @dataclass(frozen=True)
+class SessionView:
+    """One open session on "Sesiones abiertas": never its token or its hash."""
+
+    handle: str
+    device: str
+    network: str
+    created_at: str
+    last_seen: str
+    current: bool
+
+
+@dataclass(frozen=True)
 class InviteSummary:
     """ "Invita a un colega" on one account: who joined, never who they are."""
 
@@ -361,6 +373,19 @@ class Store:
             sa.Column("created_at", sa.String(40), nullable=False),
             sa.Column("expires_at", sa.String(40), nullable=False),
         )
+        # "Sesiones abiertas": a short device label (never the raw browser
+        # string), the network (an IPv6 /64) and the last use of a session,
+        # with a random handle to sign it out by. Goes with its session.
+        self.session_info = sa.Table(
+            "session_info",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("handle", sa.String(32), nullable=False, unique=True),
+            sa.Column("device", sa.String(80), nullable=False, default=""),
+            sa.Column("network", sa.String(64), nullable=False, default=""),
+            sa.Column("last_seen", sa.String(40), nullable=False),
+        )
         #: One account per audit: the report a customer uploaded or saved.
         self.account_audits = sa.Table(
             "account_audits",
@@ -479,6 +504,26 @@ class Store:
             sa.Column("account_id", sa.String(32), primary_key=True),
             sa.Column("key_sha256", sa.String(64), nullable=False),
             sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        # Two-step sign-in (TOTP): the secret an authenticator app shares,
+        # pending until a first code confirms it (``enabled_at`` empty), and
+        # the last step used so a code never works twice.
+        self.two_step = sa.Table(
+            "two_step",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("secret", sa.String(64), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("enabled_at", sa.String(40), nullable=False, default=""),
+            sa.Column("last_step", sa.BigInteger, nullable=False, default=0),
+        )
+        # A correct password on a two-step account waits here for its code.
+        self.two_step_challenges = sa.Table(
+            "two_step_challenges",
+            self.metadata,
+            sa.Column("token_sha256", sa.String(64), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("expires_at", sa.String(40), nullable=False),
         )
         self.referrals = sa.Table(
             "referrals",
@@ -1245,6 +1290,9 @@ class Store:
                 self.strategy_reports,
                 self.account_refs,
                 self.recovery_keys,
+                self.two_step,
+                self.two_step_challenges,
+                self.session_info,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1287,6 +1335,16 @@ class Store:
             ).first()
         return str(found[0]) if found is not None else None
 
+    def recovery_key_matches(self, account_id: str, key_sha256: str) -> bool:
+        """Whether ``key_sha256`` is the account's key, without spending it."""
+        sa = self._sa
+        table = self.recovery_keys
+        with self.engine.connect() as conn:
+            found = conn.execute(
+                sa.select(table.c.key_sha256).where(table.c.account_id == account_id)
+            ).first()
+        return found is not None and hmac.compare_digest(str(found[0]), key_sha256)
+
     def use_recovery_key(self, account_id: str, key_sha256: str) -> bool:
         """Spend the account's recovery key if ``key_sha256`` is its hash.
 
@@ -1307,6 +1365,107 @@ class Store:
                 .where(table.c.account_id == account_id)
                 .where(table.c.key_sha256 == key_sha256)
             )
+        return bool(result.rowcount)
+
+    # -- two-step sign-in ------------------------------------------------
+    def two_step_state(self, account_id: str) -> tuple[str, str, int] | None:
+        """``(secret, enabled_at, last_step)``; ``enabled_at`` is empty while pending."""
+        sa = self._sa
+        t = self.two_step
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(t.c.secret, t.c.enabled_at, t.c.last_step).where(
+                    t.c.account_id == account_id
+                )
+            ).first()
+        return (str(row[0]), str(row[1] or ""), int(row[2] or 0)) if row is not None else None
+
+    def two_step_on(self, account_id: str) -> str:
+        """When two-step sign-in was turned on, or ``""`` when it is off."""
+        state = self.two_step_state(account_id)
+        return state[1] if state is not None else ""
+
+    def start_two_step(self, account_id: str, secret: str, *, at: datetime) -> bool:
+        """Keep a new pending secret; refused while two-step is already on."""
+        t = self.two_step
+        with self.engine.begin() as conn:
+            conn.execute(t.delete().where((t.c.account_id == account_id) & (t.c.enabled_at == "")))
+            try:
+                with conn.begin_nested():
+                    conn.execute(
+                        t.insert().values(
+                            account_id=account_id,
+                            secret=secret,
+                            created_at=_iso(at),
+                            enabled_at="",
+                            last_step=0,
+                        )
+                    )
+            except self._sa.exc.IntegrityError:
+                return False  # already on
+        return True
+
+    def use_two_step_step(
+        self, account_id: str, step: int, *, enable_at: datetime | None = None
+    ) -> bool:
+        """Record ``step`` as used if it is newer than the last one (one winner).
+
+        With ``enable_at`` it also turns a pending secret on; without it the
+        secret must already be on.
+        """
+        t = self.two_step
+        query = t.update().where(t.c.account_id == account_id).where(t.c.last_step < step)
+        if enable_at is not None:
+            query = query.where(t.c.enabled_at == "").values(
+                last_step=step, enabled_at=_iso(enable_at)
+            )
+        else:
+            query = query.where(t.c.enabled_at != "").values(last_step=step)
+        with self.engine.begin() as conn:
+            result = conn.execute(query)
+        return bool(result.rowcount)
+
+    def stop_two_step(self, account_id: str) -> bool:
+        t = self.two_step
+        with self.engine.begin() as conn:
+            result = conn.execute(t.delete().where(t.c.account_id == account_id))
+            conn.execute(
+                self.two_step_challenges.delete().where(
+                    self.two_step_challenges.c.account_id == account_id
+                )
+            )
+        return bool(result.rowcount)
+
+    def create_two_step_challenge(
+        self, account_id: str, token_sha256: str, *, at: datetime, minutes: int
+    ) -> None:
+        c = self.two_step_challenges
+        with self.engine.begin() as conn:
+            conn.execute(c.delete().where(c.c.expires_at <= _iso(at)))
+            conn.execute(
+                c.insert().values(
+                    token_sha256=token_sha256,
+                    account_id=account_id,
+                    expires_at=_iso(at + timedelta(minutes=minutes)),
+                )
+            )
+
+    def two_step_challenge(self, token_sha256: str, now: datetime) -> str | None:
+        """The account a still-valid challenge belongs to."""
+        sa = self._sa
+        c = self.two_step_challenges
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(c.c.account_id)
+                .where(c.c.token_sha256 == token_sha256)
+                .where(c.c.expires_at > _iso(now))
+            ).first()
+        return str(row[0]) if row is not None else None
+
+    def end_two_step_challenge(self, token_sha256: str) -> bool:
+        c = self.two_step_challenges
+        with self.engine.begin() as conn:
+            result = conn.execute(c.delete().where(c.c.token_sha256 == token_sha256))
         return bool(result.rowcount)
 
     # -- account sessions ------------------------------------------------
@@ -1346,19 +1505,23 @@ class Store:
                     self.account_sessions.c.token_sha256 == token_sha256
                 )
             )
+            conn.execute(
+                self.session_info.delete().where(self.session_info.c.token_sha256 == token_sha256)
+            )
 
     def delete_sessions(self, account_id: str, *, keep: str = "") -> None:
         """Sign out everywhere, except the session ``keep`` (its hash)."""
-        table = self.account_sessions
         with self.engine.begin() as conn:
-            conn.execute(
-                table.delete()
-                .where(table.c.account_id == account_id)
-                .where(table.c.token_sha256 != keep)
-            )
+            for table in (self.account_sessions, self.session_info):
+                conn.execute(
+                    table.delete()
+                    .where(table.c.account_id == account_id)
+                    .where(table.c.token_sha256 != keep)
+                )
 
     def purge_sessions(self, now: datetime) -> int:
         """Drop expired sessions and reset links; how many rows went."""
+        sa = self._sa
         with self.engine.begin() as conn:
             gone = conn.execute(
                 self.account_sessions.delete().where(
@@ -1368,7 +1531,101 @@ class Store:
             gone += conn.execute(
                 self.account_resets.delete().where(self.account_resets.c.expires_at <= _iso(now))
             ).rowcount
+            # Session details outlive nothing: without a session they go.
+            info = self.session_info
+            conn.execute(
+                info.delete().where(
+                    ~info.c.token_sha256.in_(sa.select(self.account_sessions.c.token_sha256))
+                )
+            )
         return int(gone or 0)
+
+    def touch_session(
+        self,
+        token_sha256: str,
+        account_id: str,
+        *,
+        device: str,
+        network: str,
+        now: datetime,
+        every: timedelta = timedelta(minutes=10),
+    ) -> None:
+        """Note a session's device, network and last use (at most every ``every``)."""
+        sa = self._sa
+        info = self.session_info
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(info.c.last_seen).where(info.c.token_sha256 == token_sha256)
+            ).first()
+        values = {"device": device[:80], "network": network[:64], "last_seen": _iso(now)}
+        if row is not None:
+            if str(row[0]) > _iso(now - every):
+                return
+            with self.engine.begin() as conn:
+                conn.execute(
+                    info.update().where(info.c.token_sha256 == token_sha256).values(**values)
+                )
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    info.insert().values(
+                        token_sha256=token_sha256,
+                        account_id=account_id,
+                        handle=secrets.token_urlsafe(12),
+                        **values,
+                    )
+                )
+        except sa.exc.IntegrityError:
+            pass  # noted by a simultaneous request
+
+    def list_sessions(
+        self, account_id: str, now: datetime, *, current: str = ""
+    ) -> list[SessionView]:
+        """The account's open sessions, newest use first; ``current`` is this browser's hash."""
+        sa = self._sa
+        s_, info = self.account_sessions, self.session_info
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(
+                    s_.c.token_sha256,
+                    s_.c.created_at,
+                    info.c.handle,
+                    info.c.device,
+                    info.c.network,
+                    info.c.last_seen,
+                )
+                .select_from(s_.outerjoin(info, info.c.token_sha256 == s_.c.token_sha256))
+                .where(s_.c.account_id == account_id)
+                .where(s_.c.expires_at > _iso(now))
+            ).all()
+        views = [
+            SessionView(
+                handle=str(row[2] or ""),
+                device=str(row[3] or ""),
+                network=str(row[4] or ""),
+                created_at=str(row[1]),
+                last_seen=str(row[5] or ""),
+                current=bool(current) and str(row[0]) == current,
+            )
+            for row in rows
+        ]
+        return sorted(views, key=lambda v: (v.current, v.last_seen or v.created_at), reverse=True)
+
+    def end_session(self, account_id: str, handle: str) -> str | None:
+        """Sign out the account's session with this handle; its hash, or ``None``."""
+        sa = self._sa
+        info = self.session_info
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(info.c.token_sha256)
+                .where(info.c.handle == handle)
+                .where(info.c.account_id == account_id)
+            ).first()
+        if row is None:
+            return None
+        self.delete_session(str(row[0]))
+        return str(row[0])
 
     # -- password reset links --------------------------------------------
     def create_reset(self, account_id: str, *, token_sha256: str, at: datetime, hours: int) -> None:
@@ -2150,8 +2407,20 @@ class Store:
         if found is None:
             return None
         with self.engine.connect() as conn:
+            info = self.session_info
             sessions = conn.execute(
-                sa.select(self.account_sessions.c.created_at, self.account_sessions.c.expires_at)
+                sa.select(
+                    self.account_sessions.c.created_at,
+                    self.account_sessions.c.expires_at,
+                    info.c.device,
+                    info.c.network,
+                    info.c.last_seen,
+                )
+                .select_from(
+                    self.account_sessions.outerjoin(
+                        info, info.c.token_sha256 == self.account_sessions.c.token_sha256
+                    )
+                )
                 .where(self.account_sessions.c.account_id == account_id)
                 .order_by(self.account_sessions.c.created_at)
             ).all()
@@ -2227,7 +2496,16 @@ class Store:
                 "language": found.locale,
                 "created_at": found.created_at,
             },
-            "sessions": [{"created_at": row[0], "expires_at": row[1]} for row in sessions],
+            "sessions": [
+                {
+                    "created_at": row[0],
+                    "expires_at": row[1],
+                    "device": row[2] or "",
+                    "network": row[3] or "",
+                    "last_used_at": row[4] or None,
+                }
+                for row in sessions
+            ],
             "reports": reports,
             "access_codes": [
                 {
@@ -2281,6 +2559,8 @@ class Store:
             "arrived_through_link_tag": self.account_ref(account_id),
             # Only when it was made: the key's hash never leaves the database.
             "recovery_key_created_at": self.recovery_key_created(account_id),
+            # When two-step sign-in was turned on; never its secret.
+            "two_step_on_since": self.two_step_on(account_id) or None,
         }
 
     def account_credits(self, account_id: str, now: datetime) -> int:

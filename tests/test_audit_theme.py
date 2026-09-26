@@ -1151,3 +1151,37 @@ def test_the_currency_table_marks_its_reference_rows() -> None:
     assert ".paper table.holding td:first-child{min-width:8.6em}" in STYLE
     # In the PDF the whole table fits one page.
     assert ".paper table.currency{width:100%;font-size:8.5pt}" in STYLE
+
+
+def test_phone_walk_fixes_scroll_cue_evidence_cards_and_firm_titles() -> None:
+    phone = STYLE[STYLE.index("@keyframes scroll-cue") :]
+    # Charts and wide tables fade at the right edge while there is more to scroll,
+    # and only then: the fade follows the element's own scroll position.
+    assert "animation-timeline:scroll(self inline)" in phone
+    assert "100%{-webkit-mask-image:none;mask-image:none}" in phone
+    assert ".paper table:not(.ev):not(.firms)" in phone
+    # Evidence cards: the value sits beside the name, the tag goes underneath.
+    assert ".metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}" in phone
+    # Prop-firm cards read their challenge name as the card's title.
+    assert ".firms td:first-child small{display:block" in phone
+
+
+def test_two_step_pages_are_styled() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    # The QR sits on a white card, the note's shield icon stays icon-sized,
+    # and six-digit codes read as a code.
+    assert ".acct-qr{display:flex;justify-content:center;width:max-content" in ACCOUNT_CSS
+    assert ".acct-nudge svg{flex:none;width:20px;height:20px" in ACCOUNT_CSS
+    assert "input[autocomplete=one-time-code]{font-family:var(--mono)" in ACCOUNT_CSS
+    assert ".acct-lost{margin-top:22px;border:1px solid var(--border)" in ACCOUNT_CSS
+
+
+def test_landing_feature_cards_have_no_orphan_slot_and_read_short_on_phones() -> None:
+    assert (
+        "@media (min-width:641px){.cards-2>.card:last-child:nth-child(odd){grid-column:1/-1}"
+        in STYLE
+    )
+    phone = STYLE[STYLE.index("@media (max-width:640px){.cards-2>.card{display:grid") :]
+    assert ".cards-2>.card>.icon{grid-row:1;margin:0}" in phone
+    assert ".cards-2>.card>h3{grid-row:1;margin:0" in phone

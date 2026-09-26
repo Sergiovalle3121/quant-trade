@@ -1335,6 +1335,27 @@ LABELS: dict[str, dict[str, str]] = {
             "El Sharpe de arriba no resta ninguna tasa. Si la cuenta no es en dólares, lo justo "
             "sería restar la tasa de su propia moneda. Fuente: {source}."
         ),
+        "cash_sharpe_local": (
+            "Restando lo que pagaba el efectivo en la moneda de la cuenta ({code}) en esas "
+            "mismas fechas ({name}, {rate} al año en promedio), el Sharpe queda en {sharpe}."
+        ),
+        "cash_below_local": (
+            "Rindió menos que el efectivo en la moneda de la cuenta ({code}) en esas fechas "
+            "({ret} al año frente a {rate} de la {name})."
+        ),
+        "cash_note_local": (
+            "El Sharpe de arriba no resta ninguna tasa. La cuenta está en {code}, así que aquí "
+            "se resta la tasa de esa moneda, no la de EE. UU. Fuente: {source}."
+        ),
+        "cash_rate_MXN": "tasa interbancaria a un día de México (OCDE)",
+        "cash_rate_BRL": "tasa interbancaria a un día de Brasil (OCDE)",
+        "cash_rate_EUR": (
+            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la de la OCDE)"
+        ),
+        "cash_rate_GBP": "tasa a un día de la libra, SONIA (Banco de Inglaterra)",
+        "cash_rate_JPY": "tasa interbancaria a un día de Japón (OCDE)",
+        "cash_rate_CAD": "tasa interbancaria a un día de Canadá (OCDE)",
+        "cash_rate_CHF": "tasa interbancaria a 3 meses de Suiza (OCDE)",
         "kpi_hint_pf": "lo ganado por cada 1 perdido",
         "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
         "bps_side": "pb por lado",
@@ -2470,6 +2491,25 @@ LABELS: dict[str, dict[str, str]] = {
             "The Sharpe above subtracts no rate. If the account is not in dollars, the fair "
             "rate to subtract is its own currency's. Source: {source}."
         ),
+        "cash_sharpe_local": (
+            "After subtracting what cash in the account's currency ({code}) paid over the same "
+            "dates ({name}, {rate} a year on average), the Sharpe is {sharpe}."
+        ),
+        "cash_below_local": (
+            "It earned less than cash in the account's currency ({code}) over those dates "
+            "({ret} a year against {rate} for the {name})."
+        ),
+        "cash_note_local": (
+            "The Sharpe above subtracts no rate. The account is in {code}, so the rate "
+            "subtracted here is that currency's, not the US one. Source: {source}."
+        ),
+        "cash_rate_MXN": "overnight interbank rate of Mexico (OECD)",
+        "cash_rate_BRL": "overnight interbank rate of Brazil (OECD)",
+        "cash_rate_EUR": "euro overnight rate, the ECB's €STR (before October 2019, the OECD's)",
+        "cash_rate_GBP": "sterling overnight rate, SONIA (Bank of England)",
+        "cash_rate_JPY": "overnight interbank rate of Japan (OECD)",
+        "cash_rate_CAD": "overnight interbank rate of Canada (OECD)",
+        "cash_rate_CHF": "3-month interbank rate of Switzerland (OECD)",
         "kpi_hint_pf": "what was won for every 1 lost",
         "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
         "bps_side": "bps per side",
@@ -3490,21 +3530,32 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
 
 
 def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
-    """The Sharpe after what a US Treasury bill paid, under the tiles."""
+    """The Sharpe after what cash paid (the account currency's own rate, or a US
+    Treasury bill), under the tiles."""
     cash = data.get("cash_rate") or {}
     if cash.get("status") != "MEASURED":
         return ""
     rate = _pct(float(cash["mean_rate"]["value"]), places=2)
+    code = str(cash.get("currency") or "")
+    local = f"cash_rate_{code}" in labels
+    suffix = "_local" if local else ""
+    extra = {"code": code, "name": labels[f"cash_rate_{code}"]} if local else {}
     if cash.get("below_cash"):
-        first = labels["cash_below"].format(
-            ret=_pct(float(cash["strategy_yearly"]["value"]), places=2), rate=rate
+        first = labels["cash_below" + suffix].format(
+            ret=_pct(float(cash["strategy_yearly"]["value"]), places=2), rate=rate, **extra
         )
     else:
-        first = labels["cash_sharpe"].format(
-            rate=rate, sharpe=f"{float(cash['sharpe_excess']['value']):.2f}"
+        first = labels["cash_sharpe" + suffix].format(
+            rate=rate, sharpe=f"{float(cash['sharpe_excess']['value']):.2f}", **extra
         )
-    text = first + " " + labels["cash_note"].format(source="\x00")
+    text = first + " " + labels["cash_note" + suffix].format(source="\x00", code=code)
     link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    if cash.get("history_source_url"):
+        # The spliced older series (the euro's before €STR) gets its own link.
+        link += (
+            f" (<a href='{_e(str(cash['history_source_url']))}' rel='noopener'>"
+            f"{_e(str(cash.get('history_series', '')))}</a>)"
+        )
     return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
 
@@ -6750,20 +6801,23 @@ def render_html(
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
+    en_url = (switch_url or "").replace("lang=es", "lang=en")
+    two_switches = locale == "pt" and "lang=es" in (switch_url or "")
+    short_es = " data-short='ES'" if two_switches else ""
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
-            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
-            f"{_e(labels['switch'])}</a>"
+            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'"
+            # Two languages on a narrow phone read as ES and EN (theme.py).
+            f"{short_es}>{_e(labels['switch'])}</a>"
             if switch_url
             else ""
         )
         + (
-            f" <a class='lang-switch' href='{_e(switch_url.replace('lang=es', 'lang=en'))}' "
-            f"hreflang='en'>English</a>"
-            if switch_url and locale == "pt" and "lang=es" in switch_url
+            f" <a class='lang-switch' href='{_e(en_url)}' hreflang='en' data-short='EN'>English</a>"
+            if two_switches
             else ""
         )
         + "</div>"

@@ -394,6 +394,14 @@ for _what, _name in FILES_PT.items():
         UPLOAD_NAMES[_what]["pt"] = _name
 
 
+def _qr_svg(text: str) -> str:
+    """``text`` as an inline SVG QR code (drawn here, nothing loaded from outside)."""
+    import segno
+
+    code = segno.make_qr(text, error="m")
+    return str(code.svg_inline(scale=5, border=3, dark="#0f172a", light="#ffffff"))
+
+
 def _megabytes(size: int) -> str:
     """A byte limit as a customer reads it: 8 MB, 1.5 MB, 500 KB."""
     if size >= 1_000_000:
@@ -1249,6 +1257,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_ip_failures = StoredAttemptLog(db, "signin_ip")
     signup_attempts = StoredAttemptLog(db, "signup")
     recovery_attempts = StoredAttemptLog(db, "recovery")
+    two_step_attempts = StoredAttemptLog(db, "two_step")
     account_actions = AttemptLog()
     strategy_pdf_renders = AttemptLog(window=STRATEGY_PDF_WINDOW)
     strategy_pdf_cache: OrderedDict[tuple[Any, ...], bytes] = OrderedDict()
@@ -1261,7 +1270,28 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return None
         digest = acct.hash_secret(token)
         found = db.session_account(digest, datetime.now(UTC))
-        return (found[0], found[1], digest) if found else None
+        if not found:
+            return None
+        _note_session(request, digest, found[0].id)
+        return (found[0], found[1], digest)
+
+    def _note_session(request: Request, digest: str, account_id: str) -> None:
+        """Keep "Sesiones abiertas" current; a failure never blocks the page."""
+        client_ip = _client_ip(request, cfg.trusted_proxy_hops)
+        try:
+            ipaddress.ip_address(client_ip.strip())
+        except ValueError:
+            client_ip = ""  # only a real address is stored and shown
+        try:
+            db.touch_session(
+                digest,
+                account_id,
+                device=acct.device_label(request.headers.get("user-agent", "")),
+                network=acct.network_address(client_ip) if client_ip else "",
+                now=datetime.now(UTC),
+            )
+        except Exception:  # pragma: no cover - best effort
+            logger.warning("session note failed", exc_info=True)
 
     def _cookie(response: Any, name: str, value: str, *, max_age: int) -> None:
         response.set_cookie(
@@ -1287,7 +1317,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _anon_ok(request: Request, field: str) -> bool:
         return acct.same_secret(request.cookies.get(acct.CSRF_COOKIE), field)
 
-    def _start_session(response: Any, account: Any) -> None:
+    def _start_session(response: Any, account: Any, request: Request) -> None:
         token = acct.new_secret()
         now = datetime.now(UTC)
         db.create_session(
@@ -1297,6 +1327,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             at=now,
             days=acct.SESSION_DAYS,
         )
+        _note_session(request, acct.hash_secret(token), account.id)
         _cookie(response, acct.SESSION_COOKIE, token, max_age=acct.SESSION_DAYS * 86400)
         response.delete_cookie(acct.CSRF_COOKIE, path="/")
 
@@ -1322,8 +1353,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return lang if lang in account_pages.LANGUAGES else path_locale
 
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
-    signin_flashes = ("signed_out", "deleted", "reset_done", "recovered")
-    account_flashes = ("welcome", "code_linked", "password_changed", "filed")
+    signin_flashes = ("signed_out", "deleted", "reset_done", "recovered", "two_step_expired")
+    account_flashes = (
+        "welcome",
+        "code_linked",
+        "password_changed",
+        "filed",
+        "two_step_on",
+        "two_step_off",
+        "two_step_off_by_key",
+        "session_ended",
+        "sessions_ended",
+    )
     account_errors = (
         "code_already",
         "code_other",
@@ -1336,6 +1377,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "password_short",
         "file_bad",
         "strategy_full",
+        "code_bad",
+        "two_step_needs_key",
     )
 
     def _referrals_on() -> bool:
@@ -1454,7 +1497,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 response: Response = RedirectResponse(next_path, status_code=303)
             else:
                 response = _account_redirect(locale, "welcome")
-            _start_session(response, account)
+            _start_session(response, account, request)
             return response
 
         return handler
@@ -1539,14 +1582,121 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 signin_email_failures.hit(clean, now)
                 return again("wrong", 401)
             db.purge_sessions(now)
+            if db.two_step_on(found[0].id):
+                # The password was right; the session waits for the app's code.
+                token = acct.new_secret()
+                db.create_two_step_challenge(
+                    found[0].id,
+                    acct.hash_secret(token),
+                    at=now,
+                    minutes=acct.TWO_STEP_CHALLENGE_MINUTES,
+                )
+                target = account_pages.two_step_path(locale)
+                if next_path:
+                    target += "?next=" + quote(next_path, safe="")
+                response: Response = RedirectResponse(target, status_code=303)
+                _cookie(
+                    response,
+                    acct.TWO_STEP_COOKIE,
+                    token,
+                    max_age=acct.TWO_STEP_CHALLENGE_MINUTES * 60,
+                )
+                return response
             if next_path:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response = RedirectResponse(next_path, status_code=303)
             else:
                 response = _account_redirect(found[0].locale if lang is None else locale)
-            _start_session(response, found[0])
+            _start_session(response, found[0], request)
             return response
 
         return handler
+
+    def _challenge(request: Request) -> tuple[str, str] | None:
+        """``(token hash, account id)`` of this browser's pending two-step sign-in."""
+        token = request.cookies.get(acct.TWO_STEP_COOKIE) or ""
+        if not 20 <= len(token) <= 128:
+            return None
+        digest = acct.hash_secret(token)
+        account_id = db.two_step_challenge(digest, datetime.now(UTC))
+        return (digest, account_id) if account_id else None
+
+    def _two_step_get(path_locale: str) -> Callable[..., Response]:
+        def handler(request: Request, next: str = "", lang: str | None = None) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            if _challenge(request) is None:
+                return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
+            csrf = _anon_csrf(request)
+            page = account_pages.two_step_page(locale=locale, csrf=csrf, next_path=next_path)
+            return _anon_page(page, csrf)
+
+        return handler
+
+    def _two_step_post(path_locale: str) -> Callable[..., Response]:
+        """The app's code (or the recovery key, when the phone is lost) finishes sign-in."""
+
+        def handler(
+            request: Request,
+            code: Annotated[str, Form(max_length=20)] = "",
+            key: Annotated[str, Form(max_length=200)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            next: Annotated[str, Form(max_length=1000)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            new_csrf = _anon_csrf(request)
+
+            def again(error: str, status: int) -> Response:
+                page = account_pages.two_step_page(
+                    locale=locale, csrf=new_csrf, next_path=next_path, error=error
+                )
+                return _anon_page(page, new_csrf, status)
+
+            if not _anon_ok(request, csrf) or _cross_site(request):
+                return again("csrf", 400)
+            pending = _challenge(request)
+            if pending is None:
+                return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
+            digest, account_id = pending
+            now = datetime.now(UTC)
+            if _two_step_limited(request, account_id, now):
+                return again("too_many", 429)
+            account = db.get_account(account_id)
+            state = db.two_step_state(account_id)
+            if account is None or state is None or not state[1]:
+                db.end_two_step_challenge(digest)
+                return _signin_redirect(locale, done="two_step_expired")
+            done = ""
+            if key.strip():
+                # The phone is lost: the recovery key signs in once and turns
+                # two-step off, so the customer sets it up again.
+                if not db.use_recovery_key(account_id, acct.recovery_key_hash(key)):
+                    return again("recovery_bad", 400)
+                db.stop_two_step(account_id)
+                done = "two_step_off_by_key"
+            else:
+                step = acct.totp_match(state[0], code, now)
+                if step is None or not db.use_two_step_step(account_id, step):
+                    return again("code_bad", 400)
+            if not db.end_two_step_challenge(digest) and not done:
+                return again("code_bad", 400)  # pragma: no cover - finished twice at once
+            if next_path and not done:
+                response: Response = RedirectResponse(next_path, status_code=303)
+            else:
+                response = _account_redirect(locale, done)
+            response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
+            _start_session(response, account, request)
+            return response
+
+        return handler
+
+    def _two_step_limited(request: Request, account_id: str, now: datetime) -> bool:
+        """Count one code try per network (an IPv6 /64) and per account."""
+        net = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
+        by_net = two_step_attempts.hit(net, now)
+        by_account = two_step_attempts.hit("account:" + account_id, now)
+        return max(by_net, by_account) >= acct.MAX_TOTP_TRIES_PER_HOUR
 
     def _signout_post(path_locale: str) -> Callable[..., Response]:
         def handler(
@@ -1575,7 +1725,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = _session(request)
             if session is None:
                 return _signin_redirect(locale, next_path=account_pages.path("account", locale))
-            account, csrf, _ = session
+            account, csrf, session_hash = session
             now = datetime.now(UTC)
             return HTMLResponse(
                 account_pages.account_page(
@@ -1608,6 +1758,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     ),
                     strategies=db.list_strategies(account.id),
                     recovery_created=db.recovery_key_created(account.id) or "",
+                    two_step_since=db.two_step_on(account.id),
+                    sessions=db.list_sessions(account.id, now, current=session_hash),
                     invite=(
                         account_pages.InviteView(
                             link=(
@@ -1990,6 +2142,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             request: Request,
             email: Annotated[str, Form(max_length=320)] = "",
             key: Annotated[str, Form(max_length=200)] = "",
+            code: Annotated[str, Form(max_length=20)] = "",
             password: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
             lang: str | None = None,
@@ -2022,11 +2175,153 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if problem:
                 return again(problem, 400)
             account = db.find_account(clean) if acct.valid_email(clean) else None
-            if account is None or not db.use_recovery_key(account.id, acct.recovery_key_hash(key)):
+            key_hash = acct.recovery_key_hash(key)
+            if account is None or not db.recovery_key_matches(account.id, key_hash):
                 return again("recovery_bad", 400)
+            # With two-step on, the key alone is not enough to take the
+            # account: the app's code is asked too (only a key holder sees
+            # this). A lost phone uses the key on the code page, with the
+            # password, or the owner.
+            state = db.two_step_state(account.id)
+            if state is not None and state[1]:
+                step = acct.totp_match(state[0], code, now)
+                if step is None or not db.use_two_step_step(account.id, step):
+                    return again("code_bad_reset", 400)
+            if not db.use_recovery_key(account.id, key_hash):
+                return again("recovery_bad", 400)  # pragma: no cover - spent at once
             db.set_password(account.id, acct.hash_password(password))
             db.delete_sessions(account.id)
             return _signin_redirect(locale, done="recovered")
+
+        return handler
+
+    def _two_step_setup_page(
+        locale: str, account: Any, secret: str, csrf: str, error: str = ""
+    ) -> Response:
+        page = account_pages.two_step_setup_page(
+            locale=locale,
+            csrf=csrf,
+            secret=secret,
+            qr_svg=_qr_svg(acct.totp_uri(secret, account.email, BRAND)),
+            error=error,
+        )
+        return HTMLResponse(
+            page,
+            status_code=400 if error else 200,
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
+
+    def _two_step_start(path_locale: str) -> Callable[..., Response]:
+        """Turn two-step on, step 1: the password, then the secret and its QR code."""
+
+        def handler(
+            request: Request,
+            current: Annotated[str, Form(max_length=1024)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return RedirectResponse(f"{base}?error=wrong#dos-pasos", status_code=303)
+            # Without a recovery key a lost phone would lock the account.
+            if db.recovery_key_created(account.id) is None:
+                return RedirectResponse(
+                    f"{base}?error=two_step_needs_key#recuperacion", status_code=303
+                )
+            secret = acct.new_totp_secret()
+            if not db.start_two_step(account.id, secret, at=datetime.now(UTC)):
+                return RedirectResponse(f"{base}#dos-pasos", status_code=303)
+            # ``csrf`` was checked against the session: the next form reuses it.
+            return _two_step_setup_page(locale, account, secret, csrf)
+
+        return handler
+
+    def _two_step_confirm(path_locale: str) -> Callable[..., Response]:
+        """Turn two-step on, step 2: a first code from the app proves it is set up."""
+
+        def handler(
+            request: Request,
+            code: Annotated[str, Form(max_length=20)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, session_hash, locale, _ = checked
+            base = account_pages.path("account", locale)
+            state = db.two_step_state(account.id)
+            if state is None or state[1]:
+                return RedirectResponse(f"{base}#dos-pasos", status_code=303)
+            now = datetime.now(UTC)
+            if _two_step_limited(request, account.id, now):
+                return RedirectResponse(f"{base}?error=too_many#dos-pasos", status_code=303)
+            step = acct.totp_match(state[0], code, now)
+            if step is None or not db.use_two_step_step(account.id, step, enable_at=now):
+                return _two_step_setup_page(locale, account, state[0], csrf, "code_bad")
+            # Other browsers signed in with the password alone are signed out.
+            db.delete_sessions(account.id, keep=session_hash)
+            return RedirectResponse(f"{base}?done=two_step_on#dos-pasos", status_code=303)
+
+        return handler
+
+    def _two_step_stop(path_locale: str) -> Callable[..., Response]:
+        """Turn two-step off with a current code from the app."""
+
+        def handler(
+            request: Request,
+            code: Annotated[str, Form(max_length=20)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            state = db.two_step_state(account.id)
+            if state is None or not state[1]:
+                return RedirectResponse(f"{base}#dos-pasos", status_code=303)
+            now = datetime.now(UTC)
+            if _two_step_limited(request, account.id, now):
+                return RedirectResponse(f"{base}?error=too_many#dos-pasos", status_code=303)
+            step = acct.totp_match(state[0], code, now)
+            if step is None or not db.use_two_step_step(account.id, step):
+                return RedirectResponse(f"{base}?error=code_bad#dos-pasos", status_code=303)
+            db.stop_two_step(account.id)
+            return RedirectResponse(f"{base}?done=two_step_off#dos-pasos", status_code=303)
+
+        return handler
+
+    def _session_end(path_locale: str, *, others: bool) -> Callable[..., Response]:
+        """Sign out one session (by its handle) or every session but this one."""
+
+        def handler(
+            request: Request,
+            handle: Annotated[str, Form(max_length=40)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, session_hash, locale, _ = checked
+            base = account_pages.path("account", locale)
+            if others:
+                db.delete_sessions(account.id, keep=session_hash)
+                return RedirectResponse(f"{base}?done=sessions_ended#sesiones", status_code=303)
+            ended = db.end_session(account.id, handle.strip()) if handle.strip() else None
+            if ended is None:
+                return RedirectResponse(f"{base}#sesiones", status_code=303)
+            if ended == session_hash:
+                response = _signin_redirect(locale, done="signed_out")
+                response.delete_cookie(acct.SESSION_COOKIE, path="/")
+                return response
+            return RedirectResponse(f"{base}?done=session_ended#sesiones", status_code=303)
 
         return handler
 
@@ -2147,6 +2442,32 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(
             paths["account"] + "/recuperacion", _recovery_post(path_locale), methods=["POST"]
         )
+        app.add_api_route(
+            paths["account"] + "/dos-pasos", _two_step_start(path_locale), methods=["POST"]
+        )
+        app.add_api_route(
+            paths["account"] + "/dos-pasos/confirmar",
+            _two_step_confirm(path_locale),
+            methods=["POST"],
+        )
+        app.add_api_route(
+            paths["account"] + "/dos-pasos/desactivar",
+            _two_step_stop(path_locale),
+            methods=["POST"],
+        )
+        app.add_api_route(
+            paths["account"] + "/sesiones/cerrar",
+            _session_end(path_locale, others=False),
+            methods=["POST"],
+        )
+        app.add_api_route(
+            paths["account"] + "/sesiones/cerrar-otras",
+            _session_end(path_locale, others=True),
+            methods=["POST"],
+        )
+        two_step = account_pages.two_step_path(path_locale)
+        app.add_api_route(two_step, _two_step_get(path_locale), **html_get)
+        app.add_api_route(two_step, _two_step_post(path_locale), methods=["POST"])
         app.add_api_route(paths["reset"], _reset_get(path_locale), **html_get)
         app.add_api_route(paths["reset"], _reset_post(path_locale), methods=["POST"])
 
