@@ -160,6 +160,8 @@ COPY_PT: dict[str, str] = {
         "autoconvites. Ninguém vê quem entrou. É apagado com a conta de quem convida; se quem "
         "entrou apagar a sua, ficam só a data e o resultado, sem nada seu, para o limite "
         "mensal.|"
+        "Se você chegou por um dos nossos links com etiqueta (como ?ref=f4), só essa etiqueta, "
+        "para saber qual link funciona; ela sai com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),

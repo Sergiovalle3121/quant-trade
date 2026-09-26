@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeVar
 
+from quant_trade.audit import report_pt
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.engine import HOLDOUT_MIN_OBSERVATIONS
 from quant_trade.audit.redflags import OBSERVATIONS_WARN, flag_title
@@ -39,6 +40,8 @@ from quant_trade.audit.verdict import (
 PLAN_ORDER = (DATA_QUALITY, STATISTICAL, MULTIPLICITY, COSTS, OUT_OF_SAMPLE, BENCHMARK)
 STATUS_RANK = {"FAIL": 0, "WEAK": 1, "NOT_MEASURED": 2}
 CLASS_RANK = {"D": 0, "C": 1, "B": 2, "A": 3}
+
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,11 @@ def _fmt(value: float, digits: int = 2) -> str:
     return f"{value:,.{digits}f}"
 
 
+def _say(locale: str, es: _T, en: _T, pt: _T) -> _T:
+    """The Spanish, English or Portuguese version for ``locale`` (English by default)."""
+    return {"es": es, "pt": pt}.get(locale, en)
+
+
 def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
@@ -80,18 +88,25 @@ def _duration(periods: float, periods_per_year: float | None, locale: str) -> st
     """``periods`` of the uploaded frequency as a rough calendar span."""
     if not periods_per_year or periods_per_year <= 0:
         return ""
-    es = locale == "es"
     months = periods / periods_per_year * 12.0
     if months < 1.0:
         weeks = max(1, round(months * 52.0 / 12.0))
-        return "≈ " + (
-            _plural(weeks, "semana", "semanas") if es else _plural(weeks, "week", "weeks")
+        return "≈ " + _say(
+            locale,
+            _plural(weeks, "semana", "semanas"),
+            _plural(weeks, "week", "weeks"),
+            _plural(weeks, "semana", "semanas"),
         )
     if months < 24.0:
         whole = max(1, round(months))
-        return "≈ " + (_plural(whole, "mes", "meses") if es else _plural(whole, "month", "months"))
+        return "≈ " + _say(
+            locale,
+            _plural(whole, "mes", "meses"),
+            _plural(whole, "month", "months"),
+            _plural(whole, "mês", "meses"),
+        )
     years = months / 12.0
-    return f"≈ {years:.1f} " + ("años" if es else "years")
+    return f"≈ {years:.1f} " + _say(locale, "años", "years", "anos")
 
 
 TITLES: dict[str, dict[str, str]] = {
@@ -371,66 +386,77 @@ GENERIC_FLAG_HINT = {
 
 def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     sig = data.get("significance") or {}
-    es = locale == "es"
     n = _number(_value(sig.get("observations")))
     need = _number(_value(sig.get("min_track_record_length")))
     psr = _number(_value(sig.get("psr")))
     ppy = _number(_value((data.get("inputs") or {}).get("periods_per_year")))
     if sig.get("status") != "MEASURED" or n is None:
-        finding = (
-            "No hay suficientes datos para medir si el resultado supera al azar."
-            if es
-            else "There is not enough data to measure whether the result beats chance."
+        finding = _say(
+            locale,
+            "No hay suficientes datos para medir si el resultado supera al azar.",
+            "There is not enough data to measure whether the result beats chance.",
+            "Não há dados suficientes para medir se o resultado supera o acaso.",
         )
         return finding, [FLAG_HINTS["TOO_FEW_OBSERVATIONS"][locale]]
     if psr is not None and need is not None and need > n:
         extra = need - n
         span = _duration(extra, ppy, locale)
         span_text = f" ({span})" if span else ""
-        finding = (
+        finding = _say(
+            locale,
             f"PSR {_fmt(psr, 3)} con {n:.0f} observaciones. Con el mismo comportamiento, "
             f"llegaría a 0.95 con unas {math.ceil(need):,} observaciones: faltan "
-            f"{math.ceil(extra):,}{span_text}."
-            if es
-            else f"PSR {_fmt(psr, 3)} with {n:.0f} observations. With the same behaviour it "
+            f"{math.ceil(extra):,}{span_text}.",
+            f"PSR {_fmt(psr, 3)} with {n:.0f} observations. With the same behaviour it "
             f"would reach 0.95 at about {math.ceil(need):,} observations: "
-            f"{math.ceil(extra):,} more{span_text}."
+            f"{math.ceil(extra):,} more{span_text}.",
+            f"PSR {_fmt(psr, 3)} com {n:.0f} observações. Com o mesmo comportamento, "
+            f"chegaria a 0.95 com cerca de {math.ceil(need):,} observações: faltam "
+            f"{math.ceil(extra):,}{span_text}.",
         )
     else:
         band = (data.get("bootstrap") or {}).get("sharpe_per_period") or {}
         p5 = _number(_value(band.get("p5")))
         p5_text = f" ({_fmt(p5, 3)})" if p5 is not None else ""
-        finding = (
+        finding = _say(
+            locale,
             f"El PSR es {_fmt(psr or 0.0, 3)}, pero el percentil 5 del Sharpe en el bootstrap"
-            f"{p5_text} no queda por encima de cero."
-            if es
-            else f"PSR is {_fmt(psr or 0.0, 3)}, but the bootstrap's 5th-percentile Sharpe"
-            f"{p5_text} is not above zero."
+            f"{p5_text} no queda por encima de cero.",
+            f"PSR is {_fmt(psr or 0.0, 3)}, but the bootstrap's 5th-percentile Sharpe"
+            f"{p5_text} is not above zero.",
+            f"O PSR é {_fmt(psr or 0.0, 3)}, mas o percentil 5 do Sharpe no bootstrap"
+            f"{p5_text} não fica acima de zero.",
         )
-    actions = (
+    actions = _say(
+        locale,
         [
             "Sube un periodo más largo del mismo sistema, sin cambiar parámetros.",
             "Mejor aún, añade historial de cuenta demo posterior al backtest: cuenta como "
             "datos que el optimizador nunca vio.",
-        ]
-        if es
-        else [
+        ],
+        [
             "Upload a longer period of the same system, with unchanged parameters.",
             "Better still, add demo-account history from after the backtest: it counts as "
             "data the optimiser never saw.",
-        ]
+        ],
+        [
+            "Envie um período mais longo do mesmo sistema, sem mudar parâmetros.",
+            "Melhor ainda, adicione histórico de conta demo posterior ao backtest: conta como "
+            "dados que o otimizador nunca viu.",
+        ],
     )
     return finding, actions
 
 
 def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     mult = data.get("multiplicity") or {}
-    es = locale == "es"
     if status == "NOT_MEASURED" or mult.get("status") != "MEASURED":
-        finding = (
-            "Se calcula en cuanto la significación sea medible: el paso de historial lo resuelve."
-            if es
-            else "It is computed once significance is measurable: the history step solves it."
+        finding = _say(
+            locale,
+            "Se calcula en cuanto la significación sea medible: el paso de historial lo resuelve.",
+            "It is computed once significance is measurable: the history step solves it.",
+            "É calculado assim que a significância for mensurável: a etapa de histórico resolve "
+            "isso.",
         )
         return finding, []
     trials = _number(_value(mult.get("trials_used"))) or 1.0
@@ -440,59 +466,79 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     parts = []
     if dsr is not None:
         parts.append(
-            f"DSR {_fmt(dsr, 3)} con {trials:.0f} {'intento' if trials == 1 else 'intentos'}; "
-            "supera con 0.95 o más, y por debajo de 0.5 no supera."
-            if es
-            else f"DSR {_fmt(dsr, 3)} at {trials:.0f} {'trial' if trials == 1 else 'trials'}; "
-            "it passes at 0.95 or more and fails below 0.5."
+            _say(
+                locale,
+                f"DSR {_fmt(dsr, 3)} con {trials:.0f} {'intento' if trials == 1 else 'intentos'}; "
+                "supera con 0.95 o más, y por debajo de 0.5 no supera.",
+                f"DSR {_fmt(dsr, 3)} at {trials:.0f} {'trial' if trials == 1 else 'trials'}; "
+                "it passes at 0.95 or more and fails below 0.5.",
+                f"DSR {_fmt(dsr, 3)} com {trials:.0f} "
+                f"{'tentativa' if trials == 1 else 'tentativas'}; "
+                "passa com 0.95 ou mais e, abaixo de 0.5, não passa.",
+            )
         )
     if half is not None:
         parts.append(
-            f"Con {half:.0f} o más configuraciones probadas cae por debajo de 0.5."
-            if es
-            else f"With {half:.0f} or more configurations tried it falls below 0.5."
+            _say(
+                locale,
+                f"Con {half:.0f} o más configuraciones probadas cae por debajo de 0.5.",
+                f"With {half:.0f} or more configurations tried it falls below 0.5.",
+                f"Com {half:.0f} ou mais configurações testadas cai abaixo de 0.5.",
+            )
         )
     if pbo is not None and pbo >= 0.5:
         parts.append(
-            f"PBO {_fmt(pbo, 2)}: la mejor configuración dentro de muestra suele quedar por "
-            "debajo de la mediana fuera de muestra."
-            if es
-            else f"PBO {_fmt(pbo, 2)}: the best in-sample configuration tends to land below "
-            "the median out of sample."
+            _say(
+                locale,
+                f"PBO {_fmt(pbo, 2)}: la mejor configuración dentro de muestra suele quedar por "
+                "debajo de la mediana fuera de muestra.",
+                f"PBO {_fmt(pbo, 2)}: the best in-sample configuration tends to land below "
+                "the median out of sample.",
+                f"PBO {_fmt(pbo, 2)}: a melhor configuração dentro da amostra costuma ficar "
+                "abaixo da mediana fora da amostra.",
+            )
         )
     counted = (mult.get("trials_used") or {}).get("evidence") == "MEASURED"
     if not counted:
-        upload = (
+        upload = _say(
+            locale,
             "Sube el XML de la optimización de MT5 o la matriz de variantes: el número de "
-            "intentos pasa a ser medido y se calcula el PBO."
-            if es
-            else "Upload the MT5 optimisation XML or the variants matrix: the trial count "
-            "becomes measured and the PBO is computed."
+            "intentos pasa a ser medido y se calcula el PBO.",
+            "Upload the MT5 optimisation XML or the variants matrix: the trial count "
+            "becomes measured and the PBO is computed.",
+            "Envie o XML da otimização do MT5 ou a matriz de variantes: o número de "
+            "tentativas passa a ser medido e o PBO é calculado.",
         )
     elif pbo is None:
         # The optimisation export gave the count; only the variants' own histories
         # give the PBO.
-        upload = (
+        upload = _say(
+            locale,
             "El número de intentos ya sale de tus archivos; la matriz de variantes (el "
-            "resultado de cada configuración a lo largo del tiempo) añadiría el PBO."
-            if es
-            else "The trial count already comes from your files; the variants matrix (each "
-            "configuration's results over time) would add the PBO."
+            "resultado de cada configuración a lo largo del tiempo) añadiría el PBO.",
+            "The trial count already comes from your files; the variants matrix (each "
+            "configuration's results over time) would add the PBO.",
+            "O número de tentativas já sai dos seus arquivos; a matriz de variantes (o "
+            "resultado de cada configuração ao longo do tempo) acrescentaria o PBO.",
         )
     else:
         upload = ""
     actions = [
         *([upload] if upload else []),
-        *(
+        *_say(
+            locale,
             [
                 "Menos parámetros y rangos más cortos reducen el número de intentos.",
                 "Valida la configuración elegida en un tramo que no se usó al optimizar.",
-            ]
-            if es
-            else [
+            ],
+            [
                 "Fewer parameters and narrower ranges mean fewer trials.",
                 "Validate the chosen configuration on a stretch not used while optimising.",
-            ]
+            ],
+            [
+                "Menos parâmetros e faixas mais curtas reduzem o número de tentativas.",
+                "Valide a configuração escolhida em um trecho que não foi usado na otimização.",
+            ],
         ),
     ]
     return " ".join(parts), actions
@@ -500,20 +546,23 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
 
 def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     costs = data.get("costs") or {}
-    es = locale == "es"
     if status == "NOT_MEASURED" or costs.get("status") != "MEASURED":
-        finding = (
+        finding = _say(
+            locale,
             "Sin la lista de operaciones no se pueden volver a aplicar los costes; sin ellas la "
-            "mejor clase posible es B."
-            if es
-            else "Without the list of trades the costs cannot be re-applied; without them the "
-            "best possible class is B."
+            "mejor clase posible es B.",
+            "Without the list of trades the costs cannot be re-applied; without them the "
+            "best possible class is B.",
+            "Sem a lista de operações não é possível reaplicar os custos; sem elas a "
+            "melhor classe possível é B.",
         )
-        action = (
+        action = _say(
+            locale,
             "Sube el informe de la plataforma (MT5, MT4, TradingView...) o el CSV de "
-            "operaciones cerradas."
-            if es
-            else "Upload the platform report (MT5, MT4, TradingView...) or the closed-trades CSV."
+            "operaciones cerradas.",
+            "Upload the platform report (MT5, MT4, TradingView...) or the closed-trades CSV.",
+            "Envie o relatório da plataforma (MT5, MT4, TradingView...) ou o CSV de "
+            "operações fechadas.",
         )
         return finding, [action]
     breakeven = _number(_value(costs.get("break_even_bps")))
@@ -523,135 +572,168 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     reference_pips = _number(_value(costs.get("reference_pips")))
     pair = str(costs.get("pip_symbol") or "")
     if breakeven is None or breakeven <= 0:
-        finding = (
+        finding = _say(
+            locale,
             "Incluso sin coste extra, el neto de las operaciones no queda por encima de cero "
-            "tras las comisiones y el swap del archivo."
-            if es
-            else "Even with no extra cost, the trades do not net above zero after the "
-            "commission and swap in the file."
+            "tras las comisiones y el swap del archivo.",
+            "Even with no extra cost, the trades do not net above zero after the "
+            "commission and swap in the file.",
+            "Mesmo sem custo extra, o líquido das operações não fica acima de zero "
+            "após as comissões e o swap do arquivo.",
         )
     else:
-        finding = (
+        finding = _say(
+            locale,
             f"El neto llega a cero con {_fmt(breakeven)} pb por lado de coste extra. Para "
             f"pasar esta dimensión tiene que seguir por encima de cero a 3x la referencia "
-            f"({_fmt(needed)} pb por lado)."
-            if es
-            else f"The net reaches zero at {_fmt(breakeven)} bps per side of extra cost. To "
+            f"({_fmt(needed)} pb por lado).",
+            f"The net reaches zero at {_fmt(breakeven)} bps per side of extra cost. To "
             f"pass this dimension it has to stay above zero at 3x the reference "
-            f"({_fmt(needed)} bps per side)."
+            f"({_fmt(needed)} bps per side).",
+            f"O líquido chega a zero com {_fmt(breakeven)} pb por lado de custo extra. Para "
+            f"passar nesta dimensão, precisa continuar acima de zero a 3x a referência "
+            f"({_fmt(needed)} pb por lado).",
         )
         if pips is not None and reference_pips is not None and pair:
-            finding += (
+            finding += _say(
+                locale,
                 f" En {pair}: {_fmt(pips)} pips por lado; el mínimo para pasar son "
-                f"{_fmt(reference_pips * 3.0)} pips."
-                if es
-                else f" On {pair}: {_fmt(pips)} pips per side; passing needs "
-                f"{_fmt(reference_pips * 3.0)} pips."
+                f"{_fmt(reference_pips * 3.0)} pips.",
+                f" On {pair}: {_fmt(pips)} pips per side; passing needs "
+                f"{_fmt(reference_pips * 3.0)} pips.",
+                f" Em {pair}: {_fmt(pips)} pips por lado; o mínimo para passar são "
+                f"{_fmt(reference_pips * 3.0)} pips.",
             )
     broker = (
-        (
-            f"Compara ese margen con el spread y el deslizamiento reales de tu bróker en {pair}."
-            if es
-            else f"Compare that margin with your broker's real spread and slippage on {pair}."
+        _say(
+            locale,
+            f"Compara ese margen con el spread y el deslizamiento reales de tu bróker en {pair}.",
+            f"Compare that margin with your broker's real spread and slippage on {pair}.",
+            f"Compare essa margem com o spread e o slippage reais da sua corretora em {pair}.",
         )
         if pips is not None and pair
-        else (
+        else _say(
+            locale,
             "Compara ese margen con el spread y el deslizamiento reales de tu bróker: en "
-            "EURUSD a 1.10, 1 pb por lado son unos 1.1 pips."
-            if es
-            else "Compare that margin with your broker's real spread and slippage: on EURUSD "
-            "at 1.10, 1 bp per side is about 1.1 pips."
+            "EURUSD a 1.10, 1 pb por lado son unos 1.1 pips.",
+            "Compare that margin with your broker's real spread and slippage: on EURUSD "
+            "at 1.10, 1 bp per side is about 1.1 pips.",
+            "Compare essa margem com o spread e o slippage reais da sua corretora: em "
+            "EURUSD a 1.10, 1 pb por lado são cerca de 1.1 pips.",
         )
     )
-    actions = (
+    actions = _say(
+        locale,
         [
             broker,
             "Declara el coste real por lado al subir: se suma a lo que el informe ya detalla.",
             "Menos operaciones o un recorrido mayor por operación hacen que el coste pese menos.",
-        ]
-        if es
-        else [
+        ],
+        [
             broker,
             "Declare the real cost per side when uploading: it is added to what the report "
             "already itemises.",
             "Fewer trades or a larger move per trade make costs weigh less.",
-        ]
+        ],
+        [
+            broker,
+            "Declare o custo real por lado ao enviar: ele se soma ao que o relatório já detalha.",
+            "Menos operações ou um percurso maior por operação fazem o custo pesar menos.",
+        ],
     )
     return finding, actions
 
 
-def _account_oos(es: bool) -> tuple[str, list[str]]:
+def _account_oos(locale: str) -> tuple[str, list[str]]:
     """The out-of-sample step for an account history, which has no optimisation date."""
-    finding = (
+    finding = _say(
+        locale,
         "El historial no dice desde qué fecha el robot opera sin cambios de configuración: "
-        "sin esa fecha la mejor clase posible es B."
-        if es
-        else "The history does not say since when the robot has run with unchanged "
-        "settings: without that date the best possible class is B."
+        "sin esa fecha la mejor clase posible es B.",
+        "The history does not say since when the robot has run with unchanged "
+        "settings: without that date the best possible class is B.",
+        "O histórico não diz desde que data o robô opera sem mudanças de configuração: "
+        "sem essa data a melhor classe possível é B.",
     )
-    actions = (
+    actions = _say(
+        locale,
         [
             "Pregunta al proveedor desde qué fecha no cambió la configuración y decláralo como "
             "inicio fuera de muestra: lo posterior se mide como datos nuevos.",
             "Pide el backtest del mismo robot y súbelo junto a la cuenta: el informe compara "
             "las dos operación por operación.",
-        ]
-        if es
-        else [
+        ],
+        [
             "Ask the provider since when the settings have not changed and declare it as the "
             "out-of-sample start: what follows is measured as unseen data.",
             "Ask for the backtest of the same robot and upload it with the account: the "
             "report compares the two trade by trade.",
-        ]
+        ],
+        [
+            "Pergunte ao fornecedor desde que data a configuração não mudou e declare-a como "
+            "início fora da amostra: o que vem depois é medido como dados novos.",
+            "Peça o backtest do mesmo robô e envie-o junto com a conta: o relatório compara "
+            "os dois operação por operação.",
+        ],
     )
     return finding, actions
 
 
 def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     hold = data.get("holdout") or {}
-    es = locale == "es"
     inputs = data.get("inputs") or {}
     if status == "NOT_MEASURED":
         reason = str(hold.get("reason", ""))
         if "fewer than" in reason:
-            finding = (
+            finding = _say(
+                locale,
                 f"Uno de los dos tramos tiene menos de {HOLDOUT_MIN_OBSERVATIONS} retornos: mueve "
-                "la fecha para que ambos lados tengan al menos esa cantidad."
-                if es
-                else f"One of the two stretches has fewer than {HOLDOUT_MIN_OBSERVATIONS} "
-                "returns: move the date so that both sides have at least that many."
+                "la fecha para que ambos lados tengan al menos esa cantidad.",
+                f"One of the two stretches has fewer than {HOLDOUT_MIN_OBSERVATIONS} "
+                "returns: move the date so that both sides have at least that many.",
+                f"Um dos dois trechos tem menos de {HOLDOUT_MIN_OBSERVATIONS} retornos: mova "
+                "a data para que os dois lados tenham pelo menos essa quantidade.",
             )
         elif "outside" in reason:
-            finding = (
+            finding = _say(
+                locale,
                 f"La fecha declarada cae fuera de la serie ({inputs.get('first_timestamp', '')} "
-                f"→ {inputs.get('last_timestamp', '')})."
-                if es
-                else f"The declared date lies outside the series "
-                f"({inputs.get('first_timestamp', '')} → {inputs.get('last_timestamp', '')})."
+                f"→ {inputs.get('last_timestamp', '')}).",
+                f"The declared date lies outside the series "
+                f"({inputs.get('first_timestamp', '')} → {inputs.get('last_timestamp', '')}).",
+                f"A data declarada cai fora da série "
+                f"({inputs.get('first_timestamp', '')} → {inputs.get('last_timestamp', '')}).",
             )
         elif is_account_history(data):
-            return _account_oos(es)
+            return _account_oos(locale)
         else:
-            finding = (
-                "No se declaró un tramo fuera de muestra: sin él la mejor clase posible es B."
-                if es
-                else "No out-of-sample stretch was declared: without it the best possible "
-                "class is B."
+            finding = _say(
+                locale,
+                "No se declaró un tramo fuera de muestra: sin él la mejor clase posible es B.",
+                "No out-of-sample stretch was declared: without it the best possible class is B.",
+                "Não foi declarado um trecho fora da amostra: sem ele a melhor classe possível "
+                "é B.",
             )
-        actions = (
+        actions = _say(
+            locale,
             [
                 "Declara la fecha en que terminó la optimización: lo posterior se mide como "
                 "fuera de muestra y queda sellado en el informe.",
                 "Mejor aún, corre el EA sin cambios en un periodo posterior y sube ese "
                 "informe con la fecha de corte.",
-            ]
-            if es
-            else [
+            ],
+            [
                 "Declare the date the optimisation ended: what follows is measured out of "
                 "sample and sealed in the report.",
                 "Better still, run the EA unchanged on a later period and upload that report "
                 "with the cut-off date.",
-            ]
+            ],
+            [
+                "Declare a data em que a otimização terminou: o que vem depois é medido como "
+                "fora da amostra e fica selado no relatório.",
+                "Melhor ainda, rode o EA sem mudanças em um período posterior e envie esse "
+                "relatório com a data de corte.",
+            ],
         )
         return finding, actions
     oos = _number(_value((hold.get("out_of_sample") or {}).get("sharpe_annualised")))
@@ -659,57 +741,75 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
     parts = []
     if oos is not None:
         parts.append(
-            f"Sharpe fuera de muestra {_fmt(oos)}; hace falta 0.5 o más "
-            f"({'cumple' if oos >= 0.5 else 'no cumple'})."
-            if es
-            else f"Out-of-sample Sharpe {_fmt(oos)}; 0.5 or more is needed "
-            f"({'met' if oos >= 0.5 else 'not met'})."
+            _say(
+                locale,
+                f"Sharpe fuera de muestra {_fmt(oos)}; hace falta 0.5 o más "
+                f"({'cumple' if oos >= 0.5 else 'no cumple'}).",
+                f"Out-of-sample Sharpe {_fmt(oos)}; 0.5 or more is needed "
+                f"({'met' if oos >= 0.5 else 'not met'}).",
+                f"Sharpe fora da amostra {_fmt(oos)}; é preciso 0.5 ou mais "
+                f"({'cumpre' if oos >= 0.5 else 'não cumpre'}).",
+            )
         )
     if gap is not None:
         parts.append(
-            f"Diferencia dentro/fuera {_fmt(gap)}; el máximo es 1.0 "
-            f"({'cumple' if gap <= 1.0 else 'no cumple'})."
-            if es
-            else f"In/out gap {_fmt(gap)}; the maximum is 1.0 "
-            f"({'met' if gap <= 1.0 else 'not met'})."
+            _say(
+                locale,
+                f"Diferencia dentro/fuera {_fmt(gap)}; el máximo es 1.0 "
+                f"({'cumple' if gap <= 1.0 else 'no cumple'}).",
+                f"In/out gap {_fmt(gap)}; the maximum is 1.0 "
+                f"({'met' if gap <= 1.0 else 'not met'}).",
+                f"Diferença dentro/fora {_fmt(gap)}; o máximo é 1.0 "
+                f"({'cumpre' if gap <= 1.0 else 'não cumpre'}).",
+            )
         )
-    actions = (
+    actions = _say(
+        locale,
         [
             "Una caída fuerte fuera de muestra aparece a menudo cuando se ajustaron demasiados "
             "parámetros: menos parámetros y una nueva validación en datos no vistos.",
-        ]
-        if es
-        else [
+        ],
+        [
             "A sharp drop out of sample often appears when too many parameters were tuned: "
             "fewer parameters and a fresh validation on unseen data.",
-        ]
+        ],
+        [
+            "Uma queda forte fora da amostra aparece com frequência quando se ajustaram "
+            "parâmetros demais: menos parâmetros e uma nova validação em dados não vistos.",
+        ],
     )
     return " ".join(parts), actions
 
 
 def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     bench = data.get("benchmark") or {}
-    es = locale == "es"
     if status == "NOT_MEASURED":
-        finding = (
-            "No se subió una referencia con la que comparar."
-            if es
-            else "No reference was uploaded to compare against."
+        finding = _say(
+            locale,
+            "No se subió una referencia con la que comparar.",
+            "No reference was uploaded to compare against.",
+            "Não foi enviada uma referência para comparar.",
         )
-        actions = (
+        actions = _say(
+            locale,
             [
                 "Sube la curva de una alternativa pasiva: comprar y mantener el mismo activo o "
                 "un índice, con las mismas fechas.",
                 "Si no existe una alternativa pasiva comparable (por ejemplo, un EA de forex), "
                 "declara que no aplica: la clase A lo admite.",
-            ]
-            if es
-            else [
+            ],
+            [
                 "Upload the curve of a passive alternative: buy-and-hold of the same asset or "
                 "an index, over the same dates.",
                 "If no comparable passive alternative exists (a forex EA, say), declare it "
                 "not applicable: class A allows that.",
-            ]
+            ],
+            [
+                "Envie a curva de uma alternativa passiva: comprar e manter o mesmo ativo ou "
+                "um índice, com as mesmas datas.",
+                "Se não existe uma alternativa passiva comparável (por exemplo, um EA de forex), "
+                "declare que não se aplica: a classe A admite isso.",
+            ],
         )
         return finding, actions
     excess = _number(_value(bench.get("excess_return")))
@@ -717,20 +817,27 @@ def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str
     parts = []
     if excess is not None:
         parts.append(
-            f"Exceso sobre la referencia {excess:+.1%}."
-            if es
-            else f"Excess over the reference {excess:+.1%}."
+            _say(
+                locale,
+                f"Exceso sobre la referencia {excess:+.1%}.",
+                f"Excess over the reference {excess:+.1%}.",
+                f"Excesso sobre a referência {excess:+.1%}.",
+            )
         )
     if ratio is not None:
         parts.append(
-            f"Drawdown {_fmt(ratio)} veces el de la referencia; el máximo es 1.0."
-            if es
-            else f"Drawdown {_fmt(ratio)} times the reference's; the maximum is 1.0."
+            _say(
+                locale,
+                f"Drawdown {_fmt(ratio)} veces el de la referencia; el máximo es 1.0.",
+                f"Drawdown {_fmt(ratio)} times the reference's; the maximum is 1.0.",
+                f"Drawdown {_fmt(ratio)} vezes o da referência; o máximo é 1.0.",
+            )
         )
-    actions = (
-        ["Comprueba que la referencia es tu alternativa real, con las mismas fechas."]
-        if es
-        else ["Check that the reference is your real alternative, over the same dates."]
+    actions = _say(
+        locale,
+        ["Comprueba que la referencia es tu alternativa real, con las mismas fechas."],
+        ["Check that the reference is your real alternative, over the same dates."],
+        ["Confira se a referência é a sua alternativa real, com as mesmas datas."],
     )
     return " ".join(parts), actions
 
@@ -739,15 +846,16 @@ def _data_quality_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     flags = sorted(
         data.get("red_flags") or [], key=lambda flag: 0 if flag.get("severity") == "FAIL" else 1
     )
-    es = locale == "es"
     fails = sum(1 for flag in flags if flag.get("severity") == "FAIL")
     warns = len(flags) - fails
-    finding = (
+    finding = _say(
+        locale,
         f"{_plural(fails, 'bandera grave', 'banderas graves')} y "
-        f"{_plural(warns, 'aviso', 'avisos')} en los datos."
-        if es
-        else f"{_plural(fails, 'serious flag', 'serious flags')} and "
-        f"{_plural(warns, 'warning', 'warnings')} in the data."
+        f"{_plural(warns, 'aviso', 'avisos')} en los datos.",
+        f"{_plural(fails, 'serious flag', 'serious flags')} and "
+        f"{_plural(warns, 'warning', 'warnings')} in the data.",
+        f"{_plural(fails, 'sinal grave', 'sinais graves')} e "
+        f"{_plural(warns, 'aviso', 'avisos')} nos dados.",
     )
     seen: set[str] = set()
     actions = []
@@ -781,7 +889,7 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
 
     ``data`` is the stored result (``AuditResult.model_dump(mode="json")``).
     """
-    locale = "en" if locale == "en" else "es"
+    locale = locale if locale in ("en", "pt") else "es"
     verdict = data.get("verdict") or {}
     dimensions = [Dimension.model_validate(d) for d in verdict.get("dimensions", [])]
     current = str(verdict.get("overall", ""))
@@ -816,5 +924,8 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
     )
     return steps
 
+
+# The Portuguese of the tables above, over their English (see ``report_pt``).
+report_pt.install(globals(), report_pt.PLAN)
 
 __all__ = ["FLAG_HINTS", "PLAN_ORDER", "PlanStep", "TITLES", "improvement_plan"]

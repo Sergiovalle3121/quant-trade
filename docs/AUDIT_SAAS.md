@@ -1400,6 +1400,27 @@ questions, instead of repeating the verdict between the plan and the findings;
 the multiplicity dimension is titled "Número de configuraciones probadas" /
 "Number of settings tried".
 
+### The report in Portuguese
+
+The report, the verdict sentence, the class plan, the charts and the PDF
+footer also read in Brazilian Portuguese (`locale="pt"`).
+`audit/report_pt.py` holds the Portuguese of every Spanish-and-English table
+(labels, figure names, dimension titles, red-flag titles, plan hints, chart
+words) and `report_pt.install` adds it under `"pt"`, over the English, so a
+text still missing in Portuguese reads in English, never blank. The engine's
+English notes, the verdict's reasons (one `; `-separated part at a time) and
+the seller questions and assumptions a result stores in Spanish and English
+are translated when the page is rendered, as the Spanish ones are: the stored
+result, and so its hash, is the same whatever language reads it.
+
+Limits: the Portuguese was written for this report and checked for its
+placeholders and by the profit-claim guard, not by a native reviewer; the
+comparison page and the account screens have no Portuguese yet and send a
+Portuguese reader to their English pages. Tests
+(`tests/test_audit_portuguese_report.py`) fail when an English label has no
+Portuguese, and `i18n.untranslated` now reports a note that lacks a Spanish
+or a Portuguese rule.
+
 ## Assumptions and limitations
 
 - No market data is used. The audit sees only what the client uploads; a
@@ -1894,6 +1915,37 @@ changes what a report says.
 - **Storage**: five new tables (`accounts`, `account_sessions`,
   `account_audits`, `account_codes`, `account_resets`), created on start; no
   column is added to an existing table.
+
+### Sales funnel for the owner (`audit/funnel.py`, `/panel`)
+
+`/panel` shows, for the last 30 days, per link tag and per day and language:
+visits, accounts created, free first full reports, free previews and paid
+reports (by code and by card). It answers "which of my posts brings
+customers" without any third-party analytics.
+
+- **Tags.** A link carries `?ref=<tag>`. Only tags listed in
+  `funnel.REF_TAGS` count (the playbook template ids and a few channels);
+  anything missing, malformed or unlisted is "directo". The first listed tag
+  a browser arrives with is kept for 30 days in the `rigor_ref` cookie, which
+  holds only the tag, and stored in `account_refs` when an account is created.
+  The row goes with `delete_account`.
+- **Visits.** A `GET` answered 200 on the landing (`/`, `/en`, `/pt`) or a
+  case page (`/para`, `/for`, `/pt/para`) adds one to a counter keyed by day,
+  language and tag (`funnel_visits`). A browser counts once a day: the
+  `rigor_seen` cookie holds only the date. No address or user agent is
+  stored. Link previews, robots, prefetches and `HEAD` requests do not count.
+  A request only adds to an in-memory counter (`funnel.VisitCounter`); a
+  background thread writes the totals every minute, `/panel` flushes before
+  it reads, and shutdown flushes the rest, so a slow or failing database
+  never holds up a page. Counts that fail to write are kept for the next
+  flush.
+- **The other stages** are read from the tables the service already keeps
+  (`accounts`, `welcome_reports`, `free_previews`, and paid `audits` with
+  their payment reference), with the language and tag of the account
+  involved. An event with no account shows language `-`.
+- **Limits.** Visits count browsers per day, not people. A report deleted by the
+  retention purge stops counting. A tag counts only if the owner used it in
+  the link.
 
 ### Public verification page and badge
 

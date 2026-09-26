@@ -79,10 +79,11 @@ def test_portuguese_landing_has_no_spanish_left() -> None:
         assert spanish not in text, spanish
 
 
-def test_the_report_language_on_a_portuguese_page_is_english() -> None:
+def test_the_report_language_on_a_portuguese_page_is_portuguese() -> None:
     page = _paid("pt")
-    assert "<option value='en' selected>English</option>" in page
-    assert "O relatório sai em inglês ou espanhol" in page
+    assert "<option value='pt' selected>Português</option>" in page
+    assert "O relatório sai em português, espanhol ou inglês." in page
+    # Pages that have no Portuguese yet still link to English.
     assert link_locale("pt") == "en" and link_locale("es") == "es"
 
 
@@ -103,7 +104,7 @@ def test_every_link_on_the_portuguese_landing_opens(tmp_path: Path) -> None:
         for href in HREF.findall(page.text)
         if href.startswith("/") and not href.startswith("//")
     }
-    assert "/pt" in links and "/sample?lang=en" in links and "/pt/cadastro" in links
+    assert "/pt" in links and "/pt/exemplo" in links and "/pt/cadastro" in links
     for href in sorted(links - {""}):
         response = client.get(href, follow_redirects=False)
         assert response.status_code < 400, (href, response.status_code)
