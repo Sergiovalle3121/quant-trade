@@ -75,6 +75,7 @@ RECOGNISED_PLATFORMS: tuple[str, ...] = (
     "DEGIRO",
     "Trading 212",
     "Revolut",
+    "Zerodha",
     "cTrader",
     "Sierra Chart",
     "Rithmic",

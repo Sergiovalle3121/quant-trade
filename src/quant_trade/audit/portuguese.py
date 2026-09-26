@@ -448,9 +448,11 @@ UI_PT: dict[str, Any] = {
         (
             "percent",
             "Frente ao caixa",
-            "Subtraímos o que o dinheiro em caixa em dólares pagava nas mesmas datas (letras do "
-            "Tesouro dos EUA de 3 meses, dados públicos do FRED): você vê o Sharpe sem o que o "
-            "caixa já pagava e, se enviar um benchmark, o alfa também.",
+            "Subtraímos o que o caixa pagava nas mesmas datas, na moeda da sua conta quando o "
+            "seu relatório a indica (reais, pesos mexicanos, euros, libras, ienes, dólares "
+            "canadenses ou francos suíços) e, se não, em dólares (letras do Tesouro dos EUA de "
+            "3 meses). Dados públicos oficiais. Você vê o Sharpe sem o que o caixa já pagava "
+            "e, se enviar um benchmark, o alfa, medido frente às letras dos EUA.",
         ),
         (
             "chart",

@@ -105,3 +105,17 @@ def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
     two_step = {"es": "dos pasos", "en": "two-step", "pt": "duas etapas"}
     assert two_step[locale] in answers[0]
     assert words[locale] in _text(landing(locale=locale, free_mode=False, signed_in=False))
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_cash_card_uses_the_accounts_currency_and_keeps_alpha_on_us_bills(
+    locale: str,
+) -> None:
+    cash = next(text for icon, _, text in _UI[locale]["diffs"] if icon == "percent")
+    currency, us_bills = {
+        "es": ("moneda de tu cuenta", "frente a las letras de EE. UU."),
+        "en": ("your account's currency", "against US bills"),
+        "pt": ("moeda da sua conta", "frente às letras dos EUA"),
+    }[locale]
+    assert currency in cash and us_bills in cash
+    assert not find_claims(cash)
