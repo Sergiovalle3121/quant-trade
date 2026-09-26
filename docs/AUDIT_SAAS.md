@@ -1800,7 +1800,14 @@ changes what a report says.
   page says that picking the best of N counts as N trials. Per-test detail needs both versions
   complete. Rename, remove a version and delete the strategy (its reports
   stay); deleting the account or a report removes its rows. Nothing here
-  unlocks anything, so nothing new can be farmed.
+  unlocks anything, so nothing new can be farmed. "Descargar resumen en
+  PDF" (`/cuenta/estrategias/<id>/pdf`) prints the same page without forms
+  or buttons, with the date it was made and the fixed research-not-advice
+  notice; only the signed-in owner gets it (another account gets 404), sent
+  `private, no-store`, in the account page's language (es, en, pt). It
+  carries no links. The same summary on the same day is served from memory;
+  an account renders at most 10 in 10 minutes (then 429), since they share
+  the report PDFs' render slots.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.

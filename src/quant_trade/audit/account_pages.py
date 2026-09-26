@@ -15,7 +15,7 @@ from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
-from quant_trade.audit.pages import _e, _field, _home, _page, _page_hero
+from quant_trade.audit.pages import _disclaimer, _e, _field, _home, _page, _page_hero
 from quant_trade.audit.portuguese import link_locale
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.store import AccountAudit, AccountCode, AccountRecord, StrategyRecord
@@ -1379,8 +1379,14 @@ def strategy_page(
     strategy: StrategyRecord,
     versions: Sequence[tuple[AccountAudit, dict[str, Any] | None]],
     free_mode: bool = False,
+    printable: bool = False,
+    generated_at: str = "",
 ) -> str:
-    """One strategy: its versions oldest first, and what changed at each step."""
+    """One strategy: its versions oldest first, and what changed at each step.
+
+    ``printable`` is the PDF summary: the same content without forms or
+    buttons, with the date it was made.
+    """
     from quant_trade.audit.strategies import COPY as SCOPY
     from quant_trade.audit.strategies import figures_text, headline, what_changed
 
@@ -1407,9 +1413,18 @@ def strategy_page(
             cells = (
                 "<td class='strat-locked' colspan='3'>"
                 f"<span class='acct-tag'>{_e(copy['locked'])}</span> "
-                f"<a href='{_e(report_href(item.audit_id, locale))}'>{_e(copy['unlock'])}</a>"
-                "</td>"
+                + (
+                    _e(copy["unlock"])
+                    if printable
+                    else f"<a href='{_e(report_href(item.audit_id, locale))}'>"
+                    f"{_e(copy['unlock'])}</a>"
+                )
+                + "</td>"
             )
+        # A PDF carries no links, like a report's: they would point nowhere.
+        badge = _class_badge(item.overall_class)
+        if not printable:
+            badge = f"<a href='{_e(report_href(item.audit_id, locale))}'>{badge}</a>"
         remove = (
             f"<form method='post' action='{base}/quitar'>"
             + _hidden("csrf", csrf)
@@ -1419,9 +1434,9 @@ def strategy_page(
         )
         rows.append(
             f"<tr><td>v{number}</td><td class='strat-date'>{_e(_date(item.created_at))}</td>"
-            f"<td class='strat-cls'><a href='{_e(report_href(item.audit_id, locale))}'>"
-            f"{_class_badge(item.overall_class)}</a></td>{cells}"
-            f"<td class='strat-rm'>{remove}</td></tr>"
+            f"<td class='strat-cls'>{badge}</td>{cells}"
+            + ("" if printable else f"<td class='strat-rm'>{remove}</td>")
+            + "</tr>"
         )
         if previous is not None:
             prev_item, prev_result = previous
@@ -1438,11 +1453,16 @@ def strategy_page(
                     f"{path('account', locale)}/comparar?id={prev_item.audit_id}"
                     f"&amp;id={item.audit_id}"
                 )
+                compare = (
+                    ""
+                    if printable
+                    else f"<p class='strat-cmp'>"
+                    f"<a class='btn btn-ghost btn-sm' href='{compare_href}'>"
+                    f"{_e(copy['side_by_side'])}</a></p>"
+                )
                 blocks.append(
                     f"<div class='acct-card strat-change'><h3>v{number}: {_e(title)}</h3>"
-                    f"<ul>{items}</ul><p class='strat-cmp'>"
-                    f"<a class='btn btn-ghost btn-sm' href='{compare_href}'>"
-                    f"{_e(copy['side_by_side'])}</a></p></div>"
+                    f"<ul>{items}</ul>{compare}</div>"
                 )
             else:
                 text = copy["changed_locked"].format(
@@ -1456,7 +1476,8 @@ def strategy_page(
     if rows:
         table = (
             "<div class='acct-scroll'><table class='acct-table strat-table'>"
-            f"<thead><tr>{head}<th></th></tr></thead><tbody>{''.join(rows)}</tbody>"
+            f"<thead><tr>{head}{'' if printable else '<th></th>'}</tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody>"
             "</table></div>"
         )
     else:
@@ -1482,8 +1503,21 @@ def strategy_page(
         f"href='{path('account', locale)}#estrategias'>"
         f"{_e(copy['back'])}</a></p>"
     )
+    if printable:
+        manage = ""
+        # The fixed notice every report carries: research, not advice.
+        back = f"<p class='muted'>{_e(_disclaimer(locale))}</p>"
+        top = f"<p class='muted'>{_e(copy['pdf_generated'].format(date=_date(generated_at)))}</p>"
+    else:
+        top = (
+            f"<p><a class='btn btn-ghost btn-sm' href='{base}/pdf' download>"
+            f"{icon('print')} {_e(copy['pdf_button'])}</a></p>"
+            if rows
+            else ""
+        )
     body = (
-        table
+        top
+        + table
         + "".join(blocks)
         + (
             f"<p class='muted'>{_e(copy['tries_note'].format(n=len(versions)))}</p>"
