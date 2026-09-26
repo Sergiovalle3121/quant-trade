@@ -634,7 +634,10 @@ def _benchmark(
     }
     s_returns = s_eq["equity"].astype(float).pct_change().to_numpy()[1:]
     b_returns = b_eq["equity"].astype(float).pct_change().to_numpy()[1:]
-    cash = cashrate_lib.span_cash(joined["timestamp"], rates)
+    try:
+        cash = cashrate_lib.span_cash(joined["timestamp"], rates)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        cash = None
     section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
     return section, values, None
 
@@ -855,7 +858,22 @@ def _bill_rates(market: Callable[[str], pd.Series | None] | None) -> pd.Series |
         rates = market(market_lib.CASH.key)
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         rates = None
-    return None if rates is None or rates.empty else rates
+    return _usable_rates(rates)
+
+
+def _usable_rates(rates: pd.Series | None) -> pd.Series | None:
+    """The finite numeric rates on readable dates; None when nothing is left or
+    the reply is not a dated series at all (a broken download or cache), so the
+    lines that need them say the rates were unavailable instead of failing."""
+    if rates is None:
+        return None
+    try:
+        index = pd.DatetimeIndex(pd.to_datetime(rates.index))
+        values = pd.to_numeric(pd.Series(rates.to_numpy(), index=index), errors="coerce")
+        values = values[np.isfinite(values.to_numpy(dtype=float))]
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return None
+    return None if values.empty else values.astype(float)
 
 
 def _cash_rate(
@@ -875,7 +893,16 @@ def _cash_rate(
             "label": market_lib.CASH.label,
             "source_url": market_lib.CASH.source_url,
         }
-    return cashrate_lib.excess_sharpe(inputs.equity.frame, rates, inputs.periods_per_year)
+    try:
+        return cashrate_lib.excess_sharpe(inputs.equity.frame, rates, inputs.periods_per_year)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return {
+            "status": "NOT_MEASURED",
+            "reason": cashrate_lib.UNAVAILABLE,
+            "series": market_lib.CASH.series,
+            "label": market_lib.CASH.label,
+            "source_url": market_lib.CASH.source_url,
+        }
 
 
 def _vix_regime(
