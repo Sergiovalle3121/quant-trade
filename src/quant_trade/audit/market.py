@@ -233,6 +233,10 @@ class MarketData:
             ).start()
         return cached[1] if cached is not None else None
 
+    def ready(self) -> tuple[str, ...]:
+        """The series already in memory, in a fixed order; starts no download."""
+        return tuple(key for key in SERIES if key in self._cache)
+
     def refresh(self, key: str) -> bool:
         """Download one series now (in the calling thread); False when another
         refresh of it is running or the download failed."""

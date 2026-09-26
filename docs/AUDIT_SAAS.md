@@ -1211,6 +1211,14 @@ line and the audit goes on. The CLI's `--public-data` reads the three series
 first. The result JSON always carries a `holding` key: `null` when the file
 trades none of these markets or public data is off.
 
+The sample report (`/ejemplo`, `/sample`, `/pt/exemplo` and their PDFs) is
+built with the same public series, so a visitor sees the lines an upload
+gets without uploading a file. It reads only what is already in memory
+(`MarketData.ready`) and never waits on the network: before the first
+download lands, or with `AUDIT_PUBLIC_DATA=false`, it is the offline sample.
+Each version is built once per language and set of series in memory and
+kept. The public series move no figure of the sample, only add their lines.
+
 Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
 report adds one line under the key figures: the Sharpe ratio of the returns
 after subtracting what the 3-month US Treasury bill paid over the same days
