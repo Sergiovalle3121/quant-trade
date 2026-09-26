@@ -508,7 +508,11 @@ align-items:start}
 background:#fff}
 .acct-perks{background:var(--surface-2)}
 .acct-side{display:grid;gap:18px}
-.acct-stores h3{margin:0 0 12px;font-size:1rem}
+.acct-stores{border-color:color-mix(in srgb,var(--ok) 32%,var(--border))}
+.acct-stores h3{display:flex;align-items:center;margin:0 0 12px;font-size:1rem}
+.acct-stores h3 svg{flex:none;width:30px;height:30px;margin-right:10px;padding:6px;
+border-radius:9px;background:color-mix(in srgb,var(--ok) 10%,#fff);color:var(--ok)}
+.acct-stores .acct-list{font-size:.93rem;color:var(--text-2)}
 .acct-sec .acct-stores{margin-top:18px}
 .acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
 box-shadow:0 1px 2px rgba(0,0,0,.04)}
@@ -640,7 +644,7 @@ def _stores(copy: dict[str, str], retention_days: int) -> str:
         for item in copy["stores"].format(days=retention_days).split("|")
     )
     return (
-        f"<div class='acct-card acct-stores'><h3>{_e(copy['stores_title'])}</h3>"
+        f"<div class='acct-card acct-stores'><h3>{icon('shield')}{_e(copy['stores_title'])}</h3>"
         f"<ul class='acct-list'>{items}</ul></div>"
     )
 

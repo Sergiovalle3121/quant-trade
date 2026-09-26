@@ -5,6 +5,7 @@
   showing only the class, its fixed sentence and the fixed notice.
 - ``og-sample-{es,en}.png``: the sample report, marked as synthetic data.
 - ``og-for-{slug}-{es,en}.png``: each audience page, with its own title.
+- ``og-pt.png`` and ``og-for-{slug}-pt.png``: the Portuguese site and audience cards.
 
 Nothing on a card comes from a client file: every text is a fixed string the
 pages already show. Run with Playwright and Chromium available:
@@ -22,7 +23,7 @@ from playwright.sync_api import sync_playwright
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES
 from quant_trade.audit.pages import _UI, BADGE_NOTICE, SAMPLE_BANNER, class_text
-from quant_trade.audit.seo import BRAND, TAGLINE
+from quant_trade.audit.seo import BRAND, OG_IMAGES, TAGLINE
 from quant_trade.audit.theme import CLASS_COLOURS, STATIC_DIR, logo_mark, ring_svg
 
 FONTS = STATIC_DIR / "fonts"
@@ -146,7 +147,12 @@ def cards() -> dict[str, str]:
             out[f"og-for-{audience.slug}-{locale}.png"] = audience_card(
                 audience.text[locale].title, locale
             )
-    return out
+    # Portuguese: the site card and the audience cards (first sales' texts). Its class
+    # and sample cards wait for a Portuguese class sentence and notice.
+    out["og-pt.png"] = site_card("pt")
+    for audience in AUDIENCE_PAGES:
+        out[f"og-for-{audience.slug}-pt.png"] = audience_card(audience.text["pt"].title, "pt")
+    return {name: out[name] for name in OG_IMAGES}
 
 
 def _small_png(raw: bytes) -> bytes:

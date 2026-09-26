@@ -250,7 +250,10 @@ currency: FDAX x25, FDXM x5, FDXS x1, FESX x10, FSXE x1, FVS x100 and the
 Schatz/Bobl/Bund/Buxl futures x1,000 in EUR, FSMI x10 in CHF; ICE Brent (B)
 x1,000, Gasoil (G) x100, Sugar No. 11 (SB) x1,120 per cent, Coffee (KC) x375,
 Cotton (CT) x500, Cocoa (CC) x10, Orange juice (OJ) x150 and the US Dollar
-Index (DX) x1,000 in USD. The warning names a non-USD currency, and a file
+Index (DX) x1,000 in USD; B3 (Brazil, its "Contract Point Value" sheet)
+Ibovespa (IND) x1, Mini Ibovespa (WIN) x0.2, US Dollar (DOL) x50 and Mini US
+Dollar (WDO) x10 in BRL. The report prints amounts without a currency sign,
+so a file in euros or reais is not shown as dollars. The warning names a non-USD currency, and a file
 that mixes currencies is told the results were added without conversion.
 Other single-letter ICE roots (FTSE 100 `Z`, WTI `T`) are left out because
 they would read CME codes such as `ZNZ6` as another contract. NinjaTrader
@@ -2183,6 +2186,8 @@ Pass 56 also gives each shared link its own preview card (`tools/make_og_images.
 
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
 
+Redesign pass 57 styles the column-mapping page ("Dinos qué es cada columna"): each group of menus is a white card, the menus stack in one column on a phone so column names are not cut short, the file re-pick sits in a dashed box, and every file input's button matches the site's buttons. Cell rendering and escaping are unchanged. It also gives the account's "what we keep and how to delete it" card a shield and a green edge on /registro and /cuenta, makes the landing's secondary link monochrome, lets the price cards use the full width, stacks the sign-up buttons above the upload form on a phone, keeps the landing mock-up's address on one line, and tightens the timing tables below 380 px so they fit the screen. On the landing's "Trabajo real, no humo" section, each card's proof link sits at the card's foot with an arrow, so the six links line up. The one-year p95 drawdown tile now carries the same minus sign as the maximum drawdown beside it, in the report and on the PDF cover; the resampled-risk section still lists the depths as positive sizes of a fall. Portuguese gets its own site card (`og-pt.png`) and six audience cards (`og-for-*-pt.png`, first sales' texts); its verification and sample links keep the English card until there is a Portuguese class sentence and notice (`OG_PARTIAL_KINDS`).
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
@@ -2325,3 +2330,28 @@ the page is `no-store` and goes only to the person who typed it.
 A sixth audience page, for retail investors (`/para/inversores-particulares`, `/for/retail-investors`), covers people who invest on their own through DEGIRO, Trading 212, Interactive Brokers or XTB. It names only live checks: significance, an optional benchmark CSV, double and triple costs, the result without the best trades and months, the fixed crisis windows and the recent third. It states the reader's limit: a trade history counts only closed positions (open ones and dividends are left out), so a buy-and-hold investor should upload the portfolio's value or return over time. The landing's "Otro caso" line links it too.
 
 The prop-firm audience page (`/para/retos-prop-firm`, `/for/prop-firm-challenges`) now names the firm-fit table as a check ("¿Con qué firma encaja tu historial?"), and it adds a fourth pain: a pass whose payout is held up by the best-day (consistency) rule. The wording says it compares rules and does not recommend buying a challenge.
+
+## Ranges and adjusted figures (math review, 2026-09-26)
+
+Informational only: none of these moves a class, a dimension or a red flag.
+
+- Trade statistics carry `intervals` (10 trades or more): 95 % ranges for the
+  win rate (Wilson), the average per trade (Student's t on the per-trade
+  results after itemised fees, centred on the reported expectancy) and the
+  profit factor (2,000 resamples of the trades with a fixed seed, fewer on
+  very long lists; the upper end is NOT_MEASURED when some resamples have no
+  losing trade). Each trade is taken as an independent draw; clustered
+  trades would widen the ranges.
+- The significance section carries `autocorrelation_adjusted` (50 returns or
+  more): Lo's (2002) annualised Sharpe, `q / sqrt(q + 2 sum (q-k) rho_k)`
+  times the per-period Sharpe, with `q` the periods a year and the sum cut
+  at 10 lags or a fifth of the sample. Smoothed returns (AR(1) at 0.5)
+  inflate the plain figure by about 1.7x; this one removes it.
+- The benchmark section and the fund-versus-index comparison carry `jensen`
+  (24 shared periods or more): Jensen's alpha from regressing the
+  strategy's period returns on the benchmark's, annualised, with a
+  Newey-West t-statistic (lag `floor(4 (n/100)^(2/9))`), beta and R squared.
+  No cash rate is subtracted.
+- The fund fee table carries `two_and_twenty`: 2 % a year taken month by
+  month and 20 % of each year's gain above the high-water mark taken at the
+  year's end and at the last month.

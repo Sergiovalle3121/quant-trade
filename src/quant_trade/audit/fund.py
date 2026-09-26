@@ -38,11 +38,13 @@ flag and never changes the class: each finding is a question to ask.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit.alpha import jensen_alpha
 from quant_trade.audit.crises import crisis_review
 from quant_trade.audit.schema import measured, not_measured
 
@@ -238,6 +240,7 @@ def compare_with_benchmark(fund: pd.Series, index: pd.Series, source: str) -> di
         "beta": measured(beta),
         "findings": [],
     }
+    review["jensen"] = jensen_alpha(f, b, 12.0)
     if tracking > 0:
         review["information_ratio"] = measured(float(active.mean()) * 12.0 / tracking)
     for key, value in (("up_capture", up), ("down_capture", down)):
@@ -359,6 +362,33 @@ FEE_NOTE = (
 )
 
 
+#: The classic hedge-fund charge: 2 % a year on assets, 20 % of the gains
+#: above the high-water mark, taken at the end of each year of the record
+#: (and at its last month, as for an investor who leaves then).
+MANAGEMENT_FEE = 0.02
+PERFORMANCE_FEE = 0.20
+TWO_AND_TWENTY_NOTE = (
+    "the monthly returns with 2 % a year taken month by month and 20 % of each year's gain "
+    "above the previous high taken at the year's end (high-water mark)"
+)
+
+
+def _two_and_twenty(returns: np.ndarray, months: Sequence[int] | None = None) -> float:
+    """Growth of 1 after 2 % a year and 20 % of the gains over the high-water
+    mark, taken each December (``months`` gives each return's calendar month;
+    without it every 12th return) and at the last month."""
+    monthly = (1.0 + MANAGEMENT_FEE) ** (1.0 / 12.0) - 1.0
+    value = high_water = 1.0
+    for index, r in enumerate(returns):
+        value *= (1.0 + r) / (1.0 + monthly)
+        december = months[index] == 12 if months is not None else (index + 1) % 12 == 0
+        year_end = december or index == len(returns) - 1
+        if year_end and value > high_water:
+            value -= PERFORMANCE_FEE * (value - high_water)
+            high_water = value
+    return float(value)
+
+
 def fee_drag(series: pd.Series, comparison: dict[str, Any] | None = None) -> dict[str, Any]:
     """What common yearly fees would leave of a record not declared net of
     fees, and, with an index comparison, the fee at which the fund would only
@@ -386,6 +416,14 @@ def fee_drag(series: pd.Series, comparison: dict[str, Any] | None = None) -> dic
         "gross_cagr": measured(float(np.prod(1.0 + r) ** (1.0 / years) - 1.0)),
         "gross_growth": measured(float(np.prod(1.0 + r) - 1.0)),
         "rows": rows,
+    }
+    stamps = pd.DatetimeIndex(series.index) if isinstance(series.index, pd.DatetimeIndex) else None
+    growth = _two_and_twenty(r, list(stamps.month) if stamps is not None else None)
+    out["two_and_twenty"] = {
+        "management": MANAGEMENT_FEE,
+        "performance": PERFORMANCE_FEE,
+        "cagr": measured(growth ** (1.0 / years) - 1.0, TWO_AND_TWENTY_NOTE),
+        "growth": measured(growth - 1.0, TWO_AND_TWENTY_NOTE),
     }
     if comparison and comparison.get("status") == "MEASURED":
         fund_cagr = float(comparison["fund_cagr"]["value"])
