@@ -155,3 +155,15 @@ def test_the_plan_never_counts_centuries_of_missing_history(locale: str) -> None
     assert "10" in finding
     assert not re.search(r"\d{3,} (años|years|anos)", finding)
     assert find_claims(finding) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_funds_plan_asks_for_the_managers_record_not_a_demo_account(
+    fund_data: dict, locale: str
+) -> None:
+    steps = {s.dimension: s for s in improvement_plan(fund_data, locale)}
+    if "statistical_significance" not in steps:
+        pytest.skip("this record already passes significance")
+    actions = " ".join(steps["statistical_significance"].actions)
+    assert not re.search(r"demo|backtest|parámetros|parameters|parâmetros", actions)
+    assert find_claims(actions) == []

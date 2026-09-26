@@ -445,6 +445,30 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             f"O PSR é {_fmt(psr or 0.0, 3)}, mas o percentil 5 do Sharpe no bootstrap"
             f"{p5_text} não fica acima de zero.",
         )
+    if (data.get("fund") or {}).get("track_record"):
+        # A fund's record has no parameters or demo account: more of it is the
+        # manager's full history, or the months still to come.
+        return finding, _say(
+            locale,
+            [
+                "Pide al gestor el historial completo del fondo desde su inicio, sin años "
+                "recortados.",
+                "Vuelve a auditarlo cuando el fondo publique más meses: cada mes nuevo cuenta "
+                "como datos que nadie eligió de antemano.",
+            ],
+            [
+                "Ask the manager for the fund's full record since inception, with no years "
+                "left out.",
+                "Audit it again once the fund publishes more months: each new month counts as "
+                "data nobody picked in advance.",
+            ],
+            [
+                "Peça ao gestor o histórico completo do fundo desde o início, sem anos "
+                "cortados.",
+                "Audite de novo quando o fundo publicar mais meses: cada mês novo conta como "
+                "dados que ninguém escolheu de antemão.",
+            ],
+        )
     actions = _say(
         locale,
         [
