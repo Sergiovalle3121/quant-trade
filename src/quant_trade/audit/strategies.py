@@ -99,6 +99,11 @@ COPY: dict[str, dict[str, str]] = {
         "delete": "Borrar estrategia",
         "delete_help": "Los informes siguen en tu lista; solo se quita la agrupación.",
         "back": "Volver a mi cuenta",
+        "missing_title": "No encontramos esa estrategia",
+        "missing_lead": (
+            "Puede que la hayas borrado o que el enlace no sea de tu cuenta. Tus estrategias "
+            "están en «Mi cuenta»."
+        ),
         "pdf_button": "Descargar resumen en PDF",
         "pdf_generated": (
             "Resumen de la estrategia generado el {date} a partir de los informes guardados. "
@@ -176,6 +181,11 @@ COPY: dict[str, dict[str, str]] = {
         "delete": "Delete strategy",
         "delete_help": "The reports stay on your list; only the grouping goes.",
         "back": "Back to my account",
+        "missing_title": "We could not find that strategy",
+        "missing_lead": (
+            "You may have deleted it, or the link is not from your account. Your strategies are "
+            "under 'My account'."
+        ),
         "pdf_button": "Download PDF summary",
         "pdf_generated": (
             "Strategy summary made on {date} from the saved reports. Each full report has its "
