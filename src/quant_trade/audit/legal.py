@@ -581,6 +581,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "If you make a recovery key: only its SHA-256 and the date it was made, "
                     "never the key, which is shown to you once. It is deleted when you use it, "
                     "when you make a new one or with your account.",
+                    "If you turn on two-step sign-in: the secret your authenticator app shares "
+                    "(needed to check its codes) and the last code step used, so a code works "
+                    "once. It is deleted when you turn it off, when you use your recovery key "
+                    "or with your account.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
@@ -718,6 +722,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Si creas una clave de recuperación: solo su SHA-256 y la fecha en que la "
                 "creaste, nunca la clave, que te mostramos una sola vez. Se borra al usarla, "
                 "al crear una nueva o con tu cuenta.",
+                "Si activas la verificación en dos pasos: la clave secreta que comparte tu app "
+                "de autenticación (necesaria para comprobar sus códigos) y el último paso de "
+                "código usado, para que cada código sirva una vez. Se borra al desactivarla, al "
+                "usar tu clave de recuperación o con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
