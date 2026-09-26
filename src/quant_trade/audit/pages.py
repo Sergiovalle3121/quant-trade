@@ -398,6 +398,12 @@ _COPY: dict[str, dict[str, Any]] = {
                 "si tú la publicas.",
             ),
             (
+                "¿Y si olvido mi contraseña?",
+                "En Mi cuenta creas una clave de recuperación y la guardas. Si olvidas la "
+                "contraseña, con tu correo y esa clave pones una nueva tú mismo, sin esperar un "
+                "correo. Solo guardamos su huella, nunca la clave.",
+            ),
+            (
                 "¿Cómo se usa el sello?",
                 "Publica la verificación desde tu informe y copia el código del sello en tu web, "
                 "Telegram o foro. El sello describe una auditoría estadística; no es una promesa "
@@ -677,6 +683,12 @@ _COPY: dict[str, dict[str, Any]] = {
                 "hashes, and only if you publish it.",
             ),
             (
+                "What if I forget my password?",
+                "In My account you make a recovery key and keep it. If you forget the password, "
+                "your e-mail and that key let you set a new one yourself, without waiting for "
+                "an e-mail. We keep only its fingerprint, never the key.",
+            ),
+            (
                 "How is the badge used?",
                 "Publish the verification from your report and copy the badge code to your "
                 "site, Telegram or forum. The badge describes a statistical audit; it is not a "
@@ -730,7 +742,7 @@ _UI: dict[str, dict[str, Any]] = {
         "trust": [
             ("shield", "Sin conexión a tu bróker"),
             ("hash", "Huella SHA-256 de cada archivo"),
-            ("globe", "Informe en español o inglés"),
+            ("globe", "Informe en español, inglés o portugués"),
             ("key", "Primer informe completo gratis con tu cuenta"),
         ],
         "mock_url": "informe · clase B",
@@ -825,7 +837,29 @@ _UI: dict[str, dict[str, Any]] = {
                 "eye",
                 "Página pública con sello",
                 "Publica la verificación de tu auditoría y enséñala con un sello que dice "
-                "exactamente qué es y qué no es.",
+                "exactamente qué es y qué no es, en español, inglés o portugués.",
+            ),
+            (
+                "percent",
+                "Frente al efectivo",
+                "Restamos lo que pagaba el efectivo en dólares en las mismas fechas (letras del "
+                "Tesoro de EE. UU. a 3 meses, datos públicos de FRED): ves el Sharpe sin lo que "
+                "ya daba el efectivo y, si subes un benchmark, el alfa también.",
+            ),
+            (
+                "chart",
+                "Mercado tranquilo y agitado",
+                "Cada rentabilidad se asigna según el VIX del día anterior, y cada crisis de "
+                "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
+                "depende de un solo tipo de mercado.",
+            ),
+            (
+                "globe",
+                "En tu moneda y tras la inflación",
+                "Si la cuenta está en dólares, ves su resultado en pesos mexicanos, "
+                "reales, euros y otras "
+                "cuatro monedas al tipo de cambio de cada día, y después de la inflación de "
+                "EE. UU. (datos públicos de FRED).",
             ),
         ],
         "how_eyebrow": "Proceso",
@@ -852,6 +886,9 @@ _UI: dict[str, dict[str, Any]] = {
             "Si funciona en cada mercado o uno carga con el resto",
             "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse",
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
+            "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
+            "VIX tranquilo o agitado y crisis conocidas",
+            "Si la cuenta está en dólares: el resultado en tu moneda y tras la inflación",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -923,7 +960,7 @@ _UI: dict[str, dict[str, Any]] = {
         "trust": [
             ("shield", "No connection to your broker"),
             ("hash", "SHA-256 fingerprint of every file"),
-            ("globe", "Report in English or Spanish"),
+            ("globe", "Report in English, Spanish or Portuguese"),
             ("key", "First full report free with your account"),
         ],
         "mock_url": "report · class B",
@@ -1017,7 +1054,29 @@ _UI: dict[str, dict[str, Any]] = {
                 "eye",
                 "Public page with a badge",
                 "Publish your audit's verification page and show it with a badge that says "
-                "exactly what it is and what it is not.",
+                "exactly what it is and what it is not, in English, Spanish or Portuguese.",
+            ),
+            (
+                "percent",
+                "Against cash",
+                "We subtract what cash in dollars paid over the same dates (3-month US "
+                "Treasury bills, public FRED data): you see the Sharpe without what cash "
+                "already paid and, if you upload a benchmark, the alpha too.",
+            ),
+            (
+                "chart",
+                "Calm and agitated markets",
+                "Each return is placed by the previous day's VIX, and every publicly dated "
+                "crisis your history covers is measured on its own: you see whether the result "
+                "depends on one kind of market.",
+            ),
+            (
+                "globe",
+                "In your currency and after inflation",
+                "If the account is in dollars, you see its result in Mexican pesos, "
+                "reais, euros and "
+                "four more currencies at each day's exchange rate, and after US inflation "
+                "(public FRED data).",
             ),
         ],
         "how_eyebrow": "Process",
@@ -1044,6 +1103,9 @@ _UI: dict[str, dict[str, Any]] = {
             "Whether it works on each market or one carries the rest",
             "For funds: year-by-month calendar, worst month and time to recover",
             "The real money behind an account's %: deposits, top-ups and open losses",
+            "Against cash and the market: the Sharpe without what cash paid, calm or "
+            "agitated VIX and known crises",
+            "If the account is in dollars: the result in your currency and after inflation",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",
@@ -2346,6 +2408,7 @@ def landing(
     sample = _sample_url(locale)
     flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
+    signin_first = signed_in is False and not free_mode
     body = (
         _hero(locale, sample)
         + _specs(locale)
@@ -2381,12 +2444,20 @@ def landing(
             access_codes=access_codes,
             retention_days=retention_days,
             extras_open=extras_open,
-            signin_first=signed_in is False and not free_mode,
+            signin_first=signin_first,
         )
         + _faq_html(copy, locale, retention_days=retention_days)
         + _final_cta(copy, locale, sample, joined=joined)
     )
-    return _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
+    if signin_first:
+        # "Start free" goes straight to sign-up: the form would only send a visitor
+        # without an account there, a screen further down.
+        body = body.replace("href='#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
+    page = _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
+    if signin_first:
+        # The top bar and the phone menu carry the same button.
+        page = page.replace(f"href='{_home(locale)}#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
+    return page
 
 
 def _evidence_value(item: Any) -> str:

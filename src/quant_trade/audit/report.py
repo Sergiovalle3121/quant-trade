@@ -702,8 +702,8 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "alpha_line": (
             "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, después "
-            "de restar a ambos lo que pagó la letra del Tesoro de EE. UU. a 3 meses (beta "
-            "{beta}, t = {t}, {n} periodos)."
+            "de restar a los dos retornos lo que pagó la letra del Tesoro de EE. UU. a 3 "
+            "meses (beta {beta}, t = {t}, {n} periodos)."
         ),
         "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, sin restar "
@@ -2497,6 +2497,17 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "cost_bps_per_side": "Coste por lado (pb)",
         "oos_start": "Inicio fuera de muestra",
         "benchmark_applicable": "Aplica benchmark",
+        "overlap_share": "Fechas en común con el benchmark",
+        "strategy_total_return": "Retorno total de la estrategia",
+        "benchmark_total_return": "Retorno total del benchmark",
+        "excess_return": "Retorno por encima del benchmark",
+        "strategy_sharpe": "Sharpe de la estrategia",
+        "benchmark_sharpe": "Sharpe del benchmark",
+        "tracking_error": "Error de seguimiento",
+        "information_ratio": "Ratio de información",
+        "strategy_max_drawdown": "Drawdown máximo de la estrategia",
+        "benchmark_max_drawdown": "Drawdown máximo del benchmark",
+        "drawdown_ratio": "Drawdown de la estrategia frente al del benchmark (veces)",
         "initial_balance": "Balance inicial",
         "dsr_at_declared": "DSR con los intentos declarados",
         "dsr_at_trials_used": "DSR con los intentos usados",
@@ -2586,6 +2597,17 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "cost_bps_per_side": "Cost per side (bps)",
         "oos_start": "Out-of-sample start",
         "benchmark_applicable": "Benchmark applies",
+        "overlap_share": "Dates shared with the benchmark",
+        "strategy_total_return": "Strategy total return",
+        "benchmark_total_return": "Benchmark total return",
+        "excess_return": "Return above the benchmark",
+        "strategy_sharpe": "Strategy Sharpe",
+        "benchmark_sharpe": "Benchmark Sharpe",
+        "tracking_error": "Tracking error",
+        "information_ratio": "Information ratio",
+        "strategy_max_drawdown": "Strategy maximum drawdown",
+        "benchmark_max_drawdown": "Benchmark maximum drawdown",
+        "drawdown_ratio": "Strategy drawdown versus the benchmark's (times)",
         "initial_balance": "Initial balance",
         "dsr_at_declared": "DSR at the declared trials",
         "dsr_at_trials_used": "DSR at the trials used",
@@ -5460,9 +5482,7 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
         z = float(gap["value"])
         better = regime.get("better")
         name = (
-            f"regime_better_{better}"
-            if better in ("calm", "turbulent")
-            else "regime_no_clear_gap"
+            f"regime_better_{better}" if better in ("calm", "turbulent") else "regime_no_clear_gap"
         )
         out += (
             f"<p class='read-line'>{_e(labels[name].format(z=f'{abs(z):.2f}'))} "
@@ -6515,20 +6535,23 @@ def render_html(
             f"onclick='window.print()'>{_e(labels['print'])}</button>"
         )
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
+    en_url = (switch_url or "").replace("lang=es", "lang=en")
+    two_switches = locale == "pt" and "lang=es" in (switch_url or "")
+    short_es = " data-short='ES'" if two_switches else ""
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + (
-            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
-            f"{_e(labels['switch'])}</a>"
+            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'"
+            # Two languages on a narrow phone read as ES and EN (theme.py).
+            f"{short_es}>{_e(labels['switch'])}</a>"
             if switch_url
             else ""
         )
         + (
-            f" <a class='lang-switch' href='{_e(switch_url.replace('lang=es', 'lang=en'))}' "
-            f"hreflang='en'>English</a>"
-            if switch_url and locale == "pt" and "lang=es" in switch_url
+            f" <a class='lang-switch' href='{_e(en_url)}' hreflang='en' data-short='EN'>English</a>"
+            if two_switches
             else ""
         )
         + "</div>"
