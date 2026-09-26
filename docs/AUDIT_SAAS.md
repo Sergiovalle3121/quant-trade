@@ -2606,6 +2606,8 @@ Redesign pass 66 styles the landing's feature cards after the three new ones (ag
 
 Redesign pass 67 styles "Sesiones abiertas" in Mi cuenta. On a phone the five-column table scrolled sideways; each browser is now a card with its name as the title, network, last use and sign-in time as labelled lines, and a full-width "Cerrar" button; this browser's card is outlined. The card also gets the same space above it as the others. The same pass fixes two phone overflows in Mi cuenta seen in Portuguese: the account column no longer grows past the screen, and long dark buttons ("Criar minha chave de recuperação") wrap inside their card. "Actividad reciente" gets the same treatment: on a phone each event reads as what happened (in bold), then when, then the device and network, instead of a four-column table that scrolled sideways.
 
+Redesign pass 68 styles the fund block "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?". The yearly figures sit right-aligned, the fund's average return is a shaded total row set off by a rule, and the alpha's range and reading is a ruled line like the other readings. In the PDF the table and its introduction stay on one page instead of leaving the total row alone on the next. On a 360 px phone the fee table's "2 % + 20 %" label ran the page 15 px wide; it now wraps.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

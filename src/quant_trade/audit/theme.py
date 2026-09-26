@@ -1274,6 +1274,11 @@ STATS = """
 .facts.ranges .fact b{font-size:1.55rem;font-size:clamp(1.3rem,2vw,1.7rem);letter-spacing:-.03em;white-space:nowrap}
 .read-line{border-left:3px solid var(--text);padding:2px 0 2px 14px;margin:14px 0;font-weight:500;color:var(--text)}
 table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
+table.skill th.val,table.skill td.val{text-align:right;white-space:nowrap}
+table.skill td.val{font-variant-numeric:tabular-nums}
+table.skill tr.skill-total td{border-top:2px solid var(--border-2);background:var(--surface-2)}
+@media screen and (max-width:420px){table.timing tr.fee-classic td:first-child{white-space:normal}
+.paper table.skill td:first-child{padding-right:6px!important}}
 @media (max-width:420px){.facts.ranges .fact b{white-space:normal}}
 table.currency tr.cur-base td{background:var(--surface-2);font-weight:600}
 @keyframes scroll-cue{0%,96%{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent)}
@@ -1293,6 +1298,9 @@ table.currency tr.cur-real td{border-bottom:2px solid var(--border-2)}
 @media print{.facts.ranges{margin-bottom:12pt}.facts.ranges .fact b{font-size:13pt!important;line-height:1.2;letter-spacing:-.02em}
 .read-line{border-left:2px solid #000;padding:0 0 0 8pt;margin:8pt 0;break-inside:avoid}
 table.timing tr.fee-classic td{border-top:1.5px solid #999}
+table.skill{break-inside:avoid;page-break-inside:avoid}
+.skill-intro{break-after:avoid;page-break-after:avoid}
+table.skill tr.skill-total td{border-top:1.5px solid #999;background:#f4f4f5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 table.currency tr.cur-base td{background:#f4f4f5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 table.currency tr.cur-real td{border-bottom:1.5px solid #999}
 .paper table.currency{width:100%;font-size:8.5pt}table.currency td:first-child{width:40%}
