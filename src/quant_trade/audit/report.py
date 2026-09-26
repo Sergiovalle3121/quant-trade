@@ -732,8 +732,8 @@ LABELS: dict[str, dict[str, str]] = {
         "skill_title": "¿Cuánto es efectivo, cuánto es mercado y cuánto queda?",
         "skill_intro": (
             "Con {n} meses en común con el índice, la rentabilidad media del fondo al año se "
-            "reparte en tres partes que suman el total, restando lo que pagaban las letras del "
-            "Tesoro de EE. UU. a 3 meses."
+            "reparte en tres partes que suman el total: lo que pagaban las letras del Tesoro de "
+            "EE. UU. a 3 meses, la exposición al índice y lo que queda."
         ),
         "skill_intro_no_cash": (
             "Con {n} meses en común con el índice, la rentabilidad media del fondo al año se "
@@ -748,7 +748,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Exposición al índice (beta {beta} por lo que el índice rindió sobre el efectivo)"
         ),
         "skill_alpha": "Lo que queda (alfa)",
-        "skill_total": "Rentabilidad media del fondo",
+        "skill_total": "Rentabilidad media del fondo (media aritmética)",
         "skill_share": (
             "La exposición al índice explica el {share} de la rentabilidad del fondo; el "
             "efectivo va aparte."
@@ -756,7 +756,8 @@ LABELS: dict[str, dict[str, str]] = {
         "skill_no_share": "Sin proporción de la exposición: {reason}.",
         "skill_range": "Alfa al año: {alpha}, rango al 95 % de {low} a {high} (t = {t}).",
         "skill_needed": (
-            "Con este alfa y este ruido harían falta unos {m} meses de historial para que el "
+            "Con este alfa y este ruido harían falta unos {m} meses de historial en total (hoy hay "
+            "{n}) para que el "
             "alfa quedara a dos errores estándar de cero. Es una cuenta, no una promesa: no dice "
             "que el alfa exista ni que vaya a seguir."
         ),
@@ -772,13 +773,14 @@ LABELS: dict[str, dict[str, str]] = {
             "corrección es {alpha} al año."
         ),
         "skill_timing_up": (
-            "El fondo tuvo más exposición al mercado antes de las subidas que antes de las "
-            "caídas (Treynor y Mazuy, t = {t}). Descontado eso, el alfa de selección es {alpha} "
-            "al año."
+            "El fondo ganó más en los meses de mercado muy movido de lo que su beta explica "
+            "(Treynor y Mazuy, t = {t}): lo da acertar el momento o tener posiciones con forma "
+            "de opción. Descontado eso, el alfa de selección es {alpha} al año."
         ),
         "skill_timing_down": (
-            "El fondo tuvo menos exposición al mercado antes de las subidas que antes de las "
-            "caídas (Treynor y Mazuy, t = {t}): el momento de entrar y salir le restó."
+            "El fondo ganó menos en los meses de mercado muy movido de lo que su beta explica "
+            "(Treynor y Mazuy, t = {t}): lo da equivocar el momento o vender opciones, y le "
+            "restó rentabilidad."
         ),
         "skill_nm": "Sin reparto entre efectivo, mercado y alfa: {reason}.",
         "fund_bench_up": "Captura al alza: parte de las subidas del índice que recoge",
@@ -1883,8 +1885,8 @@ LABELS: dict[str, dict[str, str]] = {
         "skill_title": "How much is cash, how much is the market and what is left?",
         "skill_intro": (
             "Over {n} months shared with the benchmark, the fund's average yearly return splits "
-            "into three parts that add up to the total, after what 3-month US Treasury bills "
-            "paid."
+            "into three parts that add up to the total: what 3-month US Treasury bills paid, "
+            "exposure to the benchmark, and what is left."
         ),
         "skill_intro_no_cash": (
             "Over {n} months shared with the benchmark, the fund's average yearly return splits "
@@ -1898,14 +1900,15 @@ LABELS: dict[str, dict[str, str]] = {
             "Exposure to the benchmark (beta {beta} times the benchmark's return over cash)"
         ),
         "skill_alpha": "What is left (alpha)",
-        "skill_total": "The fund's average return",
+        "skill_total": "The fund's average return (arithmetic mean)",
         "skill_share": (
             "Exposure to the benchmark explains {share} of the fund's return; cash is separate."
         ),
         "skill_no_share": "No share for the exposure: {reason}.",
         "skill_range": "Alpha a year: {alpha}, 95 % range {low} to {high} (t = {t}).",
         "skill_needed": (
-            "With this alpha and this noise, a record would need about {m} months before the "
+            "With this alpha and this noise, a record would need about {m} months in all (it has "
+            "{n} now) before the "
             "alpha were two standard errors from zero. It is arithmetic, not a promise: it does "
             "not say the alpha exists or that it will continue."
         ),
@@ -1920,12 +1923,14 @@ LABELS: dict[str, dict[str, str]] = {
             "the plain beta misses it. The alpha with this correction is {alpha} a year."
         ),
         "skill_timing_up": (
-            "The fund had more market exposure before rises than before falls (Treynor and "
-            "Mazuy, t = {t}). Net of that, the selection alpha is {alpha} a year."
+            "The fund gained more in months of big market moves than its beta explains (Treynor "
+            "and Mazuy, t = {t}): good timing or option-like positions do this. Net of that, the "
+            "selection alpha is {alpha} a year."
         ),
         "skill_timing_down": (
-            "The fund had less market exposure before rises than before falls (Treynor and "
-            "Mazuy, t = {t}): its timing took away from the return."
+            "The fund gained less in months of big market moves than its beta explains (Treynor "
+            "and Mazuy, t = {t}): poor timing or selling options does this, and it took away "
+            "from the return."
         ),
         "skill_nm": "No split into cash, market and alpha: {reason}.",
         "fund_bench_up": "Up capture: share of the benchmark's rises it takes",
@@ -5956,7 +5961,7 @@ def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> s
         if needed > NEEDED_MONTHS_SHOWN:
             text = labels["skill_needed_long"]
         else:
-            text = labels["skill_needed"].format(m=int(needed))
+            text = labels["skill_needed"].format(m=int(needed), n=months)
         out += f"<p class='muted'>{_e(text)}</p>"
     lagged = skill.get("lagged") or {}
     lag_t = _ev_value(lagged.get("lag_t_stat"))

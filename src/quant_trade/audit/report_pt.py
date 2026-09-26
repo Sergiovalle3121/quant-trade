@@ -479,8 +479,8 @@ REPORT: dict[str, Any] = {
         "skill_title": "Quanto é caixa, quanto é mercado e quanto sobra?",
         "skill_intro": (
             "Com {n} meses em comum com o índice, a rentabilidade média anual do fundo se divide "
-            "em três partes que somam o total, descontando o que as letras do Tesouro dos EUA de "
-            "3 meses pagavam."
+            "em três partes que somam o total: o que as letras do Tesouro dos EUA de 3 meses "
+            "pagavam, a exposição ao índice e o que sobra."
         ),
         "skill_intro_no_cash": (
             "Com {n} meses em comum com o índice, a rentabilidade média anual do fundo se divide "
@@ -494,14 +494,15 @@ REPORT: dict[str, Any] = {
             "Exposição ao índice (beta {beta} vezes o que o índice rendeu acima do caixa)"
         ),
         "skill_alpha": "O que sobra (alfa)",
-        "skill_total": "Rentabilidade média do fundo",
+        "skill_total": "Rentabilidade média do fundo (média aritmética)",
         "skill_share": (
             "A exposição ao índice explica {share} da rentabilidade do fundo; o caixa fica à parte."
         ),
         "skill_no_share": "Sem proporção da exposição: {reason}.",
         "skill_range": "Alfa ao ano: {alpha}, faixa de 95 % de {low} a {high} (t = {t}).",
         "skill_needed": (
-            "Com este alfa e este ruído, um histórico precisaria de uns {m} meses para o alfa "
+            "Com este alfa e este ruído, um histórico precisaria de uns {m} meses no total (hoje "
+            "tem {n}) para o alfa "
             "ficar a dois erros padrão de zero. É uma conta, não uma promessa: não diz que o "
             "alfa exista nem que vá continuar."
         ),
@@ -517,12 +518,14 @@ REPORT: dict[str, Any] = {
             "{alpha} ao ano."
         ),
         "skill_timing_up": (
-            "O fundo teve mais exposição ao mercado antes das altas do que antes das quedas "
-            "(Treynor e Mazuy, t = {t}). Descontado isso, o alfa de seleção é {alpha} ao ano."
+            "O fundo ganhou mais nos meses de mercado muito agitado do que o seu beta explica "
+            "(Treynor e Mazuy, t = {t}): isso vem de acertar o momento ou de ter posições com "
+            "forma de opção. Descontado isso, o alfa de seleção é {alpha} ao ano."
         ),
         "skill_timing_down": (
-            "O fundo teve menos exposição ao mercado antes das altas do que antes das quedas "
-            "(Treynor e Mazuy, t = {t}): o momento de entrar e sair tirou do retorno."
+            "O fundo ganhou menos nos meses de mercado muito agitado do que o seu beta explica "
+            "(Treynor e Mazuy, t = {t}): isso vem de errar o momento ou de vender opções, e "
+            "tirou rentabilidade."
         ),
         "skill_nm": "Sem divisão entre caixa, mercado e alfa: {reason}.",
         "fund_bench_up": "Captura na alta: parte das altas do índice que o fundo acompanha",
