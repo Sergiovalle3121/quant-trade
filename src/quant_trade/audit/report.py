@@ -665,6 +665,11 @@ LABELS: dict[str, dict[str, str]] = {
             "equilibrio (0 y 1): con estas operaciones no se puede distinguir el sistema de uno "
             "que ni gana ni pierde por operación."
         ),
+        "ranges_below": (
+            "El rango de la media por operación o el del factor de beneficio queda entero por "
+            "debajo del punto de equilibrio (0 y 1): con estas operaciones el sistema pierde por "
+            "operación, y el azar no alcanza a explicarlo."
+        ),
         "ranges_open": "sin límite",
         "lo_line": (
             "Sharpe corregido por autocorrelación (Lo, 2002): {lo}, frente a {plain} del "
@@ -1684,6 +1689,11 @@ LABELS: dict[str, dict[str, str]] = {
             "The range of the average per trade or of the profit factor includes break-even (0 "
             "and 1): with these trades the system cannot be told apart from one that neither "
             "wins nor loses per trade."
+        ),
+        "ranges_below": (
+            "The range of the average per trade or of the profit factor lies wholly below "
+            "break-even (0 and 1): with these trades the system loses per trade, and chance does "
+            "not explain it."
         ),
         "ranges_open": "no limit",
         "lo_line": (
@@ -3419,8 +3429,14 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     # favour. A missing upper bound on the factor is an open end (above 1).
     average_even = low is not None and high is not None and low <= 0 <= high
     factor_even = factor_low is not None and factor_low <= 1 <= (factor_high or math.inf)
+    average_below = high is not None and high < 0
+    factor_below = factor_high is not None and factor_high < 1
     if average_even or factor_even:
+        # When one range straddles break-even and the other lies below it, the
+        # straddle is the cautious reading.
         out += f"<p>{_e(labels['ranges_zero'])}</p>"
+    elif average_below or factor_below:
+        out += f"<p>{_e(labels['ranges_below'])}</p>"
     return out
 
 

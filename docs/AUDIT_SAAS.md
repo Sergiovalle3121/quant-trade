@@ -2524,7 +2524,9 @@ How the report shows them (ES, EN and PT):
 - "How much of this could be chance?" under the trade statistics: the three
   ranges side by side, and one line when the range of the average per trade
   includes zero or the profit factor's includes one (either is enough, so a
-  disagreement between them never stays silent in the file's favour). The
+  disagreement between them never stays silent in the file's favour). When a
+  range lies wholly below break-even (and neither straddles it), one line says
+  the system loses per trade with these trades and chance does not explain it. The
   intro calls it a 95 % range of values consistent with the trades, not a
   prediction.
 - Under the significance table, Lo's Sharpe only when it is lower than the

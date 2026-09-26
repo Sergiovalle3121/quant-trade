@@ -83,6 +83,25 @@ def test_a_range_across_break_even_says_so() -> None:
     assert labels["ranges_open"] in shown and "inf" not in shown
 
 
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_range_wholly_below_break_even_says_so(locale: str) -> None:
+    labels = report.LABELS[locale]
+    ranges = {
+        "status": "MEASURED",
+        "trades": 60,
+        "win_rate": {"low": measured(0.2), "high": measured(0.35)},
+        "expectancy": {"low": measured(-12.3), "high": measured(-4.1)},
+        "profit_factor": {"low": measured(0.4), "high": measured(0.8)},
+    }
+    shown = html.unescape(report._ranges_html(ranges, labels))
+    assert labels["ranges_below"] in shown and labels["ranges_zero"] not in shown
+    assert find_claims(shown) == []
+    # One range below, the other straddling: the straddle is the cautious reading.
+    ranges["profit_factor"]["high"] = measured(1.1)
+    shown = html.unescape(report._ranges_html(ranges, labels))
+    assert labels["ranges_zero"] in shown and labels["ranges_below"] not in shown
+
+
 def test_lo_sharpe_is_shown_only_when_it_is_lower() -> None:
     labels = report.LABELS["en"]
     lower = {"autocorrelation_adjusted": {"sharpe": measured(1.2), "lag1": measured(0.41)}}

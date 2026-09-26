@@ -955,6 +955,11 @@ REPORT: dict[str, Any] = {
             "(0 e 1): com estas operações não é possível distinguir o sistema de um que nem "
             "ganha nem perde por operação."
         ),
+        "ranges_below": (
+            "A faixa da média por operação ou a do fator de lucro fica inteira abaixo do ponto "
+            "de equilíbrio (0 e 1): com estas operações o sistema perde por operação, e o acaso "
+            "não explica isso."
+        ),
         "ranges_open": "sem limite",
         "lo_line": (
             "Sharpe corrigido pela autocorrelação (Lo, 2002): {lo}, frente a {plain} do cálculo "
