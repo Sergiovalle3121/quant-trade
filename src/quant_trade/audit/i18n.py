@@ -1129,6 +1129,80 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("fewer than ten closed trades", "menos de diez operaciones cerradas"),
     ("fewer than fifty returns", "menos de cincuenta retornos"),
     (
+        "average yearly return split into cash, exposure to the benchmark (beta times its "
+        "return over cash) and what is left (alpha); the three add up to the fund's average",
+        "retorno anual promedio repartido entre efectivo, exposición al índice de referencia "
+        "(beta por su retorno sobre el efectivo) y lo que queda (alfa); las tres partes suman "
+        "el promedio del fondo",
+    ),
+    (
+        "cash is the 3-month US Treasury bill (FRED DTB3, converted to an annual yield)",
+        "el efectivo es la letra del Tesoro de EE. UU. a 3 meses (FRED DTB3, convertida a "
+        "rendimiento anual)",
+    ),
+    (
+        "no cash rate was available, so cash is taken as zero and the alpha also holds "
+        "(1 - beta) times what cash paid",
+        "no había una tasa de efectivo disponible, así que el efectivo se toma como cero y el "
+        "alfa incluye también (1 - beta) veces lo que pagó el efectivo",
+    ),
+    (
+        "exposure with last month's benchmark return added (Dimson, 1979); late or smoothed "
+        "prices hide part of the exposure from the plain beta",
+        "exposición sumando el retorno del índice del mes anterior (Dimson, 1979); los precios "
+        "tardíos o suavizados esconden parte de la exposición a la beta simple",
+    ),
+    (
+        "squared benchmark term (Treynor and Mazuy, 1966); above zero, the fund held more "
+        "of the market before rises than before falls",
+        "término del índice al cuadrado (Treynor y Mazuy, 1966); por encima de cero, el fondo "
+        "tuvo más mercado antes de las subidas que antes de las caídas",
+    ),
+    (
+        "alpha over its cautious standard error (the largest of HC3, Newey-West and one "
+        "widened for autocorrelated misses); beyond about 2 it is unlikely to be chance",
+        "alfa entre su error estándar prudente (el mayor entre HC3, Newey-West y uno ampliado "
+        "por errores autocorrelacionados); por encima de 2, más o menos, es poco probable que "
+        "sea casualidad",
+    ),
+    (
+        "95 % range of the yearly alpha, cautious standard error and Student's t",
+        "rango al 95 % del alfa anual, con error estándar prudente y t de Student",
+    ),
+    (
+        "months a record with this alpha and this noise would need before the alpha is two "
+        "standard errors from zero",
+        "meses que necesitaría un historial con este alfa y este ruido para que el alfa quede "
+        "a dos errores estándar de cero",
+    ),
+    (
+        "fewer than 36 months shared with the benchmark",
+        "menos de 36 meses en común con el índice de referencia",
+    ),
+    ("the alpha is not above zero", "el alfa no es mayor que cero"),
+    ("already two standard errors from zero", "ya está a dos errores estándar de cero"),
+    (
+        "the exposure to the benchmark is not two standard errors from zero, so the split is "
+        "not shown as a share",
+        "la exposición al índice de referencia no está a dos errores estándar de cero, así que "
+        "el reparto no se muestra como proporción",
+    ),
+    ("beta over its cautious standard error", "beta entre su error estándar prudente"),
+    (
+        "the benchmark's returns take too few distinct values for the regressions",
+        "los retornos del índice de referencia toman muy pocos valores distintos para las "
+        "regresiones",
+    ),
+    ("the series are not on the same months", "las series no están en los mismos meses"),
+    (
+        "the fund's average return is not above zero",
+        "el retorno promedio del fondo no es mayor que cero",
+    ),
+    (
+        "the fund moves exactly with the benchmark",
+        "el fondo se mueve exactamente igual que el índice de referencia",
+    ),
+    (
         "the uploaded returns in random order: the same Sharpe, volatility and final result, "
         "only the order changes",
         "los retornos aportados en orden al azar: el mismo Sharpe, la misma volatilidad y el "
