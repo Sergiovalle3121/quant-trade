@@ -369,3 +369,148 @@ built: it needs a provider choice, a cost and a privacy review of what the
 anchored hash reveals (nothing but the hash, by construction). The chain's
 entries are already flat strings and integers so an anchor can be added
 without changing the recipe.
+
+## Pages (`track_seal_pages.py`, `track_seal_copy.py`)
+
+Built as PR C2, behind three constants in `track_seal_pages.py` (never a
+Railway variable): `TRACK_SEAL_ENABLED = False` (the account pages, the
+examples and the owner panel), `TRACK_SEAL_PUBLIC_ENABLED = False` (the
+public page, its badge and `chain.json`, after the legal review) and
+`TRACK_SEAL_PUBLIC_PT_ENABLED = False` (the Portuguese public page, after a
+review in Brazil). While the first is off `register` mounts nothing and
+every path below answers 404. `register` is called from `web.create_app`
+with the app's own closures (`session`, `signed_in_action` with its CSRF
+check and rate limit, `panel_failures`, `settings`, `store`, `slots`); the
+only things it imports from `web` are the slot wait (`_take_slot`), the
+address reader (`_client_ip`) and the "busy" message. Every page is
+`noindex`, out of `sitemap.xml`, without index, list or search, and passes
+`guard.assert_report_clean` in Spanish, English and Portuguese.
+
+Words live in `track_seal_copy.COPY` with identical keys in `es`, `en` and
+`pt` (`tests/test_track_seal_copy.py` also renders every template with
+extreme figures, checks the forbidden words of design §8 with the fixed
+notices' exact phrases allowed, and that the brand comes only from
+`seo.BRAND`). On screen the feature is "Historial continuo" / "Continuous
+track record" / "Histórico contínuo"; the badge is "insignia" / "badge" /
+"insígnia"; the words sello, auténtico, verificado, inalterable, "para
+siempre", "demuestra" and the imperatives never appear.
+
+### Account pages (signed-in only, like `/cuenta`)
+
+| ES | EN | PT | shows |
+|---|---|---|---|
+| `/cuenta/historiales` | `/account/records` | `/pt/conta/historicos` | the account's records: status, opened date (the service's clock), uploads count, last upload and freshness ("Al día" / "sin cargas desde <fecha>"), the class of the stretch after the opening or "aún sin clase: N de M observaciones", the "Tiempo para saber" line, the whole file's class with "incluye lo anterior a la apertura, que no está cubierto", events with detail, method version and chain head, and every action |
+| `/cuenta/historiales/{id}` | `/account/records/{id}` | `/pt/conta/historicos/{id}` | the same card plus the uploads table (position, date, cut-off, closed operations, cash movements, hash) |
+
+Actions are POST forms with the session's CSRF token through the app's
+`_signed_in_action`; the action segments are Spanish in every language, as
+the account pages do (`/account/records/abrir`):
+
+- `POST {records}/abrir` (`audit_id`): open a record from one of the
+  account's eligible reports (`service.eligible_reports`: own `via`, paid,
+  not purged, a supported statement or a monthly table whose digest still
+  matches). The select lists only those. Re-import and re-audit run under
+  the audit slot, like an upload, with `settings.bootstrap_samples`.
+- `POST {records}/{id}/cargar` (`audit_id`): add an upload from an eligible
+  report not yet linked; a mismatch redirects with `done=mismatch&n=N` and
+  the page says "Esta carga no coincide con la anterior en N operaciones;
+  puede ser un ajuste del bróker o una edición."
+- `POST {records}/{id}/terminar`, `POST {records}/{id}/borrar` (without
+  `confirm=yes` it answers the confirmation page; with it, deletes),
+  `POST {records}/{id}/publicar` (requires the checkbox `holder=on`: "Soy
+  titular de esta cuenta de trading o tengo su permiso para publicar este
+  historial"), `POST {records}/{id}/despublicar`.
+- Every refusal code of the service and the core becomes a sentence per
+  language (`refusal_<code>` in the copy), shown from `?error=<code>`;
+  unknown codes are ignored. Flashes come from `?done=<kind>`.
+- Once published (and while `TRACK_SEAL_PUBLIC_ENABLED`), the card shows the
+  public link and the badge code in HTML, BBCode and Markdown. Absolute
+  links use `AUDIT_BASE_URL` only; with the default base URL they are
+  relative, never built from the `Host` header.
+- A mismatch's detail lists kinds and counts of operations (record kind and
+  field names); never a trade, a ticket or a symbol. The `ref` the table
+  stores is not shown.
+
+### Public page (only with `TRACK_SEAL_PUBLIC_ENABLED`)
+
+`/historial/{public_id}` (EN `/record/{public_id}`, PT
+`/pt/historico/{public_id}` only with `TRACK_SEAL_PUBLIC_PT_ENABLED`), plus
+`/{prefix}/{public_id}/badge.svg` (`?lang=`) and `/{prefix}/{public_id}/chain.json`.
+Built from `service.public_record`, an allow-list: the notice (the record's
+equivalent of `pages.VERIFICATION_NOTICE`), "público desde el <fecha> (<N>
+días después de abrirse)" and the unpublished periods, opened date, uploads
+count, freshness, method and recipe versions, chain head, the class of the
+stretch after the opening at the top (or "en curso"), observations,
+"Tiempo para saber", the whole file's class with its note, events with only
+date, kind and count (opened, uploaded, mismatch, ended, published,
+unpublished; hidden/shown stay private), the calibration caveat "cambios
+aún no calibrados con re-exportaciones reales" while
+`REAL_PAIRS_DOCUMENTED` (15, from the corpus regression above) is below
+`MIN_REAL_PAIRS` (5), "Historiales abiertos por esta cuenta: N. Rigor no ve
+otras cuentas de la misma persona.", "pagado por quien sube el archivo;
+pagar no cambia la clase", the limits, the `chain.json` link, the badge
+and, at the foot, "¿Te pasaron otro historial? Revísalo en Rigor" (a link
+to the upload form). Every figure carries MEASURED, DECLARED or
+NOT_MEASURED. Nothing else: no performance figure, name, file, account,
+broker, internal id, e-mail or outbound link (`tests/test_track_seal_pages.py`
+greps the page, the badge and the chain for the fixture's account number,
+name, robot, broker, symbols, tickets, the account's e-mail and the internal
+ids). Missing, hidden, unpublished or never published: the same 404. A
+withdrawn record that was once published answers only "retirado por quien
+lo abrió el <fecha>". When `verify_chain` fails the page attributes it to
+an error of the service, hides the class and `chain.json` says
+`chain_ok: false`.
+
+The badge (`record_badge_svg`) keeps the shape of the `/v` badge: the
+class letter (or "·" and "en curso"), "Rigor · Historial continuo · <clase>",
+the last upload date, the public id and `pages.BADGE_NOTICE` intact.
+
+### Examples (invented data, banner "Ejemplo con datos inventados; no es el historial de nadie")
+
+- `/historial/ejemplo`, `/record/sample`, `/pt/historico/exemplo`,
+  registered before the public ids and available with
+  `TRACK_SEAL_ENABLED` alone: a record with one mismatch event, a stale
+  stretch ("sin cargas desde 2026-06-20" at the fixed clock
+  `EXAMPLE_NOW`), a class B stretch, a time-to-know line and an unpublished
+  period. Its data is `track_seal_pages.EXAMPLE_VIEW`.
+- `/coherencia/ejemplo`, `/consistency/sample`, `/pt/coerencia/exemplo`: an
+  invented MT4 statement embedded in the module (`SYNTHETIC_STATEMENT`, four
+  trades and a deposit; no fixture is read at runtime) and the same
+  statement with three edits made with `forensics.edit`: a duplicated
+  ticket an hour later (noticed: the totals and the duplicated ticket), a
+  changed result with the summary left alone (noticed: the totals and the
+  sign of the result against the prices), and a deleted trade whose totals
+  are rewritten by hand (not noticed: the limit, "un archivo editado con
+  cuidado pasa estas pruebas"). The battery runs once per process
+  (`coherence_results`). Check ids appear only inside a `<details>` block;
+  the headlines are sentences. No calibration cell is granted yet, so every
+  trace is INFO ("es información, no una señal").
+
+### Owner: `/panel/historiales`
+
+Protected exactly like `/panel`: the key travels in the POST body, is
+compared in constant time, wrong keys count in the same `panel_failures`
+log with the same ceiling, and without `AUDIT_ADMIN_KEY` the path is 404.
+It lists every record (public id, opened date, status, published, hidden,
+chain verification, uploads) and offers only hide / unhide (reversible,
+events `hidden` / `shown`) while a complaint is looked at; a broken chain
+shows a warning. No e-mails, no ending, no deleting.
+
+### Tests
+
+`tests/test_track_seal_pages.py` (offline, `TestClient`, switches
+monkeypatched before `create_app`): 404 everywhere with the switch off;
+public routes wait for their switches; account pages need a session; a
+wrong CSRF token writes nothing; the whole flow (open from a paid own
+report through the form, a second upload made from the fixture with
+`forensics.edit`, the mismatch event and its detail, refusal sentences,
+publish with and without the checkbox, the public page's allow-list, the
+badge's content type and notice, `chain.json` recomputed with `hashlib` and
+`json`, unpublish, end, delete with confirmation, the tombstone); the
+English and Portuguese account pages; every refusal sentence in every
+language; foreign or unknown reports; stale freshness; a broken chain on
+the public page, the account page, `chain.json` and the panel; one public
+record per set of operations; the examples in three languages with the
+banner; the coherence variants; the panel's key, hide and unhide; sitemap
+and robots; brand and guard on every page. `tests/test_track_seal_copy.py`
+covers the copy.

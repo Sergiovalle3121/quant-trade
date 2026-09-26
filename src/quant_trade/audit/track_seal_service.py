@@ -61,6 +61,7 @@ __all__ = [
     "SUPPORTED_FORMATS",
     "TOO_FEW_OBSERVATIONS",
     "Added",
+    "EligibleReport",
     "EventView",
     "Opened",
     "OperationView",
@@ -70,8 +71,10 @@ __all__ = [
     "SealedStretch",
     "UploadView",
     "add_upload",
+    "all_records",
     "chain_json",
     "delete_record",
+    "eligible_reports",
     "end_record",
     "freshness",
     "get_record",
@@ -79,6 +82,7 @@ __all__ = [
     "list_records",
     "open_record",
     "public_record",
+    "public_seal_id",
     "publish",
     "quota",
     "record_events",
@@ -327,6 +331,18 @@ class UploadView:
     trades_sha256: str
     previous_hash: str
     hash: str
+
+
+@dataclass(frozen=True)
+class EligibleReport:
+    """One of the account's reports a record can start from or continue
+    with: own, paid, not purged, with a supported statement or a monthly
+    table whose stored digest still matches."""
+
+    audit_id: str
+    created_at: str
+    overall_class: str
+    source_format: str
 
 
 @dataclass(frozen=True)
@@ -684,17 +700,26 @@ def _upload_rows(store: Any, conn: Any, seal_id: str) -> list[Any]:
     )
 
 
+#: Events written in the same second keep the order they can only happen in.
+_EVENT_RANK = {
+    "opened": 0,
+    "uploaded": 1,
+    "mismatch": 1,
+    "published": 2,
+    "unpublished": 3,
+    "hidden": 4,
+    "shown": 5,
+    "ended": 6,
+}
+
+
 def _event_rows(store: Any, conn: Any, seal_id: str) -> list[Any]:
     events = store.track_seal_events
-    return list(
-        conn.execute(
-            store._sa.select(events)
-            .where(events.c.seal_id == seal_id)
-            .order_by(events.c.at, events.c.id)
-        )
-        .mappings()
-        .all()
+    rows = list(
+        conn.execute(store._sa.select(events).where(events.c.seal_id == seal_id)).mappings().all()
     )
+    rows.sort(key=lambda row: (row["at"], _EVENT_RANK.get(row["kind"], 9), row["id"]))
+    return rows
 
 
 def _insert_event(
@@ -1310,6 +1335,63 @@ def list_records(store: Any, account_id: str) -> list[RecordView]:
             .all()
         )
     return [_record_view(row) for row in found]
+
+
+def all_records(store: Any) -> list[RecordView]:
+    """Every record of every account, newest first, for the owner's panel."""
+    seals = store.track_seals
+    with store.engine.connect() as conn:
+        found = (
+            conn.execute(store._sa.select(seals).order_by(seals.c.opened_at.desc(), seals.c.id))
+            .mappings()
+            .all()
+        )
+    return [_record_view(row) for row in found]
+
+
+def eligible_reports(store: Any, account_id: str) -> tuple[EligibleReport, ...]:
+    """The account's reports that ``open_record`` or ``add_upload`` would
+    accept today, newest first (the same checks, without writing)."""
+    found: list[EligibleReport] = []
+    for item in store.account_audits_list(account_id):
+        if not item.own or not item.paid or item.purged:
+            continue
+        source = _own_source(store, account_id, item.audit_id)
+        if isinstance(source, Refusal):
+            continue
+        found.append(
+            EligibleReport(
+                audit_id=item.audit_id,
+                created_at=item.created_at,
+                overall_class=item.overall_class,
+                source_format=source.source_format,
+            )
+        )
+    return tuple(found)
+
+
+def public_seal_id(store: Any, public_id: str) -> str | None:
+    """The record id behind a public id, only while its page is public:
+    ``None`` (the same 404) when missing, withdrawn, hidden or unpublished."""
+    seals = store.track_seals
+    with store.engine.connect() as conn:
+        row = (
+            conn.execute(
+                store._sa.select(
+                    seals.c.id, seals.c.status, seals.c.hidden_at, seals.c.published
+                ).where(seals.c.public_id == public_id)
+            )
+            .mappings()
+            .first()
+        )
+    if (
+        row is None
+        or row["status"] == store_hooks.STATUS_WITHDRAWN
+        or row["hidden_at"]
+        or not row["published"]
+    ):
+        return None
+    return str(row["id"])
 
 
 def get_record(store: Any, seal_id: str, *, account_id: str | None = None) -> RecordView | None:
