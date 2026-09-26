@@ -1065,14 +1065,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "the levels in that currency divided by that country's consumer price index (IMF "
-            "CPI dataset; Eurostat's harmonised index for the euro) of each point's month, or "
-            "the latest month published"
+            "the levels in that currency divided by that country's official consumer price index "
+            "of each point's month, or the latest month published"
         ),
         (
-            "los saldos en esa moneda divididos entre el índice de precios al consumidor de ese "
-            "país (conjunto de IPC del FMI; índice armonizado de Eurostat para el euro) del mes "
-            "de cada punto, o del último mes publicado"
+            "los saldos en esa moneda divididos entre el índice oficial de precios al consumidor "
+            "de ese país del mes de cada punto, o del último mes publicado"
         ),
     ),
     (

@@ -1,9 +1,9 @@
 """Public daily closes of a few widely traded markets, read from FRED.
 
-Consumer prices outside the US come from the IMF's public CPI dataset (the
-national index each statistics office publishes, compiled by the IMF), where
-FRED's copies stopped updating; they are read the same way and kept the same
-way.
+Consumer prices outside the US come from each official publisher whose terms
+allow reuse in a paid service with attribution (Eurostat, the UK's ONS, the
+Bank of Canada, the Banco Central do Brasil), since FRED's copies of those
+indexes stopped updating; they are read the same way and kept the same way.
 
 A report on a strategy that trades the S&P 500, the Nasdaq 100 or bitcoin
 can say what simply holding that market did over the same days. The closes
@@ -20,6 +20,7 @@ tests pass a stub, and ``tests/conftest.py`` blocks :func:`_download`.
 from __future__ import annotations
 
 import io
+import json
 import math
 import re
 import threading
@@ -33,13 +34,31 @@ import pandas as pd
 
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 FRED_PAGE = "https://fred.stlouisfed.org/series/{series}"
-#: The IMF's public CPI dataset (SDMX), monthly, as CSV; no key.
-IMF_CSV = (
-    "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,CPI/{series}"
-    "?startPeriod=1990-01&detail=dataonly"
-)
-IMF_ACCEPT = "application/vnd.sdmx.data+csv;version=1.0.0"
-IMF_PAGE = "https://data.imf.org/en/datasets/IMF.STA:CPI"
+#: The User-Agent sent to the providers other than FRED.
+PROVIDER_AGENT = "Rigor-audit/1.0 (public statistics reader)"
+#: Where each non-FRED provider serves a series (all public, no key) and the
+#: page a reader can check it on.
+PROVIDER_URLS: dict[str, tuple[str, str]] = {
+    "eurostat": (
+        "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_minr"
+        "?geo={series}&coicop18=TOTAL&unit=I25&format=JSON",
+        "https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_minr/default/table",
+    ),
+    "ons": (
+        "https://www.ons.gov.uk/generator?format=csv"
+        "&uri=/economy/inflationandpriceindices/timeseries/{series}/mm23",
+        "https://www.ons.gov.uk/economy/inflationandpriceindices/timeseries/{series}/mm23",
+    ),
+    "boc": (
+        "https://www.bankofcanada.ca/valet/observations/{series}/csv",
+        "https://www.bankofcanada.ca/rates/price-indexes/cpi/",
+    ),
+    "bcb": (
+        "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json",
+        "https://dadosabertos.bcb.gov.br/dataset/{series}-indice-nacional-de-precos-ao-"
+        "consumidor-amplo-ipca",
+    ),
+}
 #: Seconds a whole FRED read may take before it is given up.
 TIMEOUT = 5.0
 #: Largest reply read (the longest series is about 0.3 MB).
@@ -71,12 +90,14 @@ class Asset:
     floor: float | None = None
     #: A rate that can go below zero (some central banks' rates did).
     negative: bool = False
-    #: Where the series is read: ``fred`` or ``imf``.
+    #: Where the series is read: ``fred`` or a key of ``PROVIDER_URLS``.
     provider: str = "fred"
 
     @property
     def source_url(self) -> str:
-        return IMF_PAGE if self.provider == "imf" else FRED_PAGE.format(series=self.series)
+        if self.provider in PROVIDER_URLS:
+            return PROVIDER_URLS[self.provider][1].format(series=self.series)
+        return FRED_PAGE.format(series=self.series)
 
 
 #: A futures contract month: a month code and year (``NQZ4``) or ``MMYY`` (``NQ 12-24``).
@@ -176,31 +197,32 @@ EUR_CASH_HISTORY = Asset(
     floor=MIN_LOCAL_RATE,
     negative=True,
 )
-#: Consumer prices in each currency of ``FX`` (all items, monthly, not seasonally
-#: adjusted): each country's national index from the IMF's CPI dataset, and the
-#: euro area's harmonised index (Eurostat's HICP) from FRED. Brazil's index runs
-#: from tiny values in 1990 (hyperinflation), so only a ceiling applies.
+#: Consumer prices in the currencies of ``FX`` whose official index is current
+#: and may be reused in a paid service with attribution (all items, monthly, not
+#: seasonally adjusted): the euro area's and Switzerland's harmonised indexes
+#: (Eurostat; the euro area's through FRED), the UK's CPI (ONS, Open Government
+#: Licence), Canada's CPI (Statistics Canada, through the Bank of Canada) and
+#: Brazil's IPCA (IBGE, through the Banco Central do Brasil, monthly changes
+#: chained into an index). Mexico's and Japan's official indexes need a
+#: registered key, so those currencies have none yet.
 MAX_PRICE_INDEX = 10_000_000.0
-LOCAL_CPI: tuple[Asset, ...] = (
-    *(
-        Asset(
-            f"cpi_{code.lower()}",
-            code,
-            f"{country}.CPI._T.IX.M",
-            re.compile(r"(?!)"),
-            ceiling=MAX_PRICE_INDEX,
-            provider="imf",
-        )
-        for code, country in (
-            ("MXN", "MEX"),
-            ("BRL", "BRA"),
-            ("GBP", "GBR"),
-            ("JPY", "JPN"),
-            ("CAD", "CAN"),
-            ("CHF", "CHE"),
-        )
-    ),
-    Asset("cpi_eur", "EUR", "CP0000EZ19M086NEST", re.compile(r"(?!)"), ceiling=10_000.0, floor=1.0),
+LOCAL_CPI: tuple[Asset, ...] = tuple(
+    Asset(
+        f"cpi_{code.lower()}",
+        code,
+        series,
+        re.compile(r"(?!)"),
+        ceiling=MAX_PRICE_INDEX,
+        floor=1.0,
+        provider=provider,
+    )
+    for code, series, provider in (
+        ("EUR", "CP0000EZ19M086NEST", "fred"),
+        ("GBP", "d7bt", "ons"),
+        ("CAD", "V41690973", "boc"),
+        ("CHF", "CH", "eurostat"),
+        ("BRL", "433", "bcb"),
+    )
 )
 #: Every series the service keeps in memory.
 SERIES: dict[str, Asset] = {
@@ -269,17 +291,53 @@ def parse_fred_csv(text: str, *, rate: bool = False, negative: bool = False) -> 
     return series.sort_index()
 
 
-def parse_imf_csv(text: str) -> pd.Series:
-    """The IMF's SDMX CSV (``TIME_PERIOD`` as ``2024-M01``, ``OBS_VALUE``) as a
-    float series indexed by each month's first day; blanks and values that are
-    not above zero dropped."""
-    frame = pd.read_csv(io.StringIO(text), usecols=["TIME_PERIOD", "OBS_VALUE"], dtype=str)
-    months = frame["TIME_PERIOD"].str.strip().str.replace("-M", "-", regex=False)
-    stamps = pd.to_datetime(months, format="%Y-%m", errors="coerce")
-    values = pd.to_numeric(frame["OBS_VALUE"], errors="coerce")
-    series = pd.Series(values.to_numpy(dtype=float), index=pd.DatetimeIndex(stamps))
-    series = series[series.index.notna() & np.isfinite(series) & (series > 0)]
+#: Brazil's monthly changes are chained from the Real plan on, after the
+#: hyperinflation years; a month outside these bounds (in percent) is broken.
+BCB_START = "1995-01-01"
+MAX_MONTHLY_CHANGE = 50.0
+
+
+def _monthly(stamps: pd.Series, values: pd.Series) -> pd.Series:
+    series = pd.Series(
+        pd.to_numeric(values, errors="coerce").to_numpy(dtype=float),
+        index=pd.DatetimeIndex(pd.to_datetime(stamps, errors="coerce")),
+    )
+    series = series[series.index.notna() & np.isfinite(series)]
     return series[~series.index.duplicated(keep="last")].sort_index()
+
+
+def parse_provider(text: str, provider: str) -> pd.Series:
+    """A monthly price index from one provider's reply, indexed by each month's
+    first day; blanks and values that are not above zero dropped."""
+    if provider == "eurostat":
+        data = json.loads(text)
+        times = data["dimension"]["time"]["category"]["index"]
+        by_position = {int(position): value for position, value in data["value"].items()}
+        stamps = pd.Series(sorted(times, key=times.get))
+        values = pd.Series([by_position.get(int(times[t])) for t in stamps], dtype=float)
+        series = _monthly(stamps + "-01", values)
+    elif provider == "ons":
+        rows = re.findall(r'^"(\d{4}) ([A-Z]{3})","([^"]*)"\s*$', text, flags=re.M)
+        stamps = pd.Series([f"01 {month} {year}" for year, month, _ in rows])
+        series = _monthly(
+            pd.Series(pd.to_datetime(stamps, format="%d %b %Y", errors="coerce")),
+            pd.Series([value for *_, value in rows]),
+        )
+    elif provider == "boc":
+        body = text.split('"OBSERVATIONS"', 1)[1]
+        frame = pd.read_csv(io.StringIO(body.strip()), dtype=str)
+        series = _monthly(frame.iloc[:, 0], frame.iloc[:, 1])
+    elif provider == "bcb":
+        frame = pd.DataFrame(json.loads(text))
+        stamps = pd.Series(pd.to_datetime(frame["data"], format="%d/%m/%Y", errors="coerce"))
+        changes = _monthly(stamps, frame["valor"])
+        changes = changes[changes.index >= pd.Timestamp(BCB_START)]
+        if bool((changes.abs() > MAX_MONTHLY_CHANGE).any()):
+            raise ValueError("monthly change out of range")
+        series = 100.0 * (1.0 + changes / 100.0).cumprod()
+    else:
+        raise ValueError(f"unknown provider {provider}")
+    return series[series > 0]
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -293,16 +351,18 @@ _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def _download(series: str, provider: str = "fred") -> str:
-    """One FRED (or IMF) series as text, within about ``TIMEOUT`` seconds in all
+    """One FRED (or other provider's) series as text, within about ``TIMEOUT`` seconds in all
     and at most ``MAX_BYTES``. ``read1`` returns whatever one receive brings, so
     the deadline is checked after every receive and a server that trickles
     bytes is cut off (each receive is itself bounded by the socket timeout)."""
-    if provider == "imf":
-        request = urllib.request.Request(
-            IMF_CSV.format(series=series), headers={"Accept": IMF_ACCEPT}
-        )
+    if provider in PROVIDER_URLS:
+        url = PROVIDER_URLS[provider][0].format(series=series)
     else:
-        request = urllib.request.Request(FRED_CSV.format(series=series))
+        url = FRED_CSV.format(series=series)
+    # FRED gets Python's default User-Agent (it stalls some custom ones); the ONS
+    # refuses that one, so the other providers get a plain name.
+    headers = {"User-Agent": PROVIDER_AGENT} if provider in PROVIDER_URLS else {}
+    request = urllib.request.Request(url, headers=headers)
     deadline = time.monotonic() + TIMEOUT
     chunks: list[bytes] = []
     size = 0
@@ -378,14 +438,14 @@ class MarketData:
         if not lock.acquire(blocking=False):
             return False
         try:
-            # An injected reader takes the series id alone; the IMF one also its provider.
+            # An injected reader takes the series id alone; the real one also its provider.
             text = (
                 self._download(asset.series)
                 if self._download is not None
                 else _download(asset.series, asset.provider)
             )
-            if asset.provider == "imf":
-                series = parse_imf_csv(text)
+            if asset.provider in PROVIDER_URLS:
+                series = parse_provider(text, asset.provider)
             else:
                 series = parse_fred_csv(text, rate=asset.rate, negative=asset.negative)
             if len(series) < 2:
@@ -428,5 +488,5 @@ __all__ = [
     "asset_of",
     "dominant_asset",
     "parse_fred_csv",
-    "parse_imf_csv",
+    "parse_provider",
 ]

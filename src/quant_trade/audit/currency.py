@@ -15,17 +15,17 @@ published (at most ``MAX_CPI_GAP_DAYS`` old; the index comes out about two
 weeks after its month ends).
 
 Each currency's row is followed by the same figures after that currency's own
-inflation: its levels divided by that country's consumer price index of each
-point's month (``market.LOCAL_CPI``: the national index from the IMF's CPI
-dataset, and Eurostat's harmonised index for the euro), or the latest month
-published, at most ``MAX_LOCAL_CPI_GAP_DAYS`` old (the IMF compiles each index
-a few weeks after the country publishes it). A currency whose prices do not
-cover the history keeps its row without the one after inflation.
+inflation: its levels divided by that country's official consumer price index
+of each point's month (``market.LOCAL_CPI``: the euro, the pound, the Canadian
+dollar, the Swiss franc and the real), or the latest month published, at most
+``MAX_CPI_GAP_DAYS`` old. A currency without such an index (the peso and the
+yen, whose official indexes need a registered key), or whose prices do not
+cover the history, keeps its row without the one after inflation.
 
 It runs when the account is in US dollars: when an imported report names the
 currency (``USD``, or ``USC`` for a cent account, whose ratios are the same), or
 when nothing names it, and then the note says the curve is read as dollars.
-When a report names one of the other currencies of ``market.FX``, the section
+When a report names one of the currencies of ``market.LOCAL_CPI``, the section
 shows the account in that currency and after that currency's inflation. Nothing
 here changes the class.
 """
@@ -49,8 +49,6 @@ MIN_YEAR_DAYS = 365
 MAX_GAP_DAYS = 7
 #: A consumer price index month older than this before a point is too stale.
 MAX_CPI_GAP_DAYS = 75
-#: The same for the other currencies' indexes, which reach the IMF later.
-MAX_LOCAL_CPI_GAP_DAYS = 125
 #: Each currency's consumer price index, by currency code.
 LOCAL_PRICES: dict[str, Asset] = {asset.label: asset for asset in LOCAL_CPI}
 #: Series quoted as US dollars per unit of the currency (the rest are units per dollar).
@@ -71,9 +69,8 @@ REAL_NOTE = (
     "month, or the latest month published; US inflation only"
 )
 LOCAL_REAL_NOTE = (
-    "the levels in that currency divided by that country's consumer price index (IMF CPI "
-    "dataset; Eurostat's harmonised index for the euro) of each point's month, or the "
-    "latest month published"
+    "the levels in that currency divided by that country's official consumer price index of "
+    "each point's month, or the latest month published"
 )
 ACCOUNT_NOTE = (
     "the account's own levels in its currency; return a year compounded over the calendar "
@@ -253,7 +250,7 @@ def _local_real(
     prices_seen = series.get(asset.key) if asset is not None else None
     if asset is None or prices_seen is None or prices_seen.empty:
         return {"status": "NOT_MEASURED", "reason": LOCAL_CPI_UNAVAILABLE}
-    prices = _asof(stamps, prices_seen, MAX_LOCAL_CPI_GAP_DAYS)
+    prices = _asof(stamps, prices_seen, MAX_CPI_GAP_DAYS)
     if prices is None:
         return {"status": "NOT_MEASURED", "reason": LOCAL_CPI_NOT_COVERED}
     out: dict[str, Any] = {

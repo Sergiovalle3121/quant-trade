@@ -213,6 +213,18 @@ COPY: dict[str, dict[str, object]] = {
             "Un informe no es una opinión legal, fiscal ni de inversión.",
         ],
         "refs_title": "Fuentes",
+        "data_title": "Datos públicos que usamos",
+        "data": [
+            "Tipos de cambio, tasas y precios de EE. UU., cierres de mercados y otras tasas de "
+            "efectivo: FRED, Banco de la Reserva Federal de St. Louis.",
+            "Precios al consumidor del euro y de Suiza: Eurostat.",
+            "Precios al consumidor del Reino Unido: Office for National Statistics, bajo la "
+            "Open Government Licence v3.0.",
+            "Precios al consumidor de Canadá: Banco de Canadá (IPC de Statistics Canada); estos "
+            "datos están disponibles gratis en bankofcanada.ca.",
+            "Precios al consumidor de Brasil: Banco Central do Brasil (IPCA del IBGE).",
+            "Todos se leen al generar el informe y no cambian la clase.",
+        ],
     },
     "en": {
         "eyebrow": "Methodology",
@@ -253,6 +265,18 @@ COPY: dict[str, dict[str, object]] = {
             "A report is not legal, tax or investment advice.",
         ],
         "refs_title": "Sources",
+        "data_title": "Public data we use",
+        "data": [
+            "Exchange rates, US rates and prices, market closes and other cash rates: FRED, "
+            "Federal Reserve Bank of St. Louis.",
+            "Consumer prices for the euro and Switzerland: Eurostat.",
+            "Consumer prices for the United Kingdom: Office for National Statistics, licensed "
+            "under the Open Government Licence v3.0.",
+            "Consumer prices for Canada: Bank of Canada (Statistics Canada's CPI); this data is "
+            "available free of charge at bankofcanada.ca.",
+            "Consumer prices for Brazil: Banco Central do Brasil (IBGE's IPCA).",
+            "All are read when the report is made and none changes the class.",
+        ],
     },
     "pt": {
         "eyebrow": "Metodologia",
@@ -296,6 +320,18 @@ COPY: dict[str, dict[str, object]] = {
             "Um relatório não é aconselhamento jurídico, fiscal nem de investimento.",
         ],
         "refs_title": "Fontes",
+        "data_title": "Dados públicos que usamos",
+        "data": [
+            "Cotações, taxas e preços dos EUA, fechamentos de mercados e outras taxas de caixa: "
+            "FRED, Federal Reserve Bank of St. Louis.",
+            "Preços ao consumidor do euro e da Suíça: Eurostat.",
+            "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
+            "Government Licence v3.0.",
+            "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
+            "dados estão disponíveis grátis em bankofcanada.ca.",
+            "Preços ao consumidor do Brasil: Banco Central do Brasil (IPCA do IBGE).",
+            "Todos são lidos ao gerar o relatório e nenhum muda a classe.",
+        ],
     },
 }
 

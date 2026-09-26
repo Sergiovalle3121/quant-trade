@@ -1378,23 +1378,33 @@ arbitrary dates) of its own month or the latest month published, at most 75 days
 old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. Each
 currency's row is followed by the same figures after that currency's own
 inflation (`market.LOCAL_CPI`): the levels in that currency divided by the
-country's consumer price index of each point's month, or the latest month
-published, at most 125 days old (`MAX_LOCAL_CPI_GAP_DAYS`: the IMF compiles
-each index a few weeks after the country publishes it). The indexes are the
-national ones from the IMF's public CPI dataset (SDMX CSV from
-`api.imf.org`, no key: `MEX`, `BRA`, `GBR`, `JPN`, `CAN`, `CHE`
-`.CPI._T.IX.M`), because FRED's OECD copies stopped updating in 2021-2025,
-and Eurostat's harmonised index for the euro area from FRED
-(`CP0000EZ19M086NEST`). A currency whose prices are missing or stale keeps
-its row without the one after inflation, and the note says so. It runs for a
-dollar account: an imported report that names `USD` or `USC` (or
-`USDT`/`USDC`, read at one dollar per coin, which the note says), or a file
-that names no currency, in which case a line says it is read as dollars.
-When a report names MXN, BRL, EUR, GBP, JPY, CAD or CHF, the section shows
-the account in that currency and after that currency's inflation, with the
-local inflation over the dates; without those prices it is NOT_MEASURED with
-the reason. Another named currency leaves it NOT_MEASURED. A price index
-reply above 10,000,000 is taken as broken.
+country's official consumer price index of each point's month, or the latest
+month published, at most 75 days old (`MAX_CPI_GAP_DAYS`). FRED's copies of
+these indexes stopped updating (2021-2025), so each comes from an official
+publisher whose terms allow reuse in a paid service with attribution, read at
+run time with no key: the euro area's HICP (Eurostat, through FRED,
+`CP0000EZ19M086NEST`), Switzerland's HICP (Eurostat API, `prc_hicp_minr`,
+`CH`), the UK's CPI (ONS time series `D7BT`, Open Government Licence v3.0),
+Canada's CPI (Statistics Canada's, through the Bank of Canada's Valet API,
+`V41690973`; the Bank asks paid services to say the data is free on its
+site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
+Central do Brasil's SGS series 433, monthly changes chained into an index
+from January 1995; a month beyond ±50 % refuses the reply). The IMF's CPI
+dataset, which covers every currency, needs written permission for
+commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
+official APIs need a registered key, so the peso and the yen show no row
+after inflation yet, and the note says so. Each row after inflation credits
+its source by name and link, as each licence asks; `/metodologia` lists
+them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
+refuses Python's default); FRED keeps the default. It runs for a dollar
+account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
+read at one dollar per coin, which the note says), or a file that names no
+currency, in which case a line says it is read as dollars. When a report
+names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+currency and after that currency's inflation, with the local inflation over
+the dates; without those prices it is NOT_MEASURED with the reason. Another
+named currency leaves it NOT_MEASURED. A price index reply below 1 or above
+10,000,000 is taken as broken.
 Needs 90 days of history. A reply above 10,000 for any of these series is
 taken as broken. It never changes the class.
 

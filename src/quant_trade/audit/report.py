@@ -32,7 +32,6 @@ from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
 from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
-from quant_trade.audit.market import IMF_PAGE
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
@@ -921,23 +920,30 @@ LABELS: dict[str, dict[str, str]] = {
             "La inflación local ({code}) en esas fechas fue de {total} en total ({yearly} al año)."
         ),
         "currency_note_local": (
-            "Después de su inflación: los saldos divididos entre el índice de precios al "
-            "consumidor del país de cada mes (el nacional, recopilado por el FMI; el armonizado "
-            "de Eurostat para el euro), o el del último mes publicado. El rendimiento al año se "
-            "muestra con al menos un año de historial. Fuente: precios de {source}, leídos al "
-            "generar el informe. No cambia la clase."
+            "Después de su inflación: los saldos divididos entre el índice oficial de precios al "
+            "consumidor del país de cada mes, o el del último mes publicado. El rendimiento al "
+            "año se muestra con al menos un año de historial. Datos leídos al generar el "
+            "informe. No cambia la clase."
         ),
         "currency_note_mixed": (
-            "Las filas «después de su inflación» dividen entre el índice de precios al "
-            "consumidor de cada país de cada mes (el nacional, recopilado por el FMI; el "
-            "armonizado de Eurostat para el euro), o el del último mes publicado; una moneda "
-            "cuyos precios no cubren las fechas muestra solo su fila antes de inflación. El "
-            "rendimiento al año se muestra con al menos un año de historial. Fuente: tipos de "
-            "cambio y precios al consumidor de {source}, leídos al generar el informe. No "
+            "Las filas «después de su inflación» dividen entre el índice oficial de precios al "
+            "consumidor de cada país de cada mes, o el del último mes publicado; una moneda sin "
+            "ese índice al día (por ahora, el peso mexicano y el yen) muestra solo su fila antes "
+            "de inflación. El rendimiento al año se muestra con al menos un año de historial. "
+            "Tipos de cambio y precios de EE. UU. de {source}, leídos al generar el informe. No "
             "cambia la clase."
         ),
-        "currency_sources": "{fred} y {imf}",
-        "currency_imf": "el FMI",
+        "currency_prices": "Precios al consumidor: {prices}.",
+        "currency_attrib_EUR": "euro, Eurostat (vía FRED)",
+        "currency_attrib_CHF": "franco suizo, Eurostat",
+        "currency_attrib_GBP": (
+            "libra, Office for National Statistics, bajo la Open Government Licence v3.0"
+        ),
+        "currency_attrib_CAD": (
+            "dólar canadiense, Banco de Canadá (IPC de Statistics Canada, disponible gratis en "
+            "bankofcanada.ca)"
+        ),
+        "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA del IBGE)",
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reales (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -2119,22 +2125,31 @@ LABELS: dict[str, dict[str, str]] = {
             "Local inflation ({code}) over those dates was {total} in total ({yearly} a year)."
         ),
         "currency_note_local": (
-            "After its own inflation: the levels divided by the country's consumer price index "
-            "of each month (the national one, compiled by the IMF; Eurostat's harmonised one "
-            "for the euro), or that of the latest month published. The return a year is shown "
-            "from one year of history. Source: prices from {source}, read when the report was "
-            "made. It does not change the class."
+            "After its own inflation: the levels divided by the country's official consumer "
+            "price index of each month, or that of the latest month published. The return a "
+            "year is shown from one year of history. Data read when the report was made. It "
+            "does not change the class."
         ),
         "currency_note_mixed": (
-            "The rows \"after its own inflation\" divide by each country's consumer price index "
-            "of each month (the national one, compiled by the IMF; Eurostat's harmonised one "
-            "for the euro), or that of the latest month published; a currency whose prices do "
-            "not cover the dates shows only its row before inflation. The return a year is "
-            "shown from one year of history. Source: exchange rates and consumer prices from "
-            "{source}, read when the report was made. It does not change the class."
+            "The rows \"after its own inflation\" divide by each country's official consumer "
+            "price index of each month, or that of the latest month published; a currency "
+            "without a current official index (for now, the Mexican peso and the yen) shows "
+            "only its row before inflation. The return a year is shown from one year of "
+            "history. Exchange rates and US prices from {source}, read when the report was "
+            "made. It does not change the class."
         ),
-        "currency_sources": "{fred} and {imf}",
-        "currency_imf": "the IMF",
+        "currency_prices": "Consumer prices: {prices}.",
+        "currency_attrib_EUR": "euro, Eurostat (through FRED)",
+        "currency_attrib_CHF": "Swiss franc, Eurostat",
+        "currency_attrib_GBP": (
+            "pound, Office for National Statistics, licensed under the Open Government Licence "
+            "v3.0"
+        ),
+        "currency_attrib_CAD": (
+            "Canadian dollar, Bank of Canada (Statistics Canada's CPI, available free of charge "
+            "at bankofcanada.ca)"
+        ),
+        "currency_attrib_BRL": "real, Banco Central do Brasil (IBGE's IPCA)",
         "currency_MXN": "Mexican pesos (MXN)",
         "currency_BRL": "Brazilian reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -5794,20 +5809,23 @@ def _currency_html(
             text = labels[key].format(code=base, total=total)
         out += f"<p>{_e(text)} {_badge('MEASURED')}</p>"
     fred = "<a href='https://fred.stlouisfed.org/' rel='noopener'>FRED</a>"
-    imf = f"<a href='{_e(IMF_PAGE)}' rel='noopener'>{_e(labels['currency_imf'])}</a>"
-    local_rows = [item for item in items if (item.get("real") or {}).get("status") == "MEASURED"]
+    local_rows = [item["real"] for item in items if (item.get("real") or {}).get("status")]
     if base:
-        note, sources = "currency_note_local", [real] if real.get("status") == "MEASURED" else []
+        note, priced = "currency_note_local", [real] if real.get("status") == "MEASURED" else []
     elif local_rows:
-        note, sources = "currency_note_mixed", local_rows
+        note, priced = "currency_note_mixed", local_rows
     else:
-        note, sources = "currency_note", []
-    uses_imf = any(
-        (item.get("real") or item).get("provider") == "imf" for item in sources
-    )
-    source = labels["currency_sources"] if uses_imf else "\x00"
-    text = _e(labels[note].format(source=source.format(fred="\x00", imf="\x01")))
-    out += f"<p class='muted'><small>{text.replace(chr(0), fred).replace(chr(1), imf)}</small></p>"
+        note, priced = "currency_note", []
+    text = _e(labels[note].format(source="\x00")).replace(chr(0), fred)
+    if priced:
+        links = "; ".join(
+            f"<a href='{_e(str(item.get('source_url', '')))}' rel='noopener'>"
+            f"{_e(labels.get('currency_attrib_' + str(item.get('code', '')), ''))}</a>"
+            for item in priced
+        )
+        prices = _e(labels["currency_prices"].format(prices="\x00")).replace(chr(0), links)
+        text += " " + prices
+    out += f"<p class='muted'><small>{text}</small></p>"
     return out
 
 

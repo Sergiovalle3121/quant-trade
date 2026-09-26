@@ -1215,22 +1215,30 @@ REPORT: dict[str, Any] = {
             "A inflação local ({code}) nessas datas foi de {total} no total ({yearly} ao ano)."
         ),
         "currency_note_local": (
-            "Depois da sua inflação: os saldos divididos pelo índice de preços ao consumidor "
-            "do país de cada mês (o nacional, compilado pelo FMI; o harmonizado do Eurostat "
-            "para o euro), ou o do último mês publicado. A rentabilidade ao ano é mostrada a "
-            "partir de um ano de histórico. Fonte: preços de {source}, lidos ao gerar o "
-            "relatório. Não muda a classe."
+            "Depois da sua inflação: os saldos divididos pelo índice oficial de preços ao "
+            "consumidor do país de cada mês, ou o do último mês publicado. A rentabilidade ao "
+            "ano é mostrada a partir de um ano de histórico. Dados lidos ao gerar o relatório. "
+            "Não muda a classe."
         ),
         "currency_note_mixed": (
-            "As linhas «depois da sua inflação» dividem pelo índice de preços ao consumidor de "
-            "cada país de cada mês (o nacional, compilado pelo FMI; o harmonizado do Eurostat "
-            "para o euro), ou o do último mês publicado; uma moeda cujos preços não cobrem as "
-            "datas mostra só a sua linha antes da inflação. A rentabilidade ao ano é mostrada "
-            "a partir de um ano de histórico. Fonte: cotações e preços ao consumidor de "
-            "{source}, lidos ao gerar o relatório. Não muda a classe."
+            "As linhas «depois da sua inflação» dividem pelo índice oficial de preços ao "
+            "consumidor de cada país de cada mês, ou o do último mês publicado; uma moeda sem "
+            "esse índice em dia (por enquanto, o peso mexicano e o iene) mostra só a sua linha "
+            "antes da inflação. A rentabilidade ao ano é mostrada a partir de um ano de "
+            "histórico. Cotações e preços dos EUA de {source}, lidos ao gerar o relatório. Não "
+            "muda a classe."
         ),
-        "currency_sources": "{fred} e {imf}",
-        "currency_imf": "o FMI",
+        "currency_prices": "Preços ao consumidor: {prices}.",
+        "currency_attrib_EUR": "euro, Eurostat (via FRED)",
+        "currency_attrib_CHF": "franco suíço, Eurostat",
+        "currency_attrib_GBP": (
+            "libra, Office for National Statistics, sob a Open Government Licence v3.0"
+        ),
+        "currency_attrib_CAD": (
+            "dólar canadense, Banco do Canadá (IPC da Statistics Canada, disponível grátis em "
+            "bankofcanada.ca)"
+        ),
+        "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA do IBGE)",
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -4948,14 +4956,12 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "the levels in that currency divided by that country's consumer price index (IMF "
-            "CPI dataset; Eurostat's harmonised index for the euro) of each point's month, or "
-            "the latest month published"
+            "the levels in that currency divided by that country's official consumer price index "
+            "of each point's month, or the latest month published"
         ),
         (
-            "os saldos nessa moeda divididos pelo índice de preços ao consumidor desse país "
-            "(conjunto de IPC do FMI; índice harmonizado do Eurostat para o euro) do mês de "
-            "cada ponto, ou do último mês publicado"
+            "os saldos nessa moeda divididos pelo índice oficial de preços ao consumidor desse "
+            "país do mês de cada ponto, ou do último mês publicado"
         ),
     ),
     (
