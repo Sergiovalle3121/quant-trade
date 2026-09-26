@@ -250,7 +250,10 @@ currency: FDAX x25, FDXM x5, FDXS x1, FESX x10, FSXE x1, FVS x100 and the
 Schatz/Bobl/Bund/Buxl futures x1,000 in EUR, FSMI x10 in CHF; ICE Brent (B)
 x1,000, Gasoil (G) x100, Sugar No. 11 (SB) x1,120 per cent, Coffee (KC) x375,
 Cotton (CT) x500, Cocoa (CC) x10, Orange juice (OJ) x150 and the US Dollar
-Index (DX) x1,000 in USD. The warning names a non-USD currency, and a file
+Index (DX) x1,000 in USD; B3 (Brazil, its "Contract Point Value" sheet)
+Ibovespa (IND) x1, Mini Ibovespa (WIN) x0.2, US Dollar (DOL) x50 and Mini US
+Dollar (WDO) x10 in BRL. The report prints amounts without a currency sign,
+so a file in euros or reais is not shown as dollars. The warning names a non-USD currency, and a file
 that mixes currencies is told the results were added without conversion.
 Other single-letter ICE roots (FTSE 100 `Z`, WTI `T`) are left out because
 they would read CME codes such as `ZNZ6` as another contract. NinjaTrader

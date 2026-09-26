@@ -2561,7 +2561,7 @@ FUTURES_POINT_VALUE_USD: dict[str, float] = {
     "ZC": 50.0, "ZS": 50.0, "ZW": 50.0,
 }  # fmt: skip
 
-#: Value per point, and its currency, of Eurex and ICE futures, by the
+#: Value per point, and its currency, of Eurex, ICE and B3 futures, by the
 #: exchange's own product code, from the contract specifications (as_of
 #: 2026-09-25): https://www.eurex.com/ex-en/markets (index and fixed-income
 #: product pages) and https://www.ice.com/products (ICE Futures Europe and
@@ -2582,6 +2582,11 @@ FUTURES_POINT_VALUE_OTHER: dict[str, tuple[float, str]] = {
     # ICE Futures U.S.
     "SB": (1_120.0, "USD"), "KC": (375.0, "USD"), "CT": (500.0, "USD"),
     "CC": (10.0, "USD"), "OJ": (150.0, "USD"), "DX": (1_000.0, "USD"),
+    # B3 (Brazil), "Contract Point Value" sheet on https://www.b3.com.br
+    # (data/files/E8/22/B5/FF/46E7061099BE5706790D8AA8/Contract-Point-Value.pdf):
+    # Ibovespa full and mini, US dollar full and mini, in reais per point.
+    "IND": (1.0, "BRL"), "WIN": (0.2, "BRL"), "DOL": (50.0, "BRL"),
+    "WDO": (10.0, "BRL"),
 }  # fmt: skip
 
 
