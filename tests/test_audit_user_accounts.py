@@ -3291,3 +3291,21 @@ def test_a_same_label_intruder_or_a_flood_of_browsers_never_clears_the_notice(
         other.get("/cuenta")
     owner = client.get("/cuenta").text
     assert "1 intento de entrar con contraseña incorrecta." in owner
+
+
+def test_a_flood_of_new_devices_lists_three_and_counts_the_rest() -> None:
+    from quant_trade.audit import account_pages
+    from quant_trade.audit.store import VisitNotice
+
+    devices = tuple(f"Chrome {n} · Linux" for n in range(8))
+    for locale, more in (
+        ("es", "Y 5 entradas más desde otros dispositivos nuevos."),
+        ("en", "And 5 more sign-ins from other new devices."),
+        ("pt", "E mais 5 entradas de outros dispositivos novos."),
+    ):
+        html = account_pages._visit_notice(
+            account_pages.COPY[locale], locale, VisitNotice(new_devices=devices)
+        )
+        assert html.count("<li>") == 4
+        assert "Chrome 2 · Linux" in html and "Chrome 3 · Linux" not in html
+        assert more in html

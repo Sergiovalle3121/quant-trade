@@ -360,6 +360,7 @@ COPY_PT: dict[str, str] = {
     "notice_failed": "{count} tentativas de entrar com senha incorreta.",
     "notice_new_device": "Uma entrada de um dispositivo novo: {device}.",
     "notice_unknown_device": "Uma entrada de um dispositivo desconhecido.",
+    "notice_more_devices": "E mais {count} entradas de outros dispositivos novos.",
     "notice_help": "Se não foi você, troque sua senha e encerre as outras sessões.",
     "notice_link": "Ver a atividade recente",
     "two_step_card": "Verificação em duas etapas",
