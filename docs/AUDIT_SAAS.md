@@ -265,6 +265,24 @@ gross reading exactly (one trade per symbol) is read the way that gives a
 round contract size. Fees in another coin than an exchange pair's quote
 currency are left out; fees of shares or futures always count.
 
+Containers (`importers.unwrap`, used by the import, format detection and
+the column screen): a zip that is not a workbook is opened when it holds
+exactly one CSV, TXT, TSV, HTML or Excel file (`__MACOSX/` copies and hidden
+files are ignored; the file inside obeys the same size limit). A web page
+that is not a MetaTrader report is read as a trade or fill table with the
+universal reader, which covers the tables brokers save with a `.xls` name;
+if no importer knows it, the column screen offers its columns. Files that
+cannot be read are refused with how to get one that can: an old binary
+Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
+(`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
+Excel or HTML history), and a zip with none or several exports
+(`zip_contents`). A member is unpacked in bounded chunks and never past
+the limit, whatever size it declares, and only stored or deflated members
+are opened (the same holds for workbook members). A web page is parsed once
+per import; the column screen offers a web table only up to
+`mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
+.xls .zip` (`pages.REPORT_ACCEPT`).
+
 Limits, each written into the report as a reading warning:
 
 - The balance curve is rebuilt from closed trades. It cannot show floating
@@ -1403,6 +1421,27 @@ questions, instead of repeating the verdict between the plan and the findings;
 the multiplicity dimension is titled "Número de configuraciones probadas" /
 "Number of settings tried".
 
+### The report in Portuguese
+
+The report, the verdict sentence, the class plan, the charts and the PDF
+footer also read in Brazilian Portuguese (`locale="pt"`).
+`audit/report_pt.py` holds the Portuguese of every Spanish-and-English table
+(labels, figure names, dimension titles, red-flag titles, plan hints, chart
+words) and `report_pt.install` adds it under `"pt"`, over the English, so a
+text still missing in Portuguese reads in English, never blank. The engine's
+English notes, the verdict's reasons (one `; `-separated part at a time) and
+the seller questions and assumptions a result stores in Spanish and English
+are translated when the page is rendered, as the Spanish ones are: the stored
+result, and so its hash, is the same whatever language reads it.
+
+Limits: the Portuguese was written for this report and checked for its
+placeholders and by the profit-claim guard, not by a native reviewer; the
+comparison page and the account screens have no Portuguese yet and send a
+Portuguese reader to their English pages. Tests
+(`tests/test_audit_portuguese_report.py`) fail when an English label has no
+Portuguese, and `i18n.untranslated` now reports a note that lacks a Spanish
+or a Portuguese rule.
+
 ## Assumptions and limitations
 
 - No market data is used. The audit sees only what the client uploads; a
@@ -1803,7 +1842,14 @@ changes what a report says.
   page says that picking the best of N counts as N trials. Per-test detail needs both versions
   complete. Rename, remove a version and delete the strategy (its reports
   stay); deleting the account or a report removes its rows. Nothing here
-  unlocks anything, so nothing new can be farmed.
+  unlocks anything, so nothing new can be farmed. "Descargar resumen en
+  PDF" (`/cuenta/estrategias/<id>/pdf`) prints the same page without forms
+  or buttons, with the date it was made and the fixed research-not-advice
+  notice; only the signed-in owner gets it (another account gets 404), sent
+  `private, no-store`, in the account page's language (es, en, pt). It
+  carries no links. The same summary on the same day is served from memory;
+  an account renders at most 10 in 10 minutes (then 429), since they share
+  the report PDFs' render slots.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
@@ -2254,6 +2300,8 @@ Pass 56 also gives each shared link its own preview card (`tools/make_og_images.
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
 
 Redesign pass 57 styles the column-mapping page ("Dinos qué es cada columna"): each group of menus is a white card, the menus stack in one column on a phone so column names are not cut short, the file re-pick sits in a dashed box, and every file input's button matches the site's buttons. Cell rendering and escaping are unchanged. It also gives the account's "what we keep and how to delete it" card a shield and a green edge on /registro and /cuenta, makes the landing's secondary link monochrome, lets the price cards use the full width, stacks the sign-up buttons above the upload form on a phone, keeps the landing mock-up's address on one line, and tightens the timing tables below 380 px so they fit the screen. On the landing's "Trabajo real, no humo" section, each card's proof link sits at the card's foot with an arrow, so the six links line up. The one-year p95 drawdown tile now carries the same minus sign as the maximum drawdown beside it, in the report and on the PDF cover; the resampled-risk section still lists the depths as positive sizes of a fall. Portuguese gets its own site card (`og-pt.png`) and six audience cards (`og-for-*-pt.png`, first sales' texts); its verification and sample links keep the English card until there is a Portuguese class sentence and notice (`OG_PARTIAL_KINDS`).
+
+Redesign pass 59 checks "¿Le gana a comprar y mantener el mercado?" on a phone and in the PDF. On a phone its row names ("Sharpe en los mismos 599 días…") now wrap instead of pushing both figure columns off the screen, and both worst falls show in red as in the crises table. The PDF already read well and is unchanged.
 
 ## Security
 

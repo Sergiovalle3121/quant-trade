@@ -43,6 +43,9 @@ SAMPLE_ROWS = 3
 MAX_COLUMNS = 80
 #: A header wider than this gets the plain refusal: no one names columns by
 #: hand in such a table, and rendering it would cost the server for nothing.
+#: A web page's table is offered for naming only up to these sizes.
+MAX_HTML_ROWS = 20_000
+MAX_HTML_CELLS = 200_000
 MAX_HEADER = universal.WIDEST_HEADER
 #: Two fields that are enough on their own: a date with each trade's result
 #: (``profit``), or a date with the account's balance or equity.
@@ -280,6 +283,7 @@ def _body(rows: list[list[str]], *, serial: bool, decimal: str) -> _Body | None:
 
 def _read_body(data: bytes) -> _Body | None:
     try:
+        data = imp.unwrap(data)
         if imp._is_zip(data):
             for sheet in imp.read_xlsx(data).values():
                 found = _body(
@@ -292,7 +296,21 @@ def _read_body(data: bytes) -> _Body | None:
             return None
         text = imp.decode_text(data)
         lowered = text.lstrip()[:4000].lower()
-        if "<html" in lowered or "<table" in lowered or text.lstrip().startswith("<"):
+        if "<html" in lowered or "<table" in lowered:
+            # A trade table saved as a web page (often named .xls); a
+            # MetaTrader report is read as it is, never offered here.
+            # The screen may read a file a few times; a page past these
+            # bounds gets the plain refusal instead of seconds of parsing.
+            head = text.lower()
+            if head.count("<tr") > MAX_HTML_ROWS or (
+                head.count("<td") + head.count("<th") > MAX_HTML_CELLS
+            ):
+                return None
+            reader = imp._read_html(text)
+            if imp._html_format(reader) is not None:
+                return None
+            return _body([row.texts for row in reader.rows], serial=False, decimal=".")
+        if text.lstrip().startswith("<"):
             return None
         # A 200,000-column header is not a table anyone names by hand.
         top = text[:4_000_000].splitlines()[: imp.UNIVERSAL_HEADER_SCAN + 1]
@@ -761,7 +779,8 @@ def mapping_page(
         "<div class='field'><label for='m-report'>"
         f"{_e(words['file'])}</label>"
         "<input id='m-report' type='file' name='report' required "
-        "accept='.csv,.txt,.tsv,.xlsx,text/csv' aria-describedby='m-report-help'>"
+        "accept='.csv,.txt,.tsv,.xlsx,.xls,.htm,.html,.zip,text/csv' "
+        "aria-describedby='m-report-help'>"
         f"<div class='help' id='m-report-help'>{_e(words['file_help'])}</div></div>"
         f"<p class='help'>{_e(words['remember'])}</p><p class='help'>{_e(words['extra'])}</p>"
         "<div class='back-row'>"

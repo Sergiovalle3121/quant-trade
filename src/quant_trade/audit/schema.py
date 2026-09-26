@@ -85,7 +85,7 @@ FILE_NAMES_ES = {
 }
 
 #: Report file extensions kept in the digest name; anything else is ``.bin``.
-REPORT_EXTENSIONS = ("html", "htm", "csv", "xlsx", "txt", "xml")
+REPORT_EXTENSIONS = ("html", "htm", "csv", "xlsx", "xls", "txt", "tsv", "xml", "zip")
 
 
 class ParseError(ValueError):
@@ -158,7 +158,7 @@ class DeclaredMetadata(BaseModel):
     oos_start: datetime | None = None
     description: str = Field("", max_length=2000)
     benchmark_applicable: bool = True
-    locale: Literal["es", "en"] = "es"
+    locale: Literal["es", "en", "pt"] = "es"
     #: Starting balance, used only when an imported report does not state one.
     initial_balance: float | None = Field(None, gt=0.0, le=1e12)
     #: The returns are a fund's own figures after its fees (a monthly track

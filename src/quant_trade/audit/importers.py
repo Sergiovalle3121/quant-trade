@@ -2050,6 +2050,32 @@ def _percent_styles(styles: ElementTree.Element | None) -> set[int]:
     return found
 
 
+class _MemberTooLarge(Exception):
+    """An archive member that unpacks past its limit, whatever it declares."""
+
+
+def _read_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, limit: int) -> bytes:
+    """A member's bytes, never more than ``limit``: read in bounded chunks,
+    because a member may declare a small size and unpack to gigabytes, and
+    only stored or deflated members (bzip2 and lzma have no output bound)."""
+    if info.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
+        raise NotImplementedError(f"compression {info.compress_type}")
+    if info.file_size > limit:
+        raise _MemberTooLarge
+    chunks: list[bytes] = []
+    total = 0
+    with archive.open(info) as member:
+        while True:
+            chunk = member.read(min(1 << 20, limit + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > limit:
+                raise _MemberTooLarge
+    return b"".join(chunks)
+
+
 def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
     """Every sheet of a workbook as rows of text or numbers (standard library only)."""
     try:
@@ -2070,7 +2096,9 @@ def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
             if name not in names:
                 return None
             try:
-                data = archive.read(name)
+                data = _read_member(archive, archive.getinfo(name), MAX_XLSX_UNCOMPRESSED_BYTES)
+            except _MemberTooLarge as exc:
+                raise _xlsx_too_big() from exc
             except (
                 zipfile.BadZipFile,
                 zlib.error,
@@ -3802,6 +3830,97 @@ def _is_zip(data: bytes) -> bool:
     return data.startswith(b"PK\x03\x04")
 
 
+#: What an archive may hold for its one export to be read.
+_ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls")
+
+
+def unwrap(data: bytes) -> bytes:
+    """The export itself: a zip holding one export (not a workbook) gives
+    that file; an old Excel workbook, an OpenDocument sheet or a PDF is
+    refused with the way to get a file that can be read."""
+    if data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        raise ReportFormatError(
+            "legacy_xls",
+            "this is an old Excel workbook (.xls), which cannot be read: open it in Excel, "
+            "LibreOffice or Google Sheets and save it as .xlsx or CSV, then upload that file",
+            "este es un libro de Excel antiguo (.xls), que no se puede leer: ábrelo en Excel, "
+            "LibreOffice o Google Sheets, guárdalo como .xlsx o CSV y sube ese archivo",
+        )
+    if data.lstrip()[:5] == b"%PDF-":
+        raise ReportFormatError(
+            "pdf_statement",
+            "a PDF is a printed statement, not data that can be read: download the history "
+            "from the platform as CSV, Excel or HTML instead (the guides show where)",
+            "un PDF es un estado de cuenta impreso, no datos que se puedan leer: descarga el "
+            "historial de la plataforma en CSV, Excel o HTML (las guías muestran dónde)",
+        )
+    if not _is_zip(data):
+        return data
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except (zipfile.BadZipFile, EOFError, OSError, ValueError):
+        return data  # read_xlsx gives the damaged-file answer
+    with archive:
+        infos = archive.infolist()
+        names = {info.filename for info in infos}
+        if "xl/workbook.xml" in names or len(infos) > MAX_XLSX_MEMBERS:
+            return data
+        if "mimetype" in names and "content.xml" in names:
+            raise ReportFormatError(
+                "opendocument_sheet",
+                "this is an OpenDocument sheet (.ods), which cannot be read: save it as .xlsx "
+                "or CSV and upload that file",
+                "esta es una hoja OpenDocument (.ods), que no se puede leer: guárdala como "
+                ".xlsx o CSV y sube ese archivo",
+            )
+        exports = [
+            info
+            for info in infos
+            if not info.is_dir()
+            and not info.filename.startswith("__MACOSX/")
+            and not info.filename.rsplit("/", 1)[-1].startswith(".")
+            and info.filename.lower().endswith(_ARCHIVED_EXPORTS)
+        ]
+        if not exports:
+            raise ReportFormatError(
+                "zip_contents",
+                "the zip holds no CSV, Excel or HTML export; upload the export itself",
+                "el zip no contiene ninguna exportación en CSV, Excel o HTML; sube la "
+                "exportación directamente",
+            )
+        if len(exports) > 1:
+            raise ReportFormatError(
+                "zip_contents",
+                f"the zip holds {len(exports)} exports; upload the one with the trades on "
+                "its own (CSV, Excel or HTML)",
+                f"el zip contiene {len(exports)} exportaciones; sube sola la que tiene las "
+                "operaciones (CSV, Excel o HTML)",
+            )
+        try:
+            inner = _read_member(archive, exports[0], MAX_REPORT_BYTES)
+        except _MemberTooLarge as exc:
+            raise ReportFormatError(
+                "file_too_large",
+                f"the file in the zip is larger than the limit of {MAX_REPORT_BYTES:,} bytes",
+                f"el archivo del zip pesa más que el límite de {MAX_REPORT_BYTES:,} bytes",
+            ) from exc
+        except (zipfile.BadZipFile, zlib.error, EOFError, NotImplementedError, RuntimeError) as exc:
+            raise ReportFormatError(
+                "bad_zip",
+                "the zip is damaged or encrypted and could not be read",
+                "el zip está dañado o cifrado y no se pudo leer",
+            ) from exc
+    # An old workbook or a PDF inside gets its own answer; a zip inside is read as a workbook.
+    return inner if _is_zip(inner) else unwrap(inner)
+
+
+def _html_table(reader: _TableReader) -> tuple[list[str], list[list[str]]] | None:
+    """A trade or fill table in a web page that is not a MetaTrader report
+    (brokers often save one as ``.xls``)."""
+    rows = [row.texts for row in reader.rows if any(cell.strip() for cell in row.texts)]
+    return _universal_table(rows[0], rows[1:]) if rows else None
+
+
 def _is_optimization_xml(text: str) -> bool:
     head = text[:4000].lower()
     return "urn:schemas-microsoft-com:office:spreadsheet" in head or (
@@ -3848,6 +3967,14 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
         raise _mapped_not_found([[_as_text(cell) for cell in row] for row in first], columns)
     text = decode_text(data)
     lowered = text.lstrip()[:4000].lower()
+    if "<html" in lowered or "<table" in lowered:
+        reader = _read_html(text)
+        if _html_format(reader) is None:
+            texts = [row.texts for row in reader.rows if any(cell.strip() for cell in row.texts)]
+            header_at = _mapped_header(texts, columns)
+            if header_at is None:
+                raise _mapped_not_found(texts, columns)
+            return universal.parse(texts[header_at], texts[header_at + 1 :], ",", columns)
     if "<html" in lowered or "<table" in lowered or text.lstrip().startswith("<?xml"):
         raise ReportFormatError(
             "universal_not_a_table",
@@ -3898,15 +4025,20 @@ def _mapped_not_found(
     )
 
 
-def _unrecognised(data: bytes) -> ReportFormatError:
+def _unrecognised(data: bytes, reader: _TableReader | None = None) -> ReportFormatError:
     """A table whose columns half match a trade list names what is missing;
     anything else gets the list of supported formats."""
     from quant_trade.audit import universal
 
     text = decode_text(data)
+    table: list[list[str]] = []
     if "<" not in text.lstrip()[:1]:
         header, rows, _ = _read_delimited(text)
-        for candidate in [header, *rows[: UNIVERSAL_HEADER_SCAN - 1]]:
+        table = [header, *rows]
+    elif reader is not None:
+        table = [row.texts for row in reader.rows if any(row.texts)]
+    if table:
+        for candidate in table[:UNIVERSAL_HEADER_SCAN]:
             found = universal.guess_columns(candidate)
             if len(set(found) & {*universal.TRADE_ROLES, *universal.FILL_ROLES}) >= 2:
                 return universal.missing_columns(candidate, found)
@@ -3925,6 +4057,10 @@ def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
     """The format of ``data`` and, for an HTML report, its parsed tables, so
     the import reads a large report once instead of twice."""
     if not data:
+        return None, None
+    try:
+        data = unwrap(data)
+    except ReportFormatError:
         return None, None
     if _is_zip(data):
         try:
@@ -3947,7 +4083,11 @@ def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
     lowered = stripped[:4000].lower()
     if "<html" in lowered or "<table" in lowered or "<!doctype html" in lowered:
         reader = _read_html(text)
-        return _html_format(reader), reader
+        known = _html_format(reader)
+        if known is None:
+            found = _html_table(reader)
+            known = _universal_format(found) if found else None
+        return known, reader
     header, rows, _ = _read_delimited(text)
     if header:
         known = _table_format(header)
@@ -3979,6 +4119,8 @@ def import_report(
     of roles (``universal.ROLES``) to column names; with it the file is read
     as a plain trade or fill table, whatever platform wrote it.
     """
+    _check_size(data)
+    data = unwrap(data)
     _check_size(data)
     if initial_balance is not None and not (math.isfinite(initial_balance) and initial_balance > 0):
         raise ReportFormatError(
@@ -4022,7 +4164,7 @@ def import_report(
             "optimización, y el informe de la prueba individual como informe",
         )
     if source_format is None:
-        raise _unrecognised(data)
+        raise _unrecognised(data, html_reader)
     draft: _Draft
     if source_format in {MT5_TESTER_HTML, MT5_HISTORY_HTML, MT4_TESTER_HTML, MT4_STATEMENT_HTML}:
         reader = html_reader if html_reader is not None else _read_html(decode_text(data))
@@ -4033,6 +4175,12 @@ def import_report(
             MT4_STATEMENT_HTML: _parse_mt4_statement,
         }[source_format]
         draft = parser(reader)
+    elif html_reader is not None:
+        from quant_trade.audit import universal
+
+        found = _html_table(html_reader)
+        assert found is not None  # _detect found it
+        draft = universal.parse(found[0], found[1], ",")
     else:
         from quant_trade.audit import universal
 

@@ -1049,3 +1049,13 @@ def test_strategy_pages_read_as_cards_with_coloured_change_words(tmp_path: Path)
         ".strat-n::before{content:' · '}",
     ):
         assert rule in STRATEGY_CSS, rule
+
+
+def test_the_buy_and_hold_table_fits_a_phone() -> None:
+    # Its row names are long ("Sharpe on the same 599 days ..."): on a phone they
+    # wrap instead of pushing both figure columns off the screen.
+    phone = STYLE[STYLE.index("@media screen and (max-width:620px){.paper table.holding") :]
+    phone = phone[: phone.index("}}") + 2]
+    assert ".paper table.holding{display:table;width:100%}" in phone
+    assert ".holding td:first-child{white-space:normal!important" in phone
+    assert ".holding td.val.neg{color:#b42318}" in STYLE
