@@ -56,6 +56,8 @@ MAX_CSV_LINE_BYTES = 32_768
 #: left the report without figures to print.
 MAX_ACCOUNT_VALUE = 1e15
 MAX_PERIOD_RETURN = 1e6
+#: Characters kept of an account currency a report names (``USD``, ``USDT``).
+MAX_CURRENCY_CHARS = 8
 MIN_OBSERVATIONS = 30
 
 TIMESTAMP_ALIASES = ("timestamp", "date", "datetime", "time", "ts", "fecha", "observation_date")
@@ -826,6 +828,8 @@ class AuditInputs:
     reported_fees: dict[str, float] = field(default_factory=dict)
     #: The platform's descriptive fields and own summary figures (DECLARED).
     report_metadata: dict[str, str] = field(default_factory=dict)
+    #: The account currency an imported report names (``USD``), else None.
+    account_currency: str | None = None
     #: Starting balance of an imported report and where it came from.
     initial_balance: float | None = None
     #: True when the equity curve was rebuilt from closed trades.
@@ -986,6 +990,7 @@ def build_inputs(
             "report_metadata": dict(imported.metadata),
             "initial_balance": imported.initial_balance,
             "cash_flows": list(imported.cash_flows),
+            "account_currency": (imported.currency or "")[:MAX_CURRENCY_CHARS] or None,
         }
         variants_in_report = imported.metadata.get("variants", "")
         if variants_in_report.isdigit() and int(variants_in_report) > 1:
@@ -1192,6 +1197,7 @@ class AuditResult(BaseModel):
     #: The Sharpe ratio after what a US Treasury bill paid (``audit/cashrate.py``).
     cash_rate: dict[str, Any] | None = None
     vix_regime: dict[str, Any] | None = None
+    in_currencies: dict[str, Any] | None = None
     #: The Sharpe next to the luck of the configurations tried (``audit/luck.py``).
     luck: dict[str, Any] | None = None
     #: Time under water, worst day and month, monthly hit rate (``audit/ride.py``).

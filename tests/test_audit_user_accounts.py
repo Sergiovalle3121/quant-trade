@@ -2245,3 +2245,177 @@ def test_sign_up_and_upload_limits_count_an_ipv6_64_as_one_network(tmp_path: Pat
         column = store.audits.c.client_ip  # type: ignore[attr-defined]
         stored = {row[0] for row in conn.execute(column.table.select().with_only_columns(column))}
     assert stored == {"2001:db8:9:9::/64"}
+
+
+KEY_SHAPE = re.compile(r"<code>([A-HJ-NP-Z2-9]{5}(?:-[A-HJ-NP-Z2-9]{5}){3})</code>")
+NEW_PASSWORD = "otra frase larga distinta"
+
+
+def _make_recovery_key(client: TestClient, password: str = PASSWORD, prefix: str = "/cuenta"):
+    csrf = _csrf(client.get(prefix).text)
+    return client.post(
+        f"{prefix}/recuperacion",
+        data={"current": password, "csrf": csrf},
+        follow_redirects=False,
+    )
+
+
+def _recover(client: TestClient, email: str, key: str, password: str = NEW_PASSWORD, ip: str = ""):
+    headers = {"X-Forwarded-For": ip} if ip else {}
+    csrf = _csrf(client.get("/olvide").text)
+    return client.post(
+        "/olvide",
+        data={"email": email, "key": key, "password": password, "csrf": csrf},
+        headers=headers,
+        follow_redirects=False,
+    )
+
+
+def test_a_recovery_key_sets_a_new_password_once_without_email(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    page = client.get("/cuenta").text
+    assert "Crea tu clave de recuperación" in page and "Aún no tienes clave" in page
+    # The current password is required, and a wrong one makes no key.
+    wrong = _make_recovery_key(client, password="no es la contraseña")
+    assert wrong.status_code == 303 and "error=wrong" in wrong.headers["location"]
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
+    shown = _make_recovery_key(client)
+    assert shown.status_code == 200 and shown.headers["cache-control"] == "no-store"
+    match = KEY_SHAPE.search(shown.text)
+    assert match, "the key is shown once"
+    key = match.group(1)
+    assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
+    # Only its hash is stored; the account page shows the date, never the key.
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = conn.execute(store.recovery_keys.select()).all()  # type: ignore[attr-defined]
+    assert len(rows) == 1 and key not in str(tuple(rows[0]))
+    page = client.get("/cuenta").text
+    assert "Creada el" in page and key not in page and "Crea tu clave" not in page
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert data["recovery_key_created_at"] and key not in json.dumps(data)
+
+    other = TestClient(client.app)
+    assert "Con tu clave de recuperación" in other.get("/olvide").text
+    assert _recover(other, "ana@example.com", "AAAAA-BBBBB-CCCCC-DDDDD").status_code == 400
+    assert _recover(other, "nadie@example.com", key).status_code == 400
+    # A weak new password is refused before the key is spent.
+    weak = _recover(other, "ana@example.com", key, password="corta")
+    assert weak.status_code == 400 and "al menos" in weak.text
+    # Typed in lower case without dashes, the key still works: once.
+    done = _recover(other, "ana@example.com", key.lower().replace("-", " "))
+    assert done.status_code == 303 and "done=recovered" in done.headers["location"]
+    assert "Contraseña guardada y sesiones cerradas" in other.get(done.headers["location"]).text
+    again = _recover(other, "ana@example.com", key, password="una tercera frase larga")
+    assert again.status_code == 400 and "ya se usó" in again.text
+    # Every session was signed out; the new password signs in, the old one no longer.
+    assert client.get("/cuenta", follow_redirects=False).status_code == 303
+    assert _signin(other, "ana@example.com").status_code == 401
+    assert _signin(other, "ana@example.com", NEW_PASSWORD).status_code == 303
+    assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
+    assert "Crea tu clave de recuperación" in other.get("/cuenta").text
+
+
+def test_a_new_recovery_key_replaces_the_old_and_goes_with_the_account(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    first = KEY_SHAPE.search(_make_recovery_key(client).text).group(1)  # type: ignore[union-attr]
+    second = KEY_SHAPE.search(_make_recovery_key(client).text).group(1)  # type: ignore[union-attr]
+    assert first != second
+    other = TestClient(client.app)
+    assert _recover(other, "ana@example.com", first).status_code == 400
+    assert _recover(other, "ana@example.com", second).status_code == 303
+    _signin(client, "ana@example.com", NEW_PASSWORD)
+    _make_recovery_key(client, password=NEW_PASSWORD)
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post("/cuenta/borrar", data={"current": NEW_PASSWORD, "csrf": csrf})
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.recovery_keys.select()).all() == []  # type: ignore[attr-defined]
+
+
+def test_recovery_tries_are_limited_per_network_and_per_email(tmp_path: Path) -> None:
+    from quant_trade.audit import accounts
+
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    key = KEY_SHAPE.search(_make_recovery_key(client).text).group(1)  # type: ignore[union-attr]
+    other = TestClient(client.app)
+    limit = accounts.MAX_RECOVERY_TRIES_PER_HOUR
+    # Rotating addresses in one /64, each guessing a different e-mail.
+    for n in range(limit):
+        answer = _recover(other, f"x{n}@example.com", key, ip=f"2001:db8:4:4::{n + 1:x}")
+        assert answer.status_code == 400
+    blocked = _recover(other, "ana@example.com", key, ip="2001:db8:4:4::ff")
+    assert blocked.status_code == 429 and "Demasiados intentos" in blocked.text
+    # One e-mail guessed from many networks stops too (the blocked try above
+    # counted for it), and the key survives it.
+    for n in range(limit - 1):
+        wrong = _recover(other, "ana@example.com", "AAAAA-BBBBB-CCCCC-DDDDD", ip=f"198.51.100.{n}")
+        assert wrong.status_code == 400
+    assert _recover(other, "ana@example.com", key, ip="203.0.113.200").status_code == 429
+    # A cross-site post is refused.
+    csrf = _csrf(other.get("/olvide").text)
+    cross = other.post(
+        "/olvide",
+        data={"email": "ana@example.com", "key": key, "password": NEW_PASSWORD, "csrf": csrf},
+        headers={"Sec-Fetch-Site": "cross-site", "X-Forwarded-For": "192.0.2.9"},
+        follow_redirects=False,
+    )
+    assert cross.status_code == 400
+
+
+def test_the_recovery_key_screens_exist_in_every_language(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    for lang, forgot, words in (
+        ("es", "/olvide", "Con tu clave de recuperación"),
+        ("en", "/forgot", "With your recovery key"),
+        ("pt", account_pages.path("forgot", "pt"), "Com sua chave de recuperação"),
+    ):
+        page = client.get(forgot).text
+        assert words in page, lang
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    _signup(client)
+    for prefix, words in (
+        ("/account", "Your recovery key"),
+        (account_pages.path("account", "pt"), "Sua chave de recuperação"),
+    ):
+        shown = _make_recovery_key(client, prefix=prefix)
+        assert words in shown.text and KEY_SHAPE.search(shown.text)
+        assert not find_claims(re.sub(r"<[^>]+>", " ", shown.text))
+    ctx = LegalContext(
+        operator_name="Op",
+        operator_contact="op@example.com",
+        operator_address="México",
+        jurisdiction="Leyes de México",
+    )
+    for locale, words in (("es", "clave de recuperación"), ("en", "recovery key")):
+        privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
+        assert words in privacy and not find_claims(privacy)
+
+
+def test_password_guesses_on_account_forms_count_a_64_and_the_account(tmp_path: Path) -> None:
+    from quant_trade.audit import accounts
+
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    csrf = _csrf(client.get("/cuenta").text)
+
+    def guess(ip: str) -> str:
+        answer = client.post(
+            "/cuenta/recuperacion",
+            data={"current": "adivinando una frase", "csrf": csrf},
+            headers={"X-Forwarded-For": ip},
+            follow_redirects=False,
+        )
+        return answer.headers["location"]
+
+    limit = accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR
+    # Rotating addresses inside one /64 share the limit...
+    for n in range(limit):
+        assert "error=wrong" in guess(f"2001:db8:7:7::{n + 1:x}")
+    assert "error=too_many" in guess("2001:db8:7:7::ffff")
+    # ...and so does the account from any other network.
+    assert "error=too_many" in guess("203.0.113.77")
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert store.recovery_key_created(ana.id) is None  # type: ignore[attr-defined]
