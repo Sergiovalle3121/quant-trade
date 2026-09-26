@@ -644,25 +644,26 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "shuffle_SHALLOWER": (
             "Es más leve que en casi todos los órdenes al azar: solo {share} de ellos cae tan "
-            "poco. Las pérdidas casi nunca siguieron a otras pérdidas. Así se ven las curvas "
-            "suavizadas, las que promedian posiciones perdedoras o un orden favorable que no "
-            "tiene por qué repetirse. La caída del archivo puede quedarse corta como medida del "
-            "riesgo."
+            "poco. Las pérdidas siguieron a otras pérdidas menos de lo que daría el azar. Así se "
+            "ven las curvas suavizadas, las que promedian posiciones perdedoras o un orden "
+            "favorable que no tiene por qué repetirse. La caída del archivo puede quedarse corta "
+            "como medida del riesgo."
         ),
         "shuffle_DEEPER": (
             "Es más profunda que en casi todos los órdenes al azar: solo {share} de ellos cae "
-            "tanto. Las pérdidas llegaron en rachas, así que el Sharpe y la volatilidad por sí "
-            "solos subestiman lo que costó aguantar esta curva."
+            "tanto. Las pérdidas llegaron en rachas más de lo que daría el azar, así que el "
+            "Sharpe y la volatilidad por sí solos subestiman lo que costó aguantar esta curva."
         ),
         "ranges_title": "¿Cuánto de esto podría ser azar?",
         "ranges_intro": (
-            "Con {n} operaciones, cada cifra tiene un margen. Con un 95 % de confianza, el "
-            "valor de fondo del sistema está entre estos límites, si cada operación es "
-            "independiente de las demás."
+            "Con {n} operaciones, cada cifra tiene un margen. Rango al 95 %: los valores de "
+            "fondo compatibles con estas operaciones, si cada una es independiente de las demás "
+            "y el sistema no cambió. No es una predicción."
         ),
         "ranges_zero": (
-            "El margen del promedio por operación incluye el cero: con estas operaciones no se "
-            "puede distinguir el sistema de uno que ni gana ni pierde por operación."
+            "El rango de la media por operación o el del factor de beneficio incluye el punto de "
+            "equilibrio (0 y 1): con estas operaciones no se puede distinguir el sistema de uno "
+            "que ni gana ni pierde por operación."
         ),
         "ranges_open": "sin límite",
         "lo_line": (
@@ -671,21 +672,22 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "lo_lower": (
             "Cada retorno tiende a parecerse al anterior (autocorrelación {rho}), algo típico de "
-            "curvas suavizadas o de precios que se actualizan poco: el Sharpe simple sale "
-            "inflado."
+            "curvas suavizadas, de precios que se actualizan poco o de estrategias que mantienen "
+            "posiciones varios periodos: el Sharpe simple sale inflado."
         ),
         "lo_lower_plain": (
             "Los retornos de periodos cercanos tienden a moverse juntos: el Sharpe simple sale "
             "inflado."
         ),
         "lo_not_lower": (
-            "Sharpe corregido por autocorrelación (Lo, 2002): no queda por debajo de {plain}, "
-            "así que el orden de los retornos no infla el Sharpe simple. Si la corrección lo "
-            "sube, el informe no lo usa: con pocos datos esa subida suele ser ruido."
+            "Sharpe corregido por autocorrelación (Lo, 2002): no queda apreciablemente por "
+            "debajo de {plain}, así que el orden de los retornos no infla el Sharpe simple de "
+            "forma apreciable. Si la corrección lo sube, el informe no la usa, para no favorecer "
+            "al archivo."
         ),
         "alpha_line": (
-            "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark "
-            "(beta {beta}, t = {t}, {n} periodos)."
+            "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, sin restar "
+            "lo que pagó el efectivo (beta {beta}, t = {t}, {n} periodos)."
         ),
         "alpha_clear_up": (
             "Con t por encima de 2, es poco probable que esa diferencia sea solo azar. No dice "
@@ -1663,24 +1665,25 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "shuffle_SHALLOWER": (
             "It is milder than in almost every random order: only {share} of them fall this "
-            "little. Losses almost never followed losses. Smoothed curves, curves that average "
-            "down losing positions, or a favourable order that need not repeat look like this. "
-            "The file's fall may understate the risk."
+            "little. Losses followed losses less than chance would give. Smoothed curves, curves "
+            "that average down losing positions, or a favourable order that need not repeat look "
+            "like this. The file's fall may understate the risk."
         ),
         "shuffle_DEEPER": (
             "It is deeper than in almost every random order: only {share} of them fall this far. "
-            "Losses came in streaks, so the Sharpe and the volatility alone understate what it "
-            "took to sit through this curve."
+            "Losses came in streaks more than chance would give, so the Sharpe and the "
+            "volatility alone understate what it took to sit through this curve."
         ),
         "ranges_title": "How much of this could be chance?",
         "ranges_intro": (
-            "With {n} trades, every figure has a margin. With 95 % confidence, the system's "
-            "underlying value lies between these bounds, if each trade is independent of the "
-            "others."
+            "With {n} trades, every figure has a margin. 95 % range: the underlying values "
+            "consistent with these trades, if each is independent of the others and the system "
+            "did not change. It is not a prediction."
         ),
         "ranges_zero": (
-            "The margin of the average per trade includes zero: with these trades the system "
-            "cannot be told apart from one that neither makes nor loses per trade."
+            "The range of the average per trade or of the profit factor includes break-even (0 "
+            "and 1): with these trades the system cannot be told apart from one that neither "
+            "wins nor loses per trade."
         ),
         "ranges_open": "no limit",
         "lo_line": (
@@ -1689,19 +1692,21 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "lo_lower": (
             "Each return tends to resemble the one before (autocorrelation {rho}), typical of "
-            "smoothed curves or prices that rarely update: the plain Sharpe comes out inflated."
+            "smoothed curves, prices that rarely update or strategies that hold positions for "
+            "several periods: the plain Sharpe comes out inflated."
         ),
         "lo_lower_plain": (
             "Returns of nearby periods tend to move together: the plain Sharpe comes out inflated."
         ),
         "lo_not_lower": (
-            "Sharpe corrected for autocorrelation (Lo, 2002): it does not fall below {plain}, so "
-            "the order of the returns does not inflate the plain Sharpe. When the correction "
-            "raises it, the report does not use it: with little data that rise is mostly noise."
+            "Sharpe corrected for autocorrelation (Lo, 2002): it is not appreciably below "
+            "{plain}, so the order of the returns does not inflate the plain Sharpe appreciably. "
+            "When the correction raises it, the report does not use it, so as not to favour the "
+            "file."
         ),
         "alpha_line": (
-            "Jensen's alpha: {alpha} a year beyond what the benchmark explains "
-            "(beta {beta}, t = {t}, {n} periods)."
+            "Jensen's alpha: {alpha} a year beyond what the benchmark explains, without "
+            "subtracting what cash paid (beta {beta}, t = {t}, {n} periods)."
         ),
         "alpha_clear_up": (
             "With t above 2, the difference is unlikely to be chance alone. It does not say it "
@@ -3206,9 +3211,7 @@ def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         )
     text = first + " " + labels["cash_note"].format(source="\x00")
     link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
-    return (
-        f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
-    )
+    return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
 
 STRESS_SCENARIOS: dict[str, dict[str, str]] = {
@@ -3408,15 +3411,15 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     average = ranges.get("expectancy") or {}
     low = _ev_value(average.get("low"))
     high = _ev_value(average.get("high"))
-    # The resampled profit factor wins over the symmetric t range when a few
-    # large trades skew them apart: no "zero" line above a factor range over 1.
-    factor_low = _ev_value((ranges.get("profit_factor") or {}).get("low"))
-    if (
-        low is not None
-        and high is not None
-        and low <= 0 <= high
-        and (factor_low is None or factor_low <= 1)
-    ):
+    factor = ranges.get("profit_factor") or {}
+    factor_low = _ev_value(factor.get("low"))
+    factor_high = _ev_value(factor.get("high"))
+    # Both ranges test break-even per trade; when either includes it the line
+    # shows, so a disagreement between them never stays silent in the file's
+    # favour. A missing upper bound on the factor is an open end (above 1).
+    average_even = low is not None and high is not None and low <= 0 <= high
+    factor_even = factor_low is not None and factor_low <= 1 <= (factor_high or math.inf)
+    if average_even or factor_even:
         out += f"<p>{_e(labels['ranges_zero'])}</p>"
     return out
 
@@ -3441,7 +3444,7 @@ def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str
 
 
 def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
-    """Jensen's alpha against the uploaded benchmark, with its Newey-West t."""
+    """Jensen's alpha against the uploaded benchmark, with its cautious t (no cash subtracted)."""
     block = benchmark.get("jensen") or {}
     if block.get("status") != "MEASURED":
         return ""

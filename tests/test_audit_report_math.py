@@ -52,7 +52,7 @@ def test_the_report_shows_the_trade_ranges_and_the_alpha(locale: str) -> None:
     assert find_claims(page) == []
 
 
-def test_a_range_across_zero_says_so() -> None:
+def test_a_range_across_break_even_says_so() -> None:
     labels = report.LABELS["es"]
     ranges = {
         "status": "MEASURED",
@@ -61,14 +61,22 @@ def test_a_range_across_zero_says_so() -> None:
         "expectancy": {"low": measured(-3.0), "high": measured(5.0)},
         "profit_factor": {"low": measured(0.8), "high": measured(1.9)},
     }
-    assert labels["ranges_zero"] in html.unescape(report._ranges_html(ranges, labels))
-    # A few large trades can skew the symmetric range across zero while the
-    # resampled profit factor stays above one: the line is left out then.
+
+    def says() -> bool:
+        return labels["ranges_zero"] in html.unescape(report._ranges_html(ranges, labels))
+
+    assert says()
+    # The average's range includes zero while the factor's stays above one:
+    # the two disagree, and the report never stays silent in the file's favour.
     ranges["profit_factor"]["low"] = measured(1.4)
-    assert labels["ranges_zero"] not in html.unescape(report._ranges_html(ranges, labels))
+    assert says()
+    # The factor's range includes one while the average's stays above zero.
     ranges["profit_factor"]["low"] = measured(0.8)
     ranges["expectancy"] = {"low": measured(1.0), "high": measured(5.0)}
-    assert labels["ranges_zero"] not in html.unescape(report._ranges_html(ranges, labels))
+    assert says()
+    # Neither includes break-even.
+    ranges["profit_factor"]["low"] = measured(1.2)
+    assert not says()
     # An open upper end reads as such, never as "inf".
     ranges["profit_factor"]["high"] = {"evidence": "NOT_MEASURED", "value": None, "note": ""}
     shown = html.unescape(report._ranges_html(ranges, labels))
