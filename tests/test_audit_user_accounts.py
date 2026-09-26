@@ -2108,3 +2108,36 @@ def test_the_upload_gate_and_a_missing_strategy_speak_the_visitors_language(
         missing = client.get(where)
         assert missing.status_code == 404 and title in missing.text
         assert "encontramos esa audit" not in missing.text and "find that audit" not in missing.text
+
+
+def test_a_preview_says_why_it_was_not_the_free_full_report(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client, "first@example.com", welcome=True)
+    assert "acct=welcome" in _upload(client).headers["location"]
+    # The same file from a fresh browser on another account: a preview, told why.
+    fresh = TestClient(client.app)
+    _signup(fresh, "second@example.com", welcome=True)
+    same_file = _upload(fresh).headers["location"]
+    assert "acct=preview_file" in same_file
+    assert account_pages.COPY["es"]["welcome_refused_file"] in fresh.get(same_file).text
+    # The same browser with a new file on a third account, in Portuguese.
+    device = client.cookies.get("rigor_device")
+    again = TestClient(client.app)
+    again.cookies.set("rigor_device", device)
+    _signup(again, "third@example.com", welcome=True)
+    same_browser = again.post(
+        "/audits",
+        files=_other_file(),
+        data={"consent": "on", "locale": "pt"},
+        follow_redirects=False,
+    ).headers["location"]
+    assert "acct=preview_device" in same_browser
+    page = again.get(same_browser).text
+    assert account_pages.COPY["pt"]["welcome_refused_device"] in page
+    assert not find_claims(
+        re.sub(r"<[^>]+>", " ", account_pages.COPY["pt"]["welcome_refused_device"])
+    )
+    # An unknown value shows nothing.
+    assert (
+        "welcome_refused" not in again.get(same_browser.replace("preview_device", "preview_x")).text
+    )

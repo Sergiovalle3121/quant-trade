@@ -353,6 +353,9 @@ PDF_CACHE_SIZE = 16
 #: one does not count. They share the report PDFs' render slots.
 #: The page's "skip to content" link, which a PDF does not need.
 _SKIP_LINK = re.compile(r"<a class='skip' href='#main'>[^<]*</a>")
+#: Why an account's upload became a preview although its free full report is
+#: unused: the file or the browser already had one, or the network's month is full.
+WELCOME_REFUSALS = ("file", "device", "network")
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -2245,6 +2248,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         device_sha256 = acct.hash_secret(device)
         reservation = acct.new_secret()
         fingerprint = ""
+        #: Why this upload was not the account's free full report, when it
+        #: could have been: told on the preview it becomes.
+        welcome_refused = ""
 
         def preview_or_credit(account_id: str) -> Response | None:
             """The first look at the monthly previews and the credits."""
@@ -2281,7 +2287,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         def claim_free_use(account_id: str, inputs: Any) -> Response | None:
             """Take the free full report or a free preview, atomically."""
-            nonlocal welcome, free_preview, spend_credit, fingerprint
+            nonlocal welcome, free_preview, spend_credit, fingerprint, welcome_refused
             fingerprint = acct.content_fingerprint(inputs.equity.frame)
             if welcome:
                 refused = db.welcome_refusal(
@@ -2312,6 +2318,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
                         return None
                 welcome = False
+                welcome_refused = refused
                 refusal = preview_or_credit(account_id)
                 if refusal is not None:
                     return refusal
@@ -2327,16 +2334,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return None
 
         if gate_account is not None:
-            if acct.WELCOME_FULL_REPORT and not db.welcome_refusal(
-                gate_account.id,
-                device_sha256=device_sha256,
-                file_sha256="",
-                client_ip=ip,
-                since=start,
-                per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
-            ):
+            first_look = (
+                db.welcome_refusal(
+                    gate_account.id,
+                    device_sha256=device_sha256,
+                    file_sha256="",
+                    client_ip=ip,
+                    since=start,
+                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                )
+                if acct.WELCOME_FULL_REPORT
+                else "off"
+            )
+            if not first_look:
                 welcome = True
             else:
+                welcome_refused = first_look
                 refusal = preview_or_credit(gate_account.id)
                 if refusal is not None:
                     return refusal
@@ -2592,6 +2605,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             location += "&acct=welcome"
         elif credit_used:
             location += "&acct=upload_credit"
+        elif free_preview and welcome_refused in WELCOME_REFUSALS:
+            location += f"&acct=preview_{welcome_refused}"
         elif code:
             location += "&code=" + ("applied" if paid else "rejected")
         if _wants_json(request):
@@ -2820,6 +2835,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         elif acct_done == "saved":
             notice = account_pages.COPY[ui]["saved_notice"]
+        elif (
+            acct_done
+            and acct_done.startswith("preview_")
+            and acct_done[8:] in WELCOME_REFUSALS
+            and not record.paid
+        ):
+            notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
         elif acct_done == "nocredit" and not record.paid:
             notice = account_pages.COPY[ui]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.
