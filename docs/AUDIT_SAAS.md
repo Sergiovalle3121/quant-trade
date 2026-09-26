@@ -302,6 +302,17 @@ per import; the column screen offers a web table only up to
 `mapping.MAX_HTML_ROWS` rows and `MAX_HTML_CELLS` cells. The upload pickers offer `.htm .html .csv .txt .tsv .xlsx
 .xls .zip` (`pages.REPORT_ACCEPT`).
 
+B3's Área do Investidor Negociação extract is read by column name only
+(`tests/test_audit_b3.py`): `Data do Negócio` is the fill time and always day
+first (`universal.DAY_FIRST_NAMES`), `Tipo de Movimentação` the side
+(Compra/Venda), `Código de Negociação` the ticker (ranked above `Mercado`,
+which holds Mercado à Vista or Fracionário), and a fractional-market ticker
+with a trailing F (`PETR4F`) pairs with `PETR4`
+(`universal.whole_lot_tickers`, only with B3's own column names). The first
+two names and the F come from open-source importers of real files; the rest
+is inferred, so B3 is not a named platform or guide until a real export
+confirms it. A wrong guess falls back to the column screen.
+
 Robinhood's Account Activity report (`robinhood_csv`, the columns `Activity
 Date`, `Instrument`, `Description`, `Trans Code`, `Quantity`, `Price`,
 `Amount`, as Robinhood's help centre and open-source importers describe it;
@@ -2065,6 +2076,22 @@ changes what a report says.
   mail provider (for example Resend, Postmark or Amazon SES), a verified
   sending domain, and its API key as a Railway variable; the hooks are listed
   in `accounts.EMAIL_HOOKS`.
+- **Recovery key** (`recovery_keys` table, `/cuenta/recuperacion`, `POST
+  /olvide`): so a customer who forgets the password needs no one, "Mi
+  cuenta" makes a recovery key after the current password: 20 characters
+  from 32 unambiguous ones (100 random bits, `accounts.new_recovery_key`),
+  shown once with `Cache-Control: no-store`; only its SHA-256 and date are
+  kept, and making a new one replaces the old. Mi cuenta nudges accounts
+  without one. On `/olvide`, e-mail + key + new password sets the password,
+  spends the key (a delete that names its hash, so it works once) and signs
+  out every session. Every try counts toward
+  `accounts.MAX_RECOVERY_TRIES_PER_HOUR` (10) per network and per e-mail; an
+  unknown e-mail and a wrong key give the same answer (someone spamming an
+  e-mail can hold its recovery for an hour; the key itself is untouched and
+  the owner's reset link still works). The key's date is in
+  the data export; the row goes with the account. The account forms that ask
+  for the current password (recovery key, password change, deletion) share
+  `accounts.MAX_ACCOUNT_ACTIONS_PER_HOUR` per network and per account.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
