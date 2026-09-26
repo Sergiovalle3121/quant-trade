@@ -763,12 +763,12 @@ def _benchmark(
 
 @dataclass(frozen=True)
 class LocalCashRates:
-    """The account currency's cash rates as FRED gives them (``history`` is the
-    monthly series that fills dates before ``rates`` starts, when it has one)."""
+    """The account currency's cash rates as their publisher gives them (``history``
+    holds the older series, by key, that fill dates before ``rates`` starts)."""
 
     currency: str
     rates: pd.Series
-    history: pd.Series | None = None
+    history: dict[str, pd.Series | None] | None = None
 
 
 def _account_code(inputs: AuditInputs) -> str:
@@ -797,12 +797,12 @@ def _local_cash_rates(
         return None
     if rates is None or rates.empty:
         return None
-    history = None
-    if local.history is not None:
+    history: dict[str, pd.Series | None] = {}
+    for older, _, _ in local.history:
         try:
-            history = market(local.history.key)
+            history[older.key] = market(older.key)
         except Exception:  # noqa: BLE001 (the history only fills early dates)
-            history = None
+            history[older.key] = None
     return LocalCashRates(code, rates, history)
 
 
@@ -1186,6 +1186,20 @@ def _holding(
     )
     if asset is None:
         return None
+    if not asset.licensed:
+        # Recognised, but no public source of its closes may be reused in a
+        # paid report: say so and point to the reader's own benchmark file.
+        reason = (
+            holding_lib.UNLICENSED_WITH_BENCHMARK
+            if inputs.benchmark is not None
+            else holding_lib.UNLICENSED
+        )
+        return {
+            "status": "NOT_MEASURED",
+            "reason": reason,
+            "asset": asset.key,
+            "label": asset.label,
+        }
     try:
         closes = market(asset.key)
     except Exception:  # noqa: BLE001 (public data must never stop an audit)

@@ -1349,14 +1349,18 @@ the 2022 crypto winter (2021-11 to 2022-12). Equity windows follow US
 equities, the crypto one bitcoin; they are fixed in advance and never fitted
 to the file. Beside each window the table shows what public indices did over
 the same months, as context only (`crises.MARKET`): the change from the close
-of the month before the window to the close of its last month, computed once
-from FRED's daily closes (S&P 500 from 2016 on, the series' start; Nasdaq
-Composite for every equity window; bitcoin on Coinbase for the crypto one),
-read on `MARKET_AS_OF`. These are a handful of fixed figures with their
-source URLs, not a data file; they never enter the result JSON, a finding or
-the class. A note under the table names the sources and says plainly that for
-a strategy trading another market (currencies, commodities, another country)
-they are context, not its yardstick. For each window the
+of the month before the window to the close of its last month, worked out
+once from the month-end levels FRED shows (S&P 500 from 2016 on, the series'
+start; Nasdaq Composite for every equity window; bitcoin on Coinbase for the
+crypto one) and checked on `MARKET_AS_OF`. These are about a dozen fixed
+historical facts about widely reported falls, cited with the FRED pages they
+can be checked on; no index series is read at run time or shown beyond them
+(S&P Dow Jones Indices, Nasdaq and Coinbase allow no reproduction of their
+data without written permission, see "Data licences"). They never enter the
+result JSON, a finding or the class. A note under the table says they are
+fixed historical figures, that no other data of these indices is read or
+shown, and that for a strategy trading another market (currencies,
+commodities, another country) they are context, not its yardstick. For each window the
 record covers in full, MEASURED: the fund's compounded return and, when a
 benchmark is present, the benchmark's. With 24 months or more, the worst and
 best 12-month return and the share of rolling 12-month periods that ended
@@ -1368,9 +1372,21 @@ Against holding the market it trades (`audit/holding.py`, `audit/market.py`).
 When at least two thirds of a file's trades are on the S&P 500, the Nasdaq 100
 or bitcoin (by symbol name: `US500`, `SPX500`, `ES` futures; `US100`,
 `USTEC`, `NAS100`, `NQ` futures; `BTCUSD`, `BTCUSDT`, `XBTUSD`; broker
-suffixes dropped), or a tester report names one of them, the report puts the
-strategy's closes beside the market's public closes from FRED
-(`SP500`, `NASDAQ100`, `CBBTCUSD`) on the same days: return, worst fall and
+suffixes dropped), or a tester report names one of them, the market is
+recognised but its closes are not read: FRED's `SP500`, `NASDAQ100` and
+`CBBTCUSD` need the written permission of S&P Dow Jones Indices, Nasdaq and
+Coinbase, and no public source we know of allows their reuse in a paid report
+(`Asset.licensed` is false, so `MarketData` never downloads them). The
+section is one NOT_MEASURED line: "no public source of this market's closes
+that we know of has a licence that allows reuse in a paid report; to compare, upload its
+closes as the benchmark file" (`holding.UNLICENSED`), or, when a benchmark
+file was uploaded, that the benchmark section compares the strategy with it
+(`UNLICENSED_WITH_BENCHMARK`). A benchmark column inside an equity or return
+CSV (`schema.BENCHMARK_COLUMN`) is read only by the fund section; platform
+statements carry no benchmark, so the separate benchmark upload is the way to
+compare. The comparison below stays in the code for a market that gets a
+licensed source. With one, the report puts the
+strategy's closes beside the market's public closes on the same days: return, worst fall and
 Sharpe ratio for both, plus correlation and beta. The two are paired on the
 sparser calendar, taking the other side's last level on or before each day:
 a strategy that also moves on weekends is read on the market's trading days
@@ -1402,16 +1418,35 @@ the service reads them unless `AUDIT_PUBLIC_DATA=false`, the CLI only with
 The public data can never hold a report back: an audit never downloads.
 `MarketData.closes` answers at once from memory (or with nothing) and, when
 the copy is missing or older than six hours, starts one background
-`refresh`; the service also downloads the three series in a background
+`refresh`; the service also downloads every licensed series in a background
 thread when it starts (`warm`). A download reads with `read1`, so its total
 deadline of 5 seconds (`TIMEOUT`) is checked after every receive and a server
 that trickles bytes is cut off within about one more socket timeout; replies
 are capped at 4 MB, redirects are refused (the address stays FRED's fixed
 https one), and values that are not finite are dropped. Only one refresh of
 a series runs at a time, and after a failure (down, slow, rate limited, not
-a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`).
+a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`). A network failure (a timeout or a reset connection) is read again up to twice, after 1.5 and 3 seconds, before it counts as failed (`READ_ATTEMPTS`, `READ_PAUSE`); a reply that arrives but cannot be read is not.
+So that a rerun of the same file reads the same values, a reply never
+replaces a kept copy it covers less of: one that ends earlier, or holds under
+90 % of the kept copy's points inside the kept copy's span (`MIN_KEPT_SHARE`;
+a short or truncated reply), is refused and the kept copy stays
+(`_check_not_shorter`). A reply that starts later but keeps that share is
+taken, so a publisher that trims its early years does not pin the kept copy
+for good. Each refused or failed refresh logs one warning with the series key,
+its provider and the error's class and message (at most 200 characters; no
+reply body, address or key). Every monthly
+series (US and local consumer prices, Brazil's Selic, the BIS policy rates;
+`Asset.monthly`) must also hold each month from its first to its last once,
+or the reply is refused (`_check_months`), except the gaps its publisher
+leaves on purpose (`Asset.gaps`: October 2025 in US CPI, which BLS never
+published, and `JAPAN_NO_POLICY_RATE`). A report built before a series is in
+memory (the service's first minutes, or a series that never loaded) does not
+only miss rows: an account in a currency whose own cash rate is missing, or
+whose euro history is missing for pre-2019 dates, gets the US bill's cash
+line and Jensen's alpha with the bill on both sides, so those figures
+differ from a report built with the rate in memory.
 When the closes are not in memory the section says so in one NOT_MEASURED
-line and the audit goes on. The CLI's `--public-data` reads the three series
+line and the audit goes on. The CLI's `--public-data` reads the series
 first. The result JSON always carries a `holding` key: `null` when the file
 trades none of these markets or public data is off.
 
@@ -1447,22 +1482,59 @@ never changes the class.
 Cash in the account's own currency (`cashrate.LOCAL`, `market.LOCAL_CASH`).
 When an imported report names the account currency and it is one of MXN,
 BRL, EUR, GBP, JPY, CAD or CHF, the same line subtracts that currency's own
-cash rate instead of the US bill's: Mexico's, Brazil's, Japan's and Canada's
-immediate (overnight interbank) rates from the OECD (`IRSTCI01…M156N`,
-monthly averages), the euro's €STR (`ECBESTRVOLWGTTRMDMNRT`, daily, from
-October 2019; before it, the euro area's OECD immediate rate `IRSTCI01EZM156N`,
-monthly, fills only the earlier dates, `EUR_CASH_HISTORY`), sterling's SONIA (`IUDSOIA`, daily) and, because the Swiss
-immediate rate stops in 2024, Switzerland's 3-month interbank rate
-(`IR3TIB01CHM156N`, monthly). Each quote becomes an annual yield by its own
-convention: a simple rate over its tenor on a 360-day (MXN, EUR, CHF) or
-365-day (GBP, JPY, CAD) year, rolled over for a year,
-`(1 + r·t/basis)^(365/t) - 1`; Brazil's is already a compounded annual yield
-and is used as it is. A daily rate may be 10 days old before a return's
-start, a monthly average 75 days (`MAX_MONTHLY_GAP_DAYS`, the month's own
-average or the latest published). These series may be negative (the franc,
-euro and yen rates were); a reply outside -5 % to 200 % a year
-(`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
-taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
+cash rate instead of the US bill's, each from its originator (the OECD copies
+FRED carried are no longer read, see "Data licences"): the euro's €STR
+(`ECBESTRVOLWGTTRMDMNRT` through FRED, daily, from October 2019; before it,
+`EUR_CASH_HISTORY` fills only the earlier dates with three daily ECB policy
+rates from the ECB's data API, each cut to its own dates: the main refinancing
+operations (MRO) fixed rate `FM.D.U2.EUR.4F.KR.MRR_FR.LEV` until 27 June 2000,
+the MRO minimum bid rate `FM.D.U2.EUR.4F.KR.MRR_MBR.LEV` of the variable-rate
+tenders from 28 June 2000 to 14 October 2008 (the only days the ECB publishes
+it; the fixed rate has no values then), and the deposit facility rate
+`FM.D.U2.EUR.4F.KR.DFR.LEV` from 15 October 2008 until €STR starts; each series
+is refused on the same rules as any rate reply and held to the daily 10-day
+staleness limit, so a missing piece leaves its dates NOT_COVERED), sterling's SONIA
+(`IUDSOIA` through FRED, daily), Canada's CORRA (Bank of Canada Valet
+`AVG.INTWO`, daily, from 1997), Brazil's Selic accumulated in the month and
+annualised on 252 business days (Banco Central do Brasil SGS 4189, monthly,
+from January 1995: before the Real plan it ran in the thousands a year) and,
+for the peso, the yen and the franc, the central bank's policy rate as the
+BIS compiles it (`WS_CBPOL`, `M.MX`, `M.JP`, `M.CH`, monthly, end of
+period). The BIS figures are official policy rates, not market rates, and so
+are the ECB rates before €STR. The splice picks, for each era, the ECB rate
+closest to what overnight cash earned: in the corridor years before
+October 2008 overnight euro rates (EONIA) sat near the MRO rate, about a point
+above the deposit rate, so the MRO rate is used; from 15 October 2008 the ECB
+allotted its operations in full, excess liquidity pushed EONIA down to the
+deposit rate floor, so the deposit rate is used. The remaining bias is small
+and still leans the strategy's way: EONIA ran mostly a few basis points above
+the MRO rate (the minimum bid, in the tender years) before October 2008, and
+after it stayed between the deposit and MRO rates, closer to the deposit rate
+once excess liquidity was large but up to a few tenths of a point above it in
+parts of 2008-2011 when liquidity shrank; €STR has run about 10 bp below the
+deposit rate. The labels
+say "policy rate" and "before October 2019, the ECB's main refinancing rate
+until October 2008 and its deposit rate after". Each quote becomes an annual yield
+by its own convention: a simple overnight rate on a 360-day (MXN target rate,
+EUR, CHF as SARON) or 365-day (GBP, JPY call rate, CAD) year, rolled over
+for a year, `(1 + r/basis)^365 - 1`; Brazil's is already a compounded annual
+yield and is used as it is. A daily rate may be 10 days old before a return's
+start (`MAX_GAP_DAYS`; €STR and the ECB rates before it, SONIA, CORRA), a monthly one 75 days
+(`MAX_MONTHLY_GAP_DAYS`): Brazil's monthly average sits on its month's first
+day, the BIS's end-of-period value on the month's last day, so a point never
+takes a month-end value before that month has ended. Both the BIS's monthly
+series and the ECB's daily ones are filled for every period at the source (the
+rate in force carries forward), so no step rule is needed, except that the
+BIS has no Japanese value in three stretches when the Bank of Japan targeted
+reserves or the monetary base instead of a rate (March 1999 to July 2000,
+April 2001 to February 2006, May 2013 to August 2016;
+`market.JAPAN_NO_POLICY_RATE`): a yen account with returns in those
+stretches is not covered and gets no line (`NO_LOCAL_CASH`, below). Each reply is refused when a date
+appears twice, a date or value is unreadable, or the reply is for another
+series (the BIS's `REF_AREA`, the ECB's `KEY`, the Bank of Canada's column).
+These series may be negative (the franc, euro and yen rates were); a reply
+outside -5 % to 200 % a year (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Brazil's
+monthly Selic reached 85 % in April 1995) is taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
 `currency.DOLLAR_CODES`) or with no named currency gets the US bill's line.
 Another named currency with no series here (`AUD`, `ARS`…), or whose rates
 cannot be read or do not cover the history, gets no line: the section is
@@ -1476,7 +1548,7 @@ It never changes the class.
 
 Calm and turbulent markets (`audit/regime.py`). With public data on, every
 report adds the section "How did it do in calm and in turbulent markets?".
-Each return is placed by the VIX (CBOE, FRED `VIXCLS`, read in the
+Each return is placed by the VIX (Cboe, FRED `VIXCLS`, credited to both; read in the
 background with the other series; a reply above 200, `MAX_VIX`, is taken as
 broken) at the close of the last market day *before* the day its stretch
 starts, at most 5 days old (`MAX_GAP_DAYS`), so the regime was known before
@@ -1727,6 +1799,50 @@ Annual return: the compound annual return is NOT_MEASURED when the history
 spans less than a year (`engine.MIN_CAGR_DAYS = 365`); compounding a few
 good weeks into a year prints a return nobody earned, and the total return
 already says what happened.
+
+### Data licences
+
+The paid report uses outside data only when its licence allows commercial
+reuse with attribution, and credits each source where it is shown and on
+`/metodologia` (`method.COPY`, `report_pt.METHOD_COPY`). Checked on
+2026-09-26:
+
+- FRED (St. Louis Fed): US federal series in the public domain (`DTB3`,
+  `CPIAUCNS`, the H.10 exchange rates `DEX*`), plus the ECB's €STR and the
+  Bank of England's SONIA, which FRED republishes. FRED's own terms ask for
+  consent for commercial use of the service; the risk is noted, and each
+  series can be read from its originator instead if needed.
+- VIX (`VIXCLS`): FRED tags it "Citation Required"; the regime line credits
+  Cboe and FRED. Cboe's own site is for personal use, so it is kept under
+  review.
+- ECB (€STR, the main refinancing operations rates and the deposit facility
+  rate): free reuse with the source quoted
+  ("Source: ECB statistics"); the methodology page tells buyers the data is
+  available free on the ECB's website, as the ECB's disclaimer asks.
+- Bank of England (SONIA): Open Government Licence v3.0, with the credit
+  "SONIA data licensed under the Open Government Licence v3.0 and copyright
+  the Governor and Company of the Bank of England" on the methodology page.
+- Bank of Canada (CPI, CORRA): reuse with credit; a paid product must say the
+  data is available free at bankofcanada.ca, which the credit lines do.
+- Banco Central do Brasil (IPCA, Selic SGS 4189): Open Database License
+  (ODbL), credited by name.
+- BIS policy rates (MXN, JPY, CHF): "The use of the statistics is
+  unrestricted, provided that ... the BIS must be cited ... as the source";
+  their inclusion must not add a charge, and the report's price does not
+  change with them. Cited as "Source: BIS".
+- Eurostat, ONS (Open Government Licence), INEGI, e-Stat: see the section on
+  currencies and inflation.
+- Not used: FRED's `SP500`, `NASDAQ100` and `CBBTCUSD` (S&P Dow Jones
+  Indices, Nasdaq and Coinbase: "Reproduction ... in any form is prohibited
+  except with the prior written permission"), so the holding comparison is
+  NOT_MEASURED for those markets and the crisis table keeps only a dozen fixed
+  historical figures; the OECD's cash-rate copies (`IRSTCI01…M156N`,
+  `IR3TIB01CHM156N`), whose terms reserve third parties' rights; the SNB's
+  SARON (non-commercial); Banco de México's and the Bank of Japan's own rate
+  files (terms unclear for a paid product). No openly licensed equity index
+  was found: the BIS publishes none, the ECB's reuse policy excludes the
+  third-party indices in its datasets, and the OECD's share-price indices
+  carry the same third-party clause.
 
 ## The verdict
 

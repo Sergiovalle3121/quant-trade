@@ -271,3 +271,14 @@ def test_the_market_note_passes_the_guard_and_says_when_it_does_not_fit(locale: 
     text = LABELS[locale]["crises_market_note"]
     assert find_claims(text) == [] and find_claims(LABELS[locale]["crises_market"]) == []
     assert ("otro mercado" if locale == "es" else "another market") in text
+
+
+def test_the_market_note_names_both_closes_of_the_change() -> None:
+    assert (
+        "variación entre el cierre del mes previo a la ventana y el de su último mes"
+        in (LABELS["es"]["crises_market_note"])
+    )
+    assert (
+        "variação entre o fechamento do mês anterior à janela e o do seu último mês"
+        in (LABELS["pt"]["crises_market_note"])
+    )

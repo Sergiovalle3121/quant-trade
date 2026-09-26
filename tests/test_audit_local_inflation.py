@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import zipfile
 from dataclasses import replace
 from html import escape
@@ -267,8 +268,17 @@ def test_the_methodology_page_credits_every_public_source(locale: str) -> None:
         "INEGI",
         "Statistics Bureau",
         "e-Stat",
+        "BIS",
+        "Cboe",
+        "ecb.europa.eu",
+        "Open Government Licence v3.0 and copyright the Governor and Company of the Bank of "
+        "England",
+        "ODbL",
+        "CORRA",
     ):
         assert name in page
+    # No market closes whose owner forbids reproduction are credited as a source.
+    assert "Coinbase" not in page and "OCDE" not in page and "OECD" not in page
 
 
 def test_new_texts_make_no_claims_and_every_series_is_read() -> None:
@@ -477,3 +487,155 @@ def test_an_account_in_another_currency_reads_one_period(locale: str) -> None:
     prefix = LABELS[locale]["currency_not_measured"].split("{reason}")[0]
     line = html.split(escape(prefix), 1)[1].split("<", 1)[0].strip()
     assert line.endswith(".") and not line.endswith(".."), line
+
+
+def _boc(months: list[str]) -> str:
+    rows = "".join(f'"{month}-01","{169.0 + i / 10:.1f}"\n' for i, month in enumerate(months))
+    return BOC.split('"date","V41690973"\n')[0] + '"date","V41690973"\n' + rows
+
+
+YEAR = [f"2025-{m:02d}" for m in range(9, 13)] + [f"2026-{m:02d}" for m in range(1, 9)]
+
+
+def _kept(first: str) -> tuple[MarketData, list[str], pd.Series]:
+    """A service that already holds a good copy of Canada's CPI, then gets ``first``."""
+    replies = [first, _boc(YEAR)]
+    data = MarketData(lambda series: replies.pop())
+    assert data.refresh("cpi_cad") is True
+    kept = data.closes("cpi_cad")
+    assert kept is not None and len(kept) == len(YEAR)
+    return data, replies, kept
+
+
+def test_a_short_boc_reply_leaves_the_kept_series_in_place() -> None:
+    data, _, kept = _kept(_boc(YEAR[:-3]))  # three months short of the kept copy
+    assert data.refresh("cpi_cad") is False
+    assert data.closes("cpi_cad") is kept
+
+
+def test_a_boc_reply_with_a_missing_month_is_refused_and_the_kept_copy_stays() -> None:
+    holed = [month for month in YEAR if month != "2026-03"]
+    assert MarketData(lambda series: _boc(holed)).refresh("cpi_cad") is False
+    data, _, kept = _kept(_boc(holed))
+    assert data.refresh("cpi_cad") is False
+    assert data.closes("cpi_cad") is kept
+
+
+def test_a_truncated_reply_leaves_the_kept_series_in_place() -> None:
+    whole = _boc(YEAR)
+    data, _, kept = _kept(whole[: whole.index('"2026-06-01"')])  # the connection cut
+    assert data.refresh("cpi_cad") is False
+    assert data.closes("cpi_cad") is kept
+    # A reply that covers the kept copy and a month more replaces it.
+    data, replies, kept = _kept(_boc([*YEAR, "2026-09"]))
+    assert data.refresh("cpi_cad") is True
+    fresh = data.closes("cpi_cad")
+    assert fresh is not None and fresh is not kept and len(fresh) == len(YEAR) + 1
+
+
+def test_a_reply_that_trims_early_years_but_keeps_nine_tenths_replaces_the_copy() -> None:
+    longer = [f"2024-{m:02d}" for m in range(1, 13)] + [f"2025-{m:02d}" for m in range(1, 9)]
+    history = [*longer, *YEAR]  # 32 months kept
+    # The publisher drops its first three months (29 of 32 kept, over nine tenths)
+    # and adds one: the reply is taken.
+    replies = [_boc([*history[3:], "2026-09"]), _boc(history)]
+    data = MarketData(lambda series: replies.pop())
+    assert data.refresh("cpi_cad") is True and data.refresh("cpi_cad") is True
+    fresh = data.closes("cpi_cad")
+    assert fresh is not None and fresh.index[0] == pd.Timestamp("2024-04-01")
+    assert fresh.index[-1] == pd.Timestamp("2026-09-01")
+
+
+def test_a_reply_that_trims_too_much_or_ends_earlier_is_refused_and_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    longer = [f"2024-{m:02d}" for m in range(1, 13)] + [f"2025-{m:02d}" for m in range(1, 9)]
+    history = [*longer, *YEAR]
+    for reply in (
+        _boc([*history[4:], "2026-09"]),  # 28 of 32 kept: under nine tenths
+        _boc(history[:-1]),  # ends a month earlier
+    ):
+        replies = [reply, _boc(history)]
+        data = MarketData(lambda series, replies=replies: replies.pop())
+        assert data.refresh("cpi_cad") is True
+        kept = data.closes("cpi_cad")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="quant_trade.audit.market"):
+            assert data.refresh("cpi_cad") is False
+        assert data.closes("cpi_cad") is kept
+        (record,) = caplog.records
+        assert record.getMessage() == (
+            "public series cpi_cad (boc) refused or failed: "
+            "ValueError: the reply covers less than the kept copy"
+        )
+
+
+def test_a_failed_read_is_logged_with_key_provider_and_error_only(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def down(series: str) -> str:
+        raise TimeoutError("FRED too slow")
+
+    data = MarketData(down, sleep=lambda seconds: None)
+    with caplog.at_level(logging.WARNING, logger="quant_trade.audit.market"):
+        assert data.refresh("cash_eur") is False
+    assert [record.getMessage() for record in caplog.records] == [
+        "public series cash_eur (fred) refused or failed: TimeoutError: FRED too slow"
+    ]
+
+
+def test_every_monthly_series_must_have_consecutive_months() -> None:
+    monthly = [asset for asset in SERIES.values() if asset.monthly]
+    assert {asset.key for asset in LOCAL_CPI} <= {asset.key for asset in monthly}
+    assert {"cpi", "cash_mxn", "cash_jpy", "cash_chf", "cash_brl"} <= {a.key for a in monthly}
+    gap = "DATE,CPIAUCNS\n2024-01-01,300\n2024-03-01,301\n2024-04-01,302\n"
+    assert MarketData(lambda series: gap).refresh("cpi") is False
+    # October 2025 is the one month BLS never published.
+    shutdown = "DATE,CPIAUCNS\n2025-09-01,324\n2025-11-01,325\n2025-12-01,326\n"
+    assert MarketData(lambda series: shutdown).refresh("cpi") is True
+    assert (
+        MarketData(lambda series: ONS.replace('"2026 JUL"', '"2026 JUN"')).refresh("cpi_gbp")
+        is False
+    )
+
+
+def test_only_the_publishers_own_gaps_are_allowed_in_a_policy_rate() -> None:
+    months = [str(p) for p in pd.period_range("2012-01", "2017-12", freq="M")]
+    kept = [m for m in months if not "2013-05" <= m <= "2016-08"]
+
+    def bis(area: str) -> str:
+        rows = "".join(f"M,{area},{month},0.05\n" for month in kept)
+        return "FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE\n" + rows
+
+    assert MarketData(lambda series: bis("JP")).refresh("cash_jpy") is True
+    assert MarketData(lambda series: bis("MX")).refresh("cash_mxn") is False
+
+
+def test_a_failed_read_is_tried_again_before_the_row_is_lost() -> None:
+    # Value's 40-file runs: one slow Bank of Canada or BCB reply dropped a row.
+    calls: list[str] = []
+    pauses: list[float] = []
+
+    def flaky(series: str) -> str:
+        calls.append(series)
+        if len(calls) < market_lib.READ_ATTEMPTS:
+            raise TimeoutError("slow")
+        return BOC
+
+    data = MarketData(flaky, sleep=pauses.append)
+    assert data.refresh("cpi_cad") is True
+    assert len(calls) == market_lib.READ_ATTEMPTS
+    assert len(pauses) == market_lib.READ_ATTEMPTS - 1
+
+    def down(series: str) -> str:
+        raise ConnectionResetError("reset")
+
+    assert MarketData(down, sleep=lambda _: None).refresh("cpi_cad") is False
+
+    def unreadable(series: str) -> str:
+        calls.append(series)
+        return "<html>blocked</html>"
+
+    calls.clear()
+    assert MarketData(unreadable, sleep=lambda _: None).refresh("cpi_cad") is False
+    assert len(calls) == 1

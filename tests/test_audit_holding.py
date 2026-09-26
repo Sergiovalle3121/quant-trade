@@ -16,8 +16,14 @@ from audit_fixtures import business_days, csv_bytes, trades_following
 from quant_trade.audit import market as market_lib
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
-from quant_trade.audit.holding import MIN_DAYS, sharpe_gap_se, versus_holding
-from quant_trade.audit.i18n import untranslated
+from quant_trade.audit.holding import (
+    MIN_DAYS,
+    UNLICENSED,
+    UNLICENSED_WITH_BENCHMARK,
+    sharpe_gap_se,
+    versus_holding,
+)
+from quant_trade.audit.i18n import localize, untranslated
 from quant_trade.audit.market import BY_KEY, MarketData, asset_of, dominant_asset, parse_fred_csv
 from quant_trade.audit.market import _download as real_download
 from quant_trade.audit.report import LABELS, _holding_html, render
@@ -74,14 +80,28 @@ def test_market_data_caches_and_keeps_the_last_good_copy() -> None:
         return replies.pop()
 
     data = MarketData(fetch, max_age=100.0, clock=lambda: now[0])
-    assert data.refresh("sp500") is True and calls == ["SP500"]
-    first = data.closes("sp500")
+    assert data.refresh("vix") is True and calls == ["VIXCLS"]
+    first = data.closes("vix")
     assert first is not None and len(first) == 2
-    assert data.closes("sp500") is first and calls == ["SP500"]
+    assert data.closes("vix") is first and calls == ["VIXCLS"]
     now[0] = 500.0  # stale: FRED is down, the last good copy stays
-    assert data.refresh("sp500") is False and data.closes("sp500") is first
+    assert data.refresh("vix") is False and data.closes("vix") is first
     assert data.closes("unknown") is None and data.refresh("unknown") is False
-    assert MarketData(lambda s: "junk").refresh("bitcoin") is False
+    assert MarketData(lambda s: "junk").refresh("vix") is False
+
+
+def test_markets_without_a_licensed_source_are_never_read() -> None:
+    """FRED's S&P 500, Nasdaq 100 and Coinbase copies need the owner's written
+    permission for any reproduction: recognised, never downloaded."""
+    asked: list[str] = []
+    data = MarketData(lambda s: asked.append(s) or "DATE,V\n2024-01-02,10\n2024-01-03,11\n")
+    for asset in market_lib.ASSETS:
+        assert not asset.licensed and asset.key not in market_lib.SERIES
+        assert data.refresh(asset.key) is False and data.closes(asset.key) is None
+    data.warm().join(timeout=5)
+    assert asked and not {"SP500", "NASDAQ100", "CBBTCUSD"} & set(asked)
+    ids = {asset.series for asset in market_lib.SERIES.values()}
+    assert not any(series.startswith(("IRSTCI01", "IR3TIB01")) for series in ids)
 
 
 def test_fred_csv_drops_values_that_are_not_finite() -> None:
@@ -101,20 +121,20 @@ def test_closes_never_waits_on_the_network() -> None:
 
     data = MarketData(slow)
     started = time.monotonic()
-    assert data.closes("nasdaq100") is None
-    assert data.closes("nasdaq100") is None  # the refresh already running is not doubled
+    assert data.closes("vix") is None
+    assert data.closes("vix") is None  # the refresh already running is not doubled
     assert time.monotonic() - started < 0.5
     release.set()
     for _ in range(100):
-        if data.closes("nasdaq100") is not None:
+        if data.closes("vix") is not None:
             break
         time.sleep(0.02)
-    assert data.closes("nasdaq100") is not None and calls == ["NASDAQ100"]
+    assert data.closes("vix") is not None and calls == ["VIXCLS"]
 
 
 def test_the_tests_never_reach_the_network() -> None:
     data = MarketData()
-    assert data.refresh("sp500") is False and data.closes("sp500") is None
+    assert data.refresh("vix") is False and data.closes("vix") is None
 
 
 def test_the_service_reads_public_data_unless_turned_off() -> None:
@@ -246,8 +266,10 @@ def _inputs(locale: str, symbol: str):  # type: ignore[no-untyped-def]
     return dataclasses.replace(inputs, trade_symbols=[symbol] * count), closes
 
 
-@pytest.mark.parametrize("locale", ["es", "en"])
-def test_the_report_shows_the_market_beside_the_strategy(locale: str) -> None:
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_an_unlicensed_market_is_a_not_measured_line_pointing_to_the_benchmark(
+    locale: str,
+) -> None:
     inputs, closes = _inputs(locale, "US100.cash")
     asked: list[str] = []
 
@@ -256,25 +278,47 @@ def test_the_report_shows_the_market_beside_the_strategy(locale: str) -> None:
         return closes
 
     result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=market)
-    assert [key for key in asked if key in market_lib.BY_KEY] == ["nasdaq100"]
-    assert result.holding is not None and result.holding["status"] == "MEASURED"
-    assert result.holding["findings"] == ["rides_the_market"]
+    assert not [key for key in asked if key in market_lib.BY_KEY]
+    holding = result.holding
+    assert holding is not None and holding["status"] == "NOT_MEASURED"
+    assert holding["reason"] == UNLICENSED and holding["label"] == "Nasdaq 100"
+    assert "source_url" not in holding
     html, _ = render(result, watermark=False)
     assert_report_clean(html)
     labels = LABELS[locale]
-    assert labels["holding"] in html and "Nasdaq 100" in html
-    assert "href='https://fred.stlouisfed.org/series/NASDAQ100'" in html
-    assert (
-        labels["holding_rides"].format(
-            label="Nasdaq 100", weeks=int(result.holding["weeks"]["value"])
-        )
-        in html
-    )
-    assert labels["holding_sharpe"].format(days=int(result.holding["days"]["value"])) in html
+    assert labels["holding"] in html
+    assert labels["holding_not_measured"].split("{")[0] in html
+    assert "fred.stlouisfed.org/series/NASDAQ100" not in html
     assert untranslated(result.model_dump(mode="json")) == []
     for key, text in labels.items():
         if key.startswith("holding"):
             assert find_claims(text) == [], key
+    # With a benchmark uploaded, the line points to that comparison instead.
+    with_benchmark = dataclasses.replace(inputs, benchmark=inputs.equity)
+    result = run_audit(with_benchmark, bootstrap_samples=200, risk_samples=300, market=market)
+    assert result.holding is not None
+    assert result.holding["reason"] == UNLICENSED_WITH_BENCHMARK
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_measured_comparison_still_renders_for_a_licensed_market(locale: str) -> None:
+    """Kept for a market that gets a licensed source: the section's own figures."""
+    closes = _market(600, seed=3)
+    moves = np.r_[0.0, closes.pct_change().dropna().to_numpy()]
+    asset = dataclasses.replace(BY_KEY["nasdaq100"], licensed=True)
+    holding = versus_holding(_curve(1.5 * moves, closes.index), closes, asset)
+    assert holding["status"] == "MEASURED" and holding["findings"] == ["rides_the_market"]
+    labels = LABELS[locale]
+    html = _holding_html(holding, locale, labels)
+    assert_report_clean(html)
+    assert (
+        labels["holding_rides"].format(label="Nasdaq 100", weeks=int(holding["weeks"]["value"]))
+        in html
+    )
+    assert labels["holding_sharpe"].format(days=int(holding["days"]["value"])) in html
 
 
 def test_without_market_data_or_a_known_market_there_is_no_section() -> None:
@@ -292,7 +336,7 @@ def test_without_market_data_or_a_known_market_there_is_no_section() -> None:
 
 
 @pytest.mark.parametrize("locale", ["es", "en"])
-def test_fred_down_is_a_plain_not_measured_line(locale: str) -> None:
+def test_public_data_down_is_the_same_plain_not_measured_line(locale: str) -> None:
     inputs, _ = _inputs(locale, "US100")
 
     def broken(key: str) -> pd.Series:
@@ -418,16 +462,16 @@ def test_a_failure_is_not_retried_at_once_and_nobody_waits() -> None:
         return "<html>rate limited</html>"
 
     data = MarketData(fetch, retry_after=600.0, clock=lambda: now[0])
-    assert data.refresh("bitcoin") is False and len(calls) == 1
+    assert data.refresh("vix") is False and len(calls) == 1
     now[0] = 300.0
-    assert data.closes("bitcoin") is None
+    assert data.closes("vix") is None
     time.sleep(0.1)
     assert len(calls) == 1  # inside the back-off: no new download started
     # Another refresh of the series already running: this one returns at once.
-    data._locks["sp500"].acquire()
-    assert data.refresh("sp500") is False and data.closes("sp500") is None
+    data._locks["tbill3m"].acquire()
+    assert data.refresh("tbill3m") is False and data.closes("tbill3m") is None
     assert len(calls) == 1
-    data._locks["sp500"].release()
+    data._locks["tbill3m"].release()
 
 
 def test_warm_downloads_every_series_in_the_background() -> None:
@@ -444,11 +488,11 @@ def test_download_is_blocked_by_the_test_guard() -> None:
 
 @pytest.mark.parametrize("locale", ["es", "en"])
 def test_a_higher_sharpe_inside_the_noise_says_it_is_not_enough(locale: str) -> None:
-    inputs, closes = _inputs(locale, "US100")
-    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=lambda k: closes)
-    assert result.holding is not None
+    closes = _market(600, seed=3)
+    moves = np.r_[0.0, closes.pct_change().dropna().to_numpy()]
+    measured = versus_holding(_curve(1.5 * moves, closes.index), closes, BY_KEY["nasdaq100"])
     labels = LABELS[locale]
-    holding = {**result.holding, "findings": []}
+    holding = {**measured, "findings": []}
     holding["sharpe_gap_in_se"] = {**holding["sharpe_gap_in_se"], "value": 0.84}
     shown = _holding_html(holding, locale, labels)
     assert labels["holding_no_clear_edge"].format(z="0.84") in shown
@@ -460,3 +504,13 @@ def test_a_higher_sharpe_inside_the_noise_says_it_is_not_enough(locale: str) -> 
     rides["sharpe_gap_in_se"] = {**holding["sharpe_gap_in_se"], "value": 0.84}
     assert labels["holding_no_clear_edge"].split("(")[0] not in _holding_html(rides, locale, labels)
     assert "FRED ," not in shown and "FRED</a>," not in shown
+
+
+def test_the_unlicensed_reason_speaks_of_the_sources_we_know_in_each_language() -> None:
+    # Not a legal absolute: only the sources known to us.
+    for reason in (UNLICENSED, UNLICENSED_WITH_BENCHMARK):
+        assert "that we know of" in reason
+        assert "que conozcamos" in localize(reason, "es")
+        assert "que conheçamos" in localize(reason, "pt")
+        for locale in ("es", "pt"):
+            assert find_claims(localize(reason, locale)) == []

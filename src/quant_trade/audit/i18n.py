@@ -982,12 +982,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "Sharpe ratio of the returns after subtracting what cash in the account's own currency "
-        "paid over the same days (the short rate FRED publishes for that currency, converted "
-        "to an annual yield by its own quote), annualised like the headline Sharpe",
+        "paid over the same days (that currency's overnight or central bank policy rate, from "
+        "its publisher, converted to an annual yield by its own quote), annualised like the "
+        "headline Sharpe",
         "Sharpe de los retornos tras restar lo que pagó el efectivo en la moneda de la cuenta "
-        "en los mismos días (la tasa a corto plazo que FRED publica para esa moneda, "
-        "convertida a rendimiento anual según su forma de cotizar), anualizado como el Sharpe "
-        "principal",
+        "en los mismos días (la tasa a un día o la tasa de política monetaria de esa moneda, "
+        "de quien la publica, convertida a rendimiento anual según su forma de cotizar), "
+        "anualizado como el Sharpe principal",
     ),
     (
         "the Treasury bill rates could not be read when the report was made",
@@ -1016,8 +1017,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "average return per period, annualised; 90 % band from its cautious standard error",
-        "rentabilidad media por periodo, anualizada; banda del 90 % con su error estándar "
-        "prudente",
+        "rentabilidad media por periodo, anualizada; banda del 90 % con su error estándar prudente",
     ),
     ("fewer than 250 returns", "menos de 250 retornos"),
     (
@@ -1133,6 +1133,21 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "the market's public closes could not be read when the report was made",
         "no se pudieron leer los cierres públicos del mercado al generar el informe",
+    ),
+    (
+        "no public source of this market's closes that we know of has a licence that allows "
+        "reuse in a paid report; to compare, upload its closes as the benchmark file",
+        "ninguna fuente pública de los cierres de este mercado que conozcamos tiene una "
+        "licencia que permita reutilizarlos en un informe de pago; para compararlo, sube sus "
+        "cierres como archivo de benchmark",
+    ),
+    (
+        "no public source of this market's closes that we know of has a licence that allows "
+        "reuse in a paid report; the benchmark section compares the strategy with the file "
+        "you uploaded",
+        "ninguna fuente pública de los cierres de este mercado que conozcamos tiene una "
+        "licencia que permita reutilizarlos en un informe de pago; la sección del benchmark "
+        "compara la estrategia con el archivo que subiste",
     ),
     (
         "fewer than 60 days shared with the market's public closes",
