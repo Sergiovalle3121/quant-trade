@@ -1128,3 +1128,26 @@ def test_the_new_statistics_blocks_are_styled() -> None:
     # In the PDF, notes sit below the body text instead of above it.
     assert ".muted{font-size:8.8pt}" in PDF_CSS
     assert ".facts.ranges .fact b{font-size:13pt!important" in STYLE
+
+
+def test_the_currency_table_marks_its_reference_rows() -> None:
+    from quant_trade.audit import report
+
+    labels = report.LABELS["pt"]
+    figures = {"total_return": {"value": 0.3, "evidence": "MEASURED"}}
+    section = {
+        "status": "MEASURED",
+        "first": "2022-01-03",
+        "last": "2023-07-14",
+        "dollars": figures,
+        "real": {**figures, "status": "MEASURED", "inflation": {"value": 0.03}},
+        "currencies": [{"code": "MXN", **figures}],
+    }
+    shown = report._currency_html(section, "pt", labels)
+    assert "<table class='timing holding currency'>" in shown
+    assert "<tr class='cur-base'>" in shown and "<tr class='cur-real'>" in shown
+    assert "table.currency tr.cur-base td{background:var(--surface-2)" in STYLE
+    # On a phone the currency names keep room instead of wrapping to four lines.
+    assert ".paper table.holding td:first-child{min-width:8.6em}" in STYLE
+    # In the PDF the whole table fits one page.
+    assert ".paper table.currency{width:100%;font-size:8.5pt}" in STYLE
