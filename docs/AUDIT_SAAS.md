@@ -344,10 +344,12 @@ column named with a `%` (`Return %`, `Rendimiento %`, `Retorno (%)`) and reads
 it as percentages, whatever the size of its values (a money-market fund's
 `0.03` is 0.03 %, as factsheet grids read it). `Data` is a Portuguese date
 column, taken only when no `date` or `fecha` column exists. Spanish and
-Portuguese curves are read by their balance column: `Saldo`, `Patrimonio`,
-`Patrimônio`, and a fund's value per share `Valor da cota`, `Valor cuota` or
-`Valor cuotaparte` (after the English names, so `equity` or `balance` wins
-when both exist). A column whose
+Portuguese curves are read by a fund's value per share (`Valor da cota`,
+`Valor cuota`, `Valor cuotaparte`) or, without one, the balance column `Saldo`
+(after the English names, so `equity` or `balance` wins when both exist).
+`Patrimonio`/`Patrimônio` is not read on its own: in a fund file it is the net
+assets, which move with subscriptions and redemptions, so it goes to the
+column screen. A column whose
 numbers plainly use a decimal comma (`10.000,50`, `1,5`) is read that way
 throughout (one plainly decimal-comma cell decides the column, so a `1,234`
 beside `1,5` reads 1.234); `10,000.50` and an ambiguous `10,000` keep the comma

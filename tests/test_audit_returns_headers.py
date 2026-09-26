@@ -142,8 +142,6 @@ def test_a_curve_with_one_comma_cell_keeps_its_scale() -> None:
     ("header", "values"),
     [
         ("Fecha;Saldo", ["10.000,00", "10.007,77", "9.950,10"]),
-        ("Data;Patrimônio", ["10.000,00", "10.007,77", "9.950,10"]),
-        ("Fecha,Patrimonio", ["10000.00", "10007.77", "9950.10"]),
         ("Data;Valor da cota", ["1,000000", "1,000777", "0,995010"]),
         ("Fecha;Valor cuotaparte", ["1,000000", "1,000777", "0,995010"]),
         ("Date,Balance", ["10000.00", "10007.77", "9950.10"]),
@@ -158,3 +156,24 @@ def test_spanish_and_portuguese_balance_headers_are_read_as_the_curve(
     assert series.source == "equity"
     first, last = float(series.frame["equity"].iloc[0]), float(series.frame["equity"].iloc[-1])
     assert round(last / first, 6) == 0.99501
+
+
+def test_a_fund_file_reads_the_share_value_not_the_net_assets() -> None:
+    # Net assets move with subscriptions and redemptions; the value per share
+    # is the return series, whichever column comes first.
+    text = "Data;Patrimônio;Valor da cota;Saldo\n" + "\n".join(
+        f"2024-01-{day:02d};{assets};{quota};{assets}"
+        for day, assets, quota in (
+            (2, "1.000.000,00", "1,000000"),
+            (3, "5.000.000,00", "1,010000"),
+            (4, "4.000.000,00", "0,999900"),
+        )
+    )
+    series = parse_equity_csv(text.encode())
+    assert [round(float(v), 6) for v in series.frame["equity"]] == [1.0, 1.01, 0.9999]
+
+
+def test_net_assets_alone_are_not_taken_as_the_curve() -> None:
+    text = "Fecha;Patrimonio\n2024-01-02;1.000.000,00\n2024-01-03;5.000.000,00\n"
+    with pytest.raises(ValueError):
+        parse_equity_csv(text.encode())

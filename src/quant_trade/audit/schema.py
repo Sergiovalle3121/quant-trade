@@ -79,14 +79,15 @@ EQUITY_ALIASES = (
     "portfolio_value",
     "close",
     "capital",
-    # Spanish and Portuguese: the account balance, and a fund's value per share
-    # (Brazil's "valor da cota", Argentina's "valor cuotaparte").
-    "saldo",
-    "patrimonio",
-    "patrimônio",
+    # Spanish and Portuguese: a fund's value per share (Brazil's "valor da
+    # cota", Argentina's "valor cuotaparte") before the account balance, so a
+    # file carrying both reads the share value. "Patrimonio" is left out: in a
+    # fund file it is the net assets, which move with subscriptions and
+    # redemptions, so it goes to the column screen instead.
     "valor_da_cota",
     "valor_cuota",
     "valor_cuotaparte",
+    "saldo",
 )
 RETURN_ALIASES = (
     "return",
