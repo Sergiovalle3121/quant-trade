@@ -48,6 +48,7 @@ from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.compare import COPY as COMPARE_COPY
 from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
+from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
@@ -79,7 +80,7 @@ from quant_trade.audit.pages import (
     verification_page,
 )
 from quant_trade.audit.payments import stripe_checkout
-from quant_trade.audit.portuguese import link_locale
+from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
@@ -298,6 +299,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Only a full report can publish a verification.",
     },
 }
+for _key, _text in MESSAGES_PT.items():
+    MESSAGES[_key].setdefault("pt", _text)
 
 #: The only routes a browser or CDN may cache: public by design, no token.
 PUBLIC_CACHE_CONTROL = "public, max-age=300"
@@ -377,6 +380,9 @@ UPLOAD_NAMES: dict[str, dict[str, str]] = {
     "optimization": {"es": "de optimización", "en": "optimisation"},
     "live": {"es": "de la cuenta real", "en": "live statement"},
 }
+for _what, _name in FILES_PT.items():
+    if _what in UPLOAD_NAMES:
+        UPLOAD_NAMES[_what]["pt"] = _name
 
 
 def _megabytes(size: int) -> str:
@@ -979,6 +985,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _locale(value: str | None) -> str:
         return value if value in LOCALES else "es"
 
+    def _error_locale(request: Request) -> str:
+        """The language of an error page: ``?lang=``, else Portuguese under ``/pt``."""
+        lang = request.query_params.get("lang")
+        if lang in REPORT_LOCALES:
+            return str(lang)
+        path = request.url.path
+        return "pt" if path == "/pt" or path.startswith("/pt/") else "es"
+
     def _html_error(
         request: Request, status: int, message: str, locale: str, *, kind: str = "audit"
     ) -> Response:
@@ -991,14 +1005,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.exception_handler(RequestValidationError)
     async def form_error(request: Request, exc: RequestValidationError) -> Response:
-        locale = _locale(request.query_params.get("lang"))
+        locale = _error_locale(request)
         return _html_error(request, 400, message("invalid_form", locale), locale)
 
     @app.exception_handler(Exception)
     async def server_error(request: Request, exc: Exception) -> Response:
         # Logged with the path only: the query string may hold the token.
         logger.exception("unhandled error on %s %s", request.method, request.url.path)
-        locale = _locale(request.query_params.get("lang"))
+        locale = _error_locale(request)
         return _secure(
             _html_error(request, 500, message("server_error", locale), locale, kind="server"),
             path=request.url.path,
@@ -1011,7 +1025,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         key = str(exc.detail) if str(exc.detail) in MESSAGES else "page_missing"
         if exc.status_code == 400 and request.url.path.startswith("/webhooks/"):
             return JSONResponse({"error": str(exc.detail)}, status_code=400)
-        locale = _locale(request.query_params.get("lang"))
+        locale = _error_locale(request)
         kind = "page" if key == "page_missing" else "audit"
         return _html_error(request, exc.status_code, message(key, locale), locale, kind=kind)
 
@@ -2096,13 +2110,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         access_code: Annotated[str, Form()] = "",
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
-        # The report's language; the upload's own screens show Portuguese readers English.
+        # The report's language, which the refusals below also speak; the sign-in
+        # gate and the column picker show Portuguese readers English.
         report_loc = _report_locale(locale)
         loc = link_locale(report_loc)
         if _cross_site(request):
-            return _html_error(request, 403, message("cross_site", loc), loc)
+            return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
-            return _html_error(request, 400, message("consent_required", loc), loc)
+            return _html_error(request, 400, message("consent_required", report_loc), report_loc)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         now = datetime.now(UTC)
         since = now - timedelta(hours=1)
@@ -2112,7 +2127,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             recent >= cfg.max_uploads_per_hour_per_ip
             or attempts >= cfg.max_uploads_per_hour_per_ip * UPLOAD_ATTEMPTS_PER_UPLOAD
         ):
-            return _html_error(request, 429, message("rate_limited", loc), loc)
+            return _html_error(request, 429, message("rate_limited", report_loc), report_loc)
         # The free tier: without a code that still works, an upload needs an
         # account, and each account gets FREE_PREVIEWS_PER_MONTH previews a
         # calendar month (also capped per network address). Past it, a
@@ -2149,15 +2164,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 count = limit // OPTIMIZATION_PASS_BYTES
                 passes = f"{round(count, -3) if count >= 1_000 else count:,}"
                 text = message(
-                    "optimization_too_large", loc, limit=_megabytes(limit), passes=passes
+                    "optimization_too_large", report_loc, limit=_megabytes(limit), passes=passes
                 )
             else:
                 text = message(
-                    "too_large", loc, what=UPLOAD_NAMES[exc.what][loc], limit=_megabytes(limit)
+                    "too_large",
+                    report_loc,
+                    what=UPLOAD_NAMES[exc.what][report_loc],
+                    limit=_megabytes(limit),
                 )
-            return _html_error(request, 413, text, loc)
+            return _html_error(request, 413, text, report_loc)
         if not uploads["equity"] and not uploads["report"]:
-            return _html_error(request, 400, message("equity_required", loc), loc)
+            return _html_error(request, 400, message("equity_required", report_loc), report_loc)
         # A new account's first file is a free full report (once per account,
         # browser and file); then the month's free previews; then a credit;
         # else the way to buy. This first look answers at once; the claims
@@ -2278,7 +2296,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
             )
         except (ValidationError, ValueError):
-            return _html_error(request, 400, message("invalid_declared", loc), loc)
+            return _html_error(request, 400, message("invalid_declared", report_loc), report_loc)
         report_filename = report.filename if report is not None and uploads["report"] else None
         # A platform report dropped in the equity-curve field is read as the
         # report, instead of failing as a malformed CSV.
@@ -2405,7 +2423,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     else None
                 )
                 if table is None:
-                    return _html_error(request, 400, _sentence(exc.localized(loc)), loc)
+                    return _html_error(
+                        request, 400, _sentence(exc.localized(report_loc)), report_loc
+                    )
                 # The columns this account chose before for the same header.
                 saved = (
                     mapping.usable_mapping(
@@ -2427,12 +2447,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 else:
                     return _mapping_answer(request, table, exc, loc, carried, report_columns)
             except ValueError:
-                return _html_error(request, 400, message("invalid_upload", loc), loc)
+                return _html_error(request, 400, message("invalid_upload", report_loc), report_loc)
             except Exception:
                 # A file no importer anticipated: the customer gets the
                 # format message, the operator gets the traceback.
                 logger.exception("upload could not be parsed")
-                return _html_error(request, 400, message("invalid_upload", loc), loc)
+                return _html_error(request, 400, message("invalid_upload", report_loc), report_loc)
             if gate_account is not None:
                 refusal = claim_free_use(gate_account.id, inputs)
                 if refusal is not None:
@@ -2443,12 +2463,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
             except Exception:
                 logger.exception("audit failed")
-                return _html_error(request, 500, message("server_error", loc), loc)
+                return _html_error(request, 500, message("server_error", report_loc), report_loc)
 
         # The slot bounds CPU and memory: a burst of uploads waits here and,
         # past the queue time, is told the service is busy instead of piling up.
         if not await _take_slot(audit_slots, cfg.audit_queue_seconds):
-            return _html_error(request, 503, message("busy", loc), loc)
+            return _html_error(request, 503, message("busy", report_loc), report_loc)
         try:
             outcome = await run_in_threadpool(parse_and_audit)
         finally:
