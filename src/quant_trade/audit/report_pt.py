@@ -1742,6 +1742,21 @@ VERDICT: dict[str, Any] = {
             "Não foi declarado quantas configurações foram testadas e, mesmo com 1, o caso mais "
             "favorável, o resultado não supera o que uma tentativa sem habilidade produziria."
         ),
+        "multiplicity.PASS.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; com 1, "
+            "o caso mais favorável, o resultado continua acima do que uma tentativa sem "
+            "habilidade produziria. Se forem mais, declará-los pode mudar esta conclusão."
+        ),
+        "multiplicity.WEAK.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
+            "com 1, o caso mais favorável, o Sharpe ajustado por essas tentativas não chega ao "
+            "limiar."
+        ),
+        "multiplicity.FAIL.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
+            "com 1, o caso mais favorável, o resultado não supera o que uma tentativa sem "
+            "habilidade produziria."
+        ),
         "costs.PASS": (
             "Com 3 vezes o custo de referência, o resultado das operações continua positivo."
         ),
@@ -1843,6 +1858,11 @@ VERDICT: dict[str, Any] = {
             "qual parte é teste sobre dados novos. Pergunte essa data ao fornecedor e declare-a "
             "para medi-lo."
         ),
+        "out_of_sample.NOT_MEASURED.fund": (
+            "O histórico mensal de um fundo é o seu histórico real, mas não diz desde quando o "
+            "gestor aplica o mesmo processo nem se algum trecho é simulado. Pergunte essa data "
+            "ao gestor e declare-a para medi-lo."
+        ),
         "data_quality.PASS": (
             "Não encontramos saltos, lacunas nem padrões de risco oculto nos arquivos. Isso não "
             "descarta erros que os arquivos não mostrem."
@@ -1926,6 +1946,10 @@ PLAN: dict[str, Any] = {
     },
     "ACCOUNT_TITLES": {
         "out_of_sample": "Descubra desde quando opera sem alterações",
+    },
+    "FUND_TITLES": {
+        "out_of_sample": "Descubra desde quando o processo do gestor não muda",
+        "costs": "Confirme se os números são líquidos de taxas",
     },
     "FLAG_HINTS": {
         "TOO_FEW_OBSERVATIONS": (
@@ -2143,6 +2167,9 @@ NOT_MEASURED: dict[str, str] = {
     ),
     "cost rows missing": "faltam linhas de custos",
     "no out-of-sample start declared": "não foi declarado um início fora da amostra",
+    "a fund's record does not say since when its process has run unchanged": (
+        "o histórico do fundo não diz desde quando o seu processo opera sem alterações"
+    ),
     "declared out-of-sample start lies outside the uploaded series": (
         "o início fora da amostra declarado cai fora da série enviada"
     ),
@@ -3544,6 +3571,7 @@ RULES: tuple[tuple[str, str], ...] = (
         "the fund's own returns after its fees; costs were not measured",
         "rentabilidades do próprio fundo após as suas taxas; os custos não foram medidos",
     ),
+    ("the index the file itself carries", "o índice que o próprio arquivo traz"),
     (
         (
             "the net-of-fees declaration applies only to a monthly fund track record; costs are "
@@ -5464,6 +5492,10 @@ REASONS: tuple[tuple[str, str], ...] = (
     (
         "no out-of-sample start declared",
         "não foi declarado um início fora da amostra",
+    ),
+    (
+        "a fund's record does not say since when its process has run unchanged",
+        "o histórico do fundo não diz desde quando o seu processo opera sem alterações",
     ),
     (
         "declared out-of-sample start lies outside the uploaded series",

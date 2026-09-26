@@ -3367,18 +3367,26 @@ def _dimension_title(name: str, locale: str) -> str:
     return DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]).get(name, name)
 
 
-def _meaning_html(verdict: dict[str, Any], locale: str, *, account: bool = False) -> str:
+def _fund_record(data: dict[str, Any]) -> bool:
+    """True when the audit ran on a fund's track record."""
+    return bool((data.get("fund") or {}).get("track_record"))
+
+
+def _meaning_html(
+    verdict: dict[str, Any], locale: str, *, account: bool = False, fund: bool = False
+) -> str:
     by_name = {d["name"]: d for d in verdict["dimensions"]}
     items = []
     for name in DIMENSION_ORDER:
         dimension = by_name.get(name)
         if dimension is None:
             continue
+        text = meaning(name, dimension["status"], locale, account=account, fund=fund)
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
             f"<h3>{_e(_dimension_title(name, locale))} "
             f"{_status_badge(dimension['status'], locale)}</h3>"
-            f"<p>{_e(meaning(name, dimension['status'], locale, account=account))}</p></div>"
+            f"<p>{_e(text)}</p></div>"
         )
     return "<div class='meaning'>" + "".join(items) + "</div>"
 
@@ -4405,6 +4413,7 @@ def _summary_in(data: dict[str, Any], locale: str) -> str:
         trials=int(trials.get("value") or 1),
         trials_evidence=str(trials.get("evidence") or "DECLARED"),
         account=is_account_history(data),
+        fund=_fund_record(data),
     )
 
 
@@ -7141,7 +7150,9 @@ def render_html(
         section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
         section(
             labels["meaning"],
-            _meaning_html(verdict, locale, account=is_account_history(data)),
+            _meaning_html(
+                verdict, locale, account=is_account_history(data), fund=_fund_record(data)
+            ),
             "r-meaning",
         ),
         section(

@@ -29,6 +29,7 @@ from quant_trade.audit.verdict import (
     BENCHMARK,
     COSTS,
     DATA_QUALITY,
+    FUND_OOS_REASON,
     MULTIPLICITY,
     OUT_OF_SAMPLE,
     STATISTICAL,
@@ -133,6 +134,23 @@ ACCOUNT_TITLES: dict[str, dict[str, str]] = {
     "es": {OUT_OF_SAMPLE: "Averigua desde cuándo opera sin cambios"},
     "en": {OUT_OF_SAMPLE: "Find out since when it has run unchanged"},
 }
+
+#: Titles that read differently when the upload is a fund's track record.
+FUND_TITLES: dict[str, dict[str, str]] = {
+    "es": {
+        OUT_OF_SAMPLE: "Averigua desde cuándo el gestor no cambia de proceso",
+        COSTS: "Confirma si las cifras son netas de comisiones",
+    },
+    "en": {
+        OUT_OF_SAMPLE: "Find out since when the manager's process is unchanged",
+        COSTS: "Confirm whether the figures are net of fees",
+    },
+}
+
+
+def _fund_record(data: dict[str, Any]) -> bool:
+    """True when a stored audit result was run on a fund's track record."""
+    return bool((data.get("fund") or {}).get("track_record"))
 
 #: What the audit would need to see for each red flag, in both languages.
 FLAG_HINTS: dict[str, dict[str, str]] = {
@@ -546,6 +564,8 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
 
 def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     costs = data.get("costs") or {}
+    if (status == "NOT_MEASURED" or costs.get("status") != "MEASURED") and _fund_record(data):
+        return _fund_costs(locale)
     if status == "NOT_MEASURED" or costs.get("status") != "MEASURED":
         finding = _say(
             locale,
@@ -679,6 +699,63 @@ def _account_oos(locale: str) -> tuple[str, list[str]]:
     return finding, actions
 
 
+def _fund_oos(locale: str) -> tuple[str, list[str]]:
+    """The out-of-sample step for a fund's track record, which has no optimisation date."""
+    finding = _say(
+        locale,
+        "El historial del fondo no dice desde cuándo el gestor aplica el mismo proceso ni si "
+        "algún tramo es simulado: sin esa fecha la mejor clase posible es B.",
+        "The fund's record does not say since when the manager has applied the same process, "
+        "or whether any stretch is simulated: without that date the best possible class is B.",
+        "O histórico do fundo não diz desde quando o gestor aplica o mesmo processo nem se "
+        "algum trecho é simulado: sem essa data a melhor classe possível é B.",
+    )
+    actions = _say(
+        locale,
+        [
+            "Pregunta al gestor desde qué fecha no cambió el proceso de inversión y si algún "
+            "tramo es simulado (pro forma); declara esa fecha como inicio fuera de muestra: lo "
+            "posterior se mide como datos nuevos.",
+        ],
+        [
+            "Ask the manager since when the investment process has not changed and whether "
+            "any stretch is simulated (pro forma); declare that date as the out-of-sample "
+            "start: what follows is measured as unseen data.",
+        ],
+        [
+            "Pergunte ao gestor desde que data o processo de investimento não mudou e se algum "
+            "trecho é simulado (pro forma); declare essa data como início fora da amostra: o "
+            "que vem depois é medido como dados novos.",
+        ],
+    )
+    return finding, actions
+
+
+def _fund_costs(locale: str) -> tuple[str, list[str]]:
+    """The cost step for a fund's track record, whose costs are inside each month."""
+    finding = _say(
+        locale,
+        "Un historial mensual de fondo ya trae sus costes de operación dentro de cada mes, "
+        "pero sin la lista de operaciones no se pueden volver a aplicar: la mejor clase "
+        "posible es B.",
+        "A fund's monthly record already carries its trading costs inside each month, but "
+        "without the list of trades they cannot be re-applied: the best possible class is B.",
+        "O histórico mensal de um fundo já traz os seus custos de operação dentro de cada "
+        "mês, mas sem a lista de operações não é possível reaplicá-los: a melhor classe "
+        "possível é B.",
+    )
+    action = _say(
+        locale,
+        "Confirma con el gestor si las cifras son netas de las comisiones de gestión y de "
+        "éxito, y decláralo: el informe muestra cuánto pesan las comisiones.",
+        "Confirm with the manager whether the figures are net of the management and "
+        "performance fees, and declare it: the report shows how much the fees weigh.",
+        "Confirme com o gestor se os números são líquidos das taxas de administração e de "
+        "performance, e declare isso: o relatório mostra quanto pesam as taxas.",
+    )
+    return finding, [action]
+
+
 def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     hold = data.get("holdout") or {}
     inputs = data.get("inputs") or {}
@@ -706,6 +783,8 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
             )
         elif is_account_history(data):
             return _account_oos(locale)
+        elif reason == FUND_OOS_REASON:
+            return _fund_oos(locale)
         else:
             finding = _say(
                 locale,
@@ -815,6 +894,15 @@ def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str
     excess = _number(_value(bench.get("excess_return")))
     ratio = _number(_value(bench.get("drawdown_ratio")))
     parts = []
+    if bench.get("source") == "file":
+        parts.append(
+            _say(
+                locale,
+                "La referencia es el índice que trae el propio archivo.",
+                "The reference is the index the file itself carries.",
+                "A referência é o índice que o próprio arquivo traz.",
+            )
+        )
     if excess is not None:
         parts.append(
             _say(
@@ -906,7 +994,9 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
                 dimension=name,
                 status=dimension.status,
                 title=(
-                    ACCOUNT_TITLES[locale].get(name, TITLES[locale][name])
+                    FUND_TITLES[locale].get(name, TITLES[locale][name])
+                    if _fund_record(data)
+                    else ACCOUNT_TITLES[locale].get(name, TITLES[locale][name])
                     if is_account_history(data)
                     else TITLES[locale][name]
                 ),

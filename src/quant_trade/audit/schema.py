@@ -236,8 +236,9 @@ class IngestedSeries:
     non_monotonic: bool
     warnings: list[str] = field(default_factory=list)
     #: A benchmark the same file carries (``timestamp``, ``ret``): a column
-    #: beside the returns, or a factsheet's benchmark rows. Read only by the
-    #: fund section; it never feeds the benchmark dimension.
+    #: beside the returns, or a factsheet's benchmark rows. The fund section
+    #: reads it, and so does the benchmark dimension when no benchmark file
+    #: was uploaded (``engine._file_benchmark``).
     benchmark: pd.DataFrame | None = None
 
     @property

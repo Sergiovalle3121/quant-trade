@@ -63,6 +63,9 @@ def _same(text: str) -> Reason:
     return (text, text)
 
 
+#: Why a fund's track record has no out-of-sample stretch unless one is declared.
+FUND_OOS_REASON = "a fund's record does not say since when its process has run unchanged"
+
 #: The engine's fixed not-measured reasons, in Spanish.
 NOT_MEASURED_ES: dict[str, str] = {
     "fewer than three returns": "menos de tres retornos",
@@ -74,6 +77,7 @@ NOT_MEASURED_ES: dict[str, str] = {
     ),
     "cost rows missing": "faltan filas de costes",
     "no out-of-sample start declared": "no se declaró un inicio fuera de muestra",
+    FUND_OOS_REASON: "el historial del fondo no dice desde cuándo su proceso opera sin cambios",
     "declared out-of-sample start lies outside the uploaded series": (
         "el inicio fuera de muestra declarado cae fuera de la serie subida"
     ),
@@ -541,6 +545,20 @@ _TEXT: dict[str, dict[str, str]] = {
             "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
             "favorable, el resultado no supera lo que produciría un intento sin habilidad."
         ),
+        f"{MULTIPLICITY}.PASS.undeclared.fund": (
+            "No se declaró cuántos fondos o estrategias lleva el mismo gestor; con 1, el caso "
+            "más favorable, el resultado sigue por encima de lo que produciría un intento sin "
+            "habilidad. Si lleva más, declararlo puede cambiar esta conclusión."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared.fund": (
+            "No se declaró cuántos fondos o estrategias lleva el mismo gestor, e incluso con 1, "
+            "el caso más favorable, el Sharpe ajustado por esos intentos no llega al umbral."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.fund": (
+            "No se declaró cuántos fondos o estrategias lleva el mismo gestor, e incluso con 1, "
+            "el caso más favorable, el resultado no supera lo que produciría un intento sin "
+            "habilidad."
+        ),
         f"{COSTS}.PASS": (
             "Con 3 veces el coste de referencia, el resultado de las operaciones sigue positivo."
         ),
@@ -634,6 +652,21 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "The number of configurations tried was not declared, and even with 1, the most "
             "favourable case, the result does not exceed what an unskilled trial would produce."
+        ),
+        f"{MULTIPLICITY}.PASS.undeclared.fund": (
+            "How many funds or strategies the same manager runs was not declared; with 1, the "
+            "most favourable case, the result stays above what an unskilled trial would "
+            "produce. If there are more, declaring them may change this conclusion."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared.fund": (
+            "How many funds or strategies the same manager runs was not declared, and even "
+            "with 1, the most favourable case, the Sharpe adjusted for those trials misses the "
+            "bar."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.fund": (
+            "How many funds or strategies the same manager runs was not declared, and even "
+            "with 1, the most favourable case, the result does not exceed what an unskilled "
+            "trial would produce."
         ),
         f"{COSTS}.PASS": "At 3 times the reference cost, the trades still end positive.",
         f"{COSTS}.WEAK": (
@@ -738,6 +771,11 @@ MEANING: dict[str, dict[str, str]] = {
             "qué parte es prueba sobre datos nuevos. Pregunta esa fecha al proveedor y "
             "declárala para medirlo."
         ),
+        f"{OUT_OF_SAMPLE}.NOT_MEASURED.fund": (
+            "El historial mensual de un fondo es su historial real, pero no dice desde cuándo "
+            "el gestor aplica el mismo proceso ni si algún tramo es simulado. Pregunta esa "
+            "fecha al gestor y declárala para medirlo."
+        ),
         f"{DATA_QUALITY}.PASS": (
             "No encontramos saltos, huecos ni patrones de riesgo oculto en los archivos. "
             "Eso no descarta errores que los archivos no muestren."
@@ -841,6 +879,11 @@ MEANING: dict[str, dict[str, str]] = {
             "known which part is a test on unseen data. Ask the provider for that date and "
             "declare it to measure it."
         ),
+        f"{OUT_OF_SAMPLE}.NOT_MEASURED.fund": (
+            "A fund's monthly record is its real history, but it does not say since when the "
+            "manager has applied the same process, or whether any stretch is simulated. Ask "
+            "the manager for that date and declare it to measure it."
+        ),
         f"{DATA_QUALITY}.PASS": (
             "We found no jumps, gaps or hidden-risk patterns in the files. "
             "That does not rule out errors the files do not show."
@@ -883,11 +926,16 @@ def class_text(overall: str, locale: str = "es") -> str:
     return texts.get(overall, "")
 
 
-def meaning(name: str, status: str, locale: str = "es", *, account: bool = False) -> str:
+def meaning(
+    name: str, status: str, locale: str = "es", *, account: bool = False, fund: bool = False
+) -> str:
     """Two plain sentences on what a dimension's status means for the reader.
 
-    ``account`` picks the wording for an account history where one exists."""
+    ``account`` picks the wording for an account history and ``fund`` the
+    wording for a fund's track record, where one exists."""
     texts = MEANING.get(locale, MEANING["es"])
+    if fund and f"{name}.{status}.fund" in texts:
+        return texts[f"{name}.{status}.fund"]
     if account and f"{name}.{status}.account" in texts:
         return texts[f"{name}.{status}.account"]
     return texts.get(f"{name}.{status}", "")
@@ -901,10 +949,12 @@ def summary(
     trials: int = 1,
     trials_evidence: str = "DECLARED",
     account: bool = False,
+    fund: bool = False,
 ) -> str:
     """Plain-language summary from fixed templates; never a promise.
 
-    ``account`` names the upload an account history rather than a backtest."""
+    ``account`` names the upload an account history rather than a backtest;
+    ``fund`` names it a fund's track record."""
     text = _TEXT[locale]
     source = TRIAL_SOURCE[locale].get(trials_evidence, TRIAL_SOURCE[locale]["DECLARED"])
     lines = [text.get(f"{overall}.account", text[overall]) if account else text[overall]]
@@ -918,6 +968,8 @@ def summary(
         undeclared = f"{key}.undeclared"
         if name == MULTIPLICITY and trials_evidence == "NOT_MEASURED" and trials == 1:
             key = undeclared if undeclared in text else key
+            if fund and f"{undeclared}.fund" in text:
+                key = f"{undeclared}.fund"
         template = text.get(key, f"{name}: {dimension.status}.")
         reasons = dimension.reasons_in(locale)
         lines.append(
@@ -940,6 +992,7 @@ def build_verdict(
     trials_evidence: str = "DECLARED",
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
     account: bool = False,
+    fund: bool = False,
 ) -> Verdict:
     overall = overall_class(dimensions)
     return Verdict(
@@ -951,6 +1004,7 @@ def build_verdict(
             trials=trials,
             trials_evidence=trials_evidence,
             account=account,
+            fund=fund,
         ),
         thresholds=thresholds.model_dump(),
         dimensions=dimensions,
