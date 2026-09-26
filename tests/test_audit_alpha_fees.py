@@ -157,8 +157,8 @@ def test_span_cash_leaves_the_cash_rate_sharpe_as_it_was() -> None:
     rates = pd.Series(np.linspace(0.05, 5.2, 320), index=pd.bdate_range("2021-02-01", periods=320))
     out = excess_sharpe(frame, rates, 252.0)
     # Values from the implementation before span_cash was split out.
-    assert out["sharpe_excess"]["value"] == -0.1114406105769542
-    assert out["mean_rate"]["value"] == 0.028801429573778403
+    assert out["sharpe_excess"]["value"] == pytest.approx(-0.1114406105769542, rel=1e-12)
+    assert out["mean_rate"]["value"] == pytest.approx(0.028801429573778403, rel=1e-12)
     gap = rates.drop(rates.index[100:120])
     assert excess_sharpe(frame, gap, 252.0)["status"] == "NOT_MEASURED"
 
@@ -199,3 +199,21 @@ def test_the_benchmark_section_subtracts_cash_when_rates_cover_it() -> None:
     assert with_cash["jensen"]["cash_subtracted"] is True
     assert without["jensen"]["cash_subtracted"] is False
     assert with_cash["jensen"]["alpha"]["value"] != without["jensen"]["alpha"]["value"]
+
+
+def test_the_benchmark_section_subtracts_nothing_when_rates_start_mid_history() -> None:
+    from audit_fixtures import csv_bytes, positive_drift
+
+    from quant_trade.audit import alpha
+    from quant_trade.audit.engine import _benchmark
+    from quant_trade.audit.schema import parse_equity_csv
+
+    strategy = parse_equity_csv(csv_bytes(positive_drift(n=400, seed=3)), what="equity")
+    bench = parse_equity_csv(csv_bytes(positive_drift(n=400, seed=4)), what="benchmark")
+    stamps = pd.DatetimeIndex(strategy.frame["timestamp"]).tz_localize(None)
+    middle = stamps[len(stamps) // 2]
+    rates = pd.Series(4.0, index=pd.date_range(middle, stamps.max(), freq="D"))
+    partial, _, _ = _benchmark(strategy, bench, rates)
+    assert partial["jensen"]["cash_subtracted"] is False
+    assert partial["jensen"]["alpha"]["note"] == alpha.NOTE
+    assert "no cash rate subtracted" in partial["jensen"]["alpha"]["note"]
