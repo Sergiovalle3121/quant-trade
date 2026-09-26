@@ -14,6 +14,1266 @@
       "expected_at": "data/cache/crypto_universe/deathlist/raw/ (gitignored)",
       "why_not_committed": "7.4 MB of provider response data; AGENTS.md forbids committing market data caches and provider responses",
       "consequence": "the 81.1% death corroboration rate cannot be recomputed here without re-fetching the roster, and a re-fetch will NOT reproduce this digest - the roster changes daily as coins are flagged inactive, so this hash names one specific capture that no later fetch can recreate"
+    },
+    {
+      "sha256": "03f3609c0b2cc4c7c7a03cb6b8ff0b9e7a85f0d4b9cbde0b0090461b4f7ec0bd",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/33316ba3e2eaedad3ad0888e2851573f6191b091/Files/Report_Trades/DetailedStatement.%2820190114_130029%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "047d75ce9839ef1e4ec4b9a005705b9e8d97db5bd23952b4ed9f736ae19578d4",
+      "names": "a public mt5_tester_xlsx export in the forensics calibration corpus: https://raw.githubusercontent.com/geraked/metatrader5/HEAD/Test/BBRSI/report.xlsx",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "048a84deaa7c3d1803bdb42168ca283387fea0ee1db3c70cc740e03812cc9eb7",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_default_params/random_forest/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "04bb43819373a93f7093258409e110fd1bb723e130a4b223d25a2b404d2e4c41",
+      "names": "a public fxblue_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/andrewbitlab/deusquant-site/7e6940d292cc40fc44f8d766991cff5768001818/data/forward/orders-deusfund-sqx1-2_17-10-2025.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "07c318b17c09734abc435805513848a3a97aa77b53a1217470944850e47fe60e",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://www.mql5.com/en/articles/download/5436.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "0841aa4b9db86e169b818ed2d8a1ccef88236fc990bd9c0435e9e3db00e6c881",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/abiodunaremu/openea/HEAD/reports/v1_1/feb2025_default/ReportTester-v1_gbpusd_feb2025.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "08bb6abe36c57f4b3eaffcd37325ffd9f6f9fb3a091ec69b6bfe25119fc4ddf9",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/8536ff2c92aafc88cdbdfb0f6bea125a85aa3774/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "091777dc5a002508331a494fe914367a76869f8a12d180923380892b2c911b87",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_adx22/baseline_only/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "096f7cbee9629f9a9cdf1054c016a4c7bf6a041e71773d49ddae02764ce4866b",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/kecoma1/Trading_BOT/851aae6cbd7ce63849cfae8bc58de1bb220b64e6/mql5/profitable/MACD_RSI_STOCH/MACD_RSI_STOCH_V3/ReportTester-54232522.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "0c2972f198191dd5afb1379871c30f209943328799823c13515a279d6b8af820",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://www.mql5.com/en/articles/download/5436.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "0dfa5d4d50b139977977ac530c4368f87a3249c2f79876caec076d95fb26edd5",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/JustinGuese/python_tradingbot_framework/HEAD/data/ZenbotZero.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "0ed4cce608343c0b38aadf38b5d0ddbf68983b7aa2e09c9921189e7ae5d43ab9",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/be9f78f048b93a65507197d2bcec383eb3a47c4f/TRADE28_8_2020/ReportHistory-50367453.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "13c53a9820a258ef0e0f2ecd76676248729448c66850c1e480b2f785b78b2451",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/ea-strategy/Strategy%20Tester%20ea-strategy.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "16356e65811db69346c3890420e333c7e1189b0be98e52286d5194f55eda13bb",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/pranay123-stack/forex-mt5-strategies/HEAD/Forex_trading_strategies_EA_scripts/LiquidityMarketMap_EA/ReportTester-52688756.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "17be2af556e613dd60864a6afddaf6585283dba17b5c60e1b530bc9372e954d2",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_iAD_filter/lstm/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "18a09d9dbc2f1919cc83b953b18ba1c4eca892658a96722d7ae850ad2882dc0f",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/fujunzibo/mt4/a8a710253b12b66e151cd6cff6a2ce48782bc6e7/test/DetailedStatement2.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1a245dfb01c76cf4a71435950c4b6969cfe0e2a127686599d91d60211c5c63b9",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/fabfdea1039ca40793bd9635963c8c9a012e2fd0/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1b368326670e8fa9d8e55668af564498660bfd3d5dea60b6c28ed9a4b53354f2",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://c.mql5.com/forextsd/forum/56/detailedstatement_3.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1bb0c3b662c6627485f08e61f620fefda15498fcf9734f761b96487c298fd7c5",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/167f562adc222cab0e393e302dd9275031a907f7/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1cda2c2d3bf136eb10fe6373b61c425f38e6f827d839466520db0ae13df2df0a",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/273445eb02a925fd8ab4a8168de41fee0ad29f3f/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1dd75ece71340b24db679ddb6434e8cd2999466fb866b762da50aebd15ae2db8",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/6c8df94c32f4c94fc4660e2fa757271102c7f460/data/raw_data/statement.csv; https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/HEAD/data/raw_data/statement.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1e18e1c96936f604643c7d037087e671549dd98eadd605d8d4fc8e015543c5ab",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/ca48b834c27aec25b7b5ff06664c46aed982c387/Files/Report_Trades/DetailedStatement.%5B20190207_184152%5D.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "1fe91e964f3dcbba082de9fc9e1d2bf772fa0f2b9758e6695d82e15c632d38f6",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ForexFearClinicElite/Signals/4fe1536a64592e41ae67abf0de5a8d2035507164/2265877.positions.csv; https://raw.githubusercontent.com/ForexFearClinicElite/Signals/HEAD/2265877.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "20ade2e938aa54d46e6257fda1bdbc14b483fbe2d9e876bf3ee54c0169c5496b",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/ba7dd023dd1fc16dfef69b935380ae70423bbf8d/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "242b54d2fb3bf03ccf3da9021e430c8b911de98370337f566e17c6eaf5aa35dc",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_ema6-24/baseline_only/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "263a664900c136e029058dac5ee2874b491a5b436e4e5d2953dffdefc73091e1",
+      "names": "a public mt5_tester_xlsx export in the forensics calibration corpus: https://raw.githubusercontent.com/geraked/metatrader5/HEAD/Test/COT1/report.xlsx",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2832d481703a9af3d2a65ea929fed951a0190a84ab6237ecdce75fbc141a4a1c",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_iAD_filter/baseline_only/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "28a67ddd75ca09a7ba8410113f8cc1e21a1a03aad126a94628b0227abf48f002",
+      "names": "a public mt5_tester_xlsx export in the forensics calibration corpus: https://raw.githubusercontent.com/geraked/metatrader5/HEAD/Test/3MACD/report.xlsx",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "29df3a52ee9c34c09898f7b40ffbd625e330b80ed154f7098aa76a66c2333b02",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_default_params/lstm/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2a0f0457c3cbcd994c449575f8bb08d35e9bc2584d5c0bd45aa6fb788de3adb1",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/EuroW/StrategyTester-EuroW.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2a722dc072c53368bba842cc7093efb73b3e823473342ba7004a6a6d62ddd838",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/HEAD/data/raw_data/Dec2023Testing.csv; https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/f0cd18ac4b1285978b68c48a55a797ae68a63987/data/raw_data/Dec2023Testing.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2d4163bb2deab6fef64b0673373b953e764ca7449f4555e39a5fbcb5efb86ac9",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_default_params/xgboost/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2db2a83cda14063451a2703401b28c0fb5e729d9e88783e93ba017cc3ee9dbe0",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://www.mql5.com/en/articles/download/5706.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2eace53b49f77ec40b4c611a2e8df741cced8f797b835b1edf2937bdd4e956ed",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/3-Tuga%20and%20Wickoff/Wickoff/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "2f370f2f081556869f86d403079f9d142f446a0e915e5db17bcea199a94cc5df",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/73d4181b16512aa2eccc64ed32f969ee3a823612/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "31173744e5ef51c7203944c5623af6e3a16cf8f68fc5584f53d24c4c419ecccc",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/pranay123-stack/forex-mt5-strategies/HEAD/Forex_trading_strategies_EA_scripts/PPCorr_EA/ReportTester-52688756.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "33a0d37a3a516d920b1dd304f571b14e55034439ee6e5bf09dd0aa34a5baaded",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/6443905b137df54998124ab0ca670a6f372a9b83/Files/Report_Trades/DetailedStatement.%2820190115_223628%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "33ee00e3a3d27dcc37d36badcf6c41047d44fac050df44868d32a1e742f2a1ee",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/bmcclanahan/forex/HEAD/notebooks/Part4_Materials/Oanda/strategies/copy_strategies/2049959.history.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "349ba06d783429722582b372d729b2dae6f8072f2c73356c26fe1bbb0a54ca2a",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/90e829e8ae875df00b3b738519bb35242db82c48/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "351c3bdf0f899419533be75028c84e3073383d8ff2128b9fd74eda6ccf69e5d3",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Jack-K1/GUHTMLST/280a0d08da2c3f57554cd17987dcdaa1bd466840/Notional_GU_Algo_Full_Report.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3615b90ff56a292272614fc4651616981255adfb524ef07369ace3e539d2d1ac",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/py-pixel-9/my-first-video/HEAD/mt4-ea/2356509.history.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3698fad1d1694111162a83f1a54622afde7e9c5410e7a6906c498e904fbed15d",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/675457fd4199b6522ba8f8114c71db130c0ac0bd/data/raw/goldwave_2339082_positions.csv; https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/goldwave_2339082_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "36c5df36344356dd30f800c9cb27c9e585d2fe54c477bd1477ceae14cf019ecd",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/42d77f61aecba0423178ce63bf765c0e4754ff57/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "382895f31544c39f1bf625ca2af1b0c4e98143732111a646e6c052f5e2cd1002",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/a25ca27914f7fc3405bf99465536dd5df63cf02a/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "38afc32081795f7cfd6ce997929f3e5e8a5380ea916539588ba43967212f8b6e",
+      "names": "a public fxblue_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/andrewbitlab/deusquant-site/88fc2ea034ab6df8835989797b10d2a08e2515d9/data/forward/orders-deusfund-sqx1-13.csv; https://raw.githubusercontent.com/andrewbitlab/deusquant-site/HEAD/data/forward/_orders-deusfund-sqx1-13.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "395d9cb9820cb123327211b1d4c6af9f628861ec1f20e80a7ad84d1b51ccd50b",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/c8d7f4aa8927ccc6c54b23e394c56228704ded12/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3a55b3fa0300b8cd8a0abc72eb09f82309f179c7442fe92711fc2d1cdb2f9bdf",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/6648951ce932571a9767a25cdcab40805d4c5b3a/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3bc0160165bc411f1a7f3d9b89729abc4191bd67a289ae3bf5c173e0b3582c9b",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/00193d24c3cdf880c54fa3d2baced77c02549b1e/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3bce88a5f81f18a00ea70c769a16fe9e1bf834078c6ae96744926a3e988460eb",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/cruzntym/forex-DashBoard/HEAD/data/statement6231db41a228040279cdf4d768bb5cd0.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3f6a85fc01b282c6013e1d3c7d5d84328aae75f81309ff1a856f806788f8b277",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_ema6-24/lstm/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3fef2515751b9d58630fafbd7c2bb1746858296ab38e5669a3a5bb2c1d99427c",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/cc68e7fcd432d27c687547362ed1f5a8afde8cc7/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "401a808eebbbf4bcb99e8353ed6f08fe8c948d828443e17578a04e225631a2ef",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/polopopeye/EAK-Project-SBC/17ee607f5bda3929b5deacf68a7a795f6bbf2ec9/EAK1/2/FBS%203%20Semanas.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "41d2ab77ecbb5f993c2ffae2690d0bae446291ef96f6500892472e00038ddd2d",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://c.mql5.com/forextsd/forum/12/multilotscalper_1.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "42f739e239e070ff24a3e5d5aefe74d75f1b554348a2a88fcda7eede57df9afc",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/gold_spike_mt4_2349227_ORDERBOOK.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "4334e326f8462667f8fd0c0727a8aa60e472f890420efe8c5637e081b6bbf489",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/7-Bias/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "43de8be2181e31f5a80b6fee765a369c3940d21e3449748bf5acbdb36af4c8eb",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://c.mql5.com/3/128/ReportTester_MACDSample.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "443da3fe3ea704841aad2388b8a8686a5bd8fa77f0a91f115ce5e13e61110e45",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/06580ca7193825c3e04b2e9496913cf566f2b8c7/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "4967400fa073ff93dcefff305645ce5c3d39d2c3a0e192897be66b315060ad86",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/ac473ea978c1b7a10504c2fb35cc34747f53b221/TRADE2782020/2782020.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "49e99f46d9db826a590741ebac662ca52cae65da97ded0ef7ba4ae4f5ae2cb7a",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/337d35f5601fc805917be0d83c5bea73d2fa1dc9/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "4a3be9d806f01ea7f7d1c96770a3797cab14f17380c7bbab08f8a16ff775447c",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/Deniskurs/DEC/HEAD/src/data/performance/statement.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "4b3a0365673a34a6d0de773245073e10c4530092231e77f91327b61c103706e0",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/EuroQ/StrategyTester-EuroQ.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "4be413bde568414841883b971100de873282f5934862f620c8df6ce195f5d830",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Jack-K1/GUHTMLST/280a0d08da2c3f57554cd17987dcdaa1bd466840/Notional_GU_Algo.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "4c20d01b0049b59e4ead1d965f0d98dca268e7702096ff7050cecbd10b56ee23",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://c.mql5.com/forextsd/forum/2/strategytester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5373293fd4720f1facf0f30f68c2bdc9bb6fb4362ba88eccafeee9ec750f9aff",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/319e63ec402a1ac8278269babb5468de0d068ad1/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "591bf955dac7634fd3de2ea1170dbbed6cfd2cd989df6a03262bfd8c30c47eb0",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ASK158/follow_trader/HEAD/src/data/signal-2329290.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5a9a461be28a21838b617e812f2a1553f70b39b77c83c67f762c2c6a09e5dce7",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/e510bfaa6a5b6f637abd5eb837158e0ab426e7e5/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5b93a94b047c37b91d99f8fa623028ab0bfe1820e543d995b12b333dcfe43b39",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/675457fd4199b6522ba8f8114c71db130c0ac0bd/data/raw/gold_reaper_2265877_positions.csv; https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/gold_reaper_2265877_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5baadd9f2f8585f56cb3d60b7eb49fc69ca314156701e6b5a9134c0f1967fd8a",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/William-Brandao/Trade-mql5/2c595e9c1ebebfcc066b1654faf00fb8549ea1d8/resultados%20OUT%20OF%20SAMPLE/RSI%20oos/brkm5%20vendido%20out%20of%20sample%20rsi.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5d07c4118bc35a68f98ddadf0a7c6d555a9eb7df7784ca2500d12696d08757ab",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/QueenofParts/Project2-Room2/18352cefa83e66b286b9ed873f84a6f47787e9c6/resources/html/DetailedStatement_gold.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5e2aaa99d5ca63c95b2f3ad187c308c3459c6a53f5a578798d202180b50ffa78",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/5-AoT/AoT_FTB/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "5e4d22e060576306f43826c8506692a0cbbdd677f5eae34e2a9bc713175735dc",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/62fc094e5546b74478523c2c8b08c36118b532cb/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "62470c9d5bad257e0c186b126aa6e4a8bb7ed1ce3319c7cfbde65b4ae18c0b0a",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/6bff9c4c7ce158c507872755bf961f2f61bbb264/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "624b06a7c7a22bc482cae41f14c67fd1e26185f8c8023fe7fc485d3de94582e2",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/f0938e71a69a22096369901ab6f0b214495084b8/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "62fb9b80c6cae441391a386f6d1bb33e0b321ac3c2d4f6a193157e180e595968",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ASK158/follow_trader/HEAD/src/data/signal-2339082.positions.csv; https://raw.githubusercontent.com/ASK158/follow_trader/f6b31fc2a55c8f69ca270d801957881b2996a18e/src/data/signal-2339082.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "66a9f8cbeee9821dcf8ae552d4626dce3ce66f242c103a7b076cfa8efb908866",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/c81e345d9be20d90947514aca3fca2333dbe2a7d/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "6765c82562ca029a7b6411a4c279d35469ddcadd8046d5490288059809ca532d",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/9d6a6eb99da9f19af8559d57c93ce0d9b7de4e2b/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "6849a2bf8a2073a6c1c63eee5ff99c1ef5d4f07f539e1f1c524c0568298f2dcb",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/9443821f1acca56dd9e0131dbdb853e687a9ee43/data/raw_data/pairs_test.csv; https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/HEAD/data/raw_data/pairs_test.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "6f873b9d09333d579e0e20021d7b6fe786a9aff67cf5054dbd1d753a9d0b1dac",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ASK158/follow_trader/HEAD/src/data/signal-2351091.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "701c9afb82bf96fd78ef0c7c3c8b27190c27989971fe6f3199cf0d4de07a035e",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/a9a157f1183320e912d17c352d302061f35294c7/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "728197c0cd1df84bc1c3b8ded3c2dfdc0f93ef89be83df669e08dbaf5dc144f9",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Jason767445898/QA_SQX/950e56a4f6aee2158b1804f4a29cbbeb2103dece/ex_MT5_reports/ReportTester-10011356247.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "75ef891433660f308bc5fe9f3b06b161500b8833aa40e51b0f6a3a492a40d62f",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/gold_spike_mt5_2375480_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "773ec4f075079d46540e0067fb547898f7ce31a8b9a457bf19438db6f58e4970",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ASK158/follow_trader/HEAD/src/data/signal-2304847.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "779eafb88c309251e7b28ded742c1d26c10cf8f203e8c624fc31abb99be37e4a",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/6443905b137df54998124ab0ca670a6f372a9b83/Files/Report_Trades/DetailedStatement.%2820190117_231722%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "77a420968fb56a41010315722417bde5e6f1e982ef37344ba7d4a7730d935d68",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/9ddcd30e1337a0e8f8e4007aef68e71828d18efc/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "7854d131b7474e3bc963bde720f3a450a912516619118c798282d9977286465d",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/kecoma1/Trading_BOT/851aae6cbd7ce63849cfae8bc58de1bb220b64e6/mql5/profitable/MACD_RSI_STOCH/MACD_RSI_STOCH_V1/ReportTester-54232522.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "787df70a7be740c16785379b1101c1fc0eece3d68c5eaba2c6aaf4e91b25a34d",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/709355f6425831442912c9d9ff2f7bb138a4db28/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "7a7b32ea52a57daff3fa5484e31352e294d503f0276beda98be4c231c50cf9ae",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/cash_hammer/ch200-seti/ch200-novee/24/24prosadka--ch20--lock--true--001lot.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "7cf859830a0ec25e4f18f9050b51b18673bf7853d08d5a59ddf67198288f3fb6",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/allaparthinaveen/ExecutionHub/HEAD/trading_engine/data/statement.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "7edda6a551149067ee44641098f826121e8c4ac8127c5a8463d3d42e60153025",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/3be58f58b2002b85864f726b8a4652d8ad09206f/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "7f766e1d51a7466bd2b434fe0e83dc66d47b75cdbae6b0125c9acadd2b36a7e1",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/William-Brandao/Trade-mql5/2c595e9c1ebebfcc066b1654faf00fb8549ea1d8/resultados%20otimiza%C3%A7%C3%A3o%20IN%20SAMPLE/BDB%20is/cmig4%20comprado%20in%20sample.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "809d2f67a8ccb11142a7c6b2e9bc0dd2c8abd5ed2cd9442974d2736c112f281e",
+      "names": "a public mt5_history_xlsx export in the forensics calibration corpus: https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/0c68febe67bfc6c224ae4b1468ef5c7ee7bc5378/TRADE_31_8_2020/ReportHistory-23_30_8_2020.xlsx; https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/5bdabfbd9e116f1c2bdfbb0c5ade167c9c3b5d81/TRADE_31_8_2020/ReportHistory-23_30_8_2020.xlsx",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "815806d3a7ff34582778006740e222fb117149895df1bc791b29ff04ac6eee4f",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/kecoma1/Trading_BOT/851aae6cbd7ce63849cfae8bc58de1bb220b64e6/mql5/profitable/MACD_RSI_STOCH/MACD_RSI_STOCH_V5/ReportTester-54232522.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "8296fb5a8bd05942b08503751919dc3e33fb64f50bf1db28b5062e6c3b20c9e5",
+      "names": "a public mt5_tester_xlsx export in the forensics calibration corpus: https://huggingface.co/algorembrant/MT5report-parser/resolve/main/backend/%5B3%5D_Process/ReportTester-263254895.xlsx",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "832acfcaf6778271286114338764d9404df72c1d72b103859cc043e3e70b67dc",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/JapanMoney/StrategyTester-JapanMoney.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "833e00d62e754a448257d8753df18907d5d4d9d38c75aefff1b7dfb90186dbab",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/alexanvl/scalper/92bee12a4e626b29849fa4c8b42c73c2d05f3d4f/res/DetailedStatement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "83409b79732bedb23dde1f68cbaf76715b3d146720b83695d2ff97a5b89364fd",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/PanPip/MQL4_experts/f1f127d67ba94412e26ca85900d164d8bfb756ce/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "837842784500ad404f10019d4484cd488a5aeee90ee976cf48877635bd1384fe",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/0c68febe67bfc6c224ae4b1468ef5c7ee7bc5378/TRADE2782020/2782020.html; https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/55c04dca3f1eccd67f643add83d0b7501ebc1fd2/TRADE2782020/2782020.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "864a32d3e6d3adcabd4ac3ae81dc7d07fba16adeed9de10dbbfce24463c0bbae",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/2-Mama/Mama.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "86883fe71005c5bee8288174360f295f79578ac66749648b6d5bf8b91d783176",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/cash_hammer/ch200-seti/ch200-novee/21/ch--20--prosadka21--x2.2--za6mesytsev.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "871c4332e148770744cd4a93911b7bc07e0e1ee9428587695d276f86245a64e0",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/QueenofParts/Project2-Room2/18352cefa83e66b286b9ed873f84a6f47787e9c6/resources/html/EATesting_All_Assest.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "87dadfe2f65d2ffb0e6b59138635f588926dad5726312f796a1e9fc5912f0e2e",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/41a6180c147ca9ad056f53b386e740dabd6cf1e5/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "8cc341f1cc6bcfccda7b6c328442498ae6d21611b9579128a7aa27ab690a75e5",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/cash_hammer/ch200-seti/ch200-novee/first--tut/ch-20-lutshiy--lock--true--150usd--001.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "8d2bb755037d815f5d4c289f8356da522396745915514aa469cc71ae5166ac91",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/888bd723e8dfa25126f121facd89f61971633cf7/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "8d973b728fb893185b62a5218c4aec98955582338cdc198ebdb5fb2fadc9d2ce",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/cruzntym/forex-DashBoard/HEAD/data/statementecea4b2366f360ffedb3b7b8cbeb87d4.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "8eb108e012f9117cdacf450b80c19acf2a2c317ccc2cf38f8bf0800d2c04f58e",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_ema6-24/random_forest/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "92e5b13b5abfdc6740ed34c089efa9939ca8816ebce50b9eb2935241548f2386",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://www.mql5.com/en/articles/download/5706.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "984133af9e31700ee130520d80fdc2438ae2058e39549d6e90b2a5c5eed8a65a",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/pranay123-stack/forex-mt5-strategies/HEAD/Forex_trading_strategies_EA_scripts/ButterflyOscillator_EA/ReportTester-52688756.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "9882c486b10e136a7cc4e2c156870f1a61b515c39aa4449e1b9f3fed08e06baa",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/kecoma1/Trading_BOT/851aae6cbd7ce63849cfae8bc58de1bb220b64e6/mql5/profitable/MACD_RSI_STOCH/MACD_RSI_STOCH_V2_LOT_1/ReportTester-54232522.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "999a48dc85a78685828af94b792216f12fbe50c653a4b1cd96daf71495eadabb",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/dd854a206a111b2e345f4105a3540fda32461ea2/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "9bb56a44aebdc65e891ea6c80e6c6cee124cfffe69fe72e40f4bc05152c08aae",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/gibeongideon/chemingin/HEAD/strategy/happyforex_311_trades_773.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "9ef616d754b9192de5cbec6fd6a2b8a7064f3df0144c0265e7a1dfa0cc11148c",
+      "names": "a public fxblue_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/andrewbitlab/deusquant-site/8aec9354d0bb1124c0b034201dcfae303ad92daf/data/forward/orders-deusfund-sqx1-13.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "9f66f0b5374b102511b84a4283db27f6da5016342d93425a2ff51562d0566f35",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/5-AoT/AoT_DailyBreakout/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "a39aa19e3ab3006e2c2ad009f1c887988134755eabfc73d85710194e0d042e04",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/dryousufmesalm/Experts/46d787809cd0c923dafb6744e50ed3f21aad8a83/mql5/890367.positions.csv; https://raw.githubusercontent.com/dryousufmesalm/Experts/HEAD/mql5/890367.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "a52b23cb341f34c75abf0bd0ba73537b3a592a49b2febf2ec826353f6db35c1c",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/Auto-profit/StrategyTester-AutoProfit.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "a6c61a80f2432615b49eba0df619efc8e6bba8d166852f1e0fbf629871ecd9bb",
+      "names": "a public mt5_history_xlsx export in the forensics calibration corpus: https://raw.githubusercontent.com/svopex/forex-MT5-report/cda04bd7095353542df19ba1d58afbf8b0555d37/ReportHistory-498754.xlsx",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "a9d0cb2019b3f29d7925c3a16735c8f19e0570ff6c3d0a1c44dcfa674db241c4",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/MikePapinski/DeepLearning/HEAD/PredictCandlestick/CandleSTick%20patterns%20prediction/BOOM_strategy.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "abc06a8439d423600af6433b9e08728fb1c598085c8157e15a08d4c776e13463",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/5816043f781ba3ec541227ee0e94ca47ceeef9d0/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "abd8f01fc81e9abe53b5db423f55c2ebd47f306780ff7883a2a6f0b8c2a8cf22",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://c.mql5.com/forextsd/forum/10/sample_report.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ad34251718407df898f637347db279d4de67d3d24a7fea31e81ceb8e640ce838",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/HEAD/data/raw_data/live.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "aef18117c8295ef553e3110dc54c071bfe346ab2ae8842a41774137760a206d6",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/9382da13be0521d807afde427614c8ff32dfa0e6/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b0c225557f0fe21e6d8d7f1d3e40aeb432045e4b685c7039e8cfeab7da345536",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_iAD_filter/xgboost/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b144bba803cbd0bcc87e269387a3142a7d05568b6f3a2a601c4b6d1419e3d138",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/msc_gold_2231030_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b4330708297faa9c6038d1d642874115a1b4eea1418419928218167a7ff0097a",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/9ead625557f3281e909a2d0ef8ab9d9a04c15b59/data/raw_data/pairs_test.csv; https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/HEAD/data/raw_data/pairs_test_old.csv; https://raw.githubusercontent.com/Eric-Lingren/ParseFolio/ef369e96d818512fad2bba220ec8b29221e59399/data/raw_data/pairs_test_old.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b43cba0de465065a2eb74e05786998b696e00b1c3dd477e6946abdcebaaf1386",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/6443905b137df54998124ab0ca670a6f372a9b83/Files/Report_Trades/DetailedStatement.%2820190115_000717%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b4c8646e6e196ca84afc1c1224d56f1d5c1ec5b805601f987d9c496c855a068b",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/33316ba3e2eaedad3ad0888e2851573f6191b091/Files/Report_Trades/DetailedStatement.%2820190114_210538%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b65429d7d9608e784484b03883d164337a29b5cf8e64a6fef69fa42a6a979198",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/1-PriceAction/Mitigation.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b685ce0ddf0eaa0c0d2e84cc30a50b1b329c8e8fbddbd98cca31b6fd55e3883a",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_iAD_filter/random_forest/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b6b8f10bcac853d264a6f6bf5b0dac1b58495fe20943d8a5d6b70819ec32cc5f",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/15c4fd9fc03eea50cb74b5c06e94b73a07642657/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b6cfa72801fbca5f419cd9e779af6c183d26a3ecf3fab5bc2edc1536feaa4531",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/dd164b8f15363bd585d16dc2a2083b023fda0212/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b73e9a012aea50076541c0e1e883607b163d703ff80cc02ec1978a53b0fd954b",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/5-AoT/AoT_PinbarStrategy/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b784713bb7ab004a8843d80d2e844bd3d5c9c2b1c54275e7ff57b14acf47acb4",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/a3dbda56b0fc7033fc8868d07b412c36a915340b/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b8b34b1712707e9ad3bf90e98f7c18e5330add8b3db86f226fa43427fd57dd2c",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/772a20cddaac88cce7a951d05e29db1b35680e73/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "b9e08f454abede61234d5c063bad3a16052556c0e7668df70a2d764cb3fbd434",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/cash_hammer/ch200-seti/ch200-novee/18--200usd/200usd--ch20.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ba8a2c58233dc1fe3430b6bc3fc53b70cdc8c66ac99b92c411ea03fcb4b18a02",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/kiracat_2342895_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "baac7b6a139273c99e662ec94f406ff3cd0563d6b9a650840f8bb723a024a086",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/kecoma1/Trading_BOT/851aae6cbd7ce63849cfae8bc58de1bb220b64e6/mql5/profitable/MACD_RSI_STOCH/MACD_RSI_STOCH_V2/ReportTester-54232522.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "be586b3244dc33e8acd3e70f7aacbf6822972588cdb210b1306ee55c9744dcf6",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/0718d639c872254f27cf606e053a3ae0e3af9324/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "bf5e3283fa740df0b1d2eff1133e0c53ba1083df4f2bc6cd7fae1b268f4debaf",
+      "names": "a public fxblue_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/andrewbitlab/deusquant-site/81f067d88d88a718571b287df2b87796426905e2/data/forward/orders-deusfund-sqx1-2_8-10-2025.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "bfa115efc5675dd6ba1085c42cdbf2ef3d0aeef1ead75f4fa2e15873660874d1",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/puregold_2362868_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "c1f37fe0d2ba43252c2706b551218cbd48ac28bd3a1615ea0d3bd12d5298304f",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/0c68febe67bfc6c224ae4b1468ef5c7ee7bc5378/TRADE_3_9_2020/ReportHistory-50367453.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "c7bb298efc96278a53e3374167c059de3390cc66b36bee8af184f3ed4dea9a9e",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://c.mql5.com/forextsd/forum/1/detailedstatement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "c9a11dd9e3c85496e9498588e5423de782fdc918e2b9bede0fc6ceff5cc28822",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/c7a26b9d2162e3265ed52e206a1ee1982bd1cec8/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "c9c08a53d0f7f3b6d16ac3b72c07fdf85bb07a4e6761638dab408e451cf2d660",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DiogoRolo19/mql4/922de56791fdd3f6eaacc7aa22d358e95610d849/mql4/5-AoT/AoT_RSIStrategy/StrategyTester.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "c9d735af409aa86780a6d9762e074a22d75c9693b7fc36dc187a4f31d5ddede5",
+      "names": "a public mt4_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/joaotorresmarques/mql4/ae010cc4c59be57bceaac52b52439f496335b3ef/Experts/EAS%20Codigo/40%20ROB%C3%94S%20FOREX/cash_hammer/ch200-seti/ch200-novee/20.85/ch20--150usd--20prosadka.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "cc5435bff3f4964b4204267fd1f8b2531ee3af540b043bd4859d2e0222947a69",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_adx22/lstm/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "cdef63d1ecdc5a6df9dcb2cb98c738e35d667c2422aca909966e983ff4ff5fe7",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://www.mql5.com/en/articles/download/5706.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d0423dbc0265325203ca3b973fe86b3e757d27c182f021c81f49b6966dfcbbf6",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/738cd9878da47b4f325e51ffd113a510e6821c08/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d1810042de8094d9b2adb907887081267061fe6e60497ecb4f139758517c9daf",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/c12072acd1dad3040713abbcbaa1fd12d9b0f501/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d2996ab408c560a827c57d7ec421c2d3382901a8fccf3f9c24c6e0e3ebaf3451",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/William-Brandao/Trade-mql5/2c595e9c1ebebfcc066b1654faf00fb8549ea1d8/resultados%20OUT%20OF%20SAMPLE/BDB%20oos/cmig4%20comprado%20out%20of%20sample.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d37bc55f6a1c45b46cbd26f2e43ed8be0781c1a4e5ee925a12f5171a6fe77631",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/d92391f2d3cc5ce61ff2e5d71eef31c205957c9d/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d38fec16ebd375d5ea8f26ed47e45b7e46f5cb8e216ebaf15138a83813c960ba",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/8d94b5418205a80bec5f3af2fd4173523f218c36/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d4eb5cd47ffbcd214539a160e2eb5978a36b7cd6885c91416ae3e37723be8999",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/polopopeye/EAK-Project-SBC/17ee607f5bda3929b5deacf68a7a795f6bbf2ec9/EAK1/2/FBS%204%20Semanas.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d5a18762e8639e9a6b7fd6e22d8d27bc569b3218363ba4d691a6c241224196b3",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://www.mql5.com/en/articles/download/5913.zip",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d61d7419da8585b201642d368bbf30a54eaca6edfcf2d1518a0a95e0abf37665",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/fbdf713ff6e33cc4a51c71c0e2306b5abbc2c078/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "d78c78d757f460eb71f21ba5af8dec8dd5f36ff2c4edbbef9404ddcee30d0212",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/fujunzibo/mt4/a8a710253b12b66e151cd6cff6a2ce48782bc6e7/test/DetailedStatement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "db1216cb98f86da6911b13be11bf4a442eba7f8fbbfdf2b803e88af7ccb1a9d9",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/alexanvl/scalper/3fe2b5920adb75aa94cb443890ba0dea75ce11c3/res/DetailedStatement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "db4eb3a33b46d17d50b1d070c84018cfa62e887ab21da821c0b9265d371c1952",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ASK158/follow_trader/HEAD/src/data/signal-2379208.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "db54adca82324a25ec6c57b9a0ce445d3666b952b7b89e592ea1dd33c35ba4c7",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/034f7bc16967dbc3169043087e0d5bcd64174e80/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "dffa80b0b6b4befafa239dcb86c5c6265a383886ff1e5351b5cd44b42ca60b3f",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/69a59b2262b203ce841f3a80abd8f0484e71ba46/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "e24df2c3527054252edf15946900ad2dc44cf776f2e1c6097d409c441839da1a",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/1a46b5663ce62ac67fc387ed59bd3a91fae14b9d/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "e2d3fd0ea082cb7752fd40584aac8de6053dacad4ee14ca35c08deec6fd8daee",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_adx22/random_forest/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "e81d031c51a1c4e331c3101b1067a6ad07331cb33053a4f2e095ad570fb0a843",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/33316ba3e2eaedad3ad0888e2851573f6191b091/Files/Report_Trades/DetailedStatement.%2820190115_084743%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "e86d2c547a5923cc1b0ef81b3fba6c6b224a5dd54a25d6c77478de5ceae44ff3",
+      "names": "a public mt5_history_html export in the forensics calibration corpus: https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/0c68febe67bfc6c224ae4b1468ef5c7ee7bc5378/TRADE28_8_2020/ReportHistory-50367453.html; https://raw.githubusercontent.com/DaraGaloX233/MQL5_TradeRecord/625b576a98940fd7c87f78fc360be78103ba34e1/TRADE28_8_2020/ReportHistory-50367453.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "e878e5ef4589c7ac4245b4e82d61226601b7d2f4955618b34ed10ac59b6ffd80",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_adx22/xgboost/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "eaea26c18527a6e795e3ab525a2ee4b3dbdb7a586c61308bc3aa7406816e246b",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/iwabuchiken/MQL4_Indicators-EAs/6443905b137df54998124ab0ca670a6f372a9b83/Files/Report_Trades/DetailedStatement.%2820190122_230530%29.%28e-j%2CM1%29.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ec02e3bc5854ec0ab83067990a15d9aeb9d56401565d2325889f4ec54b2dd4ea",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/ASK158/follow_trader/HEAD/src/data/signal-2265877.positions.csv; https://raw.githubusercontent.com/ASK158/follow_trader/f6b31fc2a55c8f69ca270d801957881b2996a18e/src/data/signal-2265877.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ed6bc2a8f3e8bdf9b07c8fef7e4fb0555b359200408ec0503573da0bb0c2060e",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/akhfzl/TurnkeyId-tech/HEAD/Sell%20and%20Buy.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ede2f6cf92901a3abf0820264fca609d7c24a4d322836551072ad947ce013614",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/pablosierrafernandez/Financial-Asset-Analysis/HEAD/9d832a941b1b626204ebc608e2788e271.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ef8f01f7c58d4b5b0302a2cab49264a6004276d6ff6ffaf6ec981bb1da7b5975",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/fujunzibo/mt4/807ab0e2dfd5335b797eb4813f1101ee5b8eb15f/test/DetailedStatement2.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "efbcbad3985c65836c58854a571f727a85965d81088331951393931048637585",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/amirayat/Copyfx-Scraper-Analysis/5e672b3d174ca07d29e179e2a612ced99b6ba55b/backtrader_samp/890367.positions.csv; https://raw.githubusercontent.com/amirayat/Copyfx-Scraper-Analysis/HEAD/backtrader_samp/890367.positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "f06d660ecce1bd66f86365b767713226af2f68500b130bd586156a0b82906c75",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_default_params/baseline_only/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "f323d70cb6e9385c11708f442cbb57aed68e54deb8363eb7c16d9e2e37e40a8b",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/pranay123-stack/forex-mt5-strategies/HEAD/Forex_trading_strategies_EA_scripts/VB_EA/ReportTester-52688756.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "f40e9c336ed392a1f8bbb9533d2e97e0e23000d381041a9b7a539e7191198cd5",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/fujunzibo/mt4/807ab0e2dfd5335b797eb4813f1101ee5b8eb15f/test/DetailedStatement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "f702e87aa4c7011ee41fae30b840be4f90089a6c105a742fe9b479fdb01240c7",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/tnickel/MqlKiScanner/HEAD/data/raw/goldwhisper_2364821_positions.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "f838e12cf3bb733b8d2383c676f25d22ebafb8c31206d71b3126401fae0c42cd",
+      "names": "a public mql5_signal_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/coler07/mql5-format/HEAD/2341644.history.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "f91b5709ab01377261d2f3613f261571c21fb7cca096aebad8297e4b76548ddd",
+      "names": "a public myfxbook_csv export in the forensics calibration corpus: https://raw.githubusercontent.com/cruzntym/forex-DashBoard/HEAD/data/statement1e1ee36cf9536fa2f581c553705839b6.csv; https://raw.githubusercontent.com/cruzntym/forex-DashBoard/HEAD/statement1e1ee36cf9536fa2f581c553705839b6.csv",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "fd8b0431f385136ac779dbb9632e26ee1fa225ef1aee46ce37737d524d565728",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Marco210210/AI-Enhanced-HFT/eae695fc6bb89b580f893f81b83c812643e90e99/backtest_ema6-24/xgboost/ReportTester-7101049.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "fe9095e9cc640f5c69f0d4d403c7d91a2530cf601518c600eb3f9c3cd69be394",
+      "names": "a public mt5_tester_html export in the forensics calibration corpus: https://raw.githubusercontent.com/kecoma1/Trading_BOT/851aae6cbd7ce63849cfae8bc58de1bb220b64e6/mql5/profitable/MACD_RSI_STOCH/MACD_RSI_STOCH_V4/ReportTester-54232522.html",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "feaccda5322ce09d6039c1dcb88548da21d907c62373fd7d8d5e73390ff57fdb",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/d954a6d5348461d623bf7628b758803e8db45246/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "ff28d4ab87db60d927b3a7687d491335dba9239060d2c548f543d1b59c2263c7",
+      "names": "a public mt4_statement_html export in the forensics calibration corpus: https://raw.githubusercontent.com/Paul-Hil/mt4-history/5e82a528edc62864da9b9b335ff569057ef1f9d8/public/data/statement.htm",
+      "expected_at": "FORENSICS_CORPUS_DIR (a local directory outside the repository; docs/AUDIT_FORENSICS.md Appendix A)",
+      "why_not_committed": "a third party's public trading statement; AGENTS.md Phase 16 keeps client and corpus files out of the repository, so the doc lists URL, format and SHA-256 only",
+      "consequence": "the frozen calibration table in src/quant_trade/audit/forensics/calibration.py cannot be recomputed here without downloading the file again from its URL, which may have changed or vanished; tests/forensics_corpus.py recomputes it from a local copy"
+    },
+    {
+      "sha256": "3fcf50a65cbe40159fc643c4a4124f5376eaa11e5de09216855ca4d2536838c9",
+      "names": "genuine_manifest.json: the manifest (path, url, sha256, format, group, genuine) of the 197 corpus files behind forensics-1",
+      "expected_at": "FORENSICS_CORPUS_MANIFEST (a local file outside the repository)",
+      "why_not_committed": "it names local paths of files that are themselves not committed; docs/AUDIT_FORENSICS.md Appendix A carries its public content",
+      "consequence": "the split into calibration and reserved files (tests/forensics_corpus.py::split) can be recomputed from Appendix A, but the manifest bytes themselves cannot be checked here"
     }
   ]
 }
