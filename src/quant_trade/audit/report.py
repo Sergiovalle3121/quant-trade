@@ -3572,7 +3572,7 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     out = (
         f"<h3>{_e(labels['ranges_title'])}</h3>"
         f"<p class='muted'>{_e(labels['ranges_intro'].format(n=trades))}</p>"
-        f"<div class='facts'>{''.join(facts)}</div>"
+        f"<div class='facts ranges'>{''.join(facts)}</div>"
     )
     average = ranges.get("expectancy") or {}
     low = _ev_value(average.get("low"))
@@ -3590,9 +3590,9 @@ def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
     if average_even or factor_even:
         # When one range straddles break-even and the other lies below it, the
         # straddle is the cautious reading.
-        out += f"<p>{_e(labels['ranges_zero'])}</p>"
+        out += f"<p class='read-line'>{_e(labels['ranges_zero'])}</p>"
     elif average_below or factor_below:
-        out += f"<p>{_e(labels['ranges_below'])}</p>"
+        out += f"<p class='read-line'>{_e(labels['ranges_below'])}</p>"
     return out
 
 
@@ -3751,7 +3751,7 @@ def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str
     return (
         f"<h3>{_e(labels['shuffle_title'])}</h3>"
         f"<p>{_e(line)} {_badge('MEASURED')}</p>"
-        f"<p>{_e(verdict)}</p>"
+        f"<p class='read-line'>{_e(verdict)}</p>"
         f"<p class='muted'>{_e(labels['shuffle_intro'])}</p>"
     )
 
@@ -5463,7 +5463,10 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
             if better in ("calm", "turbulent")
             else "regime_no_clear_gap"
         )
-        out += f"<p>{_e(labels[name].format(z=f'{abs(z):.2f}'))} {_badge('MEASURED')}</p>"
+        out += (
+            f"<p class='read-line'>{_e(labels[name].format(z=f'{abs(z):.2f}'))} "
+            f"{_badge('MEASURED')}</p>"
+        )
     link = f"<a href='{_e(str(regime.get('source_url', '')))}' rel='noopener'>FRED</a>"
     source = _e(labels["regime_source"].format(source="\x00"))
     out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
@@ -5631,7 +5634,7 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
     classic_growth = _ev_value(classic.get("growth"))
     if classic_cagr is not None and classic_growth is not None:
         body += (
-            f"<tr><td>{_e(labels['fund_fees_two_twenty'])}</td>"
+            f"<tr class='fee-classic'><td>{_e(labels['fund_fees_two_twenty'])}</td>"
             f"<td class='val'>{_e(_fund_pct(classic_cagr))}</td>"
             f"<td class='val'>{_e(_fund_pct(classic_growth))}</td></tr>"
         )

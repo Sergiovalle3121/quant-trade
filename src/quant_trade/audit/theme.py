@@ -1250,9 +1250,23 @@ table,.meaning .item,.verdict{break-inside:avoid;page-break-inside:avoid}
 @media (max-width:759px){.paper table{display:block;overflow-x:auto}}
 """
 
+#: The statistics blocks of the report: 95 % ranges, the reading lines under
+#: the shuffled drawdown and the VIX split, and the 2 and 20 fee row.
+STATS = """
+.facts.ranges{margin-bottom:26px}
+.facts.ranges .fact{padding:18px 22px}
+.facts.ranges .fact b{font-size:1.55rem;font-size:clamp(1.3rem,2vw,1.7rem);letter-spacing:-.03em;white-space:nowrap}
+.read-line{border-left:3px solid var(--text);padding:2px 0 2px 14px;margin:14px 0;font-weight:500;color:var(--text)}
+table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
+@media (max-width:420px){.facts.ranges .fact b{white-space:normal}}
+@media print{.facts.ranges{margin-bottom:12pt}.facts.ranges .fact b{font-size:13pt!important;line-height:1.2;letter-spacing:-.02em}
+.read-line{border-left:2px solid #000;padding:0 0 0 8pt;margin:8pt 0;break-inside:avoid}
+table.timing tr.fee-classic td{border-top:1.5px solid #999}}
+"""
+
 #: The full stylesheet, inlined in every page.
 STYLE = FONTS + BASE + NAV + BUTTONS + HERO + MOCK + SECTIONS + FORMS + ALERTS + FOOTER
-STYLE += REPORT + VERIFY + MOTION + PRINT
+STYLE += REPORT + STATS + VERIFY + MOTION + PRINT
 
 
 def aurora() -> str:
