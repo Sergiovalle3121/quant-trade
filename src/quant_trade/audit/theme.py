@@ -1309,7 +1309,9 @@ table.currency tr.cur-base td{background:var(--surface-2);font-weight:600}
 .crises td:last-child small{display:inline;margin:0 6px 0 0}}
 table.currency tr.cur-real td{border-bottom:2px solid var(--border-2)}
 @media screen and (max-width:420px){.paper table.holding td:first-child{min-width:8.6em}
-.paper table.holding td{padding-left:4px!important;padding-right:4px!important}}
+.paper table.holding td{padding-left:4px!important;padding-right:4px!important}
+.paper table.currency td:first-child{min-width:7.4em}
+.paper table.currency td.val,.paper table.currency th.val{padding-left:9px!important}}
 @media print{.facts.ranges{margin-bottom:12pt}.facts.ranges .fact b{font-size:13pt!important;line-height:1.2;letter-spacing:-.02em}
 .read-line{border-left:2px solid #000;padding:0 0 0 8pt;margin:8pt 0;break-inside:avoid}
 table.timing tr.fee-classic td{border-top:1.5px solid #999}

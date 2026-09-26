@@ -1252,5 +1252,12 @@ def test_crisis_rows_read_as_cards_on_phones() -> None:
     assert ".paper table:not(.ev):not(.firms):not(.crises){animation:scroll-cue" in STYLE
 
 
+def test_currency_figures_keep_a_gap_on_phones() -> None:
+    # The local-inflation rows put three figures beside a two-line name; on
+    # a narrow phone the figures keep a visible gap between them.
+    assert ".paper table.currency td.val,.paper table.currency th.val{padding-left:9px" in STYLE
+    assert ".paper table.currency td:first-child{min-width:7.4em}" in STYLE
+
+
 def test_the_line_under_the_summary_tiles_has_room() -> None:
     assert ".kpis+p{margin-top:14px}" in STYLE
