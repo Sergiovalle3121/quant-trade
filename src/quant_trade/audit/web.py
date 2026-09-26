@@ -1684,7 +1684,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, csrf, _ = session
             strategy = db.get_strategy(account.id, strategy_id[:64])
             if strategy is None:
-                raise _not_found()
+                return HTMLResponse(account_pages.strategy_missing_page(locale), status_code=404)
             listed = {item.audit_id: item for item in db.account_audits_list(account.id)}
             versions = []
             for audit_id in strategy.audit_ids:
@@ -1784,7 +1784,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             here = f"{account_pages.strategies_path(locale)}/{strategy_id}"
             strategy = db.get_strategy(account.id, strategy_id[:64])
             if strategy is None:
-                raise _not_found()
+                return HTMLResponse(account_pages.strategy_missing_page(locale), status_code=404)
             if action == "remove" and audit_id in strategy.audit_ids:
                 db.file_report(account.id, audit_id, "", at=datetime.now(UTC))
             elif action == "rename":
@@ -2191,7 +2191,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
             session = _session(request)
             if not usable and session is None:
-                return _gate(request, loc, "code" if typed else "signin", 401)
+                return _gate(request, report_loc, "code" if typed else "signin", 401)
             if not usable and session is not None:
                 gate_account = session[0]
         try:
@@ -2243,7 +2243,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 spend_credit = True
             else:
                 reason = "quota" if used >= acct.FREE_PREVIEWS_PER_MONTH else "network"
-                return _gate(request, loc, reason, 402)
+                return _gate(request, report_loc, reason, 402)
             return None
 
         def claim_preview(account_id: str) -> str:
@@ -2306,7 +2306,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if db.account_credits(account_id, now) > 0:
                     spend_credit = True
                     return None
-                return _gate(request, loc, "quota" if full == "account" else "network", 402)
+                return _gate(request, report_loc, "quota" if full == "account" else "network", 402)
             return None
 
         if gate_account is not None:
@@ -2555,7 +2555,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 full = claim_preview(gate_account.id)
                 if full:
                     db.delete_audit(audit_id)
-                    return _gate(request, loc, "quota" if full == "account" else "network", 402)
+                    return _gate(
+                        request, report_loc, "quota" if full == "account" else "network", 402
+                    )
                 free_preview = True
             if free_preview:
                 db.record_free_preview(audit_id, gate_account.id, client_ip=ip, at=now)
