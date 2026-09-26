@@ -411,7 +411,7 @@ _COPY: dict[str, dict[str, Any]] = {
                 "cuenta hacen falta dos de estas tres cosas: tu contraseña, el código de la app "
                 "o tu clave de recuperación. En Mi cuenta ves dónde está abierta tu cuenta y "
                 "cierras cada sesión, y ves tus entradas y cambios de seguridad más recientes "
-                "(hasta 90 días).",
+                "(hasta 90 días), incluidos los intentos con contraseña incorrecta.",
             ),
             (
                 "¿Cómo se usa el sello?",
@@ -706,7 +706,7 @@ _COPY: dict[str, dict[str, Any]] = {
                 "account takes two of these three: your password, the code from the app or "
                 "your recovery key. In My account you see where your account is open and "
                 "sign out each session, and you see your most recent sign-ins and security "
-                "changes (up to 90 days).",
+                "changes (up to 90 days), including wrong-password tries.",
             ),
             (
                 "How is the badge used?",

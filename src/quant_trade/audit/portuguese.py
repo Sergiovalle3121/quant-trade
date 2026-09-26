@@ -303,7 +303,8 @@ COPY_PT: dict[str, Any] = {
             "Authenticator, 1Password ou outro): aí, para entrar ou recuperar a conta, são "
             "precisas duas destas três coisas: sua senha, o código do app ou sua chave de "
             "recuperação. Em Minha conta você vê onde sua conta está aberta e encerra cada "
-            "sessão, e vê suas entradas e mudanças de segurança mais recentes (até 90 dias).",
+            "sessão, e vê suas entradas e mudanças de segurança mais recentes (até 90 dias), "
+            "incluindo as tentativas com senha incorreta.",
         ),
         (
             "Como se usa o selo?",
