@@ -1101,3 +1101,30 @@ def test_the_strategy_pdf_and_invite_box_are_styled() -> None:
     phone = phone[: phone.index("}}") + 2]
     assert "#invitar .acct-kpi:last-child{grid-column:1/-1}" in phone
     assert "#invitar .btn{width:100%" in phone
+
+
+def test_the_new_statistics_blocks_are_styled() -> None:
+    from quant_trade.audit import report
+    from quant_trade.audit.pdf import PDF_CSS
+    from quant_trade.audit.schema import measured
+
+    labels = report.LABELS["es"]
+    # 95 % ranges read as one line per card, not a bound per line.
+    ranges = {
+        "status": "MEASURED",
+        "trades": 40,
+        "win_rate": {"low": measured(0.4), "high": measured(0.6)},
+        "expectancy": {"low": measured(-2.0), "high": measured(5.0)},
+        "profit_factor": {"low": measured(0.9), "high": measured(1.4)},
+    }
+    shown = report._ranges_html(ranges, labels)
+    assert "<div class='facts ranges'>" in shown
+    assert f"<p class='read-line'>{labels['ranges_zero']}</p>" in shown
+    assert ".facts.ranges .fact b{font-size:1.55rem" in STYLE
+    assert "white-space:nowrap}" in STYLE[STYLE.index(".facts.ranges .fact b{") :][:160]
+    # The reading under the VIX split and the shuffled drawdown stands out from notes.
+    assert ".read-line{border-left:3px solid var(--text)" in STYLE
+    assert "table.timing tr.fee-classic td{border-top:2px solid" in STYLE
+    # In the PDF, notes sit below the body text instead of above it.
+    assert ".muted{font-size:8.8pt}" in PDF_CSS
+    assert ".facts.ranges .fact b{font-size:13pt!important" in STYLE

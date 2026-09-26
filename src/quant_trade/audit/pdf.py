@@ -34,6 +34,7 @@ PDF_CSS = """
 @bottom-right{content:counter(page) " / " counter(pages);font:7.5pt 'Inter',sans-serif;
 color:#666}}
 body{font-size:9.5pt}
+.muted{font-size:8.8pt}
 .report-hero h1{font-size:30pt;line-height:1.1;margin:6px 0 10px}
 .rsec>h2,.detail>h2{display:block;font-size:14pt;margin:0 0 10px}
 .rsec>h2::before,.detail>h2::before{display:inline-block;vertical-align:-3px;margin-right:9px}

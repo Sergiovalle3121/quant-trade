@@ -2419,6 +2419,8 @@ Redesign pass 61 checks the Portuguese report (/pt/exemplo and its PDF) on a pho
 
 Redesign pass 62 styles two new account pieces. The strategy summary PDF ("Descargar resumen en PDF") had a tiny title, a stray grey line left from the screen's glow and class letters off-centre, and ran two lines onto a second page; its title is now a clear heading, the line is gone, the letters sit in their circles and the summary fits one page. In "Invita a un colega" the personal link reads as a code in a quiet field, and on a phone the WhatsApp button spans the width and the third tile takes a full row.
 
+Redesign pass 63 styles the report's new statistics blocks. The 95 % ranges ("¿Cuánto de esto podría ser azar?") showed each range at headline size, split over two lines; they now read on one line per card, smaller than the headline figures, with room before the trade table. The reading under the calm/turbulent market split, under the shuffled worst fall and under the ranges (break-even and wholly-below lines) is a ruled line that stands apart from the grey notes. The 2 % + 20 % row of the fund fee table is set off from the flat-rate rows. In the PDF, grey notes were set larger than the body text; they are now slightly smaller, which also saves a page.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the

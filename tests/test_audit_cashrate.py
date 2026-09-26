@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from audit_fixtures import csv_bytes
 
-from quant_trade.audit.cashrate import NOT_COVERED, annual_yield, excess_sharpe
+from quant_trade.audit.cashrate import NOT_COVERED, UNAVAILABLE, annual_yield, excess_sharpe
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
@@ -152,4 +152,43 @@ def test_a_curve_that_earned_less_than_cash_says_so_in_words(locale: str) -> Non
     assert labels["cash_below"].split("(")[0] in html
     assert labels["cash_sharpe"].split("(")[0] not in html
     assert f"{result.cash_rate['sharpe_excess']['value']:.2f}" not in html  # type: ignore[index]
+    assert untranslated(result.model_dump(mode="json")) == []
+
+
+def _bad_series(days: pd.DatetimeIndex) -> dict[str, pd.Series]:
+    """Replies a broken download or cache could give instead of rates."""
+    index = pd.bdate_range(days[0] - pd.Timedelta(days=30), days[-1])
+    mixed: list[object] = [5.0 if i % 2 == 0 else "n/a" for i in range(len(index))]
+    return {
+        "text": pd.Series("n/a", index=index),
+        "text_index": pd.Series(5.0, index=[str(day.date()) + "x" for day in index]),
+        "mixed": pd.Series(mixed, index=index),
+        "infinite": pd.Series(np.inf, index=index),
+    }
+
+
+@pytest.mark.parametrize("kind", ["text", "text_index", "mixed", "infinite"])
+def test_a_malformed_rate_series_skips_the_cash_line_never_the_audit(kind: str) -> None:
+    days = pd.bdate_range("2023-01-02", periods=300)
+    frame = _curve(days, np.random.default_rng(5).normal(0.0008, 0.006, len(days)))
+    bench = _curve(days, np.random.default_rng(6).normal(0.0005, 0.008, len(days)))
+    inputs = build_inputs(
+        csv_bytes(frame), DeclaredMetadata(locale="es"), benchmark_bytes=csv_bytes(bench)
+    )
+    bad = _bad_series(days)[kind]
+
+    def market(key: str) -> pd.Series | None:
+        return bad if key == "tbill3m" else None
+
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=market)
+    assert result.cash_rate is not None
+    if kind == "mixed":
+        # Every other day still has a rate: the readable ones are used.
+        assert result.cash_rate["status"] == "MEASURED"
+    else:
+        assert result.cash_rate["status"] == "NOT_MEASURED"
+        assert result.cash_rate["reason"] == UNAVAILABLE
+    assert result.benchmark is not None
+    assert result.benchmark["jensen"]["status"] == "MEASURED"
+    assert result.benchmark["jensen"]["cash_subtracted"] is (kind == "mixed")
     assert untranslated(result.model_dump(mode="json")) == []
