@@ -23,6 +23,7 @@ from quant_trade.audit.seo import BRAND
 from quant_trade.audit.store import (
     AccountAudit,
     AccountCode,
+    AccountEvent,
     AccountRecord,
     InviteSummary,
     SessionView,
@@ -212,6 +213,9 @@ COPY: dict[str, dict[str, str]] = {
             "De cada sesión abierta: una etiqueta corta del dispositivo (como «Chrome · Windows», "
             "nunca el texto completo del navegador), la red y el último uso, para «Sesiones "
             "abiertas»; se borra al cerrar la sesión, al caducar o con la cuenta.|"
+            "Para «Actividad reciente»: cada entrada y cada cambio de seguridad (contraseña, "
+            "dos pasos, clave de recuperación, sesiones cerradas) con su fecha, la etiqueta del "
+            "dispositivo y la red; las últimas 50, borradas a los 90 días o con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -358,6 +362,28 @@ COPY: dict[str, dict[str, str]] = {
         "sessions_end_others": "Cerrar todas las demás",
         "session_ended": "Sesión cerrada.",
         "sessions_ended": "Cerramos todas las demás sesiones.",
+        "activity_title": "Actividad reciente",
+        "activity_help": (
+            "Entradas y cambios de seguridad de tu cuenta en los últimos 90 días. Si ves algo que"
+            " no hiciste, cambia tu contraseña y cierra las demás sesiones."
+        ),
+        "col_when": "Cuándo",
+        "col_event": "Qué pasó",
+        "event_signup": "Cuenta creada",
+        "event_signin": "Entrada con contraseña",
+        "event_signin_two_step": "Entrada con contraseña y código",
+        "event_signin_recovery_key": (
+            "Entrada con la clave de recuperación (se desactivaron los dos pasos)"
+        ),
+        "event_password_changed": "Contraseña cambiada",
+        "event_password_recovered": "Contraseña nueva con la clave de recuperación",
+        "event_password_reset": "Contraseña nueva con un enlace de restablecimiento",
+        "event_two_step_on": "Verificación en dos pasos activada",
+        "event_two_step_off": "Verificación en dos pasos desactivada",
+        "event_two_step_off_by_owner": "Verificación en dos pasos desactivada por soporte",
+        "event_recovery_key_created": "Clave de recuperación nueva",
+        "event_session_ended": "Se cerró una sesión",
+        "event_sessions_ended": "Se cerraron todas las demás sesiones",
         "two_step_card": "Verificación en dos pasos",
         "two_of_three": (
             "Con los dos pasos activos, para entrar o recuperar la cuenta necesitas dos de "
@@ -631,6 +657,9 @@ COPY: dict[str, dict[str, str]] = {
             "For each open session: a short device label (such as 'Chrome · Windows', never the "
             "browser's full string), the network and the last use, for 'Open sessions'; it goes "
             "when the session is signed out, expires or with the account.|"
+            "For 'Recent activity': each sign-in and security change (password, two-step, "
+            "recovery key, sessions signed out) with its date, device label and network; the "
+            "latest 50, deleted after 90 days or with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -775,6 +804,26 @@ COPY: dict[str, dict[str, str]] = {
         "sessions_end_others": "Sign out all the others",
         "session_ended": "Session signed out.",
         "sessions_ended": "All your other sessions were signed out.",
+        "activity_title": "Recent activity",
+        "activity_help": (
+            "Sign-ins and security changes on your account in the last 90 days. If you see "
+            "something you did not do, change your password and sign out the other sessions."
+        ),
+        "col_when": "When",
+        "col_event": "What happened",
+        "event_signup": "Account created",
+        "event_signin": "Signed in with the password",
+        "event_signin_two_step": "Signed in with the password and a code",
+        "event_signin_recovery_key": "Signed in with the recovery key (two-step turned off)",
+        "event_password_changed": "Password changed",
+        "event_password_recovered": "New password with the recovery key",
+        "event_password_reset": "New password with a reset link",
+        "event_two_step_on": "Two-step sign-in turned on",
+        "event_two_step_off": "Two-step sign-in turned off",
+        "event_two_step_off_by_owner": "Two-step sign-in turned off by support",
+        "event_recovery_key_created": "New recovery key",
+        "event_session_ended": "A session was signed out",
+        "event_sessions_ended": "All other sessions were signed out",
         "two_step_card": "Two-step sign-in",
         "two_of_three": (
             "With two-step on, signing in or recovering the account takes two of these three: "
@@ -1512,6 +1561,26 @@ def _sessions_card(
     )
 
 
+def _activity_card(copy: dict[str, str], events: Sequence[AccountEvent]) -> str:
+    """ "Actividad reciente": sign-ins and security changes, newest first."""
+    head = "".join(
+        f"<th>{_e(copy[k])}</th>" for k in ("col_when", "col_event", "col_device", "col_network")
+    )
+    rows = "".join(
+        f"<tr><td>{_e(_stamp(item.at))}</td>"
+        f"<td>{_e(copy.get('event_' + item.kind, item.kind))}</td>"
+        f"<td>{_e(item.device or '-')}</td><td>{_e(item.network or '-')}</td></tr>"
+        for item in events
+    )
+    return (
+        f"<div class='acct-card acct-activity' id='actividad'>"
+        f"<h3>{_e(copy['activity_title'])}</h3>"
+        f"<p class='muted'>{_e(copy['activity_help'])}</p>"
+        f"<div class='acct-scroll'><table class='acct-table'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{rows}</tbody></table></div></div>"
+    )
+
+
 def _codes_table(copy: dict[str, str], codes: Sequence[AccountCode], now: str) -> str:
     if not codes:
         return f"<p class='muted'>{_e(copy['codes_none'])}</p>"
@@ -1639,6 +1708,7 @@ def account_page(
     recovery_created: str = "",
     two_step_since: str = "",
     sessions: Sequence[SessionView] = (),
+    events: Sequence[AccountEvent] = (),
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
@@ -1823,6 +1893,7 @@ def account_page(
         + two_step_card
         + "</div>"
         + (_sessions_card(copy, locale, csrf, sessions) if sessions else "")
+        + (_activity_card(copy, events) if events else "")
         + _stores(copy, retention_days)
         + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"

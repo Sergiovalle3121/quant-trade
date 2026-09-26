@@ -182,6 +182,9 @@ COPY_PT: dict[str, str] = {
         "De cada sessão aberta: um rótulo curto do dispositivo (como «Chrome · Windows», nunca o "
         "texto completo do navegador), a rede e o último uso, para «Sessões abertas»; sai ao "
         "encerrar a sessão, ao expirar ou com a conta.|"
+        "Para «Atividade recente»: cada entrada e cada mudança de segurança (senha, duas "
+        "etapas, chave de recuperação, sessões encerradas) com a data, o rótulo do "
+        "dispositivo e a rede; as últimas 50, apagadas após 90 dias ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -325,6 +328,26 @@ COPY_PT: dict[str, str] = {
     "sessions_end_others": "Encerrar todas as outras",
     "session_ended": "Sessão encerrada.",
     "sessions_ended": "Encerramos todas as outras sessões.",
+    "activity_title": "Atividade recente",
+    "activity_help": (
+        "Entradas e mudanças de segurança da sua conta nos últimos 90 dias. Se vir algo que você "
+        "não fez, troque sua senha e encerre as outras sessões."
+    ),
+    "col_when": "Quando",
+    "col_event": "O que aconteceu",
+    "event_signup": "Conta criada",
+    "event_signin": "Entrada com senha",
+    "event_signin_two_step": "Entrada com senha e código",
+    "event_signin_recovery_key": "Entrada com a chave de recuperação (duas etapas desativada)",
+    "event_password_changed": "Senha trocada",
+    "event_password_recovered": "Senha nova com a chave de recuperação",
+    "event_password_reset": "Senha nova com um link de redefinição",
+    "event_two_step_on": "Verificação em duas etapas ativada",
+    "event_two_step_off": "Verificação em duas etapas desativada",
+    "event_two_step_off_by_owner": "Verificação em duas etapas desativada pelo suporte",
+    "event_recovery_key_created": "Chave de recuperação nova",
+    "event_session_ended": "Uma sessão foi encerrada",
+    "event_sessions_ended": "Todas as outras sessões foram encerradas",
     "two_step_card": "Verificação em duas etapas",
     "two_of_three": (
         "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "

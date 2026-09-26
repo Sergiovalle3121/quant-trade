@@ -457,6 +457,7 @@ def account_two_step_off(
         typer.echo("would turn off two-step sign-in; pass --yes")
         return
     store.stop_two_step(account.id)
+    store.note_event(account.id, "two_step_off_by_owner", now=datetime.now(UTC))
     typer.echo("two-step sign-in turned off")
 
 

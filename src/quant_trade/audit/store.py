@@ -202,6 +202,37 @@ class SessionView:
     current: bool
 
 
+#: "Actividad reciente": what an account event may be, in the order shown.
+ACCOUNT_EVENT_KINDS = (
+    "signup",
+    "signin",
+    "signin_two_step",
+    "signin_recovery_key",
+    "password_changed",
+    "password_recovered",
+    "password_reset",
+    "two_step_on",
+    "two_step_off",
+    "two_step_off_by_owner",
+    "recovery_key_created",
+    "session_ended",
+    "sessions_ended",
+)
+#: How long an account event is kept, and how many at most per account.
+ACCOUNT_EVENT_DAYS = 90
+ACCOUNT_EVENT_MAX = 50
+
+
+@dataclass(frozen=True)
+class AccountEvent:
+    """One line of "Actividad reciente": what happened, when and from where."""
+
+    kind: str
+    device: str
+    network: str
+    at: str
+
+
 @dataclass(frozen=True)
 class InviteSummary:
     """ "Invita a un colega" on one account: who joined, never who they are."""
@@ -385,6 +416,19 @@ class Store:
             sa.Column("device", sa.String(80), nullable=False, default=""),
             sa.Column("network", sa.String(64), nullable=False, default=""),
             sa.Column("last_seen", sa.String(40), nullable=False),
+        )
+        # "Actividad reciente": sign-ins and security changes with the
+        # device label and network, kept ACCOUNT_EVENT_DAYS days and at most
+        # ACCOUNT_EVENT_MAX per account. Goes with the account.
+        self.account_events = sa.Table(
+            "account_events",
+            self.metadata,
+            sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("kind", sa.String(32), nullable=False),
+            sa.Column("device", sa.String(80), nullable=False, default=""),
+            sa.Column("network", sa.String(64), nullable=False, default=""),
+            sa.Column("at", sa.String(40), nullable=False, index=True),
         )
         #: One account per audit: the report a customer uploaded or saved.
         self.account_audits = sa.Table(
@@ -1293,6 +1337,7 @@ class Store:
                 self.two_step,
                 self.two_step_challenges,
                 self.session_info,
+                self.account_events,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1538,7 +1583,55 @@ class Store:
                     ~info.c.token_sha256.in_(sa.select(self.account_sessions.c.token_sha256))
                 )
             )
+            cutoff = _iso(now - timedelta(days=ACCOUNT_EVENT_DAYS))
+            conn.execute(self.account_events.delete().where(self.account_events.c.at < cutoff))
         return int(gone or 0)
+
+    def note_event(
+        self, account_id: str, kind: str, *, device: str = "", network: str = "", now: datetime
+    ) -> None:
+        """Add a line to "Actividad reciente", keeping the newest ACCOUNT_EVENT_MAX."""
+        if kind not in ACCOUNT_EVENT_KINDS:
+            raise ValueError(f"unknown account event: {kind}")
+        sa = self._sa
+        ev = self.account_events
+        with self.engine.begin() as conn:
+            conn.execute(
+                ev.insert().values(
+                    account_id=account_id,
+                    kind=kind,
+                    device=device[:80],
+                    network=network[:64],
+                    at=_iso(now),
+                )
+            )
+            ids = [
+                int(row[0])
+                for row in conn.execute(
+                    sa.select(ev.c.id)
+                    .where(ev.c.account_id == account_id)
+                    .order_by(ev.c.id.desc())
+                    .offset(ACCOUNT_EVENT_MAX)
+                ).all()
+            ]
+            if ids:
+                conn.execute(ev.delete().where(ev.c.id.in_(ids)))
+
+    def list_events(self, account_id: str, *, limit: int = ACCOUNT_EVENT_MAX) -> list[AccountEvent]:
+        """The account's events, newest first."""
+        sa = self._sa
+        ev = self.account_events
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(ev.c.kind, ev.c.device, ev.c.network, ev.c.at)
+                .where(ev.c.account_id == account_id)
+                .order_by(ev.c.id.desc())
+                .limit(limit)
+            ).all()
+        return [
+            AccountEvent(kind=str(r[0]), device=str(r[1]), network=str(r[2]), at=str(r[3]))
+            for r in rows
+        ]
 
     def touch_session(
         self,
@@ -2505,6 +2598,10 @@ class Store:
                     "last_used_at": row[4] or None,
                 }
                 for row in sessions
+            ],
+            "activity": [
+                {"event": e.kind, "at": e.at, "device": e.device, "network": e.network}
+                for e in self.list_events(account_id)
             ],
             "reports": reports,
             "access_codes": [
