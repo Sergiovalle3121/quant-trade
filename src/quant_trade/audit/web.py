@@ -2983,7 +2983,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             overall=record.overall_class,
             public_id=publication.public_id,
             audited_on=record.created_at[:10],
-            locale=_locale(lang),
+            locale=_locale(link_locale(lang or "es")),
         )
         return Response(content=svg, media_type="image/svg+xml")
 
@@ -2996,7 +2996,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             published_at=publication.created_at,
             result_sha256=digest,
             base_url=_site_url(request),
-            locale=_locale(lang),
+            # The public page has Spanish and English; a Portuguese reader gets English.
+            locale=_locale(link_locale(lang or "es")),
         )
 
     sample_cache: dict[tuple[str, str], str] = {}

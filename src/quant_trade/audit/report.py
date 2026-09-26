@@ -627,6 +627,7 @@ LABELS: dict[str, dict[str, str]] = {
             "máximo anterior."
         ),
         "fund_fees_two_twenty": "2 % + 20 % de las ganancias",
+        "compare_help": "Pega el enlace de otro informe tuyo para verlos lado a lado.",
         "ranges_title": "¿Cuánto de esto podría ser azar?",
         "ranges_intro": (
             "Con {n} operaciones, cada cifra tiene un margen. Con un 95 % de confianza, el "
@@ -1619,6 +1620,7 @@ LABELS: dict[str, dict[str, str]] = {
             "performance fee: 20 % of each year's gain above the previous high."
         ),
         "fund_fees_two_twenty": "2 % + 20 % of gains",
+        "compare_help": "Paste the link of another of your reports to see them side by side.",
         "ranges_title": "How much of this could be chance?",
         "ranges_intro": (
             "With {n} trades, every figure has a margin. With 95 % confidence, the system's "
@@ -5636,7 +5638,7 @@ def render_html(
         action = "/comparar" if locale == "es" else "/compare"
         compare_html = (
             f"<form class='publish no-print' method='post' action='{action}'>"
-            f"<p class='muted'>{_e(ccopy['from_report_help'])}</p>"
+            f"<p class='muted'>{_e(labels['compare_help'])}</p>"
             f"<input type='hidden' name='lang' value='{_e(locale)}'>"
             f"<input type='hidden' name='link_a' value='{_e(compare_link)}'>"
             f"<div class='inline-form'><input type='url' name='link_b' required "
@@ -6123,6 +6125,12 @@ def render_html(
             if switch_url
             else ""
         )
+        + (
+            f" <a class='lang-switch' href='{_e(switch_url.replace('lang=es', 'lang=en'))}' "
+            f"hreflang='en'>English</a>"
+            if switch_url and locale == "pt" and "lang=es" in switch_url
+            else ""
+        )
         + "</div>"
     )
     home = {"en": "/en", "pt": "/pt"}.get(locale, "/")
@@ -6195,7 +6203,9 @@ def render_html(
     ]
     if legal_links:
         links += [
-            f"<a href='{_e(legal_url(kind, locale))}'>{_e(LINK_TEXT[locale][kind])}</a>"
+            # The terms exist in Spanish and English; a Portuguese reader gets English.
+            f"<a href='{_e(legal_url(kind, 'en' if locale == 'pt' else locale))}'>"
+            f"{_e(LINK_TEXT[locale][kind])}</a>"
             for kind in ("terms", "privacy")
         ]
     footer = (
