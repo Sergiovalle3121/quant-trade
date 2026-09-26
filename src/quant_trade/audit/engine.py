@@ -835,6 +835,7 @@ def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[st
     out: dict[str, Any] = {"status": status, "horizon_years": 1.0, **risk}
     if status == "NOT_MEASURED":
         out["reason"] = risk["max_drawdown"]["p50"]["note"]
+    out["versus_shuffle"] = analytics.shuffled_drawdown(returns)
     return out
 
 

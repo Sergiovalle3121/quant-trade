@@ -2332,3 +2332,15 @@ Informational only: none of these moves a class, a dimension or a red flag.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
+- The risk section carries `versus_shuffle` (the same 30-return floor as the
+  resampled risk, and at least one losing period): the uploaded maximum
+  drawdown against up to 1,000 random orders of the same returns (seed
+  20260926). A shuffle keeps the Sharpe, the volatility and the final
+  result exactly, so the random orders show the drawdown this Sharpe and
+  volatility usually bring over this many periods. `position` is
+  `SHALLOWER` when at most 5 % of orders fall no deeper than the upload
+  (losses rarely follow losses, as in smoothed or averaged-down curves),
+  `DEEPER` when at most 5 % fall at least as deep (losses cluster), and
+  `TYPICAL` otherwise. The upload counts as one of the orders. Curves longer
+  than 10,000 periods are compounded into blocks first. Informational: it
+  moves no flag and no class.
