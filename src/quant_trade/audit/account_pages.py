@@ -612,6 +612,12 @@ border-radius:9px;background:color-mix(in srgb,var(--ok) 10%,#fff);color:var(--o
 .acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
 box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .acct-form form>p:last-child{margin-bottom:0}
+#invitar .field{max-width:640px}
+#invitar input[readonly]{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);
+text-overflow:ellipsis}
+#invitar .btn svg{width:18px;height:18px;margin-right:8px}
+@media (max-width:760px){#invitar .acct-kpi:last-child{grid-column:1/-1}
+#invitar .btn{width:100%;justify-content:center}}
 @media (min-width:761px){.acct-grid>.acct-form{position:sticky;top:84px}}
 .acct-danger{border-color:rgba(180,35,24,.28)}
 .acct-danger h3{color:#b42318}
