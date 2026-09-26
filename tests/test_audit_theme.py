@@ -1072,3 +1072,15 @@ def test_the_sign_up_form_stays_in_view_and_fills_a_phone() -> None:
     phone = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){.acct-grid") :]
     phone = phone[: phone.index("}}") + 2]
     assert ".acct-form button[type=submit]{width:100%;justify-content:center}" in phone
+
+
+def test_timing_tables_fit_390_and_360_px_phones() -> None:
+    # A 390 px phone cut off the last column ("Aciertos") of the hour table.
+    narrow = STYLE[STYLE.index("@media screen and (max-width:420px){.timing th") :]
+    narrow = narrow[: narrow.index("}}") + 2]
+    assert ".paper table.timing{font-size:.82rem!important}" in narrow
+    assert ".timing th{letter-spacing:0}" in narrow
+    assert (
+        "@media screen and (max-width:380px){.paper table.timing{font-size:.76rem!important}"
+        in STYLE
+    )

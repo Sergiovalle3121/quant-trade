@@ -2315,6 +2315,8 @@ Redesign pass 59 checks "¿Le gana a comprar y mantener el mercado?" on a phone 
 
 Redesign pass 60 keeps the sign-up and sign-in form in view on a desktop while the reader goes down "Qué guardamos y cómo borrarlo" beside it (sticky under the menu), and on a phone the "Crear cuenta" and "Entrar" buttons span the card.
 
+Redesign pass 61 checks the Portuguese report (/pt/exemplo and its PDF) on a phone and on paper: both read well, and the cover still fits one page. On the way it found that on a 390 px phone (most iPhones) the last column of the day and hour tables ("Aciertos") was cut off in Spanish, and at 360 px in every language. Up to 420 px the timing tables now use tighter cell padding, unspaced headers and a slightly smaller type, and at 380 px or less a smaller one again, so every column fits.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
