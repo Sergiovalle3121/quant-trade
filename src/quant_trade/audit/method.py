@@ -217,7 +217,7 @@ COPY: dict[str, dict[str, object]] = {
         "data": [
             "Tipos de cambio, tasas y precios de EE. UU., cierres de mercados y otras tasas de "
             "efectivo: FRED, Banco de la Reserva Federal de St. Louis.",
-            "Precios al consumidor del euro y de Suiza: Eurostat.",
+            "Precios al consumidor de la zona del euro y de Suiza: Eurostat.",
             "Precios al consumidor del Reino Unido: Office for National Statistics, bajo la "
             "Open Government Licence v3.0.",
             "Precios al consumidor de Canadá: Banco de Canadá (IPC de Statistics Canada); estos "
@@ -269,7 +269,7 @@ COPY: dict[str, dict[str, object]] = {
         "data": [
             "Exchange rates, US rates and prices, market closes and other cash rates: FRED, "
             "Federal Reserve Bank of St. Louis.",
-            "Consumer prices for the euro and Switzerland: Eurostat.",
+            "Consumer prices for the euro area and Switzerland: Eurostat.",
             "Consumer prices for the United Kingdom: Office for National Statistics, licensed "
             "under the Open Government Licence v3.0.",
             "Consumer prices for Canada: Bank of Canada (Statistics Canada's CPI); this data is "
@@ -324,7 +324,7 @@ COPY: dict[str, dict[str, object]] = {
         "data": [
             "Cotações, taxas e preços dos EUA, fechamentos de mercados e outras taxas de caixa: "
             "FRED, Federal Reserve Bank of St. Louis.",
-            "Preços ao consumidor do euro e da Suíça: Eurostat.",
+            "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
             "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
             "Government Licence v3.0.",
             "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
