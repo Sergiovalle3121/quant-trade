@@ -578,6 +578,12 @@ def _bootstrap(returns: pd.Series, *, samples: int, seed: int) -> dict[str, Any]
 
 def _subperiods(frame: pd.DataFrame) -> list[dict[str, Any]]:
     table = subperiod_analysis(frame[["timestamp", "equity"]])
+    years = pd.to_datetime(frame["timestamp"], utc=True).dt.year
+    if len(table) > 1 and int((years == int(table["year"].iloc[0])).sum()) == 1:
+        # A first year holding only the starting point (a fund record's opening
+        # value on 31 December) has no return in it; the next year already
+        # chains from that point, so the yearly returns still compound to the total.
+        table = table.iloc[1:]
     return [
         {
             "year": int(row["year"]),
