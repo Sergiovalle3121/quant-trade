@@ -179,6 +179,13 @@ COPY_PT: dict[str, str] = {
     ),
     "buy_card": "Pague com cartão a partir da prévia de qualquer relatório.",
     "security_title": "Senha e dados",
+    "export_title": "Baixar meus dados",
+    "export_help": (
+        "Um arquivo JSON com tudo o que guardamos da sua conta: seu e-mail, relatórios, "
+        "códigos, compras, estratégias, prévias grátis e os endereços IP ainda não apagados. "
+        "Nunca inclui sua senha nem os links privados."
+    ),
+    "export_button": "Baixar meus dados (JSON)",
     "change_password": "Trocar senha",
     "password_changed": "Senha trocada. Suas outras sessões foram encerradas.",
     "delete_title": "Apagar minha conta",

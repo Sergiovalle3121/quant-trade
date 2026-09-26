@@ -1694,3 +1694,64 @@ def test_account_forms_refuse_a_cross_site_post(tmp_path: Path) -> None:
             "/cuenta/estrategias/guardar", data=data, headers=headers, follow_redirects=False
         )
         assert answer.headers["location"].startswith("/cuenta/estrategias/")
+
+
+# -- "Descargar mis datos" -----------------------------------------------------------
+def test_download_my_data_returns_only_the_owners_rows(tmp_path: Path) -> None:
+    import json
+
+    client, store, _ = _client(tmp_path)
+    assert client.get("/cuenta/datos", follow_redirects=False).status_code == 303
+    _signup(client, "ana@example.com", welcome=True)
+    code, record = store.create_access_code(credits=3, note="nota-privada", at=NOW)  # type: ignore[attr-defined]
+    first = _audit_id(_upload(client).headers["location"])
+    second_url = _upload(client, access_code=code).headers["location"]
+    second = _audit_id(second_url)
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": first, "strategy": "new", "name": "EA Oro", "csrf": csrf},
+    )
+    other = TestClient(client.app)
+    _signup(other, "bea@example.com")
+    theirs = _audit_id(_upload(other).headers["location"])
+
+    answer = client.get("/cuenta/datos")
+    assert answer.status_code == 200
+    assert answer.headers["cache-control"] == "no-store"
+    assert answer.headers["content-disposition"].startswith("attachment;")
+    data = json.loads(answer.text)
+    assert data["account"]["email"] == "ana@example.com"
+    ids = {item["audit_id"] for item in data["reports"]}
+    assert ids == {first, second} and theirs not in answer.text
+    assert all(item["upload_ip"] for item in data["reports"])  # kept until the purge
+    assert data["strategies"][0]["name"] == "EA Oro"
+    assert data["strategies"][0]["reports"] == [first]
+    assert data["access_codes"][0]["id"] == record.id
+    assert data["free_first_report"]["audit_id"] == first
+    assert "bea@example.com" not in answer.text
+    # Never a secret: no password hash, no token, no code, no owner's note.
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    for secret in ("scrypt$", code, "nota-privada", second_url.split("token=")[1][:20]):
+        assert secret not in answer.text
+    sessions = store.account_sessions  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        tokens = [row[0] for row in conn.execute(sessions.select()).all()]
+    assert tokens and not any(token in answer.text for token in tokens)
+    assert account is not None
+    # The other account downloads only its own.
+    mine = json.loads(other.get("/account/datos").text)
+    assert [item["audit_id"] for item in mine["reports"]] == [theirs]
+    # The button on the account page, in every language, and the promise in /privacidad.
+    for path, words in (
+        ("/cuenta", "Descargar mis datos"),
+        ("/account", "Download my data"),
+        ("/pt/conta", "Baixar meus dados"),
+    ):
+        page = client.get(path).text
+        assert words in page and "/datos'" in page
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    ctx = LegalContext()
+    es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
+    en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
+    assert "«Descargar mis datos»" in es and "'Download my data'" in en

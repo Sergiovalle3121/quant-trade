@@ -201,6 +201,13 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "buy_card": "Paga con tarjeta desde la vista previa de cualquier informe.",
         "security_title": "Contraseña y datos",
+        "export_title": "Descargar mis datos",
+        "export_help": (
+            "Un archivo JSON con todo lo que guardamos de tu cuenta: tu correo, tus informes, "
+            "códigos, compras, estrategias, vistas previas gratis y las direcciones IP que aún "
+            "no se borraron. Nunca incluye tu contraseña ni los enlaces privados."
+        ),
+        "export_button": "Descargar mis datos (JSON)",
         "change_password": "Cambiar contraseña",
         "password_changed": "Contraseña cambiada. Cerramos las demás sesiones.",
         "delete_title": "Borrar mi cuenta",
@@ -432,6 +439,13 @@ COPY: dict[str, dict[str, str]] = {
         "buy_message": "Hi, I want credits for my account: one full report or the pack of 3.",
         "buy_card": "Pay by card from the preview of any report.",
         "security_title": "Password and data",
+        "export_title": "Download my data",
+        "export_help": (
+            "A JSON file with everything we keep about your account: your e-mail, reports, "
+            "codes, purchases, strategies, free previews and the IP addresses not yet deleted. "
+            "It never includes your password or the private links."
+        ),
+        "export_button": "Download my data (JSON)",
         "change_password": "Change password",
         "password_changed": "Password changed. Your other sessions were signed out.",
         "delete_title": "Delete my account",
@@ -1176,7 +1190,11 @@ def account_page(
         + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
         f"<span>{_e(copy['delete_reports'])}</span></label>"
         f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
-        "</form></div>" + _stores(copy, retention_days) + "</section>"
+        "</form></div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
+        f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
+        f"<a class='btn btn-ghost' href='{path('account', locale)}/datos' download>"
+        f"{icon('file')} {_e(copy['export_button'])}</a></div>"
+        "</section>"
     )
     body = (
         _alert(copy, error, flash)

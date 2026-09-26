@@ -1699,6 +1699,15 @@ changes what a report says.
   no audit kept). A failed upload gives its claims back. Network keys hold
   a hash of the address and the retention purge deletes them.
 
+- **Descargar mis datos**: `/cuenta/datos` (EN `/account/datos`, PT
+  `/pt/conta/datos`), a GET for the signed-in account only, returns a JSON
+  file (`no-store`) with the account's e-mail, language and dates, session
+  dates, reports (class, payment, description, upload IP while kept),
+  codes (never the code or the owner's note), strategies, free previews,
+  the free first report's hashes and IP, and the column maps. Never the
+  password hash, a session, reset or report token. Backs the "Qué
+  guardamos" block and the right of access in /privacidad
+  (`store.account_export`).
 - **Mis estrategias** (`audit/strategies.py`, tables `strategies` and
   `strategy_reports`): an account names a strategy and files reports of its
   own list under it (one strategy per report, 50 strategies per account),
