@@ -244,8 +244,9 @@ def compare_with_benchmark(
         "beta": measured(beta),
         "findings": [],
     }
-    review["jensen"] = jensen_alpha(f, b, 12.0)
-    review["skill"] = skill_review(f, b, monthly_cash(rates, pd.PeriodIndex(shared.index)))
+    cash = monthly_cash(rates, pd.PeriodIndex(shared.index))
+    review["jensen"] = jensen_alpha(f, b, 12.0, cash)
+    review["skill"] = skill_review(f, b, cash)
     if tracking > 0:
         review["information_ratio"] = measured(float(active.mean()) * 12.0 / tracking)
     for key, value in (("up_capture", up), ("down_capture", down)):

@@ -191,3 +191,22 @@ def test_the_report_shows_the_shuffle_when_the_engine_measures_it() -> None:
     shuffle = result.model_dump(mode="json")["risk"]["versus_shuffle"]
     text = _text(render_html(result, watermark=False, locale="es"))
     assert (report.LABELS["es"]["shuffle_title"] in text) == (shuffle["status"] == "MEASURED")
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("subtracted", [True, False])
+def test_the_alpha_line_says_whether_cash_was_subtracted(locale: str, subtracted: bool) -> None:
+    labels = report.LABELS[locale]
+    block = {
+        "status": "MEASURED",
+        "alpha": measured(0.012),
+        "beta": measured(0.4),
+        "alpha_t_stat": measured(1.1),
+        "periods": 500,
+        "cash_subtracted": subtracted,
+    }
+    text = report._alpha_html({"jensen": block}, labels)
+    shown = labels["alpha_line" if subtracted else "alpha_line_no_cash"]
+    hidden = labels["alpha_line_no_cash" if subtracted else "alpha_line"]
+    assert shown.split("(beta")[0].format(alpha="+1.2 %")[-30:] in text
+    assert hidden.split("(beta")[0].format(alpha="+1.2 %")[-30:] not in text

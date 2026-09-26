@@ -971,6 +971,11 @@ REPORT: dict[str, Any] = {
             "posições por vários períodos: o Sharpe simples sai inflado."
         ),
         "alpha_line": (
+            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, depois de subtrair "
+            "dos dois lados o que a letra do Tesouro dos EUA de 3 meses pagou (beta {beta}, "
+            "t = {t}, {n} períodos)."
+        ),
+        "alpha_line_no_cash": (
             "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, sem subtrair o que "
             "o caixa pagou (beta {beta}, t = {t}, {n} períodos)."
         ),
@@ -4351,6 +4356,18 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "as rentabilidades mensais com 2 % ao ano descontados mês a mês e 20 % do ganho de "
             "cada ano acima do máximo anterior descontados no fechamento do ano (marca d'água)"
+        ),
+    ),
+    (
+        (
+            "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+            "standard error; what the 3-month US Treasury bill paid over the same periods "
+            "subtracted from both sides"
+        ),
+        (
+            "rentabilidade além dos movimentos do benchmark (alfa de Jensen), anualizada; erro "
+            "padrão prudente; subtraído dos dois lados o que a letra do Tesouro dos EUA de 3 "
+            "meses pagou nos mesmos períodos"
         ),
     ),
     (

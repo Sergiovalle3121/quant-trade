@@ -10,9 +10,11 @@ and White, 1985), Newey and West's (1987) and the plain one widened by
 so returns that cluster in time, change in size or are smoothed do not make
 the alpha look surer than it is. Newey-West alone called a chance alpha
 significant up to about twice as often as it should over 36 to 60 months.
-No cash rate is subtracted from either side (the same convention as the
-Sharpe ratios in the report), so alpha here is measured against the
-benchmark itself, not against its excess over cash.
+When the 3-month US Treasury bill's return over each period is given, it is
+subtracted from both sides first, so a strategy with little exposure to the
+benchmark does not show what cash paid as alpha; without it (no public data,
+or rates that do not cover the periods) nothing is subtracted and the note
+says so.
 """
 
 from __future__ import annotations
@@ -31,6 +33,11 @@ MIN_PERIODS = 24
 NOTE = (
     "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
     "standard error; no cash rate subtracted"
+)
+CASH_NOTE = (
+    "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+    "standard error; what the 3-month US Treasury bill paid over the same periods "
+    "subtracted from both sides"
 )
 T_NOTE = (
     "alpha over its cautious standard error (the largest of HC3, Newey-West and one "
@@ -77,13 +84,24 @@ def cautious_fit(y: np.ndarray, columns: list[np.ndarray]) -> tuple[np.ndarray, 
 
 
 def jensen_alpha(
-    strategy: np.ndarray, benchmark: np.ndarray, periods_per_year: float
+    strategy: np.ndarray,
+    benchmark: np.ndarray,
+    periods_per_year: float,
+    cash: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """Alpha (annualised), its cautious t-statistic, beta and R squared."""
+    """Alpha (annualised), its cautious t-statistic, beta and R squared; with
+    ``cash`` (the bill's return over each period), on returns over cash."""
     y = np.asarray(strategy, dtype=float)
     x = np.asarray(benchmark, dtype=float)
-    if len(x) != len(y):
+    if len(x) != len(y) or (cash is not None and len(cash) != len(y)):
         return {"status": "NOT_MEASURED", "reason": NOT_ALIGNED}
+    note = NOTE
+    if cash is not None:
+        # Without it, a strategy with little exposure shows (1 - beta) times
+        # what cash paid as alpha.
+        c = np.asarray(cash, dtype=float)
+        y, x = y - c, x - c
+        note = CASH_NOTE
     # A level at zero gives an infinite return: keep only the periods both measure.
     finite = np.isfinite(y) & np.isfinite(x)
     y, x = y[finite], x[finite]
@@ -101,7 +119,8 @@ def jensen_alpha(
     alpha = float(coef[0])
     return {
         "status": "MEASURED",
-        "alpha": measured(alpha * periods_per_year, NOTE),
+        "alpha": measured(alpha * periods_per_year, note),
+        "cash_subtracted": cash is not None,
         "alpha_t_stat": (
             measured(alpha / se_alpha, T_NOTE)
             if se_alpha > 0
