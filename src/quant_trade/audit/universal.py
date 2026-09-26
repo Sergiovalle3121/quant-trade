@@ -1522,6 +1522,21 @@ def _trades(
     """Read one closed trade per row; returns how many fees were left out
     because they are charged in another coin."""
     columns = mapping.columns
+    if len(rows) > imp.MAX_TRADES:
+        # One trade per row: count the rows that carry both times, a
+        # quantity and both prices before reading any date, so a list past
+        # the limit is refused without reading the rest of it.
+        closed = sum(
+            1
+            for row in rows
+            if _cell(row, columns, "entry_time").strip()
+            and _cell(row, columns, "exit_time").strip()
+            and _amount(_cell(row, columns, "quantity"), decimal)
+            and _amount(_cell(row, columns, "entry_price"), decimal) is not None
+            and _amount(_cell(row, columns, "exit_price"), decimal) is not None
+        )
+        if closed > imp.MAX_TRADES:
+            raise imp._too_many_trades(closed)
     entry_times = _times(
         [_cell(row, columns, "entry_time") for row in rows],
         serial,
