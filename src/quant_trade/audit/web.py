@@ -3214,8 +3214,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _sample_html(locale: str, base_url: str) -> str:
         """Built once per locale, address and set of public series in memory, and
         kept: the input and the clock are fixed."""
-        market, ready = _sample_market()
         with sample_lock:
+            # Read the series in memory under the lock, so a request that saw an
+            # older set never evicts a page built for a newer one.
+            market, ready = _sample_market()
             key = (locale, base_url, ready)
             # Only the current set of series is worth keeping.
             for stale in [k for k in sample_cache if k[2] != ready]:
@@ -3242,8 +3244,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _sample_pdf(locale: str) -> Response:
         """The sample report as the PDF a buyer gets, built once per language and
         set of public series in memory."""
-        market, ready = _sample_market()
         with sample_pdf_lock:
+            market, ready = _sample_market()
             key = (locale, ready)
             for stale in [k for k in sample_pdfs if k[1] != ready]:
                 del sample_pdfs[stale]

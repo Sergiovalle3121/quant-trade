@@ -5809,7 +5809,9 @@ def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, st
         + "</p>"
     )
     excess = float(bench["excess"]["value"])
-    corr = f"{float(bench['correlation']['value']):.2f}"
+    corr_value = (bench.get("correlation") or {}).get("value")
+    # A fund with no variance has no correlation; show a dash, not a crash.
+    corr = f"{float(corr_value):.2f}" if corr_value is not None else "—"
     te = f"{float(bench['tracking_error']['value']):.1%}"
     up = (bench.get("up_capture") or {}).get("value")
     down = (bench.get("down_capture") or {}).get("value")

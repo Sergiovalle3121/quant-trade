@@ -117,3 +117,13 @@ def test_a_short_record_says_why_there_is_no_split(locale: str) -> None:
     assert report.LABELS[locale]["alpha_line"].split(":")[0] in shown
     if locale != "en":
         assert "fewer than" not in shown
+
+
+
+def test_a_benchmark_without_correlation_still_renders() -> None:
+    index = _index(20, 120)
+    fund = 0.9 * index + np.random.default_rng(21).normal(0.001, 0.01, 120)
+    bench = _bench(fund, index)
+    bench["correlation"] = {"value": None, "evidence": "NOT_MEASURED"}
+    for locale in LOCALES:
+        assert "—" in _shown(bench, locale)
