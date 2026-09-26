@@ -622,9 +622,53 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_fees_growth": "Crecimiento total",
         "fund_fees_none": "Sin comisión",
         "fund_fees_management": (
-            "Solo comisión de gestión. Muchos fondos cobran además una comisión de éxito, a "
-            "menudo el 20 % de las ganancias, así que el 2.5 % no es el peor caso."
+            "Las filas de un solo porcentaje son solo comisión de gestión. La última añade la "
+            "comisión de éxito clásica: el 20 % de la ganancia de cada año por encima del "
+            "máximo anterior."
         ),
+        "fund_fees_two_twenty": "2 % + 20 % de las ganancias",
+        "ranges_title": "¿Cuánto de esto podría ser azar?",
+        "ranges_intro": (
+            "Con {n} operaciones, cada cifra tiene un margen. Con un 95 % de confianza, el "
+            "valor de fondo del sistema está entre estos límites, si cada operación es "
+            "independiente de las demás."
+        ),
+        "ranges_zero": (
+            "El margen del promedio por operación incluye el cero: con estas operaciones no se "
+            "puede distinguir el sistema de uno que ni gana ni pierde por operación."
+        ),
+        "ranges_open": "sin límite",
+        "lo_line": (
+            "Sharpe corregido por autocorrelación (Lo, 2002): {lo}, frente a {plain} del "
+            "cálculo simple."
+        ),
+        "lo_lower": (
+            "Cada retorno tiende a parecerse al anterior (autocorrelación {rho}), algo típico de "
+            "curvas suavizadas o de precios que se actualizan poco: el Sharpe simple sale "
+            "inflado."
+        ),
+        "lo_lower_plain": (
+            "Los retornos de periodos cercanos tienden a moverse juntos: el Sharpe simple sale "
+            "inflado."
+        ),
+        "lo_not_lower": (
+            "Sharpe corregido por autocorrelación (Lo, 2002): no queda por debajo de {plain}, "
+            "así que el orden de los retornos no infla el Sharpe simple. Si la corrección lo "
+            "sube, el informe no lo usa: con pocos datos esa subida suele ser ruido."
+        ),
+        "alpha_line": (
+            "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark "
+            "(beta {beta}, t = {t}, {n} periodos)."
+        ),
+        "alpha_clear_up": (
+            "Con t por encima de 2, es poco probable que esa diferencia sea solo azar. No dice "
+            "que vaya a repetirse."
+        ),
+        "alpha_clear_down": (
+            "Con t por debajo de -2, es poco probable que el rezago frente al benchmark sea "
+            "solo azar."
+        ),
+        "alpha_unclear": "Con t entre -2 y 2, la diferencia no se distingue del azar.",
         "fund_fees_break_even": (
             "Con una comisión de {rate} al año o más, el fondo habría quedado igual o por "
             "debajo de su índice en los meses en común."
@@ -1571,8 +1615,50 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_fees_growth": "Total growth",
         "fund_fees_none": "No fee",
         "fund_fees_management": (
-            "Management fees only. Many funds also take a performance fee, often 20 % of "
-            "gains, so the 2.5 % row is not the worst case."
+            "Single-percentage rows are the management fee only. The last row adds the classic "
+            "performance fee: 20 % of each year's gain above the previous high."
+        ),
+        "fund_fees_two_twenty": "2 % + 20 % of gains",
+        "ranges_title": "How much of this could be chance?",
+        "ranges_intro": (
+            "With {n} trades, every figure has a margin. With 95 % confidence, the system's "
+            "underlying value lies between these bounds, if each trade is independent of the "
+            "others."
+        ),
+        "ranges_zero": (
+            "The margin of the average per trade includes zero: with these trades the system "
+            "cannot be told apart from one that neither makes nor loses per trade."
+        ),
+        "ranges_open": "no limit",
+        "lo_line": (
+            "Sharpe corrected for autocorrelation (Lo, 2002): {lo}, against {plain} from the "
+            "plain calculation."
+        ),
+        "lo_lower": (
+            "Each return tends to resemble the one before (autocorrelation {rho}), typical of "
+            "smoothed curves or prices that rarely update: the plain Sharpe comes out inflated."
+        ),
+        "lo_lower_plain": (
+            "Returns of nearby periods tend to move together: the plain Sharpe comes out inflated."
+        ),
+        "lo_not_lower": (
+            "Sharpe corrected for autocorrelation (Lo, 2002): it does not fall below {plain}, so "
+            "the order of the returns does not inflate the plain Sharpe. When the correction "
+            "raises it, the report does not use it: with little data that rise is mostly noise."
+        ),
+        "alpha_line": (
+            "Jensen's alpha: {alpha} a year beyond what the benchmark explains "
+            "(beta {beta}, t = {t}, {n} periods)."
+        ),
+        "alpha_clear_up": (
+            "With t above 2, the difference is unlikely to be chance alone. It does not say it "
+            "will repeat."
+        ),
+        "alpha_clear_down": (
+            "With t below -2, the shortfall against the benchmark is unlikely to be chance alone."
+        ),
+        "alpha_unclear": (
+            "With t between -2 and 2, the difference cannot be told apart from chance."
         ),
         "fund_fees_break_even": (
             "At a fee of {rate} a year or more, the fund would have ended level with or below "
@@ -3227,6 +3313,7 @@ def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> s
     if stats.get("status") != "MEASURED":
         return html_text
     html_text += _streak_html(stats, labels)
+    html_text += _ranges_html(stats.get("intervals"), labels)
     html_text += _evidence_rows(stats, labels, skip={"long", "short"})
     for side in ("long", "short"):
         if isinstance(stats.get(side), dict):
@@ -3234,6 +3321,84 @@ def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> s
                 stats[side], labels, skip=set()
             )
     return html_text
+
+
+def _bound(item: Any, key: str, labels: dict[str, str]) -> str:
+    value = item.get("value") if isinstance(item, dict) else None
+    if not isinstance(value, (int, float)) or not math.isfinite(value):
+        return _e(labels["ranges_open"])
+    return _fmt(float(value), key=key)
+
+
+def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """The 95 % margin of the win rate, the average per trade and the profit factor."""
+    if not ranges or ranges.get("status") != "MEASURED":
+        return ""
+    facts = []
+    for key in ("win_rate", "expectancy", "profit_factor"):
+        pair = ranges.get(key) or {}
+        low, high = pair.get("low") or {}, pair.get("high") or {}
+        if low.get("evidence") != "MEASURED":
+            continue
+        facts.append(
+            f"<div class='fact'><b>{_bound(low, key, labels)} – {_bound(high, key, labels)}</b>"
+            f"<p>{_e(_key_label(key, labels))} {_badge('MEASURED')}</p></div>"
+        )
+    if not facts:
+        return ""
+    trades = f"{int(ranges.get('trades') or 0):,}"
+    out = (
+        f"<h3>{_e(labels['ranges_title'])}</h3>"
+        f"<p class='muted'>{_e(labels['ranges_intro'].format(n=trades))}</p>"
+        f"<div class='facts'>{''.join(facts)}</div>"
+    )
+    average = ranges.get("expectancy") or {}
+    low = _ev_value(average.get("low"))
+    high = _ev_value(average.get("high"))
+    if low is not None and high is not None and low <= 0 <= high:
+        out += f"<p>{_e(labels['ranges_zero'])}</p>"
+    return out
+
+
+def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str, str]) -> str:
+    """Lo's (2002) Sharpe beside the plain one; it never feeds the class."""
+    block = significance.get("autocorrelation_adjusted") or {}
+    lo = _ev_value(block.get("sharpe"))
+    rho = _ev_value(block.get("lag1"))
+    if lo is None or plain is None or rho is None or not math.isfinite(lo):
+        return ""
+    # Only a fall is shown: a rise from small, noisy autocorrelations would
+    # flatter the file, and the class never uses either figure.
+    if lo >= plain - 0.1 * abs(plain):
+        out = labels["lo_not_lower"].format(plain=f"{plain:.2f}")
+    else:
+        out = labels["lo_line"].format(lo=f"{lo:.2f}", plain=f"{plain:.2f}") + " "
+        out += (
+            labels["lo_lower"].format(rho=f"{rho:.2f}") if rho >= 0.1 else labels["lo_lower_plain"]
+        )
+    return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
+
+
+def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
+    """Jensen's alpha against the uploaded benchmark, with its Newey-West t."""
+    block = benchmark.get("jensen") or {}
+    if block.get("status") != "MEASURED":
+        return ""
+    alpha = _ev_value(block.get("alpha"))
+    beta = _ev_value(block.get("beta"))
+    t_stat = _ev_value(block.get("alpha_t_stat"))
+    if alpha is None or beta is None or t_stat is None:
+        return ""
+    line = labels["alpha_line"].format(
+        alpha=_pct(alpha, signed=True),
+        beta=f"{beta:.2f}",
+        t=f"{t_stat:.1f}",
+        n=f"{int(block.get('periods') or 0):,}",
+    )
+    key = (
+        "alpha_clear_up" if t_stat >= 2 else "alpha_clear_down" if t_stat <= -2 else "alpha_unclear"
+    )
+    return f"<p>{_e(line)} {_e(labels[key])} {_badge('MEASURED')}</p>"
 
 
 def _range_fact(
@@ -5076,6 +5241,13 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
         f"<td class='val'>{_e(_fund_pct(float(row['growth']['value'])))}</td></tr>"
         for row in fees.get("rows") or []
     )
+    classic = fees.get("two_and_twenty")
+    if classic:
+        body += (
+            f"<tr><td>{_e(labels['fund_fees_two_twenty'])}</td>"
+            f"<td class='val'>{_e(_fund_pct(float(classic['cagr']['value'])))}</td>"
+            f"<td class='val'>{_e(_fund_pct(float(classic['growth']['value'])))}</td></tr>"
+        )
     out = (
         f"<h3>{_e(labels['fund_fees'])}</h3>"
         f"<p class='muted'>{_e(labels['fund_fees_intro'])} {_badge('MEASURED')}</p>"
@@ -5189,6 +5361,7 @@ def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, st
                 )
             )
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    out += _alpha_html(bench, labels)
     out += f"<p class='muted'>{_e(_sentence(localize(bench.get('note', ''), locale)))}</p>"
     return out
 
@@ -5595,8 +5768,10 @@ def render_html(
         )
         cost_html += _cost_gap_note(cost["rows"], data.get("trade_stats") or {}, labels)
 
-    bench_html = _status_line(data["benchmark"], labels) + _evidence_rows(
-        data["benchmark"], labels, skip=set()
+    bench_html = (
+        _status_line(data["benchmark"], labels)
+        + _evidence_rows(data["benchmark"], labels, skip=set())
+        + _alpha_html(data["benchmark"], labels)
     )
     cscv_html = _status_line(data["cscv"], labels) + _evidence_rows(
         data["cscv"], labels, skip=set()
@@ -5875,7 +6050,12 @@ def render_html(
         (
             labels["significance"],
             _status_line(data["significance"], labels)
-            + _evidence_rows(data["significance"], labels, skip=set()),
+            + _evidence_rows(data["significance"], labels, skip=set())
+            + _lo_html(
+                data["significance"],
+                _ev_value((data.get("performance") or {}).get("sharpe")),
+                labels,
+            ),
         ),
         (labels["multiplicity"], multiplicity_html),
         (labels["bootstrap"], boot_html),

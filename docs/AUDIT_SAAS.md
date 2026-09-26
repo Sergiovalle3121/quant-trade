@@ -2518,3 +2518,19 @@ Informational only: none of these moves a class, a dimension or a red flag.
   order), it is `NOT_MEASURED` rather than `TYPICAL`, so a smoothed curve is
   never called normal. Informational: it
   moves no flag and no class.
+
+How the report shows them (ES, EN and PT):
+
+- "How much of this could be chance?" under the trade statistics: the three
+  ranges side by side, and one line when the range of the average per trade
+  includes zero.
+- Under the significance table, Lo's Sharpe only when it is lower than the
+  plain one by more than a tenth (with the first-order autocorrelation when
+  it is 0.1 or more). A higher corrected figure is never printed: with small
+  samples it mostly adds noise and would flatter the file. The report says
+  the plain figure is not inflated instead.
+- Under the benchmark table and in the fund-versus-index block, Jensen's
+  alpha with beta, t and the periods; |t| of 2 or more reads as unlikely to
+  be chance alone (with "it does not say it will repeat" for a positive
+  alpha), below that as not distinguishable from chance.
+- The fee table's last row is "2 % + 20 % of gains".
