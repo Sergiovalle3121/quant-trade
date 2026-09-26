@@ -20,6 +20,7 @@ from quant_trade.audit.breaks import (
     MEAN_NOTE,
     NOTE,
     SHORT,
+    TOO_LARGE,
     bridge_p_value,
     mean_shift,
 )
@@ -112,7 +113,7 @@ def test_short_histories_and_edge_shifts() -> None:
 
 
 def test_the_notes_have_spanish_and_portuguese_rules() -> None:
-    for note in (NOTE, DATE_NOTE, MEAN_NOTE, SHORT):
+    for note in (NOTE, DATE_NOTE, MEAN_NOTE, SHORT, TOO_LARGE):
         for locale in ("es", "pt"):
             assert localize(note, locale) != note, (locale, note)
 
@@ -145,3 +146,21 @@ def test_the_report_shows_the_section(locale: str, shift: float) -> None:
     key = "shift_badge_changed" if shift else "shift_badge_steady"
     assert labels[key] in text
     assert find_claims(page) == []
+
+
+def test_a_return_too_large_to_measure_is_not_read_as_no_change() -> None:
+    returns = _returns(300, 0.0, 3)
+    returns[150] = 1e200
+    block = mean_shift(_frame(returns), 252)
+    assert block == {"status": "NOT_MEASURED", "reason": TOO_LARGE}
+
+
+def test_the_p_value_reads_after_a_bare_p() -> None:
+    assert report._p_text(0.0341) == "= 0.034"
+    assert report._p_text(0.0004) == "< 0.001"
+    for locale in ("es", "en", "pt"):
+        for key in ("shift_changed", "shift_steady", "shift_edge"):
+            assert (
+                "p = {p}" not in report.LABELS[locale][key]
+                and "p {p}" in report.LABELS[locale][key]
+            )

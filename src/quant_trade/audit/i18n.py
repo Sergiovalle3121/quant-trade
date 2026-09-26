@@ -1010,6 +1010,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("fewer than 250 returns", "menos de 250 retornos"),
     (
+        "a return is too large to measure its spread",
+        "un retorno es demasiado grande para medir su dispersión",
+    ),
+    (
         "each return placed by the VIX close of the last market day before it starts (calm "
         "below 20, turbulent at 20 or above); return per month compounded over each regime's "
         "days; Sharpe annualised like the headline Sharpe; gap in mean returns over a cautious "

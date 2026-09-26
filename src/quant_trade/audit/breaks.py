@@ -60,18 +60,23 @@ MEAN_NOTE = "average return per period, annualised; 90 % band from its cautious 
 SHORT = "fewer than 250 returns"
 FLAT = "the returns never move"
 ZERO = "the curve reaches zero"
+TOO_LARGE = "a return is too large to measure its spread"
 
 
 def long_run_variance(values: np.ndarray) -> float:
     """The largest of the plain, Newey-West and autocorrelation-widened
-    variances of ``values`` about their mean."""
+    variances of ``values`` about their mean; not finite when a return is too
+    large to square."""
     n = len(values)
     misses = values - values.mean()
-    plain = float(misses @ misses) / n
-    lags = newey_west_lags(n)
-    newey_west = plain
-    for lag in range(1, lags + 1):
-        newey_west += 2.0 * (1.0 - lag / (lags + 1)) * float(misses[lag:] @ misses[:-lag]) / n
+    with np.errstate(over="ignore", invalid="ignore"):
+        plain = float(misses @ misses) / n
+        if not math.isfinite(plain):
+            return math.inf
+        lags = newey_west_lags(n)
+        newey_west = plain
+        for lag in range(1, lags + 1):
+            newey_west += 2.0 * (1.0 - lag / (lags + 1)) * float(misses[lag:] @ misses[:-lag]) / n
     rho = float(misses[1:] @ misses[:-1]) / (plain * n) if plain > 0 else 0.0
     rho = min(max(rho + (1.0 + 3.0 * rho) / n, 0.0), MAX_RHO)
     widened = plain * (1.0 + rho) / (1.0 - rho)
@@ -118,6 +123,8 @@ def mean_shift(frame: pd.DataFrame, ppy: float) -> dict[str, Any]:
     if n < MIN_RETURNS:
         return {"status": "NOT_MEASURED", "reason": SHORT}
     sigma2 = long_run_variance(values)
+    if not math.isfinite(sigma2):
+        return {"status": "NOT_MEASURED", "reason": TOO_LARGE}
     if not sigma2 > 0:
         return {"status": "NOT_MEASURED", "reason": FLAT}
     path = np.cumsum(values - values.mean())

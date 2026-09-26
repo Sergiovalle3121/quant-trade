@@ -438,16 +438,16 @@ REPORT: dict[str, Any] = {
         "shift_badge_steady": "Sem mudança clara",
         "shift_changed": (
             "A rentabilidade média mudou por volta de {date} (provavelmente entre {low} e "
-            "{high}): {before} ao ano antes e {after} ao ano depois. Com p = {p}, o acaso "
+            "{high}): {before} ao ano antes e {after} ao ano depois. Com p {p}, o acaso "
             "dificilmente explica uma diferença assim."
         ),
         "shift_steady": (
-            "Não há uma mudança clara na rentabilidade média ao longo do histórico (p = {p}): as "
+            "Não há uma mudança clara na rentabilidade média ao longo do histórico (p {p}): as "
             "diferenças entre trechos cabem na oscilação normal dos seus retornos. Não prova "
             "que não tenha mudado: uma mudança pequena pode passar despercebida."
         ),
         "shift_edge": (
-            "O maior desvio está nos primeiros ou nos últimos retornos do histórico (p = {p}), "
+            "O maior desvio está nos primeiros ou nos últimos retornos do histórico (p {p}), "
             "perto demais da borda para comparar um antes e um depois."
         ),
         "shift_before": "Rentabilidade média ao ano antes de {date}",
@@ -2469,6 +2469,10 @@ RULES: tuple[tuple[str, str], ...] = (
         "retorno médio por período, anualizado; banda de 90 % pelo seu erro-padrão prudente",
     ),
     ("fewer than 250 returns", "menos de 250 retornos"),
+    (
+        "a return is too large to measure its spread",
+        "um retorno é grande demais para medir a sua dispersão",
+    ),
     (
         "both {a} and {b} present; using {c}",
         "há colunas {a} e {b}; usa-se {c}",

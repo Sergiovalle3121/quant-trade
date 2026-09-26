@@ -590,17 +590,17 @@ LABELS: dict[str, dict[str, str]] = {
         "shift_badge_steady": "Sin cambio claro",
         "shift_changed": (
             "La rentabilidad media cambió alrededor del {date} (probablemente entre el {low} y "
-            "el {high}): {before} al año antes y {after} al año después. Con p = {p}, el azar "
+            "el {high}): {before} al año antes y {after} al año después. Con p {p}, el azar "
             "difícilmente explica una diferencia así."
         ),
         "shift_steady": (
             "No hay un cambio claro en la rentabilidad media a lo largo del historial "
-            "(p = {p}): las diferencias entre tramos caben en el vaivén normal de sus retornos. "
+            "(p {p}): las diferencias entre tramos caben en el vaivén normal de sus retornos. "
             "No prueba que no haya cambiado: un cambio pequeño puede pasar sin verse."
         ),
         "shift_edge": (
             "La mayor desviación está en los primeros o los últimos retornos del historial "
-            "(p = {p}), demasiado cerca del borde para comparar un antes y un después."
+            "(p {p}), demasiado cerca del borde para comparar un antes y un después."
         ),
         "shift_before": "Rentabilidad media al año antes del {date}",
         "shift_after": "Rentabilidad media al año desde el {date}",
@@ -1861,17 +1861,17 @@ LABELS: dict[str, dict[str, str]] = {
         "shift_badge_steady": "No clear change",
         "shift_changed": (
             "The average return changed around {date} (probably between {low} and {high}): "
-            "{before} a year before and {after} a year after. With p = {p}, chance alone is "
+            "{before} a year before and {after} a year after. With p {p}, chance alone is "
             "unlikely to explain a difference like this."
         ),
         "shift_steady": (
-            "There is no clear change in the average return across the history (p = {p}): the "
+            "There is no clear change in the average return across the history (p {p}): the "
             "differences between stretches fit the normal swing of its returns. It does not "
             "prove there was none: a small change can go unseen."
         ),
         "shift_edge": (
             "The largest deviation sits in the first or last returns of the history "
-            "(p = {p}), too close to the edge to compare a before and an after."
+            "(p {p}), too close to the edge to compare a before and an after."
         ),
         "shift_before": "Average return a year before {date}",
         "shift_after": "Average return a year since {date}",
@@ -5204,7 +5204,8 @@ def _date_text(iso: str, locale: str) -> str:
 
 
 def _p_text(value: float) -> str:
-    return "< 0.001" if value < 0.001 else f"{value:.3f}"
+    """``= 0.034`` or ``< 0.001``, to follow a bare "p"."""
+    return "< 0.001" if value < 0.001 else f"= {value:.3f}"
 
 
 def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
