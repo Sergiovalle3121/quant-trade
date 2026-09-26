@@ -59,10 +59,26 @@ DISALLOWED_PATHS: tuple[str, ...] = (
     "/audits/",
     "/webhooks/",
     "/health",
+    # Every account screen in each language, with its sub-pages (kept in step
+    # with account_pages.PATHS by a test; account_pt imports this module).
+    "/registro",
+    "/entrar",
+    "/salir",
     "/cuenta",
-    "/account",
+    "/olvide",
     "/restablecer",
+    "/signup",
+    "/login",
+    "/logout",
+    "/account",
+    "/forgot",
     "/reset",
+    "/pt/cadastro",
+    "/pt/entrar",
+    "/pt/sair",
+    "/pt/conta",
+    "/pt/esqueci",
+    "/pt/redefinir",
 )
 
 

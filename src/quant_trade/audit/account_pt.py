@@ -184,7 +184,10 @@ COPY_PT: dict[str, str] = {
         "encerrar a sessão, ao expirar ou com a conta.|"
         "Para «Atividade recente»: cada entrada e cada mudança de segurança (senha, duas "
         "etapas, chave de recuperação, sessões encerradas) com a data, o rótulo do "
-        "dispositivo e a rede; as últimas 50, apagadas após 90 dias ou com a conta.|"
+        "dispositivo e a rede; as últimas 50, apagadas após 90 dias ou com a conta. "
+        "À parte, as tentativas com senha incorreta na sua conta: quantas por rede e hora, "
+        "com o rótulo do dispositivo (nunca o que foi digitado); as últimas 20, apagadas "
+        "após 90 dias ou com a conta.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),
@@ -348,6 +351,8 @@ COPY_PT: dict[str, str] = {
     "event_recovery_key_created": "Chave de recuperação nova",
     "event_session_ended": "Uma sessão foi encerrada",
     "event_sessions_ended": "Todas as outras sessões foram encerradas",
+    "event_signin_failed_one": "Senha incorreta (1 tentativa)",
+    "event_signin_failed": "Senha incorreta ({count} tentativas)",
     "two_step_card": "Verificação em duas etapas",
     "two_of_three": (
         "Com as duas etapas ativas, para entrar ou recuperar a conta você precisa de duas destas "
