@@ -2073,8 +2073,8 @@ SINGULAR: dict[str, tuple[str, str]] = {
     "may be read wrong": (
         "{n} stock split that would leave no shares held was not applied; the position it touches "
         "may be read wrong",
-        "não foi aplicado {n} desdobramento que deixaria a posição sem ações; a posição afetada "
-        "pode ser lida errado",
+        "não foi aplicado {n} desdobramento ou grupamento que deixaria a posição sem ações; a "
+        "posição afetada pode ser lida errado",
     ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (
@@ -2367,8 +2367,8 @@ RULES: tuple[tuple[str, str], ...] = (
         "{n} stock split(s) that would leave no shares held were not applied; the positions they "
         "touch may be read wrong",
         (
-            "não foram aplicados {n} desdobramento(s) que deixariam a posição sem ações; as "
-            "posições afetadas podem ser lidas errado"
+            "não foram aplicados {n} desdobramento(s) ou grupamento(s) que deixariam a posição "
+            "sem ações; as posições afetadas podem ser lidas errado"
         ),
     ),
     (
