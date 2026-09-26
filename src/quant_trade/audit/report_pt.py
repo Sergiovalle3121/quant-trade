@@ -948,7 +948,7 @@ REPORT: dict[str, Any] = {
         "ranges_intro": (
             "Com {n} operações, cada número tem uma margem. Faixa de 95 %: os valores de fundo "
             "compatíveis com estas operações, se cada uma for independente das demais e o "
-            "sistema não mudou. Não é uma previsão."
+            "sistema não tiver mudado. Não é uma previsão."
         ),
         "ranges_zero": (
             "A faixa da média por operação ou a do fator de lucro inclui o ponto de equilíbrio "
@@ -1364,6 +1364,17 @@ REPORT: dict[str, Any] = {
         "cost_bps_per_side": "Custo por lado (pb)",
         "oos_start": "Início fora da amostra",
         "benchmark_applicable": "Benchmark se aplica",
+        "overlap_share": "Datas em comum com o benchmark",
+        "strategy_total_return": "Retorno total da estratégia",
+        "benchmark_total_return": "Retorno total do benchmark",
+        "excess_return": "Retorno acima do benchmark",
+        "strategy_sharpe": "Sharpe da estratégia",
+        "benchmark_sharpe": "Sharpe do benchmark",
+        "tracking_error": "Erro de rastreamento",
+        "information_ratio": "Índice de informação",
+        "strategy_max_drawdown": "Drawdown máximo da estratégia",
+        "benchmark_max_drawdown": "Drawdown máximo do benchmark",
+        "drawdown_ratio": "Drawdown da estratégia frente ao do benchmark (vezes)",
         "initial_balance": "Saldo inicial",
         "dsr_at_declared": "DSR com as tentativas declaradas",
         "dsr_at_trials_used": "DSR com as tentativas usadas",
@@ -4742,14 +4753,17 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "each return placed by the VIX close of the last market day before it starts (calm "
             "below 20, turbulent at 20 or above); return per month compounded over each "
-            "regime's days; Sharpe annualised like the headline Sharpe; gap in mean returns in "
-            "Welch standard errors"
+            "regime's days; Sharpe annualised like the headline Sharpe; gap in mean returns over "
+            "a cautious standard error (the largest of Welch's, Newey-West's and one widened "
+            "for autocorrelated returns)"
         ),
         (
             "cada retorno atribuído segundo o fechamento do VIX do último dia de mercado "
             "anterior ao seu início (tranquilo abaixo de 20, agitado a partir de 20); "
             "rentabilidade por mês composta sobre os dias de cada regime; Sharpe anualizado "
-            "como o Sharpe principal; diferença de retornos médios em erros padrão de Welch"
+            "como o Sharpe principal; diferença de retornos médios dividida por um erro padrão "
+            "prudente (o maior entre o de Welch, o de Newey-West e um ampliado por retornos "
+            "autocorrelacionados)"
         ),
     ),
     (
