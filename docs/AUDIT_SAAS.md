@@ -1348,7 +1348,9 @@ euro and yen rates were); a reply outside -5 % to 200 % a year
 (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Mexico's reached 136 % in 1988) is
 taken as broken. When the currency has no series here, or its rates cannot
 be read or do not cover the history, the
-line stays the US bill's, with its note. Jensen's alpha keeps the US bill.
+line stays the US bill's, with its note. Jensen's alpha takes the same local
+rate for the strategy's side (the benchmark keeps the bill; see the benchmark
+section).
 It never changes the class.
 
 Calm and turbulent markets (`audit/regime.py`). With public data on, every
@@ -2182,7 +2184,18 @@ changes what a report says.
   abiertas"). The latest 50 per account are kept (`store.ACCOUNT_EVENT_MAX`);
   older than 90 days (`ACCOUNT_EVENT_DAYS`) they go with `purge_sessions`,
   which every sign-in runs. They go with the account, and the export lists
-  them under `activity`. Failed sign-ins are not listed.
+  them under `activity`.
+- **Wrong-password lines** (`failed_signins` table, shown in "Actividad
+  reciente" as "Contraseña incorrecta (N intentos)"): a wrong password for an
+  existing account counts on one line per network and hour (device label and
+  time of the last try; never the typed e-mail or password). The line is
+  written by a background task after the reply is sent, so a real account
+  answers as fast as an unknown e-mail (no account-existence timing signal).
+  Their own cap, `store.FAILED_SIGNIN_MAX` (20 lines), keeps a flood from
+  pushing real events out, and the card shows at most 5 beside 20 real
+  events. They go after 90 days with `purge_sessions`, with the account, and
+  the export lists them under `failed_signins`. Rate-limited tries (429) are
+  not counted.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
@@ -2814,6 +2827,17 @@ Informational only: none of these moves a class, a dimension or a red flag.
   Without it nothing is subtracted, `cash_subtracted` is false and the note
   says so, because then a strategy with beta `b` shows `(1 - b)` times what
   cash paid as alpha.
+  When a report names an account currency with its own cash rate (the
+  currencies of the cash-rate Sharpe) and that rate covers every period too,
+  the strategy loses what cash in that currency paid instead (read by the
+  same quote, staleness and euro history as the cash-rate Sharpe) and the
+  benchmark, taken as priced in US dollars (the note and the line say so; a
+  local index uploaded as the benchmark is not detected), the bill's: each side over its own
+  currency's cash. `cash_currency` then names the currency and the line names
+  both rates. Otherwise a dollar account's bill on both sides stays. With
+  the bill on both sides, a simulated account in reais holding Brazilian cash
+  at 12 % and 0.2 of the index, with the bill at 5 %, showed about 7 % a year
+  of alpha that was only Brazil's cash premium over the bill.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
@@ -2886,7 +2910,9 @@ How the report shows them (ES, EN and PT):
   or one line saying
   dependence does not change it. The class never reads either.
 - Under the benchmark table and in the fund-versus-index block, Jensen's
-  alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to
+  alpha with beta, t and the periods, saying which cash it subtracted from
+  each side (the account currency's own rate is named) or that it subtracts
+  no cash rate; |t| of 2 or more reads as unlikely to
   be chance alone (with "it does not say it will repeat" for a positive
   alpha), below that as not distinguishable from chance.
 - The fee table's last row is "2 % + 20 % of gains".

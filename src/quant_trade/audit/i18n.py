@@ -1438,6 +1438,16 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "los momentos no dejan varianza con la que escalar",
     ),
     (
+        "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+        "standard error; what cash in the account's currency paid subtracted from the "
+        "strategy and what the 3-month US Treasury bill paid subtracted from the benchmark, "
+        "taken as priced in US dollars",
+        "rentabilidad más allá de los movimientos del benchmark (alfa de Jensen), anualizada; "
+        "error estándar prudente; restado a la estrategia lo que pagó el efectivo en la moneda "
+        "de la cuenta y al benchmark, tomado como cotizado en dólares, lo que pagó la letra del "
+        "Tesoro de EE. UU. a 3 meses",
+    ),
+    (
         "first-order autocorrelation of the returns",
         "autocorrelación de primer orden de los retornos",
     ),

@@ -221,6 +221,9 @@ ACCOUNT_EVENT_KINDS = (
 #: How long an account event is kept, and how many at most per account.
 ACCOUNT_EVENT_DAYS = 90
 ACCOUNT_EVENT_MAX = 50
+#: Wrong-password lines kept per account: their own cap, so a flood of
+#: failures never pushes real events out of the ACCOUNT_EVENT_MAX.
+FAILED_SIGNIN_MAX = 20
 
 
 @dataclass(frozen=True)
@@ -231,6 +234,7 @@ class AccountEvent:
     device: str
     network: str
     at: str
+    count: int = 1
 
 
 @dataclass(frozen=True)
@@ -429,6 +433,22 @@ class Store:
             sa.Column("device", sa.String(80), nullable=False, default=""),
             sa.Column("network", sa.String(64), nullable=False, default=""),
             sa.Column("at", sa.String(40), nullable=False, index=True),
+        )
+        # Wrong passwords on an existing account, one row per network and
+        # hour (the attempts are counted, the typed e-mail and password are
+        # never kept), at most FAILED_SIGNIN_MAX per account for
+        # ACCOUNT_EVENT_DAYS days. Goes with the account.
+        self.failed_signins = sa.Table(
+            "failed_signins",
+            self.metadata,
+            sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("network", sa.String(64), nullable=False, default=""),
+            sa.Column("hour", sa.String(13), nullable=False),
+            sa.Column("device", sa.String(80), nullable=False, default=""),
+            sa.Column("attempts", sa.Integer, nullable=False, default=1),
+            sa.Column("last_at", sa.String(40), nullable=False, index=True),
+            sa.UniqueConstraint("account_id", "network", "hour"),
         )
         #: One account per audit: the report a customer uploaded or saved.
         self.account_audits = sa.Table(
@@ -1338,6 +1358,7 @@ class Store:
                 self.two_step_challenges,
                 self.session_info,
                 self.account_events,
+                self.failed_signins,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -1585,6 +1606,7 @@ class Store:
             )
             cutoff = _iso(now - timedelta(days=ACCOUNT_EVENT_DAYS))
             conn.execute(self.account_events.delete().where(self.account_events.c.at < cutoff))
+            conn.execute(self.failed_signins.delete().where(self.failed_signins.c.last_at < cutoff))
         return int(gone or 0)
 
     def note_event(
@@ -1616,6 +1638,74 @@ class Store:
             ]
             if ids:
                 conn.execute(ev.delete().where(ev.c.id.in_(ids)))
+
+    def note_failed_signin(
+        self, account_id: str, *, device: str = "", network: str = "", now: datetime
+    ) -> None:
+        """Count a wrong password on the account's line for this network and hour."""
+        sa = self._sa
+        fs = self.failed_signins
+        hour, stamp = _iso(now)[:13], _iso(now)
+        key = (fs.c.account_id == account_id) & (fs.c.network == network[:64]) & (fs.c.hour == hour)
+        bump = (
+            fs.update()
+            .where(key)
+            .values(attempts=fs.c.attempts + 1, device=device[:80], last_at=stamp)
+        )
+        with self.engine.begin() as conn:
+            if conn.execute(bump).rowcount:
+                return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    fs.insert().values(
+                        account_id=account_id,
+                        network=network[:64],
+                        hour=hour,
+                        device=device[:80],
+                        attempts=1,
+                        last_at=stamp,
+                    )
+                )
+        except sa.exc.IntegrityError:
+            with self.engine.begin() as conn:
+                conn.execute(bump)  # a simultaneous try made the line first
+        with self.engine.begin() as conn:
+            ids = [
+                int(row[0])
+                for row in conn.execute(
+                    sa.select(fs.c.id)
+                    .where(fs.c.account_id == account_id)
+                    .order_by(fs.c.last_at.desc(), fs.c.id.desc())
+                    .offset(FAILED_SIGNIN_MAX)
+                ).all()
+            ]
+            if ids:
+                conn.execute(fs.delete().where(fs.c.id.in_(ids)))
+
+    def list_failed_signins(
+        self, account_id: str, *, limit: int = FAILED_SIGNIN_MAX
+    ) -> list[AccountEvent]:
+        """The account's wrong-password lines, newest first, as ``signin_failed`` events."""
+        sa = self._sa
+        fs = self.failed_signins
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(fs.c.device, fs.c.network, fs.c.last_at, fs.c.attempts)
+                .where(fs.c.account_id == account_id)
+                .order_by(fs.c.last_at.desc(), fs.c.id.desc())
+                .limit(limit)
+            ).all()
+        return [
+            AccountEvent(
+                kind="signin_failed",
+                device=str(r[0]),
+                network=str(r[1]),
+                at=str(r[2]),
+                count=int(r[3]),
+            )
+            for r in rows
+        ]
 
     def list_events(self, account_id: str, *, limit: int = ACCOUNT_EVENT_MAX) -> list[AccountEvent]:
         """The account's events, newest first."""
@@ -2602,6 +2692,10 @@ class Store:
             "activity": [
                 {"event": e.kind, "at": e.at, "device": e.device, "network": e.network}
                 for e in self.list_events(account_id)
+            ],
+            "failed_signins": [
+                {"last_at": e.at, "attempts": e.count, "device": e.device, "network": e.network}
+                for e in self.list_failed_signins(account_id)
             ],
             "reports": reports,
             "access_codes": [
