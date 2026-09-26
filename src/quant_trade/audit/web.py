@@ -45,8 +45,14 @@ from quant_trade.audit import check as check_lib
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
+from quant_trade.audit.compare import (
+    COMPARE_PATH,
+    compare_form,
+    comparison_body,
+    guard_page,
+    parse_report_link,
+)
 from quant_trade.audit.compare import COPY as COMPARE_COPY
-from quant_trade.audit.compare import compare_form, comparison_body, guard_page, parse_report_link
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
@@ -566,7 +572,7 @@ def request_body_limit(max_upload_bytes: int) -> int:
 # The report check takes one file of at most ``check.MAX_CHECK_BYTES``, so its
 # body limit is that plus the form overhead: a bigger upload is refused before
 # it is spooled, not after.
-CHECK_PATHS = {"/comprobar": "es", "/check": "en"}
+CHECK_PATHS = {"/comprobar": "es", "/check": "en", "/pt/comprovar": "pt"}
 
 
 def check_body_limit() -> int:
@@ -3207,6 +3213,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def method_en(request: Request, lang: str | None = None) -> str:
         return method_page(locale=_locale(lang or "en"), base_url=_site_url(request))
 
+    @app.get("/pt/metodologia", response_class=HTMLResponse)
+    def method_pt(request: Request) -> str:
+        return method_page(locale="pt", base_url=_site_url(request))
+
     @app.get("/guides", response_class=HTMLResponse)
     def guides_en(request: Request, lang: str | None = None) -> str:
         return guides_index_page(locale=_locale(lang or "en"), base_url=_site_url(request))
@@ -3331,8 +3341,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def compare_en(request: Request, lang: str | None = None) -> Response:
         return _compare_form_page(_locale(lang or "en"), request=request)
 
+    @app.get("/pt/comparar", response_class=HTMLResponse)
+    def compare_pt(request: Request) -> Response:
+        return _compare_form_page("pt", request=request)
+
     def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
-        locale = _locale(lang or default)
+        locale = "pt" if default == "pt" else _locale(lang or default)
         copy = COMPARE_COPY[locale]
         first, second = parse_report_link(link_a), parse_report_link(link_b)
         if first is None or second is None:
@@ -3362,8 +3376,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             href_b=f"{href_b}&lang={locale}",
             locale=locale,
         )
-        again = "/comparar" if locale == "es" else "/compare"
-        body += f"<p><a class='btn btn-ghost' href='{again}?lang={locale}'>{copy['again']}</a></p>"
+        again = COMPARE_PATH[locale] + ("" if locale == "pt" else f"?lang={locale}")
+        body += f"<p><a class='btn btn-ghost' href='{again}'>{copy['again']}</a></p>"
         return HTMLResponse(guard_page(compare_page(body, locale=locale)))
 
     @app.post("/comparar", response_class=HTMLResponse)
@@ -3382,6 +3396,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         return _compare(link_a, link_b, lang, "en")
 
+    @app.post("/pt/comparar", response_class=HTMLResponse)
+    def compare_post_pt(
+        link_a: Annotated[str, Form(max_length=1000)],
+        link_b: Annotated[str, Form(max_length=1000)],
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return _compare(link_a, link_b, lang, "pt")
+
     def _check_page(request: Request, locale: str, content: str, status: int = 200) -> Response:
         page = check_page(content, locale=locale, base_url=_site_url(request))
         return HTMLResponse(guard_page(page), status_code=status)
@@ -3395,6 +3417,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def check_en(request: Request, lang: str | None = None) -> Response:
         locale = _locale(lang or "en")
         return _check_page(request, locale, check_lib.check_form(locale))
+
+    @app.get("/pt/comprovar", response_class=HTMLResponse)
+    def check_pt(request: Request) -> Response:
+        return _check_page(request, "pt", check_lib.check_form("pt"))
 
     async def _check(request: Request, report: UploadFile | None, locale: str) -> Response:
         copy = check_lib.COPY[locale]
@@ -3437,6 +3463,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
         return await _check(request, report, _locale(lang or "en"))
+
+    @app.post("/pt/comprovar", response_class=HTMLResponse)
+    async def check_post_pt(
+        request: Request,
+        report: Annotated[UploadFile | None, File()] = None,
+        lang: Annotated[str | None, Form()] = None,
+    ) -> Response:
+        return await _check(request, report, "pt")
 
     @app.get("/terminos", response_class=HTMLResponse)
     def terms_es(request: Request, lang: str | None = None) -> str:

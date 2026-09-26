@@ -6,7 +6,7 @@ trust signals: an independent operator, a published method, reproducible
 numbers. Everything on this page that is a number comes from the code the
 reports run (``verdict.DEFAULT_THRESHOLDS``, ``redflags.FLAG_TITLES``,
 ``report.CLASS_LADDER``), so the page cannot drift from the reports. The
-text passes the profit-claim guard in both languages (tested).
+text passes the profit-claim guard in Spanish, English and Portuguese (tested).
 """
 
 from __future__ import annotations
@@ -15,7 +15,11 @@ from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.verdict import DEFAULT_THRESHOLDS, Thresholds
 
 #: The page's path in each language.
-METHOD_PATH: dict[str, str] = {"es": "/metodologia", "en": "/methodology"}
+METHOD_PATH: dict[str, str] = {
+    "es": "/metodologia",
+    "en": "/methodology",
+    "pt": "/pt/metodologia",
+}
 
 #: Published sources of the estimators the audit applies.
 REFERENCES: tuple[str, ...] = (
@@ -37,6 +41,50 @@ def method_url(locale: str) -> str:
 
 def dimension_rows(locale: str, t: Thresholds = DEFAULT_THRESHOLDS) -> list[tuple[str, str, str]]:
     """``(question, what is measured, what it takes to pass)`` per dimension."""
+    if locale == "pt":
+        return [
+            (
+                "O resultado se distingue do acaso?",
+                "Sharpe probabilístico (tamanho, assimetria e curtose) e bootstrap "
+                "estacionário por blocos dos retornos.",
+                f"PSR ≥ {t.psr_pass:.2f} e o percentil 5 do Sharpe do bootstrap acima de zero; "
+                f"fraco a partir de PSR {t.psr_weak:.2f}.",
+            ),
+            (
+                "Aguenta o número de tentativas?",
+                "Sharpe deflacionado com o maior número entre as tentativas declaradas, as "
+                "variantes enviadas e as passagens de otimização do MT5; PBO por validação "
+                "cruzada combinatória quando você envia variantes.",
+                f"DSR ≥ {t.dsr_pass:.2f} e PBO abaixo de {t.pbo_max:.2f}; fraco a partir de DSR "
+                f"{t.dsr_weak:.2f}.",
+            ),
+            (
+                "Aguenta os custos de operar?",
+                "Cada operação recalculada com 1x, 2x e 3x o custo, e o custo de equilíbrio.",
+                f"Continua positivo com {t.cost_pass_multiplier:.0f}x o custo de referência.",
+            ),
+            (
+                "O trecho fora da amostra se sustenta?",
+                "Sharpe depois do início fora da amostra que você declara e a sua distância "
+                "do Sharpe dentro da amostra.",
+                f"Sharpe fora da amostra ≥ {t.oos_sharpe_pass:.1f} e uma distância de no "
+                f"máximo {t.oos_gap_max:.1f}.",
+            ),
+            (
+                "Os dados estão sãos?",
+                f"{len(FLAG_TITLES)} bandeiras vermelhas: duplicados, saltos, valores "
+                "congelados, martingale, grade, depósitos, modelagem do backtest e mais.",
+                "Nenhuma bandeira. Uma bandeira grave reprova a dimensão; um aviso a deixa "
+                "como fraca.",
+            ),
+            (
+                "Supera o que você poderia ter tido sem fazer nada?",
+                "Excesso de retorno, razão de drawdown e razão de informação frente ao "
+                "benchmark que você enviar.",
+                f"Excesso de retorno e razão de informação positivos, com um drawdown de no "
+                f"máximo {t.benchmark_drawdown_ratio_max:.0f}x o do benchmark.",
+            ),
+        ]
     if locale == "en":
         return [
             (
@@ -205,6 +253,49 @@ COPY: dict[str, dict[str, object]] = {
             "A report is not legal, tax or investment advice.",
         ],
         "refs_title": "Sources",
+    },
+    "pt": {
+        "eyebrow": "Metodologia",
+        "title": "Como auditamos",
+        "summary": (
+            "O que o Rigor testa, com qual limite e com quais fontes, o que cada etiqueta "
+            "quer dizer e o que ele não faz. Os números desta página são os mesmos que o "
+            "motor usa."
+        ),
+        "independence_title": "Independência",
+        "independence": [
+            "O Rigor não vende robôs, sinais, cursos nem contas de mesa proprietária, e as "
+            "suas páginas não têm links de afiliado.",
+            "O preço do relatório é o mesmo qualquer que seja a classe: uma classe melhor "
+            "nunca custa mais.",
+            "Não operamos, não guardamos dinheiro nem chaves e não nos conectamos a nenhuma "
+            "corretora.",
+        ],
+        "dims_title": "Seis perguntas, um limite cada uma",
+        "col_pass": "O que é preciso para passar",
+        "ladder_title": "Como sai a classe de A a D",
+        "evidence_title": "O que cada etiqueta quer dizer",
+        "evidence": [
+            ("MEASURED", "Nós calculamos a partir do seu arquivo."),
+            ("DECLARED", "Você ou a sua plataforma afirmou; não podemos conferir."),
+            ("NOT_MEASURED", "Faltavam dados para medir, e o relatório diz quais."),
+        ],
+        "flags_title": "As bandeiras vermelhas que revisamos",
+        "repro_title": "Reproduzível",
+        "repro": [
+            "Cada arquivo fica identificado no relatório pela sua impressão digital SHA-256.",
+            "A reamostragem usa uma semente fixa que o relatório imprime: o mesmo arquivo com "
+            "as mesmas declarações dá os mesmos números.",
+            "O relatório imprime a versão do motor que o gerou.",
+        ],
+        "limits_title": "O que ele não faz",
+        "limits": [
+            "Não prevê resultados futuros: mede a evidência que há nos dados que você envia.",
+            "Lê os arquivos como chegam; não os confere com a corretora.",
+            "Não recomenda comprar, vender, copiar nem investir em nada.",
+            "Um relatório não é aconselhamento jurídico, fiscal nem de investimento.",
+        ],
+        "refs_title": "Fontes",
     },
 }
 

@@ -35,11 +35,13 @@ Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
 `/pt/para/` moves there), and every export guide at `/pt/guias` and
 `/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
 fields). The language switch on these pages offers the other two languages.
-Pages not translated yet (the report and its PDF, the account screens, the
-sample, the comparison and check pages, the methodology, the terms and the
-privacy policy) open in English from a Portuguese page, never in Spanish, and
-the report language on the Portuguese upload form starts on English with a line
-saying so. The profit-claim guard reads Portuguese too
+The methodology (`/pt/metodologia`), the report check (`/pt/comprovar`) and
+the comparison of two reports (`/pt/comparar`) have Portuguese pages, linked
+from every Portuguese page and offered in the language bar of their Spanish and
+English twins (`tests/test_audit_trust_pages_pt.py`). Pages not translated yet
+(the terms and the privacy policy, until the Spanish ones have had their legal
+review, and the public verification page) open in English from a Portuguese
+page, never in Spanish. The profit-claim guard reads Portuguese too
 (`guard.PORTUGUESE_CLAIM_PATTERNS`: lucrativo, rentável, garantido, sem risco,
 "vai ganhar", aprovado…, with "não", "nem" and "sem" as negations), and
 `tests/test_audit_portuguese.py` runs it over the page and opens every link on it.

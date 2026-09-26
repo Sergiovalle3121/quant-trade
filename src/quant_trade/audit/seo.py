@@ -37,6 +37,9 @@ OG_IMAGE_LOCALE: dict[str, str] = {"es": "es", "en": "en", "pt": "pt"}
 
 NOINDEX = "noindex, nofollow"
 
+#: The page that checks a report file was not edited (``audit/check.py``).
+CHECK_PATH: dict[str, str] = {"es": "/comprobar", "en": "/check", "pt": "/pt/comprovar"}
+
 #: Each public page as its path per language. The sitemap lists exactly these.
 #: Spanish and English exist for every page; Portuguese only where translated.
 PUBLIC_PAGES: tuple[dict[str, str], ...] = (
@@ -46,7 +49,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     *({lang: guide_url(g.slug, lang) for lang in ("es", "en", "pt")} for g in GUIDES),
     dict(METHOD_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
-    {"es": "/comprobar", "en": "/check"},
+    dict(CHECK_PATH),
     {"es": "/terminos", "en": "/terms"},
     {"es": "/privacidad", "en": "/privacy"},
 )

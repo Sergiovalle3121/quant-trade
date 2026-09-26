@@ -45,7 +45,6 @@ from quant_trade.audit.portuguese import (
     DISCLAIMER_PT,
     INVESTOR_PT,
     LANGUAGE_NAMES,
-    METHOD_LINK_PT,
     MONTHS_PT,
     STATUS_TEXT_PT,
     TRUST_PT,
@@ -1157,7 +1156,7 @@ def _disclaimer(locale: str) -> str:
 
 
 def _method_title(locale: str) -> str:
-    return METHOD_LINK_PT if locale == "pt" else str(METHOD_COPY[locale]["title"])
+    return str(METHOD_COPY.get(locale, METHOD_COPY["es"])["title"])
 
 
 def _sample_url(locale: str) -> str:
@@ -1203,7 +1202,9 @@ def _preset_options(locale: str) -> str:
 
 
 def _compare_url(locale: str) -> str:
-    return "/comparar" if locale == "es" else "/compare"
+    from quant_trade.audit.compare import COMPARE_PATH
+
+    return COMPARE_PATH.get(locale, COMPARE_PATH["es"])
 
 
 def _nav(
@@ -1215,14 +1216,13 @@ def _nav(
 ) -> str:
     ui = _UI[locale]
     home = _home(locale)
-    linked = link_locale(locale)
     account = _ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS["es"])[2]
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
         f"<a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a>"
         f"<a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a>"
         f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
-        f"<a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a>"
+        f"<a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a>"
         f"<a href='{home}#faq'>{_e(ui['nav_faq'])}</a>"
     )
     switch = _switch_links(locale, switch_href, alternates)
@@ -1316,7 +1316,9 @@ def _guide_links(locale: str) -> str:
 
 def _check_url(locale: str) -> str:
     """The page where anyone checks a report file was not edited."""
-    return "/check" if locale == "en" else "/comprobar"
+    from quant_trade.audit.check import CHECK_PATH
+
+    return CHECK_PATH.get(locale, CHECK_PATH["es"])
 
 
 def _footer(locale: str) -> str:
@@ -1331,9 +1333,9 @@ def _footer(locale: str) -> str:
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
-        f"<li><a href='{_compare_url(linked)}'>{_e(ui['nav_compare'])}</a></li>"
-        f"<li><a href='{_check_url(linked)}'>{_e(ui['footer_check'])}</a></li>"
-        f"<li><a href='{_e(method_url(linked))}'>{_e(_method_title(locale))}</a></li>"
+        f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
+        f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
+        f"<li><a href='{_e(method_url(locale))}'>{_e(_method_title(locale))}</a></li>"
     )
     legal = (
         f"<li><a href='{_e(legal_url('terms', linked))}'>{_e(copy['terms_link'])}</a></li>"
@@ -1829,8 +1831,8 @@ def _trust(
     linked = link_locale(locale)
     hrefs = {
         "sample": _sample_url(locale),
-        "method": method_url(linked),
-        "check": _check_url(linked),
+        "method": method_url(locale),
+        "check": _check_url(locale),
         "privacy": legal_url("privacy", linked),
         "terms": legal_url("terms", linked),
     }
@@ -2019,7 +2021,7 @@ def _prices_html(
             + f"<p class='muted account-note' data-reveal>{_e(copy['account_note'])} "
             f"<a href='{_ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS['es'])[0]}'>"
             f"{_e(copy['account_link'])}</a></p>"
-            + f"<p class='method-link' data-reveal><a href='{_e(method_url(link_locale(locale)))}'>"
+            + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
             f"{_e(_method_title(locale))}{icon('arrow')}</a></p>"
         )
     return (
@@ -2662,28 +2664,28 @@ def legal_page(
 
 def compare_page(content: str, *, locale: str = "es", lead: str = "", switch_href: str = "") -> str:
     """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
-    from quant_trade.audit.compare import COMPARE_CSS, COPY
+    from quant_trade.audit.compare import COMPARE_CSS, COMPARE_PATH, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
-    other = "en" if locale == "es" else "es"
-    other_path = switch_href or ("/compare" if other == "en" else "/comparar")
     body = (
         _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
     )
-    return _page(copy["title"], locale, body, switch_href=other_path, solid_nav=True)
+    if switch_href:
+        # A page reached from one report (Mi cuenta) switches only between Spanish and English.
+        return _page(copy["title"], locale, body, switch_href=switch_href, solid_nav=True)
+    return _page(copy["title"], locale, body, alternates=dict(COMPARE_PATH), solid_nav=True)
 
 
 def check_page(content: str, *, locale: str = "es", base_url: str = "") -> str:
     """The page that checks a report file (``audit/check.py`` builds ``content``)."""
-    from quant_trade.audit.check import CHECK_CSS, COPY, check_path
+    from quant_trade.audit.check import CHECK_CSS, CHECK_PATH, COPY, check_path
 
     locale = _locale(locale)
     copy = COPY[locale]
-    other = "en" if locale == "es" else "es"
     body = (
         _page_hero(copy["eyebrow"], copy["title"], copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{CHECK_CSS}</style>"
@@ -2700,7 +2702,7 @@ def check_page(content: str, *, locale: str = "es", base_url: str = "") -> str:
         locale,
         body,
         meta_html=meta,
-        switch_href=check_path(other),
+        alternates=dict(CHECK_PATH),
         solid_nav=True,
     )
 
@@ -2791,7 +2793,6 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
     locale = _locale(locale)
     copy = _COPY[locale]
     words: dict[str, Any] = METHOD_COPY[locale]
-    other = "en" if locale == "es" else "es"
     title = f"{words['title']} · {copy['title']}"
     meta = _public_meta(title, words["summary"], locale, method_url(locale), base_url)
 
@@ -2828,9 +2829,9 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
         f"<li>{_e(titles.get(locale, titles['en']))}</li>" for titles in FLAG_TITLES.values()
     )
     refs = "".join(f"<li>{_e(ref)}</li>" for ref in REFERENCES)
-    crumbs = (
-        f"<a href='/?lang={_e(locale)}'>{_e(GUIDES_COPY[locale]['back'])}</a><span>/</span>"
-        f"<a href='{_e(method_url(other))}' hreflang='{other}'>{_other_name(locale)}</a>"
+    alternates = {lang: method_url(lang) for lang in METHOD_COPY}
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(GUIDES_COPY[locale]['back'])}</a>" + (
+        _language_crumbs(alternates, locale)
     )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["summary"], crumbs)
@@ -2852,7 +2853,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
         )
         + "</div></div>"
     )
-    return _page(title, locale, body, meta_html=meta, switch_href=method_url(other), solid_nav=True)
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
 #: Guides for an account's history rather than a backtest, listed apart on /guias.
