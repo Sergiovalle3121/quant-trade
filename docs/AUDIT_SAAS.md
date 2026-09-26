@@ -2605,3 +2605,30 @@ Informational only: none of these moves a class, a dimension or a red flag.
   order), it is `NOT_MEASURED` rather than `TYPICAL`, so a smoothed curve is
   never called normal. Informational: it
   moves no flag and no class.
+
+How the report shows them (ES, EN and PT):
+
+- "How much of this could be chance?" under the trade statistics: the three
+  ranges side by side, and one line when the range of the average per trade
+  includes zero or the profit factor's includes one (either is enough, so a
+  disagreement between them never stays silent in the file's favour). When a
+  range lies wholly below break-even (and neither straddles it), one line says
+  the system loses per trade with these trades and chance does not explain it. The
+  intro calls it a 95 % range of values consistent with the trades, not a
+  prediction.
+- Under the significance table, Lo's Sharpe only when it is lower than the
+  plain one by more than a tenth (with the first-order autocorrelation when
+  it is 0.1 or more). A higher corrected figure is never printed: with small
+  samples it mostly adds noise and would flatter the file. The report says
+  the plain figure is not inflated instead.
+- Under the benchmark table and in the fund-versus-index block, Jensen's
+  alpha with beta, t and the periods, saying it subtracts no cash rate; |t| of 2 or more reads as unlikely to
+  be chance alone (with "it does not say it will repeat" for a positive
+  alpha), below that as not distinguishable from chance.
+- The fee table's last row is "2 % + 20 % of gains".
+- In the risk section, "Is the file's worst fall normal for these returns?":
+  the uploaded worst fall beside the 5th to 95th percentile of the same
+  returns in random order, and one sentence for `TYPICAL`, `SHALLOWER`
+  (losses rarely follow losses; the file's fall may understate the risk) or
+  `DEEPER` (losses came in streaks). It says it is not the one-year fall
+  above. Nothing shows when it is `NOT_MEASURED`.

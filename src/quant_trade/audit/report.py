@@ -624,9 +624,87 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_fees_growth": "Crecimiento total",
         "fund_fees_none": "Sin comisión",
         "fund_fees_management": (
-            "Solo comisión de gestión. Muchos fondos cobran además una comisión de éxito, a "
-            "menudo el 20 % de las ganancias, así que el 2.5 % no es el peor caso."
+            "Las filas de un solo porcentaje son solo comisión de gestión. La última añade la "
+            "comisión de éxito clásica: el 20 % de la ganancia de cada año por encima del "
+            "máximo anterior."
         ),
+        "fund_fees_two_twenty": "2 % + 20 % de las ganancias",
+        "compare_help": "Pega el enlace de otro informe tuyo para verlos lado a lado.",
+        "shuffle_title": "¿Es normal la peor caída del archivo para estos retornos?",
+        "shuffle_line": (
+            "Peor caída del archivo: {observed}. Con los mismos retornos en {samples} órdenes al "
+            "azar, la peor caída va de {low} a {high} en 9 de cada 10 órdenes (mediana {mid})."
+        ),
+        "shuffle_intro": (
+            "Cambiar el orden no cambia el Sharpe, la volatilidad ni el resultado final: solo "
+            "muestra qué caída suelen traer estos retornos a lo largo de todo el archivo. No es "
+            "la caída a un año de la tabla de arriba."
+        ),
+        "shuffle_TYPICAL": (
+            "Está dentro de lo habitual para estos retornos: el orden en que llegaron no la hace "
+            "ni mucho más leve ni mucho más profunda."
+        ),
+        "shuffle_SHALLOWER": (
+            "Es más leve que en casi todos los órdenes al azar: solo {share} de ellos cae tan "
+            "poco. Las pérdidas siguieron a otras pérdidas menos de lo que daría el azar. Así se "
+            "ven las curvas suavizadas, las que promedian posiciones perdedoras o un orden "
+            "favorable que no tiene por qué repetirse. La caída del archivo puede quedarse corta "
+            "como medida del riesgo."
+        ),
+        "shuffle_DEEPER": (
+            "Es más profunda que en casi todos los órdenes al azar: solo {share} de ellos cae "
+            "tanto. Las pérdidas llegaron en rachas más de lo que daría el azar, así que el "
+            "Sharpe y la volatilidad por sí solos subestiman lo que costó aguantar esta curva."
+        ),
+        "ranges_title": "¿Cuánto de esto podría ser azar?",
+        "ranges_intro": (
+            "Con {n} operaciones, cada cifra tiene un margen. Rango al 95 %: los valores de "
+            "fondo compatibles con estas operaciones, si cada una es independiente de las demás "
+            "y el sistema no cambió. No es una predicción."
+        ),
+        "ranges_zero": (
+            "El rango de la media por operación o el del factor de beneficio incluye el punto de "
+            "equilibrio (0 y 1): con estas operaciones no se puede distinguir el sistema de uno "
+            "que ni gana ni pierde por operación."
+        ),
+        "ranges_below": (
+            "El rango de la media por operación o el del factor de beneficio queda entero por "
+            "debajo del punto de equilibrio (0 y 1): con estas operaciones el sistema pierde por "
+            "operación, y el azar no alcanza a explicarlo."
+        ),
+        "ranges_open": "sin límite",
+        "lo_line": (
+            "Sharpe corregido por autocorrelación (Lo, 2002): {lo}, frente a {plain} del "
+            "cálculo simple."
+        ),
+        "lo_lower": (
+            "Cada retorno tiende a parecerse al anterior (autocorrelación {rho}), algo típico de "
+            "curvas suavizadas, de precios que se actualizan poco o de estrategias que mantienen "
+            "posiciones varios periodos: el Sharpe simple sale inflado."
+        ),
+        "lo_lower_plain": (
+            "Los retornos de periodos cercanos tienden a moverse juntos: el Sharpe simple sale "
+            "inflado."
+        ),
+        "lo_not_lower": (
+            "Sharpe corregido por autocorrelación (Lo, 2002): no queda apreciablemente por "
+            "debajo de {plain}, así que el orden de los retornos no infla el Sharpe simple de "
+            "forma apreciable. Si la corrección lo sube, el informe no la usa, para no favorecer "
+            "al archivo."
+        ),
+        "alpha_line": (
+            "Alfa de Jensen: {alpha} al año más allá de lo que explica el benchmark, sin restar "
+            "lo que pagó el efectivo (beta {beta}, t = {t}, {n} periodos)."
+        ),
+        "alpha_clear_up": (
+            "Con t por encima de 2, es poco probable que esa diferencia sea solo azar. No dice "
+            "que vaya a repetirse."
+        ),
+        "alpha_clear_down": (
+            "Con t por debajo de -2, es poco probable que el rezago frente al benchmark sea "
+            "solo azar."
+        ),
+        "alpha_unclear": "Con t entre -2 y 2, la diferencia no se distingue del azar.",
         "fund_fees_break_even": (
             "Con una comisión de {rate} al año o más, el fondo habría quedado igual o por "
             "debajo de su índice en los meses en común."
@@ -1605,8 +1683,84 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_fees_growth": "Total growth",
         "fund_fees_none": "No fee",
         "fund_fees_management": (
-            "Management fees only. Many funds also take a performance fee, often 20 % of "
-            "gains, so the 2.5 % row is not the worst case."
+            "Single-percentage rows are the management fee only. The last row adds the classic "
+            "performance fee: 20 % of each year's gain above the previous high."
+        ),
+        "fund_fees_two_twenty": "2 % + 20 % of gains",
+        "compare_help": "Paste the link of another of your reports to see them side by side.",
+        "shuffle_title": "Is the file's worst fall normal for these returns?",
+        "shuffle_line": (
+            "Worst fall in the file: {observed}. With the same returns in {samples} random "
+            "orders, the worst fall runs from {low} to {high} in 9 of 10 orders (median {mid})."
+        ),
+        "shuffle_intro": (
+            "Changing the order does not change the Sharpe, the volatility or the final result: "
+            "it only shows the fall these returns usually bring over the whole file. It is not "
+            "the one-year fall in the table above."
+        ),
+        "shuffle_TYPICAL": (
+            "It is within the usual range for these returns: the order they came in makes it "
+            "neither much milder nor much deeper."
+        ),
+        "shuffle_SHALLOWER": (
+            "It is milder than in almost every random order: only {share} of them fall this "
+            "little. Losses followed losses less than chance would give. Smoothed curves, curves "
+            "that average down losing positions, or a favourable order that need not repeat look "
+            "like this. The file's fall may understate the risk."
+        ),
+        "shuffle_DEEPER": (
+            "It is deeper than in almost every random order: only {share} of them fall this far. "
+            "Losses came in streaks more than chance would give, so the Sharpe and the "
+            "volatility alone understate what it took to sit through this curve."
+        ),
+        "ranges_title": "How much of this could be chance?",
+        "ranges_intro": (
+            "With {n} trades, every figure has a margin. 95 % range: the underlying values "
+            "consistent with these trades, if each is independent of the others and the system "
+            "did not change. It is not a prediction."
+        ),
+        "ranges_zero": (
+            "The range of the average per trade or of the profit factor includes break-even (0 "
+            "and 1): with these trades the system cannot be told apart from one that neither "
+            "wins nor loses per trade."
+        ),
+        "ranges_below": (
+            "The range of the average per trade or of the profit factor lies wholly below "
+            "break-even (0 and 1): with these trades the system loses per trade, and chance does "
+            "not explain it."
+        ),
+        "ranges_open": "no limit",
+        "lo_line": (
+            "Sharpe corrected for autocorrelation (Lo, 2002): {lo}, against {plain} from the "
+            "plain calculation."
+        ),
+        "lo_lower": (
+            "Each return tends to resemble the one before (autocorrelation {rho}), typical of "
+            "smoothed curves, prices that rarely update or strategies that hold positions for "
+            "several periods: the plain Sharpe comes out inflated."
+        ),
+        "lo_lower_plain": (
+            "Returns of nearby periods tend to move together: the plain Sharpe comes out inflated."
+        ),
+        "lo_not_lower": (
+            "Sharpe corrected for autocorrelation (Lo, 2002): it is not appreciably below "
+            "{plain}, so the order of the returns does not inflate the plain Sharpe appreciably. "
+            "When the correction raises it, the report does not use it, so as not to favour the "
+            "file."
+        ),
+        "alpha_line": (
+            "Jensen's alpha: {alpha} a year beyond what the benchmark explains, without "
+            "subtracting what cash paid (beta {beta}, t = {t}, {n} periods)."
+        ),
+        "alpha_clear_up": (
+            "With t above 2, the difference is unlikely to be chance alone. It does not say it "
+            "will repeat."
+        ),
+        "alpha_clear_down": (
+            "With t below -2, the shortfall against the benchmark is unlikely to be chance alone."
+        ),
+        "alpha_unclear": (
+            "With t between -2 and 2, the difference cannot be told apart from chance."
         ),
         "fund_fees_break_even": (
             "At a fee of {rate} a year or more, the fund would have ended level with or below "
@@ -3132,9 +3286,7 @@ def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         )
     text = first + " " + labels["cash_note"].format(source="\x00")
     link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
-    return (
-        f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
-    )
+    return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
 
 STRESS_SCENARIOS: dict[str, dict[str, str]] = {
@@ -3292,6 +3444,7 @@ def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> s
     if stats.get("status") != "MEASURED":
         return html_text
     html_text += _streak_html(stats, labels)
+    html_text += _ranges_html(stats.get("intervals"), labels)
     html_text += _evidence_rows(stats, labels, skip={"long", "short"})
     for side in ("long", "short"):
         if isinstance(stats.get(side), dict):
@@ -3299,6 +3452,98 @@ def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> s
                 stats[side], labels, skip=set()
             )
     return html_text
+
+
+def _bound(item: Any, key: str, labels: dict[str, str]) -> str:
+    value = item.get("value") if isinstance(item, dict) else None
+    if not isinstance(value, (int, float)) or not math.isfinite(value):
+        return _e(labels["ranges_open"])
+    return _fmt(float(value), key=key)
+
+
+def _ranges_html(ranges: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """The 95 % margin of the win rate, the average per trade and the profit factor."""
+    if not ranges or ranges.get("status") != "MEASURED":
+        return ""
+    facts = []
+    for key in ("win_rate", "expectancy", "profit_factor"):
+        pair = ranges.get(key) or {}
+        low, high = pair.get("low") or {}, pair.get("high") or {}
+        if low.get("evidence") != "MEASURED":
+            continue
+        facts.append(
+            f"<div class='fact'><b>{_bound(low, key, labels)} – {_bound(high, key, labels)}</b>"
+            f"<p>{_e(_key_label(key, labels))} {_badge('MEASURED')}</p></div>"
+        )
+    if not facts:
+        return ""
+    trades = f"{int(ranges.get('trades') or 0):,}"
+    out = (
+        f"<h3>{_e(labels['ranges_title'])}</h3>"
+        f"<p class='muted'>{_e(labels['ranges_intro'].format(n=trades))}</p>"
+        f"<div class='facts'>{''.join(facts)}</div>"
+    )
+    average = ranges.get("expectancy") or {}
+    low = _ev_value(average.get("low"))
+    high = _ev_value(average.get("high"))
+    factor = ranges.get("profit_factor") or {}
+    factor_low = _ev_value(factor.get("low"))
+    factor_high = _ev_value(factor.get("high"))
+    # Both ranges test break-even per trade; when either includes it the line
+    # shows, so a disagreement between them never stays silent in the file's
+    # favour. A missing upper bound on the factor is an open end (above 1).
+    average_even = low is not None and high is not None and low <= 0 <= high
+    factor_even = factor_low is not None and factor_low <= 1 <= (factor_high or math.inf)
+    average_below = high is not None and high < 0
+    factor_below = factor_high is not None and factor_high < 1
+    if average_even or factor_even:
+        # When one range straddles break-even and the other lies below it, the
+        # straddle is the cautious reading.
+        out += f"<p>{_e(labels['ranges_zero'])}</p>"
+    elif average_below or factor_below:
+        out += f"<p>{_e(labels['ranges_below'])}</p>"
+    return out
+
+
+def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str, str]) -> str:
+    """Lo's (2002) Sharpe beside the plain one; it never feeds the class."""
+    block = significance.get("autocorrelation_adjusted") or {}
+    lo = _ev_value(block.get("sharpe"))
+    rho = _ev_value(block.get("lag1"))
+    if lo is None or plain is None or rho is None or not math.isfinite(lo):
+        return ""
+    # Only a fall is shown: a rise from small, noisy autocorrelations would
+    # flatter the file, and the class never uses either figure.
+    if lo >= plain - 0.1 * abs(plain):
+        out = labels["lo_not_lower"].format(plain=f"{plain:.2f}")
+    else:
+        out = labels["lo_line"].format(lo=f"{lo:.2f}", plain=f"{plain:.2f}") + " "
+        out += (
+            labels["lo_lower"].format(rho=f"{rho:.2f}") if rho >= 0.1 else labels["lo_lower_plain"]
+        )
+    return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
+
+
+def _alpha_html(benchmark: dict[str, Any], labels: dict[str, str]) -> str:
+    """Jensen's alpha against the uploaded benchmark, with its cautious t (no cash subtracted)."""
+    block = benchmark.get("jensen") or {}
+    if block.get("status") != "MEASURED":
+        return ""
+    alpha = _ev_value(block.get("alpha"))
+    beta = _ev_value(block.get("beta"))
+    t_stat = _ev_value(block.get("alpha_t_stat"))
+    if alpha is None or beta is None or t_stat is None:
+        return ""
+    line = labels["alpha_line"].format(
+        alpha=_pct(alpha, signed=True),
+        beta=f"{beta:.2f}",
+        t=f"{t_stat:.2f}",
+        n=f"{int(block.get('periods') or 0):,}",
+    )
+    key = (
+        "alpha_clear_up" if t_stat >= 2 else "alpha_clear_down" if t_stat <= -2 else "alpha_unclear"
+    )
+    return f"<p>{_e(line)} {_e(labels[key])} {_badge('MEASURED')}</p>"
 
 
 def _range_fact(
@@ -3381,7 +3626,41 @@ def _risk_html(
             f"{_value_cell(under['p50'], percent=False)}, {_e(labels['risk_under_p95'])} "
             f"{_value_cell(under['p95'], percent=False)}</p>"
         )
+    html_text += _shuffle_html(risk.get("versus_shuffle"), labels)
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
+
+
+def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str:
+    """The file's worst fall beside the same returns in random order."""
+    if not shuffle or shuffle.get("status") != "MEASURED":
+        return ""
+    observed = _ev_value(shuffle.get("observed"))
+    spread = shuffle.get("shuffled") or {}
+    low, mid, high = (_ev_value(spread.get(q)) for q in ("p5", "p50", "p95"))
+    position = shuffle.get("position")
+    if observed is None or low is None or mid is None or high is None:
+        return ""
+    if position not in ("TYPICAL", "SHALLOWER", "DEEPER"):
+        return ""
+    share_key = "share_at_most_as_deep" if position == "SHALLOWER" else "share_at_least_as_deep"
+    share = _ev_value(shuffle.get(share_key))
+    samples = int((shuffle.get("method") or {}).get("samples") or 0)
+    line = labels["shuffle_line"].format(
+        observed=f"{abs(observed):.1%}",
+        # One thousand orders reads "1,000" in English; Spanish and Portuguese
+        # write four-digit counts without a separator.
+        samples=f"{samples:,}" if _locale_of(labels) == "en" else str(samples),
+        low=f"{abs(low):.1%}",
+        high=f"{abs(high):.1%}",
+        mid=f"{abs(mid):.1%}",
+    )
+    verdict = labels[f"shuffle_{position}"].format(share=f"{share or 0:.1%}")
+    return (
+        f"<h3>{_e(labels['shuffle_title'])}</h3>"
+        f"<p>{_e(line)} {_badge('MEASURED')}</p>"
+        f"<p>{_e(verdict)}</p>"
+        f"<p class='muted'>{_e(labels['shuffle_intro'])}</p>"
+    )
 
 
 def _cost_gap_note(
@@ -4989,9 +5268,7 @@ def _holding_html(
     out = ""
     days = int(holding["days"]["value"])
     if "rides_the_market" in (holding.get("findings") or []):
-        rides = labels["holding_rides"].format(
-            label=label, weeks=int(holding["weeks"]["value"])
-        )
+        rides = labels["holding_rides"].format(label=label, weeks=int(holding["weeks"]["value"]))
         out += (
             f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
             f"{_e(labels['beh_badge_found'])}</span><ul class='beh-asks'>"
@@ -5040,9 +5317,7 @@ def _holding_html(
     out += f"<p>{_e(together)} {_badge('MEASURED')}</p>"
     if closed_only:
         out += f"<p class='muted'>{_e(labels['holding_closed_only'])}</p>"
-    link = (
-        f"<a href='{_e(str(holding.get('source_url', '')))}' rel='noopener'>FRED</a>"
-    )
+    link = f"<a href='{_e(str(holding.get('source_url', '')))}' rel='noopener'>FRED</a>"
     source = _e(labels["holding_source"].format(label=label, source="\x00"))
     out += f"<p class='muted'><small>{source.replace(chr(0), link)}</small></p>"
     return out
@@ -5195,6 +5470,15 @@ def _fund_fees_html(fees: dict[str, Any] | None, labels: dict[str, str]) -> str:
         f"<td class='val'>{_e(_fund_pct(float(row['growth']['value'])))}</td></tr>"
         for row in fees.get("rows") or []
     )
+    classic = fees.get("two_and_twenty") or {}
+    classic_cagr = _ev_value(classic.get("cagr"))
+    classic_growth = _ev_value(classic.get("growth"))
+    if classic_cagr is not None and classic_growth is not None:
+        body += (
+            f"<tr><td>{_e(labels['fund_fees_two_twenty'])}</td>"
+            f"<td class='val'>{_e(_fund_pct(classic_cagr))}</td>"
+            f"<td class='val'>{_e(_fund_pct(classic_growth))}</td></tr>"
+        )
     out = (
         f"<h3>{_e(labels['fund_fees'])}</h3>"
         f"<p class='muted'>{_e(labels['fund_fees_intro'])} {_badge('MEASURED')}</p>"
@@ -5308,6 +5592,7 @@ def _fund_benchmark_html(fund: dict[str, Any], locale: str, labels: dict[str, st
                 )
             )
     out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    out += _alpha_html(bench, labels)
     out += f"<p class='muted'>{_e(_sentence(localize(bench.get('note', ''), locale)))}</p>"
     return out
 
@@ -5582,7 +5867,7 @@ def render_html(
         action = "/comparar" if locale == "es" else "/compare"
         compare_html = (
             f"<form class='publish no-print' method='post' action='{action}'>"
-            f"<p class='muted'>{_e(ccopy['from_report_help'])}</p>"
+            f"<p class='muted'>{_e(labels['compare_help'])}</p>"
             f"<input type='hidden' name='lang' value='{_e(locale)}'>"
             f"<input type='hidden' name='link_a' value='{_e(compare_link)}'>"
             f"<div class='inline-form'><input type='url' name='link_b' required "
@@ -5714,8 +5999,10 @@ def render_html(
         )
         cost_html += _cost_gap_note(cost["rows"], data.get("trade_stats") or {}, labels)
 
-    bench_html = _status_line(data["benchmark"], labels) + _evidence_rows(
-        data["benchmark"], labels, skip=set()
+    bench_html = (
+        _status_line(data["benchmark"], labels)
+        + _evidence_rows(data["benchmark"], labels, skip=set())
+        + _alpha_html(data["benchmark"], labels)
     )
     cscv_html = _status_line(data["cscv"], labels) + _evidence_rows(
         data["cscv"], labels, skip=set()
@@ -5999,7 +6286,12 @@ def render_html(
         (
             labels["significance"],
             _status_line(data["significance"], labels)
-            + _evidence_rows(data["significance"], labels, skip=set()),
+            + _evidence_rows(data["significance"], labels, skip=set())
+            + _lo_html(
+                data["significance"],
+                _ev_value((data.get("performance") or {}).get("sharpe")),
+                labels,
+            ),
         ),
         (labels["multiplicity"], multiplicity_html),
         (labels["bootstrap"], boot_html),
@@ -6065,6 +6357,12 @@ def render_html(
             f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'>"
             f"{_e(labels['switch'])}</a>"
             if switch_url
+            else ""
+        )
+        + (
+            f" <a class='lang-switch' href='{_e(switch_url.replace('lang=es', 'lang=en'))}' "
+            f"hreflang='en'>English</a>"
+            if switch_url and locale == "pt" and "lang=es" in switch_url
             else ""
         )
         + "</div>"
@@ -6139,7 +6437,9 @@ def render_html(
     ]
     if legal_links:
         links += [
-            f"<a href='{_e(legal_url(kind, locale))}'>{_e(LINK_TEXT[locale][kind])}</a>"
+            # The terms exist in Spanish and English; a Portuguese reader gets English.
+            f"<a href='{_e(legal_url(kind, 'en' if locale == 'pt' else locale))}'>"
+            f"{_e(LINK_TEXT[locale][kind])}</a>"
             for kind in ("terms", "privacy")
         ]
     footer = (

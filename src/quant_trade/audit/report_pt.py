@@ -946,13 +946,19 @@ REPORT: dict[str, Any] = {
         "fund_fees_two_twenty": "2 % + 20 % dos ganhos",
         "ranges_title": "Quanto disso pode ser acaso?",
         "ranges_intro": (
-            "Com {n} operações, cada número tem uma margem. Com 95 % de confiança, o valor de "
-            "fundo do sistema está entre estes limites, se cada operação for independente das "
-            "demais."
+            "Com {n} operações, cada número tem uma margem. Faixa de 95 %: os valores de fundo "
+            "compatíveis com estas operações, se cada uma for independente das demais e o "
+            "sistema não mudou. Não é uma previsão."
         ),
         "ranges_zero": (
-            "A margem da média por operação inclui o zero: com estas operações não é possível "
-            "distinguir o sistema de um que nem ganha nem perde por operação."
+            "A faixa da média por operação ou a do fator de lucro inclui o ponto de equilíbrio "
+            "(0 e 1): com estas operações não é possível distinguir o sistema de um que nem "
+            "ganha nem perde por operação."
+        ),
+        "ranges_below": (
+            "A faixa da média por operação ou a do fator de lucro fica inteira abaixo do ponto "
+            "de equilíbrio (0 e 1): com estas operações o sistema perde por operação, e o acaso "
+            "não explica isso."
         ),
         "ranges_open": "sem limite",
         "lo_line": (
@@ -961,12 +967,12 @@ REPORT: dict[str, Any] = {
         ),
         "lo_lower": (
             "Cada retorno tende a se parecer com o anterior (autocorrelação {rho}), algo típico "
-            "de curvas suavizadas ou de preços que se atualizam pouco: o Sharpe simples sai "
-            "inflado."
+            "de curvas suavizadas, de preços que se atualizam pouco ou de estratégias que mantêm "
+            "posições por vários períodos: o Sharpe simples sai inflado."
         ),
         "alpha_line": (
-            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica (beta {beta}, t = "
-            "{t}, {n} períodos)."
+            "Alfa de Jensen: {alpha} ao ano além do que o benchmark explica, sem subtrair o que "
+            "o caixa pagou (beta {beta}, t = {t}, {n} períodos)."
         ),
         "alpha_clear_up": (
             "Com t acima de 2, é pouco provável que essa diferença seja só acaso. Não diz que vá "
@@ -981,11 +987,38 @@ REPORT: dict[str, Any] = {
             "inflado."
         ),
         "lo_not_lower": (
-            "Sharpe corrigido pela autocorrelação (Lo, 2002): não fica abaixo de {plain}, então "
-            "a ordem dos retornos não infla o Sharpe simples. Se a correção o eleva, o relatório "
-            "não o usa: com poucos dados essa alta costuma ser ruído."
+            "Sharpe corrigido pela autocorrelação (Lo, 2002): não fica apreciavelmente abaixo de "
+            "{plain}, então a ordem dos retornos não infla o Sharpe simples de forma apreciável. "
+            "Se a correção o eleva, o relatório não a usa, para não favorecer o arquivo."
         ),
         "compare_help": "Cole o link de outro relatório seu para vê-los lado a lado.",
+        "shuffle_title": "A pior queda do arquivo é normal para estes retornos?",
+        "shuffle_line": (
+            "Pior queda do arquivo: {observed}. Com os mesmos retornos em {samples} ordens "
+            "aleatórias, a pior queda vai de {low} a {high} em 9 de cada 10 ordens (mediana "
+            "{mid})."
+        ),
+        "shuffle_intro": (
+            "Mudar a ordem não muda o Sharpe, a volatilidade nem o resultado final: só mostra "
+            "que queda esses retornos costumam trazer ao longo de todo o arquivo. Não é a queda "
+            "em um ano da tabela acima."
+        ),
+        "shuffle_TYPICAL": (
+            "Está dentro do habitual para estes retornos: a ordem em que chegaram não a torna "
+            "nem muito mais leve nem muito mais profunda."
+        ),
+        "shuffle_SHALLOWER": (
+            "É mais leve do que em quase todas as ordens aleatórias: só {share} delas caem tão "
+            "pouco. As perdas seguiram outras perdas menos do que o acaso daria. Assim se "
+            "parecem as curvas suavizadas, as que fazem preço médio em posições perdedoras ou "
+            "uma ordem favorável que não precisa se repetir. A queda do arquivo pode subestimar "
+            "o risco."
+        ),
+        "shuffle_DEEPER": (
+            "É mais profunda do que em quase todas as ordens aleatórias: só {share} delas caem "
+            "tanto. As perdas vieram em sequência mais do que o acaso daria, então o Sharpe e a "
+            "volatilidade sozinhos subestimam o que custou aguentar esta curva."
+        ),
         "holding": "Ganha de comprar e manter o mercado?",
         "holding_intro": (
             "A estratégia opera sobretudo o {label}. Estes são os seus fechamentos diários ao "
