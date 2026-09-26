@@ -276,6 +276,29 @@ def _column(index: int) -> str:
     return name
 
 
+def test_tradingview_workbook_uses_the_trades_sheet(monkeypatch: pytest.MonkeyPatch) -> None:
+    trades = [["Trade #", "Type", "Signal", "Date/Time", "Price", "Contracts", "Profit"],
+              [1, "Entry Long", "L", "2024-01-02 09:00", 100.0, 1, ""]]  # fmt: skip
+    performance = [["Metric", "All"], ["Net Profit", 12.5]]
+    monkeypatch.setattr(
+        importers, "read_xlsx", lambda data: {"Performance": performance, "List": trades}
+    )
+    monkeypatch.setattr(importers, "_is_workbook", lambda data: True)
+    table = rows.load(b"PK\x03\x04fake", importers.TRADINGVIEW_XLSX)
+    assert table.family == families.TRADINGVIEW
+    assert table.header[0] == "Trade #" and len(table.rows) == 2
+
+
+def test_old_statement_header_date_with_suffix() -> None:
+    from quant_trade.audit.forensics import header
+
+    assert header._mt4_date("2006.08.01 05:04 (local time)") is not None
+    assert header._mt4_date("2006.08.01 05:04 (local time)").isoformat() == "2006-08-01T05:04:00"
+    assert header._mt4_date("2006.08.01 05:04:33").isoformat() == "2006-08-01T05:04:33"
+    assert header._mt4_date("2024 March 8, 18:30").isoformat() == "2024-03-08T18:30:00"
+    assert header._mt4_date("Account: 12345678") is None
+
+
 def test_account_key_is_read_only_in_memory() -> None:
     mt4 = (FIXTURES / "mt4_statement.htm").read_bytes()
     mt5 = (FIXTURES / "mt5_history.html").read_bytes()

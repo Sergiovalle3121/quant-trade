@@ -36,6 +36,8 @@ _MONTHS = {
     for name in (name, name[:3])
 }
 _MT4_DATE = re.compile(r"^(\d{4})\s+([A-Za-z]+)\s+(\d{1,2}),\s*(\d{1,2}):(\d{2})$")
+#: Older statements (2006) print the date as MT time with a suffix.
+_MT4_DATE_OLD = re.compile(r"^(\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}(?::\d{2})?)(?:\s*\(.*\))?$")
 
 
 @dataclass(frozen=True)
@@ -99,7 +101,11 @@ def read_header(table: RawTable, currency_hint: str | None = None) -> Header:
 def _mt4_date(text: str) -> datetime | None:
     match = _MT4_DATE.match(text.strip())
     if match is None:
-        return None
+        old = _MT4_DATE_OLD.match(text.strip())
+        if old is None:
+            return None
+        parsed = importers._one_time(old.group(1))
+        return parsed.replace(tzinfo=None) if parsed is not None else None
     month = _MONTHS.get(match.group(2).lower())
     if month is None:
         return None

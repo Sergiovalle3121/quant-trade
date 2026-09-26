@@ -503,16 +503,22 @@ def run_TIME_SANITY(table: RawTable, ctx: Context) -> RawOutcome:
         _count("zero_duration", zero),
     )
     if report_date is None:
-        return RawOutcome.skip(
-            "no_header_date",
-            figures=measured + (("after_report_date", "no_header_date", NOT_MEASURED),),
+        # Without a printed report date (CSV exports, some old statements)
+        # the calendar and close-before-open rules still measure; only the
+        # after-report-date rule is out of reach.
+        figures = measured + (
+            ("after_report_date", "no_header_date", NOT_MEASURED),
+            ("report_date", "", NOT_MEASURED),
+            ("report_date_source", "", NOT_MEASURED),
+            ("max_ahead_seconds", "0", NOT_MEASURED),
         )
-    figures = measured + (
-        _count("after_report_date", after),
-        ("report_date", _iso(report_date), DECLARED),
-        ("report_date_source", source, DECLARED),
-        _count("max_ahead_seconds", max_ahead),
-    )
+    else:
+        figures = measured + (
+            _count("after_report_date", after),
+            ("report_date", _iso(report_date), DECLARED),
+            ("report_date_source", source, DECLARED),
+            _count("max_ahead_seconds", max_ahead),
+        )
     if n_rows == 0:
         return RawOutcome.skip("no_qualifying_row", figures=figures)
     return RawOutcome(hits=len(hits), figures=figures, examples=_examples(hits))

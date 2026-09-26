@@ -199,7 +199,11 @@ def _load_workbook(raw: bytes, source_format: str | None, family: str) -> RawTab
         found = importers._mt5_workbook(sheets)
         if found is not None:
             return _from_reader(found[1], source_format, family, "none", "none", 0)
-    for rows in sheets.values():
+    ordered = list(sheets.values())
+    if family == families.TRADINGVIEW:
+        # The export's first sheet is "Performance"; the trades come later.
+        ordered = [rows for rows in ordered if rows and importers._is_tradingview_header(rows[0])]
+    for rows in ordered:
         if rows:
             header = tuple(importers._as_text(value) for value in rows[0])
             body = [[importers._as_text(value) for value in row] for row in rows[1:]]

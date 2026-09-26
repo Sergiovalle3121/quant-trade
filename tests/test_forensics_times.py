@@ -203,8 +203,9 @@ def test_market_hours_figures_on_fixtures() -> None:
 def test_csv_fixtures(name: str) -> None:
     table = _load(name)
     sanity = _run(times.run_TIME_SANITY, table)
-    assert sanity.not_measured and sanity.reason == "no_header_date"
+    assert not sanity.not_measured and sanity.hits == 0
     assert ("after_report_date", "no_header_date", "NOT_MEASURED") in sanity.figures
+    assert ("report_date", "", "NOT_MEASURED") in sanity.figures
     assert _figure(sanity, "unparseable") == "0"
     order = _run(times.run_ROW_ORDER, table)
     assert not order.not_measured and order.hits == 0
@@ -220,7 +221,8 @@ def test_account_export_samples(family: str) -> None:
     table = _table(SAMPLES[family])
     assert table.family == family
     sanity = _run(times.run_TIME_SANITY, table)
-    assert sanity.not_measured and sanity.reason == "no_header_date"
+    assert not sanity.not_measured and sanity.hits == 0
+    assert ("after_report_date", "no_header_date", "NOT_MEASURED") in sanity.figures
     assert _figure(sanity, "n_rows") == "4"  # FX Blue: three closed plus one open position
     order = _run(times.run_ROW_ORDER, table)
     assert order.hits == 0
@@ -286,8 +288,19 @@ def test_time_sanity_row_after_report_date() -> None:
 def test_time_sanity_without_header_date() -> None:
     table = _altered("mt4_statement.htm", "2024 March 8, 18:30", "")
     outcome = _run(times.run_TIME_SANITY, table)
-    assert outcome.not_measured and outcome.reason == "no_header_date"
+    assert not outcome.not_measured and outcome.hits == 0
+    assert ("after_report_date", "no_header_date", "NOT_MEASURED") in outcome.figures
     assert _figure(outcome, "n_rows") == "3"
+    # The calendar rule still measures without a report date.
+    data = (FIXTURES / "mt4_statement.htm").read_bytes()
+    data = data.replace(b"2024 March 8, 18:30", b"")
+    data = data.replace(CLOSE_OF_FIRST_TRADE.encode(), b"2024.02.30 11:40:31")
+    outcome = _run(times.run_TIME_SANITY, _table(data))
+    assert outcome.hits == 1 and _figure(outcome, "unparseable") == "1"
+    # An old statement prints its date as MT time with a suffix.
+    local = _altered("mt4_statement.htm", "2024 March 8, 18:30", "2024.03.08 18:30 (local time)")
+    outcome = _run(times.run_TIME_SANITY, local)
+    assert _figure(outcome, "report_date") == "2024-03-08T18:30:00Z"
 
 
 def test_time_sanity_tester_rows_after_period_end() -> None:
