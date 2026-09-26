@@ -299,10 +299,16 @@ same member, inflated-size and cell limits: numbers, currency and percentages
 come from the cell's stored value, dates and times from its ISO value, and the
 blank rows and cells a sheet repeats to its edge are never laid out (a repeated
 row with values counts toward the cell limit). It goes through the same
-detection and column screen as a workbook, so no layout is guessed;
-if no importer knows it, the column screen offers its columns. Files that
+detection and column screen as a workbook, so no layout is guessed. An
+Excel 97-2003 workbook (`.xls`, an OLE2 compound file) is read the same way
+with xlrd 2.x (the web extra; it reads only this format and never runs
+macros), with no formatting, each sheet loaded on demand and unloaded after,
+the same cell and column limits, and date cells turned into ISO text in the
+workbook's own date system (1900 or 1904). If no importer knows the sheet,
+the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+Excel workbook that is damaged, encrypted or not a workbook (`legacy_xls`:
+save it as .xlsx or CSV), an OpenDocument file
 that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its

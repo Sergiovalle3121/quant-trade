@@ -41,6 +41,7 @@ web = [
   "httpx>=0.27",
   "weasyprint>=70",
   "segno>=1.6",
+  "xlrd>=2.0.1,<3",
 ]
 
 dev = [

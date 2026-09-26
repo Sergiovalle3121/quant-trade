@@ -316,7 +316,7 @@ def _as_utf8_csv(data: bytes) -> bytes:
     # Imported here: the importers build on this module's types.
     from quant_trade.audit.importers import decode_text, xlsx_as_csv
 
-    if data.startswith(b"PK\x03\x04"):
+    if data.startswith((b"PK\x03\x04", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")):
         return xlsx_as_csv(data, TIMESTAMP_ALIASES)
     if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:4000]:
         return decode_text(data).encode("utf-8")

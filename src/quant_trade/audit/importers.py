@@ -2116,8 +2116,95 @@ def _read_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, limit: int) ->
     return b"".join(chunks)
 
 
+def _legacy_xls_refused() -> ReportFormatError:
+    return ReportFormatError(
+        "legacy_xls",
+        "this is an old Excel workbook (.xls), which cannot be read: open it in Excel, "
+        "LibreOffice or Google Sheets and save it as .xlsx or CSV, then upload that file",
+        "este es un libro de Excel antiguo (.xls), que no se puede leer: ábrelo en Excel, "
+        "LibreOffice o Google Sheets, guárdalo como .xlsx o CSV y sube ese archivo",
+    )
+
+
+def read_xls(data: bytes) -> dict[str, list[list[Any]]]:
+    """Every sheet of an Excel 97-2003 workbook (.xls) as rows, like ``read_xlsx``.
+
+    Read with xlrd (2.x reads only this format and never runs macros), with
+    no formatting and each sheet loaded only when reached. A date cell comes
+    back as ISO text, whichever date system the workbook uses. A damaged,
+    encrypted or unreadable file gets the plain "save it as .xlsx or CSV"
+    answer, and the same cell and column limits as a workbook apply.
+    """
+    try:
+        import xlrd
+    except ImportError as exc:  # the web extra is not installed
+        raise _legacy_xls_refused() from exc
+    try:
+        book = xlrd.open_workbook(
+            file_contents=data,
+            on_demand=True,
+            formatting_info=False,
+            logfile=io.StringIO(),
+            verbosity=0,
+        )
+    except Exception as exc:  # noqa: BLE001 - xlrd raises many kinds on a bad file
+        raise _legacy_xls_refused() from exc
+    sheets: dict[str, list[list[Any]]] = {}
+    cells = 0
+    try:
+        for index in range(book.nsheets):
+            sheet = book.sheet_by_index(index)
+            width = min(sheet.ncols, MAX_XLSX_COLUMNS)
+            cells += sheet.nrows * width
+            if cells > MAX_XLSX_CELLS:
+                raise _xlsx_too_big()
+            rows: list[list[Any]] = []
+            for row_index in range(sheet.nrows):
+                row: list[Any] = []
+                for cell in sheet.row_slice(row_index, 0, width):
+                    row.append(_xls_value(cell.ctype, cell.value, book.datemode, xlrd))
+                while row and row[-1] is None:
+                    row.pop()
+                rows.append(row)
+            sheets[book.sheet_names()[index] or f"Sheet{index + 1}"] = rows
+            book.unload_sheet(index)
+    except ReportFormatError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - a sheet damaged past its header
+        raise _legacy_xls_refused() from exc
+    finally:
+        book.release_resources()
+    if not sheets:
+        raise ReportFormatError(
+            "bad_xlsx", "the workbook has no sheets", "el libro de Excel no tiene hojas"
+        )
+    return sheets
+
+
+def _xls_value(kind: int, value: Any, datemode: int, xlrd: Any) -> Any:
+    """One xlrd cell as ``read_xlsx`` gives it: text, a float, a date as ISO text."""
+    if kind == xlrd.XL_CELL_TEXT:
+        return value if value.strip() else None
+    if kind == xlrd.XL_CELL_NUMBER:
+        return float(value)
+    if kind == xlrd.XL_CELL_DATE:
+        try:
+            moment = xlrd.xldate_as_datetime(value, datemode)
+        except (ValueError, OverflowError, xlrd.xldate.XLDateError):
+            return float(value)
+        if 0 <= value < 1:
+            return moment.time().isoformat()
+        return moment.isoformat(sep=" ")
+    if kind == xlrd.XL_CELL_BOOLEAN:
+        return "TRUE" if value else "FALSE"
+    return None  # empty, blank or an error cell
+
+
 def read_xlsx(data: bytes) -> dict[str, list[list[Any]]]:
-    """Every sheet of a workbook as rows of text or numbers (standard library only)."""
+    """Every sheet of a workbook as rows of text or numbers (standard library only;
+    an old .xls goes to ``read_xls``)."""
+    if _is_legacy_xls(data):
+        return read_xls(data)
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except (zipfile.BadZipFile, EOFError, OSError, ValueError) as exc:
@@ -4323,23 +4410,31 @@ def _is_zip(data: bytes) -> bool:
     return data.startswith(b"PK\x03\x04")
 
 
+#: The signature of an OLE2 compound file, the container of an Excel
+#: 97-2003 workbook (.xls).
+OLE_SIGNATURE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+
+
+def _is_legacy_xls(data: bytes) -> bool:
+    return data.startswith(OLE_SIGNATURE)
+
+
+def _is_workbook(data: bytes) -> bool:
+    """A workbook ``read_xlsx`` reads: .xlsx or .ods (a zip) or .xls."""
+    return _is_zip(data) or _is_legacy_xls(data)
+
+
 #: What an archive may hold for its one export to be read.
 _ARCHIVED_EXPORTS = (".csv", ".txt", ".tsv", ".htm", ".html", ".xlsx", ".xls", ".xml")
 
 
 def unwrap(data: bytes) -> bytes:
     """The export itself: a zip holding one export (not a workbook) gives
-    that file; an OpenDocument spreadsheet is read like a workbook; an old
-    Excel workbook, another OpenDocument file or a PDF is
+    that file; an OpenDocument spreadsheet or an old Excel workbook is read
+    like a workbook; another OpenDocument file or a PDF is
     refused with the way to get a file that can be read."""
-    if data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
-        raise ReportFormatError(
-            "legacy_xls",
-            "this is an old Excel workbook (.xls), which cannot be read: open it in Excel, "
-            "LibreOffice or Google Sheets and save it as .xlsx or CSV, then upload that file",
-            "este es un libro de Excel antiguo (.xls), que no se puede leer: ábrelo en Excel, "
-            "LibreOffice o Google Sheets, guárdalo como .xlsx o CSV y sube ese archivo",
-        )
+    if _is_legacy_xls(data):
+        return data  # read_xlsx reads the old workbook, or refuses it
     if data.lstrip()[:5] == b"%PDF-":
         raise ReportFormatError(
             "pdf_statement",
@@ -4499,7 +4594,7 @@ def _mapped_draft(data: bytes, columns: Mapping[str, str]) -> _Draft:
     """The customer's table read with their own column mapping."""
     from quant_trade.audit import universal
 
-    if _is_zip(data):
+    if _is_workbook(data):
         sheets = read_xlsx(data)
         for sheet in sheets.values():
             texts = [[_as_text(cell) for cell in row] for row in sheet]
@@ -4608,7 +4703,7 @@ def _detect(data: bytes) -> tuple[str | None, _TableReader | None]:
         data = unwrap(data)
     except ReportFormatError:
         return None, None
-    if _is_zip(data):
+    if _is_workbook(data):
         try:
             sheets = read_xlsx(data)
         except ParseError:
@@ -4676,7 +4771,7 @@ def import_report(
         )
     if columns:
         return _assemble(_mapped_draft(data, columns), initial_balance)
-    if _is_zip(data):
+    if _is_workbook(data):
         # Read the workbook here so that its own errors (too large, damaged)
         # reach the client instead of a generic "unknown format".
         sheets = read_xlsx(data)
