@@ -1040,7 +1040,7 @@ REPORT: dict[str, Any] = {
             "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
             "espera que o S&P 500 se mova no mês seguinte) no fechamento do dia de mercado "
             "anterior ao seu início: mercado tranquilo abaixo de 20, agitado a partir de 20. "
-            "Desde 1990 o VIX fechou em 20 ou mais mais ou menos um dia em cada três. Período: "
+            "Desde 1990 o VIX fechou em 20 ou mais cerca de um dia em cada três. Período: "
             "de {first} a {last}."
         ),
         "regime_not_measured": "Sem separação pelo VIX: {reason}.",

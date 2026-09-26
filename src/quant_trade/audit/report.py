@@ -709,7 +709,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Cada rentabilidad del archivo se asigna según el VIX (cuánto espera el mercado de "
             "opciones que se mueva el S&P 500 el mes siguiente) al cierre del día de mercado "
             "anterior a que empiece: mercado tranquilo por debajo de 20, agitado desde 20. "
-            "Desde 1990 el VIX cerró en 20 o más más o menos un día de cada tres. Periodo: del "
+            "Desde 1990 el VIX cerró en 20 o más aproximadamente un día de cada tres. Periodo: del "
             "{first} al {last}."
         ),
         "regime_not_measured": "Sin separación por el VIX: {reason}.",
@@ -733,7 +733,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "regime_source": (
             "VIX: datos públicos de {source} (serie VIXCLS, de CBOE) leídos al generar el "
-            "informe. Mide acciones de EE. UU.: si la estrategia opera otro mercado, tómelo "
+            "informe. Mide acciones de EE. UU.: si la estrategia opera otro mercado, tómalo "
             "como termómetro general del miedo en los mercados. No cambia la clase."
         ),
         "crises_market": "Mercado en esas fechas",
