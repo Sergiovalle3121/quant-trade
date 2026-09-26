@@ -926,6 +926,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "las tasas de las letras del Tesoro no cubren todo el historial",
     ),
     ("the returns never move", "los retornos nunca se mueven"),
+    ("the strategy's compound return a year", "la rentabilidad compuesta anual de la estrategia"),
     (
         "the market's public closes could not be read when the report was made",
         "no se pudieron leer los cierres públicos del mercado al generar el informe",

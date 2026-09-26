@@ -79,6 +79,9 @@ def test_the_report_shows_it_under_the_tiles(locale: str) -> None:
     assert_report_clean(html)
     assert "href='https://fred.stlouisfed.org/series/DTB3'" in html
     assert LABELS[locale]["cash_sharpe"].split("(")[0] in html
+    assert LABELS[locale]["cash_note"].split(".")[0] in html
+    for key in ("cash_sharpe", "cash_below", "cash_note"):
+        assert find_claims(LABELS[locale][key]) == [], key
     assert f"{float(annual_yield(np.array([0.052]))[0]):.2%}" in html  # 5.45 %, the yield
     assert find_claims(LABELS[locale]["cash_sharpe"]) == []
     assert untranslated(result.model_dump(mode="json")) == []
@@ -124,3 +127,29 @@ def test_a_rate_reply_out_of_range_counts_as_unavailable() -> None:
         assert data.refresh("tbill3m") is False and data.closes("tbill3m") is None
     good = MarketData(lambda series: "DATE,DTB3\n2024-01-02,5.1\n2024-01-03,5.2\n")
     assert good.refresh("tbill3m") is True
+
+
+@pytest.mark.parametrize("locale", ["es", "en"])
+def test_a_curve_that_earned_less_than_cash_says_so_in_words(locale: str) -> None:
+    """A low-volatility curve below the bill rate: no -50 Sharpe, a plain sentence."""
+    days = pd.bdate_range("2023-01-02", periods=300)
+    rng = np.random.default_rng(5)
+    frame = _curve(days, rng.normal(0.00005, 0.0003, len(days)))
+    out = excess_sharpe(frame, _rates(days, 5.0), 252.0)
+    assert out["below_cash"] is True
+    assert out["sharpe_excess"]["value"] < -3
+    assert out["strategy_yearly"]["value"] < out["mean_rate"]["value"]
+    inputs = build_inputs(csv_bytes(frame), DeclaredMetadata(locale=locale))
+    result = run_audit(
+        inputs,
+        bootstrap_samples=200,
+        risk_samples=300,
+        market=lambda k: _rates(days, 5.0) if k == "tbill3m" else None,
+    )
+    html, _ = render(result, watermark=False)
+    assert_report_clean(html)
+    labels = LABELS[locale]
+    assert labels["cash_below"].split("(")[0] in html
+    assert labels["cash_sharpe"].split("(")[0] not in html
+    assert f"{result.cash_rate['sharpe_excess']['value']:.2f}" not in html  # type: ignore[index]
+    assert untranslated(result.model_dump(mode="json")) == []

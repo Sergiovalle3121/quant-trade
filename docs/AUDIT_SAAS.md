@@ -1189,7 +1189,11 @@ the start of that stretch (at most 10 days old, `MAX_GAP_DAYS`) is
 compounded over those days; the result is annualised like the headline
 Sharpe, which stays as it is and subtracts nothing. The line also gives the
 average rate over the history and says it is a dollar rate (another
-currency's own cash rate is the fair one). It needs 10 returns and rates
+currency's own cash rate is the fair one). When the strategy's compound return a year is below the
+average rate, or the excess Sharpe is below -3 (`BELOW_CASH_SHARPE`, a curve
+that barely moves), the line says in words that it earned less than cash
+(both yearly figures) instead of printing a large negative Sharpe
+(`below_cash`). It needs 10 returns and rates
 covering the whole history, otherwise it is NOT_MEASURED and not shown. It
 never changes the class.
 

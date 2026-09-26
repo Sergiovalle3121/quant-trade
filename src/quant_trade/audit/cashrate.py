@@ -32,6 +32,8 @@ from quant_trade.audit.schema import measured
 MAX_GAP_DAYS = 10
 #: Days to maturity of the 3-month bill the discount rate is quoted for.
 BILL_DAYS = 91.0
+#: Below this excess Sharpe the report says in words that cash did better.
+BELOW_CASH_SHARPE = -3.0
 #: Returns needed before the figure is worth printing.
 MIN_RETURNS = 10
 
@@ -89,12 +91,24 @@ def excess_sharpe(frame: pd.DataFrame, rates: pd.Series, ppy: float) -> dict[str
         return {"status": "NOT_MEASURED", "reason": FLAT, **base}
     weights = np.clip(span_days, 0.0, None)
     mean_rate = float(np.average(yearly, weights=weights)) if weights.sum() > 0 else 0.0
+    sharpe = float(excess.mean() / spread * math.sqrt(ppy))
+    years = float(weights.sum()) / 365.0
+    strategy_yearly = (
+        float((equity[-1] / equity[0]) ** (1.0 / years) - 1.0) if years > 0 else float("nan")
+    )
+    # A curve that barely moves makes the excess Sharpe a large negative number
+    # that reads like a bug; the plain comparison says the same thing.
+    below = (math.isfinite(strategy_yearly) and strategy_yearly < mean_rate) or (
+        sharpe < BELOW_CASH_SHARPE
+    )
     return {
         "status": "MEASURED",
         "note": NOTE,
         **base,
-        "sharpe_excess": measured(float(excess.mean() / spread * math.sqrt(ppy)), NOTE),
+        "sharpe_excess": measured(sharpe, NOTE),
         "mean_rate": measured(mean_rate, NOTE),
+        "strategy_yearly": measured(strategy_yearly, "the strategy's compound return a year"),
+        "below_cash": below,
     }
 
 
