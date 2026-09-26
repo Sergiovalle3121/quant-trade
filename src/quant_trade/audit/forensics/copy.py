@@ -72,7 +72,7 @@ COPY: dict[str, dict[str, str]] = {
         "calibration": (
             "{unexplained} señales sin explicar en {groups} cuentas o estrategias reales "
             "({n} archivos de este formato) usadas para ajustar el método; con esos datos, "
-            "la tasa de falsas señales podría llegar hasta {cp95} %."
+            "la proporción de señales sin motivo podría llegar hasta {cp95} %."
         ),
         "no_calibration": (
             "Sin calibración con archivos reales de este formato todavía: un hallazgo "
@@ -168,7 +168,7 @@ COPY: dict[str, dict[str, str]] = {
         "calibration": (
             "{unexplained} unexplained signals across {groups} real accounts or strategies "
             "({n} files of this format) used to tune the method; on that data, the "
-            "false-signal rate could be as high as {cp95} %."
+            "rate of unwarranted signals could be as high as {cp95} %."
         ),
         "no_calibration": (
             "No calibration on real files of this format yet: a finding counts as a note, "
@@ -260,7 +260,7 @@ COPY: dict[str, dict[str, str]] = {
         "calibration": (
             "{unexplained} sinais sem explicação em {groups} contas ou estratégias reais "
             "({n} arquivos deste formato) usadas para ajustar o método; com esses dados, "
-            "a taxa de falsos sinais pode chegar a {cp95} %."
+            "a proporção de sinais sem motivo pode chegar a {cp95} %."
         ),
         "no_calibration": (
             "Ainda sem calibração com arquivos reais deste formato: um achado conta como "
