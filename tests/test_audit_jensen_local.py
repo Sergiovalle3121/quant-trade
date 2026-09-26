@@ -12,7 +12,7 @@ import pytest
 from audit_fixtures import csv_bytes
 
 from quant_trade.audit import report
-from quant_trade.audit.alpha import CASH_NOTE, LOCAL_CASH_NOTE, jensen_alpha
+from quant_trade.audit.alpha import CASH_NOTE, LOCAL_CASH_NOTE, NOTE, jensen_alpha
 from quant_trade.audit.cashrate import LOCAL, local_span_cash, span_cash
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
@@ -136,11 +136,14 @@ def test_a_brl_account_with_no_skill_shows_no_alpha() -> None:
     assert dollar.benchmark["jensen"]["alpha"]["value"] > 0.05
 
 
-def test_without_the_local_rate_the_bill_comes_off_both_sides() -> None:
+def test_without_the_local_rate_no_cash_comes_off_either_side() -> None:
+    # The bill is what dollars paid: taking it off an account in reais would
+    # leave Brazil's cash premium over it in the alpha.
     inputs, rates = _brl_account()
     only_bill = {CASH.key: rates[CASH.key]}
     result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, market=only_bill.get)
-    assert result.benchmark["jensen"]["alpha"]["note"] == CASH_NOTE
+    assert result.benchmark["jensen"]["alpha"]["note"] == NOTE
+    assert result.benchmark["jensen"]["cash_subtracted"] is False
     assert "cash_currency" not in result.benchmark["jensen"]
 
     def broken(key: str) -> pd.Series | None:
@@ -149,7 +152,7 @@ def test_without_the_local_rate_the_bill_comes_off_both_sides() -> None:
         return rates.get(key)
 
     result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, market=broken)
-    assert result.benchmark["jensen"]["alpha"]["note"] == CASH_NOTE
+    assert result.benchmark["jensen"]["alpha"]["note"] == NOTE
     # Without the bill neither side loses cash, even with the local rate.
     only_local = {LOCAL["BRL"].asset.key: rates[LOCAL["BRL"].asset.key]}
     result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, market=only_local.get)
@@ -189,3 +192,20 @@ def test_the_line_falls_back_when_the_currency_has_no_name() -> None:
 def test_the_note_has_spanish_and_portuguese_rules() -> None:
     for locale in ("es", "pt"):
         assert localize(LOCAL_CASH_NOTE, locale) != LOCAL_CASH_NOTE
+
+
+@pytest.mark.parametrize("currency", ["AUD", "ARS", " ars "])
+def test_another_currency_without_a_rate_here_never_loses_the_bill(currency: str) -> None:
+    inputs, rates = _brl_account()
+    inputs = replace(inputs, account_currency=currency)
+    result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, market=rates.get)
+    assert result.benchmark["jensen"]["cash_subtracted"] is False
+    assert result.benchmark["jensen"]["alpha"]["note"] == NOTE
+
+
+@pytest.mark.parametrize("currency", ["USD", "USC", "USDT", "usdc", None])
+def test_a_dollar_account_loses_the_bill_on_both_sides(currency: str | None) -> None:
+    inputs, rates = _brl_account()
+    inputs = replace(inputs, account_currency=currency)
+    result = run_audit(inputs, bootstrap_samples=100, risk_samples=200, market=rates.get)
+    assert result.benchmark["jensen"]["alpha"]["note"] == CASH_NOTE

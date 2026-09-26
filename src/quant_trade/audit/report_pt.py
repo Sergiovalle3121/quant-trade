@@ -4974,6 +4974,12 @@ RULES: tuple[tuple[str, str], ...] = (
         "as taxas das letras do Tesouro não cobrem todo o histórico",
     ),
     (
+        "the account is not in US dollars and what cash in its currency paid could not be "
+        "read for the whole history",
+        "a conta não está em dólares americanos e não foi possível ler o que o "
+        "caixa na sua moeda pagou para todo o histórico",
+    ),
+    (
         "the returns never move",
         "os retornos nunca se movem",
     ),
