@@ -1442,18 +1442,27 @@ site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
 Central do Brasil's SGS series 433, monthly changes chained into an index
 from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
 month, refuses the reply, since a broken link would leave its inflation out of
-every later level). The IMF's CPI
-dataset, which covers every currency, needs written permission for
-commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
-official APIs need a registered key, so the peso and the yen show no row
-after inflation yet, and the note says so. Each row after inflation credits
+every later level), Mexico's INPC (INEGI's open-data zip of the 2018 base,
+from January 2003; its terms allow commercial use with the credit "Fuente:
+INEGI" and the product name; the zip is opened in memory and its table
+refused above `MAX_BYTES`) and Japan's CPI (the Statistics Bureau's
+long-term national file on e-Stat, file id `000040482943`, from 1970, base
+2025, read as Shift_JIS; the Public Data License 1.0 and e-Stat's terms
+allow commercial use, and the credit says the figures are edited from the
+survey). The e-Stat file id is pinned: if e-Stat publishes later months under
+a new id, the yen rows first say "prices through {month}" and then drop to
+the row before inflation, and the id needs updating. A month that appears
+twice in either file refuses the reply. The IMF's CPI dataset, which covers
+every currency, needs written permission for commercial reuse, so it is not
+used; Banxico's and INEGI's APIs need a registered key, while the files used
+here do not. Each row after inflation credits
 its source by name and link, as each licence asks; `/metodologia` lists
 them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
 refuses Python's default); FRED keeps the default. It runs for a dollar
 account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
 read at one dollar per coin, which the note says), or a file that names no
 currency, in which case a line says it is read as dollars. When a report
-names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+names EUR, GBP, CAD, CHF, BRL, MXN or JPY, the section shows the account in that
 currency and after that currency's inflation, with the local inflation over
 the dates; without those prices it is NOT_MEASURED with the reason. Another
 named currency leaves it NOT_MEASURED. A price index reply below 1 or above

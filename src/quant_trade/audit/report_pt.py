@@ -1267,8 +1267,8 @@ REPORT: dict[str, Any] = {
         "currency_note_mixed": (
             "As linhas «depois da sua inflação» dividem pelo índice oficial de preços ao "
             "consumidor de cada país de cada mês, ou o do último mês publicado; uma moeda sem "
-            "esse índice em dia (por enquanto, o peso mexicano e o iene) mostra só a sua linha "
-            "antes da inflação. A rentabilidade ao ano é mostrada a partir de um ano de "
+            "esse índice em dia mostra só a sua linha antes da inflação. A rentabilidade ao "
+            "ano é mostrada a partir de um ano de "
             "histórico. Cotações e preços dos EUA de {source}, lidos ao gerar o relatório. Não "
             "muda a classe."
         ),
@@ -1284,6 +1284,14 @@ REPORT: dict[str, Any] = {
             "bankofcanada.ca)"
         ),
         "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA do IBGE)",
+        "currency_attrib_MXN": (
+            "peso mexicano, Fonte: INEGI, Índice Nacional de Precios al Consumidor (INPC), "
+            "usado aqui para descontar a inflação dos saldos"
+        ),
+        "currency_attrib_JPY": (
+            "iene, elaborado a partir do Índice de Preços ao Consumidor do Japão (Statistics "
+            "Bureau, Ministry of Internal Affairs and Communications), via e-Stat"
+        ),
         "currency_MXN": "Pesos mexicanos (MXN)",
         "currency_BRL": "Reais (BRL)",
         "currency_EUR": "Euros (EUR)",
@@ -1369,6 +1377,11 @@ REPORT: dict[str, Any] = {
             "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
             "dados estão disponíveis grátis em bankofcanada.ca.",
             "Preços ao consumidor do Brasil: Banco Central do Brasil (IPCA do IBGE).",
+            "Preços ao consumidor do México. Fonte: INEGI, Índice Nacional de Precios al "
+            "Consumidor (INPC); usamos para descontar a inflação dos saldos.",
+            "Preços ao consumidor do Japão: elaborado a partir do Índice de Preços ao "
+            "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
+            "via e-Stat.",
             "Todos são lidos ao gerar o relatório e nenhum muda a classe.",
         ],
     },
