@@ -4384,6 +4384,28 @@ RULES: tuple[tuple[str, str], ...] = (
         "uma das duas séries nunca se move",
     ),
     (
+        (
+            "the uploaded returns in random order: the same Sharpe, volatility and final result, "
+            "only the order changes"
+        ),
+        (
+            "os retornos enviados em ordem aleatória: o mesmo Sharpe, a mesma volatilidade e o "
+            "mesmo resultado final, só a ordem muda"
+        ),
+    ),
+    (
+        "deepest fall of the uploaded order",
+        "pior queda na ordem enviada",
+    ),
+    (
+        "too few losing periods for their order to matter",
+        "poucos períodos com perda para que a ordem importe",
+    ),
+    (
+        "no losing period; the drawdown is zero in any order",
+        "nenhum período com perda; a queda é zero em qualquer ordem",
+    ),
+    (
         "Resampled estimate from the supplied history: it is not a prediction.",
         "Estimativa reamostrada do histórico fornecido: não é uma previsão.",
     ),
