@@ -1823,8 +1823,10 @@ changes what a report says.
   address is one the inviter used (its free report, previews, own uploads),
   and as `cap` past `accounts.REFERRAL_MONTHLY_CAP` (5) credited invites in
   the calendar month (unique slots, so simultaneous rewards cannot pass it).
-  The inviter never sees who joined. Rows go with either account and show
-  in "Descargar mis datos". Off in free mode or without the free first
+  The inviter never sees who joined. Rows go with the inviter's account; an
+  invitee's deletion drops a pending row and keeps a decided one (dates,
+  outcome, slot) under a random id with no browser mark, so deleting
+  credited invitees never frees the cap. They show in "Descargar mis datos". Off in free mode or without the free first
   report.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`

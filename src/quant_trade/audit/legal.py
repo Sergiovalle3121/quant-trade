@@ -573,8 +573,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "For 'Invite a colleague': each account's invite link, and for an account "
                     "created through someone's link, the date, whether its free first report "
                     "happened and the hash of its browser identifier, to refuse self-invites. "
-                    "The inviter sees only counts, never who joined. It is deleted with "
-                    "either account.",
+                    "The inviter sees only counts, never who joined. It is deleted with the "
+                    "inviter's account; when the account that joined is deleted, its row "
+                    "keeps only the dates and the outcome under a random id (no e-mail, no "
+                    "browser hash), so the monthly limit still holds.",
                 ),
             ),
             (
@@ -696,7 +698,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
                 "informe gratis y el hash del identificador de su navegador, para rechazar "
                 "autoinvitaciones. Quien invita ve solo cifras, nunca quién se unió. Se borra "
-                "con cualquiera de las dos cuentas.",
+                "con la cuenta de quien invita; si se borra la cuenta que se unió, su fila "
+                "guarda solo las fechas y el resultado bajo un id al azar (sin correo ni hash "
+                "del navegador), para que el límite mensual se mantenga.",
             ),
         ),
         (

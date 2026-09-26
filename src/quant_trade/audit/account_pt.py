@@ -157,7 +157,9 @@ COPY_PT: dict[str, str] = {
         "relatório grátis uma vez. Elas ficam mesmo se você apagar a conta, sem o seu e-mail.|"
         "Se você entrou pelo link de um colega ou alguém entra pelo seu: a data, se já houve o "
         "primeiro relatório e uma marca aleatória do navegador (um hash), para evitar "
-        "autoconvites. Ninguém vê quem entrou; é apagado com qualquer uma das duas contas.|"
+        "autoconvites. Ninguém vê quem entrou. É apagado com a conta de quem convida; se quem "
+        "entrou apagar a sua, ficam só a data e o resultado, sem nada seu, para o limite "
+        "mensal.|"
         "Para apagar tudo: «Apagar minha conta», no fim de «Minha conta». Remove na hora seu "
         "e-mail, senha, sessões e listas; você também pode apagar os relatórios que enviou."
     ),

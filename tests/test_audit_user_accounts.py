@@ -2016,6 +2016,8 @@ def test_deleting_either_account_removes_its_invite_rows(tmp_path: Path) -> None
     assert store.invite_summary(ana.id, datetime.now(UTC)).joined == 0  # type: ignore[attr-defined]
     store.delete_account(ana.id)  # type: ignore[attr-defined]
     assert store.inviter_for_token(token) is None  # type: ignore[attr-defined]
+    for gone in (ana.id, bea.id):
+        assert store.account_export(gone) is None  # type: ignore[attr-defined]
     with store.engine.connect() as conn:  # type: ignore[attr-defined]
         assert not conn.execute(store.referrals.select()).all()  # type: ignore[attr-defined]
         assert not conn.execute(store.invite_links.select()).all()  # type: ignore[attr-defined]
@@ -2040,3 +2042,49 @@ def test_invite_screens_exist_in_every_language_and_pass_the_guard() -> None:
         signup = account_pages.signup_page(locale=locale, csrf="c" * 30, invite="abc12345")
         assert "name='invite' value='abc12345'" in signup
         assert account_pages.COPY[locale]["invited_banner"] in signup
+
+
+def test_deleting_credited_invitees_never_frees_the_monthly_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "REFERRAL_MONTHLY_CAP", 2)
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    _signup(client)
+    token = _invite_token(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+
+    def invite(n: int) -> TestClient:
+        friend = TestClient(client.app)
+        _join(friend, f"friend{n}@example.com", token)
+        friend.get("/cuenta")  # the invitee's own invite link exists too
+        friend.post(
+            "/audits",
+            files=_seeded_file(50 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": f"198.51.100.{60 + n}"},
+        )
+        return friend
+
+    for n in range(2):
+        invite(n)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 2  # type: ignore[attr-defined]
+    for n in range(2):
+        friend = store.find_account(f"friend{n}@example.com")  # type: ignore[attr-defined]
+        store.delete_account(friend.id)  # type: ignore[attr-defined]
+    invite(2)
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 2  # type: ignore[attr-defined]
+    summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
+    assert (summary.joined, summary.credited, summary.credited_this_month) == (3, 2, 2)
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        kept = conn.execute(store.referrals.select()).mappings().all()  # type: ignore[attr-defined]
+        # The deleted invitees keep only an outcome under a random id.
+        assert all(
+            row["device_sha256"] == "" for row in kept if row["invitee_id"].startswith("gone")
+        )
+        tokens = conn.execute(store.invite_links.select()).mappings().all()  # type: ignore[attr-defined]
+    assert {row["account_id"] for row in tokens} == {
+        ana.id,
+        store.find_account("friend2@example.com").id,  # type: ignore[attr-defined]
+    }

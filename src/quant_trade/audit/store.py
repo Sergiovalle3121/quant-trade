@@ -1218,11 +1218,17 @@ class Store:
             conn.execute(
                 self.invite_links.delete().where(self.invite_links.c.account_id == account_id)
             )
+            r = self.referrals
+            conn.execute(r.delete().where(r.c.inviter_id == account_id))
+            # An invitee that leaves: a pending invite goes; a decided one
+            # keeps its outcome and monthly slot under a random id with no
+            # browser mark, so deleting credited invitees never frees the
+            # inviter's cap.
+            conn.execute(r.delete().where((r.c.invitee_id == account_id) & (r.c.outcome == "")))
             conn.execute(
-                self.referrals.delete().where(
-                    (self.referrals.c.invitee_id == account_id)
-                    | (self.referrals.c.inviter_id == account_id)
-                )
+                r.update()
+                .where(r.c.invitee_id == account_id)
+                .values(invitee_id="gone" + secrets.token_hex(14), device_sha256="")
             )
             conn.execute(self.accounts.delete().where(self.accounts.c.id == account_id))
         return deleted
