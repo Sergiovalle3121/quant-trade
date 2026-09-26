@@ -202,21 +202,54 @@ def local_excess_sharpe(
         "source_url": asset.source_url,
         "currency": currency,
     }
-    values = _clean(rates, asset)
+    values, max_gap, spliced = _local_values(frame["timestamp"], rates, local, history)
     if values.empty:
         return {"status": "NOT_MEASURED", "reason": UNAVAILABLE, **base}
-    max_gap: int | np.ndarray = local.max_gap
-    if local.history is not None:
-        older = _clean(history, local.history)
-        older = older[older.index < values.index[0]]
-        starts = _days(frame["timestamp"])[:-1].floor("D")
-        early = np.asarray(starts < values.index[0])
-        if not older.empty and bool(early.any()):
-            max_gap = np.where(early, MAX_MONTHLY_GAP_DAYS, local.max_gap)
-            values = pd.concat([older, values])
-            base["history_series"] = local.history.series
-            base["history_source_url"] = local.history.source_url
+    if spliced and local.history is not None:
+        base["history_series"] = local.history.series
+        base["history_source_url"] = local.history.source_url
     return _excess(frame, values, ppy, base, NOTE_LOCAL, max_gap, local.yearly)
+
+
+def _local_values(
+    stamps: pd.Series, rates: pd.Series | None, local: LocalCash, history: pd.Series | None
+) -> tuple[pd.Series, int | np.ndarray, bool]:
+    """The cleaned rates of ``local``, how old each span's value may be, and
+    whether the monthly ``history`` filled spans that start before them."""
+    values = _clean(rates, local.asset)
+    max_gap: int | np.ndarray = local.max_gap
+    if values.empty or local.history is None:
+        return values, max_gap, False
+    older = _clean(history, local.history)
+    older = older[older.index < values.index[0]]
+    starts = _days(stamps)[:-1].floor("D")
+    early = np.asarray(starts < values.index[0])
+    if older.empty or not bool(early.any()):
+        return values, max_gap, False
+    max_gap = np.where(early, MAX_MONTHLY_GAP_DAYS, local.max_gap)
+    return pd.concat([older, values]), max_gap, True
+
+
+def local_span_cash(
+    stamps: pd.Series,
+    rates: pd.Series | None,
+    currency: str,
+    history: pd.Series | None = None,
+) -> np.ndarray | None:
+    """What cash in ``currency`` (a key of ``LOCAL``) paid over each span
+    between consecutive ``stamps``, read like :func:`local_excess_sharpe`;
+    ``None`` when the rates do not cover every span's start."""
+    if currency not in LOCAL or len(stamps) < 2:
+        return None
+    local = LOCAL[currency]
+    values, max_gap, _ = _local_values(stamps, rates, local, history)
+    if values.empty:
+        return None
+    paired = _span_rates(_days(stamps), values, max_gap, local.yearly)
+    if isinstance(paired, str):
+        return None
+    yearly, span_days = paired
+    return np.asarray((1.0 + yearly) ** (span_days / 365.0) - 1.0, dtype=float)
 
 
 def _excess(
@@ -273,5 +306,6 @@ __all__ = [
     "annual_yield",
     "excess_sharpe",
     "local_excess_sharpe",
+    "local_span_cash",
     "span_cash",
 ]

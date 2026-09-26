@@ -22,6 +22,7 @@ import math
 import re
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from statistics import NormalDist
 from typing import Any
@@ -660,6 +661,7 @@ def _benchmark(
     strategy: IngestedSeries,
     benchmark: IngestedSeries | None,
     rates: pd.Series | None = None,
+    local_cash: LocalCashRates | None = None,
 ) -> tuple[dict[str, Any], dict[str, float | None], str | None]:
     empty: dict[str, float | None] = {
         "excess_return": None,
@@ -727,8 +729,58 @@ def _benchmark(
         cash = cashrate_lib.span_cash(joined["timestamp"], rates)
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         cash = None
-    section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
+    # The account's own currency's cash comes off the strategy when its rate
+    # covers every period and the bill's covers the benchmark's; otherwise both
+    # sides lose the bill's, as for a dollar account.
+    own = None
+    if local_cash is not None and cash is not None:
+        try:
+            own = cashrate_lib.local_span_cash(
+                joined["timestamp"], local_cash.rates, local_cash.currency, local_cash.history
+            )
+        except Exception:  # noqa: BLE001 (public data must never stop an audit)
+            own = None
+    if own is not None and local_cash is not None:
+        section["jensen"] = alpha_lib.jensen_alpha(
+            s_returns, b_returns, joined_ppy, own, cash, local_cash.currency
+        )
+    else:
+        section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy, cash)
     return section, values, None
+
+
+@dataclass(frozen=True)
+class LocalCashRates:
+    """The account currency's cash rates as FRED gives them (``history`` is the
+    monthly series that fills dates before ``rates`` starts, when it has one)."""
+
+    currency: str
+    rates: pd.Series
+    history: pd.Series | None = None
+
+
+def _local_cash_rates(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
+) -> LocalCashRates | None:
+    """The account currency's cash rates when public data is on and the
+    currency has one here; ``None`` otherwise or when they cannot be read."""
+    code = (inputs.account_currency or "").strip().upper()
+    if market is None or code not in cashrate_lib.LOCAL:
+        return None
+    local = cashrate_lib.LOCAL[code]
+    try:
+        rates = market(local.asset.key)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        return None
+    if rates is None or rates.empty:
+        return None
+    history = None
+    if local.history is not None:
+        try:
+            history = market(local.history.key)
+        except Exception:  # noqa: BLE001 (the history only fills early dates)
+            history = None
+    return LocalCashRates(code, rates, history)
 
 
 def _cscv(variants: np.ndarray | None) -> tuple[dict[str, Any], float | None]:
@@ -1006,22 +1058,16 @@ def _local_cash_rate(
 ) -> dict[str, Any] | None:
     """The Sharpe after the account currency's own cash rate, or None when the
     currency has none here or its rates do not cover the history."""
-    code = (inputs.account_currency or "").strip().upper()
-    if code not in cashrate_lib.LOCAL:
+    local = _local_cash_rates(inputs, market)
+    if local is None:
         return None
     try:
-        local = cashrate_lib.LOCAL[code]
-        rates = market(local.asset.key)
-        if rates is None or rates.empty:
-            return None
-        history = None
-        if local.history is not None:
-            try:
-                history = market(local.history.key)
-            except Exception:  # noqa: BLE001 (the history only fills early dates)
-                history = None
         out = cashrate_lib.local_excess_sharpe(
-            inputs.equity.frame, rates, inputs.periods_per_year, code, history
+            inputs.equity.frame,
+            local.rates,
+            inputs.periods_per_year,
+            local.currency,
+            local.history,
         )
     except Exception:  # noqa: BLE001 (public data must never stop an audit)
         return None
@@ -1256,7 +1302,7 @@ def run_audit(
     holdout, oos_sharpe, gap, holdout_reason = _holdout(frame, inputs.declared.oos_start, ppy)
     bill_rates = _bill_rates(market)
     benchmark, benchmark_values, benchmark_reason = _benchmark(
-        inputs.equity, inputs.benchmark, bill_rates
+        inputs.equity, inputs.benchmark, bill_rates, _local_cash_rates(inputs, market)
     )
     cscv, pbo = _cscv(inputs.variants)
     costs, rows, reference, assumed, gross = _costs(inputs)

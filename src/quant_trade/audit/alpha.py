@@ -39,6 +39,12 @@ CASH_NOTE = (
     "standard error; what the 3-month US Treasury bill paid over the same periods "
     "subtracted from both sides"
 )
+LOCAL_CASH_NOTE = (
+    "return beyond the benchmark's moves (Jensen's alpha), annualised; cautious "
+    "standard error; what cash in the account's currency paid subtracted from the "
+    "strategy and what the 3-month US Treasury bill paid subtracted from the benchmark, "
+    "taken as priced in US dollars"
+)
 T_NOTE = (
     "alpha over its cautious standard error (the largest of HC3, Newey-West and one "
     "widened for autocorrelated misses); beyond about 2 it is unlikely to be chance"
@@ -88,20 +94,33 @@ def jensen_alpha(
     benchmark: np.ndarray,
     periods_per_year: float,
     cash: np.ndarray | None = None,
+    benchmark_cash: np.ndarray | None = None,
+    cash_currency: str | None = None,
 ) -> dict[str, Any]:
     """Alpha (annualised), its cautious t-statistic, beta and R squared; with
-    ``cash`` (the bill's return over each period), on returns over cash."""
+    ``cash`` (the bill's return over each period), on returns over cash.
+
+    With ``benchmark_cash`` too, ``cash`` is what cash in the account's own
+    currency (``cash_currency``) paid and comes off the strategy only, while
+    the benchmark, taken as priced in dollars, loses the bill's return: each
+    side over its own currency's cash."""
     y = np.asarray(strategy, dtype=float)
     x = np.asarray(benchmark, dtype=float)
-    if len(x) != len(y) or (cash is not None and len(cash) != len(y)):
+    if (
+        len(x) != len(y)
+        or (cash is not None and len(cash) != len(y))
+        or (benchmark_cash is not None and len(benchmark_cash) != len(y))
+    ):
         return {"status": "NOT_MEASURED", "reason": NOT_ALIGNED}
     note = NOTE
+    local = cash is not None and benchmark_cash is not None
     if cash is not None:
         # Without it, a strategy with little exposure shows (1 - beta) times
         # what cash paid as alpha.
         c = np.asarray(cash, dtype=float)
-        y, x = y - c, x - c
-        note = CASH_NOTE
+        b = np.asarray(benchmark_cash, dtype=float) if benchmark_cash is not None else c
+        y, x = y - c, x - b
+        note = LOCAL_CASH_NOTE if local else CASH_NOTE
     # A level at zero gives an infinite return: keep only the periods both measure.
     finite = np.isfinite(y) & np.isfinite(x)
     y, x = y[finite], x[finite]
@@ -121,6 +140,7 @@ def jensen_alpha(
         "status": "MEASURED",
         "alpha": measured(alpha * periods_per_year, note),
         "cash_subtracted": cash is not None,
+        **({"cash_currency": cash_currency} if local and cash_currency else {}),
         "alpha_t_stat": (
             measured(alpha / se_alpha, T_NOTE)
             if se_alpha > 0
