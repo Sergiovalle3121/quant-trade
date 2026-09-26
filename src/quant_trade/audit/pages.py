@@ -767,7 +767,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("6", "dimensiones auditadas"),
             ("{flags}", "banderas rojas revisadas en cada archivo"),
             ("{presets}", "retos de prop firms simulables"),
-            ("{platforms}", "formatos de plataforma que reconoce"),
+            ("{platforms}", "plataformas que reconoce"),
         ],
         "evidence_eyebrow": "Evidencia",
         "evidence_title": ("Cada número dice", "de dónde sale."),
@@ -959,7 +959,7 @@ _UI: dict[str, dict[str, Any]] = {
             ("6", "audited dimensions"),
             ("{flags}", "red flags checked on every file"),
             ("{presets}", "prop-firm challenges to simulate"),
-            ("{platforms}", "platform formats it recognises"),
+            ("{platforms}", "platforms it recognises"),
         ],
         "evidence_eyebrow": "Evidence",
         "evidence_title": ("Every number says", "where it comes from."),
@@ -1441,9 +1441,9 @@ def _specs(locale: str) -> str:
     ui = _UI[locale]
     counts = {
         "presets": len(PRESETS),
-        # The dedicated readers ("CSV" is the generic one) plus the exports
-        # the universal reader recognises: one figure for "what it reads".
-        "platforms": len(PLATFORMS) + len(RECOGNISED_PLATFORMS),
+        # Distinct platforms named on the page: the dedicated readers (minus
+        # the generic "CSV") plus the exports the universal reader recognises.
+        "platforms": len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"}),
         "flags": len(FLAG_TITLES),
     }
     specs = "".join(

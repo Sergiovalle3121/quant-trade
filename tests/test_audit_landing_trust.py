@@ -67,15 +67,17 @@ def test_the_whatsapp_line_needs_a_contact() -> None:
 
 
 def test_platform_figure_counts_readers_and_recognised_exports() -> None:
-    """The landing's platform figure matches the platforms other copy names."""
+    """The landing's platform figure counts each named platform once, never the generic CSV."""
     from quant_trade.audit.audiences import RECOGNISED_PLATFORMS
     from quant_trade.audit.pages import PLATFORMS, _specs
 
-    total = len(PLATFORMS) + len(RECOGNISED_PLATFORMS)
+    names = {*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"}
+    assert len(names) == len(PLATFORMS) - 1 + len(RECOGNISED_PLATFORMS)  # none twice
+    total = len(names)
     for locale, label in (
-        ("es", "formatos de plataforma que reconoce"),
-        ("en", "platform formats it recognises"),
-        ("pt", "formatos de plataforma que reconhece"),
+        ("es", "plataformas que reconoce"),
+        ("en", "platforms it recognises"),
+        ("pt", "plataformas que reconhece"),
     ):
         html = _specs(locale)
         assert f"<b data-count>{total}</b><span>{label}</span>" in html
