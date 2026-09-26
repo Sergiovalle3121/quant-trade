@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 import re
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -37,9 +38,11 @@ from quant_trade.audit import decay as decay_lib
 from quant_trade.audit import firmfit as firmfit_lib
 from quant_trade.audit import forward as forward_lib
 from quant_trade.audit import fund as fund_lib
+from quant_trade.audit import holding as holding_lib
 from quant_trade.audit import instruments as instruments_lib
 from quant_trade.audit import live as live_lib
 from quant_trade.audit import luck as luck_lib
+from quant_trade.audit import market as market_lib
 from quant_trade.audit import plateau as plateau_lib
 from quant_trade.audit import ride as ride_lib
 from quant_trade.audit import sizing as sizing_lib
@@ -835,7 +838,35 @@ def _risk(returns: pd.Series, ppy: float, *, samples: int, seed: int) -> dict[st
     out: dict[str, Any] = {"status": status, "horizon_years": 1.0, **risk}
     if status == "NOT_MEASURED":
         out["reason"] = risk["max_drawdown"]["p50"]["note"]
+    out["versus_shuffle"] = analytics.shuffled_drawdown(returns)
     return out
+
+
+def _holding(
+    inputs: AuditInputs, market: Callable[[str], pd.Series | None] | None
+) -> dict[str, Any] | None:
+    """The strategy beside simply holding the market it trades, when the file
+    names one with public closes and those closes can be read."""
+    if market is None:
+        return None
+    asset = market_lib.dominant_asset(
+        inputs.trade_symbols, (inputs.report_metadata or {}).get("symbol", "")
+    )
+    if asset is None:
+        return None
+    try:
+        closes = market(asset.key)
+    except Exception:  # noqa: BLE001 (public data must never stop an audit)
+        closes = None
+    if closes is None or closes.empty:
+        return {
+            "status": "NOT_MEASURED",
+            "reason": holding_lib.UNAVAILABLE,
+            "asset": asset.key,
+            "label": asset.label,
+            "source_url": asset.source_url,
+        }
+    return holding_lib.versus_holding(inputs.equity.frame, closes, asset)
 
 
 def _challenge(inputs: AuditInputs, *, samples: int, seed: int) -> dict[str, Any]:
@@ -944,8 +975,13 @@ def run_audit(
     audit_id: str | None = None,
     risk_samples: int = RISK_SAMPLES,
     challenge_samples: int = CHALLENGE_SAMPLES,
+    market: Callable[[str], pd.Series | None] | None = None,
 ) -> AuditResult:
-    """Audit one upload. Pure, deterministic for a fixed ``seed``/``now``/``audit_id``."""
+    """Audit one upload. Pure, deterministic for a fixed ``seed``/``now``/``audit_id``.
+
+    ``market`` returns the public daily closes of a market by key
+    (``market.MarketData.closes``); it is called only when the file trades one
+    of those markets, and without it the holding comparison is left out."""
     clock = now.astimezone(UTC) if now is not None else datetime.now(UTC)
     identifier = audit_id or uuid.uuid4().hex
     frame = inputs.equity.frame
@@ -1101,6 +1137,7 @@ def run_audit(
             inputs.equity.frame, bench_months, from_trades=inputs.balance_only
         )
     )
+    holding = None if fund.get("status") == "MEASURED" else _holding(inputs, market)
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1309,6 +1346,7 @@ def run_audit(
         instruments=instruments,
         fund=fund,
         crises=crises,
+        holding=holding,
         luck=luck,
         ride=ride,
         vendor_questions=questions,

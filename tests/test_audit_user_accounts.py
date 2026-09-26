@@ -1694,3 +1694,95 @@ def test_account_forms_refuse_a_cross_site_post(tmp_path: Path) -> None:
             "/cuenta/estrategias/guardar", data=data, headers=headers, follow_redirects=False
         )
         assert answer.headers["location"].startswith("/cuenta/estrategias/")
+
+
+# -- "Descargar mis datos" -----------------------------------------------------------
+def test_download_my_data_returns_only_the_owners_rows(tmp_path: Path) -> None:
+    import json
+
+    client, store, _ = _client(tmp_path)
+    assert client.get("/cuenta/datos", follow_redirects=False).status_code == 303
+    _signup(client, "ana@example.com", welcome=True)
+    code, record = store.create_access_code(credits=3, note="nota-privada", at=NOW)  # type: ignore[attr-defined]
+    first = _audit_id(_upload(client).headers["location"])
+    second_url = _upload(client, access_code=code).headers["location"]
+    second = _audit_id(second_url)
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": first, "strategy": "new", "name": "EA Oro", "csrf": csrf},
+    )
+    other = TestClient(client.app)
+    _signup(other, "bea@example.com")
+    theirs = _audit_id(_upload(other).headers["location"])
+
+    answer = client.get("/cuenta/datos")
+    assert answer.status_code == 200
+    assert answer.headers["cache-control"] == "no-store"
+    assert answer.headers["content-disposition"].startswith("attachment;")
+    data = json.loads(answer.text)
+    assert data["account"]["email"] == "ana@example.com"
+    ids = {item["audit_id"] for item in data["reports"]}
+    assert ids == {first, second} and theirs not in answer.text
+    assert all(item["upload_ip"] for item in data["reports"])  # kept until the purge
+    assert data["strategies"][0]["name"] == "EA Oro"
+    assert data["strategies"][0]["reports"] == [first]
+    assert data["access_codes"][0]["id"] == record.id
+    assert data["free_first_report"]["audit_id"] == first
+    assert "bea@example.com" not in answer.text
+    # Never a secret: no password hash, no token, no code, no owner's note.
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    for secret in ("scrypt$", code, "nota-privada", second_url.split("token=")[1][:20]):
+        assert secret not in answer.text
+    sessions = store.account_sessions  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        tokens = [row[0] for row in conn.execute(sessions.select()).all()]
+    assert tokens and not any(token in answer.text for token in tokens)
+    assert account is not None
+    # The other account downloads only its own.
+    mine = json.loads(other.get("/account/datos").text)
+    assert [item["audit_id"] for item in mine["reports"]] == [theirs]
+    # The button on the account page, in every language, and the promise in /privacidad.
+    for path, words in (
+        ("/cuenta", "Descargar mis datos"),
+        ("/account", "Download my data"),
+        ("/pt/conta", "Baixar meus dados"),
+    ):
+        page = client.get(path).text
+        assert words in page and "/datos'" in page
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    ctx = LegalContext()
+    es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
+    en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
+    assert "«Descargar mis datos»" in es and "'Download my data'" in en
+
+
+def test_download_my_data_refuses_cross_site_and_hides_others_descriptions(
+    tmp_path: Path,
+) -> None:
+    import json
+
+    client, store, _ = _client(tmp_path)
+    _signup(client, "ana@example.com")
+    # An anonymous upload paid with a code, later saved by Ana from its link.
+    code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
+    stranger = TestClient(client.app)
+    theirs = _audit_id(
+        _upload(stranger, description="mi robot secreto", access_code=code).headers["location"]
+    )
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(store.audits.update().values(paid=False, paid_at=None))  # type: ignore[attr-defined]
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    store.link_audit(account.id, theirs, at=NOW)  # type: ignore[attr-defined]  # saved from a link
+    refused = client.get(
+        "/cuenta/datos", headers={"Sec-Fetch-Site": "cross-site"}, follow_redirects=False
+    )
+    assert refused.status_code == 303 and refused.headers["location"] == "/cuenta"
+    data = json.loads(client.get("/cuenta/datos", headers={"Sec-Fetch-Site": "none"}).text)
+    saved = next(item for item in data["reports"] if item["audit_id"] == theirs)
+    assert saved["description"] == "" and saved["upload_ip"] == ""
+    assert "mi robot secreto" not in json.dumps(data)
+    # Once this account pays for it, the description is part of what it bought.
+    store.mark_paid(theirs, stripe_session_id="cs_saved", at=NOW)  # type: ignore[attr-defined]
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert "mi robot secreto" in json.dumps(data, ensure_ascii=False)

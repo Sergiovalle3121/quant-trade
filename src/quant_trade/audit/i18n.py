@@ -895,6 +895,34 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "la curva nunca se aleja un 0.1 % de su inicio",
     ),
     (
+        "the strategy's closes against the market's public closes (FRED) on the days both are "
+        "seen (the sparser of the two calendars); Sharpe ratios on those days without "
+        "subtracting a cash rate, annualised by the days observed; correlation and beta on "
+        "Friday-to-Friday weekly returns",
+        "los cierres de la estrategia frente a los cierres públicos del mercado (FRED) en los "
+        "días en que se ven los dos (el calendario con menos días); Sharpe en esos días sin "
+        "restar la tasa del efectivo, anualizado según los días observados; correlación y beta "
+        "con rentabilidades semanales de viernes a viernes",
+    ),
+    (
+        "fewer than 12 weeks shared with the market's public closes",
+        "menos de 12 semanas en común con los cierres públicos del mercado",
+    ),
+    ("no overlapping days", "ningún día en común"),
+    (
+        "the market's public closes could not be read when the report was made",
+        "no se pudieron leer los cierres públicos del mercado al generar el informe",
+    ),
+    (
+        "fewer than 60 days shared with the market's public closes",
+        "menos de 60 días en común con los cierres públicos del mercado",
+    ),
+    (
+        "the shared days span less than 90 calendar days",
+        "los días en común abarcan menos de 90 días naturales",
+    ),
+    ("one of the two series never moves", "una de las dos series nunca se mueve"),
+    (
         "fixed calendar windows of widely recorded market falls; the curve's month-end "
         "returns compounded over each window it covers in full",
         "periodos fijos de caídas de mercado de fecha pública; las rentabilidades de fin de "
@@ -1082,6 +1110,21 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     ("fewer than ten closed trades", "menos de diez operaciones cerradas"),
     ("fewer than fifty returns", "menos de cincuenta retornos"),
+    (
+        "the uploaded returns in random order: the same Sharpe, volatility and final result, "
+        "only the order changes",
+        "los retornos aportados en orden al azar: el mismo Sharpe, la misma volatilidad y el "
+        "mismo resultado final; solo cambia el orden",
+    ),
+    ("deepest fall of the uploaded order", "caída más profunda en el orden aportado"),
+    (
+        "too few losing periods for their order to matter",
+        "muy pocos periodos perdedores para que su orden importe",
+    ),
+    (
+        "no losing period; the drawdown is zero in any order",
+        "ningún periodo perdedor; la caída es cero en cualquier orden",
+    ),
     (
         "the monthly returns with 2 % a year taken month by month and 20 % of each year's gain "
         "above the previous high taken at the year's end (high-water mark)",

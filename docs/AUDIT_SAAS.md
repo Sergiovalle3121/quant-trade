@@ -1125,6 +1125,57 @@ positive. One finding, as a question: `fell_more_in_crises` when, over at
 least two windows with a benchmark, the fund did worse in two thirds or more
 of them. No red flag and no class change.
 
+Against holding the market it trades (`audit/holding.py`, `audit/market.py`).
+When at least two thirds of a file's trades are on the S&P 500, the Nasdaq 100
+or bitcoin (by symbol name: `US500`, `SPX500`, `ES` futures; `US100`,
+`USTEC`, `NAS100`, `NQ` futures; `BTCUSD`, `BTCUSDT`, `XBTUSD`; broker
+suffixes dropped), or a tester report names one of them, the report puts the
+strategy's closes beside the market's public closes from FRED
+(`SP500`, `NASDAQ100`, `CBBTCUSD`) on the same days: return, worst fall and
+Sharpe ratio for both, plus correlation and beta. The two are paired on the
+sparser calendar, taking the other side's last level on or before each day:
+a strategy that also moves on weekends is read on the market's trading days
+(weekend moves roll into Monday), a weekday strategy beside bitcoin on its
+own days. The strategy's Sharpe here is on those shared days only
+(`strategy_sharpe_shared_days`, labelled "on the same N days"), not the
+headline Sharpe. Correlation and beta use Friday-to-Friday weekly returns,
+because a file's day ends at its last stamp (often broker time read as UTC)
+while FRED closes at the market's close, and that offset pulls daily figures
+toward zero. It needs 60 shared days (`MIN_DAYS`) spanning 90 calendar days
+(`MIN_SPAN_DAYS`) and 12 weekly returns (`MIN_WEEKS`); a market close more
+than 5 days before a strategy day is not paired (`MAX_GAP_DAYS`). One
+finding, as a question, no red flag and no class change: `rides_the_market`
+when the weekly correlation is 0.7 or more (`CLOSE_MOVE`) and the strategy's
+Sharpe is not at least 2 standard errors (`EDGE_SE`) above holding's, the
+standard error of the difference of two correlated Sharpe ratios (Jobson and
+Korkie with Memmel's correction) on the weekly returns (`sharpe_gap_se`,
+`sharpe_gap_in_se`). A gap inside the noise reads as "no clear edge", never
+as "worse"; without the finding (low correlation), a gap under 2 standard
+errors still gets one line under the table saying the higher Sharpe is not
+enough to say the strategy beats the market. Sharpe is used because it does not change with position
+size, so a leveraged copy of the index scores the same as the index. Neither
+Sharpe subtracts a cash rate. On a balance-only file a line says the
+strategy's correlation and worst fall read short. The closes are read at
+run time (`MarketData`, kept in memory for six hours, Python's default
+User-Agent because FRED stalls custom ones), never stored in the repository;
+the service reads them unless `AUDIT_PUBLIC_DATA=false`, the CLI only with
+`--public-data`, and the tests block the download (`tests/conftest.py`).
+The public data can never hold a report back: an audit never downloads.
+`MarketData.closes` answers at once from memory (or with nothing) and, when
+the copy is missing or older than six hours, starts one background
+`refresh`; the service also downloads the three series in a background
+thread when it starts (`warm`). A download reads with `read1`, so its total
+deadline of 5 seconds (`TIMEOUT`) is checked after every receive and a server
+that trickles bytes is cut off within about one more socket timeout; replies
+are capped at 4 MB, redirects are refused (the address stays FRED's fixed
+https one), and values that are not finite are dropped. Only one refresh of
+a series runs at a time, and after a failure (down, slow, rate limited, not
+a CSV) the series is not asked for again for 10 minutes (`RETRY_AFTER`).
+When the closes are not in memory the section says so in one NOT_MEASURED
+line and the audit goes on. The CLI's `--public-data` reads the three series
+first. The result JSON always carries a `holding` key: `null` when the file
+trades none of these markets or public data is off.
+
 The same windows apply to any dated curve that is not a fund record (a
 daily backtest, a platform report, a trade history), in their own section
 "How did it do in the known crises?". The curve is taken at month ends. On
@@ -1702,6 +1753,17 @@ changes what a report says.
   no audit kept). A failed upload gives its claims back. Network keys hold
   a hash of the address and the retention purge deletes them.
 
+- **Descargar mis datos**: `/cuenta/datos` (EN `/account/datos`, PT
+  `/pt/conta/datos`), a GET for the signed-in account only, returns a JSON
+  file (`no-store`) with the account's e-mail, language and dates, session
+  dates, reports (class, payment, description, upload IP while kept),
+  codes (never the code or the owner's note), strategies, free previews,
+  the free first report's hashes and IP, and the column maps. Never the
+  password hash, a session, reset or report token. Backs the "Qué
+  guardamos" block and the right of access in /privacidad. A browser-flagged
+  cross-site request is sent back to the account page; a report saved from
+  someone else's link shows its description only once paid
+  (`store.account_export`).
 - **Mis estrategias** (`audit/strategies.py`, tables `strategies` and
   `strategy_reports`): an account names a strategy and files reports of its
   own list under it (one strategy per report, 50 strategies per account),
@@ -2190,6 +2252,8 @@ Redesign pass 55 makes each locked figure in a preview's summary a link to the u
 
 Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
 
+Redesign pass 58 styles "Mis estrategias". On the account page each strategy is a card with its latest class, name and version count; on a phone the count goes under the name and "Ver estrategia" spans the card. On a strategy's page the version table uses tabular figures, its "Quitar de la estrategia" buttons sit quietly at the right, and on a phone each version becomes a card with every figure under its column name (`data-label`). In "Qué cambió" each line ends in a chip coloured by its meaning only: green for "mejor", red for "peor", grey for "cambió", "igual" or "sin cambio claro". The wording and the rules behind each word are unchanged.
+
 Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
 
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
@@ -2363,3 +2427,18 @@ Informational only: none of these moves a class, a dimension or a red flag.
 - The fund fee table carries `two_and_twenty`: 2 % a year taken month by
   month and 20 % of each year's gain above the high-water mark taken at the
   year's end and at the last month.
+- The risk section carries `versus_shuffle` (the same 30-return floor as the
+  resampled risk, and at least five losing periods): the uploaded maximum
+  drawdown against up to 1,000 random orders of the same returns (seed
+  20260926). A shuffle keeps the Sharpe, the volatility and the final
+  result exactly, so the random orders show the drawdown this Sharpe and
+  volatility usually bring over this many periods. `position` is
+  `SHALLOWER` when at most 5 % of orders fall no deeper than the upload
+  (losses rarely follow losses, as in smoothed or averaged-down curves),
+  `DEEPER` when at most 5 % fall at least as deep (losses cluster), and
+  `TYPICAL` otherwise. The upload counts as one of the orders. Curves longer
+  than 10,000 periods are compounded into blocks first. When more than half
+  of the orders tie the uploaded fall (a few losses fall the same in any
+  order), it is `NOT_MEASURED` rather than `TYPICAL`, so a smoothed curve is
+  never called normal. Informational: it
+  moves no flag and no class.

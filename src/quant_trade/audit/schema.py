@@ -1181,6 +1181,8 @@ class AuditResult(BaseModel):
     #: A dated curve through fixed market-fall windows (``audit/crises.py``),
     #: when the fund section does not already show them.
     crises: dict[str, Any] | None = None
+    #: The strategy beside simply holding the market it trades (``audit/holding.py``).
+    holding: dict[str, Any] | None = None
     #: The Sharpe next to the luck of the configurations tried (``audit/luck.py``).
     luck: dict[str, Any] | None = None
     #: Time under water, worst day and month, monthly hit rate (``audit/ride.py``).

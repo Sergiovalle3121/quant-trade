@@ -993,3 +993,59 @@ def test_both_drawdown_tiles_carry_the_same_sign() -> None:
     tiles = {label: shown for label, shown, _ in _kpi_list(data, LABELS["es"])}
     falls = [shown for label, shown in tiles.items() if label.startswith("Drawdown")]
     assert len(falls) == 2 and all(shown.startswith("-") for shown in falls)
+
+
+def test_strategy_pages_read_as_cards_with_coloured_change_words(tmp_path: Path) -> None:
+    from audit_fixtures import csv_bytes, positive_drift
+
+    from quant_trade.audit.account_pages import STRATEGY_CSS
+
+    settings = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db",
+        bootstrap_samples=100,
+        free_mode=True,
+        contact_url="https://wa.me/000",
+    )
+    store = make_store(settings.database_url)
+    client = TestClient(create_app(settings, store))
+    signup = client.get("/registro").text
+    csrf = re.search(r"name='csrf' value='([^']+)'", signup).group(1)  # type: ignore[union-attr]
+    client.post(
+        "/registro",
+        data={"email": "ana@example.com", "password": "una frase larga y segura", "csrf": csrf},
+    )
+    ids = []
+    for seed in (1, 2):
+        files = {"equity": ("e.csv", csv_bytes(positive_drift(500, seed=seed)), "text/csv")}
+        answer = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
+        ids.append(answer.headers["location"].split("/audits/")[1].split("?")[0])
+    csrf = re.search(r"name='csrf' value='([^']+)'", client.get("/cuenta").text).group(1)  # type: ignore[union-attr]
+    where = client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": ids[0], "strategy": "new", "name": "EA Oro", "csrf": csrf},
+        follow_redirects=False,
+    ).headers["location"]
+    client.post(
+        "/cuenta/estrategias/guardar",
+        data={"audit_id": ids[1], "strategy": where.rsplit("/", 1)[1], "csrf": csrf},
+    )
+    account = client.get("/cuenta").text
+    assert "<span class='muted strat-n'>2 versiones</span>" in account
+    view = client.get(where).text
+    # Each figure carries its column name, so a phone shows the row as a labelled card.
+    assert "<td class='strat-fig' data-label='Sharpe anualizado'>" in view
+    assert "<td class='strat-rm'>" in view and "<td>v2</td>" in view
+    # The word beside each change is a chip: green better, red worse, grey otherwise.
+    words = re.findall(r"<b class='strat-word is-(up|down|flat)'>([^<]+)</b>", view)
+    assert words and {tone for tone, _ in words} <= {"up", "down", "flat"}
+    for tone, word in words:
+        assert (tone == "up") == (word == "mejor") and (tone == "down") == (word == "peor")
+    assert not find_claims(re.sub(r"<[^>]+>", " ", view))
+    for rule in (
+        ".strat-word.is-up{color:var(--ok)",
+        ".strat-word.is-down{color:var(--bad)",
+        ".strat-table thead{display:none}",
+        "content:attr(data-label)",
+        ".strat-n::before{content:' · '}",
+    ):
+        assert rule in STRATEGY_CSS, rule
