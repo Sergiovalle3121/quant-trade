@@ -1185,3 +1185,22 @@ def test_landing_feature_cards_have_no_orphan_slot_and_read_short_on_phones() ->
     phone = STYLE[STYLE.index("@media (max-width:640px){.cards-2>.card{display:grid") :]
     assert ".cards-2>.card>.icon{grid-row:1;margin:0}" in phone
     assert ".cards-2>.card>h3{grid-row:1;margin:0" in phone
+
+
+def test_open_sessions_read_as_cards_on_phones() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    phone = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){.sess-table thead") :]
+    # Each browser is a card: its name as the title, then labelled figures.
+    assert ".sess-table .sess-fig::before{content:attr(data-label)" in phone
+    # This browser's card is outlined, so it stands out from the others.
+    assert ".sess-table tr:has(.acct-tag){border-color:var(--text)}" in phone
+    # On a phone the account column can shrink, and long dark buttons wrap
+    # inside their card instead of running past it.
+    assert ".acct-grid{grid-template-columns:minmax(0,1fr)}" in ACCOUNT_CSS
+    assert ".acct-card .btn-dark{max-width:100%;height:auto" in ACCOUNT_CSS
+    # "Actividad reciente": on a phone each event reads as what happened, then
+    # when, then the device and network, with no sideways scroll.
+    activity = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){.act-table thead") :]
+    assert ".act-table td:nth-child(2){grid-column:1/-1" in activity
+    assert ".act-table td:nth-child(1){grid-area:2/1/3/-1}" in activity
