@@ -286,7 +286,14 @@ cannot be read are refused with how to get one that can: an old binary
 Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
 (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
-(`zip_contents`). A member is unpacked in bounded chunks and never past
+(`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
+default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
+`<Trade>` at `EXECUTION` level with the attribute names as columns
+(order-level and summary rows are ignored; parsed with the same no-DOCTYPE
+guard as workbooks); a statement with no executions is refused with
+`flex_no_trades`, naming the Trades section to add; one with more than
+`MAX_FLEX_COLUMNS` (200) attribute names, more than `MAX_ROWS` trades, or a
+table past the report size limit is refused with `flex_too_large`. A member is unpacked in bounded chunks and never past
 the limit, whatever size it declares, and only stored or deflated members
 are opened (the same holds for workbook members). A web page is parsed once
 per import; the column screen offers a web table only up to
@@ -2367,6 +2374,8 @@ Redesign pass 59 checks "¿Le gana a comprar y mantener el mercado?" on a phone 
 Redesign pass 60 keeps the sign-up and sign-in form in view on a desktop while the reader goes down "Qué guardamos y cómo borrarlo" beside it (sticky under the menu), and on a phone the "Crear cuenta" and "Entrar" buttons span the card.
 
 Redesign pass 61 checks the Portuguese report (/pt/exemplo and its PDF) on a phone and on paper: both read well, and the cover still fits one page. On the way it found that on a 390 px phone (most iPhones) the last column of the day and hour tables ("Aciertos") was cut off in Spanish, and at 360 px in every language. Up to 420 px the timing tables now use tighter cell padding, unspaced headers and a slightly smaller type, and at 380 px or less a smaller one again, so every column fits.
+
+Redesign pass 62 styles two new account pieces. The strategy summary PDF ("Descargar resumen en PDF") had a tiny title, a stray grey line left from the screen's glow and class letters off-centre, and ran two lines onto a second page; its title is now a clear heading, the line is gone, the letters sit in their circles and the summary fits one page. In "Invita a un colega" the personal link reads as a code in a quiet field, and on a phone the WhatsApp button spans the width and the third tile takes a full row.
 
 ## Security
 
