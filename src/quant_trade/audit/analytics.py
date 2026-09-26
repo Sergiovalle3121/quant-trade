@@ -25,6 +25,7 @@ from quant_trade.audit.prop_presets import ChallengeRules
 from quant_trade.audit.schema import MIN_OBSERVATIONS, measured, not_measured
 from quant_trade.audit.streaks import loss_streak_review
 from quant_trade.core.models import Trade
+from quant_trade.metrics.statistics import _phi_inv
 from quant_trade.research.bootstrap import stationary_bootstrap_indices
 
 #: Van Tharp caps the trade count in SQN at 100 so large samples do not
@@ -271,6 +272,112 @@ def trade_statistics(
     )
     out["long"] = _side_split(pnl, ordered_sides, "long", net_each)
     out["short"] = _side_split(pnl, ordered_sides, "short", net_each)
+    out["intervals"] = trade_intervals(
+        pnl,
+        wins=int((net_each > 0).sum()) if net_each is not None else len(wins),
+        per_trade=net_each if net_each is not None else pnl,
+        expectancy=net / n,
+    )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# How far each trade figure could move by chance
+# ---------------------------------------------------------------------------
+
+#: Trades needed before a range is worth printing.
+INTERVAL_MIN_TRADES = 10
+INTERVAL_CONFIDENCE = 0.95
+#: Resamples of the trades for the profit factor's range, fewer on long lists
+#: so the resampled cells stay under ``INTERVAL_MAX_CELLS``.
+INTERVAL_SAMPLES = 2000
+INTERVAL_MIN_SAMPLES = 200
+INTERVAL_MAX_CELLS = 20_000_000
+INTERVAL_SEED = 20260925
+INTERVAL_METHOD = (
+    "95 % ranges, each trade taken as an independent draw: Wilson for the win rate, "
+    "Student's t for the average per trade, trades resampled for the profit factor"
+)
+FEW_TRADES_FOR_RANGE = "fewer than ten closed trades"
+UNBOUNDED_RANGE = "some resamples have no losing trade; the upper end is unbounded"
+
+
+def _t_quantile(probability: float, dof: int) -> float:
+    """Student's t quantile (Hill's expansion around the normal; within 0.2 %
+    of the exact value from 5 degrees of freedom)."""
+    z = -_normal_quantile(1.0 - probability)
+    g1 = (z**3 + z) / 4.0
+    g2 = (5 * z**5 + 16 * z**3 + 3 * z) / 96.0
+    g3 = (3 * z**7 + 19 * z**5 + 17 * z**3 - 15 * z) / 384.0
+    g4 = (79 * z**9 + 776 * z**7 + 1482 * z**5 - 1920 * z**3 - 945 * z) / 92160.0
+    return z + g1 / dof + g2 / dof**2 + g3 / dof**3 + g4 / dof**4
+
+
+def _normal_quantile(probability: float) -> float:
+    return _phi_inv(probability)
+
+
+def trade_intervals(
+    pnl: np.ndarray, *, wins: int, per_trade: np.ndarray, expectancy: float
+) -> dict[str, Any]:
+    """95 % ranges for the win rate, the average per trade and the profit factor.
+
+    Each trade is taken as an independent draw from the same system, so each
+    range says how far the figure could land by chance with this many trades;
+    clustered trades would widen them. The average per trade is centred on the
+    reported expectancy (fees included) with the spread of ``per_trade``; the
+    profit factor's range resamples the trades with a fixed seed.
+    """
+    n = int(len(pnl))
+    if n < INTERVAL_MIN_TRADES:
+        return {"status": "NOT_MEASURED", "reason": FEW_TRADES_FOR_RANGE}
+    low, high = _wilson(wins, n)
+    out: dict[str, Any] = {
+        "status": "MEASURED",
+        "confidence": INTERVAL_CONFIDENCE,
+        "method": INTERVAL_METHOD,
+        "trades": n,
+        "win_rate": {"low": measured(low), "high": measured(high)},
+    }
+    spread = float(np.std(per_trade, ddof=1))
+    margin = _t_quantile(0.5 + INTERVAL_CONFIDENCE / 2, n - 1) * spread / math.sqrt(n)
+    out["expectancy"] = {
+        "low": measured(expectancy - margin),
+        "high": measured(expectancy + margin),
+    }
+    if not (pnl < 0).any() or not (pnl > 0).any():
+        out["profit_factor"] = {
+            "low": not_measured("no losing trades; the ratio is undefined"),
+            "high": not_measured("no losing trades; the ratio is undefined"),
+        }
+        return out
+    samples = int(min(INTERVAL_SAMPLES, max(INTERVAL_MIN_SAMPLES, INTERVAL_MAX_CELLS // n)))
+    rng = np.random.default_rng(INTERVAL_SEED)
+    gains = np.zeros(samples)
+    losses = np.zeros(samples)
+    step = max(1, INTERVAL_MAX_CELLS // (4 * n))
+    for start in range(0, samples, step):
+        rows = min(step, samples - start)
+        drawn = pnl[rng.integers(0, n, size=(rows, n))]
+        gains[start : start + rows] = np.where(drawn > 0, drawn, 0.0).sum(axis=1)
+        losses[start : start + rows] = -np.where(drawn < 0, drawn, 0.0).sum(axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        factors = np.where(losses > 0, gains / np.where(losses > 0, losses, 1.0), np.inf)
+    tail = (1.0 - INTERVAL_CONFIDENCE) / 2 * 100
+    pf_low = float(np.percentile(factors, tail))
+    pf_high = float(np.percentile(factors, 100 - tail))
+    if not math.isfinite(pf_low):
+        out["profit_factor"] = {
+            "low": not_measured(UNBOUNDED_RANGE),
+            "high": not_measured(UNBOUNDED_RANGE),
+            "samples": samples,
+        }
+        return out
+    out["profit_factor"] = {
+        "low": measured(pf_low),
+        "high": measured(pf_high) if math.isfinite(pf_high) else not_measured(UNBOUNDED_RANGE),
+        "samples": samples,
+    }
     return out
 
 
@@ -682,8 +789,7 @@ _QUESTIONS: dict[str, dict[str, str]] = {
     "exit_losses": {
         "es": "Las operaciones perdedoras duran más que las ganadoras: ¿cómo decide el "
         "sistema cerrar una pérdida?",
-        "en": "Losing trades last longer than winners: how does the system decide to close "
-        "a loss?",
+        "en": "Losing trades last longer than winners: how does the system decide to close a loss?",
     },
     "after_losses": {
         "es": "¿Qué hace el sistema después de varias pérdidas seguidas: cambia el tamaño, "

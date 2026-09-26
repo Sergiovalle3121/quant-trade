@@ -2307,3 +2307,28 @@ the page is `no-store` and goes only to the person who typed it.
 A sixth audience page, for retail investors (`/para/inversores-particulares`, `/for/retail-investors`), covers people who invest on their own through DEGIRO, Trading 212, Interactive Brokers or XTB. It names only live checks: significance, an optional benchmark CSV, double and triple costs, the result without the best trades and months, the fixed crisis windows and the recent third. It states the reader's limit: a trade history counts only closed positions (open ones and dividends are left out), so a buy-and-hold investor should upload the portfolio's value or return over time. The landing's "Otro caso" line links it too.
 
 The prop-firm audience page (`/para/retos-prop-firm`, `/for/prop-firm-challenges`) now names the firm-fit table as a check ("¿Con qué firma encaja tu historial?"), and it adds a fourth pain: a pass whose payout is held up by the best-day (consistency) rule. The wording says it compares rules and does not recommend buying a challenge.
+
+## Ranges and adjusted figures (math review, 2026-09-26)
+
+Informational only: none of these moves a class, a dimension or a red flag.
+
+- Trade statistics carry `intervals` (10 trades or more): 95 % ranges for the
+  win rate (Wilson), the average per trade (Student's t on the per-trade
+  results after itemised fees, centred on the reported expectancy) and the
+  profit factor (2,000 resamples of the trades with a fixed seed, fewer on
+  very long lists; the upper end is NOT_MEASURED when some resamples have no
+  losing trade). Each trade is taken as an independent draw; clustered
+  trades would widen the ranges.
+- The significance section carries `autocorrelation_adjusted` (50 returns or
+  more): Lo's (2002) annualised Sharpe, `q / sqrt(q + 2 sum (q-k) rho_k)`
+  times the per-period Sharpe, with `q` the periods a year and the sum cut
+  at 10 lags or a fifth of the sample. Smoothed returns (AR(1) at 0.5)
+  inflate the plain figure by about 1.7x; this one removes it.
+- The benchmark section and the fund-versus-index comparison carry `jensen`
+  (24 shared periods or more): Jensen's alpha from regressing the
+  strategy's period returns on the benchmark's, annualised, with a
+  Newey-West t-statistic (lag `floor(4 (n/100)^(2/9))`), beta and R squared.
+  No cash rate is subtracted.
+- The fund fee table carries `two_and_twenty`: 2 % a year taken month by
+  month and 20 % of each year's gain above the high-water mark taken at the
+  year's end and at the last month.

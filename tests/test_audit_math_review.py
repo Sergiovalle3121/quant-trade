@@ -6,12 +6,14 @@ independently of the code under test.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 import pytest
 from audit_fixtures import business_days, csv_bytes, positive_drift
 
-from quant_trade.audit.engine import run_audit
+from quant_trade.audit.engine import autocorrelation_adjusted_sharpe, run_audit
 from quant_trade.audit.redflags import annualised_sharpe
 from quant_trade.audit.ride import ride_review
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
@@ -72,9 +74,7 @@ def test_the_headline_volatility_is_the_one_the_sharpe_divides_by() -> None:
 def test_the_benchmark_section_prints_the_headline_sharpe() -> None:
     strategy = positive_drift(300, seed=3)
     bench = positive_drift(300, mean=0.0003, seed=8)
-    inputs = build_inputs(
-        csv_bytes(strategy), DeclaredMetadata(), benchmark_bytes=csv_bytes(bench)
-    )
+    inputs = build_inputs(csv_bytes(strategy), DeclaredMetadata(), benchmark_bytes=csv_bytes(bench))
     result = run_audit(inputs)
     assert result.benchmark["status"] == "MEASURED"
     assert result.benchmark["strategy_sharpe"]["value"] == pytest.approx(
@@ -118,3 +118,41 @@ def test_the_headline_sharpe_uses_the_sample_deviation() -> None:
     returns = pd.Series([0.01, -0.005, 0.02, 0.0, 0.015])
     expected = returns.mean() / returns.std(ddof=1) * np.sqrt(252)
     assert annualised_sharpe(returns, 252) == pytest.approx(expected)
+
+
+def _ar1(returns: np.ndarray, phi: float) -> np.ndarray:
+    out = np.zeros_like(returns)
+    for index, value in enumerate(returns):
+        out[index] = (phi * out[index - 1] if index else 0.0) + value
+    return out * (1 - phi)
+
+
+def test_independent_returns_keep_their_sharpe_after_lo() -> None:
+    rng = np.random.default_rng(0)
+    returns = pd.Series(rng.normal(0.0005, 0.01, 3000))
+    adjusted = autocorrelation_adjusted_sharpe(returns, 252)
+    assert adjusted["sharpe"]["value"] == pytest.approx(annualised_sharpe(returns, 252), rel=0.05)
+
+
+def test_smoothed_returns_lose_the_inflation_after_lo() -> None:
+    rng = np.random.default_rng(0)
+    raw = rng.normal(0.0005, 0.01, 3000)
+    smoothed = pd.Series(_ar1(raw, 0.5))
+    plain = annualised_sharpe(smoothed, 252)
+    adjusted = autocorrelation_adjusted_sharpe(smoothed, 252)
+    assert adjusted["lag1"]["value"] == pytest.approx(0.5, abs=0.05)
+    # Smoothing inflates the plain figure by about sqrt((1 + phi) / (1 - phi)) = 1.73.
+    assert plain / adjusted["sharpe"]["value"] == pytest.approx(math.sqrt(3.0), rel=0.15)
+    assert adjusted["sharpe"]["value"] == pytest.approx(
+        annualised_sharpe(pd.Series(raw), 252), rel=0.15
+    )
+
+
+def test_a_short_series_has_no_lo_sharpe() -> None:
+    adjusted = autocorrelation_adjusted_sharpe(pd.Series(np.linspace(-0.01, 0.01, 30)), 252)
+    assert adjusted["sharpe"]["evidence"] == "NOT_MEASURED"
+
+
+def test_the_audit_carries_the_lo_sharpe() -> None:
+    result = run_audit(build_inputs(csv_bytes(positive_drift(300)), DeclaredMetadata()))
+    assert result.significance["autocorrelation_adjusted"]["sharpe"]["evidence"] == "MEASURED"

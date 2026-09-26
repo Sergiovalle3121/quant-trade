@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 
 from quant_trade.audit import account as account_lib
+from quant_trade.audit import alpha as alpha_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import costs as cost_lib
@@ -214,6 +215,54 @@ def _performance(
         out["win_rate"] = not_measured("no trades uploaded")
         out["trade_count"] = not_measured("no trades uploaded")
     return out
+
+
+#: Returns needed before the autocorrelation-adjusted Sharpe is shown, and the
+#: most lags it sums (later sample autocorrelations are mostly noise).
+LO_MIN_OBSERVATIONS = 50
+LO_MAX_LAGS = 10
+LO_NOTE = (
+    "annualised Sharpe with the autocorrelation of the returns taken into account "
+    "(Lo, 2002); returns that follow each other make the plain figure too high"
+)
+LO_NOT_ENOUGH = "fewer than fifty returns"
+
+
+def autocorrelation_adjusted_sharpe(returns: pd.Series, periods_per_year: float) -> dict[str, Any]:
+    """Lo's (2002) annualised Sharpe for serially correlated returns.
+
+    The plain figure multiplies the per-period Sharpe by ``sqrt(q)``, ``q``
+    periods a year, which holds only for independent returns. With
+    autocorrelations ``rho_k`` the right factor is
+    ``q / sqrt(q + 2 * sum_{k=1}^{q-1} (q - k) rho_k)``; the sum is cut at
+    ``LO_MAX_LAGS`` lags (or a fifth of the sample), where sample
+    autocorrelations stop carrying signal. Positive autocorrelation (smoothed
+    or stale marks) lowers the figure; negative raises it."""
+    clean = pd.to_numeric(returns, errors="coerce").dropna().to_numpy(dtype=float)
+    n = len(clean)
+    if n < LO_MIN_OBSERVATIONS:
+        reason = LO_NOT_ENOUGH
+        return {"sharpe": not_measured(reason), "lag1": not_measured(reason), "lags": 0}
+    std = float(clean.std(ddof=1))
+    q = max(int(round(periods_per_year)), 1)
+    if std <= 0 or q < 2:
+        reason = "zero variance" if std <= 0 else "fewer than two periods a year"
+        return {"sharpe": not_measured(reason), "lag1": not_measured(reason), "lags": 0}
+    centred = clean - clean.mean()
+    denominator = float(centred @ centred)
+    lags = min(LO_MAX_LAGS, n // 5, q - 1)
+    rho = [float(centred[k:] @ centred[:-k]) / denominator for k in range(1, lags + 1)]
+    inside = q + 2.0 * sum((q - k) * r for k, r in enumerate(rho, start=1))
+    if inside <= 0:
+        reason = "the autocorrelations leave no variance to scale by"
+        return {"sharpe": not_measured(reason), "lag1": measured(rho[0]), "lags": lags}
+    factor = q / math.sqrt(inside)
+    per_period = float(clean.mean()) / std
+    return {
+        "sharpe": measured(per_period * factor, LO_NOTE),
+        "lag1": measured(rho[0], "first-order autocorrelation of the returns"),
+        "lags": lags,
+    }
 
 
 def _significance(returns: pd.Series) -> tuple[dict[str, Any], dict[str, float] | None]:
@@ -576,6 +625,9 @@ def _benchmark(
             else not_measured("benchmark has no drawdown")
         ),
     }
+    s_returns = s_eq["equity"].astype(float).pct_change().dropna().to_numpy()
+    b_returns = b_eq["equity"].astype(float).pct_change().dropna().to_numpy()
+    section["jensen"] = alpha_lib.jensen_alpha(s_returns, b_returns, joined_ppy)
     return section, values, None
 
 
@@ -904,6 +956,7 @@ def run_audit(
 
     performance = _performance(frame, trades, returns, ppy, inputs.report_metadata or {})
     significance, moments = _significance(returns)
+    significance["autocorrelation_adjusted"] = autocorrelation_adjusted_sharpe(returns, ppy)
     multiplicity = _multiplicity(
         moments,
         declared_trials=inputs.declared.trials,
