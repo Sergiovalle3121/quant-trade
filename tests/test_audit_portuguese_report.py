@@ -289,7 +289,7 @@ def test_a_portuguese_report_speaks_of_the_account_in_portuguese(tmp_path: Any) 
     assert "Report saved to your account." not in page
 
 
-def test_portuguese_pages_link_english_where_there_is_no_portuguese(tmp_path: Any) -> None:
+def test_portuguese_pages_link_english_only_where_there_is_no_portuguese(tmp_path: Any) -> None:
     from audit_fixtures import csv_bytes, positive_drift
 
     client = _web_client(tmp_path)
@@ -305,8 +305,10 @@ def test_portuguese_pages_link_english_where_there_is_no_portuguese(tmp_path: An
     audit_id = location.split("/audits/")[1].split("?")[0]
     query = location.split("?", 1)[1]
     published = client.post(f"/audits/{audit_id}/publish?{query}", follow_redirects=False)
+    # The public verification page exists in Portuguese.
+    assert published.headers["location"].endswith("?lang=pt")
     public = client.get(published.headers["location"]).text
-    assert "<html lang='en'>" in public
+    assert "<html lang='pt'>" in public
 
 
 def test_the_compare_box_speaks_portuguese() -> None:

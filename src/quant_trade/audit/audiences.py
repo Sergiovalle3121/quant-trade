@@ -68,6 +68,7 @@ RECOGNISED_PLATFORMS: tuple[str, ...] = (
     "Fidelity",
     "E*TRADE",
     "Webull",
+    "Robinhood",
     "tastytrade",
     "eToro",
     "XTB",

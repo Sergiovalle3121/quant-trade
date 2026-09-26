@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -51,13 +52,15 @@ def _upload(client: TestClient) -> tuple[str, str]:
     return location.split("/audits/")[1].split("?")[0], location.split("token=")[1]
 
 
-def test_fixed_wording_passes_the_guard_in_both_languages() -> None:
+def test_fixed_wording_passes_the_guard_in_every_language() -> None:
     for texts in (BADGE_NOTICE, VERIFICATION_NOTICE, SAMPLE_BANNER):
         for text in texts.values():
             assert find_claims(text) == []
     assert "no verificados con el bróker" in BADGE_NOTICE["es"]
     assert "no garantiza resultados" in BADGE_NOTICE["es"]
-    for locale in ("es", "en"):
+    assert set(BADGE_NOTICE) == set(VERIFICATION_NOTICE) == {"es", "en", "pt"}
+    assert "não garante resultados" in BADGE_NOTICE["pt"]
+    for locale in ("es", "en", "pt"):
         svg = badge_svg(overall="B", public_id="abc", audited_on="2026-09-24", locale=locale)
         assert find_claims(svg) == []
         assert BADGE_NOTICE[locale] in svg
@@ -65,9 +68,21 @@ def test_fixed_wording_passes_the_guard_in_both_languages() -> None:
 
 
 def test_badge_never_mentions_returns() -> None:
-    svg = badge_svg(overall="A", public_id="abc", audited_on="2026-09-24").lower()
-    for word in ("rentab", "ganancia", "profit", "return", "%", "crecimiento", "growth"):
-        assert word not in svg
+    for locale in ("es", "en", "pt"):
+        svg = badge_svg(overall="A", public_id="abc", audited_on="2026-09-24", locale=locale)
+        for word in (
+            "rentab",
+            "ganancia",
+            "profit",
+            "return",
+            "%",
+            "crecimiento",
+            "growth",
+            "lucro",
+            "retorno",
+            "ganho",
+        ):
+            assert word not in svg.lower(), (locale, word)
 
 
 def test_publish_shows_only_the_allowed_fields(tmp_path: Path) -> None:
@@ -112,6 +127,39 @@ def test_publish_shows_only_the_allowed_fields(tmp_path: Path) -> None:
 
     # The private report keeps no-store.
     assert client.get(f"/audits/{audit_id}?token={token}").headers["cache-control"] == "no-store"
+
+
+def test_the_public_page_and_badge_read_in_portuguese(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    audit_id, token = _upload(client)
+    location = client.post(
+        f"/audits/{audit_id}/publish?token={token}&lang=pt", follow_redirects=False
+    ).headers["location"]
+    assert location.endswith("?lang=pt")
+    public_id = location.split("/v/")[1].split("?")[0]
+    page = client.get(f"/v/{public_id}?lang=pt").text
+    assert "<html lang='pt'>" in page
+    bare = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", page, flags=re.S)
+    text = html.unescape(re.sub(r"<[^>]+>", " ", bare))
+    assert VERIFICATION_NOTICE["pt"] in text
+    assert "Verificação pública de auditoria" in text and "Classe " in text
+    assert "Significância estatística" in text
+    for spanish in ("Clase ", "Significación", "Dimensiones", "Sello para tu web", "Copia este"):
+        assert spanish not in text, spanish
+    for secret in (SECRET_DESCRIPTION, token, audit_id, "entry_time", "timestamp,equity"):
+        assert secret not in page
+    assert find_claims(text) == []
+    # The badge, its snippet and the check link follow the page's language.
+    assert f"/v/{public_id}/badge.svg?lang=pt" in page
+    assert "href='/pt/comprovar'" in page
+    # The language bar offers the same page in the three languages.
+    assert f"href='/v/{public_id}' hreflang='es'" in page
+    assert f"href='/v/{public_id}?lang=en' hreflang='en'" in page
+    spanish = client.get(f"/v/{public_id}").text
+    assert f"href='/v/{public_id}?lang=pt' hreflang='pt'" in spanish
+    badge = client.get(f"/v/{public_id}/badge.svg?lang=pt").text
+    assert BADGE_NOTICE["pt"] in badge and "Classe" in badge
+    assert find_claims(badge) == []
 
 
 def test_publish_needs_the_token_and_unknown_ids_are_404(tmp_path: Path) -> None:

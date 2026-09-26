@@ -47,6 +47,7 @@ Formats, pairing rules and samples come from
 
 from __future__ import annotations
 
+import bisect
 import csv
 import io
 import math
@@ -54,6 +55,7 @@ import re
 import statistics
 import zipfile
 import zlib
+from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
@@ -86,6 +88,7 @@ VECTORBT_CSV = "vectorbt_csv"
 MYFXBOOK_CSV = "myfxbook_csv"
 MQL5_SIGNAL_CSV = "mql5_signal_csv"
 FXBLUE_CSV = "fxblue_csv"
+ROBINHOOD_CSV = "robinhood_csv"
 MT5_OPTIMIZATION_XML = "mt5_optimization_xml"
 MT5_TESTER_XLSX = "mt5_tester_xlsx"
 MT5_HISTORY_XLSX = "mt5_history_xlsx"
@@ -111,6 +114,7 @@ REPORT_FORMATS: tuple[str, ...] = (
     MYFXBOOK_CSV,
     MQL5_SIGNAL_CSV,
     FXBLUE_CSV,
+    ROBINHOOD_CSV,
     UNIVERSAL_TRADES_CSV,
     UNIVERSAL_FILLS_CSV,
 )
@@ -570,6 +574,9 @@ class _Draft:
     sized: bool = False
     #: Positions the parser saw opened and never closed (fill lists).
     open_positions: int = 0
+    #: Contract sizes the file states (an option's 100 shares), used as they
+    #: are instead of being inferred from each trade's profit.
+    known_sizes: dict[str, float] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -2685,6 +2692,8 @@ def _table_format(header: list[str]) -> str | None:
         return MQL5_SIGNAL_CSV
     if _is_fxblue_header(names):
         return FXBLUE_CSV
+    if _is_robinhood_header(names):
+        return ROBINHOOD_CSV
     return None
 
 
@@ -3095,15 +3104,25 @@ def _snap(size: float) -> float:
     return _significant(size)
 
 
+def _too_many_trades(count: int) -> ReportFormatError:
+    return ReportFormatError(
+        "too_many_trades",
+        f"the file has {count:,} closed trades; the limit is {MAX_TRADES:,}",
+        f"el archivo tiene {count:,} operaciones cerradas; el límite es {MAX_TRADES:,}",
+    )
+
+
 def _contract_sizes(trips: list[_Trip]) -> dict[str, float]:
     ratios: dict[str, list[float]] = {}
+    by_symbol: dict[str, list[_Trip]] = {}
     for trip in trips:
+        by_symbol.setdefault(trip.symbol, []).append(trip)
         move = abs(trip.exit_price - trip.entry_price)
         if move > 0 and trip.volume > 0 and trip.gross != 0:
             ratios.setdefault(trip.symbol, []).append(abs(trip.gross) / (move * trip.volume))
     sizes = {symbol: _snap(statistics.median(values)) for symbol, values in ratios.items()}
     for symbol in sizes:
-        if _unit_size_fits([trip for trip in trips if trip.symbol == symbol]):
+        if _unit_size_fits(by_symbol[symbol]):
             sizes[symbol] = 1.0
     return {trip.symbol: sizes.get(trip.symbol, 1.0) for trip in trips}
 
@@ -3377,14 +3396,11 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
             "el archivo no contiene operaciones cerradas",
         )
     if len(draft.trips) > MAX_TRADES:
-        raise ReportFormatError(
-            "too_many_trades",
-            f"the file has {len(draft.trips):,} closed trades; the limit is {MAX_TRADES:,}",
-            f"el archivo tiene {len(draft.trips):,} operaciones cerradas; el límite es "
-            f"{MAX_TRADES:,}",
-        )
+        raise _too_many_trades(len(draft.trips))
     trips = sorted(draft.trips, key=lambda trip: (trip.exit_time, trip.entry_time))
-    sizes = _contract_sizes(trips)
+    known = draft.known_sizes
+    sizes = _contract_sizes([trip for trip in trips if trip.symbol not in known])
+    sizes.update({trip.symbol: known[trip.symbol] for trip in trips if trip.symbol in known})
     warnings = list(draft.warnings)
     unusual = sorted(
         {(trip.symbol, sizes[trip.symbol]) for trip in trips if abs(sizes[trip.symbol] - 1) > 0.005}
@@ -3398,7 +3414,8 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     trade_fees: list[float] = []
     trade_symbols: list[str] = []
     invalid = draft.invalid_rows
-    drifting = _drifting_symbols(trips, sizes) if draft.itemised else set()
+    unknown = [trip for trip in trips if trip.symbol not in known]
+    drifting = _drifting_symbols(unknown, sizes) if draft.itemised else set()
     if drifting:
         warnings.append(f"{CONVERSION_DRIFT_WARNING}: {', '.join(sorted(drifting))}")
     backwards = 0
@@ -3776,6 +3793,320 @@ def _parse_fxblue(header: list[str], rows: list[list[str]]) -> _Draft:
         draft.cash = sorted(cash, key=lambda item: item.time)
     draft.naive_times = True
     return draft
+
+
+# ---------------------------------------------------------------------------
+# Robinhood
+# ---------------------------------------------------------------------------
+
+#: Robinhood's Account Activity report (Account > Reports and statements >
+#: Reports), as its help centre and open-source importers describe it.
+_ROBINHOOD_COLUMNS = frozenset(
+    {"activity date", "instrument", "description", "trans code", "quantity", "price", "amount"}
+)
+#: Trans codes that trade: +1 buys, -1 sells. BTO, STO, BTC and STC open and
+#: close options; Buy and Sell trade shares.
+_ROBINHOOD_TRADES = {"buy": 1, "sell": -1, "bto": 1, "sto": -1, "btc": 1, "stc": -1}
+#: Codes that only close: what they sell or buy beyond the open position was
+#: opened before the file starts (Robinhood shares are long only).
+_ROBINHOOD_CLOSE_ONLY = frozenset({"btc", "stc"})
+#: An option that expired, was assigned or was exercised ends at no premium;
+#: the shares an assignment delivers come on their own Buy or Sell row.
+_ROBINHOOD_OPTION_ENDS = frozenset({"oexp", "oasgn", "oexer"})
+#: A split (``SPR``) or a symbol exchange (``SXCH``): the shares leaving carry
+#: an ``S`` after the quantity ("200S") and the shares arriving do not.
+_ROBINHOOD_SHARE_EVENTS = frozenset({"spr", "sxch"})
+#: An option contract as the Description names it: "SPY 3/15/2024 Call $500.00".
+_ROBINHOOD_OPTION = re.compile(
+    r"\b([A-Z][A-Z0-9.]{0,9})\s+(\d{1,2}/\d{1,2}/\d{4})\s+(Call|Put)\s+\$?(\d[\d,]*(?:\.\d+)?)",
+    re.IGNORECASE,
+)
+#: Shares per US listed option contract.
+OPTION_MULTIPLIER = 100.0
+#: The exit price shown for an option that ended at no premium: a trade record
+#: needs a positive price, so it shows the smallest option tick, while the
+#: trade's result is computed at zero.
+EXPIRED_OPTION_PRICE = 0.01
+
+ROBINHOOD_UNOPENED_WARNING = (
+    "{n} closing trade(s) of positions the file never shows being opened (opened before its "
+    "first date or transferred in) left out; download the full history to include them"
+)
+ROBINHOOD_EXPIRED_WARNING = (
+    "{n} option(s) expired: each closes at no premium, so its result is the whole premium, and its "
+    "exit price shows 0.01 (the smallest option tick) because a trade needs a positive price"
+)
+ROBINHOOD_ASSIGNED_WARNING = (
+    "{n} option(s) assigned or exercised: each closes at no premium and the shares it delivers "
+    "open at the strike as their own trade, so the total result is right but the win rate and "
+    "average trade count one position as two"
+)
+ROBINHOOD_UNDELIVERED_WARNING = (
+    "{n} option(s) assigned or exercised whose delivered shares are not in the file (no share "
+    "trade at the strike within a few days), so their result leaves out the stock move"
+)
+ROBINHOOD_MOVES_WARNING = (
+    "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
+    "positions they change may be read wrong"
+)
+
+
+def _is_robinhood_header(names: set[str]) -> bool:
+    return names >= _ROBINHOOD_COLUMNS
+
+
+def _robinhood_option(description: str) -> tuple[str, str, float] | None:
+    """The option contract a Description names, written one way for every row,
+    with its underlying and strike."""
+    match = _ROBINHOOD_OPTION.search(" ".join(description.split()))
+    if match is None:
+        return None
+    ticker, expiry, kind, strike_text = match.groups()
+    strike = float(strike_text.replace(",", ""))
+    return f"{ticker.upper()} {expiry} {kind.title()} {strike:g}", ticker.upper(), strike
+
+
+#: How far from an assignment a share trade at the strike may be dated and
+#: priced and still count as its delivery (settlement lags, cents rounding).
+_DELIVERY_DAYS = 4
+_DELIVERY_PRICE_SHARE = 0.005
+
+
+def _delivered(
+    deliveries: dict[tuple[str, date], list[float]], underlying: str, day: datetime, strike: float
+) -> bool:
+    """True when the file has a share trade in the underlying at the strike
+    within a few days of an assignment or exercise."""
+    tolerance = max(0.011, strike * _DELIVERY_PRICE_SHARE)
+    for shift in range(-_DELIVERY_DAYS, _DELIVERY_DAYS + 1):
+        prices = deliveries.get((underlying, (day + timedelta(days=shift)).date()))
+        if prices:
+            at = bisect.bisect_left(prices, strike - tolerance)
+            if at < len(prices) and prices[at] <= strike + tolerance:
+                return True
+    return False
+
+
+@dataclass
+class _RobinhoodRow:
+    day: datetime
+    code: str
+    symbol: str
+    option: str | None
+    underlying: str
+    strike: float
+    quantity: float | None
+    leaving: bool
+    price: float | None
+    amount: float | None
+
+
+def _parse_robinhood(header: list[str], rows: list[list[str]]) -> _Draft:
+    """Robinhood's Account Activity report: share and option fills paired
+    first in, first out into round trips, options at 100 shares a contract.
+
+    Deposits, dividends, interest and fees are cash, not trades. An option
+    that expires, is assigned or is exercised closes at no premium. Splits
+    and symbol exchanges rescale the shares held; other share movements
+    (transfers, mergers) are left out and counted in a warning, and so are
+    closes of positions opened before the file starts.
+    """
+    columns = _index(header)
+    draft = _Draft(ROBINHOOD_CSV, [])
+    draft.itemised = {"commission"}
+    draft.naive_times = True
+    draft.sized = True
+    listed: list[_RobinhoodRow] = []
+    for row in rows:
+        code = _cells(row, columns, "trans code").strip().lower()
+        if not code:
+            continue  # the disclaimer under the table
+        quantity_text = _cells(row, columns, "quantity").strip()
+        leaving = quantity_text[-1:] in {"S", "s"}
+        try:
+            day = datetime.strptime(_cells(row, columns, "activity date").strip(), "%m/%d/%Y")
+        except ValueError:
+            if code in _ROBINHOOD_TRADES:
+                draft.invalid_rows += 1
+            continue
+        contract = _robinhood_option(_cells(row, columns, "description"))
+        listed.append(
+            _RobinhoodRow(
+                day=day,
+                code=code,
+                symbol=" ".join(_cells(row, columns, "instrument").split()),
+                option=contract[0] if contract else None,
+                underlying=contract[1] if contract else "",
+                strike=contract[2] if contract else 0.0,
+                quantity=_num(quantity_text[:-1] if leaving else quantity_text),
+                leaving=leaving,
+                price=_num(_cells(row, columns, "price")),
+                amount=_num(_cells(row, columns, "amount")),
+            )
+        )
+    # The report lists the newest first; within a day, splits come before the
+    # day's trades, opens before closes, and expiries last.
+    if len(listed) > 1 and listed[0].day > listed[-1].day:
+        listed.reverse()
+
+    def stage(item: _RobinhoodRow) -> int:
+        if item.code in _ROBINHOOD_SHARE_EVENTS:
+            return 0
+        if item.code in _ROBINHOOD_OPTION_ENDS:
+            return 3
+        return 1 if item.code in {"buy", "bto", "sto"} else 2
+
+    listed.sort(key=lambda item: (item.day, stage(item)))
+    lots: dict[str, deque[list[Any]]] = {}
+    unopened = moves = expired = assigned = undelivered = 0
+    deliveries: dict[tuple[str, date], list[float]] = {}
+    for item in listed:
+        if item.code in {"buy", "sell"} and item.option is None and item.price is not None:
+            deliveries.setdefault((item.symbol.upper(), item.day.date()), []).append(item.price)
+    for prices in deliveries.values():
+        prices.sort()
+
+    def close(symbol: str, signed: float, price: float, moment: datetime, fee: float) -> float:
+        """Close open lots against a fill; returns the quantity left over."""
+        held = lots.setdefault(symbol, deque())
+        left = abs(signed)
+        fee_per_unit = fee / left
+        multiplier = draft.known_sizes[symbol]
+        while left > 1e-12 and held and (held[0][0] > 0) != (signed > 0):
+            if len(draft.trips) >= MAX_TRADES:
+                # Stop pairing at the limit instead of after the whole file.
+                raise _too_many_trades(len(draft.trips) + 1)
+            lot = held[0]
+            closed = min(left, abs(lot[0]))
+            side = "long" if lot[0] > 0 else "short"
+            move = (price - lot[1]) if side == "long" else (lot[1] - price)
+            draft.trips.append(
+                _Trip(
+                    symbol=symbol,
+                    side=side,
+                    volume=closed,
+                    entry_time=lot[2],
+                    exit_time=moment,
+                    entry_price=lot[1],
+                    exit_price=price if price > 0 else EXPIRED_OPTION_PRICE,
+                    gross=move * closed * multiplier,
+                    commission=-(lot[3] + fee_per_unit) * closed,
+                )
+            )
+            lot[0] -= closed if lot[0] > 0 else -closed
+            left -= closed
+            if abs(lot[0]) <= 1e-12:
+                held.popleft()
+        return left if left > 1e-12 else 0.0
+
+    events: dict[tuple[datetime, str], list[_RobinhoodRow]] = {}
+    for item in listed:
+        if item.code in _ROBINHOOD_SHARE_EVENTS:
+            events.setdefault((item.day, item.code), []).append(item)
+    for item in listed:
+        if item.code in _ROBINHOOD_TRADES:
+            symbol = item.option or item.symbol
+            quantity, price = item.quantity, item.price
+            if not symbol or not quantity or price is None or price < 0:
+                draft.invalid_rows += 1
+                continue
+            sign = _ROBINHOOD_TRADES[item.code]
+            multiplier = OPTION_MULTIPLIER if item.option is not None else 1.0
+            draft.known_sizes[symbol] = multiplier
+            notional = abs(quantity) * price * multiplier
+            # Robinhood charges no commission; regulatory fees are the gap
+            # between the cash that moved and the fill's value.
+            fee = 0.0
+            if item.amount is not None:
+                gap = round(-sign * notional - item.amount, 2)
+                fee = gap if 0 < gap <= notional else 0.0
+            left = close(symbol, sign * abs(quantity), price, item.day, fee)
+            if left:
+                opens = item.code not in _ROBINHOOD_CLOSE_ONLY and not (
+                    item.code == "sell" and item.option is None
+                )
+                if opens:
+                    lots[symbol].append([sign * left, price, item.day, fee / abs(quantity)])
+                else:
+                    unopened += 1
+        elif item.code in _ROBINHOOD_OPTION_ENDS:
+            held = lots.get(item.option or "")
+            if item.option is None or not held:
+                unopened += 1
+                continue
+            open_quantity = sum(lot[0] for lot in held)
+            quantity = min(abs(item.quantity or open_quantity), abs(open_quantity))
+            close(item.option, -math.copysign(quantity, open_quantity), 0.0, item.day, 0.0)
+            if item.code == "oexp":
+                expired += 1
+            elif _delivered(deliveries, item.underlying, item.day, item.strike):
+                assigned += 1
+            else:
+                undelivered += 1
+        elif item.code in _ROBINHOOD_SHARE_EVENTS:
+            group = events.pop((item.day, item.code), None)
+            if group is not None:
+                moves += _robinhood_share_event(group, lots, draft.known_sizes)
+        elif item.quantity:
+            moves += 1
+    draft.trips.sort(key=lambda trip: (trip.exit_time, trip.entry_time))
+    if unopened:
+        draft.warnings.append(ROBINHOOD_UNOPENED_WARNING.format(n=unopened))
+    if moves:
+        draft.warnings.append(ROBINHOOD_MOVES_WARNING.format(n=moves))
+    if expired:
+        draft.warnings.append(ROBINHOOD_EXPIRED_WARNING.format(n=expired))
+    if assigned:
+        draft.warnings.append(ROBINHOOD_ASSIGNED_WARNING.format(n=assigned))
+    if undelivered:
+        draft.warnings.append(ROBINHOOD_UNDELIVERED_WARNING.format(n=undelivered))
+    still_open = sum(1 for held in lots.values() if held)
+    draft.open_positions = still_open
+    if still_open:
+        draft.warnings.append(
+            f"{still_open} position(s) still open at the end of the report; excluded "
+            "from the closed trades"
+        )
+    return draft
+
+
+def _robinhood_share_event(
+    group: list[_RobinhoodRow], lots: dict[str, deque[list[Any]]], sizes: dict[str, float]
+) -> int:
+    """Rescale the shares held for a split, or move them to the new symbol
+    for an exchange; returns how many rows could not be read that way."""
+    code = group[0].code
+    pairs: list[tuple[_RobinhoodRow, _RobinhoodRow]] = []
+    if code == "spr":
+        by_symbol: dict[str, list[_RobinhoodRow]] = {}
+        for item in group:
+            by_symbol.setdefault(item.symbol, []).append(item)
+        for legs in by_symbol.values():
+            leaving = [item for item in legs if item.leaving]
+            arriving = [item for item in legs if not item.leaving]
+            if len(leaving) != 1 or len(arriving) != 1:
+                return len(group)
+            pairs.append((leaving[0], arriving[0]))
+    else:
+        leaving = [item for item in group if item.leaving]
+        arriving = [item for item in group if not item.leaving]
+        if len(leaving) != 1 or len(arriving) != 1:
+            return len(group)
+        pairs.append((leaving[0], arriving[0]))
+    for old, new in pairs:
+        if not old.quantity or not new.quantity or not old.symbol or not new.symbol:
+            return len(group)
+    for old, new in pairs:
+        assert old.quantity and new.quantity  # checked above
+        ratio = abs(new.quantity) / abs(old.quantity)
+        held = lots.pop(old.symbol, deque())
+        for lot in held:
+            lot[0] *= ratio
+            lot[1] /= ratio
+            lot[3] /= ratio
+        lots.setdefault(new.symbol, deque()).extend(held)
+        sizes.setdefault(new.symbol, 1.0)
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -4257,6 +4588,8 @@ def import_report(
             draft = _parse_mql5_signal(header, rows)
         elif source_format == FXBLUE_CSV:
             draft = _parse_fxblue(header, rows)
+        elif source_format == ROBINHOOD_CSV:
+            draft = _parse_robinhood(header, rows)
         elif source_format in {UNIVERSAL_TRADES_CSV, UNIVERSAL_FILLS_CSV}:
             found = _universal_table(header, rows)
             assert found is not None  # _detect found it
@@ -4603,6 +4936,7 @@ __all__ = [
     "MQL5_SIGNAL_CSV",
     "MYFXBOOK_CSV",
     "FXBLUE_CSV",
+    "ROBINHOOD_CSV",
     "NINJATRADER_CSV",
     "NINJATRADER_EXECUTIONS_CSV",
     "QUANTCONNECT_TRADES_CSV",

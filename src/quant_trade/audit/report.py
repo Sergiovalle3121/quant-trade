@@ -2879,6 +2879,7 @@ SOURCE_NAMES: dict[str, str] = {
     "myfxbook_csv": "Myfxbook (CSV)",
     "mql5_signal_csv": "MQL5 signal (CSV)",
     "fxblue_csv": "FX Blue (CSV)",
+    "robinhood_csv": "Robinhood (CSV)",
     "universal_trades_csv": "CSV / Excel",
     "universal_fills_csv": "CSV / Excel (fills / ejecuciones)",
 }
