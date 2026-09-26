@@ -823,7 +823,16 @@ SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         import anyio
-        from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+        from fastapi import (
+            BackgroundTasks,
+            FastAPI,
+            File,
+            Form,
+            HTTPException,
+            Query,
+            Request,
+            UploadFile,
+        )
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import (
             HTMLResponse,
@@ -1295,6 +1304,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         except Exception:  # pragma: no cover - best effort
             logger.warning("session note failed", exc_info=True)
 
+    def _note_failed_signin(account_id: str, device: str, network: str, now: datetime) -> None:
+        """Count a wrong password for "Actividad reciente"; best effort, off the reply."""
+        try:
+            db.note_failed_signin(account_id, device=device, network=network, now=now)
+        except Exception:  # pragma: no cover - best effort
+            logger.warning("failed sign-in note failed", exc_info=True)
+
     def _note_event(request: Request, account_id: str, kind: str) -> None:
         """Add a line to "Actividad reciente"; a failure never blocks the action."""
         device, network = _device_network(request)
@@ -1539,6 +1555,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _signin_post(path_locale: str) -> Callable[..., Response]:
         def handler(
             request: Request,
+            background: BackgroundTasks,
             email: Annotated[str, Form(max_length=320)] = "",
             password: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
@@ -1591,6 +1608,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 signin_failures.hit(pair, now)
                 signin_ip_failures.hit(ip, now)
                 signin_email_failures.hit(clean, now)
+                if found is not None:
+                    # Written after the reply is sent, so an existing account
+                    # answers as fast as an unknown e-mail.
+                    background.add_task(
+                        _note_failed_signin, found[0].id, *_device_network(request), now
+                    )
                 return again("wrong", 401)
             db.purge_sessions(now)
             if db.two_step_on(found[0].id):
@@ -1772,7 +1795,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     recovery_created=db.recovery_key_created(account.id) or "",
                     two_step_since=db.two_step_on(account.id),
                     sessions=db.list_sessions(account.id, now, current=session_hash),
-                    events=db.list_events(account.id, limit=20),
+                    # Up to 5 wrong-password lines beside 20 real events, so
+                    # failures never push the real ones off the card.
+                    events=sorted(
+                        [
+                            *db.list_events(account.id, limit=20),
+                            *db.list_failed_signins(account.id, limit=5),
+                        ],
+                        key=lambda e: e.at,
+                        reverse=True,
+                    ),
                     invite=(
                         account_pages.InviteView(
                             link=(

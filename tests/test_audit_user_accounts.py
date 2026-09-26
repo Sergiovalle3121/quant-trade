@@ -3060,3 +3060,91 @@ def test_recent_activity_exists_in_every_language(tmp_path: Path) -> None:
     for locale, words in (("es", "Actividad reciente"), ("en", "Recent activity")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
         assert words in privacy and not find_claims(privacy)
+
+
+def test_wrong_passwords_are_counted_per_network_and_hour(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": LAPTOP_UA})
+    _signup(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    guesser = TestClient(client.app)
+    guesser.headers.update({"User-Agent": PHONE_UA})
+    typed = "guess-number-one-secret"
+    for _ in range(3):
+        assert _signin(guesser, "ana@example.com", typed, ip="203.0.113.9").status_code == 401
+    assert _signin(guesser, "ana@example.com", typed, ip="2001:db8:9:9::1").status_code == 401
+    # An unknown e-mail answers the same and writes nothing.
+    unknown = _signin(guesser, "nadie@example.com", typed, ip="203.0.113.9")
+    assert unknown.status_code == 401
+    lines = store.list_failed_signins(ana.id)  # type: ignore[attr-defined]
+    assert sorted((e.network, e.count) for e in lines) == [
+        ("2001:db8:9:9::/64", 1),
+        ("203.0.113.9", 3),
+    ]
+    assert all(e.device == "Safari · iPhone" for e in lines)
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = conn.execute(store.failed_signins.select()).all()  # type: ignore[attr-defined]
+    assert len(rows) == 2 and typed not in str(rows) and "nadie" not in str(rows)
+    # Real events are untouched and the card shows both lines.
+    assert _kinds(store) == ["signup"]
+    page = client.get("/cuenta").text
+    card = page.split("id='actividad'")[1]
+    assert "Contraseña incorrecta (3 intentos)" in card
+    assert "Contraseña incorrecta (1 intento)" in card and "Cuenta creada" in card
+    assert typed not in page and not find_claims(re.sub(r"<[^>]+>", " ", page))
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert sorted(f["attempts"] for f in data["failed_signins"]) == [1, 3]
+    assert typed not in json.dumps(data)
+
+
+def test_a_flood_of_wrong_passwords_never_hides_real_events(tmp_path: Path) -> None:
+    from quant_trade.audit.store import ACCOUNT_EVENT_DAYS, FAILED_SIGNIN_MAX
+
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    _make_recovery_key(client)
+    for n in range(FAILED_SIGNIN_MAX + 15):
+        store.note_failed_signin(  # type: ignore[attr-defined]
+            ana.id, device="? · ?", network=f"198.51.100.{n}", now=datetime.now(UTC)
+        )
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = conn.execute(store.failed_signins.select()).all()  # type: ignore[attr-defined]
+    assert len(rows) == FAILED_SIGNIN_MAX
+    assert _kinds(store) == ["recovery_key_created", "signup"]
+    card = client.get("/cuenta").text.split("id='actividad'")[1]
+    assert card.count("Contraseña incorrecta") == 5
+    assert "Clave de recuperación nueva" in card and "Cuenta creada" in card
+    # They expire with the purge and go with the account.
+    old = datetime.now(UTC) - timedelta(days=ACCOUNT_EVENT_DAYS + 1)
+    store.note_failed_signin(ana.id, network="192.0.2.1", now=old)  # type: ignore[attr-defined]
+    store.purge_sessions(datetime.now(UTC))  # type: ignore[attr-defined]
+    networks = {e.network for e in store.list_failed_signins(ana.id)}  # type: ignore[attr-defined]
+    assert "192.0.2.1" not in networks
+    csrf = _csrf(client.get("/cuenta").text)
+    client.post("/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf})
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.failed_signins.select()).all() == []  # type: ignore[attr-defined]
+
+
+def test_wrong_password_lines_exist_in_every_language(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    _signin(TestClient(client.app), "ana@example.com", "not-the-password-at-all")
+    _signin(TestClient(client.app), "ana@example.com", "not-the-password-at-all")
+    for prefix, words in (
+        ("/account", "Wrong password (2 tries)"),
+        (account_pages.path("account", "pt"), "Senha incorreta (2 tentativas)"),
+    ):
+        page = client.get(prefix).text
+        assert words in page, prefix
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    ctx = LegalContext(
+        operator_name="Op",
+        operator_contact="op@example.com",
+        operator_address="México",
+        jurisdiction="Leyes de México",
+    )
+    for locale, words in (("es", "contraseña incorrecta"), ("en", "wrong password")):
+        privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
+        assert words in privacy and not find_claims(privacy)

@@ -215,7 +215,10 @@ COPY: dict[str, dict[str, str]] = {
             "abiertas»; se borra al cerrar la sesión, al caducar o con la cuenta.|"
             "Para «Actividad reciente»: cada entrada y cada cambio de seguridad (contraseña, "
             "dos pasos, clave de recuperación, sesiones cerradas) con su fecha, la etiqueta del "
-            "dispositivo y la red; las últimas 50, borradas a los 90 días o con la cuenta.|"
+            "dispositivo y la red; las últimas 50, borradas a los 90 días o con la cuenta. "
+            "Aparte, los intentos con contraseña incorrecta en tu cuenta: cuántos por red y "
+            "hora, con la etiqueta del dispositivo (nunca lo que se escribió); los últimos 20, "
+            "borrados a los 90 días o con la cuenta.|"
             "Para borrar todo: «Borrar mi cuenta», al final de «Mi cuenta». Quita al instante tu "
             "correo, contraseña, sesiones y listas; puedes borrar también los informes que "
             "subiste."
@@ -384,6 +387,8 @@ COPY: dict[str, dict[str, str]] = {
         "event_recovery_key_created": "Clave de recuperación nueva",
         "event_session_ended": "Se cerró una sesión",
         "event_sessions_ended": "Se cerraron todas las demás sesiones",
+        "event_signin_failed_one": "Contraseña incorrecta (1 intento)",
+        "event_signin_failed": "Contraseña incorrecta ({count} intentos)",
         "two_step_card": "Verificación en dos pasos",
         "two_of_three": (
             "Con los dos pasos activos, para entrar o recuperar la cuenta necesitas dos de "
@@ -659,7 +664,9 @@ COPY: dict[str, dict[str, str]] = {
             "when the session is signed out, expires or with the account.|"
             "For 'Recent activity': each sign-in and security change (password, two-step, "
             "recovery key, sessions signed out) with its date, device label and network; the "
-            "latest 50, deleted after 90 days or with the account.|"
+            "latest 50, deleted after 90 days or with the account. Separately, wrong-password "
+            "tries on your account: how many per network and hour, with the device label "
+            "(never what was typed); the latest 20, deleted after 90 days or with the account.|"
             "To delete it all: 'Delete my account', at the end of 'My account'. It removes your "
             "e-mail, password, sessions and lists at once; you can delete the reports you "
             "uploaded too."
@@ -824,6 +831,8 @@ COPY: dict[str, dict[str, str]] = {
         "event_recovery_key_created": "New recovery key",
         "event_session_ended": "A session was signed out",
         "event_sessions_ended": "All other sessions were signed out",
+        "event_signin_failed_one": "Wrong password (1 try)",
+        "event_signin_failed": "Wrong password ({count} tries)",
         "two_step_card": "Two-step sign-in",
         "two_of_three": (
             "With two-step on, signing in or recovering the account takes two of these three: "
@@ -1533,6 +1542,14 @@ def _sessions_card(
     )
 
 
+def _event_label(copy: dict[str, str], item: AccountEvent) -> str:
+    if item.kind == "signin_failed":
+        if item.count == 1:
+            return copy["event_signin_failed_one"]
+        return copy["event_signin_failed"].format(count=item.count)
+    return copy.get("event_" + item.kind, item.kind)
+
+
 def _activity_card(copy: dict[str, str], events: Sequence[AccountEvent]) -> str:
     """ "Actividad reciente": sign-ins and security changes, newest first."""
     head = "".join(
@@ -1540,7 +1557,7 @@ def _activity_card(copy: dict[str, str], events: Sequence[AccountEvent]) -> str:
     )
     rows = "".join(
         f"<tr><td>{_e(_stamp(item.at))}</td>"
-        f"<td>{_e(copy.get('event_' + item.kind, item.kind))}</td>"
+        f"<td>{_e(_event_label(copy, item))}</td>"
         f"<td>{_e(item.device or '-')}</td><td>{_e(item.network or '-')}</td></tr>"
         for item in events
     )

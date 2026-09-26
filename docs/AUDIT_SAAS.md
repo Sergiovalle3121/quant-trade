@@ -2150,7 +2150,18 @@ changes what a report says.
   abiertas"). The latest 50 per account are kept (`store.ACCOUNT_EVENT_MAX`);
   older than 90 days (`ACCOUNT_EVENT_DAYS`) they go with `purge_sessions`,
   which every sign-in runs. They go with the account, and the export lists
-  them under `activity`. Failed sign-ins are not listed.
+  them under `activity`.
+- **Wrong-password lines** (`failed_signins` table, shown in "Actividad
+  reciente" as "Contraseña incorrecta (N intentos)"): a wrong password for an
+  existing account counts on one line per network and hour (device label and
+  time of the last try; never the typed e-mail or password). The line is
+  written by a background task after the reply is sent, so a real account
+  answers as fast as an unknown e-mail (no account-existence timing signal).
+  Their own cap, `store.FAILED_SIGNIN_MAX` (20 lines), keeps a flood from
+  pushing real events out, and the card shows at most 5 beside 20 real
+  events. They go after 90 days with `purge_sessions`, with the account, and
+  the export lists them under `failed_signins`. Rate-limited tries (429) are
+  not counted.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
