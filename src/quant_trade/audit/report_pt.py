@@ -4167,6 +4167,16 @@ RULES: tuple[tuple[str, str], ...] = (
         "nenhum período com perda; o desvio negativo é zero",
     ),
     (
+        (
+            "the futures results are in different currencies ({currencies}) and were added as "
+            "they are, without converting them"
+        ),
+        (
+            "os resultados de futuros estão em moedas diferentes ({currencies}) e foram somados "
+            "como estão, sem convertê-los"
+        ),
+    ),
+    (
         "Resampled estimate from the supplied history: it is not a prediction.",
         "Estimativa reamostrada do histórico fornecido: não é uma previsão.",
     ),
