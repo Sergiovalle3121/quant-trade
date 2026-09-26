@@ -6069,7 +6069,7 @@ def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> s
     months = int(skill.get("months") or 0)
     with_cash = (skill.get("cash_basis") or {}).get("source") is not None
     intro = labels["skill_intro" if with_cash else "skill_intro_no_cash"].format(n=months)
-    out += f"<p class='muted'>{_e(intro)}</p>"
+    out += f"<p class='muted skill-intro'>{_e(intro)}</p>"
     parts = skill.get("attribution") or {}
     beta = _ev_value(skill.get("beta"))
     rows = (
@@ -6086,14 +6086,14 @@ def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> s
         text = labels[label].format(beta=f"{beta:.2f}" if beta is not None else "—")
         strong = key == "total"
         cell = _e(_fund_pct(value))
-        body += (
-            f"<tr><td>{'<b>' if strong else ''}{_e(text)}{'</b>' if strong else ''}</td>"
+        body += ("<tr class='skill-total'>" if strong else "<tr>") + (
+            f"<td>{'<b>' if strong else ''}{_e(text)}{'</b>' if strong else ''}</td>"
             f"<td class='val'>{cell}</td></tr>"
         )
     if body:
         out += (
-            f"<table><tr><th>{_e(labels['skill_part'])}</th>"
-            f"<th>{_e(labels['skill_year'])}</th></tr>{body}</table>"
+            f"<table class='skill'><tr><th>{_e(labels['skill_part'])}</th>"
+            f"<th class='val'>{_e(labels['skill_year'])}</th></tr>{body}</table>"
         )
     share = parts.get("exposure_share") or {}
     if share.get("evidence") == "MEASURED" and _ev_value(share) is not None:
@@ -6117,7 +6117,7 @@ def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> s
             if t_stat <= -2
             else labels["alpha_unclear"]
         )
-        out += f"<p>{_e(line)} {_badge('MEASURED')} {_e(reading)}</p>"
+        out += f"<p class='read-line'>{_e(line)} {_badge('MEASURED')} {_e(reading)}</p>"
     needed = _ev_value(skill.get("months_needed"))
     if needed is not None:
         if needed > NEEDED_MONTHS_SHOWN:
