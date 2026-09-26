@@ -844,9 +844,12 @@ _UI: dict[str, dict[str, Any]] = {
             (
                 "percent",
                 "Frente al efectivo",
-                "Restamos lo que pagaba el efectivo en dólares en las mismas fechas (letras del "
-                "Tesoro de EE. UU. a 3 meses, datos públicos de FRED): ves el Sharpe sin lo que "
-                "ya daba el efectivo y, si subes un benchmark, el alfa también.",
+                "Restamos lo que pagaba el efectivo en las mismas fechas, en la moneda de tu "
+                "cuenta si tu reporte la indica (pesos mexicanos, reales, euros, libras, yenes, "
+                "dólares canadienses o francos suizos) y, si no, en dólares (letras del Tesoro "
+                "de EE. UU. a 3 meses). Datos públicos oficiales. Ves el Sharpe sin lo que ya "
+                "daba el efectivo y, si subes un benchmark, el alfa, medido frente a las letras "
+                "de EE. UU.",
             ),
             (
                 "chart",
@@ -1061,9 +1064,11 @@ _UI: dict[str, dict[str, Any]] = {
             (
                 "percent",
                 "Against cash",
-                "We subtract what cash in dollars paid over the same dates (3-month US "
-                "Treasury bills, public FRED data): you see the Sharpe without what cash "
-                "already paid and, if you upload a benchmark, the alpha too.",
+                "We subtract what cash paid over the same dates, in your account's currency "
+                "when your report names it (Mexican pesos, reais, euros, pounds, yen, Canadian "
+                "dollars or Swiss francs) and otherwise in dollars (3-month US Treasury bills). "
+                "Official public data. You see the Sharpe without what cash already paid and, "
+                "if you upload a benchmark, the alpha, measured against US bills.",
             ),
             (
                 "chart",
