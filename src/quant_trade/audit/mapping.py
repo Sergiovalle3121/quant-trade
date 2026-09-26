@@ -851,7 +851,7 @@ def mapping_page(
         "<div class='field'><label for='m-report'>"
         f"{_e(words['file'])}</label>"
         "<input id='m-report' type='file' name='report' required "
-        "accept='.csv,.txt,.tsv,.xlsx,.xls,.htm,.html,.zip,text/csv' "
+        "accept='.csv,.txt,.tsv,.xlsx,.xls,.ods,.htm,.html,.zip,text/csv' "
         "aria-describedby='m-report-help'>"
         f"<div class='help' id='m-report-help'>{_e(words['file_help'])}</div></div>"
         f"<p class='help'>{_e(words['remember'])}</p><p class='help'>{_e(words['extra'])}</p>"
