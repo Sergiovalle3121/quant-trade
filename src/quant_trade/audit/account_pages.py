@@ -612,6 +612,12 @@ border-radius:9px;background:color-mix(in srgb,var(--ok) 10%,#fff);color:var(--o
 .acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
 box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .acct-form form>p:last-child{margin-bottom:0}
+#invitar .field{max-width:640px}
+#invitar input[readonly]{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);
+text-overflow:ellipsis}
+#invitar .btn svg{width:18px;height:18px;margin-right:8px}
+@media (max-width:760px){#invitar .acct-kpi:last-child{grid-column:1/-1}
+#invitar .btn{width:100%;justify-content:center}}
 @media (min-width:761px){.acct-grid>.acct-form{position:sticky;top:84px}}
 .acct-danger{border-color:rgba(180,35,24,.28)}
 .acct-danger h3{color:#b42318}
@@ -1496,6 +1502,26 @@ def strategies_section(
     )
 
 
+def strategy_missing_page(locale: str) -> str:
+    """A strategy that is not on this account (deleted, or someone else's)."""
+    from quant_trade.audit.strategies import COPY as SCOPY
+
+    locale = _locale(locale)
+    copy = SCOPY[locale]
+    body = (
+        "<div class='wrap-narrow'><div class='acct-card'>"
+        f"<a class='btn btn-dark' href='{path('account', locale)}#estrategias'>"
+        f"{_e(copy['back'])}</a></div></div>"
+    )
+    return _shell(
+        locale,
+        copy["missing_title"],
+        copy["missing_lead"],
+        body,
+        switch={lang: path("account", lang) for lang in LANGUAGES},
+    )
+
+
 def strategy_page(
     *,
     locale: str,
@@ -1716,4 +1742,15 @@ color:var(--text-2);font-size:.85rem}
 .strat-table .strat-rm{text-align:left}
 .strat-table .strat-rm .btn{width:100%;justify-content:center}
 .strat-change li{flex-direction:column;align-items:flex-start;gap:6px}}
+@media print{.page-hero{padding:0 0 10pt;border-bottom:1px solid #ddd}
+.page-hero::after{content:none;display:none}
+.page-hero h1{font-size:24pt;line-height:1.1;letter-spacing:-.03em;margin:6pt 0 6pt}
+.page-hero .lead{font-size:10pt;max-width:none;margin:0}
+.page-main{padding:14pt 0 0}
+.strat-table{font-size:8.5pt}
+.strat-table .acct-cls{display:inline-block;width:22px;height:22px;line-height:19px;
+text-align:center;font-size:9pt}
+.strat-change{break-inside:avoid;padding:12pt 14pt;margin:10pt 0}
+.strat-change li{padding:6pt 0}
+.strat-word{padding:2px 8px;font-size:7.5pt}}
 """

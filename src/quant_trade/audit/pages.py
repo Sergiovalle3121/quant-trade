@@ -2094,7 +2094,7 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
 
 #: What the file pickers offer for a platform file: web pages (and the tables
 #: brokers save as .xls), text tables, workbooks and a zip holding one export.
-REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.zip"
+REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.xml,.zip"
 
 
 def _upload_form(

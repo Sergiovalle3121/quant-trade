@@ -1084,3 +1084,20 @@ def test_timing_tables_fit_390_and_360_px_phones() -> None:
         "@media screen and (max-width:380px){.paper table.timing{font-size:.76rem!important}"
         in STYLE
     )
+
+
+def test_the_strategy_pdf_and_invite_box_are_styled() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS, STRATEGY_CSS
+
+    # The strategy PDF: a readable title without the screen's glow line, and class
+    # letters centred without CSS grid (WeasyPrint does not place grid items).
+    printed = STRATEGY_CSS[STRATEGY_CSS.index("@media print{") :]
+    assert ".page-hero::after{content:none;display:none}" in printed
+    assert ".page-hero h1{font-size:24pt" in printed
+    assert ".strat-table .acct-cls{display:inline-block" in printed
+    # "Invita a un colega": the link reads as a code, the button and tiles fit a phone.
+    assert "#invitar input[readonly]{font-family:var(--mono)" in ACCOUNT_CSS
+    phone = ACCOUNT_CSS[ACCOUNT_CSS.index("@media (max-width:760px){#invitar") :]
+    phone = phone[: phone.index("}}") + 2]
+    assert "#invitar .acct-kpi:last-child{grid-column:1/-1}" in phone
+    assert "#invitar .btn{width:100%" in phone
