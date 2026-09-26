@@ -1067,9 +1067,9 @@ _BUILDERS = {
 }
 
 
-def _class_if_passed(dimensions: list[Dimension], name: str) -> str:
+def _class_if_passed(dimensions: list[Dimension], name: str, *, own_index: bool = False) -> str:
     changed = [d.model_copy(update={"status": "PASS"}) if d.name == name else d for d in dimensions]
-    return overall_class(changed)
+    return overall_class(changed, own_index=own_index)
 
 
 def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]:
@@ -1088,7 +1088,9 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
         if dimension is None or dimension.status not in STATUS_RANK:
             continue
         finding, actions = _BUILDERS[name](data, dimension.status, locale)
-        better = _class_if_passed(dimensions, name)
+        better = _class_if_passed(
+            dimensions, name, own_index=(data.get("benchmark") or {}).get("source") == "file"
+        )
         steps.append(
             PlanStep(
                 dimension=name,

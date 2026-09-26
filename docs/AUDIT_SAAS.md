@@ -1265,6 +1265,10 @@ benchmark" still makes it NOT_APPLICABLE. A month in which the fund or its
 index loses 100 % or more (most often a typo in a factsheet) leaves the
 section NOT_MEASURED ("a month in the fund or its benchmark loses 100% or
 more") instead of dividing by a compound growth of zero.
+The index in the file is the one the manager chose to print, so a PASS
+against it is not an independent check: `verdict.overall_class(own_index=True)`
+lets it complete a B but never an A (a FAIL or WEAK counts as usual), and the
+plan's "what would change the class" follows the same rule.
 
 What fees would take (`fund.fee_drag`). On a fund record not declared net
 of fees, a table shows the yearly return and total growth with a yearly fee

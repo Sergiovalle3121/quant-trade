@@ -1578,6 +1578,7 @@ def run_audit(
         thresholds=thresholds,
         account=_real_fills(inputs),
         fund=fund_record(inputs),
+        own_index=benchmark.get("source") == "file",
     )
     mintrl = significance.get("min_track_record_length", {})
     mintrl_value = mintrl.get("value") if mintrl.get("evidence") == MEASURED else None

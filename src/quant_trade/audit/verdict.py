@@ -460,7 +460,12 @@ def assess_benchmark(
     return _dimension(BENCHMARK, "WEAK", reasons, inputs)
 
 
-def overall_class(dimensions: list[Dimension]) -> Literal["A", "B", "C", "D"]:
+def overall_class(
+    dimensions: list[Dimension], *, own_index: bool = False
+) -> Literal["A", "B", "C", "D"]:
+    """``own_index``: the benchmark is the index the file itself carries (a
+    fund's record), chosen by the manager; a PASS against it is not an
+    independent check, so it cannot complete an A."""
     status = {dimension.name: dimension.status for dimension in dimensions}
     fails = sum(1 for value in status.values() if value == "FAIL")
     if status.get(DATA_QUALITY) == "FAIL" or status.get(STATISTICAL) == "FAIL" or fails >= 2:
@@ -475,6 +480,7 @@ def overall_class(dimensions: list[Dimension]) -> Literal["A", "B", "C", "D"]:
     if (
         all(value in ("PASS", "NOT_APPLICABLE") for value in rest)
         and status.get(DATA_QUALITY) == "PASS"
+        and not (own_index and status.get(BENCHMARK) == "PASS")
     ):
         return "A"
     return "B"
@@ -1012,8 +1018,9 @@ def build_verdict(
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
     account: bool = False,
     fund: bool = False,
+    own_index: bool = False,
 ) -> Verdict:
-    overall = overall_class(dimensions)
+    overall = overall_class(dimensions, own_index=own_index)
     return Verdict(
         overall=overall,
         summary=summary(
