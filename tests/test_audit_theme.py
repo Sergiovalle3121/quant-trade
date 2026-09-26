@@ -1164,3 +1164,14 @@ def test_phone_walk_fixes_scroll_cue_evidence_cards_and_firm_titles() -> None:
     assert ".metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}" in phone
     # Prop-firm cards read their challenge name as the card's title.
     assert ".firms td:first-child small{display:block" in phone
+
+
+def test_two_step_pages_are_styled() -> None:
+    from quant_trade.audit.account_pages import ACCOUNT_CSS
+
+    # The QR sits on a white card, the note's shield icon stays icon-sized,
+    # and six-digit codes read as a code.
+    assert ".acct-qr{display:flex;justify-content:center;width:max-content" in ACCOUNT_CSS
+    assert ".acct-nudge svg{flex:none;width:20px;height:20px" in ACCOUNT_CSS
+    assert "input[autocomplete=one-time-code]{font-family:var(--mono)" in ACCOUNT_CSS
+    assert ".acct-lost{margin-top:22px;border:1px solid var(--border)" in ACCOUNT_CSS

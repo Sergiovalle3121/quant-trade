@@ -881,9 +881,21 @@ margin:18px 0 28px}
 .acct-gift b{font-size:1.3rem;line-height:1.5}
 .acct-nudge{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;
 padding:12px 16px;border:1px solid var(--border);border-radius:14px}
-.acct-qr{display:flex;justify-content:center;margin:12px 0}
-.acct-qr svg{max-width:100%;height:auto;border-radius:10px}
-.acct-lost{margin-top:18px}.acct-lost summary{cursor:pointer}
+.acct-qr{display:flex;justify-content:center;width:max-content;max-width:100%;margin:18px auto;
+padding:14px;background:#fff;border:1px solid var(--border);border-radius:18px;
+box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.acct-qr svg{display:block;max-width:100%;height:auto}
+.acct-nudge{flex-wrap:nowrap;align-items:flex-start;gap:12px;background:var(--surface-2);
+font-size:.93rem;line-height:1.55}
+.acct-nudge svg{flex:none;width:20px;height:20px;margin-top:2px;color:var(--ok)}
+input[autocomplete=one-time-code]{font-family:var(--mono);font-size:1.45rem;letter-spacing:.32em;
+text-align:center;max-width:15rem;padding-left:.32em}
+input#f-key{font-family:var(--mono);letter-spacing:.04em}
+.acct-lost{margin-top:22px;border:1px solid var(--border);border-radius:14px;padding:14px 18px;
+background:#fff}
+.acct-lost summary{cursor:pointer;font-weight:500}
+.acct-lost[open] summary{margin-bottom:10px}
+.acct-lost form{margin-top:8px}
 .acct-key code{display:block;font-size:1.35rem;letter-spacing:.06em;padding:18px;
 border:1px dashed var(--border);border-radius:14px;text-align:center;
 overflow-wrap:anywhere;user-select:all}
