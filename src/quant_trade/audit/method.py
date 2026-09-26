@@ -223,8 +223,8 @@ COPY: dict[str, dict[str, object]] = {
             "Precios al consumidor de Canadá: Banco de Canadá (IPC de Statistics Canada); estos "
             "datos están disponibles gratis en bankofcanada.ca.",
             "Precios al consumidor de Brasil: Banco Central do Brasil (IPCA del IBGE).",
-            "Precios al consumidor de México: Fuente: INEGI, Índice Nacional de Precios al "
-            "Consumidor (INPC); lo usamos para dividir los saldos.",
+            "Precios al consumidor de México. Fuente: INEGI, Índice Nacional de Precios al "
+            "Consumidor (INPC); lo usamos para descontar la inflación de los saldos.",
             "Precios al consumidor de Japón: elaborado a partir del Índice de Precios al "
             "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
             "vía e-Stat.",
@@ -280,8 +280,8 @@ COPY: dict[str, dict[str, object]] = {
             "Consumer prices for Canada: Bank of Canada (Statistics Canada's CPI); this data is "
             "available free of charge at bankofcanada.ca.",
             "Consumer prices for Brazil: Banco Central do Brasil (IBGE's IPCA).",
-            "Consumer prices for Mexico: Source: INEGI, Índice Nacional de Precios al "
-            "Consumidor (INPC); we use it to divide the levels.",
+            "Consumer prices for Mexico. Source: INEGI, Índice Nacional de Precios al "
+            "Consumidor (INPC); we use it to take inflation out of the balances.",
             "Consumer prices for Japan: created by editing the Consumer Price Index "
             "(Statistics Bureau, Ministry of Internal Affairs and Communications), through "
             "e-Stat.",
@@ -340,8 +340,8 @@ COPY: dict[str, dict[str, object]] = {
             "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
             "dados estão disponíveis grátis em bankofcanada.ca.",
             "Preços ao consumidor do Brasil: Banco Central do Brasil (IPCA do IBGE).",
-            "Preços ao consumidor do México: Fonte: INEGI, Índice Nacional de Precios al "
-            "Consumidor (INPC); usamos para dividir os saldos.",
+            "Preços ao consumidor do México. Fonte: INEGI, Índice Nacional de Precios al "
+            "Consumidor (INPC); usamos para descontar a inflação dos saldos.",
             "Preços ao consumidor do Japão: elaborado a partir do Índice de Preços ao "
             "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
             "via e-Stat.",

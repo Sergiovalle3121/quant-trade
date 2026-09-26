@@ -975,7 +975,7 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA del IBGE)",
         "currency_attrib_MXN": (
             "peso mexicano, Fuente: INEGI, Índice Nacional de Precios al Consumidor (INPC), "
-            "usado aquí para dividir los saldos"
+            "usado aquí para descontar la inflación de los saldos"
         ),
         "currency_attrib_JPY": (
             "yen, elaborado a partir del Índice de Precios al Consumidor de Japón (Statistics "
@@ -2218,7 +2218,7 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_attrib_BRL": "real, Banco Central do Brasil (IBGE's IPCA)",
         "currency_attrib_MXN": (
             "Mexican peso, Source: INEGI, Índice Nacional de Precios al Consumidor (INPC), "
-            "used here to divide the levels"
+            "used here to take inflation out of the balances"
         ),
         "currency_attrib_JPY": (
             "yen, created by editing Japan's Consumer Price Index (Statistics Bureau, Ministry "

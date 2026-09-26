@@ -1270,7 +1270,7 @@ REPORT: dict[str, Any] = {
         "currency_attrib_BRL": "real, Banco Central do Brasil (IPCA do IBGE)",
         "currency_attrib_MXN": (
             "peso mexicano, Fonte: INEGI, Índice Nacional de Precios al Consumidor (INPC), "
-            "usado aqui para dividir os saldos"
+            "usado aqui para descontar a inflação dos saldos"
         ),
         "currency_attrib_JPY": (
             "iene, elaborado a partir do Índice de Preços ao Consumidor do Japão (Statistics "
@@ -1361,8 +1361,8 @@ REPORT: dict[str, Any] = {
             "Preços ao consumidor do Canadá: Banco do Canadá (IPC da Statistics Canada); esses "
             "dados estão disponíveis grátis em bankofcanada.ca.",
             "Preços ao consumidor do Brasil: Banco Central do Brasil (IPCA do IBGE).",
-            "Preços ao consumidor do México: Fonte: INEGI, Índice Nacional de Precios al "
-            "Consumidor (INPC); usamos para dividir os saldos.",
+            "Preços ao consumidor do México. Fonte: INEGI, Índice Nacional de Precios al "
+            "Consumidor (INPC); usamos para descontar a inflação dos saldos.",
             "Preços ao consumidor do Japão: elaborado a partir do Índice de Preços ao "
             "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
             "via e-Stat.",
