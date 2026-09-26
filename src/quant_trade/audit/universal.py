@@ -1254,6 +1254,10 @@ NO_PROFIT_WARNING = (
 SIGNED_SIDE_WARNING = "no side column; the side was taken from the sign of the quantity"
 PROFIT_SIDE_WARNING = "no side column; the side was taken from the sign of the profit"
 FUTURES_WARNING = "futures results computed with each contract's point value: {listed}"
+FUTURES_CURRENCIES_WARNING = (
+    "the futures results are in different currencies ({currencies}) and were added as they "
+    "are, without converting them"
+)
 UNREADABLE_FILL_WARNING = (
     "{symbol}: a fill with an unreadable time ({time}) was left out; the trade it opened or "
     "closed is missing from the results"
@@ -1615,31 +1619,44 @@ def _profit_is_net(items: list[tuple[str, float, float | None, float]], column_n
     return named_net
 
 
-def _point_value(symbol: str) -> float | None:
-    """The CME value per point of a futures contract code (``MNQZ6``,
-    ``ES DEC26``); a bare root is not enough, since ``CL`` or ``GC`` alone may
-    be a share ticker."""
+def _contract(symbol: str) -> tuple[str, float, str] | None:
+    """The root, value per point and currency of a futures contract code
+    (``MNQZ6``, ``ES DEC26``, ``FDAX 12-26``, ``FGBLZ6``); a bare root is not
+    enough, since ``CL`` or ``GC`` alone may be a share ticker."""
     code = symbol.strip().upper().split(".")[0]
     root = imp._futures_root(code)
-    if root not in imp.FUTURES_POINT_VALUE_USD or code == root:
+    found = imp.futures_point_value(root)
+    if found is None or code == root:
         return None
-    return imp.FUTURES_POINT_VALUE_USD[root]
+    return root, found[0], found[1]
+
+
+def _point_value(symbol: str) -> float | None:
+    contract = _contract(symbol)
+    return contract[1] if contract else None
 
 
 def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
     """Scale each futures trip's price move by its point value; True when
     every trip was a known contract (so no size is inferred)."""
-    priced: dict[str, float] = {}
+    priced: dict[str, tuple[float, str]] = {}
     for trip in trips:
-        value = _point_value(trip.symbol)
-        if value is not None:
+        contract = _contract(trip.symbol)
+        if contract is not None:
+            root, value, currency = contract
             trip.gross *= value
-            priced[imp._futures_root(trip.symbol.strip().upper().split(".")[0])] = value
+            priced[root] = (value, currency)
     if priced:
         listed = ", ".join(
-            f"{root} x{imp._size_text(value)}" for root, value in sorted(priced.items())
+            f"{root} x{imp._size_text(value)}" + ("" if currency == "USD" else f" {currency}")
+            for root, (value, currency) in sorted(priced.items())
         )
         draft.warnings.append(FUTURES_WARNING.format(listed=listed))
+        currencies = sorted({currency for _, currency in priced.values()})
+        if len(currencies) > 1:
+            draft.warnings.append(
+                FUTURES_CURRENCIES_WARNING.format(currencies=", ".join(currencies))
+            )
     return (
         bool(priced)
         and len(priced) >= 1

@@ -236,6 +236,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "resultados de futuros calculados con el valor por punto de cada contrato: {listed}",
     ),
     (
+        "the futures results are in different currencies ({currencies}) and were added as they "
+        "are, without converting them",
+        "los resultados de futuros están en monedas distintas ({currencies}) y se sumaron tal "
+        "cual, sin convertirlos",
+    ),
+    (
         "the profit column already subtracts commission (it matches the price move after "
         "costs), so it was read as net",
         "la columna de resultado ya descuenta la comisión (cuadra con el movimiento del "

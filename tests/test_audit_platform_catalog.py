@@ -76,6 +76,75 @@ def test_tradovate_orders_are_fills_priced_with_the_contract_point_value() -> No
     assert not any("contract size inferred" in warning for warning in report.warnings)
 
 
+@pytest.mark.parametrize(
+    ("code", "root", "value", "currency"),
+    [
+        ("FDAX 12-26", "FDAX", 25.0, "EUR"),
+        ("FDXMZ6", "FDXM", 5.0, "EUR"),
+        ("FDXSZ6", "FDXS", 1.0, "EUR"),
+        ("FESXZ6", "FESX", 10.0, "EUR"),
+        ("FSXEZ6", "FSXE", 1.0, "EUR"),
+        ("FSMIZ6", "FSMI", 10.0, "CHF"),
+        ("FVSZ6", "FVS", 100.0, "EUR"),
+        ("FGBSZ6", "FGBS", 1_000.0, "EUR"),
+        ("FGBMZ6", "FGBM", 1_000.0, "EUR"),
+        ("FGBLZ6", "FGBL", 1_000.0, "EUR"),
+        ("FGBXZ6", "FGBX", 1_000.0, "EUR"),
+        ("BZ6", "B", 1_000.0, "USD"),
+        ("GZ26", "G", 100.0, "USD"),
+        ("SBH7", "SB", 1_120.0, "USD"),
+        ("KCZ6", "KC", 375.0, "USD"),
+        ("CTZ6", "CT", 500.0, "USD"),
+        ("CCZ6", "CC", 10.0, "USD"),
+        ("OJF7", "OJ", 150.0, "USD"),
+        ("DXZ6", "DX", 1_000.0, "USD"),
+        # CME codes that share a first letter keep their own contract.
+        ("GCZ6", "GC", 100.0, "USD"),
+        ("MGCZ6", "MGC", 10.0, "USD"),
+        ("SIZ6", "SI", 5_000.0, "USD"),
+        ("ZBZ6", "ZB", 1_000.0, "USD"),
+        ("ZFZ6", "ZF", 1_000.0, "USD"),
+        ("CLZ6", "CL", 1_000.0, "USD"),
+    ],
+)
+def test_eurex_and_ice_contracts_carry_their_point_value(
+    code: str, root: str, value: float, currency: str
+) -> None:
+    from quant_trade.audit.universal import _contract
+
+    assert _contract(code) == (root, value, currency)
+
+
+@pytest.mark.parametrize("ticker", ["B", "G", "FDAX", "BRK", "GOOG", "SB", "ZN6"])
+def test_a_bare_root_or_a_share_ticker_is_not_a_contract(ticker: str) -> None:
+    from quant_trade.audit.universal import _contract
+
+    assert _contract(ticker) is None
+
+
+def test_eurex_fills_are_priced_in_euros_and_mixed_currencies_are_named() -> None:
+    header = "Account,B/S,Contract,avgPrice,filledQty,Fill Time"
+    rows = [
+        "ACC1,Buy,FDAXZ6,24000.0,1,09/21/2026 09:30:00",
+        "ACC1,Sell,FDAXZ6,24010.0,1,09/21/2026 09:45:00",
+    ]
+    report = _read([header, *rows], "fills.csv")
+    assert [round(t.pnl, 2) for t in report.trades.trades] == [250.0]
+    assert any("point value: FDAX x25 EUR" in warning for warning in report.warnings)
+    assert not any("different currencies" in warning for warning in report.warnings)
+    mixed = _read(
+        [
+            header,
+            *rows,
+            "ACC1,Buy,ESZ6,6000.0,1,09/22/2026 09:30:00",
+            "ACC1,Sell,ESZ6,6002.0,1,09/22/2026 09:45:00",
+        ],
+        "fills.csv",
+    )
+    assert [round(t.pnl, 2) for t in mixed.trades.trades] == [250.0, 100.0]
+    assert any("different currencies (EUR, USD)" in warning for warning in mixed.warnings)
+
+
 def test_topstepx_trades_with_a_zone_after_the_time() -> None:
     header = (
         "Id,ContractName,EnteredAt,ExitedAt,EntryPrice,ExitPrice,Fees,PnL,Size,Type,TradeDay,"
