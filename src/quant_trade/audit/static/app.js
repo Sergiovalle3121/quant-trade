@@ -206,4 +206,81 @@
       });
     });
   });
+
+  // Passkeys: the page carries the options; the device's answer goes back in
+  // an ordinary form post (no fetch, so the CSP keeps connect-src 'none').
+  function fromB64(text) {
+    var s = text.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var raw = atob(s), out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out.buffer;
+  }
+  function toB64(buf) {
+    var bytes = new Uint8Array(buf), raw = "";
+    for (var i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i]);
+    return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  ready(function () {
+    d.querySelectorAll("form[data-passkey]").forEach(function (form) {
+      var go = form.querySelector("[data-passkey-go]");
+      var err = form.querySelector("[data-passkey-error]");
+      var field = form.querySelector("input[name=credential]");
+      var create = form.getAttribute("data-passkey") === "create";
+      function fail() {
+        if (err) err.hidden = false;
+        if (go) go.disabled = false;
+      }
+      if (!window.PublicKeyCredential || !navigator.credentials || !field) {
+        fail();
+        if (go) go.disabled = true;
+        return;
+      }
+      form.addEventListener("submit", function (ev) {
+        if (field.value) return;
+        ev.preventDefault();
+        if (go) go.disabled = true;
+        if (err) err.hidden = true;
+        var o;
+        try {
+          o = JSON.parse(form.getAttribute("data-options"));
+        } catch (e) {
+          fail();
+          return;
+        }
+        o.challenge = fromB64(o.challenge);
+        if (create) {
+          o.user.id = fromB64(o.user.id);
+          (o.excludeCredentials || []).forEach(function (c) { c.id = fromB64(c.id); });
+        } else {
+          (o.allowCredentials || []).forEach(function (c) { c.id = fromB64(c.id); });
+        }
+        var ask = create
+          ? navigator.credentials.create({ publicKey: o })
+          : navigator.credentials.get({ publicKey: o });
+        ask.then(function (c) {
+          if (!c) return fail();
+          var r = c.response;
+          var out = {
+            id: c.id,
+            rawId: toB64(c.rawId),
+            type: c.type,
+            clientExtensionResults: {},
+            response: { clientDataJSON: toB64(r.clientDataJSON) }
+          };
+          if (c.authenticatorAttachment) out.authenticatorAttachment = c.authenticatorAttachment;
+          if (create) {
+            out.response.attestationObject = toB64(r.attestationObject);
+            if (r.getTransports) out.response.transports = r.getTransports();
+          } else {
+            out.response.authenticatorData = toB64(r.authenticatorData);
+            out.response.signature = toB64(r.signature);
+            if (r.userHandle) out.response.userHandle = toB64(r.userHandle);
+          }
+          field.value = JSON.stringify(out);
+          form.submit();
+        }, fail);
+      });
+    });
+  });
 })();

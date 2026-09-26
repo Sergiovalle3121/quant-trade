@@ -1836,6 +1836,9 @@ with an empty value):
    custom domain you attach (it is also the address in the badge embed code
    of `/v/…` pages), and `AUDIT_TRUSTED_PROXY_HOPS=1` so the
    hourly limit counts the visitor's address and not Railway's proxy.
+   Moving `AUDIT_BASE_URL` to another domain later leaves existing passkeys
+   behind (see "Passkeys" under customer accounts); sign-in by password,
+   code and recovery key is unaffected.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
    `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
@@ -2265,6 +2268,36 @@ changes what a report says.
   still show); tabs opened at the same instant may each show it. The rows
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
+- **Passkeys** (`passkeys.py` on `webauthn`, py_webauthn by Duo Labs;
+  `passkeys` and `passkey_challenges` tables): on Mi cuenta, "Llaves de
+  acceso" adds one after the current password (`POST /cuenta/llaves`, then
+  `/cuenta/llaves/guardar`) and removes one (`/cuenta/llaves/quitar`); at
+  most `passkeys.MAX_PER_ACCOUNT` (10). The sign-in page offers "Entrar con
+  una llave de acceso" (`/entrar/llave`, EN `/login/passkey`, PT
+  `/pt/entrar/chave`): a discoverable credential, so no e-mail is typed, and
+  the device must check its owner (fingerprint, face or PIN, user
+  verification required); device plus that check are two factors, so on a
+  two-step account the passkey is enough. After a correct password, the
+  code page also offers the account's passkeys in place of the code
+  (`/entrar/codigo/llave`). Each passkey page stores a random 32-byte
+  challenge for 5 minutes behind the `rigor_passkey` cookie (only its hash
+  is the key), used once; `passkeys.MAX_STARTS_PER_HOUR` pages per network.
+  The options are embedded in the page and `app.js` posts the device's
+  answer in an ordinary form, so the CSP stays `connect-src 'none'`. The
+  store keeps the credential id, the public key, the counter (a counter
+  that goes backwards is refused; synced passkeys report zero), the name,
+  the host it was made for and dates; never a private key. Events
+  `signin_passkey`, `passkey_added`, `passkey_removed`; the export lists
+  name, site and dates as `passkeys`; the rows go with the account.
+  The relying party is the host of `AUDIT_BASE_URL`, and the buttons show
+  only on requests that reached that host. **Changing the domain**: a
+  passkey is bound by the browser to the host it was made on, so after
+  `AUDIT_BASE_URL` moves to a new domain the old passkeys stop working
+  there. Nothing else changes: the password, the two-step code and the
+  recovery key keep working, the card lists each old passkey as "Solo
+  funciona en <old host>", and customers add a new one on the new domain
+  and remove the old. Announce it before the switch; there is no way to
+  move a passkey between domains.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with

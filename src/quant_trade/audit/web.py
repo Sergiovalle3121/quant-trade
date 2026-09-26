@@ -42,6 +42,7 @@ from pydantic import ValidationError
 from quant_trade.audit import account_pages, funnel, mapping, payments, universal
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
+from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
@@ -1267,6 +1268,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signup_attempts = StoredAttemptLog(db, "signup")
     recovery_attempts = StoredAttemptLog(db, "recovery")
     two_step_attempts = StoredAttemptLog(db, "two_step")
+    passkey_starts = StoredAttemptLog(db, "passkey")
     account_actions = AttemptLog()
     strategy_pdf_renders = AttemptLog(window=STRATEGY_PDF_WINDOW)
     strategy_pdf_cache: OrderedDict[tuple[Any, ...], bytes] = OrderedDict()
@@ -1391,6 +1393,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "two_step_off_by_key",
         "session_ended",
         "sessions_ended",
+        "passkey_added",
+        "passkey_removed",
     )
     account_errors = (
         "code_already",
@@ -1406,6 +1410,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "strategy_full",
         "code_bad",
         "two_step_needs_key",
+        "passkey_unavailable",
+        "passkey_expired",
+        "passkey_failed",
+        "passkey_full",
     )
 
     def _referrals_on() -> bool:
@@ -1547,6 +1555,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 csrf=csrf,
                 flash=done if done in signin_flashes else "",
                 next_path=next_path,
+                passkeys=_rp(request) is not None,
             )
             return _anon_page(page, csrf)
 
@@ -1574,6 +1583,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     error=error,
                     email=clean if acct.valid_email(clean) else "",
                     next_path=next_path,
+                    passkeys=_rp(request) is not None,
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -1658,10 +1668,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         def handler(request: Request, next: str = "", lang: str | None = None) -> Response:
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
-            if _challenge(request) is None:
+            pending = _challenge(request)
+            if pending is None:
                 return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
             csrf = _anon_csrf(request)
-            page = account_pages.two_step_page(locale=locale, csrf=csrf, next_path=next_path)
+            page = account_pages.two_step_page(
+                locale=locale,
+                csrf=csrf,
+                next_path=next_path,
+                passkeys=_has_passkeys(request, pending[1]),
+            )
             return _anon_page(page, csrf)
 
         return handler
@@ -1680,10 +1696,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
             new_csrf = _anon_csrf(request)
+            pending: tuple[str, str] | None = None
 
             def again(error: str, status: int) -> Response:
                 page = account_pages.two_step_page(
-                    locale=locale, csrf=new_csrf, next_path=next_path, error=error
+                    locale=locale,
+                    csrf=new_csrf,
+                    next_path=next_path,
+                    error=error,
+                    passkeys=pending is not None and _has_passkeys(request, pending[1]),
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -1732,6 +1753,324 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         by_net = two_step_attempts.hit(net, now)
         by_account = two_step_attempts.hit("account:" + account_id, now)
         return max(by_net, by_account) >= acct.MAX_TOTP_TRIES_PER_HOUR
+
+    # -- passkeys --------------------------------------------------------------
+    def _rp(request: Request) -> pk.RelyingParty | None:
+        """This site as a passkey's relying party, only when the request reached its host.
+
+        A passkey belongs to the host of AUDIT_BASE_URL; on any other address
+        (an old domain, a preview) the browser would refuse it, so the
+        buttons do not show there.
+        """
+        rp = pk.relying_party(cfg.base_url, BRAND)
+        if rp is None or (request.url.hostname or "").lower() != rp.rp_id:
+            return None
+        return rp
+
+    def _has_passkeys(request: Request, account_id: str) -> bool:
+        rp = _rp(request)
+        return rp is not None and bool(db.passkey_ids(account_id, rp.rp_id))
+
+    def _passkey_page(
+        request: Request,
+        *,
+        locale: str,
+        csrf: str,
+        mode: str,
+        options: str,
+        action: str,
+        back: str,
+        next_path: str,
+        token: str,
+        anon: bool,
+    ) -> Response:
+        page = account_pages.passkey_page(
+            locale=locale,
+            csrf=csrf,
+            mode=mode,
+            options=options,
+            action=action,
+            back=back,
+            next_path=next_path,
+        )
+        response: Response = (
+            _anon_page(page, csrf)
+            if anon
+            else HTMLResponse(page, headers={"Cache-Control": "no-store"})
+        )
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        _cookie(response, pk.COOKIE, token, max_age=pk.CHALLENGE_MINUTES * 60)
+        return response
+
+    def _passkey_started(request: Request, now: datetime) -> bool:
+        """Count one passkey page per network; ``False`` past the hourly limit."""
+        net = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
+        return passkey_starts.hit(net, now) <= pk.MAX_STARTS_PER_HOUR
+
+    def _new_passkey_challenge(
+        now: datetime, purpose: str, account_id: str = "", label: str = ""
+    ) -> tuple[str, bytes]:
+        token = acct.new_secret()
+        challenge = pk.new_challenge()
+        db.create_passkey_challenge(
+            acct.hash_secret(token),
+            challenge=pk.encode(challenge),
+            purpose=purpose,
+            account_id=account_id,
+            label=label,
+            at=now,
+            minutes=pk.CHALLENGE_MINUTES,
+        )
+        return token, challenge
+
+    def _take_passkey_challenge(
+        request: Request, purpose: str, now: datetime
+    ) -> tuple[bytes, str, str] | None:
+        token = request.cookies.get(pk.COOKIE) or ""
+        if not 20 <= len(token) <= 128:
+            return None
+        taken = db.take_passkey_challenge(acct.hash_secret(token), purpose, now)
+        if taken is None:
+            return None
+        return pk.decode(taken[0]), taken[1], taken[2]
+
+    def _passkey_add_start(path_locale: str) -> Callable[..., Response]:
+        """Adding a passkey, step 1: the password, then the page that asks the device."""
+
+        def handler(
+            request: Request,
+            current: Annotated[str, Form(max_length=1024)] = "",
+            label: Annotated[str, Form(max_length=200)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            rp = _rp(request)
+            if rp is None:
+                return RedirectResponse(f"{base}?error=passkey_unavailable#llaves", 303)
+            if not acct.verify_password(db.password_hash(account.id) or "", current):
+                return RedirectResponse(f"{base}?error=wrong#llaves", status_code=303)
+            if len(db.list_passkeys(account.id)) >= pk.MAX_PER_ACCOUNT:
+                return RedirectResponse(f"{base}?error=passkey_full#llaves", status_code=303)
+            now = datetime.now(UTC)
+            if not _passkey_started(request, now):
+                return RedirectResponse(f"{base}?error=too_many#llaves", status_code=303)
+            token, challenge = _new_passkey_challenge(now, "add", account.id, pk.clean_label(label))
+            options = pk.registration_options(
+                rp,
+                challenge=challenge,
+                user_handle=account.id.encode("ascii"),
+                user_name=account.email,
+                existing=db.passkey_ids(account.id, rp.rp_id),
+            )
+            # ``csrf`` was checked against the session: the next form reuses it.
+            return _passkey_page(
+                request,
+                locale=locale,
+                csrf=csrf,
+                mode="create",
+                options=options,
+                action=account_pages.passkeys_path(locale) + "/guardar",
+                back=f"{base}#llaves",
+                next_path="",
+                token=token,
+                anon=False,
+            )
+
+        return handler
+
+    def _passkey_add_finish(path_locale: str) -> Callable[..., Response]:
+        """Adding a passkey, step 2: check what the device made and keep its public key."""
+
+        def handler(
+            request: Request,
+            credential: Annotated[str, Form(max_length=pk.MAX_CREDENTIAL_CHARS)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            rp = _rp(request)
+            if rp is None:
+                return RedirectResponse(f"{base}?error=passkey_unavailable#llaves", 303)
+            now = datetime.now(UTC)
+            taken = _take_passkey_challenge(request, "add", now)
+            if taken is None or taken[1] != account.id:
+                return RedirectResponse(f"{base}?error=passkey_expired#llaves", status_code=303)
+            made = pk.verify_new(rp, credential, challenge=taken[0])
+            if made is None:
+                return RedirectResponse(f"{base}?error=passkey_failed#llaves", status_code=303)
+            added = db.add_passkey(
+                account.id,
+                credential_id=made.credential_id,
+                public_key=made.public_key,
+                sign_count=made.sign_count,
+                label=taken[2],
+                rp_id=rp.rp_id,
+                transports=made.transports,
+                at=now,
+                limit=pk.MAX_PER_ACCOUNT,
+            )
+            if not added:
+                return RedirectResponse(f"{base}?error=passkey_full#llaves", status_code=303)
+            _note_event(request, account.id, "passkey_added")
+            response = RedirectResponse(f"{base}?done=passkey_added#llaves", status_code=303)
+            response.delete_cookie(pk.COOKIE, path="/")
+            return response
+
+        return handler
+
+    def _passkey_remove(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            credential: Annotated[str, Form(max_length=2000)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            if not db.remove_passkey(account.id, credential):
+                return RedirectResponse(f"{base}#llaves", status_code=303)
+            _note_event(request, account.id, "passkey_removed")
+            return RedirectResponse(f"{base}?done=passkey_removed#llaves", status_code=303)
+
+        return handler
+
+    def _passkey_signin_start(path_locale: str, *, step: bool) -> Callable[..., Response]:
+        """The page that asks the device for a passkey: on the sign-in page (the
+        device picks the account) or in place of the app's code (``step``)."""
+
+        def handler(
+            request: Request,
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            next: Annotated[str, Form(max_length=1000)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            if not _anon_ok(request, csrf) or _cross_site(request):
+                return _signin_redirect(locale, next_path=next_path)
+            rp = _rp(request)
+            if rp is None:
+                return _signin_redirect(locale, next_path=next_path)
+            now = datetime.now(UTC)
+            account_id = ""
+            allowed: list[str] = []
+            if step:
+                pending = _challenge(request)
+                if pending is None:
+                    return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
+                account_id = pending[1]
+                allowed = db.passkey_ids(account_id, rp.rp_id)
+                if not allowed:
+                    return RedirectResponse(account_pages.two_step_path(locale), 303)
+            back = (
+                account_pages.two_step_path(locale)
+                if step
+                else account_pages.path("signin", locale)
+            )
+            if next_path:
+                back += "?next=" + quote(next_path, safe="")
+            if not _passkey_started(request, now):
+                return RedirectResponse(back, status_code=303)
+            token, challenge = _new_passkey_challenge(now, "step" if step else "signin", account_id)
+            options = pk.authentication_options(rp, challenge=challenge, allowed=allowed)
+            action = (
+                account_pages.passkey_step_path(locale)
+                if step
+                else account_pages.passkey_signin_path(locale)
+            ) + "/entrar"
+            return _passkey_page(
+                request,
+                locale=locale,
+                csrf=_anon_csrf(request),
+                mode="get",
+                options=options,
+                action=action,
+                back=back,
+                next_path=next_path,
+                token=token,
+                anon=True,
+            )
+
+        return handler
+
+    def _passkey_signin_finish(path_locale: str, *, step: bool) -> Callable[..., Response]:
+        """Check the device's answer and open the session."""
+
+        def handler(
+            request: Request,
+            credential: Annotated[str, Form(max_length=pk.MAX_CREDENTIAL_CHARS)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            next: Annotated[str, Form(max_length=1000)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            next_path = acct.safe_next(next)
+            new_csrf = _anon_csrf(request)
+            rp = _rp(request)
+
+            def again(error: str, status: int) -> Response:
+                page = account_pages.signin_page(
+                    locale=locale,
+                    csrf=new_csrf,
+                    error=error,
+                    next_path=next_path,
+                    passkeys=rp is not None,
+                )
+                return _anon_page(page, new_csrf, status)
+
+            if not _anon_ok(request, csrf) or _cross_site(request):
+                return again("csrf", 400)
+            if rp is None:
+                return again("passkey_unavailable", 400)
+            now = datetime.now(UTC)
+            pending = _challenge(request) if step else None
+            if step and pending is None:
+                return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
+            taken = _take_passkey_challenge(request, "step" if step else "signin", now)
+            if taken is None or (pending is not None and taken[1] != pending[1]):
+                return again("passkey_expired", 400)
+            credential_id = pk.credential_id(credential)
+            found = db.find_passkey(credential_id, rp.rp_id) if credential_id else None
+            if found is None or (pending is not None and found[0] != pending[1]):
+                return again("passkey_failed", 400)
+            used = pk.verify_use(
+                rp, credential, challenge=taken[0], public_key=found[1], sign_count=found[2]
+            )
+            if used is None or used.credential_id != credential_id:
+                return again("passkey_failed", 400)
+            if not db.use_passkey(
+                credential_id, old_count=found[2], new_count=used.new_sign_count, at=now
+            ):
+                return again("passkey_failed", 400)
+            account = db.get_account(found[0])
+            if account is None:
+                return again("passkey_failed", 400)  # pragma: no cover - deleted meanwhile
+            db.purge_sessions(now)
+            if pending is not None:
+                db.end_two_step_challenge(pending[0])
+            if next_path:
+                response: Response = RedirectResponse(next_path, status_code=303)
+            else:
+                response = _account_redirect(account.locale if lang is None else locale)
+            response.delete_cookie(pk.COOKIE, path="/")
+            response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
+            _start_session(response, account, request, event="signin_passkey")
+            return response
+
+        return handler
 
     def _signout_post(path_locale: str) -> Callable[..., Response]:
         def handler(
@@ -1811,6 +2150,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     strategies=db.list_strategies(account.id),
                     recovery_created=db.recovery_key_created(account.id) or "",
                     two_step_since=db.two_step_on(account.id),
+                    passkeys=db.list_passkeys(account.id),
+                    passkey_site=rp.rp_id if (rp := _rp(request)) is not None else "",
                     sessions=db.list_sessions(account.id, now, current=session_hash),
                     # Up to 5 wrong-password lines beside 20 real events, so
                     # failures never push the real ones off the card.
@@ -2538,6 +2879,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             _session_end(path_locale, others=True),
             methods=["POST"],
         )
+        passkeys_base = account_pages.passkeys_path(path_locale)
+        app.add_api_route(passkeys_base, _passkey_add_start(path_locale), methods=["POST"])
+        app.add_api_route(
+            passkeys_base + "/guardar", _passkey_add_finish(path_locale), methods=["POST"]
+        )
+        app.add_api_route(passkeys_base + "/quitar", _passkey_remove(path_locale), methods=["POST"])
+        for passkey_path, step in (
+            (account_pages.passkey_signin_path(path_locale), False),
+            (account_pages.passkey_step_path(path_locale), True),
+        ):
+            app.add_api_route(
+                passkey_path, _passkey_signin_start(path_locale, step=step), methods=["POST"]
+            )
+            app.add_api_route(
+                passkey_path + "/entrar",
+                _passkey_signin_finish(path_locale, step=step),
+                methods=["POST"],
+            )
         two_step = account_pages.two_step_path(path_locale)
         app.add_api_route(two_step, _two_step_get(path_locale), **html_get)
         app.add_api_route(two_step, _two_step_post(path_locale), methods=["POST"])
