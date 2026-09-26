@@ -293,10 +293,17 @@ exactly one CSV, TXT, TSV, HTML or Excel file (`__MACOSX/` copies and hidden
 files are ignored; the file inside obeys the same size limit). A web page
 that is not a MetaTrader report is read as a trade or fill table with the
 universal reader, which covers the tables brokers save with a `.xls` name;
+an OpenDocument spreadsheet (`.ods`, LibreOffice; recognised by its `mimetype`
+member) is read like an Excel workbook, with the standard library only and the
+same member, inflated-size and cell limits: numbers, currency and percentages
+come from the cell's stored value, dates and times from its ISO value, and the
+blank rows and cells a sheet repeats to its edge are never laid out (a repeated
+row with values counts toward the cell limit). It goes through the same
+detection and column screen as a workbook, so no layout is guessed;
 if no importer knows it, the column screen offers its columns. Files that
 cannot be read are refused with how to get one that can: an old binary
-Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument sheet
-(`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
+Excel workbook (`legacy_xls`: save it as .xlsx or CSV), an OpenDocument file
+that is not a spreadsheet (`opendocument_sheet`), a PDF statement (`pdf_statement`: download the CSV,
 Excel or HTML history), and a zip with none or several exports
 (`zip_contents`). An Interactive Brokers Flex Query statement in XML (its
 default format, `<FlexQueryResponse>`) is read as the Flex CSV: one row per
@@ -1402,13 +1409,42 @@ year compounded over the calendar days (only from one year of history,
 shown after US inflation: each point is divided by US consumer prices
 (`CPIAUCNS`, not seasonally adjusted, as BLS recommends for deflating between
 arbitrary dates) of its own month or the latest month published, at most 75 days
-old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. The
-deflator is US only (FRED has no current consumer price index for most of the
-other currencies), so the currency figures are before their own inflation and
-the note says so. It runs only for a dollar account: an imported report that
-names `USD` or `USC` (or `USDT`/`USDC`, read at one dollar per coin, which the
-note says), or a file that names no currency, in which case a line
-says it is read as dollars; another named currency leaves it NOT_MEASURED.
+old (`MAX_CPI_GAP_DAYS`), with the inflation over the dates beside it. Each
+currency's row is followed by the same figures after that currency's own
+inflation (`market.LOCAL_CPI`): the levels in that currency divided by the
+country's official consumer price index of each point's month, or the latest
+month published, at most 75 days old (`MAX_CPI_GAP_DAYS`). FRED's copies of
+these indexes stopped updating (2021-2025), so each comes from an official
+publisher whose terms allow reuse in a paid service with attribution, read at
+run time with no key: the euro area's HICP (Eurostat, through FRED,
+`CP0000EZ19M086NEST`), Switzerland's HICP (Eurostat API, `prc_hicp_minr`,
+`CH`), the UK's CPI (ONS time series `D7BT`, Open Government Licence v3.0),
+Canada's CPI (Statistics Canada's, through the Bank of Canada's Valet API,
+`V41690973`; the Bank asks paid services to say the data is free on its
+site, and the credit line does) and Brazil's IPCA (IBGE's, through the Banco
+Central do Brasil's SGS series 433, monthly changes chained into an index
+from January 1995; a month beyond ±50 %, or a missing, repeated or unreadable
+month, refuses the reply, since a broken link would leave its inflation out of
+every later level). The IMF's CPI
+dataset, which covers every currency, needs written permission for
+commercial reuse, and Mexico's (INEGI, Banxico) and Japan's (e-Stat)
+official APIs need a registered key, so the peso and the yen show no row
+after inflation yet, and the note says so. Each row after inflation credits
+its source by name and link, as each licence asks; `/metodologia` lists
+them too. Non-FRED providers get the User-Agent `PROVIDER_AGENT` (the ONS
+refuses Python's default); FRED keeps the default. It runs for a dollar
+account: an imported report that names `USD` or `USC` (or `USDT`/`USDC`,
+read at one dollar per coin, which the note says), or a file that names no
+currency, in which case a line says it is read as dollars. When a report
+names EUR, GBP, CAD, CHF or BRL, the section shows the account in that
+currency and after that currency's inflation, with the local inflation over
+the dates; without those prices it is NOT_MEASURED with the reason. Another
+named currency leaves it NOT_MEASURED. A price index reply below 1 or above
+10,000,000, or with two consecutive months more than 3 times apart
+(`MAX_PRICE_STEP`), is taken as broken. When the last point is more than 45
+days past the start of the last price month used (`STALE_TAIL_DAYS`), the row
+after inflation says "prices through {month}": the months after it are not
+deflated. The same applies to the dollar row after US inflation.
 Needs 90 days of history. A reply above 10,000 for any of these series is
 taken as broken. It never changes the class.
 

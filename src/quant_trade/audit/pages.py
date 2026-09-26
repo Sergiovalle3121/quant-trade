@@ -2198,7 +2198,7 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
 
 #: What the file pickers offer for a platform file: web pages (and the tables
 #: brokers save as .xls), text tables, workbooks and a zip holding one export.
-REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.xml,.zip"
+REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip"
 
 
 def _upload_form(
@@ -2326,7 +2326,7 @@ def _upload_form(
         + _drop(
             "equity",
             copy["equity"],
-            ".csv,.txt,.tsv,.xlsx,text/csv",
+            ".csv,.txt,.tsv,.xlsx,.ods,text/csv",
             _e(copy["equity_help"]),
             locale,
         )
@@ -2966,6 +2966,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["repro_title"], bullets(words["repro"])),
                 (words["limits_title"], bullets(words["limits"], "minus")),
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
+                (words["data_title"], bullets(words["data"])),
             ],
             locale,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
