@@ -547,6 +547,25 @@ LABELS: dict[str, dict[str, str]] = {
         "ride_positive": (
             "Meses en positivo ({k} de {n}); racha más larga de meses en negativo: {run}"
         ),
+        "ride_calmar": (
+            "Ratio Calmar sobre {years} años: retorno anual compuesto dividido entre la peor "
+            "caída"
+        ),
+        "ride_tail_day": "Rentabilidad media por día en el peor 5 % de los días ({k} de {n})",
+        "ride_tail_month": "Rentabilidad media por mes en el peor 5 % de los meses ({k} de {n})",
+        "ride_day_one": "1 día",
+        "falls_title": "Las peores caídas",
+        "falls_intro": (
+            "Cada caída va del último punto en un máximo a su punto más bajo y termina en la "
+            "primera fecha de vuelta en ese máximo. Una que no vuelve antes de la última fecha del"
+            " archivo sigue abierta."
+        ),
+        "falls_depth": "Caída",
+        "falls_down": "Del máximo al mínimo",
+        "falls_back": "De vuelta al máximo",
+        "falls_total": "Duración total",
+        "falls_below": "Meses por debajo del máximo",
+        "falls_open": "sigue abierta",
         "ride_closed": (
             "La curva se reconstruye con operaciones cerradas: las pérdidas abiertas no se ven, "
             "así que las caídas reales duraron y midieron al menos esto."
@@ -1845,6 +1864,24 @@ LABELS: dict[str, dict[str, str]] = {
         "ride_worst_day": "Worst day ({date})",
         "ride_worst_month": "Worst month ({month})",
         "ride_positive": "Months that ended up ({k} of {n}); longest run of losing months: {run}",
+        "ride_calmar": (
+            "Calmar ratio over {years} years: compound annual return divided by the deepest "
+            "fall"
+        ),
+        "ride_tail_day": "Average return per day in the worst 5 % of days ({k} of {n})",
+        "ride_tail_month": "Average return per month in the worst 5 % of months ({k} of {n})",
+        "ride_day_one": "1 day",
+        "falls_title": "The deepest falls",
+        "falls_intro": (
+            "Each fall runs from the last point at a high to its lowest point and ends on the "
+            "first date back at that high. One not back by the file's last date is still open."
+        ),
+        "falls_depth": "Fall",
+        "falls_down": "High to low",
+        "falls_back": "Back at the high",
+        "falls_total": "Total length",
+        "falls_below": "Months below the high",
+        "falls_open": "still open",
         "ride_closed": (
             "The curve is rebuilt from closed trades: open losses do not show, so the real "
             "falls lasted and measured at least this much."
@@ -5604,6 +5641,7 @@ def _ride_html(
                 ),
             )
         )
+    cells += _ride_ratio_cells(ride, labels)
     facts = "".join(
         f"<div class='fact{cls}'><b>{_e(value)}</b><p>{_e(text)} {_badge(item['evidence'])}"
         "</p></div>"
@@ -5613,10 +5651,106 @@ def _ride_html(
     out += f"<div class='facts{grid}'>{facts}</div>"
     if fell and not ride.get("recovered"):
         out += f"<p class='muted'>{_e(labels['ride_not_back_note'])}</p>"
+    out += _falls_html(ride, locale, labels, monthly=False)
     if closed_only:
         out += f"<p class='muted'>{_e(labels['ride_closed'])}</p>"
     out += f"<p class='muted'>{_e(_sentence(localize(ride.get('note', ''), locale)))}</p>"
     return out
+
+
+def _ride_ratio_cells(
+    ride: dict[str, Any], labels: dict[str, str], *, days: bool = True
+) -> list[tuple[str, str, dict[str, Any], str]]:
+    """The Calmar ratio and the average of the worst 5 % of days and months."""
+    cells: list[tuple[str, str, dict[str, Any], str]] = []
+    calmar = ride.get("calmar") or {}
+    if calmar.get("evidence") == "MEASURED":
+        value = float(calmar["value"])
+        years = float(calmar.get("years") or 0)
+        text = labels["ride_calmar"].format(years=f"{years:.1f}")
+        cells.append((" neg" if value < 0 else "", f"{value:.2f}", calmar, text))
+    for key, label in (("tail_day", "ride_tail_day"), ("tail_month", "ride_tail_month")):
+        tail = ride.get(key) or {}
+        if tail.get("evidence") != "MEASURED" or (key == "tail_day" and not days):
+            continue
+        value = float(tail["value"])
+        cells.append(
+            (
+                " neg" if value < 0 else "",
+                _pct(value, signed=True),
+                tail,
+                labels[label].format(k=int(tail["count"]), n=int(tail["of"])),
+            )
+        )
+    return cells
+
+
+def _months_between(start: str, end: str) -> int:
+    """Calendar months from the month of ``start`` to the month of ``end``."""
+    return (int(end[:4]) - int(start[:4])) * 12 + int(end[5:7]) - int(start[5:7])
+
+
+def _falls_html(
+    ride: dict[str, Any] | None, locale: str, labels: dict[str, str], *, monthly: bool
+) -> str:
+    """The deepest falls, each from its high to its low and back, as a fact sheet lists them.
+
+    ``monthly`` shows a monthly record's dates as months and its lengths in months.
+    """
+    falls = (ride or {}).get("worst_falls") or []
+    if not falls:
+        return ""
+
+    def when(iso: str) -> str:
+        text = _date_text(iso, locale)
+        return text.split(" ", 1)[1] if monthly else text
+
+    def length(start: str, end: str, days: int) -> str:
+        if monthly:
+            months = _months_between(start, end)
+            return labels["luck_month_one" if months == 1 else "luck_months"].format(n=months)
+        if days == 1:
+            return labels["ride_day_one"]
+        return labels["ride_days"].format(n=f"{days:,}")
+
+    last = "falls_below" if monthly else "falls_total"
+    heads = tuple(labels[key] for key in ("falls_depth", "falls_down", "falls_back", last))
+    rows = ""
+    for fall in falls:
+        end = fall.get("to")
+        down = (
+            f"{when(fall['from'])} → {when(fall['low'])} "
+            f"({length(fall['from'], fall['low'], int(fall['fall_days']))})"
+        )
+        back = (
+            f"{when(end)} ({length(fall['low'], end, int(fall['recovery_days']))})"
+            if end
+            else labels["falls_open"]
+        )
+        # An open fall's length runs to the file's last date.
+        total = length(fall["from"], fall["until"], int(fall["days"]))
+        if monthly:
+            # Months below the high, as the fund's own tile counts them: the
+            # month back at the high is not one of them.
+            below = _months_between(fall["from"], fall["until"]) - (1 if end else 0)
+            total = labels["luck_month_one" if below == 1 else "luck_months"].format(n=below)
+        cells = (
+            (" val neg", _pct(float(fall["depth"]["value"]), signed=True)),
+            ("", down),
+            ("", back),
+            (" val", total),
+        )
+        rows += "<tr>" + "".join(
+            f"<td class='{cls.strip()}' data-l='{_e(head)}'>{_e(text)}</td>"
+            for (cls, text), head in zip(cells, heads, strict=True)
+        ) + "</tr>"
+    head_row = "".join(f"<th>{_e(head)}</th>" for head in heads)
+    return (
+        f"<h3>{_e(labels['falls_title'])} {_badge('MEASURED')}</h3>"
+        f"<table class='timing falls'><thead><tr>{head_row}</tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+        f"<p class='muted'>{_e(labels['falls_intro'])}</p>"
+    )
 
 
 def _duration_text(hours: float, locale: str) -> str:
@@ -5792,7 +5926,12 @@ def _fund_calendar(years: list[dict[str, Any]], labels: dict[str, str]) -> str:
     )
 
 
-def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+def _fund_html(
+    fund: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    ride: dict[str, Any] | None = None,
+) -> str:
     """A monthly track record read the way a fund investor reads it."""
     if not fund or fund.get("status") != "MEASURED":
         return ""
@@ -5865,7 +6004,12 @@ def _fund_html(fund: dict[str, Any] | None, locale: str, labels: dict[str, str])
             neg=not recovered,
         ),
     ]
-    out += f"<div class='facts pairs'>{''.join(facts)}</div>"
+    measured_ride = ride if (ride or {}).get("status") == "MEASURED" else None
+    for cls, value, item, text in _ride_ratio_cells(measured_ride or {}, labels, days=False):
+        facts.append(tile(value, text, item["evidence"], neg=cls == " neg"))
+    grid = " pairs" if len(facts) % 2 == 0 else ""
+    out += f"<div class='facts{grid}'>{''.join(facts)}</div>"
+    out += _falls_html(measured_ride, locale, labels, monthly=True)
     out += _fund_calendar(fund.get("years") or [], labels)
     out += _fund_benchmark_html(fund, locale, labels)
     out += _fund_fees_html(fund.get("fees"), labels)
@@ -7095,7 +7239,7 @@ def render_html(
             else []
         ),
         *(
-            [(labels["fund"], _fund_html(data.get("fund"), locale, labels))]
+            [(labels["fund"], _fund_html(data.get("fund"), locale, labels, data.get("ride")))]
             if (data.get("fund") or {}).get("status") == "MEASURED"
             else []
         ),

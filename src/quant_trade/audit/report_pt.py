@@ -397,6 +397,25 @@ REPORT: dict[str, Any] = {
         "ride_positive": (
             "Meses no positivo ({k} de {n}); maior sequência de meses no negativo: {run}"
         ),
+        "ride_calmar": (
+            "Índice Calmar em {years} anos: retorno anual composto dividido pela maior "
+            "queda"
+        ),
+        "ride_tail_day": "Rentabilidade média por dia nos piores 5 % dos dias ({k} de {n})",
+        "ride_tail_month": "Rentabilidade média por mês nos piores 5 % dos meses ({k} de {n})",
+        "ride_day_one": "1 dia",
+        "falls_title": "As quedas mais profundas",
+        "falls_intro": (
+            "Cada queda vai do último ponto em uma máxima até o seu ponto mais baixo e termina na "
+            "primeira data de volta a essa máxima. Uma que não volta antes da última data do "
+            "arquivo continua aberta."
+        ),
+        "falls_depth": "Queda",
+        "falls_down": "Da máxima ao mínimo",
+        "falls_back": "De volta à máxima",
+        "falls_total": "Duração total",
+        "falls_below": "Meses abaixo da máxima",
+        "falls_open": "continua aberta",
         "ride_closed": (
             "A curva é reconstruída com operações fechadas: as perdas abertas não aparecem, "
             "então as quedas reais duraram e mediram pelo menos isto."
@@ -4702,6 +4721,34 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "fewer than three calendar months",
         "menos de três meses corridos",
+    ),
+    (
+        "fewer than 81 days; the worst 5 % would hold fewer than 5",
+        "menos de 81 dias; os piores 5 % teriam menos de 5",
+    ),
+    (
+        "fewer than 40 months; the worst 5 % would hold fewer than 2",
+        "menos de 40 meses; os piores 5 % teriam menos de 2",
+    ),
+    (
+        "average of the worst 5 % of the days",
+        "média dos piores 5 % dos dias",
+    ),
+    (
+        "average of the worst 5 % of the months",
+        "média dos piores 5 % dos meses",
+    ),
+    (
+        "compound annual return over the depth of the deepest fall",
+        "retorno anual composto dividido pela profundidade da maior queda",
+    ),
+    (
+        "under a year of history; it divides an annual return",
+        "menos de um ano de histórico; ele divide um retorno anual",
+    ),
+    (
+        "the deepest fall is under 1 %, too shallow to divide by",
+        "a maior queda é de menos de 1 %, pouco demais para dividir por ela",
     ),
     (
         "calendar days from the uploaded equity curve; months from each month's last point",
