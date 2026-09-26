@@ -85,6 +85,8 @@ def test_an_mt5_report_alone_gives_trades_and_a_balance_curve() -> None:
 def test_report_digest_names_keep_only_known_extensions() -> None:
     assert report_digest_name("a.HTM") == "report.htm"
     assert report_digest_name("list.xlsx") == "report.xlsx"
+    assert report_digest_name("history.ZIP") == "report.zip"
+    assert report_digest_name("movimientos.xls") == "report.xls"
     assert report_digest_name("x.exe") == "report.bin"
     assert report_digest_name(None) == "report.bin"
 
