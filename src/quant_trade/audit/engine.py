@@ -34,6 +34,7 @@ from quant_trade.audit import account as account_lib
 from quant_trade.audit import alpha as alpha_lib
 from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import behaviour as behaviour_lib
+from quant_trade.audit import breaks as breaks_lib
 from quant_trade.audit import cashrate as cashrate_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import crises as crises_lib
@@ -1438,6 +1439,10 @@ def run_audit(
         else ({"status": "NOT_MEASURED", "reason": "no trades uploaded"}, [])
     )
     flags.extend(recent_flags)
+    try:
+        shift = breaks_lib.mean_shift(inputs.equity.frame, inputs.periods_per_year)
+    except Exception:  # noqa: BLE001 (an informational block must never stop an audit)
+        shift = {"status": "NOT_MEASURED", "reason": breaks_lib.FLAT}
     behaviour = (
         behaviour_lib.behaviour_review(inputs.trades.trades, inputs.trades.fees)
         if inputs.trades is not None
@@ -1699,6 +1704,7 @@ def run_audit(
         plateau=plateau,
         forward=forward,
         recent=recent,
+        mean_shift=shift,
         behaviour=behaviour,
         instruments=instruments,
         fund=fund,

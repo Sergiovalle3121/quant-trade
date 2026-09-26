@@ -1280,6 +1280,11 @@ STATS = """
 .read-line{border-left:3px solid var(--text);padding:2px 0 2px 14px;margin:14px 0;font-weight:500;color:var(--text)}
 table.timing tr.fee-classic td{border-top:2px solid var(--border-2);font-weight:600}
 .kpis+p{margin-top:14px}
+@media screen and (max-width:620px){.facts.pairs{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.facts.pairs .fact{padding:16px 16px 14px;border-radius:16px}
+.facts.pairs .fact b{font-size:1.5rem;overflow-wrap:anywhere}
+.facts.pairs .fact p{font-size:.84rem;line-height:1.45}
+.facts.pairs .fact p .badge{margin-top:6px}}
 table.skill th.val,table.skill td.val{text-align:right;white-space:nowrap}
 table.skill td.val{font-variant-numeric:tabular-nums}
 table.skill tr.skill-total td{border-top:2px solid var(--border-2);background:var(--surface-2)}

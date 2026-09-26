@@ -407,6 +407,19 @@ COPY: dict[str, dict[str, str]] = {
         "notice_more_devices": "Y {count} entradas más desde otros dispositivos nuevos.",
         "notice_help": "Si no fuiste tú, cambia tu contraseña y cierra las demás sesiones.",
         "notice_link": "Ver la actividad reciente",
+        "protect_title": "Protección de tu cuenta",
+        "protect_count": "{on} de {total} activas",
+        "protect_all": "Tienes activas todas las protecciones que ofrecemos.",
+        "protect_recovery": "Clave de recuperación",
+        "protect_two_step": "Verificación en dos pasos",
+        "protect_two_step_why": "Además de la contraseña, un código de una app en tu teléfono.",
+        "protect_two_step_needs": "Primero crea tu clave de recuperación.",
+        "protect_passkey": "Llave de acceso",
+        "protect_passkey_why": "Entra con la huella, la cara o el PIN, sin escribir la contraseña.",
+        "protect_on": "Activa",
+        "protect_go_recovery": "Crear",
+        "protect_go_two_step": "Activar",
+        "protect_go_passkey": "Añadir",
         "passkey_card": "Llaves de acceso",
         "passkey_help": (
             "Entra con la huella, la cara o el PIN de tu teléfono o computadora, sin escribir "
@@ -916,6 +929,21 @@ COPY: dict[str, dict[str, str]] = {
         "notice_more_devices": "And {count} more sign-ins from other new devices.",
         "notice_help": "If it was not you, change your password and sign out the other sessions.",
         "notice_link": "See recent activity",
+        "protect_title": "Your account's protection",
+        "protect_count": "{on} of {total} on",
+        "protect_all": "Every protection we offer is on.",
+        "protect_recovery": "Recovery key",
+        "protect_two_step": "Two-step sign-in",
+        "protect_two_step_why": "Besides the password, a code from an app on your phone.",
+        "protect_two_step_needs": "Make your recovery key first.",
+        "protect_passkey": "Passkey",
+        "protect_passkey_why": (
+            "Sign in with your fingerprint, face or PIN, without typing the password."
+        ),
+        "protect_on": "On",
+        "protect_go_recovery": "Make",
+        "protect_go_two_step": "Turn on",
+        "protect_go_passkey": "Add",
         "passkey_card": "Passkeys",
         "passkey_help": (
             "Sign in with your phone's or computer's fingerprint, face or PIN, without typing "
@@ -1216,6 +1244,12 @@ padding:10px 0;border-top:1px solid var(--border)}
 .pk-list li:first-child{border-top:0}
 .pk-list strong{display:block;overflow-wrap:anywhere}
 .acct-passkey-alt{margin-top:18px}
+.acct-protect{margin:0 0 24px}
+.acct-protect h3 svg{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
+.protect-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin:8px 0 4px}
+.protect-bar span{display:block;height:100%;background:var(--ok)}
+.protect-list li.is-on strong{color:var(--text-2)}
+.protect-list .acct-tag svg{width:14px;height:14px;vertical-align:-2px;margin-right:4px}
 @media (max-width:760px){.act-table thead{display:none}
 .paper table.act-table,.act-table{border:0;background:none;box-shadow:none;overflow:visible}
 .act-table,.act-table tbody{display:block}
@@ -2021,12 +2055,13 @@ def account_page(
         if recovery_created
         else copy["recovery_missing"]
     )
-    # Without a key, a forgotten password needs the owner: say so near the top.
-    recovery_nudge = (
-        ""
-        if recovery_created
-        else f"<p class='acct-nudge'>{icon('shield')}<span>{_e(copy['recovery_nudge'])}</span> "
-        f"<a href='#recuperacion'>{_e(copy['recovery_make'])}</a></p>"
+    # What protects the account and what is still off, near the top: without
+    # a key, a forgotten password needs the owner.
+    recovery_nudge = _protection_card(
+        copy,
+        recovery=bool(recovery_created),
+        two_step=bool(two_step_since),
+        passkey=bool(passkeys) if (passkey_site or passkeys) else None,
     )
     if two_step_since:
         two_step_card = (
@@ -2228,6 +2263,57 @@ __all__ = [
 def two_step_path(locale: str) -> str:
     """Where a two-step account types its app's code after the password."""
     return path("signin", locale) + ("/code" if _locale(locale) == "en" else "/codigo")
+
+
+def _protection_card(
+    copy: dict[str, str], *, recovery: bool, two_step: bool, passkey: bool | None
+) -> str:
+    """ "Protección de tu cuenta": each protection, on or how to turn it on.
+
+    ``passkey`` is ``None`` where passkeys cannot be used (another address).
+    """
+    items: list[tuple[str, bool, str, str, str]] = [
+        ("recovery", recovery, copy["recovery_nudge"], "#recuperacion", "protect_go_recovery"),
+        (
+            "two_step",
+            two_step,
+            copy["protect_two_step_why" if recovery else "protect_two_step_needs"],
+            "#dos-pasos" if recovery else "#recuperacion",
+            "protect_go_two_step",
+        ),
+    ]
+    if passkey is not None:
+        items.append(
+            ("passkey", passkey, copy["protect_passkey_why"], "#llaves", "protect_go_passkey")
+        )
+    on = sum(1 for item in items if item[1])
+    total = len(items)
+    if on == total:
+        return (
+            f"<p class='acct-nudge acct-protect-ok'>{icon('shield')}"
+            f"<span>{_e(copy['protect_all'])}</span></p>"
+        )
+    rows = ""
+    for name, done, why, anchor, go in items:
+        state = (
+            f"<span class='acct-tag'>{icon('check')}{_e(copy['protect_on'])}</span>"
+            if done
+            else f"<a class='btn btn-ghost btn-sm' href='{anchor}'>{_e(copy[go])}</a>"
+        )
+        rows += (
+            f"<li class='{'is-on' if done else 'is-off'}'><span><strong>"
+            f"{_e(copy['protect_' + name])}</strong>"
+            + ("" if done else f"<span class='muted'>{_e(why)}</span>")
+            + f"</span>{state}</li>"
+        )
+    return (
+        "<div class='acct-card acct-protect' id='proteccion'>"
+        f"<h3>{icon('shield')}{_e(copy['protect_title'])}</h3>"
+        f"<p class='muted'>{_e(copy['protect_count'].format(on=on, total=total))}</p>"
+        f"<div class='protect-bar' role='presentation'>"
+        f"<span style='width:{round(100 * on / total)}%'></span></div>"
+        f"<ul class='pk-list protect-list'>{rows}</ul></div>"
+    )
 
 
 def _passkey_suffix(locale: str) -> str:
