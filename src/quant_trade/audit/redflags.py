@@ -124,6 +124,7 @@ def scan(
     variants_columns: int = 0,
     real_fills: bool = False,
     net_of_fees: bool = False,
+    fund_record: bool = False,
 ) -> list[RedFlag]:
     flags: list[RedFlag] = []
     frame = series.frame
@@ -278,12 +279,13 @@ def scan(
     # A report that itemises commission and fees has measured costs even
     # when the client declares none, and so has an account history: its
     # prices are the broker's real fills.
-    # A fund's own track record declared net of its fees has no costs left
-    # to declare (``net_of_fees`` is only ever true for one).
+    # A fund's own monthly track record has no per-side cost to declare: its
+    # trading costs are inside each month, and its fees are shown on their own.
     if (
         declared.cost_bps_per_side == 0
         and not real_fills
         and not net_of_fees
+        and not fund_record
         and not (trades is not None and trades.reports_fees)
     ):
         flags.append(

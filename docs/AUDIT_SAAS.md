@@ -1241,11 +1241,23 @@ fees, so the upload form has a box for it ("Son rentabilidades de un fondo,
 ya netas de sus comisiones"). It is honoured only for a fund track record: a
 hand-made return or NAV file (or factsheet table) at 13 or fewer periods a
 year, with no trades, platform report or live history (`engine.fund_record`).
-There it drops `ZERO_DECLARED_COSTS`, the section shows the declaration as
+There it drops `ZERO_DECLARED_COSTS` (which no fund record raises now: its
+trading costs are inside each month), the section shows the declaration as
 DECLARED and says Rigor did not measure costs, and the report is titled
 "Auditoría de historial de fondo". Anywhere else the box is ignored with a
 warning and costs are checked as usual. The observation thresholds do not
 change, and the costs dimension stays NOT_MEASURED.
+
+A fund record in the verdict and the plan. With no out-of-sample start
+declared, the out-of-sample reason reads "a fund's record does not say since
+when its process has run unchanged" (`verdict.FUND_OOS_REASON`). The
+dimension card, the summary and the plan ask the manager since when the
+process has been unchanged and whether any stretch is simulated (pro forma),
+not for an optimisation date or an unchanged robot. The costs step asks
+whether the figures are net of the management and performance fees, instead
+of a platform report. Undeclared trials read as how many funds or strategies
+the same manager runs. The caps do not change: out of sample and costs stay
+NOT_MEASURED, and the best class without them is B.
 
 Against its benchmark. Factsheets print the benchmark's months next to the
 fund's, so the equity file may carry it:
@@ -1288,9 +1300,23 @@ benchmark's; each needs 6 such months). Findings, as questions:
 No index data is bundled: the benchmark is the customer's, as supplied, and
 the note says Rigor did not check it against the index. When the fund's
 figures are not declared net of fees, the section says the comparison
-flatters a fund whose figures are before fees. It never feeds the benchmark
-dimension (that reads only the uploaded benchmark file, as before), so the
-class does not move.
+flatters a fund whose figures are before fees. When no benchmark file is
+uploaded, the same index also feeds the benchmark dimension
+(`engine._file_benchmark`): it is laid on the curve's own dates, the first
+point is the base both start from, and it is used only when it gives a return
+for every later point (else the dimension stays NOT_MEASURED). The section
+then carries `source: "file"`, the overlap row says "the index the file
+itself carries", and the plan step says the reference is the file's own
+index. A fund that trails its own index fails the dimension like any other
+upload. An uploaded benchmark file still wins, and a declared "no applicable
+benchmark" still makes it NOT_APPLICABLE. A month in which the fund or its
+index loses 100 % or more (most often a typo in a factsheet) leaves the
+section NOT_MEASURED ("a month in the fund or its benchmark loses 100% or
+more") instead of dividing by a compound growth of zero.
+The index in the file is the one the manager chose to print, so a PASS
+against it is not an independent check: `verdict.overall_class(own_index=True)`
+lets it complete a B but never an A (a FAIL or WEAK counts as usual), and the
+plan's "what would change the class" follows the same rule.
 
 What fees would take (`fund.fee_drag`). On a fund record not declared net
 of fees, a table shows the yearly return and total growth with a yearly fee

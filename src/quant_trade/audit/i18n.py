@@ -901,6 +901,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the fund's own returns after its fees; costs were not measured",
         "rentabilidades del propio fondo tras sus comisiones; los costes no se midieron",
     ),
+    ("the index the file itself carries", "el índice que trae el propio archivo"),
+    (
+        "a fund's record does not say since when its process has run unchanged",
+        "el historial del fondo no dice desde cuándo su proceso opera sin cambios",
+    ),
     (
         "the net-of-fees declaration applies only to a monthly fund track record; costs are "
         "checked as usual",
@@ -1234,6 +1239,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "the benchmark's monthly returns do not vary",
         "las rentabilidades mensuales del índice de referencia no varían",
+    ),
+    (
+        "a month in the fund or its benchmark loses 100% or more",
+        "un mes del fondo o de su índice de referencia pierde el 100 % o más",
     ),
     (
         "needs at least {n} months with the benchmark up",
