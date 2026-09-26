@@ -438,6 +438,40 @@ def totp_uri(secret: str, email: str, issuer: str) -> str:
     )
 
 
+_BROWSERS = (
+    ("Edg/", "Edge"),
+    ("OPR/", "Opera"),
+    ("SamsungBrowser/", "Samsung Internet"),
+    ("Firefox/", "Firefox"),
+    ("FxiOS/", "Firefox"),
+    ("CriOS/", "Chrome"),
+    ("Chrome/", "Chrome"),
+    ("Safari/", "Safari"),
+)
+_SYSTEMS = (
+    ("iPhone", "iPhone"),
+    ("iPad", "iPad"),
+    ("Android", "Android"),
+    ("Windows", "Windows"),
+    ("Mac OS X", "Mac"),
+    ("Macintosh", "Mac"),
+    ("CrOS", "ChromeOS"),
+    ("Linux", "Linux"),
+)
+
+
+def device_label(user_agent: str) -> str:
+    """A short label for "Sesiones abiertas", such as ``Chrome · Windows``.
+
+    Only the label is kept, never the browser's full string; an unknown
+    browser or system reads ``?``.
+    """
+    agent = user_agent[:512]
+    browser = next((name for mark, name in _BROWSERS if mark in agent), "?")
+    system = next((name for mark, name in _SYSTEMS if mark in agent), "?")
+    return f"{browser} · {system}"
+
+
 def hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
 

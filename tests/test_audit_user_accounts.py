@@ -2546,6 +2546,7 @@ def test_signing_in_with_two_step_needs_a_fresh_code_from_the_app(tmp_path: Path
     assert other.get("/cuenta", follow_redirects=False).status_code == 303
     page = other.get("/entrar/codigo").text
     assert "Escribe el código de tu app" in page and "Perdiste el teléfono" in page
+    assert ">Volver al inicio de sesión</a>" in page and ">Entra</a>" not in page
     assert _enter_code(other, "000000").status_code == 400
     # The code that confirmed the setup was used; it does not sign in.
     assert _enter_code(other, _code(secret)).status_code == 400
@@ -2738,5 +2739,154 @@ def test_the_two_step_screens_exist_in_every_language(tmp_path: Path) -> None:
         jurisdiction="Leyes de México",
     )
     for locale, words in (("es", "verificación en dos pasos"), ("en", "two-step sign-in")):
+        privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
+        assert words in privacy and not find_claims(privacy)
+
+
+LAPTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0"
+PHONE_UA = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+)
+
+
+def test_device_labels_keep_only_browser_and_system() -> None:
+    from quant_trade.audit import accounts
+
+    assert accounts.device_label(LAPTOP_UA) == "Firefox · Windows"
+    assert accounts.device_label(PHONE_UA) == "Safari · iPhone"
+    chrome_mac = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/128.0 Safari/537.36"
+    )
+    assert accounts.device_label(chrome_mac) == "Chrome · Mac"
+    edge = chrome_mac.replace("Macintosh; Intel Mac OS X 14_5", "Windows NT 10.0") + " Edg/128.0"
+    assert accounts.device_label(edge) == "Edge · Windows"
+    assert accounts.device_label("") == "? · ?"
+    assert accounts.device_label("<script>" * 200) == "? · ?"
+
+
+def test_open_sessions_list_devices_and_sign_out_one_or_all_others(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1)
+    client.headers.update({"User-Agent": LAPTOP_UA, "X-Forwarded-For": "2001:db8:3:3::10"})
+    _signup(client)
+    phone = TestClient(client.app)
+    phone.headers.update({"User-Agent": PHONE_UA, "X-Forwarded-For": "203.0.113.44"})
+    _signin(phone, "ana@example.com")
+    tablet = TestClient(client.app)
+    _signin(tablet, "ana@example.com")
+    page = client.get("/cuenta").text
+    assert "Sesiones abiertas" in page
+    assert "Firefox · Windows <span class='acct-tag'>este navegador</span>" in page
+    assert "Safari · iPhone" in page and "203.0.113.44" in page
+    assert "2001:db8:3:3::/64" in page and "2001:db8:3:3::10" not in page
+    assert "Cerrar todas las demás" in page
+    assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    # Only the label is stored, never the browser's full string or a token.
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = [tuple(r) for r in conn.execute(store.session_info.select()).all()]  # type: ignore[attr-defined]
+    assert len(rows) == 3 and "Mozilla" not in str(rows)
+    # Sign out the phone by its handle.
+    handles = dict(
+        re.findall(
+            r"<td>([^<]+?)(?: <span[^>]*>[^<]*</span>)?</td>.*?name='handle' value='([^']+)'", page
+        )
+    )
+    phone_handle = handles["Safari · iPhone"]
+    csrf = _csrf(page)
+    done = client.post(
+        "/cuenta/sesiones/cerrar",
+        data={"handle": phone_handle, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "done=session_ended" in done.headers["location"]
+    assert phone.get("/cuenta", follow_redirects=False).status_code == 303
+    assert tablet.get("/cuenta", follow_redirects=False).status_code == 200
+    # Another account cannot sign out ana's sessions with her handle.
+    bea = TestClient(client.app)
+    _signup(bea, "bea@example.com")
+    laptop_handle = handles["Firefox · Windows"]
+    bea.post(
+        "/cuenta/sesiones/cerrar",
+        data={"handle": laptop_handle, "csrf": _csrf(bea.get("/cuenta").text)},
+    )
+    assert client.get("/cuenta", follow_redirects=False).status_code == 200
+    # "Sign out all the others" keeps only this browser.
+    others = client.post(
+        "/cuenta/sesiones/cerrar-otras", data={"csrf": csrf}, follow_redirects=False
+    )
+    assert "done=sessions_ended" in others.headers["location"]
+    assert tablet.get("/cuenta", follow_redirects=False).status_code == 303
+    page = client.get("/cuenta").text
+    assert "Cerrar todas las demás" not in page and "Safari · iPhone" not in page
+    data = json.loads(client.get("/cuenta/datos").text)
+    assert data["sessions"][0]["device"] == "Firefox · Windows"
+    assert data["sessions"][0]["network"] == "2001:db8:3:3::/64"
+    assert data["sessions"][0]["last_used_at"]
+    # Signing out this browser's own row signs it out.
+    own = client.post(
+        "/cuenta/sesiones/cerrar",
+        data={"handle": laptop_handle, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "done=signed_out" in own.headers["location"]
+    assert client.get("/cuenta", follow_redirects=False).status_code == 303
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        left = conn.execute(store.session_info.select()).all()  # type: ignore[attr-defined]
+    assert len(left) == 1  # bea's
+
+
+def test_session_details_go_with_the_session_and_the_account(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    # A session opened before the table existed fills in on its next use.
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(store.session_info.delete())  # type: ignore[attr-defined]
+    assert "Sin datos todavía" not in client.get("/cuenta").text
+    other = TestClient(client.app)
+    _signin(other, "ana@example.com")
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(store.session_info.delete().where(store.session_info.c.account_id == ana.id))  # type: ignore[attr-defined]
+    # Listed without details until that browser comes back.
+    page = client.get("/cuenta").text
+    assert "Sin datos todavía" in page
+    other.get("/cuenta")
+    assert "Sin datos todavía" not in client.get("/cuenta").text
+    # Signing out removes the row; an expired session's row goes with the purge.
+    csrf = _csrf(other.get("/cuenta").text)
+    other.post("/salir" if False else account_pages.path("signout", "es"), data={"csrf": csrf})
+    assert len(store.list_sessions(ana.id, datetime.now(UTC))) == 1  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert len(conn.execute(store.session_info.select()).all()) == 1  # type: ignore[attr-defined]
+    store.purge_sessions(datetime.now(UTC) + timedelta(days=400))  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.session_info.select()).all() == []  # type: ignore[attr-defined]
+    _signin(other, "ana@example.com")
+    csrf = _csrf(other.get("/cuenta").text)
+    other.post("/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf})
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute(store.session_info.select()).all() == []  # type: ignore[attr-defined]
+
+
+def test_the_open_sessions_list_exists_in_every_language(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    client.headers.update({"User-Agent": PHONE_UA})
+    _signup(client)
+    for prefix, words in (
+        ("/account", "Open sessions"),
+        (account_pages.path("account", "pt"), "Sessões abertas"),
+    ):
+        page = client.get(prefix).text
+        assert words in page and "Safari · iPhone" in page, prefix
+        assert "testclient" not in page, prefix
+        assert not find_claims(re.sub(r"<[^>]+>", " ", page))
+    ctx = LegalContext(
+        operator_name="Op",
+        operator_contact="op@example.com",
+        operator_address="México",
+        jurisdiction="Leyes de México",
+    )
+    for locale, words in (("es", "Sesiones abiertas"), ("en", "Open sessions")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
         assert words in privacy and not find_claims(privacy)

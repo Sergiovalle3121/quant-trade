@@ -2097,6 +2097,17 @@ changes what a report says.
   `quant-trade audit account-two-step-off EMAIL --yes` after checking the
   request. The secret is stored as is (a code check needs it); the export
   shows only when it was turned on.
+- **Open sessions** (`session_info` table, "Sesiones abiertas" in Mi cuenta,
+  `/cuenta/sesiones/cerrar` and `/cerrar-otras`): each session keeps a short
+  device label (`accounts.device_label`, such as "Chrome · Windows"; the full
+  browser string is never stored), its network (`accounts.network_address`)
+  and its last use, updated at most every 10 minutes, with a random handle
+  to sign it out by (never the token or its hash). The list marks this
+  browser; signing out this browser's own row signs it out. Sessions opened
+  before the table existed fill in on their next use. Rows go with their
+  session (sign-out, "sign out the others", password change, expiry through
+  `purge_sessions`) and with the account; the export lists each session's
+  device, network and last use.
 - **Deletion**: the customer deletes the account from `/cuenta` (password
   required), optionally with the reports they uploaded while signed in; a
   report saved or paid for from someone else's link is only unlinked; the owner does it with
