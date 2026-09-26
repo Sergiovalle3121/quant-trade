@@ -218,9 +218,11 @@ COPY: dict[str, dict[str, object]] = {
             "Tipos de cambio de la Reserva Federal, letra del Tesoro y precios al consumidor de "
             "EE. UU.: FRED, Banco de la Reserva Federal de St. Louis. El VIX es de Cboe Global "
             "Markets, vía FRED.",
-            "Tasa a un día del euro (€STR, vía FRED) y, antes de octubre de 2019, la tasa de la "
-            "facilidad de depósito del BCE. Fuente: estadísticas del BCE; estos datos están "
-            "disponibles gratis en el sitio web del BCE (ecb.europa.eu).",
+            "Tasa a un día del euro (€STR, vía FRED) y, antes de octubre de 2019, la tasa de "
+            "las operaciones principales de financiación del BCE (la tasa fija o, en las "
+            "subastas a tipo variable, la tasa mínima de puja) hasta octubre de 2008 y la tasa "
+            "de la facilidad de depósito del BCE después. Fuente: estadísticas del BCE; estos "
+            "datos están disponibles gratis en el sitio web del BCE (ecb.europa.eu).",
             "Tasa a un día de la libra (vía FRED): SONIA data licensed under the Open Government "
             "Licence v3.0 and copyright the Governor and Company of the Bank of England.",
             "Tasa a un día de Canadá (CORRA): Banco de Canadá; la convertimos a rendimiento "
@@ -292,7 +294,9 @@ COPY: dict[str, dict[str, object]] = {
             "FRED, Federal Reserve Bank of St. Louis. The VIX is Cboe Global Markets', through "
             "FRED.",
             "The euro overnight rate (€STR, through FRED) and, before October 2019, the ECB's "
-            "deposit facility rate. Source: ECB statistics; this data is available free of "
+            "main refinancing operations rate (the fixed rate or, in the variable-rate "
+            "tenders, the minimum bid rate) until October 2008 and the ECB's deposit facility "
+            "rate after. Source: ECB statistics; this data is available free of "
             "charge on the ECB's website (ecb.europa.eu).",
             "The sterling overnight rate (through FRED): SONIA data licensed under the Open "
             "Government Licence v3.0 and copyright the Governor and Company of the Bank of "

@@ -1450,30 +1450,46 @@ When an imported report names the account currency and it is one of MXN,
 BRL, EUR, GBP, JPY, CAD or CHF, the same line subtracts that currency's own
 cash rate instead of the US bill's, each from its originator (the OECD copies
 FRED carried are no longer read, see "Data licences"): the euro's €STR
-(`ECBESTRVOLWGTTRMDMNRT` through FRED, daily, from October 2019; before it the
-ECB's deposit facility rate `FM.D.U2.EUR.4F.KR.DFR.LEV`, daily from the ECB's
-data API, fills only the earlier dates, `EUR_CASH_HISTORY`), sterling's SONIA
+(`ECBESTRVOLWGTTRMDMNRT` through FRED, daily, from October 2019; before it,
+`EUR_CASH_HISTORY` fills only the earlier dates with three daily ECB policy
+rates from the ECB's data API, each cut to its own dates: the main refinancing
+operations (MRO) fixed rate `FM.D.U2.EUR.4F.KR.MRR_FR.LEV` until 27 June 2000,
+the MRO minimum bid rate `FM.D.U2.EUR.4F.KR.MRR_MBR.LEV` of the variable-rate
+tenders from 28 June 2000 to 14 October 2008 (the only days the ECB publishes
+it; the fixed rate has no values then), and the deposit facility rate
+`FM.D.U2.EUR.4F.KR.DFR.LEV` from 15 October 2008 until €STR starts; each series
+is refused on the same rules as any rate reply and held to the daily 10-day
+staleness limit, so a missing piece leaves its dates NOT_COVERED), sterling's SONIA
 (`IUDSOIA` through FRED, daily), Canada's CORRA (Bank of Canada Valet
 `AVG.INTWO`, daily, from 1997), Brazil's Selic accumulated in the month and
 annualised on 252 business days (Banco Central do Brasil SGS 4189, monthly,
 from January 1995: before the Real plan it ran in the thousands a year) and,
 for the peso, the yen and the franc, the central bank's policy rate as the
 BIS compiles it (`WS_CBPOL`, `M.MX`, `M.JP`, `M.CH`, monthly, end of
-period). The BIS figures are official policy rates, not market rates, and the
-ECB's deposit rate is a policy rate too: overnight euro rates sat above it,
-by about a point before 2008 and by less after, so for pre-2019 euro dates
-the cash subtracted can be lower than what overnight cash earned, and the
-excess Sharpe correspondingly higher. The labels say "policy rate" and "the
-ECB's deposit rate before October 2019". Each quote becomes an annual yield
+period). The BIS figures are official policy rates, not market rates, and so
+are the ECB rates before €STR. The splice picks, for each era, the ECB rate
+closest to what overnight cash earned: in the corridor years before
+October 2008 overnight euro rates (EONIA) sat near the MRO rate, about a point
+above the deposit rate, so the MRO rate is used; from 15 October 2008 the ECB
+allotted its operations in full, excess liquidity pushed EONIA down to the
+deposit rate floor, so the deposit rate is used. The remaining bias is small
+and still leans the strategy's way: EONIA ran mostly a few basis points above
+the MRO rate (the minimum bid, in the tender years) before October 2008, and
+after it stayed between the deposit and MRO rates, closer to the deposit rate
+once excess liquidity was large but up to a few tenths of a point above it in
+parts of 2008-2011 when liquidity shrank; €STR has run about 10 bp below the
+deposit rate. The labels
+say "policy rate" and "before October 2019, the ECB's main refinancing rate
+until October 2008 and its deposit rate after". Each quote becomes an annual yield
 by its own convention: a simple overnight rate on a 360-day (MXN target rate,
 EUR, CHF as SARON) or 365-day (GBP, JPY call rate, CAD) year, rolled over
 for a year, `(1 + r/basis)^365 - 1`; Brazil's is already a compounded annual
 yield and is used as it is. A daily rate may be 10 days old before a return's
-start (`MAX_GAP_DAYS`; €STR, SONIA, CORRA), a monthly one 75 days
+start (`MAX_GAP_DAYS`; €STR and the ECB rates before it, SONIA, CORRA), a monthly one 75 days
 (`MAX_MONTHLY_GAP_DAYS`): Brazil's monthly average sits on its month's first
 day, the BIS's end-of-period value on the month's last day, so a point never
 takes a month-end value before that month has ended. Both the BIS's monthly
-series and the ECB's daily one are filled for every period at the source (the
+series and the ECB's daily ones are filled for every period at the source (the
 rate in force carries forward), so no step rule is needed, except that the
 BIS has no Japanese value in three stretches when the Bank of Japan targeted
 reserves or the monetary base instead of a rate (March 1999 to July 2000,
@@ -1765,7 +1781,8 @@ reuse with attribution, and credits each source where it is shown and on
 - VIX (`VIXCLS`): FRED tags it "Citation Required"; the regime line credits
   Cboe and FRED. Cboe's own site is for personal use, so it is kept under
   review.
-- ECB (€STR and the deposit facility rate): free reuse with the source quoted
+- ECB (€STR, the main refinancing operations rates and the deposit facility
+  rate): free reuse with the source quoted
   ("Source: ECB statistics"); the methodology page tells buyers the data is
   available free on the ECB's website, as the ECB's disclaimer asks.
 - Bank of England (SONIA): Open Government Licence v3.0, with the credit

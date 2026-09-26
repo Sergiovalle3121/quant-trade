@@ -32,7 +32,7 @@ Nothing here changes the class.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -66,7 +66,7 @@ NOTE_LOCAL = (
     "its publisher, converted to an annual yield by its own quote), annualised like the "
     "headline Sharpe"
 )
-#: A monthly average older than this before a return's start is too stale to use.
+#: A monthly value older than this before a return's start is too stale to use.
 MAX_MONTHLY_GAP_DAYS = 75
 
 
@@ -82,8 +82,9 @@ class LocalCash:
     tenor_days: float
     #: How old the last value before a return's start may be.
     max_gap: int
-    #: An older series, same quote, used only before ``asset`` starts.
-    history: Asset | None = None
+    #: Older daily series, same quote, used only before ``asset`` starts, each
+    #: ``(series, first day used, first day no longer used)``.
+    history: tuple[tuple[Asset, str | None, str | None], ...] = ()
 
     @property
     def name(self) -> str:
@@ -102,7 +103,7 @@ _BY_CODE = {asset.label: asset for asset in LOCAL_CASH}
 #: Every quote is simple over its day count except Brazil's Selic, already a
 #: compounded yield on 252 business days: Mexico's target overnight rate and
 #: the franc's (SARON's, which the SNB steers to) on 360 days, the yen's call
-#: rate, CORRA and SONIA on 365, the euro's €STR and the ECB's deposit rate on 360.
+#: rate, CORRA and SONIA on 365, the euro's €STR and the ECB's policy rates on 360.
 LOCAL: dict[str, LocalCash] = {
     "MXN": LocalCash(_BY_CODE["MXN"], 360.0, 1.0, MAX_MONTHLY_GAP_DAYS),
     "BRL": LocalCash(_BY_CODE["BRL"], None, 1.0, MAX_MONTHLY_GAP_DAYS),
@@ -127,7 +128,7 @@ def _days(stamps: pd.Series) -> pd.DatetimeIndex:
 def _span_rates(
     stamps: pd.DatetimeIndex,
     rates: pd.Series,
-    max_gap: int | np.ndarray = MAX_GAP_DAYS,
+    max_gap: int = MAX_GAP_DAYS,
     to_yearly: Callable[[np.ndarray], np.ndarray] | None = None,
 ) -> tuple[np.ndarray, np.ndarray] | str:
     """The rate's annual yield at the start of each span between consecutive
@@ -196,12 +197,13 @@ def local_excess_sharpe(
     rates: pd.Series,
     ppy: float,
     currency: str,
-    history: pd.Series | None = None,
+    history: Mapping[str, pd.Series | None] | None = None,
 ) -> dict[str, Any]:
     """The Sharpe ratio of the returns in ``frame`` after the cash rate of the
     account's own ``currency`` (a key of ``LOCAL``). The values are cleaned
-    first; a ``history`` series (same quote) fills only the dates before
-    ``rates`` starts, where a value may be ``MAX_MONTHLY_GAP_DAYS`` old."""
+    first; the ``history`` series by key (same quote, daily, each within its own
+    dates) fill only the dates before ``rates`` starts, held to the same
+    staleness limit."""
     local = LOCAL[currency]
     asset = local.asset
     base: dict[str, Any] = {
@@ -211,40 +213,54 @@ def local_excess_sharpe(
         "source_name": asset.publisher,
         "currency": currency,
     }
-    values, max_gap, spliced = _local_values(frame["timestamp"], rates, local, history)
+    values, used = _local_values(frame["timestamp"], rates, local, history)
     if values.empty:
         return {"status": "NOT_MEASURED", "reason": UNAVAILABLE, **base}
-    if spliced and local.history is not None:
-        base["history_series"] = local.history.series
-        base["history_source_url"] = local.history.source_url
-        base["history_source_name"] = local.history.publisher
-    return _excess(frame, values, ppy, base, NOTE_LOCAL, max_gap, local.yearly)
+    if used:
+        base["history_sources"] = [
+            {"series": older.series, "source_url": older.source_url, "source_name": older.publisher}
+            for older in used
+        ]
+    return _excess(frame, values, ppy, base, NOTE_LOCAL, local.max_gap, local.yearly)
 
 
 def _local_values(
-    stamps: pd.Series, rates: pd.Series | None, local: LocalCash, history: pd.Series | None
-) -> tuple[pd.Series, int | np.ndarray, bool]:
-    """The cleaned rates of ``local``, how old each span's value may be, and
-    whether the monthly ``history`` filled spans that start before them."""
+    stamps: pd.Series,
+    rates: pd.Series | None,
+    local: LocalCash,
+    history: Mapping[str, pd.Series | None] | None,
+) -> tuple[pd.Series, list[Asset]]:
+    """The cleaned rates of ``local``, preceded by its ``history`` series (each
+    cleaned and cut to its own dates, all before the rates start), and the
+    older series that hold a span's start."""
     values = _clean(rates, local.asset)
-    max_gap: int | np.ndarray = local.max_gap
-    if values.empty or local.history is None:
-        return values, max_gap, False
-    older = _clean(history, local.history)
-    older = older[older.index < values.index[0]]
+    if values.empty or not local.history or not history:
+        return values, []
     starts = _days(stamps)[:-1].floor("D")
-    early = np.asarray(starts < values.index[0])
-    if older.empty or not bool(early.any()):
-        return values, max_gap, False
-    max_gap = np.where(early, MAX_MONTHLY_GAP_DAYS, local.max_gap)
-    return pd.concat([older, values]), max_gap, True
+    pieces: list[pd.Series] = []
+    used: list[Asset] = []
+    for older, since, until in local.history:
+        piece = _clean(history.get(older.key), older)
+        if piece.empty:
+            continue
+        first = pd.Timestamp(since) if since is not None else piece.index[0]
+        last = values.index[0] if until is None else min(pd.Timestamp(until), values.index[0])
+        piece = piece[(piece.index >= first) & (piece.index < last)]
+        if piece.empty:
+            continue
+        pieces.append(piece)
+        if bool(((starts >= first) & (starts < last)).any()):
+            used.append(older)
+    if not used:
+        return values, []
+    return pd.concat([*pieces, values]), used
 
 
 def local_span_cash(
     stamps: pd.Series,
     rates: pd.Series | None,
     currency: str,
-    history: pd.Series | None = None,
+    history: Mapping[str, pd.Series | None] | None = None,
 ) -> np.ndarray | None:
     """What cash in ``currency`` (a key of ``LOCAL``) paid over each span
     between consecutive ``stamps``, read like :func:`local_excess_sharpe`;
@@ -252,10 +268,10 @@ def local_span_cash(
     if currency not in LOCAL or len(stamps) < 2:
         return None
     local = LOCAL[currency]
-    values, max_gap, _ = _local_values(stamps, rates, local, history)
+    values, _ = _local_values(stamps, rates, local, history)
     if values.empty:
         return None
-    paired = _span_rates(_days(stamps), values, max_gap, local.yearly)
+    paired = _span_rates(_days(stamps), values, local.max_gap, local.yearly)
     if isinstance(paired, str):
         return None
     yearly, span_days = paired
@@ -268,7 +284,7 @@ def _excess(
     ppy: float,
     base: dict[str, Any],
     note: str,
-    max_gap: int | np.ndarray,
+    max_gap: int,
     to_yearly: Callable[[np.ndarray], np.ndarray] | None,
 ) -> dict[str, Any]:
     stamps = _days(frame["timestamp"])

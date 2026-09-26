@@ -1211,8 +1211,9 @@ REPORT: dict[str, Any] = {
         "cash_rate_MXN": "taxa de política monetária do México (BIS)",
         "cash_rate_BRL": "taxa Selic mensal do Brasil (Banco Central do Brasil)",
         "cash_rate_EUR": (
-            "taxa de um dia do euro, €STR do BCE (antes de outubro de 2019, a taxa de "
-            "depósito do BCE)"
+            "taxa de um dia do euro, €STR do BCE (antes de outubro de 2019, a taxa das "
+            "operações principais de refinanciamento do BCE até outubro de 2008 e sua taxa "
+            "de depósito depois)"
         ),
         "cash_rate_GBP": "taxa de um dia da libra, SONIA (Banco da Inglaterra)",
         "cash_rate_JPY": "taxa de política monetária do Japão (BIS)",
@@ -1399,8 +1400,10 @@ REPORT: dict[str, Any] = {
         "data": [
             "Cotações do Federal Reserve, letra do Tesouro e preços ao consumidor dos EUA: "
             "FRED, Federal Reserve Bank of St. Louis. O VIX é da Cboe Global Markets, via FRED.",
-            "Taxa de um dia do euro (€STR, via FRED) e, antes de outubro de 2019, a taxa da "
-            "facilidade de depósito do BCE. Fonte: estatísticas do BCE; esses dados estão "
+            "Taxa de um dia do euro (€STR, via FRED) e, antes de outubro de 2019, a taxa das "
+            "operações principais de refinanciamento do BCE (a taxa fixa ou, nos leilões de "
+            "taxa variável, a taxa mínima de proposta) até outubro de 2008 e a taxa da "
+            "facilidade de depósito do BCE depois. Fonte: estatísticas do BCE; esses dados estão "
             "disponíveis grátis no site do BCE (ecb.europa.eu).",
             "Taxa de um dia da libra (via FRED): SONIA data licensed under the Open Government "
             "Licence v3.0 and copyright the Governor and Company of the Bank of England.",

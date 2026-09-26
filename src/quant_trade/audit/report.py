@@ -1469,8 +1469,9 @@ LABELS: dict[str, dict[str, str]] = {
         "cash_rate_MXN": "tasa de política monetaria de México (BIS)",
         "cash_rate_BRL": "tasa Selic mensual de Brasil (Banco Central do Brasil)",
         "cash_rate_EUR": (
-            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la tasa de "
-            "depósito del BCE)"
+            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la tasa de las "
+            "operaciones principales de financiación del BCE hasta octubre de 2008 y su tasa "
+            "de depósito después)"
         ),
         "cash_rate_GBP": "tasa a un día de la libra, SONIA (Banco de Inglaterra)",
         "cash_rate_JPY": "tasa de política monetaria de Japón (BIS)",
@@ -2743,7 +2744,8 @@ LABELS: dict[str, dict[str, str]] = {
         "cash_rate_MXN": "policy rate of Mexico (BIS)",
         "cash_rate_BRL": "monthly Selic rate of Brazil (Banco Central do Brasil)",
         "cash_rate_EUR": (
-            "euro overnight rate, the ECB's €STR (before October 2019, the ECB's deposit rate)"
+            "euro overnight rate, the ECB's €STR (before October 2019, the ECB's main "
+            "refinancing rate until October 2008 and its deposit rate after)"
         ),
         "cash_rate_GBP": "sterling overnight rate, SONIA (Bank of England)",
         "cash_rate_JPY": "policy rate of Japan (BIS)",
@@ -3774,6 +3776,12 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
     return note + f"<div class='kpis'>{tiles}</div>" + ("" if locked else _cash_html(data, labels))
 
 
+def _series_code(series: str) -> str:
+    """The instrument part of an ECB key (``MRR_FR`` of ``D.U2.EUR.4F.KR.MRR_FR.LEV``)."""
+    parts = series.split(".")
+    return parts[-2] if len(parts) > 2 else series
+
+
 def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     """The Sharpe after what cash paid (the account currency's own rate, or a US
     Treasury bill), under the tiles."""
@@ -3798,13 +3806,16 @@ def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>"
         f"{_e(str(cash.get('source_name') or 'FRED'))}</a>"
     )
-    if cash.get("history_source_url"):
-        # The spliced older series (the euro's before €STR) gets its own link.
-        older = cash.get("history_source_name") or cash.get("history_series", "")
-        link += (
-            f" (<a href='{_e(str(cash['history_source_url']))}' rel='noopener'>"
-            f"{_e(str(older))}</a>)"
-        )
+    older = [
+        f"<a href='{_e(str(item.get('source_url', '')))}' rel='noopener'>"
+        f"{_e(str(item.get('source_name', '')))} "
+        f"{_e(_series_code(str(item.get('series', ''))))}</a>"
+        for item in cash.get("history_sources") or []
+        if isinstance(item, dict)
+    ]
+    if older:
+        # The spliced older series (the euro's before €STR) get their own links.
+        link += " (" + ", ".join(older) + ")"
     return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
 

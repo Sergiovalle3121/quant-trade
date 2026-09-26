@@ -302,21 +302,40 @@ LOCAL_CASH: tuple[Asset, ...] = tuple(
         ("CHF", "CH", "bis"),
     )
 )
-#: The ECB's deposit facility rate (daily, from 1999), for the years before
-#: €STR starts in October 2019. It is a policy rate, not €STR: overnight market
-#: rates sat above it, by about a point before 2008 and by less after, and €STR
-#: has run about 10 bp below it.
-EUR_CASH_HISTORY = Asset(
-    "cash_eur_history",
-    "EUR",
-    "D.U2.EUR.4F.KR.DFR.LEV",
-    re.compile(r"(?!)"),
-    rate=True,
-    ceiling=MAX_LOCAL_RATE,
-    floor=MIN_LOCAL_RATE,
-    negative=True,
-    provider="ecb",
+
+
+def _ecb_rate(key: str, series: str) -> Asset:
+    """A daily euro rate of the ECB's financial markets dataset (FM)."""
+    return Asset(
+        key,
+        "EUR",
+        series,
+        re.compile(r"(?!)"),
+        rate=True,
+        ceiling=MAX_LOCAL_RATE,
+        floor=MIN_LOCAL_RATE,
+        negative=True,
+        provider="ecb",
+    )
+
+
+#: The euro's cash before €STR starts in October 2019, spliced from three
+#: daily ECB policy rates, each ``(series, first day used, first day no longer
+#: used)``: the main refinancing operations (MRO) rate until 14 October 2008 (the
+#: fixed rate, and the minimum bid rate of the variable-rate tenders from
+#: 28 June 2000, the only days the ECB publishes it), then the deposit facility
+#: rate. Before October 2008 overnight rates sat near the MRO rate, about a
+#: point above the deposit rate; from then, full allotment pushed them down
+#: towards the deposit rate, and €STR has run about 10 bp below it.
+EUR_MRO_FIXED = _ecb_rate("cash_eur_mro", "D.U2.EUR.4F.KR.MRR_FR.LEV")
+EUR_MRO_MIN_BID = _ecb_rate("cash_eur_mro_bid", "D.U2.EUR.4F.KR.MRR_MBR.LEV")
+EUR_DEPOSIT = _ecb_rate("cash_eur_deposit", "D.U2.EUR.4F.KR.DFR.LEV")
+EUR_CASH_HISTORY: tuple[tuple[Asset, str | None, str | None], ...] = (
+    (EUR_MRO_FIXED, None, "2000-06-28"),
+    (EUR_MRO_MIN_BID, "2000-06-28", "2008-10-15"),
+    (EUR_DEPOSIT, "2008-10-15", None),
 )
+
 #: Consumer prices in the currencies of ``FX`` whose official index is current
 #: and may be reused in a paid service with attribution (all items, monthly, not
 #: seasonally adjusted): the euro area's and Switzerland's harmonised indexes
@@ -356,7 +375,7 @@ SERIES: dict[str, Asset] = {
     CPI.key: CPI,
     **{asset.key: asset for asset in FX},
     **{asset.key: asset for asset in LOCAL_CASH},
-    EUR_CASH_HISTORY.key: EUR_CASH_HISTORY,
+    **{asset.key: asset for asset, _, _ in EUR_CASH_HISTORY},
     **{asset.key: asset for asset in LOCAL_CPI},
 }
 

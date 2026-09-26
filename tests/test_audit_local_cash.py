@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from audit_fixtures import csv_bytes
 
-from quant_trade.audit.cashrate import LOCAL, NOTE_LOCAL, local_excess_sharpe
+from quant_trade.audit.cashrate import LOCAL, NOTE_LOCAL, local_excess_sharpe, local_span_cash
 from quant_trade.audit.engine import NO_LOCAL_CASH, run_audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
@@ -172,42 +172,138 @@ def test_a_broken_local_series_never_stops_the_audit() -> None:
     assert untranslated(result.model_dump(mode="json")) == []
 
 
-def test_older_euro_dates_take_the_ecb_deposit_rate_and_only_those() -> None:
-    days = pd.bdate_range("2018-01-02", "2021-06-30")
+def _ecb(instrument: str, rows: list[tuple[str, str]]) -> str:
+    """An ECB FM daily series (``csvdata``, ``detail=dataonly``), as its API sends it."""
+    key = f"FM.D.U2.EUR.4F.KR.{instrument}.LEV"
+    head = (
+        "KEY,FREQ,REF_AREA,CURRENCY,PROVIDER_FM,INSTRUMENT_FM,PROVIDER_FM_ID,DATA_TYPE_FM,"
+        "TIME_PERIOD,OBS_VALUE\n"
+    )
+    body = "".join(f"{key},D,U2,EUR,4F,KR,{instrument},LEV,{day},{v}\n" for day, v in rows)
+    return head + body
+
+
+def _each_day(first: str, last: str, value: str) -> list[tuple[str, str]]:
+    return [(day.strftime("%Y-%m-%d"), value) for day in pd.date_range(first, last)]
+
+
+def _euro_history(first: str = "1999-01-01", last: str = "2021-06-30") -> dict[str, pd.Series]:
+    """The three ECB series before €STR, parsed from replies in the ECB's shape:
+    the MRO fixed rate at 4.25 (it has no values in the variable-rate tender
+    years), the minimum bid rate at 3.25 only in those years, the deposit rate
+    at 2.0 throughout."""
+    fixed = _each_day(first, "2000-06-27", "4.25") + _each_day("2008-10-15", last, "4.25")
+    replies = {
+        "cash_eur_mro": ("MRR_FR", fixed),
+        "cash_eur_mro_bid": ("MRR_MBR", _each_day("2000-06-28", "2008-10-14", "3.25")),
+        "cash_eur_deposit": ("DFR", _each_day(first, last, "2.0")),
+    }
+    return {
+        key: parse_rates(_ecb(code, rows), "ecb", f"D.U2.EUR.4F.KR.{code}.LEV")
+        for key, (code, rows) in replies.items()
+    }
+
+
+def _yearly(percent: float) -> float:
+    return float(LOCAL["EUR"].yearly(np.array([percent]))[0])
+
+
+def test_older_euro_dates_take_the_mro_until_october_2008_then_the_deposit_rate() -> None:
+    history = _euro_history()
+    estr = pd.Series(-0.5, index=pd.bdate_range("2019-10-01", "2021-06-30"))
+    # Each era alone takes its own ECB rate (the curve's returns are flat, so the
+    # mean rate is the rate of the span starts).
+    for first, last, percent, used in (
+        ("1999-02-01", "2000-06-26", 4.25, ["MRR_FR"]),
+        ("2000-06-28", "2008-10-10", 3.25, ["MRR_MBR"]),
+        ("2008-10-15", "2019-09-27", 2.0, ["DFR"]),
+    ):
+        days = pd.bdate_range(first, last)
+        out = local_excess_sharpe(
+            _curve(days, np.full(len(days), 0.0001)), estr, 252.0, "EUR", history
+        )
+        assert out["status"] == "MEASURED", first
+        assert out["mean_rate"]["value"] == pytest.approx(_yearly(percent)), first
+        assert [item["series"].split(".")[-2] for item in out["history_sources"]] == used
+    # The cut-overs: 27 June 2000 is the fixed rate, 28 June the minimum bid;
+    # 14 October 2008 the minimum bid, 15 October the deposit rate; 30 September
+    # 2019 the deposit rate, 1 October €STR.
+    for day, percent in (
+        ("2000-06-27", 4.25),
+        ("2000-06-28", 3.25),
+        ("2008-10-14", 3.25),
+        ("2008-10-15", 2.0),
+        ("2019-09-30", 2.0),
+        ("2019-10-01", -0.5),
+    ):
+        stamps = pd.Series(pd.date_range(day, periods=2, freq="D", tz="UTC"))
+        cash = local_span_cash(stamps, estr, "EUR", history)
+        assert cash is not None and cash[0] == pytest.approx(
+            (1 + _yearly(percent)) ** (1 / 365) - 1
+        ), day
+    # A span from 1999 to 2021 names all three, oldest first, and links each.
+    days = pd.bdate_range("1999-02-01", "2021-06-30", freq="W-FRI")
+    whole = local_excess_sharpe(_curve(days, np.full(len(days), 0.001)), estr, 52.0, "EUR", history)
+    assert whole["status"] == "MEASURED"
+    assert [item["source_url"] for item in whole["history_sources"]] == [
+        f"https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.{code}.LEV"
+        for code in ("MRR_FR", "MRR_MBR", "DFR")
+    ]
+    assert {item["source_name"] for item in whole["history_sources"]} == {"ECB"}
+    assert _yearly(-0.5) < whole["mean_rate"]["value"] < _yearly(4.25)
+
+
+def test_the_euro_history_is_held_to_the_daily_staleness_limit() -> None:
+    history = _euro_history()
+    estr = pd.Series(-0.5, index=pd.bdate_range("2019-10-01", "2021-06-30"))
+    days = pd.bdate_range("2004-01-02", "2004-12-31")
     frame = _curve(days, np.full(len(days), 0.0001))
-    estr = pd.Series(-0.5, index=pd.bdate_range("2019-10-01", days[-1]))
-    oecd = pd.Series(-0.36, index=pd.date_range("2017-01-01", "2021-06-30", freq="D"))
-    assert local_excess_sharpe(frame, estr, 252.0, "EUR")["status"] == "NOT_MEASURED"
-    out = local_excess_sharpe(frame, estr, 252.0, "EUR", oecd)
-    assert out["status"] == "MEASURED" and out["history_series"] == "D.U2.EUR.4F.KR.DFR.LEV"
-    assert out["history_source_name"] == "ECB"
-    assert out["history_source_url"].endswith("/FM/FM.D.U2.EUR.4F.KR.DFR.LEV")
-    # A history that starts after €STR does not name the older series.
-    recent = frame[frame["timestamp"] >= pd.Timestamp("2020-01-01", tz="UTC")]
-    assert "history_series" not in local_excess_sharpe(recent, estr, 252.0, "EUR", oecd)
-    # The mean mixes -0.36 % before October 2019 and -0.5 % after.
-    low, high = (float(LOCAL["EUR"].yearly(np.array([v]))[0]) for v in (-0.5, -0.36))
-    assert low < out["mean_rate"]["value"] < high
-    # €STR still has to be fresh after it starts: a month-long hole is not covered.
-    holed = estr[(estr.index < "2020-03-01") | (estr.index > "2020-04-01")]
-    assert local_excess_sharpe(frame, holed, 252.0, "EUR", oecd)["status"] == "NOT_MEASURED"
+    assert local_excess_sharpe(frame, estr, 252.0, "EUR", history)["status"] == "MEASURED"
+    # Without the minimum bid rate, the tender years are not covered: the fixed
+    # rate's last value (June 2000) is far older than ten days.
+    no_bid = {**history, "cash_eur_mro_bid": None}
+    assert local_excess_sharpe(frame, estr, 252.0, "EUR", no_bid)["status"] == "NOT_MEASURED"
+    # Nor are they filled by the deposit rate, which is only used from October 2008.
+    only_dfr = {"cash_eur_deposit": history["cash_eur_deposit"]}
+    assert local_excess_sharpe(frame, estr, 252.0, "EUR", only_dfr)["status"] == "NOT_MEASURED"
+    # A three-week hole in the minimum bid rate is past the daily limit (the
+    # monthly 75 days no longer applies to the euro's history).
+    bid = history["cash_eur_mro_bid"]
+    holed = {
+        **history,
+        "cash_eur_mro_bid": bid[(bid.index < "2004-05-01") | (bid.index > "2004-05-21")],
+    }
+    assert local_excess_sharpe(frame, estr, 252.0, "EUR", holed)["status"] == "NOT_MEASURED"
+    # Ten days old is still covered.
+    short = {
+        **history,
+        "cash_eur_mro_bid": bid[(bid.index < "2004-05-01") | (bid.index > "2004-05-09")],
+    }
+    assert local_excess_sharpe(frame, estr, 252.0, "EUR", short)["status"] == "MEASURED"
+    # A history that starts after €STR does not name the older series, and
+    # €STR still has to be fresh after it starts.
+    recent = pd.bdate_range("2020-01-02", "2021-06-30")
+    later = _curve(recent, np.full(len(recent), 0.0001))
+    assert "history_sources" not in local_excess_sharpe(later, estr, 252.0, "EUR", history)
+    gap = estr[(estr.index < "2020-03-01") | (estr.index > "2020-04-01")]
+    assert local_excess_sharpe(later, gap, 252.0, "EUR", history)["status"] == "NOT_MEASURED"
 
 
 def test_the_engine_reads_the_euro_history_for_an_old_euro_account() -> None:
-    days = pd.bdate_range("2018-01-02", "2021-06-30")
+    days = pd.bdate_range("2007-01-02", "2021-06-30")
     inputs = _inputs(days, "es", "EUR")
     series = {
         "cash_eur": pd.Series(-0.5, index=pd.bdate_range("2019-10-01", days[-1])),
-        "cash_eur_history": pd.Series(
-            -0.4, index=pd.date_range("2017-01-01", "2021-06-30", freq="D")
-        ),
+        **_euro_history("2006-01-01"),
     }
     result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=series.get)
     assert result.cash_rate is not None and result.cash_rate["currency"] == "EUR"
     assert result.cash_rate["label"] == "EUR cash rate (FRED ECBESTRVOLWGTTRMDMNRT)"
     html = render(result, watermark=False)[0]
-    ecb = "https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.DFR.LEV"
-    assert f"href='{ecb}' rel='noopener'>ECB</a>" in html
+    for code in ("MRR_MBR", "DFR"):
+        ecb = f"https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.{code}.LEV"
+        assert f"href='{ecb}' rel='noopener'>ECB {code}</a>" in html
+    assert "MRR_FR.LEV" not in html
     assert "IRSTCI01" not in html
     assert_report_clean(html)
 
@@ -230,12 +326,26 @@ BOC_CORRA = (
     '"Canadian Overnight Repo Rate Average (CORRA) (%)"\n\n"OBSERVATIONS"\n'
     '"date","AVG.INTWO"\n"2026-09-22","2.2900"\n"2026-09-23","2.2900"\n"2026-09-24","2.3000"\n'
 )
-ECB_DFR = (
-    "KEY,FREQ,REF_AREA,CURRENCY,PROVIDER_FM,INSTRUMENT_FM,PROVIDER_FM_ID,DATA_TYPE_FM,"
-    "TIME_PERIOD,OBS_VALUE\n"
-    "FM.D.U2.EUR.4F.KR.DFR.LEV,D,U2,EUR,4F,KR,DFR,LEV,2019-09-17,-0.4\n"
-    "FM.D.U2.EUR.4F.KR.DFR.LEV,D,U2,EUR,4F,KR,DFR,LEV,2019-09-18,-0.5\n"
-    "FM.D.U2.EUR.4F.KR.DFR.LEV,D,U2,EUR,4F,KR,DFR,LEV,2019-09-19,-0.5\n"
+ECB_DFR = _ecb("DFR", [("2019-09-17", "-0.4"), ("2019-09-18", "-0.5"), ("2019-09-19", "-0.5")])
+#: The MRO fixed rate stops on 27 June 2000 and resumes on 15 October 2008;
+#: the minimum bid rate covers only the days between.
+ECB_MRR_FR = _ecb(
+    "MRR_FR",
+    [
+        ("2000-06-26", "4.25"),
+        ("2000-06-27", "4.25"),
+        ("2008-10-15", "3.75"),
+        ("2008-10-16", "3.75"),
+    ],
+)
+ECB_MRR_MBR = _ecb(
+    "MRR_MBR",
+    [
+        ("2000-06-28", "4.25"),
+        ("2000-06-29", "4.25"),
+        ("2008-10-13", "4.25"),
+        ("2008-10-14", "4.25"),
+    ],
 )
 
 
@@ -248,6 +358,15 @@ def test_each_new_source_is_read_in_its_own_shape() -> None:
     assert list(corra) == [2.29, 2.29, 2.30] and corra.index[-1] == pd.Timestamp("2026-09-24")
     dfr = parse_rates(ECB_DFR, "ecb", "D.U2.EUR.4F.KR.DFR.LEV")
     assert list(dfr) == [-0.4, -0.5, -0.5]
+    fixed = parse_rates(ECB_MRR_FR, "ecb", "D.U2.EUR.4F.KR.MRR_FR.LEV")
+    assert list(fixed.index.strftime("%Y-%m-%d")) == [
+        "2000-06-26",
+        "2000-06-27",
+        "2008-10-15",
+        "2008-10-16",
+    ]
+    bid = parse_rates(ECB_MRR_MBR, "ecb", "D.U2.EUR.4F.KR.MRR_MBR.LEV")
+    assert list(bid) == [4.25] * 4 and bid.index[-1] == pd.Timestamp("2008-10-14")
     # A BIS month's value stands at its last day, not at the start of the month.
     jpy = parse_rates(_bis("JP", [("2016-08", "-0.1"), ("2016-09", "-0.1")]), "bis", "JP")
     assert list(jpy.index) == [pd.Timestamp("2016-08-31"), pd.Timestamp("2016-09-30")]
@@ -259,7 +378,9 @@ def test_each_new_source_is_read_in_its_own_shape() -> None:
             ),
         ),
         ("cash_cad", BOC_CORRA),
-        ("cash_eur_history", ECB_DFR),
+        ("cash_eur_deposit", ECB_DFR),
+        ("cash_eur_mro", ECB_MRR_FR),
+        ("cash_eur_mro_bid", ECB_MRR_MBR),
         ("cash_jpy", _bis("JP", [("2026-07", "1"), ("2026-08", "1")])),
     ):
         data = MarketData(lambda series, text=text: text)
@@ -272,8 +393,15 @@ def test_a_broken_reply_from_a_new_source_is_refused() -> None:
     blank = _bis("CH", [("2026-07", "0"), ("2026-08", "NaN")])
     for text in (twice, other, blank, "<html>busy</html>"):
         assert MarketData(lambda series, text=text: text).refresh("cash_mxn") is False
-    wrong_key = ECB_DFR.replace("FM.D.U2.EUR.4F.KR.DFR.LEV", "FM.D.U2.EUR.4F.KR.MRR_FR.LEV")
-    assert MarketData(lambda series: wrong_key).refresh("cash_eur_history") is False
+    # Each ECB series refuses a reply for another one (the fixed rate for the
+    # deposit rate, the minimum bid for the fixed rate), a repeated day and a blank.
+    for key, text in (
+        ("cash_eur_deposit", ECB_MRR_FR),
+        ("cash_eur_mro", ECB_MRR_MBR),
+        ("cash_eur_mro_bid", ECB_MRR_MBR.replace("2008-10-13", "2008-10-14")),
+        ("cash_eur_mro", ECB_MRR_FR.replace("2008-10-16,3.75", "2008-10-16,")),
+    ):
+        assert MarketData(lambda series, text=text: text).refresh(key) is False, key
     unreadable = BOC_CORRA.replace('"2026-09-23","2.2900"', '"2026-09-23","n/a"')
     assert MarketData(lambda series: unreadable).refresh("cash_cad") is False
     with pytest.raises(ValueError):
