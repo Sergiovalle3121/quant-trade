@@ -95,7 +95,14 @@ def footer_text(audit_id: str, locale: str) -> str:
     return f"{BRAND} · {word} {audit_id}"
 
 
-def report_pdf(page_html: str, *, audit_id: str, locale: str, wait_seconds: float = 0.0) -> bytes:
+def report_pdf(
+    page_html: str,
+    *,
+    audit_id: str,
+    locale: str,
+    wait_seconds: float = 0.0,
+    footer: str = "",
+) -> bytes:
     """``page_html`` (a rendered report) as PDF bytes.
 
     Raises ``PdfUnavailable`` without WeasyPrint and ``PdfBusy`` when
@@ -113,7 +120,7 @@ def report_pdf(page_html: str, *, audit_id: str, locale: str, wait_seconds: floa
     if not acquired:
         raise PdfBusy("too many PDFs at once")
     try:
-        footer = footer_text(audit_id, locale).replace("\\", "").replace('"', "")
+        footer = (footer or footer_text(audit_id, locale)).replace("\\", "").replace('"', "")
         # Inside the page, after its own styles, so these rules win the cascade.
         style = "<style>" + PDF_CSS.replace("__FOOTER__", footer) + "</style>"
         page_html = page_html.replace("</head>", style + "</head>", 1)

@@ -1540,7 +1540,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
-    def _strategy_get(path_locale: str) -> Callable[..., Response]:
+    def _strategy_get(path_locale: str, *, as_pdf: bool = False) -> Callable[..., Response]:
         def handler(request: Request, strategy_id: str, lang: str | None = None) -> Response:
             locale = _account_locale(path_locale, lang)
             session = _session(request)
@@ -1564,14 +1564,46 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     else None
                 )
                 versions.append((item, result))
-            page = account_pages.strategy_page(
-                locale=locale,
-                csrf=csrf,
-                strategy=strategy,
-                versions=versions,
-                free_mode=cfg.free_mode,
+            now = datetime.now(UTC)
+            page = guard_page(
+                account_pages.strategy_page(
+                    locale=locale,
+                    csrf=csrf,
+                    strategy=strategy,
+                    versions=versions,
+                    free_mode=cfg.free_mode,
+                    printable=as_pdf,
+                    generated_at=now.isoformat().replace("+00:00", "Z"),
+                )
             )
-            return HTMLResponse(guard_page(page))
+            if not as_pdf:
+                return HTMLResponse(page)
+            # The summary as a PDF: the owner's own page, laid out like a report
+            # PDF (no network, the shared render slots), never cached.
+            view = link_locale(locale)
+            try:
+                word = {"en": "strategy", "pt": "estratégia"}.get(locale, "estrategia")
+                content = pdf_lib.report_pdf(
+                    page,
+                    audit_id=strategy.id,
+                    locale=view,
+                    wait_seconds=PDF_WAIT_SECONDS,
+                    footer=f"{BRAND} · {word} {strategy.id}",
+                )
+            except pdf_lib.PdfBusy:
+                return _html_error(request, 503, message("pdf_busy", view), view)
+            except pdf_lib.PdfUnavailable:
+                return _html_error(request, 503, message("pdf_unavailable", view), view)
+            name = pdf_lib.filename(f"strategy{strategy.id}")
+            return Response(
+                content=content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{name}"',
+                    "Cache-Control": "private, no-store",
+                    "X-Robots-Tag": "noindex",
+                },
+            )
 
         return handler
 
@@ -1832,6 +1864,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         app.add_api_route(
             strategies_base + "/{strategy_id}", _strategy_get(path_locale), **html_get
+        )
+        app.add_api_route(
+            strategies_base + "/{strategy_id}/pdf",
+            _strategy_get(path_locale, as_pdf=True),
+            methods=["GET"],
         )
         for suffix, action in (("quitar", "remove"), ("nombre", "rename"), ("borrar", "delete")):
             app.add_api_route(
