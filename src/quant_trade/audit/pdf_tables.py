@@ -8,8 +8,10 @@ text sits. So a PDF is read under stricter rules than any other upload:
 - The extraction runs in a child process killed after
   ``MAX_PDF_SECONDS``, with its memory and CPU capped, because a crafted
   PDF can make pdfminer loop and a thread cannot be stopped.
-- At most ``MAX_PDF_PAGES`` pages and ``MAX_PAGE_CHARS`` characters per
-  page; a scanned PDF (no text) is refused.
+- At most ``MAX_PDF_PAGES`` pages, ``MAX_PAGE_CHARS`` characters per
+  page and ``MAX_PDF_CELLS`` table cells in all, and the child's answer
+  is read only up to ``MAX_PDF_OUTPUT`` bytes; a scanned PDF (no text) is
+  refused.
 - The pieces of a table split across pages are joined only when every
   piece has the same columns; a header repeated on each page is dropped.
   A row cut by a page break (most of its cells empty) makes the whole
@@ -42,11 +44,11 @@ MAX_PDF_SECONDS = 10
 MAX_PDF_MEMORY = 1 << 30
 #: A data row must fill at least this share of the header's named columns.
 MIN_ROW_FILL = 0.6
-PDF_SIGNATURE = b"%PDF-"
-
-
-def is_pdf(data: bytes) -> bool:
-    return data.lstrip()[:5] == PDF_SIGNATURE
+#: Cells across all pages: empty cells cost no characters, so a dense ruled
+#: grid is capped by count (a statement of 5,000 trades needs about 100k).
+MAX_PDF_CELLS = 200_000
+#: The child's answer read by the web process, refused past this size.
+MAX_PDF_OUTPUT = 8 << 20
 
 
 def unreadable() -> ReportFormatError:
@@ -102,7 +104,7 @@ def _extract(data: bytes) -> dict[str, Any]:
     }
     try:
         done = subprocess.run(  # noqa: S603 - our own module, no shell
-            [sys.executable, "-m", "quant_trade.audit.pdf_tables"],
+            [sys.executable, "-m", "quant_trade.audit.pdf_tables", str(MAX_PDF_CELLS)],
             input=data,
             capture_output=True,
             timeout=MAX_PDF_SECONDS,
@@ -111,7 +113,7 @@ def _extract(data: bytes) -> dict[str, Any]:
         )
     except subprocess.TimeoutExpired as exc:
         raise unreadable() from exc
-    if done.returncode != 0:
+    if done.returncode != 0 or len(done.stdout) > MAX_PDF_OUTPUT:
         return {}
     try:
         answer = json.loads(done.stdout.decode("utf-8"))
@@ -157,7 +159,7 @@ def stitch(tables: list[list[list[Any]]]) -> list[list[str]]:
     return [header, *body]
 
 
-def _child() -> int:
+def _child(max_cells: int = MAX_PDF_CELLS) -> int:
     """Read the PDF on standard input, write its ruled tables as JSON."""
     try:
         import resource
@@ -178,7 +180,7 @@ def _child() -> int:
                 answer = {"refusal": "pages"}
             else:
                 tables: list[list[list[Any]]] = []
-                text = 0
+                text = cells = 0
                 answer = {}
                 for page in document.pages:
                     characters = len(page.chars)
@@ -186,7 +188,12 @@ def _child() -> int:
                         answer = {"refusal": "dense"}
                         break
                     text += characters
-                    tables.extend(page.extract_tables())
+                    for table in page.extract_tables():
+                        cells += sum(len(row) for row in table)
+                        tables.append(table)
+                    if cells > max_cells:
+                        answer = {"refusal": "dense"}
+                        break
                 if not answer:
                     answer = {"tables": tables} if text and tables else {"refusal": "no_table"}
     except Exception:  # noqa: BLE001 - any damage is the same refusal
@@ -196,4 +203,4 @@ def _child() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(_child())
+    raise SystemExit(_child(int(sys.argv[1]) if len(sys.argv) > 1 else MAX_PDF_CELLS))

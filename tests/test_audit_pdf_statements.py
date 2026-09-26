@@ -203,3 +203,22 @@ def test_the_upload_shows_the_screen_with_the_notice_then_reads_the_named_column
         "/audits", files=files, data={"consent": "on", **named}, follow_redirects=False
     )
     assert posted.status_code == 303, posted.text[:500]
+
+
+def test_a_table_past_the_cell_cap_or_an_answer_past_the_size_cap_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Empty cells cost no characters, so a dense ruled grid is capped by
+    # cell count in the child and by answer size in the web process.
+    data = _statement(TRADES)
+    monkeypatch.setattr(pdf_tables, "MAX_PDF_CELLS", len(TRADES) * len(HEADER) // 2)
+    with pytest.raises(ReportFormatError) as dense:
+        pdf_tables.rows(data)
+    assert dense.value.code == "pdf_statement"
+    monkeypatch.undo()
+    monkeypatch.setattr(pdf_tables, "MAX_PDF_OUTPUT", 1_000)
+    with pytest.raises(ReportFormatError) as large:
+        pdf_tables.rows(data)
+    assert large.value.code == "pdf_statement"
+    monkeypatch.undo()
+    assert len(pdf_tables.rows(data)) == len(TRADES) + 1
