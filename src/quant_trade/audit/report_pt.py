@@ -2069,6 +2069,13 @@ SINGULAR: dict[str, tuple[str, str]] = {
         "operação de ações no preço de exercício nesses dias), então o resultado não inclui o "
         "movimento das ações",
     ),
+    "{n} stock split(s) that would leave no shares held were not applied; the positions they touch "
+    "may be read wrong": (
+        "{n} stock split that would leave no shares held was not applied; the position it touches "
+        "may be read wrong",
+        "não foi aplicado {n} desdobramento que deixaria a posição sem ações; a posição afetada "
+        "pode ser lida errado",
+    ),
     "{n} share movement(s) that are not trades (transfers, mergers, splits) left out; the "
     "positions they change may be read wrong": (
         "{n} share movement that is not a trade (transfer, merger, split) left out; the "
@@ -2354,6 +2361,14 @@ RULES: tuple[tuple[str, str], ...] = (
             "{n} opção(ões) atribuídas ou exercidas cujas ações entregues não estão no arquivo "
             "(nenhuma operação de ações no preço de exercício nesses dias), então o resultado não "
             "inclui o movimento das ações"
+        ),
+    ),
+    (
+        "{n} stock split(s) that would leave no shares held were not applied; the positions they "
+        "touch may be read wrong",
+        (
+            "não foram aplicados {n} desdobramento(s) que deixariam a posição sem ações; as "
+            "posições afetadas podem ser lidas errado"
         ),
     ),
     (

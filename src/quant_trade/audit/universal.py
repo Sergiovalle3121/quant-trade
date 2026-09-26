@@ -1704,22 +1704,30 @@ def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
 
 #: A row whose side reads like this changes the shares held, not a trade.
 SPLIT_WORDS = frozenset({"stocksplit"})
+SPLIT_EMPTIES_WARNING = (
+    "{n} stock split(s) that would leave no shares held were not applied; the positions they touch "
+    "may be read wrong"
+)
 
 
 def _split_lots(
     open_lots: dict[tuple[str, str], list[list[Any]]], account: str, symbol: str, added: float
-) -> None:
+) -> bool:
     """Rescale a long position's lots for a split that added ``added``
-    shares (fewer when negative), keeping each lot's cost."""
+    shares (fewer when negative), keeping each lot's cost; ``False`` when
+    the split would leave the position with no shares, which is not applied."""
     lots = open_lots.get((account, symbol)) or []
     held = sum(lot[0] for lot in lots)
-    if held <= 0 or held + added <= 0 or any(lot[0] < 0 for lot in lots):
-        return
+    if held <= 0 or any(lot[0] < 0 for lot in lots):
+        return True  # nothing long held: the split changes nothing here
+    if held + added <= 0:
+        return False
     ratio = (held + added) / held
     for lot in lots:
         lot[0] *= ratio
         lot[1] /= ratio
         lot[3] /= ratio
+    return True
 
 
 def _fills(
@@ -1807,10 +1815,10 @@ def _fills(
     if newest_first:
         fills = [(f[0], -f[1], *f[2:]) for f in fills]
     splits.sort(key=lambda split: split[0])
-    next_split = 0
+    next_split = unapplied = 0
     for moment, _, account, symbol, signed_qty, price, fee, profit, multiplier in sorted(fills):
         while next_split < len(splits) and splits[next_split][0] <= moment:
-            _split_lots(open_lots, *splits[next_split][1:])
+            unapplied += not _split_lots(open_lots, *splits[next_split][1:])
             next_split += 1
         lots = open_lots.setdefault((account, symbol), [])
         left = abs(signed_qty)
@@ -1840,6 +1848,8 @@ def _fills(
                 lots.pop(0)
         if left > 0:
             lots.append([left if signed_qty > 0 else -left, price, moment, fee_per_unit])
+    if unapplied:
+        draft.warnings.append(SPLIT_EMPTIES_WARNING.format(n=unapplied))
     closed_by_account = {account: len(listed) for account, listed in trips.items()}
     chosen = imp._busiest_account(
         [[account] for account in trips], list(trips), closed_by_account, draft.warnings

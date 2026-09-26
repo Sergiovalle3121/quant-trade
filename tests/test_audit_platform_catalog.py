@@ -899,3 +899,35 @@ def test_a_split_of_shares_not_held_changes_nothing() -> None:
         ]
     )
     assert [round(trade.pnl, 2) for trade in report.trades.trades] == [36.0]
+
+
+def test_a_reverse_split_shrinks_the_lots_and_keeps_their_cost() -> None:
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            "2022-01-03T14:30:00.000Z,GSK,BUY - MARKET,100,$5.00,$500.00,USD,1.0",
+            # 1-for-10: 90 of the 100 shares go.
+            "2022-02-01T05:00:00.000Z,GSK,STOCK SPLIT,-90,,$0,USD,1.0",
+            "2022-03-01T14:30:00.000Z,GSK,SELL - MARKET,10,$60.00,$600.00,USD,1.0",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_price == pytest.approx(50.0) and trade.quantity == pytest.approx(10)
+    assert round(trade.pnl, 2) == 100.0
+    assert not any("split" in warning for warning in report.warnings)
+
+
+def test_a_split_that_would_empty_the_position_is_not_applied_and_said() -> None:
+    from quant_trade.audit.universal import SPLIT_EMPTIES_WARNING  # noqa: PLC0415
+
+    report = _read(
+        [
+            REVOLUT_HEADER,
+            "2022-01-03T14:30:00.000Z,GSK,BUY - MARKET,100,$5.00,$500.00,USD,1.0",
+            "2022-02-01T05:00:00.000Z,GSK,STOCK SPLIT,-100,,$0,USD,1.0",
+            "2022-03-01T14:30:00.000Z,GSK,SELL - MARKET,10,$60.00,$600.00,USD,1.0",
+        ]
+    )
+    (trade,) = report.trades.trades
+    assert trade.entry_price == pytest.approx(5.0) and round(trade.pnl, 2) == 550.0
+    assert SPLIT_EMPTIES_WARNING.format(n=1) in report.warnings
