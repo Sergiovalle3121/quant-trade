@@ -2313,6 +2313,8 @@ Redesign pass 57 styles the column-mapping page ("Dinos qué es cada columna"): 
 
 Redesign pass 59 checks "¿Le gana a comprar y mantener el mercado?" on a phone and in the PDF. On a phone its row names ("Sharpe en los mismos 599 días…") now wrap instead of pushing both figure columns off the screen, and both worst falls show in red as in the crises table. The PDF already read well and is unchanged.
 
+Redesign pass 60 keeps the sign-up and sign-in form in view on a desktop while the reader goes down "Qué guardamos y cómo borrarlo" beside it (sticky under the menu), and on a phone the "Crear cuenta" and "Entrar" buttons span the card.
+
 ## Security
 
 The security and robustness review of the web service, the importers and the
