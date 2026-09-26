@@ -866,8 +866,7 @@ _UI: dict[str, dict[str, Any]] = {
                 "cuenta si tu reporte la indica (pesos mexicanos, reales, euros, libras, yenes, "
                 "dólares canadienses o francos suizos) y, si no, en dólares (letras del Tesoro "
                 "de EE. UU. a 3 meses). Datos públicos oficiales. Ves el Sharpe sin lo que ya "
-                "daba el efectivo y, si subes un benchmark, el alfa, medido frente a las letras "
-                "de EE. UU.",
+                "daba el efectivo y, si subes un benchmark, el alfa también.",
             ),
             (
                 "chart",
@@ -1087,7 +1086,7 @@ _UI: dict[str, dict[str, Any]] = {
                 "when your report names it (Mexican pesos, reais, euros, pounds, yen, Canadian "
                 "dollars or Swiss francs) and otherwise in dollars (3-month US Treasury bills). "
                 "Official public data. You see the Sharpe without what cash already paid and, "
-                "if you upload a benchmark, the alpha, measured against US bills.",
+                "if you upload a benchmark, the alpha too.",
             ),
             (
                 "chart",

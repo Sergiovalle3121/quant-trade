@@ -461,7 +461,7 @@ UI_PT: dict[str, Any] = {
             "seu relatório a indica (reais, pesos mexicanos, euros, libras, ienes, dólares "
             "canadenses ou francos suíços) e, se não, em dólares (letras do Tesouro dos EUA de "
             "3 meses). Dados públicos oficiais. Você vê o Sharpe sem o que o caixa já pagava "
-            "e, se enviar um benchmark, o alfa, medido frente às letras dos EUA.",
+            "e, se enviar um benchmark, o alfa também.",
         ),
         (
             "chart",
