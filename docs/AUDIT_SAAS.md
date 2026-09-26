@@ -1788,6 +1788,32 @@ changes what a report says.
   `account_audits`, `account_codes`, `account_resets`), created on start; no
   column is added to an existing table.
 
+### Sales funnel for the owner (`audit/funnel.py`, `/panel`)
+
+`/panel` shows, for the last 30 days, per link tag and per day and language:
+visits, accounts created, free first full reports, free previews and paid
+reports (by code and by card). It answers "which of my posts brings
+customers" without any third-party analytics.
+
+- **Tags.** A link carries `?ref=<tag>`. Only tags listed in
+  `funnel.REF_TAGS` count (the playbook template ids and a few channels);
+  anything missing, malformed or unlisted is "directo". The first listed tag
+  a browser arrives with is kept for 30 days in the `rigor_ref` cookie, which
+  holds only the tag, and stored in `account_refs` when an account is created.
+  The row goes with `delete_account`.
+- **Visits.** A `GET` answered 200 on the landing (`/`, `/en`, `/pt`) or a
+  case page (`/para`, `/for`, `/pt/para`) adds one to a counter keyed by day,
+  language and tag (`funnel_visits`). No address, cookie or user agent is
+  stored. Link previews, robots, prefetches and `HEAD` requests do not count.
+  A failed counter never breaks the page.
+- **The other stages** are read from the tables the service already keeps
+  (`accounts`, `welcome_reports`, `free_previews`, and paid `audits` with
+  their payment reference), with the language and tag of the account
+  involved. An event with no account shows language `-`.
+- **Limits.** Visits count page views, not people. A report deleted by the
+  retention purge stops counting. A tag counts only if the owner used it in
+  the link.
+
 ### Public verification page and badge
 
 The owner of an audit (whoever holds its token) can publish it. The page at

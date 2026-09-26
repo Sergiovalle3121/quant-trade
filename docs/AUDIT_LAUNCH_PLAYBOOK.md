@@ -904,6 +904,22 @@ Qué medir cada semana, en la hoja de ventas:
   corregir en `audit/importers.py`).
 - Verificaciones publicadas y visitas que llegan desde un sello.
 
+### Etiquetas para saber qué publicación trae clientes
+
+Cada enlace a Rigor que publiques lleva al final la etiqueta de su texto:
+`?ref=` y el id en minúsculas. Por ejemplo, el F6 enlaza a
+`/para/retos-prop-firm?ref=f6`, el P1 a `/?ref=p1` y el D3 a
+`/para/traders-acciones-futuros-cripto?ref=d3`. En tu perfil de un foro o red
+usa la etiqueta del sitio (`mql5`, `rankia`, `reddit`, `ff`, `telegram`,
+`youtube`, `x`, `instagram`, `facebook`, `linkedin`, `tiktok`, `email`) y en tu
+estado de WhatsApp `w0`. La lista completa está en `audit/funnel.py`
+(`REF_TAGS`) y en `/panel`.
+
+En `/panel`, «Embudo de ventas» muestra por etiqueta y por día e idioma las
+visitas, las cuentas nuevas, los informes gratis, las vistas previas y los
+pagos. Una etiqueta que no está en la lista cuenta como «sin etiqueta». Cuenta
+la primera etiqueta con la que llega cada navegador, durante 30 días.
+
 Si casi nadie sube un archivo, el problema está en el mensaje o en el canal;
 si suben pero no pagan, en el precio o en lo que enseña la vista previa. Vuelve
 a esta guía y cambia una sola cosa cada vez. Solo cuando haya ventas y
