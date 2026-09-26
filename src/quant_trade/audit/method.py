@@ -215,8 +215,21 @@ COPY: dict[str, dict[str, object]] = {
         "refs_title": "Fuentes",
         "data_title": "Datos públicos que usamos",
         "data": [
-            "Tipos de cambio, tasas y precios de EE. UU., cierres de mercados y otras tasas de "
-            "efectivo: FRED, Banco de la Reserva Federal de St. Louis.",
+            "Tipos de cambio de la Reserva Federal, letra del Tesoro y precios al consumidor de "
+            "EE. UU.: FRED, Banco de la Reserva Federal de St. Louis. El VIX es de Cboe Global "
+            "Markets, vía FRED.",
+            "Tasa a un día del euro (€STR, vía FRED) y, antes de octubre de 2019, la tasa de la "
+            "facilidad de depósito del BCE. Fuente: estadísticas del BCE; estos datos están "
+            "disponibles gratis en el sitio web del BCE (ecb.europa.eu).",
+            "Tasa a un día de la libra (vía FRED): SONIA data licensed under the Open Government "
+            "Licence v3.0 and copyright the Governor and Company of the Bank of England.",
+            "Tasa a un día de Canadá (CORRA): Banco de Canadá; la convertimos a rendimiento "
+            "anual, y estos datos están disponibles gratis en bankofcanada.ca.",
+            "Tasa Selic mensual de Brasil: Banco Central do Brasil, serie 4189, bajo la Open "
+            "Database License (ODbL).",
+            "Tasas de política monetaria de México, Japón y Suiza. Fuente: BIS (Banco de Pagos "
+            "Internacionales). Son las tasas oficiales de cada banco central, no tasas de "
+            "mercado.",
             "Precios al consumidor de la zona del euro y de Suiza: Eurostat.",
             "Precios al consumidor del Reino Unido: Office for National Statistics, bajo la "
             "Open Government Licence v3.0.",
@@ -229,6 +242,9 @@ COPY: dict[str, dict[str, object]] = {
             "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
             "vía e-Stat.",
             "Todos se leen al generar el informe y no cambian la clase.",
+            "No mostramos cierres del S&P 500, del Nasdaq 100 ni de bitcoin: ninguna fuente "
+            "pública permite reutilizarlos en un informe de pago. Las cifras de caídas "
+            "históricas de la tabla de crisis son hechos fijos, no datos que leamos.",
         ],
     },
     "en": {
@@ -272,8 +288,21 @@ COPY: dict[str, dict[str, object]] = {
         "refs_title": "Sources",
         "data_title": "Public data we use",
         "data": [
-            "Exchange rates, US rates and prices, market closes and other cash rates: FRED, "
-            "Federal Reserve Bank of St. Louis.",
+            "The Federal Reserve's exchange rates, the US Treasury bill and US consumer prices: "
+            "FRED, Federal Reserve Bank of St. Louis. The VIX is Cboe Global Markets', through "
+            "FRED.",
+            "The euro overnight rate (€STR, through FRED) and, before October 2019, the ECB's "
+            "deposit facility rate. Source: ECB statistics; this data is available free of "
+            "charge on the ECB's website (ecb.europa.eu).",
+            "The sterling overnight rate (through FRED): SONIA data licensed under the Open "
+            "Government Licence v3.0 and copyright the Governor and Company of the Bank of "
+            "England.",
+            "Canada's overnight rate (CORRA): Bank of Canada; we convert it to an annual yield, "
+            "and this data is available free of charge at bankofcanada.ca.",
+            "Brazil's monthly Selic rate: Banco Central do Brasil, series 4189, under the Open "
+            "Database License (ODbL).",
+            "Policy rates of Mexico, Japan and Switzerland. Source: BIS (Bank for International "
+            "Settlements). They are each central bank's official rate, not market rates.",
             "Consumer prices for the euro area and Switzerland: Eurostat.",
             "Consumer prices for the United Kingdom: Office for National Statistics, licensed "
             "under the Open Government Licence v3.0.",
@@ -286,6 +315,9 @@ COPY: dict[str, dict[str, object]] = {
             "(Statistics Bureau, Ministry of Internal Affairs and Communications), through "
             "e-Stat.",
             "All are read when the report is made and none changes the class.",
+            "We show no S&P 500, Nasdaq 100 or bitcoin closes: no public source allows their "
+            "reuse in a paid report. The historical falls in the crisis table are fixed facts, "
+            "not data we read.",
         ],
     },
     "pt": {
@@ -332,8 +364,20 @@ COPY: dict[str, dict[str, object]] = {
         "refs_title": "Fontes",
         "data_title": "Dados públicos que usamos",
         "data": [
-            "Cotações, taxas e preços dos EUA, fechamentos de mercados e outras taxas de caixa: "
-            "FRED, Federal Reserve Bank of St. Louis.",
+            "Cotações do Federal Reserve, letra do Tesouro e preços ao consumidor dos EUA: "
+            "FRED, Federal Reserve Bank of St. Louis. O VIX é da Cboe Global Markets, via FRED.",
+            "Taxa de um dia do euro (€STR, via FRED) e, antes de outubro de 2019, a taxa da "
+            "facilidade de depósito do BCE. Fonte: estatísticas do BCE; esses dados estão "
+            "disponíveis grátis no site do BCE (ecb.europa.eu).",
+            "Taxa de um dia da libra (via FRED): SONIA data licensed under the Open Government "
+            "Licence v3.0 and copyright the Governor and Company of the Bank of England.",
+            "Taxa de um dia do Canadá (CORRA): Banco do Canadá; nós a convertemos em rendimento "
+            "anual, e esses dados estão disponíveis grátis em bankofcanada.ca.",
+            "Taxa Selic mensal do Brasil: Banco Central do Brasil, série 4189, sob a Open "
+            "Database License (ODbL).",
+            "Taxas de política monetária do México, do Japão e da Suíça. Fonte: BIS (Banco de "
+            "Compensações Internacionais). São as taxas oficiais de cada banco central, não "
+            "taxas de mercado.",
             "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
             "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
             "Government Licence v3.0.",
@@ -346,6 +390,9 @@ COPY: dict[str, dict[str, object]] = {
             "Consumidor (Statistics Bureau, Ministry of Internal Affairs and Communications), "
             "via e-Stat.",
             "Todos são lidos ao gerar o relatório e nenhum muda a classe.",
+            "Não mostramos fechamentos do S&P 500, do Nasdaq 100 nem do bitcoin: nenhuma fonte "
+            "pública permite reutilizá-los em um relatório pago. As quedas históricas da tabela "
+            "de crises são fatos fixos, não dados que lemos.",
         ],
     },
 }

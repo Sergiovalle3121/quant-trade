@@ -1,16 +1,21 @@
-"""Public daily closes of a few widely traded markets, read from FRED.
+"""Public series the report reads at run time: rates, prices and the VIX.
 
-Consumer prices outside the US come from each official publisher whose terms
-allow reuse in a paid service with attribution (Eurostat, the UK's ONS, the
-Bank of Canada, the Banco Central do Brasil, Mexico's INEGI, Japan's Statistics
-Bureau through e-Stat), since FRED's copies of those
-indexes stopped updating; they are read the same way and kept the same way.
+Only sources whose terms allow reuse in a paid report with attribution are
+read. US federal series (Treasury bills, consumer prices, the Federal
+Reserve's exchange rates), the ECB's €STR, the Bank of England's SONIA and
+Cboe's VIX come from the St. Louis Fed's FRED. Consumer prices outside the US
+and the cash rates FRED only carried as OECD copies come from each original
+publisher (Eurostat, the UK's ONS, the Bank of Canada, the Banco Central do
+Brasil, Mexico's INEGI, Japan's Statistics Bureau through e-Stat, the BIS and
+the ECB); they are read the same way and kept the same way.
 
-A report on a strategy that trades the S&P 500, the Nasdaq 100 or bitcoin
-can say what simply holding that market did over the same days. The closes
-come from the St. Louis Fed's public FRED service at run time, are kept in
-memory for a few hours and are never written to the repository or bundled
-with the package. No key, no paid source.
+The S&P 500, the Nasdaq 100 and bitcoin (``ASSETS``) are still recognised
+from a file's symbols, but their closes are never read: FRED's copies need
+the written permission of S&P Dow Jones Indices, Nasdaq and Coinbase for any
+reproduction, and no public source allows reuse in a paid report. The report
+says so in one NOT_MEASURED line. Everything read is kept in memory for a few
+hours and never written to the repository or bundled with the package. No
+key, no paid source.
 
 The audit itself stays pure: ``engine.run_audit`` takes a ``market``
 callable and calls it only when the file names one of these markets. The
@@ -73,6 +78,45 @@ PROVIDER_URLS: dict[str, tuple[str, str]] = {
         "https://www.e-stat.go.jp/stat-search/file-download?statInfId={series}&fileKind=1",
         "https://www.e-stat.go.jp/stat-search/files?tstat=000001243876",
     ),
+    # Brazil's Selic, accumulated in the month and annualised on 252 business
+    # days (SGS 4189, ODbL).
+    "bcb_rate": (
+        "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json",
+        "https://dadosabertos.bcb.gov.br/dataset/{series}-taxa-de-juros---selic-acumulada-no-"
+        "mes-anualizada-base-252",
+    ),
+    # Canada's overnight repo rate average (CORRA), daily.
+    "boc_rate": (
+        "https://www.bankofcanada.ca/valet/observations/{series}/csv",
+        "https://www.bankofcanada.ca/rates/interest-rates/corra/",
+    ),
+    # Central bank policy rates compiled by the BIS, monthly, end of period, by
+    # the two-letter area code; unrestricted use with the BIS cited.
+    "bis": (
+        "https://stats.bis.org/api/v1/data/WS_CBPOL/M.{series}?format=csv&detail=dataonly",
+        "https://data.bis.org/topics/CBPOL/BIS,WS_CBPOL,1.0/M.{series}",
+    ),
+    # An ECB series of its financial markets dataset (FM), by its key.
+    "ecb": (
+        "https://data-api.ecb.europa.eu/service/data/FM/{series}?format=csvdata&detail=dataonly",
+        "https://data.ecb.europa.eu/data/datasets/FM/FM.{series}",
+    ),
+}
+#: The providers that publish a rate in percent a year (zero and below kept).
+RATE_PROVIDERS = frozenset({"bcb_rate", "boc_rate", "bis", "ecb"})
+#: Who each source credits, as the report's link text names it.
+PUBLISHERS: dict[str, str] = {
+    "fred": "FRED",
+    "eurostat": "Eurostat",
+    "ons": "ONS",
+    "boc": "Bank of Canada",
+    "bcb": "Banco Central do Brasil",
+    "inegi": "INEGI",
+    "estat": "e-Stat",
+    "bcb_rate": "Banco Central do Brasil",
+    "boc_rate": "Bank of Canada",
+    "bis": "BIS",
+    "ecb": "ECB",
 }
 #: How each provider's bytes become text: INEGI sends a zip, carried byte for
 #: byte as Latin-1 text and opened by :func:`parse_provider`; e-Stat's CSV is
@@ -115,6 +159,9 @@ class Asset:
     #: values; a larger jump is a broken reply (Brazil's worst month, March
     #: 1990, was about x1.8).
     max_step: float | None = None
+    #: False when no public source of the series allows reuse in a paid
+    #: report: the market is recognised but its closes are never read.
+    licensed: bool = True
 
     @property
     def source_url(self) -> str:
@@ -122,27 +169,39 @@ class Asset:
             return PROVIDER_URLS[self.provider][1].format(series=self.series)
         return FRED_PAGE.format(series=self.series)
 
+    @property
+    def publisher(self) -> str:
+        """The source the report credits by name."""
+        return PUBLISHERS.get(self.provider, "FRED")
+
 
 #: A futures contract month: a month code and year (``NQZ4``) or ``MMYY`` (``NQ 12-24``).
 _FUTURES = r"([FGHJKMNQUVXZ]\d{1,2}|\d{4})?"
+#: The markets a file's symbols are matched to. None has a public source whose
+#: licence allows reuse in a paid report (FRED's ``SP500``, ``NASDAQ100`` and
+#: ``CBBTCUSD`` need the written permission of S&P Dow Jones Indices, Nasdaq and
+#: Coinbase), so none is ever read; the series ids only name what is missing.
 ASSETS: tuple[Asset, ...] = (
     Asset(
         "sp500",
         "S&P 500",
         "SP500",
         re.compile(rf"^(US500|USA500|SPX500|SPX|SP500|SPXUSD|US500USD|M?ES{_FUTURES})$"),
+        licensed=False,
     ),
     Asset(
         "nasdaq100",
         "Nasdaq 100",
         "NASDAQ100",
         re.compile(rf"^(US100|USTEC|USTECH|NAS100|NASDAQ100|NASUSD|NDX|NDX100|M?NQ{_FUTURES})$"),
+        licensed=False,
     ),
     Asset(
         "bitcoin",
-        "Bitcoin (Coinbase)",
+        "Bitcoin",
         "CBBTCUSD",
         re.compile(r"^(BTCUSD|BTCUSDT|BTCUSDC|XBTUSD|BTCPERP|BTCUSDTPERP|BTC)$"),
+        licensed=False,
     ),
 )
 BY_KEY = {asset.key: asset for asset in ASSETS}
@@ -188,13 +247,17 @@ FX: tuple[Asset, ...] = tuple(
         ("CHF", "DEXSZUS"),
     )
 )
-#: Highest and lowest rate a local cash series may hold (Mexico's call rate
-#: reached 136 % in 1988; the Swiss 3-month rate went to -0.93 % in 2015).
+#: Highest and lowest rate a local cash series may hold (Brazil's Selic reached
+#: 85 % a year in April 1995; the Swiss policy rate went to -0.75 % in 2015).
 MAX_LOCAL_RATE = 200.0
 MIN_LOCAL_RATE = -5.0
-#: What cash earned in each currency of ``FX``, in percent a year, as FRED
-#: publishes it: the overnight or immediate rate where one is current, else
-#: the 3-month interbank rate.
+#: What cash earned in each currency of ``FX``, in percent a year, from its
+#: originator: the euro's €STR (ECB) and sterling's SONIA (Bank of England),
+#: both through FRED; Canada's CORRA (Bank of Canada) and Brazil's monthly
+#: Selic (Banco Central do Brasil); and, for the peso, the yen and the franc,
+#: the central bank's policy rate as the BIS compiles it (an official rate,
+#: not a market one; Japan has no value from May 2013 to August 2016, when the
+#: Bank of Japan set no policy rate).
 LOCAL_CASH: tuple[Asset, ...] = tuple(
     Asset(
         f"cash_{code.lower()}",
@@ -205,28 +268,32 @@ LOCAL_CASH: tuple[Asset, ...] = tuple(
         ceiling=MAX_LOCAL_RATE,
         floor=MIN_LOCAL_RATE,
         negative=True,
+        provider=provider,
     )
-    for code, series in (
-        ("MXN", "IRSTCI01MXM156N"),
-        ("BRL", "IRSTCI01BRM156N"),
-        ("EUR", "ECBESTRVOLWGTTRMDMNRT"),
-        ("GBP", "IUDSOIA"),
-        ("JPY", "IRSTCI01JPM156N"),
-        ("CAD", "IRSTCI01CAM156N"),
-        ("CHF", "IR3TIB01CHM156N"),
+    for code, series, provider in (
+        ("MXN", "MX", "bis"),
+        ("BRL", "4189", "bcb_rate"),
+        ("EUR", "ECBESTRVOLWGTTRMDMNRT", "fred"),
+        ("GBP", "IUDSOIA", "fred"),
+        ("JPY", "JP", "bis"),
+        ("CAD", "AVG.INTWO", "boc_rate"),
+        ("CHF", "CH", "bis"),
     )
 )
-#: The euro area's immediate rate (OECD, monthly), for the years before €STR
-#: starts in October 2019; FRED's copy stops updating in 2026.
+#: The ECB's deposit facility rate (daily, from 1999), for the years before
+#: €STR starts in October 2019. It is a policy rate, not €STR: overnight market
+#: rates sat above it, by about a point before 2008 and by less after, and €STR
+#: has run about 10 bp below it.
 EUR_CASH_HISTORY = Asset(
     "cash_eur_history",
     "EUR",
-    "IRSTCI01EZM156N",
+    "D.U2.EUR.4F.KR.DFR.LEV",
     re.compile(r"(?!)"),
     rate=True,
     ceiling=MAX_LOCAL_RATE,
     floor=MIN_LOCAL_RATE,
     negative=True,
+    provider="ecb",
 )
 #: Consumer prices in the currencies of ``FX`` whose official index is current
 #: and may be reused in a paid service with attribution (all items, monthly, not
@@ -258,9 +325,9 @@ LOCAL_CPI: tuple[Asset, ...] = tuple(
         ("JPY", "000040482943", "estat"),
     )
 )
-#: Every series the service keeps in memory.
+#: Every series the service keeps in memory (never an unlicensed market).
 SERIES: dict[str, Asset] = {
-    **BY_KEY,
+    **{asset.key: asset for asset in ASSETS if asset.licensed},
     CASH.key: CASH,
     VIX.key: VIX,
     CPI.key: CPI,
@@ -410,6 +477,56 @@ def parse_provider(text: str, provider: str) -> pd.Series:
     return series[series > 0]
 
 
+def parse_rates(text: str, provider: str, series: str) -> pd.Series:
+    """A rate in percent a year from one of ``RATE_PROVIDERS``, indexed by day;
+    zero and negative values kept. A date that appears twice, a reply for
+    another series, or an unreadable date or value refuses the reply.
+
+    The BIS publishes a month's value as of its last day, so it is placed on
+    that day (never at the start of the month it closed); Brazil's monthly
+    Selic is the month's own average and stays on its first day."""
+    if provider == "bcb_rate":
+        rows = json.loads(text)
+        if not isinstance(rows, list) or not rows:
+            raise ValueError("no rates")
+        frame = pd.DataFrame(rows)
+        stamps = pd.Series(pd.to_datetime(frame["data"], format="%d/%m/%Y", errors="coerce"))
+        values = frame["valor"]
+        # Before the Real plan the monthly Selic ran in the thousands a year.
+        kept = (stamps >= pd.Timestamp(BCB_START)) | stamps.isna()
+        stamps, values = stamps[kept], values[kept]
+    elif provider == "boc_rate":
+        body = text.split('"OBSERVATIONS"', 1)[1]
+        frame = pd.read_csv(io.StringIO(body.strip()), dtype=str)
+        if frame.columns[1] != series:
+            raise ValueError("a reply for another series")
+        stamps = pd.Series(pd.to_datetime(frame.iloc[:, 0], format="%Y-%m-%d", errors="coerce"))
+        values = frame.iloc[:, 1]
+    elif provider == "bis":
+        frame = pd.read_csv(io.StringIO(text), dtype=str)
+        if not bool((frame["REF_AREA"] == series).all()) or not bool((frame["FREQ"] == "M").all()):
+            raise ValueError("a reply for another series")
+        months = pd.to_datetime(frame["TIME_PERIOD"], format="%Y-%m", errors="coerce")
+        stamps = pd.Series(months + pd.offsets.MonthEnd(0))
+        values = frame["OBS_VALUE"]
+    elif provider == "ecb":
+        frame = pd.read_csv(io.StringIO(text), dtype=str)
+        if not bool((frame["KEY"] == f"FM.{series}").all()):
+            raise ValueError("a reply for another series")
+        stamps = pd.Series(pd.to_datetime(frame["TIME_PERIOD"], format="%Y-%m-%d", errors="coerce"))
+        values = frame["OBS_VALUE"]
+    else:
+        raise ValueError(f"unknown rate provider {provider}")
+    numbers = pd.to_numeric(values, errors="coerce").to_numpy(dtype=float)
+    if len(numbers) == 0:
+        raise ValueError("no rates")
+    if bool(stamps.isna().any()) or not bool(np.isfinite(numbers).all()):
+        raise ValueError("an unreadable date or rate")
+    if bool(stamps.duplicated().any()):
+        raise ValueError("a date appears twice")
+    return pd.Series(numbers, index=pd.DatetimeIndex(stamps.to_numpy())).sort_index()
+
+
 #: The INPC rows among the other indexes of INEGI's file, and the name of the
 #: monthly table inside the zip.
 INEGI_HEADLINE = "Precios al Consumidor (INPC)"
@@ -538,7 +655,9 @@ class MarketData:
                 if self._download is not None
                 else _download(asset.series, asset.provider)
             )
-            if asset.provider in PROVIDER_URLS:
+            if asset.provider in RATE_PROVIDERS:
+                series = parse_rates(text, asset.provider, asset.series)
+            elif asset.provider in PROVIDER_URLS:
                 series = parse_provider(text, asset.provider)
             else:
                 series = parse_fred_csv(text, rate=asset.rate, negative=asset.negative)
@@ -580,6 +699,8 @@ __all__ = [
     "FX",
     "LOCAL_CPI",
     "PROVIDER_ENCODING",
+    "PUBLISHERS",
+    "RATE_PROVIDERS",
     "SERIES",
     "VIX",
     "Asset",
@@ -588,4 +709,5 @@ __all__ = [
     "dominant_asset",
     "parse_fred_csv",
     "parse_provider",
+    "parse_rates",
 ]

@@ -15,14 +15,17 @@ compounded over those days. FRED publishes a bank-discount rate ``d``: a
 and that yield is what is used. It is a dollar rate: for an account in another
 currency, that currency's own cash rate is the fair one, and the note says so.
 
-When an imported report names the account's currency and FRED carries a
-current cash rate for it (``LOCAL``: the overnight or immediate rate of the
-peso, real, euro, pound, yen and Canadian dollar, the 3-month interbank rate of
-the Swiss franc), that rate is subtracted instead (:func:`local_excess_sharpe`),
+When an imported report names the account's currency and its originator
+publishes a current cash rate for it that may be reused in a paid report
+(``LOCAL``: the overnight rate of the euro, pound and Canadian dollar, Brazil's
+monthly Selic, and the policy rate of the peso, yen and franc as the BIS
+compiles it), that rate is subtracted instead (:func:`local_excess_sharpe`),
 converted to an annual yield by its own quote: a simple rate over ``tenor_days``
 on a ``basis``-day year, rolled over for a year, or, for Brazil's, a rate that
-is already an annual compounded yield. Monthly series are averages of the
-month, so a point takes its own month's value or the latest one published.
+is already an annual compounded yield. Brazil's monthly Selic is the month's
+average, so a point takes its own month's value or the latest one published;
+the BIS's monthly policy rates stand at each month's last day, so a point
+takes the last month-end on or before it.
 Nothing here changes the class.
 """
 
@@ -59,8 +62,9 @@ TOO_FEW = "fewer than ten returns"
 FLAT = "the returns never move"
 NOTE_LOCAL = (
     "Sharpe ratio of the returns after subtracting what cash in the account's own currency "
-    "paid over the same days (the short rate FRED publishes for that currency, converted "
-    "to an annual yield by its own quote), annualised like the headline Sharpe"
+    "paid over the same days (that currency's overnight or central bank policy rate, from "
+    "its publisher, converted to an annual yield by its own quote), annualised like the "
+    "headline Sharpe"
 )
 #: A monthly average older than this before a return's start is too stale to use.
 MAX_MONTHLY_GAP_DAYS = 75
@@ -78,13 +82,13 @@ class LocalCash:
     tenor_days: float
     #: How old the last value before a return's start may be.
     max_gap: int
-    #: A monthly series, same quote, used only before ``asset`` starts.
+    #: An older series, same quote, used only before ``asset`` starts.
     history: Asset | None = None
 
     @property
     def name(self) -> str:
         """What the result calls the rate (the report names it in words)."""
-        return f"{self.asset.label} cash rate (FRED {self.asset.series})"
+        return f"{self.asset.label} cash rate ({self.asset.publisher} {self.asset.series})"
 
     def yearly(self, percent: np.ndarray) -> np.ndarray:
         rate = np.asarray(percent, dtype=float) / 100.0
@@ -95,14 +99,18 @@ class LocalCash:
 
 _BY_CODE = {asset.label: asset for asset in LOCAL_CASH}
 #: Cash rates by account currency: (days in the quote's year, tenor, staleness).
+#: Every quote is simple over its day count except Brazil's Selic, already a
+#: compounded yield on 252 business days: Mexico's target overnight rate and
+#: the franc's (SARON's, which the SNB steers to) on 360 days, the yen's call
+#: rate, CORRA and SONIA on 365, the euro's €STR and the ECB's deposit rate on 360.
 LOCAL: dict[str, LocalCash] = {
     "MXN": LocalCash(_BY_CODE["MXN"], 360.0, 1.0, MAX_MONTHLY_GAP_DAYS),
     "BRL": LocalCash(_BY_CODE["BRL"], None, 1.0, MAX_MONTHLY_GAP_DAYS),
     "EUR": LocalCash(_BY_CODE["EUR"], 360.0, 1.0, MAX_GAP_DAYS, EUR_CASH_HISTORY),
     "GBP": LocalCash(_BY_CODE["GBP"], 365.0, 1.0, MAX_GAP_DAYS),
     "JPY": LocalCash(_BY_CODE["JPY"], 365.0, 1.0, MAX_MONTHLY_GAP_DAYS),
-    "CAD": LocalCash(_BY_CODE["CAD"], 365.0, 1.0, MAX_MONTHLY_GAP_DAYS),
-    "CHF": LocalCash(_BY_CODE["CHF"], 360.0, 91.0, MAX_MONTHLY_GAP_DAYS),
+    "CAD": LocalCash(_BY_CODE["CAD"], 365.0, 1.0, MAX_GAP_DAYS),
+    "CHF": LocalCash(_BY_CODE["CHF"], 360.0, 1.0, MAX_MONTHLY_GAP_DAYS),
 }
 
 
@@ -192,14 +200,15 @@ def local_excess_sharpe(
 ) -> dict[str, Any]:
     """The Sharpe ratio of the returns in ``frame`` after the cash rate of the
     account's own ``currency`` (a key of ``LOCAL``). The values are cleaned
-    first; a ``history`` series (monthly, same quote) fills only the dates
-    before ``rates`` starts, where a value may be ``MAX_MONTHLY_GAP_DAYS`` old."""
+    first; a ``history`` series (same quote) fills only the dates before
+    ``rates`` starts, where a value may be ``MAX_MONTHLY_GAP_DAYS`` old."""
     local = LOCAL[currency]
     asset = local.asset
     base: dict[str, Any] = {
         "series": asset.series,
         "label": local.name,
         "source_url": asset.source_url,
+        "source_name": asset.publisher,
         "currency": currency,
     }
     values, max_gap, spliced = _local_values(frame["timestamp"], rates, local, history)
@@ -208,6 +217,7 @@ def local_excess_sharpe(
     if spliced and local.history is not None:
         base["history_series"] = local.history.series
         base["history_source_url"] = local.history.source_url
+        base["history_source_name"] = local.history.publisher
     return _excess(frame, values, ppy, base, NOTE_LOCAL, max_gap, local.yearly)
 
 

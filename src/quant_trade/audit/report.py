@@ -995,11 +995,12 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "crises_market": "Mercado en esas fechas",
         "crises_market_note": (
-            "Mercado: cierre del mes previo a la ventana contra el cierre de su último mes, "
-            "datos públicos de FRED consultados el {as_of} ({sources}). Son acciones de "
-            "EE. UU. y bitcoin: si la estrategia opera otro mercado (divisas, materias "
-            "primas, otro país), tómelos solo como contexto de lo que vivía el mercado, no "
-            "como su punto de comparación."
+            "Mercado: variación del cierre del mes previo a la ventana al cierre de su último "
+            "mes, una cifra histórica fija comprobada el {as_of} con los niveles del índice en "
+            "FRED ({sources}); no se lee ni se muestra ningún otro dato de esos índices. Son "
+            "acciones de EE. UU. y bitcoin: si la estrategia opera otro mercado (divisas, "
+            "materias primas, otro país), tómelos solo como contexto de lo que vivía el "
+            "mercado, no como su punto de comparación."
         ),
         "crises_no_trades": "sin operaciones cerradas en la ventana",
         "crises_worse": (
@@ -1422,15 +1423,16 @@ LABELS: dict[str, dict[str, str]] = {
             "El Sharpe de arriba no resta ninguna tasa. La cuenta está en {code}, así que aquí "
             "se resta la tasa de esa moneda, no la de EE. UU. Fuente: {source}."
         ),
-        "cash_rate_MXN": "tasa interbancaria a un día de México (OCDE)",
-        "cash_rate_BRL": "tasa interbancaria a un día de Brasil (OCDE)",
+        "cash_rate_MXN": "tasa de política monetaria de México (BIS)",
+        "cash_rate_BRL": "tasa Selic mensual de Brasil (Banco Central do Brasil)",
         "cash_rate_EUR": (
-            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la de la OCDE)"
+            "tasa a un día del euro, €STR del BCE (antes de octubre de 2019, la tasa de "
+            "depósito del BCE)"
         ),
         "cash_rate_GBP": "tasa a un día de la libra, SONIA (Banco de Inglaterra)",
-        "cash_rate_JPY": "tasa interbancaria a un día de Japón (OCDE)",
-        "cash_rate_CAD": "tasa interbancaria a un día de Canadá (OCDE)",
-        "cash_rate_CHF": "tasa interbancaria a 3 meses de Suiza (OCDE)",
+        "cash_rate_JPY": "tasa de política monetaria de Japón (BIS)",
+        "cash_rate_CAD": "tasa a un día de Canadá, CORRA (Banco de Canadá)",
+        "cash_rate_CHF": "tasa de política monetaria de Suiza (BIS)",
         "kpi_hint_pf": "lo ganado por cada 1 perdido",
         "kpi_hint_breakeven": "cuánto más puede costar operar antes de quedar en cero",
         "bps_side": "pb por lado",
@@ -2196,7 +2198,7 @@ LABELS: dict[str, dict[str, str]] = {
             "does not change the class."
         ),
         "currency_note_mixed": (
-            "The rows \"after its own inflation\" divide by each country's official consumer "
+            'The rows "after its own inflation" divide by each country\'s official consumer '
             "price index of each month, or that of the latest month published; a currency "
             "without a current official index shows only its row before inflation. The "
             "return a year is shown from one year of "
@@ -2208,8 +2210,7 @@ LABELS: dict[str, dict[str, str]] = {
         "currency_attrib_EUR": "euro, Eurostat (through FRED)",
         "currency_attrib_CHF": "Swiss franc, Eurostat's harmonised index",
         "currency_attrib_GBP": (
-            "pound, Office for National Statistics, licensed under the Open Government Licence "
-            "v3.0"
+            "pound, Office for National Statistics, licensed under the Open Government Licence v3.0"
         ),
         "currency_attrib_CAD": (
             "Canadian dollar, Bank of Canada (Statistics Canada's CPI, available free of charge "
@@ -2238,11 +2239,12 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "crises_market": "Market over those months",
         "crises_market_note": (
-            "Market: the close of the month before the window against the close of its last "
-            "month, public FRED data read on {as_of} ({sources}). These are US equities and "
-            "bitcoin: if the strategy trades another market (currencies, commodities, another "
-            "country), take them only as context for what the market went through, not as its "
-            "yardstick."
+            "Market: the change from the close of the month before the window to the close of "
+            "its last month, a fixed historical figure checked on {as_of} against the index "
+            "levels on FRED ({sources}); no other data of these indices is read or shown. "
+            "These are US equities and bitcoin: if the strategy trades another market "
+            "(currencies, commodities, another country), take them only as context for what "
+            "the market went through, not as its yardstick."
         ),
         "crises_no_trades": "no trades closed in the window",
         "crises_worse": (
@@ -2654,13 +2656,15 @@ LABELS: dict[str, dict[str, str]] = {
             "The Sharpe above subtracts no rate. The account is in {code}, so the rate "
             "subtracted here is that currency's, not the US one. Source: {source}."
         ),
-        "cash_rate_MXN": "overnight interbank rate of Mexico (OECD)",
-        "cash_rate_BRL": "overnight interbank rate of Brazil (OECD)",
-        "cash_rate_EUR": "euro overnight rate, the ECB's €STR (before October 2019, the OECD's)",
+        "cash_rate_MXN": "policy rate of Mexico (BIS)",
+        "cash_rate_BRL": "monthly Selic rate of Brazil (Banco Central do Brasil)",
+        "cash_rate_EUR": (
+            "euro overnight rate, the ECB's €STR (before October 2019, the ECB's deposit rate)"
+        ),
         "cash_rate_GBP": "sterling overnight rate, SONIA (Bank of England)",
-        "cash_rate_JPY": "overnight interbank rate of Japan (OECD)",
-        "cash_rate_CAD": "overnight interbank rate of Canada (OECD)",
-        "cash_rate_CHF": "3-month interbank rate of Switzerland (OECD)",
+        "cash_rate_JPY": "policy rate of Japan (BIS)",
+        "cash_rate_CAD": "overnight rate of Canada, CORRA (Bank of Canada)",
+        "cash_rate_CHF": "policy rate of Switzerland (BIS)",
         "kpi_hint_pf": "what was won for every 1 lost",
         "kpi_hint_breakeven": "how much more trading can cost before it reaches zero",
         "bps_side": "bps per side",
@@ -3700,12 +3704,16 @@ def _cash_html(data: dict[str, Any], labels: dict[str, str]) -> str:
             rate=rate, sharpe=f"{float(cash['sharpe_excess']['value']):.2f}", **extra
         )
     text = first + " " + labels["cash_note" + suffix].format(source="\x00", code=code)
-    link = f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>FRED</a>"
+    link = (
+        f"<a href='{_e(str(cash.get('source_url', '')))}' rel='noopener'>"
+        f"{_e(str(cash.get('source_name') or 'FRED'))}</a>"
+    )
     if cash.get("history_source_url"):
         # The spliced older series (the euro's before €STR) gets its own link.
+        older = cash.get("history_source_name") or cash.get("history_series", "")
         link += (
             f" (<a href='{_e(str(cash['history_source_url']))}' rel='noopener'>"
-            f"{_e(str(cash.get('history_series', '')))}</a>)"
+            f"{_e(str(older))}</a>)"
         )
     return f"<p class='muted'>{_e(text).replace(chr(0), link)} {_badge('MEASURED')}</p>"
 
@@ -5854,9 +5862,7 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
     return out
 
 
-def _currency_html(
-    section: dict[str, Any] | None, locale: str, labels: dict[str, str]
-) -> str:
+def _currency_html(section: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """The dollar curve in other currencies and after US inflation."""
     if not section:
         return ""
