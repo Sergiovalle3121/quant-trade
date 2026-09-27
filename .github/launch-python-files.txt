@@ -1,5 +1,6 @@
 src/quant_trade/audit/account_pages.py
 src/quant_trade/audit/account_pt.py
+src/quant_trade/audit/accounts.py
 src/quant_trade/audit/engine.py
 src/quant_trade/audit/errors_pt.py
 src/quant_trade/audit/funnel.py
@@ -23,6 +24,8 @@ src/quant_trade/audit/store.py
 src/quant_trade/audit/theme.py
 src/quant_trade/audit/verdict.py
 src/quant_trade/audit/web.py
+tests/audit_fixtures.py
+tests/forgery_lab.py
 tests/test_audit_access_codes.py
 tests/test_audit_card_payments.py
 tests/test_audit_email_delivery.py
@@ -47,5 +50,11 @@ tests/test_audit_purchase_mail.py
 tests/test_audit_refunds.py
 tests/test_audit_report.py
 tests/test_audit_schema.py
+tests/test_audit_settings.py
 tests/test_audit_user_accounts.py
+tests/test_audit_web_languages.py
+tests/test_forensics_balance.py
+tests/test_forensics_review.py
+tests/test_forensics_totals.py
+tests/test_forgery_lab.py
 tools/rigor_load_smoke.py

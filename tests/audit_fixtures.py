@@ -11,6 +11,14 @@ import numpy as np
 import pandas as pd
 
 START = "2019-01-02"
+MT5_TESTER_TAMPERED_BALANCE = b"<td>11 063.05</td>"
+MT5_TESTER_CLEAN_BALANCE = b"<td>10 063.05</td>"
+
+
+def clean_mt5_tester_bytes(data: bytes) -> bytes:
+    """Reconstruct a clean control in memory; keep the committed tamper intact."""
+    assert data.count(MT5_TESTER_TAMPERED_BALANCE) == 1
+    return data.replace(MT5_TESTER_TAMPERED_BALANCE, MT5_TESTER_CLEAN_BALANCE)
 
 
 def business_days(n: int, start: str = START) -> pd.DatetimeIndex:

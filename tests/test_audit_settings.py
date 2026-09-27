@@ -19,7 +19,9 @@ def test_defaults_are_free_sqlite_and_secretless() -> None:
     assert settings.stripe_enabled is False
     assert settings.database_kind == "sqlite"
     assert settings.stripe_secret_key == ""
-    assert settings.price_usd == 49.0
+    assert settings.price_usd == 29.0
+    assert settings.pack_price_usd_cents == 6900
+    assert settings.pack_price_usd == 0.0  # free mode cannot sell a pack
 
 
 def test_free_mode_is_forced_without_every_stripe_variable() -> None:

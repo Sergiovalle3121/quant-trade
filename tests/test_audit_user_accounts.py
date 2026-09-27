@@ -944,7 +944,9 @@ def test_a_new_account_gets_its_first_full_report_free_then_previews(tmp_path: P
     assert "class='lockbox'" in client.get(second.headers["location"]).text
 
 
-def test_the_free_report_is_once_per_browser_and_once_per_file(tmp_path: Path) -> None:
+def test_the_free_report_is_once_per_browser_but_a_shared_file_remains_eligible(
+    tmp_path: Path,
+) -> None:
     client, _, _ = _client(tmp_path)
     _signup(client, "first@example.com", welcome=True)
     assert "acct=welcome" in _upload(client).headers["location"]
@@ -959,11 +961,11 @@ def test_the_free_report_is_once_per_browser_and_once_per_file(tmp_path: Path) -
     )
     assert same_browser.status_code == 303
     assert "acct=welcome" not in same_browser.headers["location"]
-    # A fresh browser with the same file gets a preview too.
+    # A different eligible account may inspect the same file from a fresh browser.
     fresh = TestClient(client.app)
     _signup(fresh, "third@example.com", welcome=True)
     same_file = _upload(fresh)
-    assert same_file.status_code == 303 and "acct=welcome" not in same_file.headers["location"]
+    assert same_file.status_code == 303 and "acct=welcome" in same_file.headers["location"]
     # ...while a fresh browser with a new file still gets its free full report.
     other = TestClient(client.app)
     _signup(other, "fourth@example.com", welcome=True)
@@ -1138,8 +1140,10 @@ def test_the_free_report_network_cap_and_previews_hold_when_the_first_look_is_st
     assert len(store.account_audits_list(account.id)) == 3  # type: ignore[attr-defined]
 
 
-def test_one_extra_byte_does_not_make_a_new_file(tmp_path: Path) -> None:
-    client, _, _ = _client(tmp_path)
+def test_one_extra_byte_keeps_the_fingerprint_but_a_new_account_remains_eligible(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path)
     body = csv_bytes(positive_drift(450, seed=11))
     _signup(client, "a@example.com", welcome=True)
     first = client.post(
@@ -1157,7 +1161,11 @@ def test_one_extra_byte_does_not_make_a_new_file(tmp_path: Path) -> None:
         data={"consent": "on"},
         follow_redirects=False,
     )
-    assert again.status_code == 303 and "acct=welcome" not in again.headers["location"]
+    assert again.status_code == 303 and "acct=welcome" in again.headers["location"]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = conn.execute(store.welcome_reports.select()).mappings().all()  # type: ignore[attr-defined]
+    assert len(rows) == 2
+    assert len({row["file_sha256"] for row in rows}) == 1
 
 
 def test_network_claims_hold_only_a_hash_and_the_purge_drops_them(tmp_path: Path) -> None:
@@ -1439,7 +1447,7 @@ def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> N
             "/account",
             "paid ones and your free report stay",
             "The IP address of each upload",
-            "They stay even if you delete the account, without your e-mail",
+            "They remain without your e-mail even if you delete the account",
         ),
     ):
         page = re.sub(r"\s+", " ", client.get(path).text)
@@ -1448,9 +1456,9 @@ def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> N
     es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
     en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
     assert "tu primer informe completo gratis: se conservan" in es
-    assert "aunque borres tu cuenta y sin tu correo" in es
+    assert "dos hashes se quedan sin tu correo aunque borres la cuenta" in es
     assert "your free first full report: kept" in en
-    assert "even if you delete your account and without your e-mail" in en
+    assert "two hashes stay without your e-mail even if you delete your account" in en
 
 
 def test_the_account_screens_exist_in_portuguese(tmp_path: Path) -> None:
