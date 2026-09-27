@@ -84,13 +84,14 @@ def test_a_portuguese_report_fits_its_two_language_links_on_a_narrow_phone() -> 
     page = render_html(
         sample_result("pt"), watermark=False, locale="pt", switch_url="/audits/x?lang=es"
     )
-    assert "hreflang='es' data-short='ES'>Español</a>" in page
-    assert "hreflang='en' data-short='EN'>English</a>" in page
-    assert ".nav-end>.lang-switch[data-short]::before{content:attr(data-short)" in REPORT
+    assert re.search(r"<a\b[^>]*hreflang='es'[^>]*data-short='ES'>Español</a>", page)
+    assert re.search(r"<a\b[^>]*hreflang='en'[^>]*data-short='EN'>English</a>", page)
+    assert ".report-languages .lang-switch[data-short]::before{content:attr(data-short)" in REPORT
     spanish = render_html(
         sample_result("es"), watermark=False, locale="es", switch_url="/audits/x?lang=en"
     )
-    assert "data-short=" not in spanish
+    assert re.search(r"<a\b[^>]*hreflang='en'[^>]*data-short='EN'>English</a>", spanish)
+    assert re.search(r"<a\b[^>]*hreflang='pt'[^>]*data-short='PT'>Português</a>", spanish)
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))

@@ -48,9 +48,15 @@ def test_trust_links_point_to_pages_that_exist_in_the_page_language() -> None:
     es = _section(_paid("es"))
     for href in ("/ejemplo?lang=es", "/metodologia", "/comprobar", "/privacidad", "/terminos"):
         assert f"href='{href}" in es, href
-    # The legal pages are not in Portuguese yet and open in English.
+    # Portuguese legal pages are translated and linked in the same language.
     pt = _section(_paid("pt"))
-    for href in ("/pt/exemplo", "/pt/metodologia", "/pt/comprovar", "/privacy", "/terms"):
+    for href in (
+        "/pt/exemplo",
+        "/pt/metodologia",
+        "/pt/comprovar",
+        "/pt/privacidade",
+        "/pt/termos",
+    ):
         assert f"href='{href}" in pt, href
 
 

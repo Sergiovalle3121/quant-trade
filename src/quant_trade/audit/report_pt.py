@@ -1599,6 +1599,8 @@ REPORT: dict[str, Any] = {
         "floor": "Mínimo por erro de amostragem",
         "observed_across_variants": "Observado nas variantes",
         "sharpe_variance_used": "Variância do Sharpe usada",
+        "dependence_ratio": "Aumento da variância por dependência",
+        "effective_observations": "Observações efetivas após dependência",
         "sharpe_per_period": "Sharpe por período",
         "break_even_bps": "Custo de equilíbrio (pb por lado)",
         "break_even_pips": "Custo de equilíbrio (pips por lado)",
@@ -2115,6 +2117,18 @@ PLAN: dict[str, Any] = {
         "TRADES_OUTSIDE_EQUITY": "Envie a curva e as operações da mesma conta e do mesmo período.",
         "TRADES_EQUITY_UNRELATED": (
             "As operações não explicam a curva: envie os dois arquivos da mesma conta."
+        ),
+        "MONETARY_RECONCILIATION_MISMATCH": (
+            "Peça uma exportação original do mesmo período e compare saldo inicial, depósitos, "
+            "saques, resultado líquido e saldo final; esclareça moeda e posições abertas."
+        ),
+        "MONETARY_RECONCILIATION_UNEXPLAINED": (
+            "Envie curva e operações da mesma conta e período, com fluxos de caixa, custos e "
+            "valor das posições abertas; a causa ainda não pode ser medida."
+        ),
+        "FORENSIC_BALANCE_CHAIN_SIGNAL": (
+            "Compare o relatório original e o registro de operações da mesma execução; este "
+            "sinal heurístico não prova que o histórico foi alterado."
         ),
         "GAIN_INFLATED_BY_FLOWS": (
             "A porcentagem sai de descontar depósitos e saques: julgue a conta também pelo "

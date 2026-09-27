@@ -11,6 +11,7 @@ src/quant_trade/audit/owner.py
 src/quant_trade/audit/pages.py
 src/quant_trade/audit/payments.py
 src/quant_trade/audit/pdf.py
+src/quant_trade/audit/plan.py
 src/quant_trade/audit/portuguese.py
 src/quant_trade/audit/redflags.py
 src/quant_trade/audit/report.py
@@ -29,13 +30,17 @@ tests/test_audit_email_pages.py
 tests/test_audit_email_routes_ui.py
 tests/test_audit_funnel.py
 tests/test_audit_importers.py
+tests/test_audit_landing_trust.py
 tests/test_audit_launch_journey.py
 tests/test_audit_launch_playbook.py
 tests/test_audit_legal.py
+tests/test_audit_luck_ride.py
 tests/test_audit_mail_recovery.py
 tests/test_audit_monetary_integrity.py
 tests/test_audit_money_web.py
 tests/test_audit_ops.py
+tests/test_audit_path_to_pay.py
+tests/test_audit_plan.py
 tests/test_audit_portuguese_report.py
 tests/test_audit_public.py
 tests/test_audit_purchase_mail.py

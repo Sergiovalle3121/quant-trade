@@ -179,16 +179,16 @@ def _account_email_status(ctx: LegalContext, locale: str) -> str:
             "es": (
                 "Enviamos enlaces de confirmación, cambio de correo y recuperación de "
                 "contraseña cuando se solicitan; también avisos de compra o cargo adicional "
-                "a correos verificados. No son mensajes publicitarios."
+                "a correos confirmados. No son mensajes publicitarios."
             ),
             "en": (
                 "We send confirmation, e-mail change and password recovery links when "
-                "requested; verified addresses also receive purchase or additional-charge "
+                "requested; confirmed addresses also receive purchase or additional-charge "
                 "notices. These are not advertising messages."
             ),
             "pt": (
                 "Enviamos links de confirmação, troca de e-mail e recuperação de senha "
-                "quando solicitados; endereços verificados também recebem avisos de compra "
+                "quando solicitados; endereços confirmados também recebem avisos de compra "
                 "ou cobrança adicional. Não são mensagens publicitárias."
             ),
         }[locale]

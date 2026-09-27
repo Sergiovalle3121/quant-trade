@@ -312,6 +312,37 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
         "es": "Las operaciones no explican la curva: sube ambos archivos de la misma cuenta.",
         "en": "The trades do not explain the curve: upload both files from the same account.",
     },
+    "MONETARY_RECONCILIATION_MISMATCH": {
+        "es": (
+            "Pide una exportación original del mismo periodo y compara saldo inicial, "
+            "depósitos, retiros, resultado neto y saldo final; aclara divisa y posiciones abiertas."
+        ),
+        "en": (
+            "Ask for an original export of the same period and compare starting balance, "
+            "deposits, withdrawals, net P&L and ending balance; clarify currency and "
+            "open positions."
+        ),
+    },
+    "MONETARY_RECONCILIATION_UNEXPLAINED": {
+        "es": (
+            "Sube curva y operaciones de la misma cuenta y periodo, con flujos de efectivo, "
+            "costes y valoración de posiciones abiertas; la causa aún no se puede medir."
+        ),
+        "en": (
+            "Upload the curve and trades for the same account and period, including cash "
+            "flows, costs and open-position values; the cause cannot yet be measured."
+        ),
+    },
+    "FORENSIC_BALANCE_CHAIN_SIGNAL": {
+        "es": (
+            "Compara el reporte original y el registro de operaciones de la misma ejecución; "
+            "esta señal heurística no demuestra que el historial se alteró."
+        ),
+        "en": (
+            "Compare the original report and trade ledger from the same run; this heuristic "
+            "signal does not prove the history was altered."
+        ),
+    },
     "GAIN_INFLATED_BY_FLOWS": {
         "es": (
             "El porcentaje sale de quitar depósitos y retiros: juzga la cuenta también por "
@@ -486,8 +517,7 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "data nobody picked in advance.",
             ],
             [
-                "Peça ao gestor o histórico completo do fundo desde o início, sem anos "
-                "cortados.",
+                "Peça ao gestor o histórico completo do fundo desde o início, sem anos cortados.",
                 "Audite de novo quando o fundo publicar mais meses: cada mês novo conta como "
                 "dados que ninguém escolheu de antemão.",
             ],
