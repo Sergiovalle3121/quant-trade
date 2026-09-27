@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
 pytest.importorskip("fastapi")
-pytest.importorskip("sqlalchemy")
+sa = pytest.importorskip("sqlalchemy")
 
 from audit_fixtures import csv_bytes, positive_drift, signed_in  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import accounts  # noqa: E402
+from quant_trade.audit import accounts, funnel  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.payments import (  # noqa: E402
     PLAN_PACK,
@@ -25,6 +27,7 @@ from quant_trade.audit.payments import (  # noqa: E402
     checkout_params,
     fulfil,
     pack_code,
+    payment_link_urls,
 )
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import (  # noqa: E402
@@ -223,10 +226,19 @@ def test_locked_report_puts_card_payment_first_with_the_pack_and_keeps_codes(
 def test_checkout_route_sends_the_chosen_plan(tmp_path: Path) -> None:
     client = _client(tmp_path)
     audit_id, token = _upload(client)
-    seen: list[tuple[str, str]] = []
+    seen: list[tuple[str, str, str, int]] = []
 
-    def fake(settings: AuditSettings, aid: str, tok: str, *, plan: str, locale: str) -> str:
-        seen.append((plan, locale))
+    def fake(
+        settings: AuditSettings,
+        aid: str,
+        tok: str,
+        *,
+        plan: str,
+        locale: str,
+        order_id: str,
+        amount_cents: int,
+    ) -> str:
+        seen.append((plan, locale, order_id, amount_cents))
         return "https://checkout.stripe.test/s"
 
     client.app.state.checkout_factory = fake
@@ -234,14 +246,269 @@ def test_checkout_route_sends_the_chosen_plan(tmp_path: Path) -> None:
     for plan in ("pack", "single", "gift"):
         response = client.post(url, data={"plan": plan}, follow_redirects=False)
         assert response.headers["location"] == "https://checkout.stripe.test/s"
-    assert seen == [("pack", "en"), ("single", "en"), ("single", "en")]
+    assert [(plan, locale, amount) for plan, locale, _, amount in seen] == [
+        ("pack", "en", 6900),
+        ("single", "en", 2900),
+    ]
+    orders = client.app.state.store.list_checkout_orders()
+    assert len(orders) == 2 and len({order.id for order in orders}) == 2
 
     no_pack = _client(tmp_path / "b", pack_price_usd_cents=0)
     aid, tok = _upload(no_pack)
     no_pack.app.state.checkout_factory = fake
     no_pack.post(f"/audits/{aid}/checkout?token={tok}", data={"plan": "pack"})
-    assert seen[-1] == ("single", "es")
+    assert seen[-1][0:2] == ("single", "es")
     assert "name='plan' value='pack'" not in no_pack.get(f"/audits/{aid}?token={tok}").text
+
+
+def test_checkout_retry_after_restart_reuses_frozen_order(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    calls: list[str] = []
+
+    def fake(
+        settings: AuditSettings,
+        aid: str,
+        tok: str,
+        *,
+        plan: str,
+        locale: str,
+        order_id: str,
+        amount_cents: int,
+    ) -> dict[str, Any]:
+        calls.append(order_id)
+        return {"id": "cs_frozen", "url": "https://checkout.stripe.test/frozen"}
+
+    client.app.state.checkout_factory = fake
+    path = f"/audits/{audit_id}/checkout?token={token}"
+    first = client.post(path, follow_redirects=False)
+    assert first.headers["location"] == "https://checkout.stripe.test/frozen"
+    restarted = _client(tmp_path, price_usd_cents=4900)
+    restarted.app.state.checkout_factory = fake
+    second = restarted.post(path, follow_redirects=False)
+    assert second.headers["location"] == first.headers["location"]
+    assert len(calls) == 1
+    (order,) = restarted.app.state.store.list_checkout_orders()
+    assert order.amount_cents == 2900 and order.session_id == "cs_frozen"
+
+
+def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    order_ids: list[str] = []
+
+    def timeout(
+        settings: AuditSettings,
+        aid: str,
+        tok: str,
+        *,
+        plan: str,
+        locale: str,
+        order_id: str,
+        amount_cents: int,
+    ) -> str:
+        order_ids.append(order_id)
+        if len(order_ids) == 1:
+            raise TimeoutError("simulated Stripe timeout")
+        return "https://checkout.stripe.test/recovered"
+
+    client.app.state.checkout_factory = timeout
+    path = f"/audits/{audit_id}/checkout?token={token}"
+    with pytest.raises(TimeoutError):
+        client.post(path, follow_redirects=False)
+    retry = client.post(path, follow_redirects=False)
+    assert retry.headers["location"] == "https://checkout.stripe.test/recovered"
+    assert len(set(order_ids)) == 1
+
+
+def test_checkout_pause_blocks_new_orders_but_paid_sessions_still_settle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AUDIT_PAUSE_NEW_CHECKOUT", "true")
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    path = f"/audits/{audit_id}/checkout?token={token}"
+    paused = client.post(path, follow_redirects=False)
+    assert paused.status_code == 503
+    assert not client.app.state.store.list_checkout_orders()
+    assert _webhook(client, _session(audit_id, sid="cs_paid_during_pause")) == 200
+    assert client.app.state.store.get_audit(audit_id).paid
+    assert "class='lockbox'" not in client.get(f"/audits/{audit_id}?token={token}").text
+    assert client.post(path, follow_redirects=False).status_code == 303
+
+
+def test_paid_order_uses_frozen_price_after_a_setting_change(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    store = client.app.state.store
+    order = store.reserve_checkout(
+        audit_id,
+        account_id=store.account_for_audit(audit_id) or "",
+        plan=PLAN_SINGLE,
+        amount_cents=2900,
+        currency="usd",
+        at=NOW,
+    )
+    paid = _session(audit_id, sid="cs_price_frozen")
+    paid["metadata"]["order_id"] = order.id
+    more_expensive_setting = _settings(tmp_path, price_usd_cents=4900)
+    assert fulfil(store, more_expensive_setting, paid, at=NOW) == audit_id
+    assert "class='lockbox'" not in client.get(f"/audits/{audit_id}?token={token}").text
+
+
+def test_pack_delivery_rolls_back_if_credit_grant_fails_then_recovers(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    store = client.app.state.store
+    session = _session(audit_id, plan=PLAN_PACK, sid="cs_retry_after_db_failure")
+
+    def fail_grant(
+        conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, many: bool
+    ) -> None:
+        if "INSERT INTO credit_grants" in statement:
+            raise RuntimeError("simulated database failure")
+
+    sa.event.listen(store.engine, "before_cursor_execute", fail_grant)
+    try:
+        with pytest.raises(RuntimeError, match="simulated database failure"):
+            fulfil(store, _settings(tmp_path), session, at=NOW)
+    finally:
+        sa.event.remove(store.engine, "before_cursor_execute", fail_grant)
+    assert not store.get_audit(audit_id).paid
+    assert store.list_checkout_orders() == []
+    assert store.list_access_codes() == []
+    assert fulfil(store, _settings(tmp_path), session, at=NOW) == audit_id
+    assert "class='lockbox'" not in client.get(f"/audits/{audit_id}?token={token}").text
+
+
+def test_two_paid_sessions_are_two_charges_but_one_delivery(tmp_path: Path) -> None:
+    key = "k" * 40
+    client = _client(tmp_path, admin_key=key)
+    audit_id, token = _upload(client)
+    first = _session(audit_id, plan=PLAN_PACK, sid="cs_first_pack")
+    second = _session(audit_id, plan=PLAN_PACK, sid="cs_second_pack")
+    assert _webhook(client, first) == 200
+    assert _webhook(client, second) == 200
+    assert _webhook(client, second) == 200
+    store = client.app.state.store
+    record = store.get_audit(audit_id)
+    assert record.paid and record.stripe_session_id == "cs_first_pack"
+    assert len(store.list_access_codes()) == 1
+    orders = {order.session_id: order for order in store.list_checkout_orders()}
+    assert set(orders) == {"cs_first_pack", "cs_second_pack"}
+    assert orders["cs_first_pack"].status == "delivered"
+    assert orders["cs_second_pack"].status == "duplicate"
+    assert orders["cs_second_pack"].resolution == "manual_refund_review"
+    returned = client.get(f"/audits/{audit_id}?token={token}&session_id=cs_second_pack")
+    assert "segundo cobro" in returned.text
+    panel = client.post("/panel", data={"key": key}).text
+    assert "cs_first_pack" in panel and "cs_second_pack" in panel
+    assert "cargo duplicado" in panel and "revisar reembolso manualmente" in panel
+    counts = funnel.build(store.funnel_events(NOW.date().isoformat())).total.counts
+    assert counts["purchases"] == 2
+    assert counts["rights_sold"] == 3
+    assert counts["gross_usd_cents"] == 13800
+
+
+def test_two_paid_sessions_with_one_order_id_still_record_both_charges(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, _ = _upload(client)
+    store = client.app.state.store
+    order = store.reserve_checkout(
+        audit_id,
+        account_id=store.account_for_audit(audit_id) or "",
+        plan=PLAN_PACK,
+        amount_cents=6900,
+        currency="usd",
+        at=NOW,
+    )
+    first = _session(audit_id, plan=PLAN_PACK, sid="cs_same_order_first")
+    second = _session(audit_id, plan=PLAN_PACK, sid="cs_same_order_second")
+    first["metadata"]["order_id"] = order.id
+    second["metadata"]["order_id"] = order.id
+    store.attach_checkout_session(
+        order.id,
+        session_id=first["id"],
+        checkout_url="https://checkout.stripe.test/same-order",
+        expires_at=None,
+    )
+    assert _webhook(client, first) == 200
+    assert _webhook(client, second) == 200
+    assert _webhook(client, second) == 200
+    orders = {item.session_id: item for item in store.list_checkout_orders()}
+    assert len(orders) == 2
+    assert orders[second["id"]].status == "duplicate"
+    assert orders[second["id"]].resolution == "manual_refund_review"
+    assert len(store.list_access_codes()) == 1
+
+
+def test_a_preledger_paid_session_replay_is_reconciled_without_duplicate_charge(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path)
+    audit_id, _ = _upload(client)
+    store = client.app.state.store
+    assert store.mark_paid(audit_id, stripe_session_id="cs_legacy_paid", at=NOW)
+    replay = _session(audit_id, plan=PLAN_PACK, sid="cs_legacy_paid")
+    assert _webhook(client, replay) == 200
+    assert _webhook(client, replay) == 200
+    (order,) = store.list_checkout_orders()
+    assert order.session_id == "cs_legacy_paid"
+    assert order.status == "delivered"
+    assert order.resolution == "legacy_reconciled"
+    assert len(store.list_access_codes()) == 1
+    assert store.get_access_code(pack_code(WEBHOOK_SECRET, "cs_legacy_paid")).credits_left == 2
+    assert funnel.build(store.funnel_events(NOW.date().isoformat())).total.counts["purchases"] == 1
+
+
+def test_preledger_pack_with_existing_code_is_backfilled_without_extra_credits(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path)
+    audit_id, _ = _upload(client)
+    store = client.app.state.store
+    session_id = "cs_legacy_existing_code"
+    assert store.mark_paid(audit_id, stripe_session_id=session_id, at=NOW)
+    code = pack_code(WEBHOOK_SECRET, session_id)
+    assert store.ensure_access_code(code, credits=2, note="old pack", at=NOW)
+    assert _webhook(client, _session(audit_id, plan=PLAN_PACK, sid=session_id)) == 200
+    assert _webhook(client, _session(audit_id, plan=PLAN_PACK, sid=session_id)) == 200
+    assert len(store.list_access_codes()) == 1
+    assert store.get_access_code(code).credits_left == 2
+    assert store.account_credits(store.account_for_audit(audit_id), datetime.now(UTC)) == 2
+
+
+def test_historical_paid_session_survives_a_price_increase(tmp_path: Path) -> None:
+    client = _client(tmp_path, price_usd_cents=4900, pack_price_usd_cents=9900)
+    audit_id, _ = _upload(client)
+    old_price = _session(audit_id, sid="cs_old_price", amount_total=2900)
+    assert _webhook(client, old_price) == 200
+    assert client.app.state.store.get_audit(audit_id).paid
+    (order,) = client.app.state.store.list_checkout_orders()
+    assert order.amount_cents == order.paid_amount_cents == 2900
+    assert order.status == "delivered"
+
+
+def test_pack_credits_can_unlock_when_manual_code_sales_are_off(tmp_path: Path) -> None:
+    client = _client(tmp_path, access_codes=False)
+    bought_id, bought_token = _upload(client)
+    assert _webhook(client, _session(bought_id, plan=PLAN_PACK, sid="cs_credit_pack")) == 200
+    assert client.get(f"/audits/{bought_id}?token={bought_token}").status_code == 200
+    preview_id, preview_token = _upload(client)
+    page = client.get(f"/audits/{preview_id}?token={preview_token}").text
+    assert "crédito" in page.lower()
+    csrf = re.search(r"name='csrf' value='([^']+)'", page)
+    assert csrf is not None
+    response = client.post(
+        f"/audits/{preview_id}/credit?token={preview_token}",
+        data={"csrf": csrf.group(1)},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert client.app.state.store.get_audit(preview_id).paid
+    owner = client.app.state.store.account_for_audit(preview_id)
+    assert owner is not None
+    assert client.app.state.store.account_credits(owner, datetime.now(UTC)) == 1
 
 
 def test_return_from_stripe_unlocks_only_a_paid_session_for_this_audit(tmp_path: Path) -> None:
@@ -361,6 +628,7 @@ LINKS = {
     "stripe_secret_key": "",
     "stripe_link_single": "https://buy.stripe.com/abc123",
     "stripe_link_pack": "https://buy.stripe.com/pack456",
+    "allow_legacy_payment_links": True,
 }
 
 
@@ -371,6 +639,7 @@ def test_payment_links_from_env_need_the_webhook_secret() -> None:
         "STRIPE_PAYMENT_LINK_PACK": "https://buy.stripe.com/def",
         "AUDIT_FREE_MODE": "false",
         "AUDIT_STRIPE_TEST_AUDITS": "a1, a2",
+        "AUDIT_LEGACY_PAYMENT_LINKS_ENABLED": "true",
     }
     settings = AuditSettings.from_env(env)
     assert settings.links_enabled and not settings.stripe_enabled
@@ -384,6 +653,43 @@ def test_payment_links_from_env_need_the_webhook_secret() -> None:
         {**env, "STRIPE_PAYMENT_LINK_SINGLE": "https://buy.stripe.com/test_abc"}
     )
     assert card_mode(test_links) == "test" and not test_links.card_public
+
+
+def test_payment_links_are_off_by_default_but_historical_webhooks_still_work(
+    tmp_path: Path,
+) -> None:
+    disabled = AuditSettings.from_env(
+        {
+            "STRIPE_WEBHOOK_SECRET": WEBHOOK_SECRET,
+            "STRIPE_PAYMENT_LINK_SINGLE": "https://buy.stripe.com/abc",
+            "AUDIT_FREE_MODE": "false",
+        }
+    )
+    assert disabled.links_configured and not disabled.links_enabled
+    client = _client(tmp_path, stripe_secret_key="", stripe_link_single="", access_codes=True)
+    audit_id, _ = _upload(client)
+    assert _webhook(client, _session(audit_id, sid="cs_old_link")) == 200
+    assert client.app.state.store.get_audit(audit_id).paid
+
+
+def test_payment_link_tags_append_to_an_existing_query() -> None:
+    settings = AuditSettings(
+        stripe_link_single=(
+            "https://buy.stripe.com/abc?prefilled_email=a%40b"
+            "&client_reference_id=stale&locale=pt#old-fragment"
+        ),
+        stripe_link_pack="https://buy.stripe.com/pack?promo=1",
+        access_codes=True,
+        free_mode=False,
+    )
+    single, pack = payment_link_urls(settings, "report123", "es")
+    assert parse_qs(urlsplit(single).query) == {
+        "prefilled_email": ["a@b"],
+        "client_reference_id": ["report123"],
+        "locale": ["es"],
+    }
+    assert parse_qs(urlsplit(pack).query)["client_reference_id"] == ["report123"]
+    assert urlsplit(single).fragment == ""
 
 
 def test_report_links_carry_the_audit_and_the_webhook_unlocks_it(tmp_path: Path) -> None:
@@ -524,7 +830,8 @@ def test_a_charged_live_payment_that_unlocks_nothing_shows_on_the_panel(tmp_path
     page = client.post("/panel", data={"key": key}).text
     assert "Pagos con tarjeta que no abrieron un informe" in page
     assert "cs_gone" in page and "pagó menos que el precio" in page
-    assert "cs_test_x" not in page and "2900" not in page
+    assert "cs_test_x" not in page
+    assert store.list_checkout_orders() == []
     assert find_claims(page) == []
 
     later = datetime.now(UTC) + timedelta(days=400)

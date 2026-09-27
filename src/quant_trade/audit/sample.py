@@ -315,7 +315,15 @@ def sample_result(
         live_bytes=synthetic_live_statement(),
         live_filename="SyntheticSampleLive.csv",
     )
-    return run_audit(inputs, bootstrap_samples=bootstrap_samples, now=SAMPLE_NOW, market=market)
+    # The public sample is one fixed, synthetic record. A random id would
+    # change its JSON seal and PDF bytes on every process restart.
+    return run_audit(
+        inputs,
+        bootstrap_samples=bootstrap_samples,
+        now=SAMPLE_NOW,
+        audit_id="sample",
+        market=market,
+    )
 
 
 __all__ = [

@@ -19,7 +19,6 @@ from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _disclaimer, _e, _field, _home, _page, _page_hero
 from quant_trade.audit.passkeys import MAX_PER_ACCOUNT as PASSKEYS_MAX
-from quant_trade.audit.portuguese import link_locale
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.store import (
     AccountAudit,
@@ -200,8 +199,9 @@ COPY: dict[str, dict[str, str]] = {
             "días.|"
             "Tus códigos y compras, con fecha. Nunca vemos ni guardamos los datos de tu "
             "tarjeta: el pago con tarjeta lo procesa Stripe.|"
-            "Una marca aleatoria de tu navegador y la huella del archivo, solo para dar el "
-            "informe gratis una vez. Se conservan aunque borres la cuenta, sin tu correo.|"
+            "Una marca aleatoria de tu navegador para limitar la oferta gratuita y la "
+            "huella del archivo para revisar su uso. Un archivo idéntico no bloquea por sí "
+            "solo otra cuenta elegible. Se conservan aunque borres la cuenta, sin tu correo.|"
             "Si te uniste con el enlace de un colega o alguien se une con el tuyo: la fecha, "
             "si ya hubo primer informe y una marca aleatoria del navegador (un hash), para "
             "evitar autoinvitaciones. Nadie ve quién se unió. Se borra con la cuenta de quien "
@@ -270,30 +270,73 @@ COPY: dict[str, dict[str, str]] = {
         "invite_unit_many": "créditos",
         "invite_label": "Tu enlace personal",
         "invite_share": "Enviar por WhatsApp",
+        "invite_telegram": "Compartir en Telegram",
+        "invite_reddit": "Preparar enlace en Reddit",
+        "invite_copy": "Copiar enlace",
+        "invite_copied": "Enlace copiado",
+        "invite_native": "Compartir…",
         "invite_share_text": (
             "Te paso Rigor: subes tu backtest o tu historial y te da una auditoría "
-            "independiente. Tu primer informe completo es gratis:"
+            "independiente. Tu primer informe completo es gratis. Si lo terminas con mi enlace, "
+            "yo recibo un crédito:"
         ),
         "invite_joined": "Se unieron con tu enlace",
         "invite_waiting": "Esperan su primer informe",
         "invite_credited": "Créditos recibidos",
         "invite_month": "Este mes: {n} de {cap}",
         "invite_rules": (
-            "Solo cuentan cuentas nuevas de otras personas: no desde tu mismo navegador ni tu "
-            "misma red. El crédito aparece en «Tus códigos de acceso» y se usa como cualquier "
-            "otro. Nunca mostramos quién se unió."
+            "Solo cuentan cuentas nuevas de otras personas: no desde tu mismo navegador. "
+            "Compartir una red no prueba que sean la misma persona. El crédito aparece en "
+            "«Tus códigos de acceso» y se usa como cualquier otro. Nunca mostramos quién se unió."
         ),
         "invited_banner": (
             "Un colega te invitó. Crea tu cuenta y tu primer informe completo es gratis."
         ),
         "change_password": "Cambiar contraseña",
         "change_email": "Cambiar correo",
+        "email_status_title": "Correo de tu cuenta",
+        "email_verified_status": "Correo confirmado.",
+        "email_unverified_status": (
+            "Tu correo aún no está confirmado. Tu primer informe completo gratis sigue "
+            "disponible; confirma el correo para comprar o recibir créditos por invitaciones."
+        ),
+        "email_delivery_unavailable": (
+            "El envío de correos no está disponible ahora. Puedes usar tu primer informe "
+            "gratis; las compras y los créditos por invitaciones requieren confirmación."
+        ),
+        "email_request_button": "Enviar enlace de confirmación",
+        "email_pending_note": (
+            "Cambio pendiente a {email}. Sigue entrando con tu correo actual hasta abrir "
+            "el enlace enviado al nuevo."
+        ),
+        "email_verification_sent": (
+            "Si podemos enviar a este correo, recibirás un enlace para confirmarlo."
+        ),
+        "email_pending": (
+            "El cambio quedó pendiente. Abre el enlace enviado al correo nuevo para terminarlo."
+        ),
+        "email_verified": (
+            "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
+        ),
+        "email_checkout_required": (
+            "Confirma tu correo desde Mi cuenta antes de pagar. Tu primer informe completo "
+            "gratis sigue disponible."
+        ),
         "email_now": "Ahora entras con {email}. Desde el cambio entrarás con el correo nuevo.",
         "email_new": "Correo nuevo",
         "email_again": "Repite el correo nuevo",
         "email_help": (
             "Todavía no enviamos correos para confirmarlo: revisa que esté bien escrito. Cerramos"
             " las demás sesiones."
+        ),
+        "email_help_pending": (
+            "El correo actual seguirá activo hasta que abras el enlace enviado al nuevo. "
+            "Después cerraremos las demás sesiones."
+        ),
+        "email_change_request": "Enviar confirmación al correo nuevo",
+        "email_change_unavailable": (
+            "El cambio de correo espera a que vuelva el envío de mensajes. Tu correo actual "
+            "sigue activo."
         ),
         "email_passkey_note": (
             "Tus llaves de acceso siguen funcionando; tu teléfono o computadora puede seguir "
@@ -318,6 +361,19 @@ COPY: dict[str, dict[str, str]] = {
         "delete_button": "Borrar mi cuenta",
         "deleted": "Tu cuenta se borró.",
         "forgot_title": "Recupera tu contraseña",
+        "forgot_email_title": "Recibir un enlace por correo",
+        "forgot_email_help": (
+            "Escribe el correo de tu cuenta. Si existe y podemos enviarle mensajes, recibirás "
+            "un enlace de un solo uso. No mostramos si hay una cuenta con ese correo."
+        ),
+        "forgot_email_button": "Solicitar enlace",
+        "forgot_email_lead": (
+            "También puedes usar tu clave de recuperación. Si no llega el enlace, escríbenos."
+        ),
+        "email_reset_requested": (
+            "Si existe una cuenta con ese correo y el envío está disponible, llegará un "
+            "enlace para cambiar la contraseña."
+        ),
         "forgot_lead": (
             "Todavía no enviamos correos. Escríbenos desde el correo de tu cuenta y te "
             "mandamos un enlace de un solo uso para poner una contraseña nueva."
@@ -547,6 +603,13 @@ COPY: dict[str, dict[str, str]] = {
         "two_step_expired": "El paso del código caducó. Entra otra vez con tu contraseña.",
         "reset_title": "Pon una contraseña nueva",
         "reset_lead": "Este enlace funciona una sola vez y caduca en 24 horas.",
+        "reset_email_lead": "Este enlace funciona una sola vez y caduca en una hora.",
+        "email_confirm_title": "Confirma este enlace de correo",
+        "email_confirm_lead": (
+            "La confirmación se completará al pulsar el botón. Si no pediste verificar "
+            "o cambiar tu correo, cierra esta página."
+        ),
+        "email_confirm_button": "Confirmar correo",
         "reset_button": "Guardar contraseña",
         "reset_bad": "Este enlace ya se usó o caducó. Pide uno nuevo.",
         "reset_done": "Contraseña guardada. Entra con ella.",
@@ -745,8 +808,9 @@ COPY: dict[str, dict[str, str]] = {
             "days.|"
             "Your codes and purchases, with dates. We never see or keep your card details: card "
             "payments are processed by Stripe.|"
-            "A random mark of your browser and the file's fingerprint, only to give the free "
-            "report once. They stay even if you delete the account, without your e-mail.|"
+            "A random browser mark to limit the free offer and the file's fingerprint to "
+            "review its use. An identical file does not by itself block another eligible "
+            "account. They remain without your e-mail even if you delete the account.|"
             "If you joined through a colleague's link, or someone joins through yours: the "
             "date, whether the first report happened and a random browser mark (a hash), to "
             "stop self-invites. Nobody sees who joined. It goes with the inviter's account; if "
@@ -813,30 +877,70 @@ COPY: dict[str, dict[str, str]] = {
         "invite_unit_many": "credits",
         "invite_label": "Your personal link",
         "invite_share": "Send on WhatsApp",
+        "invite_telegram": "Share on Telegram",
+        "invite_reddit": "Prepare a Reddit link",
+        "invite_copy": "Copy link",
+        "invite_copied": "Link copied",
+        "invite_native": "Share…",
         "invite_share_text": (
             "Try Rigor: upload your backtest or track record and get an independent audit. "
-            "Your first full report is free:"
+            "Your first full report is free. If you finish it through my link, I get one credit:"
         ),
         "invite_joined": "Joined with your link",
         "invite_waiting": "Waiting for their first report",
         "invite_credited": "Credits received",
         "invite_month": "This month: {n} of {cap}",
         "invite_rules": (
-            "Only new accounts of other people count: not from your own browser or network. "
-            "The credit shows under 'Your access codes' and is used like any other. We never "
-            "show who joined."
+            "Only new accounts of other people count: not from your own browser. Sharing a "
+            "network does not prove two people are the same. The credit shows under 'Your "
+            "access codes' and is used like any other. We never show who joined."
         ),
         "invited_banner": (
             "A colleague invited you. Create your account and your first full report is free."
         ),
         "change_password": "Change password",
         "change_email": "Change e-mail",
+        "email_status_title": "Your account e-mail",
+        "email_verified_status": "E-mail confirmed.",
+        "email_unverified_status": (
+            "Your e-mail is not confirmed yet. Your first free full report is still available; "
+            "confirm the e-mail to buy reports or receive referral credits."
+        ),
+        "email_delivery_unavailable": (
+            "E-mail delivery is unavailable now. You can use your first free report; "
+            "purchases and referral credits require confirmation."
+        ),
+        "email_request_button": "Send a confirmation link",
+        "email_pending_note": (
+            "Change pending to {email}. Keep signing in with your current e-mail until you "
+            "open the link sent to the new one."
+        ),
+        "email_verification_sent": (
+            "If we can send to this address, you will receive a link to confirm it."
+        ),
+        "email_pending": (
+            "The change is pending. Open the link sent to the new e-mail to finish it."
+        ),
+        "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
+        "email_checkout_required": (
+            "Confirm your e-mail from My account before paying. Your first free full report "
+            "is still available."
+        ),
         "email_now": "You sign in with {email}. After the change you sign in with the new address.",
         "email_new": "New e-mail",
         "email_again": "Repeat the new e-mail",
         "email_help": (
             "We do not send e-mails to confirm it yet: check that it is spelled right. Your other"
             " sessions are signed out."
+        ),
+        "email_help_pending": (
+            "The current e-mail stays active until you open the link sent to the new one. "
+            "Your other sessions are signed out after that."
+        ),
+        "email_change_request": "Send confirmation to the new e-mail",
+        "email_change_unavailable": (
+            "Changing your e-mail must wait until delivery resumes. Your current e-mail "
+            "stays active."
         ),
         "email_passkey_note": (
             "Your passkeys keep working; your phone or computer may still show the old e-mail as "
@@ -862,6 +966,19 @@ COPY: dict[str, dict[str, str]] = {
         "delete_button": "Delete my account",
         "deleted": "Your account was deleted.",
         "forgot_title": "Recover your password",
+        "forgot_email_title": "Get a link by e-mail",
+        "forgot_email_help": (
+            "Enter your account e-mail. If an account exists and we can send to it, you will "
+            "receive a one-time link. We do not reveal whether an account exists."
+        ),
+        "forgot_email_button": "Request link",
+        "forgot_email_lead": (
+            "You can also use your recovery key. If the link does not arrive, write to us."
+        ),
+        "email_reset_requested": (
+            "If an account exists for that address and delivery is available, a password "
+            "reset link will arrive."
+        ),
         "forgot_lead": (
             "We do not send e-mails yet. Write to us from your account's e-mail and we send "
             "you a one-time link to set a new password."
@@ -1082,6 +1199,13 @@ COPY: dict[str, dict[str, str]] = {
         "two_step_expired": "The code step expired. Sign in again with your password.",
         "reset_title": "Set a new password",
         "reset_lead": "This link works once and expires in 24 hours.",
+        "reset_email_lead": "This link works once and expires in one hour.",
+        "email_confirm_title": "Confirm this email link",
+        "email_confirm_lead": (
+            "Confirmation happens when you press the button. If you did not ask to "
+            "verify or change your email, close this page."
+        ),
+        "email_confirm_button": "Confirm email",
         "reset_button": "Save password",
         "reset_bad": "This link was already used or has expired. Ask for a new one.",
         "reset_done": "Password saved. Sign in with it.",
@@ -1156,6 +1280,8 @@ box-shadow:0 1px 2px rgba(0,0,0,.04)}
 #invitar .field{max-width:640px}
 #invitar input[readonly]{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);
 text-overflow:ellipsis}
+#invitar .invite-actions{display:flex;flex-wrap:wrap;gap:8px}
+#invitar .invite-actions [hidden]{display:none}
 #invitar .btn svg{width:18px;height:18px;margin-right:8px}
 @media (max-width:760px){#invitar .acct-kpi:last-child{grid-column:1/-1}
 #invitar .btn{width:100%;justify-content:center}}
@@ -1284,6 +1410,13 @@ padding:10px 0;border-top:1px solid var(--border)}
 .pk-list strong{display:block;overflow-wrap:anywhere}
 .acct-passkey-alt{margin-top:18px}
 .acct-protect{margin:0 0 24px}
+.acct-email-status{margin:0 0 24px;border-color:var(--border);overflow-wrap:anywhere}
+.acct-card#correo{overflow-wrap:anywhere}
+.acct-email-status h2{margin:0 0 8px;font-size:1.15rem}
+.acct-email-status p{margin:8px 0}
+.acct-email-status form{margin:14px 0 0}
+.paper input:focus-visible,.paper select:focus-visible,.paper textarea:focus-visible{
+outline:2px solid var(--accent);outline-offset:2px}
 .acct-protect h3 svg{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
 .protect-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin:8px 0 4px}
 .protect-bar span{display:block;height:100%;background:var(--ok)}
@@ -1391,7 +1524,6 @@ def signup_page(
     copy = COPY[locale]
     from quant_trade.audit.legal import legal_url
 
-    legal = link_locale(locale)  # the terms are not in Portuguese yet
     signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
         (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
@@ -1409,8 +1541,8 @@ def signup_page(
         )
         + "<p class='muted acct-terms'>"
         + _e(copy["terms_agree"]).format(
-            terms=f"<a href='{_e(legal_url('terms', legal))}'>{_e(copy['terms_link'])}</a>",
-            privacy=f"<a href='{_e(legal_url('privacy', legal))}'>{_e(copy['privacy_link'])}</a>",
+            terms=f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a>",
+            privacy=f"<a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a>",
         )
         + "</p>"
         + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['signup_button'])}"
@@ -1478,9 +1610,16 @@ def signin_page(
 
 
 def forgot_page(
-    *, locale: str, contact_url: str, csrf: str = "", error: str = "", email: str = ""
+    *,
+    locale: str,
+    contact_url: str,
+    csrf: str = "",
+    error: str = "",
+    email: str = "",
+    email_delivery_ready: bool = False,
+    flash: str = "",
 ) -> str:
-    """A new password with the recovery key; without one, a message to the owner."""
+    """Recover with a key or, when delivery is configured, an e-mail link."""
     locale = _locale(locale)
     copy = COPY[locale]
     button = ""
@@ -1493,7 +1632,19 @@ def forgot_page(
             f"target='_blank'>{icon('chat')}{_e(copy['forgot_contact'])}</a></p>"
         )
     recover = ""
+    email_request = ""
     if csrf:
+        if email_delivery_ready:
+            email_request = (
+                f"<form class='acct-card' method='post' "
+                f"action='{path('forgot', locale)}/enlace'>"
+                f"<h2>{_e(copy['forgot_email_title'])}</h2>"
+                f"<p class='muted'>{_e(copy['forgot_email_help'])}</p>"
+                + _hidden("csrf", csrf)
+                + _email_field(copy, email)
+                + f"<button class='btn btn-primary btn-lg' type='submit'>"
+                f"{_e(copy['forgot_email_button'])}</button></form>"
+            )
         recover = (
             f"<form method='post' action='{path('forgot', locale)}' autocomplete='off'>"
             f"<h2>{_e(copy['recover_title'])}</h2>"
@@ -1522,11 +1673,14 @@ def forgot_page(
             + f"<button class='btn btn-primary btn-lg' type='submit'>"
             f"{_e(copy['recover_button'])}</button></form>"
         )
+    help_key = "forgot_email_lead" if email_delivery_ready else "forgot_lead"
     body = (
         "<div class='wrap-narrow'>"
-        + _alert(copy, error)
+        + _alert(copy, error, flash)
+        + email_request
         + recover
-        + f"<h2>{_e(copy['recover_none_title'])}</h2><p class='muted'>{_e(copy['forgot_lead'])}</p>"
+        + f"<h2>{_e(copy['recover_none_title'])}</h2>"
+        f"<p class='muted'>{_e(copy[help_key])}</p>"
         + button
         + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
         "</p></div>"
@@ -1610,7 +1764,15 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
     )
 
 
-def reset_page(*, locale: str, csrf: str, token: str, error: str = "", valid: bool = True) -> str:
+def reset_page(
+    *,
+    locale: str,
+    csrf: str,
+    token: str,
+    error: str = "",
+    valid: bool = True,
+    email_link: bool = False,
+) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
     if not valid:
@@ -1636,8 +1798,41 @@ def reset_page(*, locale: str, csrf: str, token: str, error: str = "", valid: bo
             + f"<button class='btn btn-primary btn-lg' type='submit'>{_e(copy['reset_button'])}"
             "</button></form></div>"
         )
+    switch = {
+        lang: path("reset", lang) + (f"?token={quote(token, safe='')}" if valid and token else "")
+        for lang in LANGUAGES
+    }
     return _shell(
-        locale, copy["reset_title"], copy["reset_lead"], body, switch=_switch("reset", locale)
+        locale,
+        copy["reset_title"],
+        copy["reset_email_lead" if email_link else "reset_lead"],
+        body,
+        switch=switch,
+    )
+
+
+def email_confirm_page(*, locale: str, action_path: str, token: str, csrf: str) -> str:
+    """A deliberate POST before consuming a verification or change link."""
+    from quant_trade.audit.mail import PATHS as EMAIL_PATHS
+
+    locale = _locale(locale)
+    copy = COPY[locale]
+    body = (
+        "<div class='wrap-narrow'><div class='acct-card'>"
+        + f"<form method='post' action='{_e(action_path)}'>"
+        + _hidden("csrf", csrf)
+        + _hidden("token", token)
+        + f"<button class='btn btn-primary btn-lg' type='submit'>"
+        f"{_e(copy['email_confirm_button'])}</button>" + "</form></div></div>"
+    )
+    encoded = quote(token, safe="")
+    switch = {lang: EMAIL_PATHS[lang]["verify"] + f"?token={encoded}" for lang in LANGUAGES}
+    return _shell(
+        locale,
+        copy["email_confirm_title"],
+        copy["email_confirm_lead"],
+        body,
+        switch=switch,
     )
 
 
@@ -1932,7 +2127,20 @@ def invite_section(locale: str, invite: InviteView) -> str:
     """The account's invite link, how the reward works and what it has earned."""
     copy = COPY[_locale(locale)]
     unit = copy["invite_unit_one" if invite.credits == 1 else "invite_unit_many"]
-    share = "https://wa.me/?text=" + quote(f"{copy['invite_share_text']} {invite.link}")
+    share_text = copy["invite_share_text"]
+    share = "https://wa.me/?text=" + quote(f"{share_text} {invite.link}", safe="")
+    telegram = (
+        "https://t.me/share/url?url="
+        + quote(invite.link, safe="")
+        + "&text="
+        + quote(share_text, safe="")
+    )
+    reddit = (
+        "https://www.reddit.com/submit?url="
+        + quote(invite.link, safe="")
+        + "&title="
+        + quote(share_text, safe="")
+    )
     summary = invite.summary
     kpis = (
         "<div class='acct-kpis'>"
@@ -1951,20 +2159,84 @@ def invite_section(locale: str, invite: InviteView) -> str:
         + "</p>"
         + _field(
             copy["invite_label"],
-            f"<input type='text' readonly value='{_e(invite.link)}' "
+            f"<input id='invite-link' type='text' readonly value='{_e(invite.link)}' "
             "spellcheck='false' autocomplete='off'>",
         )
-        + f"<p><a class='btn btn-dark' href='{_e(share)}' rel='noopener noreferrer' "
-        f"target='_blank'>{icon('chat')}{_e(copy['invite_share'])}</a></p>"
+        + "<p class='invite-actions'>"
+        + f"<button class='btn btn-ghost' type='button' data-copy='invite-link' "
+        f"data-done='{_e(copy['invite_copied'])}' hidden>{_e(copy['invite_copy'])}</button>"
+        + f"<button class='btn btn-ghost' type='button' data-native-share='invite-link' "
+        f"data-share-title='Rigor' data-share-text='{_e(share_text)}' hidden>"
+        f"{_e(copy['invite_native'])}</button>"
+        + f"<a class='btn btn-dark' href='{_e(share)}' rel='noopener noreferrer' "
+        f"target='_blank'>{icon('chat')}{_e(copy['invite_share'])}</a> "
+        + f"<a class='btn btn-ghost' href='{_e(telegram)}' rel='noopener noreferrer' "
+        f"target='_blank'>{_e(copy['invite_telegram'])}</a> "
+        + f"<a class='btn btn-ghost' href='{_e(reddit)}' rel='noopener noreferrer' "
+        f"target='_blank'>{_e(copy['invite_reddit'])}</a></p>"
         + kpis
         + f"<p class='muted'>{_e(copy['invite_rules'])}</p></section>"
     )
 
 
-def _email_card(
-    copy: dict[str, str], locale: str, csrf: str, email: str, *, has_passkeys: bool
+def _email_status_card(
+    copy: dict[str, str],
+    locale: str,
+    csrf: str,
+    *,
+    verified: bool,
+    pending: str,
+    delivery_ready: bool,
+    verification_required: bool,
 ) -> str:
-    """ "Cambiar correo": the new address twice (no e-mail confirms it yet) and the password."""
+    if not verification_required:
+        return ""
+    status = "email_verified_status" if verified else "email_unverified_status"
+    pending_note = (
+        f"<p class='muted'>{_e(copy['email_pending_note'].format(email=_safe_text(pending)))}</p>"
+        if pending
+        else ""
+    )
+    delivery_note = (
+        f"<p class='muted'>{_e(copy['email_delivery_unavailable'])}</p>"
+        if not delivery_ready and not verified
+        else ""
+    )
+    resend = (
+        f"<form method='post' action='{path('account', locale)}/verificar-correo'>"
+        + _hidden("csrf", csrf)
+        + f"<button class='btn btn-dark' type='submit'>{_e(copy['email_request_button'])}</button>"
+        "</form>"
+        if not verified and delivery_ready
+        else ""
+    )
+    return (
+        "<section class='acct-card acct-email-status' id='verificar-correo'>"
+        f"<h2>{_e(copy['email_status_title'])}</h2><p>{_e(copy[status])}</p>"
+        + pending_note
+        + delivery_note
+        + resend
+        + "</section>"
+    )
+
+
+def _email_card(
+    copy: dict[str, str],
+    locale: str,
+    csrf: str,
+    email: str,
+    *,
+    has_passkeys: bool,
+    delivery_ready: bool,
+    verification_required: bool,
+) -> str:
+    """Change the account e-mail, pending confirmation when the flag is on."""
+    if verification_required and not delivery_ready:
+        return (
+            "<div class='acct-card' id='correo'>"
+            f"<h3>{_e(copy['change_email'])}</h3>"
+            f"<p class='muted'>{_e(copy['email_change_unavailable'])}</p></div>"
+        )
     shown = f"<b>{_e(_safe_text(email))}</b>"
     before, _, after = copy["email_now"].partition("{email}")
     return (
@@ -1982,7 +2254,7 @@ def _email_card(
             copy["email_again"],
             "<input type='email' name='email_again' required maxlength='254' autocomplete='off' "
             "autocapitalize='none' spellcheck='false'>",
-            copy["email_help"],
+            copy["email_help_pending" if verification_required else "email_help"],
         )
         + _field(
             copy["password_current"],
@@ -1990,7 +2262,8 @@ def _email_card(
             "autocomplete='current-password'>",
         )
         + (f"<p class='muted'>{_e(copy['email_passkey_note'])}</p>" if has_passkeys else "")
-        + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_email'])}</button>"
+        + f"<button class='btn btn-dark' type='submit'>"
+        f"{_e(copy['email_change_request' if verification_required else 'change_email'])}</button>"
         "</form>"
     )
 
@@ -2025,6 +2298,10 @@ def account_page(
     notice: VisitNotice | None = None,
     passkeys: Sequence[PasskeyRecord] = (),
     passkey_site: str = "",
+    email_verified: bool = False,
+    email_pending: str = "",
+    email_delivery_ready: bool = False,
+    email_verification_required: bool = False,
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
@@ -2182,7 +2459,15 @@ def account_page(
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_password'])}</button>"
         "</form>"
-        + _email_card(copy, locale, csrf, account.email, has_passkeys=bool(passkeys))
+        + _email_card(
+            copy,
+            locale,
+            csrf,
+            account.email,
+            has_passkeys=bool(passkeys),
+            delivery_ready=email_delivery_ready,
+            verification_required=email_verification_required,
+        )
         + "<form class='acct-card acct-danger' method='post' "
         f"action='{path('account', locale)}/borrar'>"
         f"<h3>{_e(copy['delete_title'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
@@ -2226,6 +2511,15 @@ def account_page(
     )
     body = (
         _alert(copy, error, flash)
+        + _email_status_card(
+            copy,
+            locale,
+            csrf,
+            verified=email_verified,
+            pending=email_pending,
+            delivery_ready=email_delivery_ready,
+            verification_required=email_verification_required,
+        )
         + (_visit_notice(copy, locale, notice) if notice else "")
         + header
         + recovery_nudge

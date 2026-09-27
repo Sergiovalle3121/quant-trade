@@ -1,25 +1,37 @@
 # Plan de lanzamiento de Rigor: las primeras 10 ventas
 
-Guía práctica para vender a mano los primeros informes de Rigor
-(https://rigor.up.railway.app, código en `src/quant_trade/audit/`). Hoy el
-cliente paga por transferencia, Mercado Pago o el medio que acuerdes por
-WhatsApp y recibe un código de acceso; el pago con tarjeta se enciende solo
-cuando las claves de Stripe estén en Railway. Primera versión: 2026-09-24.
+> **ARCHIVO HISTÓRICO · NO PUBLICAR NI COBRAR CON ESTA GUÍA.** El plan de
+> transferencias, Mercado Pago, WhatsApp y códigos de abajo describe un flujo
+> anterior, no la configuración de lanzamiento. Antes de anunciar o aceptar
+> pagos deben cerrarse las puertas técnicas, operativas y legales del
+> [expediente de lanzamiento](launch/RIGOR_PUBLIC_LAUNCH.md). Entre ellas:
+> Stripe Checkout y webhooks probados, confirmación de correo con SMTP real y
+> `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, migración de cuentas existentes,
+> revisión de términos y conciliación de reembolsos. Las devoluciones se
+> tramitan según términos y revisión manual; esta guía no promete un
+> reembolso automático. Los Payment Links heredados deben desactivarse en
+> Stripe antes de subir precios y sus pagos históricos deben conciliarse.
+
+Guía histórica de las primeras ventas manuales de Rigor
+(https://rigor.up.railway.app, código en `src/quant_trade/audit/`). En esa
+versión se proponían transferencias, Mercado Pago o un medio acordado por
+WhatsApp y la entrega por código; ese flujo ya no es instrucción vigente para
+abrir cobros. Las claves de Stripe por sí solas tampoco abren la puerta de
+cobro. Primera versión: 2026-09-24.
 Puesta al día: 2026-09-25.
 
 Qué cambió respecto a la primera versión:
 
 - El servicio se llama Rigor y tiene más secciones (lista en "Qué vendes").
-- **No hay auditorías gratis.** El dueño lo pidió así ("antes de dar pruebas
-  gratis necesito vender algo bien"). Lo gratis es la vista previa que
-  cualquiera ve al subir su archivo; el informe completo se paga desde el
-  primer cliente.
+- Una cuenta nueva recibe su primer informe completo gratis. Después tiene
+  tres vistas previas gratis al mes; los informes completos adicionales se
+  cobran al precio indicado abajo.
 - La razón de regalar las primeras auditorías era que los importadores no se
   habían probado con archivos reales. Ya se probaron con 39 archivos reales
   públicos (MetaTrader en 7 idiomas, Myfxbook, señales de MQL5, FX Blue y
   TradingView): ver `docs/research/audit_iteration4/real_reports_check.md`,
-  `mt_languages_check.md` y `tracking_exports_check.md`. Y si un informe lee
-  mal el archivo, se devuelve el importe.
+  `mt_languages_check.md` y `tracking_exports_check.md`. Si un informe de pago
+  lee mal un archivo, se revisa la incidencia según `/terminos`.
 - Los códigos se crean desde el navegador en `/panel`; ya no hace falta
   `railway ssh`.
 - Se añaden un canal (tus propios contactos) y dos plantillas: P1 y D2.
@@ -109,23 +121,24 @@ comprobar).
 
 | Oferta | Precio | Cuándo |
 |---|---|---|
-| Vista previa | Gratis, siempre | Clase, gráficas, banderas rojas, lectura del archivo y explicación de cada dimensión. |
-| Informe completo | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Desde el primer cliente. |
-| Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`, código con 3 créditos) | Para quien compara varios robots, versiones o un backtest y su cuenta. |
-| Devolución | El importe de ese informe | Si el informe lee mal el archivo (operaciones, saldo o fechas) y no se puede corregir. |
-| Informe completo | USD 49 | Solo cuando haya opiniones publicables de clientes reales. |
+| Primer informe completo | Gratis con una cuenta nueva | Se entrega una vez, después de subir el primer archivo admitido. |
+| Vistas previas posteriores | 3 gratis por cuenta y mes, con límites por red | Clase, gráficas, banderas rojas, lectura del archivo y explicación de cada dimensión. |
+| Informe completo adicional | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Después del primer informe gratis. |
+| Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`) | Con tarjeta: desbloquea el informe actual y deja 2 créditos; por venta manual: un código de 3 créditos tras verificar el pago. |
+| Incidencia de lectura | Revisión y resolución según `/terminos` | Si un informe de pago lee mal operaciones, saldo o fechas, el cliente puede contactar con soporte; se corrige, emite un crédito o tramita manualmente el reembolso que proceda. |
 
-La vista previa es el anzuelo: el cliente ve la clase y las gráficas de su
-propio archivo antes de pagar. Mándalo siempre a subir primero y a pagar
-después. No regales el informe completo para conseguir una opinión: la
-devolución por archivo mal leído ya quita el riesgo al primer comprador.
+La cuenta nueva recibe su primer informe completo sin pagar. Después puede
+usar tres vistas previas gratis al mes y decidir si compra otros informes.
+Mándalo a crear la cuenta y subir su propio archivo antes de hablar de pago.
 
 ## 2. Antes del primer mensaje
 
-Hecho (comprobado en `/health` el 2026-09-25): servicio en Railway con
-Postgres, `AUDIT_ACCESS_CODES=true`, `AUDIT_FREE_MODE=false`, precio USD 29,
-borrado automático, datos del operador en `/terminos` y enlace de WhatsApp en
-el botón "Pedir un código".
+Revisar antes de publicar: servicio en Railway con Postgres,
+`AUDIT_FREE_MODE=false`, precio USD 29/69, primer informe completo gratis
+por cuenta nueva, borrado automático, datos del operador en `/terminos` y
+un canal de ayuda operativo. `AUDIT_ACCESS_CODES` solo controla la venta
+manual de códigos; los créditos de paquetes y referidos funcionan aunque
+esté en `false`.
 
 Solo tú puedes hacer lo que falta:
 
@@ -258,8 +271,8 @@ Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el
 
 También compara un backtest con la cuenta real donde corre el robot y separa los depósitos del resultado de operar, que es donde más se maquilla un historial.
 
-La vista previa es gratis: https://<dominio>
-El informe completo cuesta USD 29, o USD 69 el paquete de 3. Si lee mal tu archivo, te devuelvo el importe.
+Crea tu cuenta y recibe tu primer informe completo gratis: https://<dominio>
+Después tienes 3 vistas previas gratis al mes. Cada informe completo adicional cuesta USD 29, o USD 69 el paquete de 3. Si uno de pago lee mal tu archivo, escríbenos para revisar la incidencia según los términos.
 
 Ejemplo completo: https://<dominio>/ejemplo
 Si te sirve o conoces a alguien a quien le sirva, me ayudas mucho. Si no, no pasa nada.
@@ -274,8 +287,8 @@ I launched Rigor, a service that audits backtests and account histories: you upl
 
 It also compares a backtest with the live account the robot runs on, and separates deposits from trading results, which is where a history is most often dressed up.
 
-The preview is free: https://<domain>
-The full report is USD 29, or USD 69 for a pack of 3. If it misreads your file, I refund you.
+Create an account and get your first full report free: https://<domain>
+After that you have 3 free previews a month. Each additional full report is USD 29, or USD 69 for a pack of 3. If a paid report misreads your file, contact us so we can review it under the terms.
 
 Full sample: https://<domain>/ejemplo
 If it is useful to you or someone you know, that helps me a lot. If not, no problem.
@@ -292,8 +305,8 @@ Rigor analiza el backtest o el historial de cuenta que ya tienes y le da una cla
 
 Cómo empezar:
 1. Sube tu archivo en https://<dominio> tal cual sale de tu plataforma (MT5, MT4, TradingView, NinjaTrader, Myfxbook, FX Blue, señales de MQL5, QuantConnect, backtesting.py o vectorbt).
-2. La vista previa es gratis: ves la clase, las gráficas, las banderas rojas y qué significa cada dimensión.
-3. Si quieres el informe completo, cuesta USD 29 (o USD 69 el paquete de 3) y te mando un código de acceso.
+2. Al crear tu cuenta, el primer informe completo es gratis. Después tienes 3 vistas previas gratis al mes.
+3. Cada informe completo adicional cuesta USD 29 (o USD 69 el paquete de 3). Puedes pagar con tarjeta si está disponible o pedirme un código de acceso.
 
 Aquí tienes un informe de ejemplo con datos sintéticos: https://<dominio>/ejemplo
 
@@ -309,8 +322,8 @@ Rigor analyses the backtest or account history you already have and gives it a c
 
 How to start:
 1. Upload your file at https://<domain> exactly as your platform exports it (MT5, MT4, TradingView, NinjaTrader, Myfxbook, FX Blue, MQL5 signals, QuantConnect, backtesting.py or vectorbt).
-2. The preview is free: you see the class, the charts, the red flags and what each dimension means.
-3. If you want the full report, it is USD 29 (or USD 69 for a pack of 3) and I send you an access code.
+2. When you create an account, your first full report is free. After that you have 3 free previews a month.
+3. Each additional full report is USD 29 (or USD 69 for a pack of 3). You can pay by card if available or ask me for an access code.
 
 Here is a sample report built from synthetic data: https://<domain>/ejemplo
 
@@ -360,7 +373,7 @@ Puedes pagar por:
 
 Cuando vea el pago te mando un código de acceso. Lo escribes en tu informe, en el recuadro "¿Tienes un código de acceso?", y se desbloquea completo: pruebas de estrés, riesgo y capital, simulador de reto, cuenta real frente al backtest si la subiste, preguntas para el vendedor y el PDF.
 
-Si el informe lee mal tu archivo y no se puede corregir, te devuelvo el importe.
+Si el informe lee mal tu archivo, escríbenos para revisarlo y aplicar la solución prevista en los términos.
 Términos del servicio: https://<dominio>/terminos
 ```
 
@@ -375,7 +388,7 @@ You can pay by:
 
 Once I see the payment I send you an access code. Type it in your report, in the "Have an access code?" box, and the full report unlocks: stress tests, risk and capital, the challenge simulator, the live account against the backtest if you uploaded it, questions for the vendor and the PDF.
 
-If the report misreads your file and it cannot be fixed, I refund you.
+If the report misreads your file, contact us so we can review it and apply the remedy in the terms.
 Terms of service: https://<domain>/terms
 ```
 
@@ -436,7 +449,7 @@ Gracias por avisar. El archivo no se pudo leer, así que no se creó ninguna aud
 
 ¿Puedes mandarme una captura de la pantalla de error y decirme de qué plataforma y versión sale el archivo? Si es un informe de MT5, prueba a guardarlo de nuevo como HTML desde el Probador de estrategias sin abrirlo en Excel.
 
-Si no se resuelve, te devuelvo el pago.
+Si ya pagaste y el servicio no puede generar el informe por un fallo propio, revisaré el caso y tramitaré la solución prevista en los términos.
 ```
 
 #### W6 · EN · When the file cannot be read
@@ -446,7 +459,7 @@ Thanks for letting me know. The file could not be read, so no audit was created 
 
 Could you send me a screenshot of the error and tell me which platform and version produced the file? If it is an MT5 report, try saving it again as HTML from the Strategy Tester without opening it in Excel.
 
-If it cannot be fixed, I will refund you.
+If you already paid and the service cannot produce the report because of its own fault, I will review the case and arrange the remedy in the terms.
 ```
 
 ### Foros
@@ -464,7 +477,7 @@ También: el resultado sin sus mejores operaciones, el modelo de ticks del proba
 
 Qué no hace: no se conecta a ningún bróker, no predice resultados y no recomienda comprar ningún robot.
 
-Con una cuenta gratis, el primer informe completo no se paga; después, 3 vistas previas gratis al mes y USD 29 por informe completo, que se devuelven si lee mal el archivo. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
+Con una cuenta gratis, el primer informe completo no se paga; después, 3 vistas previas gratis al mes y USD 29 por informe completo adicional. Los errores de lectura en informes de pago se revisan según los términos. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
 
 Informe de ejemplo con datos sintéticos: https://<dominio>/ejemplo
 Cómo audita, con cada umbral: https://<dominio>/metodologia
@@ -483,7 +496,7 @@ Also: the result without its best trades, the tester's tick model, whether the b
 
 What it does not do: it never connects to a broker, it does not predict results and it does not recommend buying any robot.
 
-A free account gets its first full report free; after that, 3 free previews a month and USD 29 per full report, refunded if it misreads the file. Vendors can publish a verification page with the hashes of the audited file.
+A free account gets its first full report free; after that, 3 free previews a month and USD 29 per additional full report. We review paid reports that misread a file under the terms. Vendors can publish a verification page with the hashes of the audited file.
 
 Sample report built from synthetic data: https://<domain>/ejemplo
 How it audits, with every threshold: https://<domain>/methodology
@@ -947,7 +960,7 @@ de pagar.
 | 5. Paga | Confirma el pago en tu banco o Mercado Pago antes de nada. Luego, en `https://<dominio>/panel`, crea un código con 1 crédito (3 para el paquete) y en la nota pon nombre de pila y referencia del pago. El código se muestra una sola vez. | `/panel` |
 | 6. Entrega | Envía el código por WhatsApp y por ningún otro canal. | W4 |
 | 7. Canje | El cliente escribe el código en su informe y lo desbloquea; puede guardarlo en PDF. | — |
-| 8. Si falla | Si el archivo no se lee, no se crea auditoría y el código queda intacto. Si el informe lee mal el archivo, desactiva el código en `/panel`, devuelve el pago y avisa en el proyecto para corregir el importador. | W6 |
+| 8. Si falla | Si el archivo no se lee, no se crea auditoría y el código queda intacto. Si un informe de pago lee mal el archivo, registra y revisa la incidencia, corrige el importador y tramita manualmente la solución prevista en `/terminos`. | W6 |
 | 9. Vendedor | Si es vendedor, explica cómo publicar la verificación. | V2 |
 | 10. Seguimiento | A los tres días, pide opinión sobre el informe y que lo recomiende. | W5 |
 
@@ -1024,7 +1037,7 @@ opiniones reales tiene sentido pensar en pruebas gratis o en subir el precio.
   informes de MT5 del dueño. NinjaTrader, QuantConnect, backtesting.py y
   vectorbt solo se probaron con archivos de ejemplo públicos, porque no hay
   exportaciones reales publicadas; el primer cliente de esas plataformas es
-  también una prueba, cubierta por la devolución.
+  también una prueba; revisa cualquier incidencia conforme a `/terminos`.
 - La normativa sobre publicidad de servicios financieros y correos
   comerciales varía por país; consulta a un abogado antes de escribir en
   frío a vendedores fuera de tu país.

@@ -1,8 +1,8 @@
 """Portuguese (Brazil and Portugal) words for the public pages.
 
 The landing, its prices and its questions exist in Portuguese at ``/pt``.
-Pages that are not translated yet (the terms, the privacy policy, the
-public verification page) open in English from a Portuguese page, so a visitor
+Pages that are not translated yet (such as the public verification page)
+open in English from a Portuguese page, so a visitor
 never meets a broken or half-Spanish page. The copy keeps the same honest
 limits as the Spanish and English versions and passes the profit-claim
 guard, which reads Portuguese too.
@@ -681,7 +681,7 @@ TRUST_PT: dict[str, Any] = {
             "O seu arquivo é seu",
             "Nunca é publicado. Se você não desbloquear o relatório, é apagado após {retention} "
             "dias, e você pode apagar a sua conta e os seus relatórios quando quiser.",
-            "Política de privacidade (em inglês)",
+            "Política de privacidade",
             "privacy",
         ),
         (
@@ -689,7 +689,7 @@ TRUST_PT: dict[str, Any] = {
             "Se ler mal o seu arquivo, devolvemos o valor",
             "Se as operações, o saldo ou as datas não batem com a sua plataforma e não "
             "conseguimos corrigir, devolvemos o que você pagou por esse relatório.",
-            "Termos do serviço (em inglês)",
+            "Termos do serviço",
             "terms",
         ),
     ],
@@ -779,7 +779,7 @@ MESSAGES_PT: dict[str, str] = {
     "payment_required": "O detalhe completo desta auditoria requer pagamento.",
     "payments_disabled": "Os pagamentos não estão ativados neste serviço.",
     "card_paid": (
-        "Pagamento recebido: este é o relatório completo. A Stripe envia o recibo por e-mail."
+        "Pagamento recebido: este é o relatório completo. Contate o suporte se precisar de ajuda."
     ),
     "card_pending": (
         "Estamos confirmando o seu pagamento com a Stripe. Recarregue esta página em "

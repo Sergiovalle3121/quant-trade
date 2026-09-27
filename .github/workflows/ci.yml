@@ -24,6 +24,8 @@ jobs:
         run: xargs ruff format --check < .github/v9-python-files.txt
       - name: Evidence governance format check
         run: xargs ruff format --check < .github/evidence-python-files.txt
+      - name: Public launch format check
+        run: xargs ruff format --check < .github/launch-python-files.txt
       - name: Mypy
         run: mypy src
       - name: Diff whitespace check

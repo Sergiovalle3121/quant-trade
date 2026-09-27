@@ -16,7 +16,7 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 from typer.testing import CliRunner  # noqa: E402
 
-from quant_trade.audit import account_pages  # noqa: E402
+from quant_trade.audit import account_pages, funnel  # noqa: E402
 from quant_trade.audit.accounts import (  # noqa: E402
     CSRF_COOKIE,
     MAX_FAILED_SIGNINS_PER_EMAIL,
@@ -397,7 +397,7 @@ def test_a_card_pack_bought_from_an_account_report_lands_on_it(tmp_path: Path) -
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db",
         free_mode=False,
-        stripe_secret_key="sk_test_x",
+        stripe_secret_key="sk_live_x",
         stripe_webhook_secret="whsec_x",
     )
     account = store.create_account(email="m@example.com", password_hash="x", locale="es", at=NOW)
@@ -1462,7 +1462,7 @@ def test_the_account_screens_exist_in_portuguese(tmp_path: Path) -> None:
     assert "<html lang='pt'" in page and "Crie sua conta" in page
     assert "O que guardamos e como apagar" in page
     assert "href='/registro'" in page and "href='/signup'" in page  # language switch
-    assert "/terms?lang=en" in page  # the terms are not in Portuguese yet
+    assert "/pt/termos?lang=pt" in page and "/pt/privacidade?lang=pt" in page
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
     # ?lang=pt on a Spanish path reads in Portuguese too.
     assert "Crie sua conta" in client.get("/registro?lang=pt").text
@@ -1948,18 +1948,22 @@ def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report
     assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
     summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
     assert (summary.joined, summary.waiting, summary.credited) == (1, 0, 1)
+    metrics = funnel.build(store.funnel_events(funnel.day_of(datetime.now(UTC)))).total.counts
+    assert metrics["gift_credits"] == 1
+    assert metrics["purchases"] == 0 and metrics["gross_usd_cents"] == 0
     assert "bea@example.com" not in client.get("/cuenta").text  # never who joined
     # A second upload of the new account credits nothing more.
     bea.post("/audits", files=_seeded_file(23), data={"consent": "on"}, headers=bea_ip)
     assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
 
-    # Someone on Ana's own network is taken as Ana: joined, no credit.
+    # A different browser on the same household/office network is not
+    # automatically treated as Ana; an IP is not proof of self-referral.
     carl = TestClient(client.app)
     _join(carl, "carl@example.com", token)
     carl.post("/audits", files=_seeded_file(24), data={"consent": "on"}, headers=ana_ip)
-    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 2  # type: ignore[attr-defined]
     summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
-    assert (summary.joined, summary.credited) == (2, 1)
+    assert (summary.joined, summary.credited) == (2, 2)
 
     # Ana's own browser (her free report's mark) is never noted as an invite.
     device = client.cookies.get("rigor_device")
@@ -1971,7 +1975,7 @@ def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report
     # The data download carries dates and outcomes, never the other account.
     data = json.loads(client.get("/cuenta/datos").text)
     assert data["invites"]["link_token"] == token
-    assert [item["outcome"] for item in data["invites"]["joined"]] == ["credited", "self"]
+    assert [item["outcome"] for item in data["invites"]["joined"]] == ["credited", "credited"]
     assert "bea@example.com" not in json.dumps(data)
     assert json.loads(bea.get("/cuenta/datos").text)["invites"]["joined_through_an_invite"]
 
@@ -2007,6 +2011,44 @@ def test_invites_ignore_bad_tokens_the_signed_in_inviter_and_the_monthly_cap(
     summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
     assert (summary.joined, summary.credited, summary.credited_this_month) == (2, 1, 1)
     assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+
+
+def test_global_referral_budget_is_atomic_and_stays_spent_after_deletion(
+    tmp_path: Path,
+) -> None:
+    client, store, _ = _client(tmp_path, trusted_proxy_hops=1, referral_global_monthly_cap=1)
+    _signup(client)
+    token = _invite_token(client)
+    ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    assert ana is not None
+    for n, email in enumerate(("first@example.com", "second@example.com")):
+        friend = TestClient(client.app)
+        _join(friend, email, token)
+        result = friend.post(
+            "/audits",
+            files=_seeded_file(60 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": f"198.51.100.{60 + n}"},
+            follow_redirects=False,
+        )
+        assert "acct=welcome" in result.headers["location"]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        outcomes = [
+            row[0]
+            for row in conn.execute(  # type: ignore[attr-defined]
+                store.referrals.select().with_only_columns(store.referrals.c.outcome)  # type: ignore[attr-defined]
+            ).all()
+        ]
+        slots = conn.execute(store.referral_global_slots.select()).all()  # type: ignore[attr-defined]
+    assert len(slots) == 1
+    assert sorted(outcomes) == ["budget", "credited"]
+    assert store.invite_summary(ana.id, datetime.now(UTC)).credited == 1  # type: ignore[attr-defined]
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
+    second = store.find_account("second@example.com")  # type: ignore[attr-defined]
+    assert second is not None
+    store.delete_account(second.id)  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+        assert len(conn.execute(store.referral_global_slots.select()).all()) == 1  # type: ignore[attr-defined]
 
 
 def test_deleting_either_account_removes_its_invite_rows(tmp_path: Path) -> None:
@@ -2045,6 +2087,12 @@ def test_invite_screens_exist_in_every_language_and_pass_the_guard() -> None:
         text = re.sub(r"<[^>]+>", " ", html)
         assert "abc12345" in html and not find_claims(text)
         assert "{" not in text
+        assert "id='invite-link'" in html and "data-copy='invite-link'" in html
+        assert "data-native-share='invite-link'" in html
+        assert "https://wa.me/?text=" in html
+        assert "https://t.me/share/url?url=" in html
+        assert "https://www.reddit.com/submit?url=" in html
+        assert "?token=" not in html  # never a private report URL
         signup = account_pages.signup_page(locale=locale, csrf="c" * 30, invite="abc12345")
         assert "name='invite' value='abc12345'" in signup
         assert account_pages.COPY[locale]["invited_banner"] in signup
@@ -2116,16 +2164,16 @@ def test_the_upload_gate_and_a_missing_strategy_speak_the_visitors_language(
         assert "encontramos esa audit" not in missing.text and "find that audit" not in missing.text
 
 
-def test_a_preview_says_why_it_was_not_the_free_full_report(tmp_path: Path) -> None:
+def test_shared_file_and_network_allow_two_real_accounts_their_free_report(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     _signup(client, "first@example.com", welcome=True)
     assert "acct=welcome" in _upload(client).headers["location"]
-    # The same file from a fresh browser on another account: a preview, told why.
+    # Colleagues can examine the same robot from one office network.
     fresh = TestClient(client.app)
     _signup(fresh, "second@example.com", welcome=True)
     same_file = _upload(fresh).headers["location"]
-    assert "acct=preview_file" in same_file
-    assert account_pages.COPY["es"]["welcome_refused_file"] in fresh.get(same_file).text
+    assert "acct=welcome" in same_file
+    assert fresh.get(same_file).status_code == 200
     # The same browser with a new file on a third account, in Portuguese.
     device = client.cookies.get("rigor_device")
     again = TestClient(client.app)
@@ -2186,7 +2234,8 @@ def test_ipv6_counts_by_its_64_in_the_free_tier_and_invites(
     )
     assert "acct=welcome" not in rotated.headers["location"]
     assert "acct=preview_network" in rotated.headers["location"]
-    # ...and with the cap raised, the same /64 is the inviter's own network: no credit.
+    # ...and with the cap raised, a distinct browser on the same /64 may get
+    # a free report and reward the inviter; the network alone proves nothing.
     monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 3)
     carl = TestClient(client.app)
     _join(carl, "carl@example.com", token)
@@ -2197,9 +2246,9 @@ def test_ipv6_counts_by_its_64_in_the_free_tier_and_invites(
         headers={"X-Forwarded-For": "2001:db8:1:2:aaaa::5"},
     )
     ana = store.find_account("ana@example.com")  # type: ignore[attr-defined]
-    assert store.account_credits(ana.id, datetime.now(UTC)) == 0  # type: ignore[attr-defined]
+    assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
     data = json.loads(client.get("/cuenta/datos").text)
-    assert "self" in [item["outcome"] for item in data["invites"]["joined"]]
+    assert "credited" in [item["outcome"] for item in data["invites"]["joined"]]
 
 
 def test_sign_up_and_upload_limits_count_an_ipv6_64_as_one_network(tmp_path: Path) -> None:

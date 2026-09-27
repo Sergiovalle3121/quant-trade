@@ -109,7 +109,9 @@ BOOTSTRAP_PERCENTILES = (5.0, 50.0, 95.0)
 #: the budget the samples are reduced to fit and both counts are recorded.
 BOOTSTRAP_MAX_CELLS = 10_000_000
 BOOTSTRAP_MIN_SAMPLES = 50
-VARIANCE_POLICY = "max(observed across uploaded variants, sampling-variance floor)"
+VARIANCE_POLICY = (
+    "max(observed across uploaded variants, sampling-variance floor widened for serial dependence)"
+)
 RISK_SAMPLES = 2000
 CHALLENGE_SAMPLES = 5000
 #: The challenge simulator walks daily closes; coarser data cannot feed it.
@@ -447,6 +449,7 @@ def _multiplicity(
     trials_used: int | None = None,
     trials_evidence: str = DECLARED,
     trials_source: str = "declared by the client",
+    dependence_ratio: float = 1.0,
 ) -> dict[str, Any]:
     trials = trials_used if trials_used is not None else declared_trials
     trials_record = {"value": trials, "evidence": trials_evidence, "note": trials_source}
@@ -469,7 +472,8 @@ def _multiplicity(
     n = int(moments["observations"])
     skew = float(moments["skewness"])
     kurt = float(moments["kurtosis"])
-    floor = sharpe_sampling_variance(sr, skew, kurt, n)
+    dependence_ratio = max(1.0, dependence_ratio)
+    floor = sharpe_sampling_variance(sr, skew, kurt, n) * dependence_ratio
     if variants is not None:
         per_column = [
             sharpe_per_period(pd.Series(variants[:, j])) for j in range(variants.shape[1])
@@ -483,7 +487,11 @@ def _multiplicity(
 
     def dsr(trials: int) -> float:
         return psr_from_moments(
-            sr, n, skew, kurt, benchmark_sharpe=expected_max_sharpe(trials, used)
+            sr,
+            max(3, int(1 + (n - 1) / dependence_ratio)),
+            skew,
+            kurt,
+            benchmark_sharpe=expected_max_sharpe(trials, used),
         )
 
     grid = sorted({*DSR_SENSITIVITY_TRIALS, declared_trials, trials})
@@ -508,6 +516,8 @@ def _multiplicity(
         "sharpe_variance_used": measured(used),
         "variance_policy": VARIANCE_POLICY,
         "floor": measured(floor, "sampling variance of the Sharpe estimator"),
+        "dependence_ratio": measured(dependence_ratio, DEPENDENCE_RATIO_NOTE),
+        "effective_observations": measured(max(3, int(1 + (n - 1) / dependence_ratio))),
         "observed_across_variants": observed_evidence,
         "dsr_at_declared": measured(
             dsr(declared_trials), f"PSR against E[max Sharpe] of {_trials_text(declared_trials)}"
@@ -630,7 +640,13 @@ def _holdout(
         return {"status": "NOT_MEASURED", "reason": reason, "oos_start": None}, None, None, reason
     start = pd.Timestamp(oos_start)
     first, last = frame["timestamp"].iloc[0], frame["timestamp"].iloc[-1]
-    base = {"oos_start": declared(_iso(start), "declared by the client; not verifiable")}
+    base = {
+        "oos_start": declared(_iso(start), "declared by the client; not verifiable"),
+        "selection_verified": False,
+        "selection_note": (
+            "the upload cannot establish whether this date was chosen before seeing the results"
+        ),
+    }
     if start <= first or start > last:
         reason = "declared out-of-sample start lies outside the uploaded series"
         return {"status": "NOT_MEASURED", "reason": reason, **base}, None, None, reason
@@ -946,6 +962,145 @@ def _safe_text(text: str) -> str:
     """Client-controlled text (report metadata, names echoed in warnings) is
     kept out of the audit's own voice: wording the guard refuses is withheld."""
     return WITHHELD_TEXT if find_claims(text) else text
+
+
+def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.RedFlag]]:
+    """Compare the monetary curve with the closed-trade ledger where possible.
+
+    A separate uploaded curve can contain undisclosed flows or open positions.
+    An unexplained difference is therefore a warning, not an accusation. A
+    platform balance cell that contradicts its own deal chain is testable.
+    """
+    if inputs.trades is None or not inputs.trades.trades:
+        return {"status": "NOT_MEASURED", "reason": "no closed-trade ledger supplied"}, []
+    if inputs.equity.source != "equity":
+        return {"status": "NOT_MEASURED", "reason": "uploaded returns are not money"}, []
+
+    trades = inputs.trades.trades
+    frame = inputs.equity.frame
+    initial = float(inputs.initial_balance or frame["equity"].iloc[0])
+    fees = inputs.trades.fees or [0.0] * len(trades)
+    gross = float(sum(trade.pnl for trade in trades))
+    itemised = float(sum(fees))
+    net = gross - itemised
+    first_entry = min(trade.entry_time for trade in trades)
+    # Platform importers end the return curve at the last closed deal. A
+    # withdrawal after that deal is deliberately outside this observation
+    # window, even when the account summary shows its later balance.
+    last_exit_time = max(trade.exit_time for trade in trades)
+    flows = float(
+        sum(
+            amount
+            for when, amount in inputs.cash_flows
+            if when > first_entry and when.date() <= last_exit_time.date()
+        )
+    )
+    expected = initial + flows + net
+    reported = lead_number(inputs.report_metadata.get("reported_final_balance"))
+    observed = (
+        reported
+        if inputs.balance_only and reported is not None
+        else float(frame["equity"].iloc[-1])
+    )
+    difference = observed - expected
+    tolerance = max(0.02, 0.011 * (len(trades) + 1), 0.0001 * max(abs(initial), abs(expected)))
+    start = pd.Timestamp(frame["timestamp"].iloc[0])
+    end = pd.Timestamp(frame["timestamp"].iloc[-1])
+    outside = sum(
+        not (
+            start - pd.Timedelta(days=1) <= pd.Timestamp(t.exit_time) <= end + pd.Timedelta(days=1)
+        )
+        for t in trades
+    )
+    coverage = {
+        "curve": (
+            "rebuilt from the platform deal rows" if inputs.balance_only else "separate upload"
+        ),
+        "closed_trades": len(trades),
+        "trades_outside_curve": outside,
+        "flows": "listed by platform" if inputs.cash_flows else "not supplied",
+        "open_positions": "not valued separately",
+        "currency": (
+            inputs.account_currency
+            if inputs.balance_only and inputs.account_currency
+            else "not stated; same units assumed"
+        ),
+    }
+    if not inputs.balance_only:
+        coverage["trade_currency"] = inputs.account_currency or "not supplied"
+        coverage["curve_currency"] = "not supplied"
+    span = max((end - start).total_seconds(), 1.0)
+    last_exit = pd.Timestamp(max(t.exit_time for t in trades))
+    uncovered_tail = max((end - last_exit).total_seconds(), 0.0)
+    coverage["uncovered_tail_share"] = uncovered_tail / span
+    common = {
+        "currency": (
+            inputs.account_currency
+            if inputs.balance_only and inputs.account_currency
+            else "UNKNOWN"
+        ),
+        "coverage": coverage,
+        "initial_capital": measured(initial),
+        "cash_flows_after_start": (
+            measured(flows) if inputs.cash_flows else not_measured("not supplied")
+        ),
+        "gross_closed_pnl": measured(gross),
+        "itemised_costs": (
+            measured(itemised) if inputs.trades.fees is not None else not_measured("not itemised")
+        ),
+        "net_closed_pnl": measured(net),
+        "open_position_value": not_measured("no separate valuation supplied"),
+        "expected_final": measured(expected),
+        "observed_final": measured(observed),
+        "difference": measured(difference),
+        "tolerance": measured(tolerance, "0.011 per closed trade plus 1 bp of capital"),
+    }
+    if outside or (not inputs.balance_only and uncovered_tail / span > 0.01):
+        return {
+            "status": "NOT_MEASURED",
+            "reason": (
+                "trades extend outside the curve dates"
+                if outside
+                else "closed trades do not cover the final part of the curve"
+            ),
+            **common,
+        }, []
+    if abs(difference) <= tolerance:
+        return {
+            "status": "MATCH",
+            "reason": (
+                "closed-trade ledger agrees within tolerance; "
+                "this does not authenticate the history"
+            ),
+            **common,
+        }, []
+    if inputs.balance_only and reported is not None:
+        flag = redflags.RedFlag(
+            "MONETARY_RECONCILIATION_MISMATCH",
+            "FAIL",
+            f"printed final balance differs from initial balance plus flows and net closed P&L "
+            f"by {difference:,.2f} {inputs.account_currency or 'in file units'}; "
+            "the return was rebuilt from deal amounts",
+            difference,
+        )
+        return {
+            "status": "CONTRADICTION",
+            "reason": "printed balance contradicts deal amounts",
+            **common,
+        }, [flag]
+    flag = redflags.RedFlag(
+        "MONETARY_RECONCILIATION_UNEXPLAINED",
+        "WARN",
+        f"separate curve and closed trades differ by {difference:,.2f} "
+        "in file units; provide cash flows, currency conversion "
+        "and open-position valuation to reconcile them",
+        difference,
+    )
+    return {
+        "status": "NOT_MEASURED",
+        "reason": "flows, currency conversion or open positions could explain the difference",
+        **common,
+    }, [flag]
 
 
 def _trade_stats(inputs: AuditInputs) -> dict[str, Any]:
@@ -1322,6 +1477,7 @@ def run_audit(
     risk_samples: int = RISK_SAMPLES,
     challenge_samples: int = CHALLENGE_SAMPLES,
     market: Callable[[str], pd.Series | None] | None = None,
+    source_commit_sha: str | None = None,
 ) -> AuditResult:
     """Audit one upload. Pure, deterministic for a fixed ``seed``/``now``/``audit_id``.
 
@@ -1340,6 +1496,10 @@ def run_audit(
     significance, moments = _significance(returns)
     significance["autocorrelation_adjusted"] = autocorrelation_adjusted_sharpe(returns, ppy)
     significance["dependence"] = dependence_adjusted_psr(returns)
+    ratio_evidence = significance["dependence"]["ratio"]
+    dependence_ratio = (
+        float(ratio_evidence["value"]) if ratio_evidence["evidence"] == MEASURED else 1.0
+    )
     multiplicity = _multiplicity(
         moments,
         declared_trials=inputs.declared.trials,
@@ -1347,6 +1507,7 @@ def run_audit(
         trials_used=trials_used,
         trials_evidence=trials_evidence,
         trials_source=trials_source,
+        dependence_ratio=dependence_ratio,
     )
     luck = luck_lib.luck_review(
         moments,
@@ -1384,6 +1545,8 @@ def run_audit(
         share = benchmark["overlap_share"]["value"]
         benchmark["overlap_share"] = measured(share, FILE_BENCHMARK_NOTE)
     cscv, pbo = _cscv(inputs.variants)
+    if inputs.variant_validation is not None:
+        cscv["source_validation"] = inputs.variant_validation
     costs, rows, reference, assumed, gross = _costs(inputs)
     measured_trials = trials_used if trials_evidence == MEASURED else 0
     flags = redflags.scan(
@@ -1407,6 +1570,27 @@ def run_audit(
         )
         if not inputs.balance_only:
             flags.extend(redflags.scan_trades_against_equity(inputs.trades, frame))
+    reconciliation, reconciliation_flags = _reconciliation(inputs)
+    flags.extend(reconciliation_flags)
+    if inputs.forensics is not None:
+        balance_signal = next(
+            (
+                check
+                for check in inputs.forensics.get("checks", [])
+                if check.get("id") == "BALANCE_CHAIN" and check.get("status") == "SIGNAL"
+            ),
+            None,
+        )
+        if balance_signal is not None:
+            flags.append(
+                redflags.RedFlag(
+                    "FORENSIC_BALANCE_CHAIN_SIGNAL",
+                    "WARN",
+                    "a calibrated heuristic found balance-chain inconsistencies; "
+                    "this alone does not establish alteration",
+                    len(balance_signal.get("examples", [])),
+                )
+            )
     account, account_flags = account_lib.account_review(
         source_format=inputs.source_format,
         cash_flows=inputs.cash_flows,
@@ -1537,7 +1721,13 @@ def run_audit(
     risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
     challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
 
-    psr = float(moments["psr"]) if moments is not None else None
+    plain_psr = float(moments["psr"]) if moments is not None else None
+    adjusted_psr = significance["dependence"]["psr"]
+    psr = (
+        min(plain_psr, float(adjusted_psr["value"]))
+        if plain_psr is not None and adjusted_psr["evidence"] == MEASURED
+        else plain_psr
+    )
     p5 = (
         float(bootstrap["sharpe_per_period"]["p5"]["value"])
         if bootstrap["status"] == "MEASURED"
@@ -1545,6 +1735,7 @@ def run_audit(
     )
     statistical = verdict.assess_statistical(
         psr=psr,
+        unadjusted_psr=plain_psr,
         bootstrap_p5_sharpe=p5,
         observations=int(len(returns)),
         thresholds=thresholds,
@@ -1636,6 +1827,13 @@ def run_audit(
         engine={
             "name": ENGINE_NAME,
             "package_version": _package_version(),
+            "verdict_policy_version": "2026-09-27-dependence-1",
+            "source_commit_sha": (
+                declared(source_commit_sha.lower())
+                if source_commit_sha is not None
+                and re.fullmatch(r"[0-9a-fA-F]{40}", source_commit_sha)
+                else not_measured("build commit SHA was not embedded")
+            ),
             "seed": seed,
             "bootstrap_samples": bootstrap_samples,
             "risk_samples": risk_samples,
@@ -1705,6 +1903,8 @@ def run_audit(
         client_text_findings=scan_client_text(inputs.declared.description),
         seal=seal,
         verdict=final,
+        reconciliation=reconciliation,
+        forensics=inputs.forensics,
         series=_series(frame, balance_only=inputs.balance_only),
         trade_stats=trade_stats,
         stress=stress_tests,

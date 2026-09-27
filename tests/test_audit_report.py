@@ -137,6 +137,169 @@ def test_the_report_links_every_section_from_its_section_bar() -> None:
     assert f"<span class='verdict-lead'>{lead}.</span>" in page
 
 
+def test_report_language_links_preserve_the_private_report_and_sample_paths() -> None:
+    from quant_trade.audit.sample import sample_result
+
+    result = sample_result("es", bootstrap_samples=60)
+    private = "/audits/abc123?token=sample%2Btoken&lang=en"
+    for locale in ("es", "en", "pt"):
+        page = render_html(result, watermark=False, locale=locale, switch_url=private)
+        assert "class='report-languages'" in page
+        for target in {"es", "en", "pt"} - {locale}:
+            assert (
+                f"href='/audits/abc123?token=sample%2Btoken&amp;lang={target}' hreflang='{target}'"
+            ) in page
+        assert f"hreflang='{locale}'" not in page
+
+    for locale, alternate in (
+        ("es", "/sample?lang=en"),
+        ("en", "/ejemplo?lang=es"),
+        ("pt", "/ejemplo?lang=es"),
+    ):
+        page = render_html(result, watermark=False, locale=locale, switch_url=alternate)
+        for target, path in (("es", "/ejemplo"), ("en", "/sample"), ("pt", "/pt/exemplo")):
+            if target != locale:
+                assert f"href='{path}' hreflang='{target}'" in page
+
+
+def test_secondary_analysis_folds_without_hiding_alerts_or_pdf_content() -> None:
+    from quant_trade.audit.pdf import _expand_details_for_pdf
+    from quant_trade.audit.sample import sample_result
+    from quant_trade.audit.theme import STYLE
+
+    result = sample_result("es", bootstrap_samples=60)
+    full = render_html(result, watermark=False, locale="es")
+    assert full.count("<details open class='detail report-detail'") >= 10
+    assert "<summary><h2>Rendimiento anualizado" in full
+    assert "<section class='detail'" in full
+    assert "<h2>Costes de operación</h2>" in full
+    assert "<h2>Banderas rojas</h2>" in full
+    assert "id='r-next'" in full and "id='r-flags'" in full
+    assert "id='r-inputs'" in full and "<h2>No medido</h2>" in full
+    assert ".report-detail:not([open])>.detail-body{display:block!important}" in STYLE
+    # An older saved report with closed details is opened by the PDF renderer.
+    closed = full.replace(
+        "<details open class='detail report-detail", "<details class='detail report-detail"
+    )
+    pdf_html = _expand_details_for_pdf(closed)
+    assert pdf_html.count("<details open class='detail report-detail'") == full.count(
+        "<details open class='detail report-detail'"
+    )
+    assert "<details class='detail report-detail'" not in pdf_html
+
+
+def test_reconciliation_and_forensic_signal_remain_visible_in_every_language() -> None:
+    from quant_trade.audit.pdf import _expand_details_for_pdf
+
+    def measured(value: float) -> dict[str, object]:
+        return {"value": value, "evidence": "MEASURED", "note": ""}
+
+    missing = {"value": None, "evidence": "NOT_MEASURED", "note": "not supplied"}
+    recon = {
+        "status": "CONTRADICTION",
+        "reason": "printed balance contradicts deal amounts",
+        "currency": "USD",
+        "coverage": {
+            "curve": "rebuilt from the platform deal rows",
+            "closed_trades": 2,
+            "trades_outside_curve": 0,
+            "flows": "not supplied",
+            "open_positions": "not valued separately",
+            "currency": "USD",
+        },
+        "initial_capital": measured(10000.0),
+        "cash_flows_after_start": missing,
+        "gross_closed_pnl": measured(60.0),
+        "itemised_costs": measured(10.0),
+        "net_closed_pnl": measured(50.0),
+        "open_position_value": missing,
+        "expected_final": measured(10050.0),
+        "observed_final": measured(11050.0),
+        "difference": measured(1000.0),
+        "tolerance": measured(1.0),
+    }
+    forensics = {
+        "method_version": "forensics-1",
+        "family": "mt5_tester",
+        "rows_read": 2,
+        "truncated": False,
+        "checks": [
+            {
+                "id": "BALANCE_CHAIN",
+                "status": "SIGNAL",
+                "figures": [["broken_links", "1", "MEASURED"]],
+                "calibration": [
+                    ["n", "26"],
+                    ["groups", "26"],
+                    ["n_reserved", "13"],
+                    ["unexplained", "0"],
+                    ["cp95_upper_pct", "13.2"],
+                    ["frozen", "2026-09-26"],
+                ],
+            },
+            {"id": "FILE_TRACE", "status": "INFO", "calibration": [], "figures": []},
+        ],
+    }
+    result = _result().model_copy(update={"reconciliation": recon, "forensics": forensics})
+    assert result.model_dump(mode="json")["reconciliation"]["difference"]["value"] == 1000.0
+    assert result.model_dump(mode="json")["forensics"]["checks"][0]["status"] == "SIGNAL"
+    for locale, titles in (
+        ("es", ("Conciliación monetaria", "Coherencia interna del archivo", "Cadena de saldos")),
+        ("en", ("Money reconciliation", "Internal file consistency", "Balance chain")),
+        ("pt", ("Conciliação monetária", "Coerência interna do arquivo", "Cadeia de saldos")),
+    ):
+        page = render_html(result, watermark=False, locale=locale)
+        assert all(title in page for title in titles)
+        assert "10,000.00" in page and "11,050.00" in page and "1,000.00" in page
+        assert "forensics-1" in page and "2026-09-26" in page
+        assert "BALANCE_CHAIN" in page and "broken links" in page
+        assert page.index("id='r-reconciliation'") < page.index("<details open class='detail")
+        assert page.index("id='r-forensics'") < page.index("<details open class='detail")
+        pdf_html = _expand_details_for_pdf(page)
+        assert "<details open class='detail report-detail forensic-all'" in pdf_html
+
+    separate = {
+        **recon,
+        "currency": "UNKNOWN",
+        "coverage": {
+            **recon["coverage"],
+            "curve": "separate upload",
+            "currency": "not stated; same units assumed",
+            "trade_currency": "USD",
+            "curve_currency": "not supplied",
+        },
+    }
+    separate_result = result.model_copy(update={"reconciliation": separate})
+    for locale, statements in (
+        (
+            "es",
+            (
+                "USD según las operaciones",
+                "Moneda indicada en operaciones",
+                "Moneda indicada en la curva:",
+            ),
+        ),
+        (
+            "en",
+            (
+                "USD according to trades",
+                "Currency stated by trades",
+                "Currency stated by the curve:",
+            ),
+        ),
+        (
+            "pt",
+            (
+                "USD conforme as operações",
+                "Moeda informada nas operações",
+                "Moeda informada na curva:",
+            ),
+        ),
+    ):
+        page = render_html(separate_result, watermark=False, locale=locale)
+        assert all(statement in page for statement in statements)
+
+
 def test_metric_tables_share_columns_so_values_line_up() -> None:
     from quant_trade.audit.sample import sample_result
 

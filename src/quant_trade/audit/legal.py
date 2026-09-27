@@ -20,12 +20,17 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 
-from quant_trade.audit.accounts import DEVICE_COOKIE, FREE_PREVIEWS_PER_MONTH
+from quant_trade.audit.accounts import (
+    DEVICE_COOKIE,
+    FREE_PREVIEWS_PER_MONTH,
+    REFERRAL_CREDITS,
+    REFERRAL_MONTHLY_CAP,
+)
 from quant_trade.audit.funnel import REF_COOKIE, REF_DAYS, SEEN_COOKIE
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
-LEGAL_UPDATED = "2026-09-26"
+LEGAL_UPDATED = "2026-09-27"
 
 STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
 
@@ -33,14 +38,18 @@ STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
 LEGAL_PATHS: dict[str, dict[str, str]] = {
     "es": {"terms": "/terminos", "privacy": "/privacidad"},
     "en": {"terms": "/terms", "privacy": "/privacy"},
+    "pt": {"terms": "/pt/termos", "privacy": "/pt/privacidade"},
 }
 
 LINK_TEXT: dict[str, dict[str, str]] = {
     "es": {"terms": "Términos del servicio", "privacy": "Política de privacidad"},
     "en": {"terms": "Terms of service", "privacy": "Privacy policy"},
+    "pt": {"terms": "Termos do serviço", "privacy": "Política de privacidade"},
 }
 
-_NOT_SET = {"es": "[sin configurar]", "en": "[not configured]"}
+_NOT_SET = {"es": "[sin configurar]", "en": "[not configured]", "pt": "[não configurado]"}
+
+_LOCAL_REVIEW_PT = "Versão em português pendente de revisão jurídica local."
 
 _UNCONFIGURED_WARNING = {
     "es": (
@@ -50,6 +59,10 @@ _UNCONFIGURED_WARNING = {
     "en": (
         "The operator of this service has not filled in its details yet (name, contact, "
         "address and jurisdiction). Until then this text is a draft."
+    ),
+    "pt": (
+        "O operador ainda não informou seus dados (nome, contato, endereço e jurisdição). "
+        "Até lá, este texto é um rascunho."
     ),
 }
 
@@ -67,6 +80,8 @@ class LegalContext:
     card_payments: bool = False
     access_codes: bool = False
     pack_price_usd: float = 0.0
+    email_delivery_ready: bool = False
+    email_verification_required: bool = False
     retention_days: int = 30
     max_uploads_per_hour_per_ip: int = 10
 
@@ -115,6 +130,75 @@ def _value(value: str, locale: str) -> str:
     return value or _NOT_SET[locale]
 
 
+def _warning(ctx: LegalContext, locale: str) -> str | None:
+    if locale == "pt":
+        return (
+            f"{_UNCONFIGURED_WARNING['pt']} {_LOCAL_REVIEW_PT}"
+            if not ctx.configured
+            else _LOCAL_REVIEW_PT
+        )
+    return None if ctx.configured else _UNCONFIGURED_WARNING[locale]
+
+
+def _account_recovery(ctx: LegalContext, locale: str) -> str:
+    if ctx.email_delivery_ready:
+        return {
+            "es": (
+                "Si olvidas la contraseña, puedes pedir un enlace de un solo uso por correo "
+                "o usar tu clave de recuperación. Puedes borrar la cuenta desde su página."
+            ),
+            "en": (
+                "If you forget your password, you can request a one-time e-mail link or use "
+                "your recovery key. You can delete the account from its page."
+            ),
+            "pt": (
+                "Se você esquecer a senha, pode pedir um link de uso único por e-mail ou usar "
+                "sua chave de recuperação. Você pode excluir a conta pela própria página."
+            ),
+        }[locale]
+    return {
+        "es": (
+            "Si la olvidas, te enviamos un enlace de un solo uso después de comprobar que nos "
+            "escribes desde el correo de la cuenta. Puedes borrar la cuenta cuando quieras "
+            "desde su página."
+        ),
+        "en": (
+            "If you forget it, we send you a one-time link after checking that you write from "
+            "the account's e-mail. You can delete the account at any time from its page."
+        ),
+        "pt": (
+            "Se você esquecê-la, enviamos um link de uso único depois de confirmar que você "
+            "escreve do e-mail da conta. Você pode excluir a conta pela própria página."
+        ),
+    }[locale]
+
+
+def _account_email_status(ctx: LegalContext, locale: str) -> str:
+    if ctx.email_delivery_ready:
+        return {
+            "es": (
+                "Enviamos enlaces de confirmación, cambio de correo y recuperación de "
+                "contraseña cuando se solicitan; también avisos de compra o cargo adicional "
+                "a correos verificados. No son mensajes publicitarios."
+            ),
+            "en": (
+                "We send confirmation, e-mail change and password recovery links when "
+                "requested; verified addresses also receive purchase or additional-charge "
+                "notices. These are not advertising messages."
+            ),
+            "pt": (
+                "Enviamos links de confirmação, troca de e-mail e recuperação de senha "
+                "quando solicitados; endereços verificados também recebem avisos de compra "
+                "ou cobrança adicional. Não são mensagens publicitárias."
+            ),
+        }[locale]
+    return {
+        "es": "Todavía no comprobamos el correo ni enviamos correos.",
+        "en": "There is no e-mail check yet and we send no e-mail.",
+        "pt": "Ainda não verificamos o e-mail nem enviamos mensagens por e-mail.",
+    }[locale]
+
+
 def _card_refund_es(ctx: LegalContext) -> str:
     """How a refund reaches a card, said only while card payment is on."""
     if not ctx.card_payments:
@@ -146,6 +230,21 @@ def _card_refund_en(ctx: LegalContext) -> str:
     )
 
 
+def _card_refund_pt(ctx: LegalContext) -> str:
+    if not ctx.card_payments:
+        return ""
+    share = (
+        f" Se o relatório fazia parte de um pacote, devolvemos sua parte (USD "
+        f"{ctx.pack_price_usd / PACK_CREDITS:.2f}) ou, se você preferir, emitimos um novo crédito."
+        if ctx.pack_price_usd
+        else ""
+    )
+    return (
+        "Se você pagou com cartão, o reembolso volta para o mesmo cartão pelo Stripe; "
+        f"o banco pode levar alguns dias para mostrá-lo.{share}"
+    )
+
+
 def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.free_mode:
         return (
@@ -157,6 +256,11 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
         "La vista previa es gratuita. El informe completo cuesta "
         f"USD {ctx.price_usd:.2f} por auditoría."
     ]
+    if ctx.card_payments and ctx.email_verification_required:
+        lines.append(
+            "Para pagar con tarjeta debes confirmar el correo de tu cuenta. Tu primer informe "
+            "completo gratis sigue disponible antes de confirmarlo."
+        )
     if ctx.card_payments:
         lines.append(
             "El pago con tarjeta lo procesa Stripe en su propia página de pago. El cargo se "
@@ -191,8 +295,9 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     lines.append(
         "Si pagaste y el informe completo no se generó por un fallo del servicio, escríbenos: "
         "devolvemos el importe o entregamos un código nuevo. Como el informe se entrega al "
-        "momento, un informe ya desbloqueado no se reembolsa, salvo que la ley aplicable "
-        "diga otra cosa."
+        "momento, no devolvemos un informe ya desbloqueado por cambio de opinión. Sí "
+        "atendemos errores del informe que no podamos corregir, fallos de entrega y los "
+        "derechos que conceda la ley aplicable."
     )
     if ctx.card_payments:
         lines.append(_card_refund_es(ctx))
@@ -207,6 +312,11 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
             "affected.",
         )
     lines = [f"The preview is free. The full report costs USD {ctx.price_usd:.2f} per audit."]
+    if ctx.card_payments and ctx.email_verification_required:
+        lines.append(
+            "To pay by card, confirm your account e-mail. Your first free full report "
+            "remains available before confirmation."
+        )
     if ctx.card_payments:
         lines.append(
             "Card payments are processed by Stripe on its own checkout page. The charge is in "
@@ -240,11 +350,74 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
     lines.append(
         "If you paid and the full report was not produced because of a fault in the service, "
         "write to us: we refund the amount or issue a new code. Because the report is "
-        "delivered at once, a report already unlocked is not refunded unless the applicable "
-        "law says otherwise."
+        "delivered at once, we do not refund an unlocked report for a change of mind. "
+        "We do address report errors we cannot fix, failed delivery and rights under "
+        "applicable law."
     )
     if ctx.card_payments:
         lines.append(_card_refund_en(ctx))
+    return tuple(lines)
+
+
+def _price_pt(ctx: LegalContext) -> tuple[str, ...]:
+    if ctx.free_mode:
+        return (
+            "No momento, o serviço é gratuito: o relatório completo tem marca d'água. "
+            "Se isso mudar, o preço será mostrado antes do pagamento e não afetará as "
+            "auditorias já feitas.",
+        )
+    lines = [
+        f"A prévia é gratuita. O relatório completo custa USD {ctx.price_usd:.2f} por auditoria."
+    ]
+    if ctx.card_payments and ctx.email_verification_required:
+        lines.append(
+            "Para pagar com cartão, confirme o e-mail da sua conta. Seu primeiro relatório "
+            "completo gratuito continua disponível antes da confirmação."
+        )
+    if ctx.card_payments:
+        lines.append(
+            "O pagamento com cartão é processado pelo Stripe na página de pagamento dele. "
+            "A cobrança é em dólares dos Estados Unidos (USD); seu banco pode cobrar pela "
+            "conversão de moeda. Não vemos nem guardamos os dados do seu cartão."
+        )
+    if ctx.access_codes:
+        lines.append(
+            "Você também pode pagar fora do site (transferência, Mercado Pago ou outro meio "
+            "acordado) e receber um código de acesso. Cada crédito do código libera uma "
+            "auditoria. O código é entregue uma vez; guarde-o."
+        )
+    if ctx.pack_price_usd and ctx.card_payments:
+        lines.append(
+            f"O pacote de {PACK_CREDITS} relatórios custa USD {ctx.pack_price_usd:.2f}. "
+            "Se você comprar o pacote com cartão a partir de um relatório, esse relatório "
+            f"será liberado e você receberá um código com {PACK_CREDITS - 1} créditos para "
+            "os próximos; o código aparece no relatório sempre que você o abrir."
+        )
+    elif ctx.pack_price_usd and ctx.access_codes:
+        lines.append(
+            f"Também vendemos códigos com {PACK_CREDITS} créditos por "
+            f"USD {ctx.pack_price_usd:.2f}; cada crédito libera uma auditoria."
+        )
+    if ctx.card_payments or ctx.access_codes:
+        lines.append(
+            "Se o relatório completo ler seu arquivo incorretamente (operações, saldo ou "
+            "datas que não correspondem à plataforma) e não conseguirmos corrigir, entre "
+            "em contato com o identificador do relatório: devolvemos o valor desse relatório "
+            "ou, se você preferir, emitimos um novo crédito."
+        )
+    lines.append(
+        "Se você pagou e o relatório completo não foi gerado por uma falha do serviço, "
+        "entre em contato: devolvemos o valor ou emitimos um novo código. Como o relatório "
+        "é entregue na hora, não reembolsamos um relatório já liberado por mudança de "
+        "ideia. Atendemos erros que não possamos corrigir, falhas na entrega e direitos "
+        "previstos na lei aplicável."
+    )
+    if ctx.card_payments:
+        lines.append(_card_refund_pt(ctx))
+        lines.append(
+            "Se houver cobrança duplicada, entre em contato com os identificadores dos "
+            "pagamentos para analisarmos o reembolso manualmente."
+        )
     return tuple(lines)
 
 
@@ -254,7 +427,9 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     address = _value(ctx.operator_address, locale)
     contact = _value(ctx.operator_contact, locale)
     jurisdiction = _value(ctx.jurisdiction, locale)
-    warning = None if ctx.configured else _UNCONFIGURED_WARNING[locale]
+    warning = _warning(ctx, locale)
+    if locale == "pt":
+        return _terms_pt(ctx, name, address, contact, jurisdiction, warning)
     if locale == "en":
         sections: tuple[tuple[str, tuple[str, ...]], ...] = (
             ("Provider", (f'{name}, {address}. Contact: {contact} ("we").',)),
@@ -294,8 +469,9 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Your account",
                 (
                     (
-                        "A new account's first file is a free full report, once per account, "
-                        "browser and file, and a few per network address each month. "
+                        "A new account's first eligible upload is a free full report, once "
+                        "per account and browser, with a monthly network limit. The same "
+                        "file on another eligible account does not by itself block it. "
                         f"After it, the free preview needs an account: {FREE_PREVIEWS_PER_MONTH} "
                         "a calendar month per account, also counted per network address. Past "
                         "that, each file is a paid report. "
@@ -309,9 +485,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                         else "The account is optional while the service is in free mode."
                     ),
                     "The account shows your reports, credits and purchases in one place.",
-                    "You are responsible for your password. If you forget it, we send you a "
-                    "one-time link after checking that you write from the account's e-mail. "
-                    "You can delete the account at any time from its page.",
+                    "You are responsible for your password. " + _account_recovery(ctx, "en"),
                     *(
                         (
                             "An access code saved on an account still belongs to the code's "
@@ -418,8 +592,9 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             "Tu cuenta",
             (
                 (
-                    "El primer archivo de una cuenta nueva es un informe completo gratis, una vez "
-                    "por cuenta, navegador y archivo, y unos pocos por dirección de red al mes. "
+                    "La primera carga elegible de una cuenta nueva da un informe completo "
+                    "gratis, una vez por cuenta y navegador, con límite mensual por red. "
+                    "El mismo archivo en otra cuenta elegible no la bloquea por sí solo. "
                     "Después, la vista previa gratis necesita una cuenta: "
                     f"{FREE_PREVIEWS_PER_MONTH} por mes calendario y por cuenta, "
                     "contadas también por dirección de red. "
@@ -435,9 +610,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 ),
                 "La cuenta sirve para ver en un solo lugar tus informes, tus créditos y tus "
                 "compras.",
-                "Eres responsable de tu contraseña. Si la olvidas, te enviamos un enlace de un "
-                "solo uso después de comprobar que nos escribes desde el correo de la cuenta. "
-                "Puedes borrar la cuenta cuando quieras desde su página.",
+                "Eres responsable de tu contraseña. " + _account_recovery(ctx, "es"),
                 *(
                     (
                         "Un código de acceso guardado en una cuenta sigue siendo del titular "
@@ -506,6 +679,153 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     return LegalText("Términos del servicio", warning, sections, LEGAL_UPDATED)
 
 
+def _terms_pt(
+    ctx: LegalContext,
+    name: str,
+    address: str,
+    contact: str,
+    jurisdiction: str,
+    warning: str | None,
+) -> LegalText:
+    account = (
+        (
+            "O primeiro arquivo de uma conta nova dá direito a um relatório completo "
+            "gratuito, uma vez por conta e navegador, sujeito também aos limites "
+            "mensais por endereço de rede. O mesmo arquivo em outra conta elegível não "
+            "a bloqueia por si só. Uma rede compartilhada, por si só, não impede "
+            "o acesso. Depois disso, a prévia gratuita exige uma conta: "
+            f"{FREE_PREVIEWS_PER_MONTH} por mês civil por conta, também sujeitas aos limites "
+            "por rede. Após esses limites, cada arquivo exige pagamento. "
+            + (
+                "Um relatório pago com código de acesso funciona sem conta. "
+                if ctx.access_codes
+                else ""
+            )
+            + "O link privado de cada relatório funciona sem conta."
+        )
+        if not ctx.free_mode
+        else "A conta é opcional enquanto o serviço estiver no modo gratuito."
+    )
+    sections: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("Prestador", (f'{name}, {address}. Contato: {contact} ("nós").',)),
+        (
+            "O que é o serviço",
+            (
+                "Uma análise estatística automatizada dos arquivos de backtest ou de conta "
+                "que você envia: relatório da plataforma, exportação de otimização, curva de "
+                "patrimônio ou retornos e, se fornecidos, operações, benchmark e variantes. "
+                "O resultado é um relatório com avaliação por dimensão e cada valor marcado "
+                "pela evidência disponível (MEASURED, DECLARED ou NOT_MEASURED).",
+            ),
+        ),
+        (
+            "O que o serviço não é",
+            (
+                "O serviço não presta aconselhamento de investimento, financeiro, jurídico "
+                "ou tributário. Não recomenda compra, venda ou operação. Não executa ordens, "
+                "não custodia recursos, não pede chaves da corretora ou da bolsa e não se "
+                "conecta a elas. Não prevê resultados futuros: uma avaliação favorável "
+                "significa apenas que não encontramos evidência de sobreajuste nos dados "
+                "enviados. A simulação de desafios de prop firm e o risco por reamostragem "
+                "são estimativas desses dados, não previsões.",
+            ),
+        ),
+        (
+            "Seus arquivos",
+            (
+                "Você declara ter direito de enviar os arquivos e que eles não contêm "
+                "dados pessoais de terceiros. Os arquivos são usados para produzir seu "
+                "relatório. A política de privacidade explica o que guardamos e por quanto tempo.",
+                f"Há um limite de {ctx.max_uploads_per_hour_per_ip} envios por hora por endereço "
+                "IP. Envie apenas resultados de backtest ou de conta.",
+            ),
+        ),
+        (
+            "Sua conta e indicações",
+            (
+                account,
+                "A conta reúne seus relatórios, créditos e compras. Você é responsável pela "
+                "senha. " + _account_recovery(ctx, "pt"),
+                (
+                    "Ao indicar um colega, você recebe "
+                    f"{REFERRAL_CREDITS} crédito quando a pessoa indicada concluir seu "
+                    "primeiro relatório completo gratuito, até "
+                    f"{REFERRAL_MONTHLY_CAP} créditos por mês civil. Indicações feitas pelo "
+                    "mesmo navegador não contam como novas pessoas. Compartilhar uma rede "
+                    "não invalida uma indicação por si só."
+                    + (
+                        " Para receber o crédito, seu e-mail precisa estar confirmado."
+                        if ctx.email_verification_required
+                        else ""
+                    )
+                ),
+                *(
+                    (
+                        "Um código de acesso salvo na conta continua pertencendo ao titular "
+                        "do código; os créditos podem ser usados pela conta ou digitando o código.",
+                    )
+                    if ctx.access_codes
+                    else ()
+                ),
+            ),
+        ),
+        (
+            "Limites da análise",
+            (
+                "O relatório depende dos arquivos enviados, que não são conferidos com a "
+                "corretora. Valores DECLARED vêm de declarações do usuário; valores "
+                "NOT_MEASURED não puderam ser calculados. Não garantimos identificar todos "
+                "os erros de um backtest.",
+            ),
+        ),
+        ("Preço e pagamento", _price_pt(ctx)),
+        (
+            "Seu link privado",
+            (
+                "O link do relatório contém um token secreto. Quem o possui pode abrir e "
+                "liberar o relatório e publicar sua página de verificação; guarde-o como uma "
+                "senha. Guardamos apenas um hash do token e não podemos reenviar um link perdido.",
+            ),
+        ),
+        (
+            "Emblema e página de verificação",
+            (
+                "Se você publicar a verificação, a página mostra a classe, as dimensões, "
+                "os hashes, a data e um aviso fixo, nunca arquivos, operações ou descrição. "
+                "Você pode usar o emblema em seu site, Telegram, fóruns ou vídeos, sempre "
+                "ligado à página de verificação. Não pode apresentá-lo como promessa de "
+                "resultado, endosso de um produto ou junto de alegações de rentabilidade; "
+                "nesse caso, podemos retirar a publicação.",
+            ),
+        ),
+        (
+            "Limitação de responsabilidade",
+            (
+                "Na medida permitida pela lei aplicável, nossa responsabilidade total é "
+                "limitada ao valor pago pela auditoria em questão. Não respondemos por perdas "
+                "de investimento ou decisões tomadas com base no relatório.",
+            ),
+        ),
+        (
+            "Titularidade",
+            (
+                "O relatório é seu. O mecanismo de análise, os textos e o formato são nossos. "
+                "Você pode compartilhar o relatório; não pode revender o serviço sem "
+                "acordo escrito.",
+            ),
+        ),
+        ("Lei aplicável e foro", (f"{jurisdiction}.",)),
+        (
+            "Alterações",
+            (
+                "Publicamos alterações nesta página com uma nova data. Cada auditoria segue "
+                "os termos vigentes no dia em que foi realizada.",
+            ),
+        ),
+    )
+    return LegalText("Termos do serviço", warning, sections, LEGAL_UPDATED)
+
+
 def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
     """What a card payment leaves with us and what Stripe receives; empty while off."""
     if not ctx.card_payments:
@@ -519,6 +839,15 @@ def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
             "whether you bought one report or the pack. Stripe processes them under its own "
             f"policy: {STRIPE_PRIVACY_URL}. We never see your card details.",
         )
+    if locale == "pt":
+        return (
+            "Quando você paga com cartão: guardamos o identificador da sessão de pagamento "
+            "do Stripe, a data e, no caso de um pacote, o hash do código de acesso.",
+            "O Stripe recebe os dados do cartão, o e-mail digitado em sua página de pagamento "
+            "(para enviar o recibo), o país do cartão, o identificador do relatório e a "
+            "informação de que você comprou um relatório ou o pacote. O Stripe trata esses "
+            f"dados conforme sua política: {STRIPE_PRIVACY_URL}. Não vemos os dados do cartão.",
+        )
     return (
         "Si pagas con tarjeta: el identificador de la sesión de pago de Stripe, la fecha del "
         "pago y, si compras el paquete, el hash de su código de acceso.",
@@ -529,6 +858,53 @@ def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
     )
 
 
+def _email_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
+    if not (ctx.email_delivery_ready or ctx.email_verification_required):
+        return ()
+    return {
+        "es": (
+            "Si confirmas tu correo: la dirección confirmada y la fecha, hasta que borres "
+            "la cuenta.",
+            "Para enviar confirmaciones, cambios de correo, recuperación y avisos de compra "
+            "o cargo adicional: el destinatario, "
+            "propósito, idioma, estado, intentos de envío, caducidad y, cuando corresponde, "
+            "el correo nuevo pendiente. Los enlaces de un solo uso se derivan de un "
+            "identificador aleatorio y un secreto del servidor; no guardamos el enlace ni "
+            "el token en claro ni adjuntamos archivos del informe. Los enlaces de confirmación "
+            "y cambio caducan a las 24 horas; los de recuperación, a la hora. Los avisos de "
+            "compra incluyen referencia, importe y plan, nunca token ni resultado. Las filas de "
+            "envío se programan para borrarse 30 días después de caducar, mediante la limpieza "
+            "periódica, o antes si borras la cuenta.",
+        ),
+        "en": (
+            "If you confirm your e-mail: the confirmed address and date, until you delete "
+            "the account.",
+            "To send confirmations, e-mail changes, recovery and purchase or additional-charge "
+            "notices: the recipient, purpose, "
+            "language, delivery state, retry count, expiry and, where relevant, the pending "
+            "new address. One-time links are derived from a random id and a server secret; "
+            "we do not keep the link or token in clear text or attach report files. "
+            "Confirmation and change links expire after 24 hours; recovery links after one "
+            "hour. Purchase notices include reference, amount and plan, never a token or "
+            "result. Delivery rows are scheduled for deletion 30 days after expiry by periodic "
+            "cleanup, or sooner when you delete the account.",
+        ),
+        "pt": (
+            "Se você confirmar o e-mail: o endereço confirmado e a data, até a exclusão da conta.",
+            "Para enviar confirmações, trocas de e-mail, recuperação e avisos de compra ou "
+            "cobrança adicional: destinatário, "
+            "finalidade, idioma, estado, tentativas de envio, vencimento e, quando houver, "
+            "o novo e-mail pendente. Os links de uso único são derivados de um identificador "
+            "aleatório e de um segredo do servidor; não guardamos o link nem o token em "
+            "texto claro nem anexamos arquivos do relatório. Links de confirmação e troca "
+            "vencem em 24 horas; os de recuperação, em uma hora. Avisos de compra incluem "
+            "referência, valor e plano, nunca token ou resultado. Os registros de envio estão "
+            "programados para exclusão 30 dias após o vencimento pela limpeza periódica, "
+            "ou antes com a exclusão da conta.",
+        ),
+    }[locale]
+
+
 def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     locale = _locale(locale)
     name = _value(ctx.operator_name, locale)
@@ -536,7 +912,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     contact = _value(ctx.operator_contact, locale)
     days = ctx.retention_days
     limit = ctx.max_uploads_per_hour_per_ip
-    warning = None if ctx.configured else _UNCONFIGURED_WARNING[locale]
+    warning = _warning(ctx, locale)
+    if locale == "pt":
+        return _privacy_pt(ctx, name, address, contact, days, limit, warning)
     if locale == "en":
         sections: tuple[tuple[str, tuple[str, ...]], ...] = (
             ("Who is responsible", (f"{name}, {address}. Contact: {contact}.",)),
@@ -560,17 +938,19 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "When you join the updates list: your e-mail address.",
                     "If you create an account: your e-mail address, a scrypt hash of your "
                     "password (never the password), which reports and access codes are on it, "
-                    "and a hash of each sign-in session. There is no e-mail check yet and we "
-                    "send no e-mail.",
+                    "and a hash of each sign-in session. " + _account_email_status(ctx, "en"),
+                    *_email_keeps(ctx, "en"),
                     "To count free previews: which account used each one, when, and the "
                     "network address it came from. The address is cleared with the rest "
                     f"after {days} days.",
                     "For the free first full report: a random identifier of your browser "
                     f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
-                    "SHA-256 of the file and the network address, so the same browser or file "
-                    "gets it only once. The address is cleared after "
-                    f"{days} days; the two hashes stay, even if you delete your account and "
-                    "without your e-mail, so the offer cannot be repeated.",
+                    "SHA-256 of the file and the network address. The browser and account "
+                    "limits prevent repeat claims; the same file on another eligible account "
+                    "does not block it by itself. The address is cleared after "
+                    f"{days} days; the two hashes stay without your e-mail even if you "
+                    "delete your account. The browser hash helps prevent a repeat claim; "
+                    "the file hash records what was previously used.",
                     "For 'Invite a colleague': each account's invite link, and for an account "
                     "created through someone's link, the date, whether its free first report "
                     "happened and the hash of its browser identifier, to refuse self-invites. "
@@ -724,16 +1104,19 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Si te apuntas a la lista de avisos: tu correo.",
                 "Si creas una cuenta: tu correo, un hash scrypt de tu contraseña (nunca la "
                 "contraseña), qué informes y códigos de acceso tiene y un hash de cada sesión "
-                "iniciada. Todavía no comprobamos el correo ni enviamos correos.",
+                "iniciada. " + _account_email_status(ctx, "es"),
+                *_email_keeps(ctx, "es"),
                 "Para contar las vistas previas gratis: qué cuenta usó cada una, cuándo y "
                 f"desde qué dirección de red. La dirección se borra con lo demás a los {days} "
                 "días.",
                 "Para el primer informe completo gratis: un identificador al azar de tu "
                 f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
-                "el SHA-256 del archivo y la dirección de red, para que el mismo navegador o "
-                f"archivo lo reciba una sola vez. La dirección se borra a los {days} días; los "
-                "dos hashes se quedan, aunque borres tu cuenta y sin tu correo, para que la "
-                "oferta no se repita.",
+                "el SHA-256 del archivo y la dirección de red. Los límites por cuenta y "
+                "navegador evitan repetir la oferta; el mismo archivo en otra cuenta elegible "
+                f"no la bloquea por sí solo. La dirección se borra a los {days} días; los "
+                "dos hashes se quedan sin tu correo aunque borres la cuenta. La marca del "
+                "navegador ayuda a impedir un segundo regalo; el hash del archivo deja "
+                "constancia de lo usado.",
                 "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, para una "
                 "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
                 "informe gratis y el hash del identificador de su navegador, para rechazar "
@@ -865,6 +1248,170 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         ),
     )
     return LegalText("Política de privacidad", warning, sections, LEGAL_UPDATED)
+
+
+def _privacy_pt(
+    ctx: LegalContext,
+    name: str,
+    address: str,
+    contact: str,
+    days: int,
+    limit: int,
+    warning: str | None,
+) -> LegalText:
+    sections: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("Responsável", (f"{name}, {address}. Contato: {contact}.",)),
+        (
+            "O que guardamos",
+            (
+                "Os arquivos enviados (relatório da plataforma, exportação de otimização, "
+                "curva de patrimônio, operações, benchmark e variantes) e o hash SHA-256 "
+                "de cada um.",
+                "O que você declara no formulário, inclusive a descrição opcional, e o "
+                "relatório gerado.",
+                f"O endereço IP do envio, para aplicar o limite de {limit} envios por hora "
+                "por endereço e evitar abusos.",
+                "Um hash do token privado do relatório, nunca o próprio token.",
+                *_stripe_keeps(ctx, "pt"),
+                "Quando você usa um código de acesso: o identificador interno do código que "
+                "liberou a auditoria. Os códigos são guardados apenas como hash.",
+                "Quando você publica uma página de verificação: o identificador público e a data.",
+                "Quando você baixa o relatório em PDF ou JSON: o hash SHA-256 do arquivo, "
+                "para que quem o possui confira em /pt/comprovar se ele foi alterado. "
+                "Um arquivo enviado para essa conferência é lido e descartado, sem ser guardado.",
+                "Se você entra na lista de novidades: seu e-mail.",
+                "Se você cria uma conta: seu e-mail, um hash scrypt da senha (nunca a senha), "
+                "os relatórios e códigos de acesso associados e o hash de cada sessão iniciada. "
+                + _account_email_status(ctx, "pt"),
+                *_email_keeps(ctx, "pt"),
+                "Para contar as prévias gratuitas: qual conta usou cada uma, quando e de qual "
+                f"endereço de rede. O endereço é eliminado com os demais dados após {days} dias.",
+                "Para o primeiro relatório completo gratuito: um identificador aleatório do "
+                f"navegador (cookie {DEVICE_COOKIE}, guardado por nós apenas como hash), "
+                "o SHA-256 do arquivo e o endereço de rede. Os limites por conta e navegador "
+                "evitam repetição; o mesmo arquivo em outra conta elegível não a bloqueia "
+                f"por si só. O endereço é eliminado após {days} dias; "
+                "os dois hashes permanecem sem o e-mail mesmo se você excluir a conta. "
+                "A marca do navegador ajuda a impedir outro presente; o hash do arquivo "
+                "registra o que já foi usado.",
+                "Para 'Indique um colega': o link de indicação de cada conta e, para uma conta "
+                "criada por esse link, a data, se seu primeiro relatório gratuito foi concluído "
+                "e o hash do identificador do navegador, para impedir autoindicações. Quem "
+                "indicou vê apenas totais, não a identidade de quem entrou. Esses dados são "
+                "eliminados com a conta de quem indicou. Se a conta indicada for excluída, "
+                "seu registro conserva apenas datas e resultado sob um identificador aleatório "
+                "(sem e-mail nem hash do navegador), para manter o limite mensal.",
+                "Se você cria uma chave de recuperação: apenas seu SHA-256 e a data de criação, "
+                "nunca a chave, mostrada uma única vez. Ela é eliminada quando usada, substituída "
+                "ou quando a conta é excluída.",
+                "Se você ativa a verificação em duas etapas: o segredo compartilhado com o "
+                "aplicativo autenticador, necessário para conferir os códigos, e a última etapa "
+                "de código usada, para impedir sua reutilização. Esses dados são eliminados ao "
+                "desativar a função, usar a chave de recuperação ou excluir a conta.",
+                "Se você cadastra uma chave de acesso: o identificador da credencial, a chave "
+                "pública (nunca a chave privada, que permanece no dispositivo), o nome dado "
+                "por você, o endereço do site, o contador do dispositivo e as datas de cadastro "
+                "e último uso. Esses dados são eliminados ao remover a chave ou excluir a conta.",
+                "Em 'Sessões abertas': de cada sessão, uma identificação breve do dispositivo "
+                "(como 'Chrome · Windows', nunca a identificação completa do navegador), "
+                "o endereço de rede (IPv6 considerada por /64) e a data do último uso. "
+                "Os dados são eliminados quando a sessão termina, expira ou a conta é excluída.",
+                "Em 'Atividade recente': entradas na conta, mudanças de senha, verificação "
+                "em duas etapas, chave de recuperação e chaves de acesso, além de sessões "
+                "encerradas, com data, identificação breve do dispositivo e endereço de rede. "
+                "Guardamos os 50 registros mais recentes por até 90 dias ou até a exclusão da "
+                "conta. Tentativas de senha incorreta são contadas por rede e hora, sem guardar "
+                "o e-mail ou a senha digitada; mantemos as 20 linhas mais recentes por até "
+                "90 dias ou até a exclusão da conta. Para cada navegador que abre 'Minha conta', "
+                "guardamos a data da última visita e uma identificação breve sob o hash de "
+                "sua marca aleatória, para mostrar o que ocorreu desde então; o registro é "
+                "eliminado após 90 dias sem visita ou com a conta.",
+                "Para contar visitas vindas de nossos próprios links: as visitas à página "
+                "inicial e às páginas de casos são contadas por dia, idioma e etiqueta do "
+                "link (como ?ref=f4), sem endereço de rede. A cookie "
+                f"{SEEN_COOKIE} guarda só a data de hoje para contar um navegador uma vez "
+                "por dia. Se você chega por um link etiquetado, a cookie "
+                f"{REF_COOKIE} guarda a etiqueta por {REF_DAYS} dias; se você criar uma conta, "
+                "a etiqueta permanece nela até a exclusão.",
+            ),
+        ),
+        (
+            "O que não guardamos",
+            (
+                "Não pedimos nem guardamos chaves de corretora ou bolsa, senhas de conta de "
+                "trading ou dados de cartão. Estas páginas não usam analítica ou publicidade "
+                "de terceiros. As cookies são nossas: sessão, proteção dos formulários, marca "
+                "do navegador para a oferta gratuita, origem de nossos próprios links e data "
+                "para contar uma visita por dia. Nenhuma acompanha você entre sites ou é "
+                "compartilhada. Nosso registro de acessos guarda apenas o endereço abreviado "
+                "(sem a parte final do IP) e nunca o segredo do link do relatório. O provedor "
+                "de hospedagem pode manter seus próprios registros de requisições com IP "
+                "completo pelo prazo definido por ele.",
+            ),
+        ),
+        (
+            "Para que usamos os dados",
+            (
+                "Para produzir e mostrar o relatório, aplicar os limites de envio, registrar "
+                "pagamentos ou códigos usados, mostrar uma página de verificação publicada "
+                "por você e administrar a lista de novidades. Não vendemos dados nem os "
+                "usamos para publicidade; o acesso dos fornecedores está descrito abaixo.",
+            ),
+        ),
+        (
+            "Por quanto tempo guardamos",
+            (
+                f"Auditorias não pagas: após {days} dias, eliminamos arquivos, relatório, "
+                "declarações e descrição. Permanecem o identificador, os hashes dos arquivos, "
+                "a classe e a data, para que o registro ainda possa ser conferido.",
+                f"O IP do envio é eliminado nessa mesma limpeza após {days} dias, inclusive "
+                "nas auditorias pagas.",
+                "Auditorias pagas e primeiro relatório completo gratuito: guardados para que "
+                "você possa reabri-los até excluí-los com sua conta ou solicitar a exclusão.",
+                "Página de verificação: pública até você retirá-la no relatório, pedir sua "
+                "retirada ou pedir a exclusão da auditoria. Se publicada, a limpeza conserva "
+                "apenas o que ela mostra (classe, estados das dimensões, hashes, datas, "
+                "número de tentativas e versão do mecanismo), para manter a página e o emblema.",
+                "Lista de novidades: até você pedir a remoção.",
+                "Conta: até você excluí-la na própria página ou pedir sua exclusão. Isso "
+                "elimina e-mail, hash da senha, sessões e a lista de relatórios e códigos. "
+                "Os relatórios seguem as regras acima, a menos que você também escolha "
+                "excluí-los. Uma sessão termina em 30 dias ou quando você sai da conta.",
+            ),
+        ),
+        (
+            "Quem pode acessar",
+            (
+                "O operador e os provedores de hospedagem e banco de dados que guardam os "
+                "dados para nós."
+                + (
+                    " O Stripe recebe os dados necessários para o pagamento com cartão."
+                    if ctx.card_payments
+                    else ""
+                )
+                + " Uma página de verificação, apenas se você a publicar, mostra classe, "
+                "dimensões, hashes, data e aviso fixo; nunca arquivos, operações, descrição "
+                "ou token.",
+                "Os dados podem ser hospedados fora do seu país, nos servidores do provedor "
+                "de hospedagem.",
+            ),
+        ),
+        (
+            "Seus direitos",
+            (
+                f"Escreva para {contact} para pedir acesso, cópia, correção ou exclusão de "
+                "seus dados. Para demonstrar que a auditoria é sua, inclua o link privado. "
+                "A exclusão da auditoria remove arquivos, relatório, hashes, classe e página "
+                "de verificação. Para sair da lista de novidades, escreva do e-mail inscrito. "
+                "Você pode excluir a conta pela própria página e baixar uma cópia dos dados "
+                "guardados nela em 'Baixar meus dados'. Responderemos nos prazos da lei aplicável.",
+                "Você também pode apresentar uma reclamação à autoridade de proteção de "
+                "dados competente.",
+            ),
+        ),
+        ("Alterações", ("Publicamos alterações nesta página com uma nova data.",)),
+    )
+    return LegalText("Política de privacidade", warning, sections, LEGAL_UPDATED)
 
 
 __all__ = [

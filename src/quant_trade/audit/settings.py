@@ -18,7 +18,7 @@ from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 
 DEFAULT_DATABASE_URL = "sqlite:///state/audit/audit.db"
 DEFAULT_BASE_URL = "http://localhost:8000"
-DEFAULT_PRICE_USD_CENTS = 4900
+DEFAULT_PRICE_USD_CENTS = 2900
 #: A pack of ``PACK_CREDITS`` audits sold as one access code. It is shown only
 #: when codes are sold and it costs less than that many single audits;
 #: ``AUDIT_PACK_PRICE_USD_CENTS=0`` hides it.
@@ -93,6 +93,8 @@ class AuditSettings:
     #: Paid links are confirmed only by the signed webhook.
     stripe_link_single: str = ""
     stripe_link_pack: str = ""
+    #: Historical compatibility only; public launch keeps this false.
+    allow_legacy_payment_links: bool = False
     #: Audits that may be unlocked by a test-mode payment. Empty in normal
     #: operation, so Stripe's public test card never unlocks a real report.
     stripe_test_audits: frozenset[str] = frozenset()
@@ -110,6 +112,20 @@ class AuditSettings:
     audit_queue_seconds: int = DEFAULT_AUDIT_QUEUE_SECONDS
     #: The owner sells access codes (bank transfer, Mercado Pago, WhatsApp).
     access_codes: bool = False
+    #: Stop new referral rewards during an incident without disabling credits.
+    referral_rewards: bool = True
+    #: Maximum credited invites across the service in one UTC calendar month.
+    referral_global_monthly_cap: int = 100
+    #: Migration switch: when enabled, new Checkout and referral rewards
+    #: require a confirmed email. Sign-up and the first free report still work.
+    email_verification_required: bool = False
+    email_token_secret: str = field(default="", repr=False)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = field(default="", repr=False)
+    smtp_from: str = ""
+    smtp_security: str = "starttls"
     #: Where a client asks the owner for a code; shown on the landing page.
     contact_url: str = ""
     #: Run the retention purge inside the web service (at start, then daily).
@@ -139,6 +155,27 @@ class AuditSettings:
             raise ValueError("max_concurrent_audits must be at least 1")
         if self.audit_queue_seconds < 0:
             raise ValueError("audit_queue_seconds cannot be negative")
+        if self.referral_global_monthly_cap < 0:
+            raise ValueError("referral_global_monthly_cap cannot be negative")
+        if not 1 <= self.smtp_port <= 65535:
+            raise ValueError("smtp_port must be between 1 and 65535")
+        if self.smtp_security not in ("starttls", "ssl"):
+            raise ValueError("smtp_security must be starttls or ssl")
+
+    @property
+    def email_delivery_ready(self) -> bool:
+        """A configured encrypted SMTP transport and deterministic token key."""
+        return bool(
+            self.base_url.startswith("https://")
+            and self.smtp_host
+            and "\n" not in self.smtp_host
+            and "\r" not in self.smtp_host
+            and self.smtp_from.count("@") == 1
+            and "\n" not in self.smtp_from
+            and "\r" not in self.smtp_from
+            and len(self.email_token_secret) >= 32
+            and (not self.smtp_username or self.smtp_password)
+        )
 
     @property
     def stripe_configured(self) -> bool:
@@ -159,7 +196,12 @@ class AuditSettings:
 
     @property
     def links_enabled(self) -> bool:
-        return self.links_configured and not self.free_mode and not self.stripe_enabled
+        return (
+            self.allow_legacy_payment_links
+            and self.links_configured
+            and not self.free_mode
+            and not self.stripe_enabled
+        )
 
     @property
     def card_test_mode(self) -> bool:
@@ -224,8 +266,13 @@ class AuditSettings:
         stripe_price_id = env.get("STRIPE_PRICE_ID", "").strip()
         stripe_link_single = env.get("STRIPE_PAYMENT_LINK_SINGLE", "").strip()
         stripe_link_pack = env.get("STRIPE_PAYMENT_LINK_PACK", "").strip()
+        allow_legacy_links = (
+            env.get("AUDIT_LEGACY_PAYMENT_LINKS_ENABLED", "false").strip().lower() in TRUE_VALUES
+        )
         configured = stripe_keys_valid(stripe_secret_key, stripe_webhook_secret) or (
-            stripe_webhook_secret.startswith("whsec_") and payment_link_valid(stripe_link_single)
+            allow_legacy_links
+            and stripe_webhook_secret.startswith("whsec_")
+            and payment_link_valid(stripe_link_single)
         )
         requested_free = env.get("AUDIT_FREE_MODE", "true").strip().lower() in TRUE_VALUES
         access_codes = env.get("AUDIT_ACCESS_CODES", "").strip().lower() in TRUE_VALUES
@@ -240,6 +287,7 @@ class AuditSettings:
             stripe_price_id=stripe_price_id,
             stripe_link_single=stripe_link_single if payment_link_valid(stripe_link_single) else "",
             stripe_link_pack=stripe_link_pack if payment_link_valid(stripe_link_pack) else "",
+            allow_legacy_payment_links=allow_legacy_links,
             stripe_test_audits=_ids(env.get("AUDIT_STRIPE_TEST_AUDITS", "")),
             # Free mode is forced unless Stripe is fully configured or the
             # owner opted into selling access codes.
@@ -264,6 +312,20 @@ class AuditSettings:
                 env.get("AUDIT_QUEUE_SECONDS", "").strip() or DEFAULT_AUDIT_QUEUE_SECONDS
             ),
             access_codes=access_codes,
+            referral_rewards=env.get("AUDIT_REFERRAL_REWARDS", "true").strip().lower()
+            in TRUE_VALUES,
+            referral_global_monthly_cap=int(env.get("AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP", "100")),
+            email_verification_required=env.get("AUDIT_EMAIL_VERIFICATION_REQUIRED", "false")
+            .strip()
+            .lower()
+            in TRUE_VALUES,
+            email_token_secret=env.get("AUDIT_EMAIL_TOKEN_SECRET", ""),
+            smtp_host=env.get("AUDIT_SMTP_HOST", "").strip(),
+            smtp_port=int(env.get("AUDIT_SMTP_PORT", "587")),
+            smtp_username=env.get("AUDIT_SMTP_USERNAME", "").strip(),
+            smtp_password=env.get("AUDIT_SMTP_PASSWORD", ""),
+            smtp_from=env.get("AUDIT_SMTP_FROM", "").strip(),
+            smtp_security=env.get("AUDIT_SMTP_SECURITY", "starttls").strip().lower(),
             contact_url=_safe_url(env.get("AUDIT_CONTACT_URL", "")),
             auto_purge=env.get("AUDIT_AUTO_PURGE", "").strip().lower() in TRUE_VALUES,
             operator_name=_text(env.get("AUDIT_OPERATOR_NAME", "")),

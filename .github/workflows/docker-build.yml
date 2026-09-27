@@ -12,6 +12,9 @@ on:
       - "Dockerfile.web"
       - "requirements.lock.txt"
       - "pyproject.toml"
+      - "src/quant_trade/audit/**"
+      - "railway.json"
+      - ".github/workflows/docker-build.yml"
 
 concurrency: quant-trade-docker-build
 
@@ -31,12 +34,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the audit web image
         run: docker build -f Dockerfile.web -t quant-trade:audit-web .
-      - name: Serve and probe the health endpoint
+      - name: Serve and probe liveness and readiness
         run: |
           set -euo pipefail
           docker run -d --rm --name audit-web -e PORT=8080 -p 8080:8080 quant-trade:audit-web
           for _ in $(seq 1 30); do
-            if curl -fsS http://localhost:8080/health; then echo; docker stop audit-web; exit 0; fi
+            if curl -fsS http://localhost:8080/live \
+              && curl -fsS http://localhost:8080/ready; then
+              echo
+              docker stop audit-web
+              exit 0
+            fi
             sleep 1
           done
           docker logs audit-web

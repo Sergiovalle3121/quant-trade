@@ -274,6 +274,8 @@ def test_sample_is_deterministic_and_uses_the_optimisation_passes() -> None:
     assert first.verdict == second.verdict
     assert first.performance == second.performance
     assert first.inputs == second.inputs
+    assert first.audit_id == second.audit_id == "sample"
+    assert first.model_dump(mode="json") == second.model_dump(mode="json")
     trials = first.multiplicity["trials_used"]
     assert trials["evidence"] == "MEASURED" and trials["value"] >= 120
     assert first.inputs["source_format"] == "mt5_tester_html"

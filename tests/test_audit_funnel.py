@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -168,9 +169,16 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
         "signups": 1,
         "welcome": 1,
         "previews": 1,
-        "paid_code": 1,
-        "paid_card": 0,
+        "credit_used": 1,
+        "gift_credits": 0,
+        "purchases": 0,
+        "buyers": 0,
+        "repeat_purchases": 0,
+        "rights_sold": 0,
+        "gross_usd_cents": 0,
+        "refund_usd_cents": 0,
     }
+    assert built.by_ref["f6"].paid == 0  # a code without verified payment is no sale
     assert built.by_ref[funnel.DIRECT].counts["signups"] == 1
     assert built.by_day[(_today(), "es")].counts["signups"] == 2
 
@@ -178,6 +186,62 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
     store.delete_account(account.id)  # type: ignore[attr-defined]
     left = store.funnel_events(_today())["signups"]  # type: ignore[attr-defined]
     assert all(ref != "f6" for _, _, ref, _ in left)
+
+
+def test_one_invitee_can_grant_only_one_credit_under_concurrent_settlement(tmp_path: Path) -> None:
+    store = make_store(f"sqlite:///{tmp_path}/referrals.db")
+    now = datetime.now(UTC)
+    inviter = store.create_account(
+        email="inviter@example.com", password_hash="unused", locale="es", at=now
+    )
+    invitee = store.create_account(
+        email="invitee@example.com", password_hash="unused", locale="es", at=now
+    )
+    assert inviter is not None and invitee is not None
+    assert store.record_referral(invitee.id, inviter.id, device_sha256="", at=now)
+
+    def settle(_: int) -> str:
+        return store.reward_referral(
+            invitee.id, device_sha256="", client_ip="", at=now, credits=1, monthly_cap=5
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(settle, (1, 2)))
+    assert sorted(outcomes) == ["", "credited"]
+    assert store.account_credits(inviter.id, now) == 1
+    with store.engine.connect() as conn:
+        grants = conn.execute(store.credit_grants.select()).mappings().all()
+    assert len(grants) == 1 and grants[0]["origin"] == "referral"
+
+
+def test_reward_switch_hides_new_invites_but_keeps_earned_credits(tmp_path: Path) -> None:
+    client, store = _client(tmp_path)
+    _signup(client, "ana@example.com")
+    now = datetime.now(UTC)
+    inviter = store.find_account("ana@example.com")
+    invitee = store.create_account(
+        email="bea@example.com", password_hash="unused", locale="es", at=now
+    )
+    assert inviter is not None and invitee is not None
+    assert store.record_referral(invitee.id, inviter.id, device_sha256="", at=now)
+    assert (
+        store.reward_referral(
+            invitee.id, device_sha256="", client_ip="", at=now, credits=1, monthly_cap=5
+        )
+        == "credited"
+    )
+    disabled = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db",
+        bootstrap_samples=100,
+        free_mode=False,
+        access_codes=True,
+        referral_rewards=False,
+    )
+    after = TestClient(create_app(disabled, store), headers=BROWSER)
+    after.cookies.update(client.cookies)
+    page = after.get("/cuenta").text
+    assert "Invita a un colega" not in page
+    assert store.account_credits(inviter.id, now) == 1
 
 
 def test_the_panel_shows_the_funnel_behind_the_key(tmp_path: Path) -> None:

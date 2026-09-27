@@ -110,15 +110,34 @@ def since_day(now: datetime, days: int = FUNNEL_DAYS) -> str:
     return day_of(now - timedelta(days=days - 1))
 
 
-STAGES: tuple[str, ...] = ("visits", "signups", "welcome", "previews", "paid_code", "paid_card")
+STAGES: tuple[str, ...] = (
+    "visits",
+    "signups",
+    "welcome",
+    "previews",
+    "credit_used",
+    "gift_credits",
+    "purchases",
+    "buyers",
+    "repeat_purchases",
+    "rights_sold",
+    "gross_usd_cents",
+    "refund_usd_cents",
+)
 
 STAGE_LABELS: dict[str, str] = {
     "visits": "Visitas",
     "signups": "Cuentas",
     "welcome": "Informe gratis",
     "previews": "Vistas previas",
-    "paid_code": "Pagos con código",
-    "paid_card": "Pagos con tarjeta",
+    "credit_used": "Créditos canjeados",
+    "gift_credits": "Créditos regalados",
+    "purchases": "Compras confirmadas",
+    "buyers": "Compradores con cuenta",
+    "repeat_purchases": "Compras repetidas",
+    "rights_sold": "Derechos vendidos",
+    "gross_usd_cents": "Cobro bruto en centavos USD",
+    "refund_usd_cents": "Devoluciones confirmadas en centavos USD",
 }
 
 
@@ -133,7 +152,7 @@ class FunnelCounts:
 
     @property
     def paid(self) -> int:
-        return self.counts["paid_code"] + self.counts["paid_card"]
+        return self.counts["purchases"]
 
 
 @dataclass

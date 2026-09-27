@@ -150,7 +150,7 @@ def test_variants_matrix() -> None:
     parsed = parse_variants_csv(csv_bytes(frame))
     assert parsed.shape == (64, 4)
     with pytest.raises(ParseError, match="two numeric"):
-        parse_variants_csv(b"timestamp,a\n2020-01-01,1\n" * 20)
+        parse_variants_csv(csv_bytes(frame[["timestamp", "a"]]))
 
 
 def test_infer_frequency_labels() -> None:

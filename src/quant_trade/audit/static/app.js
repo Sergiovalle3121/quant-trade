@@ -14,6 +14,26 @@
   }
 
   ready(function () {
+    // Reports ship with their technical details open so a saved page, a PDF,
+    // and a no-JavaScript browser never lose evidence. Fold them only on screen.
+    var reportDetails = Array.prototype.slice.call(d.querySelectorAll("details.report-detail"));
+    if (reportDetails.length) {
+      var target = window.location.hash.slice(1);
+      reportDetails.forEach(function (item) { item.open = !!target && item.id === target; });
+      var openBeforePrint = null;
+      window.addEventListener("beforeprint", function () {
+        if (openBeforePrint === null) {
+          openBeforePrint = reportDetails.map(function (item) { return item.open; });
+        }
+        reportDetails.forEach(function (item) { item.open = true; });
+      });
+      window.addEventListener("afterprint", function () {
+        if (openBeforePrint === null) return;
+        reportDetails.forEach(function (item, i) { item.open = openBeforePrint[i]; });
+        openBeforePrint = null;
+      });
+    }
+
     // Reveal sections as they scroll into view.
     var items = d.querySelectorAll("[data-reveal]");
     if ("IntersectionObserver" in window) {
@@ -133,17 +153,32 @@
       });
     }
 
-    // Copy buttons (the badge code on the verification page).
+    // Copy buttons (the badge code and the invitation URL).
     d.querySelectorAll("[data-copy]").forEach(function (button) {
       var target = d.getElementById(button.getAttribute("data-copy"));
       if (!target || !navigator.clipboard) return;
       button.hidden = false;
       button.addEventListener("click", function () {
-        navigator.clipboard.writeText(target.textContent || "").then(function () {
+        navigator.clipboard.writeText(target.value || target.textContent || "").then(function () {
           var label = button.textContent;
           button.textContent = button.getAttribute("data-done") || label;
           setTimeout(function () { button.textContent = label; }, 1800);
         });
+      });
+    });
+
+    // Optional system share sheet; the visible URL and channel links work
+    // without JavaScript and also cover Discord by copying and pasting.
+    d.querySelectorAll("[data-native-share]").forEach(function (button) {
+      var target = d.getElementById(button.getAttribute("data-native-share"));
+      if (!target || !navigator.share) return;
+      button.hidden = false;
+      button.addEventListener("click", function () {
+        navigator.share({
+          title: button.getAttribute("data-share-title") || "Rigor",
+          text: button.getAttribute("data-share-text") || "",
+          url: target.value || target.textContent || ""
+        }).catch(function () { /* The user may cancel the share sheet. */ });
       });
     });
   });

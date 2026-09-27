@@ -115,6 +115,62 @@ class RefusedPayment:
 
 
 @dataclass(frozen=True)
+class CheckoutOrder:
+    """One frozen card order. A session can be paid without delivering twice."""
+
+    id: str
+    audit_id: str
+    account_id: str
+    plan: str
+    amount_cents: int
+    currency: str
+    status: str
+    session_id: str
+    checkout_url: str
+    expires_at: str
+    paid_amount_cents: int
+    confirmed_at: str
+    resolution: str
+    livemode: bool | None = None
+
+
+@dataclass(frozen=True)
+class EmailDeliveryIssue:
+    """Operator-safe purchase notice state, without recipient or message body."""
+
+    id: str
+    kind: str
+    status: str
+    attempts: int
+    created_at: str
+    next_attempt_at: str
+
+
+@dataclass(frozen=True)
+class StripeRefundRecord:
+    """A signed Stripe refund snapshot, including partial and failed attempts."""
+
+    refund_id: str
+    payment_intent_id: str
+    charge_id: str
+    order_id: str
+    amount_minor: int
+    currency: str
+    status: str
+    livemode: bool
+    first_seen_at: str
+    last_seen_at: str
+
+
+@dataclass(frozen=True)
+class PaymentOutcome:
+    """Result of recording a paid session and its delivery in one transaction."""
+
+    status: str
+    order_id: str
+
+
+@dataclass(frozen=True)
 class AccessCodeRecord:
     """An access code as the owner may see it: never the code itself."""
 
@@ -377,6 +433,17 @@ class Store:
             sa.Column("expires_at", sa.String(40)),
             sa.Column("disabled", sa.Boolean, nullable=False, default=False),
         )
+        # Additive table for existing databases: the old access_codes table
+        # has no source column, and its notes are not financial evidence.
+        self.credit_grants = sa.Table(
+            "credit_grants",
+            self.metadata,
+            sa.Column("code_id", sa.String(32), primary_key=True),
+            sa.Column("origin", sa.String(16), nullable=False),
+            sa.Column("order_id", sa.String(64), nullable=False, default=""),
+            sa.Column("credits", sa.Integer, nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
         # One row per published audit; the public id is unrelated to the
         # audit id so a verification link never opens the private report.
         self.publications = sa.Table(
@@ -421,6 +488,65 @@ class Store:
             sa.Column("reason", sa.String(80), nullable=False),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
+        # Every paid session has its own row. The audit's `paid` flag is the
+        # entitlement; a second charge stays visible here for resolution.
+        self.checkout_orders = sa.Table(
+            "checkout_orders",
+            self.metadata,
+            sa.Column("id", sa.String(64), primary_key=True),
+            sa.Column("audit_id", sa.String(64), nullable=False, index=True),
+            sa.Column("account_id", sa.String(32), nullable=False, default=""),
+            sa.Column("plan", sa.String(16), nullable=False),
+            sa.Column("amount_cents", sa.Integer, nullable=False),
+            sa.Column("currency", sa.String(3), nullable=False),
+            sa.Column("status", sa.String(16), nullable=False),
+            sa.Column("session_id", sa.String(255), unique=True),
+            sa.Column("checkout_url", sa.Text, nullable=False, default=""),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("expires_at", sa.String(40), nullable=False),
+            sa.Column("paid_amount_cents", sa.Integer, nullable=False, default=0),
+            sa.Column("confirmed_at", sa.String(40), nullable=False, default=""),
+            sa.Column("resolution", sa.String(80), nullable=False, default=""),
+            sa.Column("livemode", sa.Boolean),
+        )
+        # Additive mapping: older databases need no ALTER TABLE. A refund can
+        # arrive before the Checkout webhook and remain unlinked until it does.
+        self.stripe_payment_intents = sa.Table(
+            "stripe_payment_intents",
+            self.metadata,
+            sa.Column("payment_intent_id", sa.String(255), primary_key=True),
+            sa.Column("order_id", sa.String(64), nullable=False, unique=True),
+            sa.Column("session_id", sa.String(255), nullable=False),
+            sa.Column("livemode", sa.Boolean),
+            sa.Column("recorded_at", sa.String(40), nullable=False),
+        )
+        # One row per refund, rather than summing cumulative Charge snapshots.
+        # Its final status can change from succeeded to failed days later.
+        self.stripe_refunds = sa.Table(
+            "stripe_refunds",
+            self.metadata,
+            sa.Column("refund_id", sa.String(255), primary_key=True),
+            sa.Column("payment_intent_id", sa.String(255), nullable=False, default="", index=True),
+            sa.Column("charge_id", sa.String(255), nullable=False, default=""),
+            sa.Column("order_id", sa.String(64), nullable=False, default="", index=True),
+            sa.Column("amount_minor", sa.Integer, nullable=False),
+            sa.Column("currency", sa.String(3), nullable=False),
+            sa.Column("status", sa.String(20), nullable=False),
+            sa.Column("livemode", sa.Boolean, nullable=False),
+            sa.Column("first_seen_at", sa.String(40), nullable=False),
+            sa.Column("last_seen_at", sa.String(40), nullable=False),
+            sa.Column("succeeded_at", sa.String(40), nullable=False, default=""),
+            sa.Column("event_id", sa.String(255), nullable=False, default=""),
+        )
+        # One reusable in-flight order per report and plan. The Stripe
+        # idempotency key is the order id, including after a process restart.
+        self.checkout_slots = sa.Table(
+            "checkout_slots",
+            self.metadata,
+            sa.Column("audit_id", sa.String(64), primary_key=True),
+            sa.Column("plan", sa.String(16), primary_key=True),
+            sa.Column("order_id", sa.String(64), nullable=False),
+        )
         # Customer accounts (``audit/accounts.py``). New tables only, so an
         # existing database gains them on start with no column migration.
         self.accounts = sa.Table(
@@ -431,6 +557,49 @@ class Store:
             sa.Column("password_hash", sa.String(255), nullable=False),
             sa.Column("locale", sa.String(8), nullable=False, default="es"),
             sa.Column("created_at", sa.String(40), nullable=False),
+        )
+        # A separate table makes verification an additive migration: legacy
+        # accounts have no row and must confirm before gated actions.
+        self.verified_emails = sa.Table(
+            "verified_emails",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("email", sa.String(254), nullable=False),
+            sa.Column("verified_at", sa.String(40), nullable=False),
+        )
+        # Durable delivery and one-use challenges share an id. The database
+        # stores no usable link/token: its HMAC is derived when sending.
+        self.email_outbox = sa.Table(
+            "email_outbox",
+            self.metadata,
+            sa.Column("id", sa.String(32), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, index=True),
+            sa.Column("kind", sa.String(16), nullable=False),
+            sa.Column("email", sa.String(254), nullable=False),
+            sa.Column("original_email", sa.String(254), nullable=False),
+            sa.Column("locale", sa.String(8), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
+            sa.Column("expires_at", sa.String(40), nullable=False),
+            sa.Column("used_at", sa.String(40)),
+            sa.Column("status", sa.String(12), nullable=False),
+            sa.Column("attempts", sa.Integer, nullable=False, default=0),
+            sa.Column("next_attempt_at", sa.String(40), nullable=False),
+            sa.Column("lease_until", sa.String(40), nullable=False, default=""),
+            sa.Column("sent_at", sa.String(40), nullable=False, default=""),
+        )
+        # The readiness warning query runs often, including on old databases.
+        # Create these explicitly after create_all so existing outboxes get them.
+        self.email_outbox_due_index = sa.Index(
+            "ix_email_outbox_kind_status_due",
+            self.email_outbox.c.kind,
+            self.email_outbox.c.status,
+            self.email_outbox.c.next_attempt_at,
+        )
+        self.email_outbox_lease_index = sa.Index(
+            "ix_email_outbox_kind_status_lease",
+            self.email_outbox.c.kind,
+            self.email_outbox.c.status,
+            self.email_outbox.c.lease_until,
         )
         #: Only the SHA-256 of a session cookie is kept.
         self.account_sessions = sa.Table(
@@ -541,10 +710,10 @@ class Store:
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
-        #: The one free full report each new account gets. The device (a hash
-        #: of a random browser cookie) and the file's SHA-256 stay so that the
-        #: same browser or file never gets a second one on another account;
-        #: the address is cleared by the retention purge.
+        #: The one free full report each new account gets. The browser mark
+        #: prevents repeat claims from that browser; the file SHA-256 records
+        #: the prior use but does not alone bar another eligible account.
+        #: The address is cleared by the retention purge.
         self.welcome_reports = sa.Table(
             "welcome_reports",
             self.metadata,
@@ -687,6 +856,15 @@ class Store:
             sa.Column("reward_slot", sa.String(80), unique=True),
             sa.Column("code_id", sa.String(32)),
         )
+        # A fixed monthly launch budget shared by all inviters. Slots remain
+        # allocated even when an invitee later deletes their account.
+        self.referral_global_slots = sa.Table(
+            "referral_global_slots",
+            self.metadata,
+            sa.Column("month", sa.String(7), primary_key=True),
+            sa.Column("slot", sa.Integer, primary_key=True),
+            sa.Column("created_at", sa.String(40), nullable=False),
+        )
         #: Failed sign-ins, sign-ups and panel keys in the last hour, so a
         #: deploy does not reset the limits. Keys are hashed (they hold an
         #: address or an e-mail) and rows older than the window are deleted.
@@ -719,6 +897,8 @@ class Store:
         )
         store_hooks.define_tables(self)  # the continuous track record's tables
         self.metadata.create_all(self.engine)
+        self.email_outbox_due_index.create(self.engine, checkfirst=True)
+        self.email_outbox_lease_index.create(self.engine, checkfirst=True)
 
     # -- column maps -------------------------------------------------------
     def save_column_map(
@@ -887,6 +1067,735 @@ class Store:
             )
             return bool(result.rowcount)
 
+    @staticmethod
+    def _checkout_order(row: Any) -> CheckoutOrder:
+        return CheckoutOrder(
+            id=str(row["id"]),
+            audit_id=str(row["audit_id"]),
+            account_id=str(row["account_id"] or ""),
+            plan=str(row["plan"]),
+            amount_cents=int(row["amount_cents"]),
+            currency=str(row["currency"]),
+            status=str(row["status"]),
+            session_id=str(row["session_id"] or ""),
+            checkout_url=str(row["checkout_url"] or ""),
+            expires_at=str(row["expires_at"]),
+            paid_amount_cents=int(row["paid_amount_cents"]),
+            confirmed_at=str(row["confirmed_at"] or ""),
+            resolution=str(row["resolution"] or ""),
+            livemode=row["livemode"],
+        )
+
+    def get_checkout_order(self, order_id: str) -> CheckoutOrder | None:
+        if not _usable_key(order_id):
+            return None
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    self._sa.select(self.checkout_orders).where(
+                        self.checkout_orders.c.id == order_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        return self._checkout_order(row) if row is not None else None
+
+    def get_checkout_session(self, session_id: str) -> CheckoutOrder | None:
+        if not _usable_key(session_id):
+            return None
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    self._sa.select(self.checkout_orders).where(
+                        self.checkout_orders.c.session_id == session_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        return self._checkout_order(row) if row is not None else None
+
+    def reserve_checkout(
+        self,
+        audit_id: str,
+        *,
+        account_id: str,
+        plan: str,
+        amount_cents: int,
+        currency: str,
+        at: datetime,
+    ) -> CheckoutOrder:
+        """Freeze a new order or reuse its valid in-flight Checkout session.
+
+        Both an HTTP retry and a concurrent second click get the same order id,
+        which is sent to Stripe as the idempotency key. The slot is rotated
+        only after it expires or settles.
+        """
+        if plan not in ("single", "pack") or amount_cents < 1 or currency != "usd":
+            raise ValueError("invalid checkout plan or amount")
+        sa = self._sa
+        orders, slots = self.checkout_orders, self.checkout_slots
+        stamp = _iso(at)
+        expires = _iso(at + timedelta(hours=23))
+        for _ in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    audit = conn.execute(
+                        sa.select(self.audits.c.paid).where(self.audits.c.id == audit_id)
+                    ).first()
+                    if audit is None or bool(audit[0]):
+                        raise ValueError("audit unavailable for checkout")
+                    slot = conn.execute(
+                        sa.select(slots.c.order_id)
+                        .where(slots.c.audit_id == audit_id)
+                        .where(slots.c.plan == plan)
+                        .with_for_update()
+                    ).first()
+                    if slot is not None:
+                        old = (
+                            conn.execute(
+                                sa.select(orders).where(orders.c.id == slot[0]).with_for_update()
+                            )
+                            .mappings()
+                            .first()
+                        )
+                        if (
+                            old is not None
+                            and old["status"] in ("creating", "open")
+                            and str(old["expires_at"]) > stamp
+                        ):
+                            return self._checkout_order(old)
+                    order_id = secrets.token_hex(16)
+                    conn.execute(
+                        orders.insert().values(
+                            id=order_id,
+                            audit_id=audit_id,
+                            account_id=account_id,
+                            plan=plan,
+                            amount_cents=amount_cents,
+                            currency=currency,
+                            status="creating",
+                            session_id=None,
+                            checkout_url="",
+                            created_at=stamp,
+                            expires_at=expires,
+                            paid_amount_cents=0,
+                            confirmed_at="",
+                            resolution="",
+                        )
+                    )
+                    if slot is None:
+                        conn.execute(
+                            slots.insert().values(audit_id=audit_id, plan=plan, order_id=order_id)
+                        )
+                    else:
+                        conn.execute(
+                            slots.update()
+                            .where(slots.c.audit_id == audit_id)
+                            .where(slots.c.plan == plan)
+                            .values(order_id=order_id)
+                        )
+                    row = (
+                        conn.execute(sa.select(orders).where(orders.c.id == order_id))
+                        .mappings()
+                        .one()
+                    )
+                    return self._checkout_order(row)
+            except sa.exc.IntegrityError:
+                # Another request inserted this report/plan slot. Read it on retry.
+                continue
+        raise RuntimeError("could not reserve checkout")
+
+    def attach_checkout_session(
+        self, order_id: str, *, session_id: str, checkout_url: str, expires_at: datetime | None
+    ) -> CheckoutOrder:
+        """Persist Stripe's session before redirecting to its payment page."""
+        if not checkout_url.startswith("https://") or len(checkout_url) > 2048:
+            raise ValueError("invalid checkout URL")
+        orders = self.checkout_orders
+        sa = self._sa
+        with self.engine.begin() as conn:
+            row = conn.execute(sa.select(orders).where(orders.c.id == order_id)).mappings().first()
+            if row is None or (row["session_id"] and row["session_id"] != session_id):
+                raise ValueError("checkout session does not match order")
+            values: dict[str, Any] = {"checkout_url": checkout_url}
+            if session_id:
+                values["session_id"] = session_id
+            if expires_at is not None:
+                values["expires_at"] = _iso(expires_at)
+            if row["status"] == "creating":
+                values["status"] = "open"
+            conn.execute(orders.update().where(orders.c.id == order_id).values(**values))
+            updated = (
+                conn.execute(sa.select(orders).where(orders.c.id == order_id)).mappings().one()
+            )
+        return self._checkout_order(updated)
+
+    def settle_card_payment(
+        self,
+        *,
+        order_id: str,
+        session_id: str,
+        audit_id: str,
+        plan: str,
+        expected_cents: int,
+        paid_cents: int,
+        currency: str,
+        pack_code: str,
+        at: datetime,
+        payment_intent_id: str = "",
+        payment_livemode: bool | None = None,
+        queue_receipt: bool = False,
+    ) -> PaymentOutcome:
+        """Record one charge and deliver at most once, in a single DB transaction.
+
+        A second paid session for an already unlocked audit is a separate
+        `duplicate` order with a manual refund review, never another pack.
+        Stripe retries are idempotent by its session id.
+        """
+        sa = self._sa
+        orders, audits = self.checkout_orders, self.audits
+        stamp = _iso(at)
+        if payment_livemode is not None and type(payment_livemode) is not bool:
+            raise ValueError("invalid paid session mode")
+
+        def queue_purchase_notice(conn: Any, resolved_order_id: str, kind: str) -> None:
+            """Commit a buyer notice with the charge, never a second notice on replay.
+
+            The transport is intentionally outside this transaction. Only a
+            previously verified address is eligible; legacy anonymous sales
+            remain in the owner's reconciliation queue.
+            """
+            if not queue_receipt:
+                return
+            account_id = conn.execute(
+                sa.select(orders.c.account_id).where(orders.c.id == resolved_order_id)
+            ).scalar()
+            if not account_id:
+                return
+            address = (
+                conn.execute(
+                    sa.select(self.accounts.c.email, self.accounts.c.locale)
+                    .join(
+                        self.verified_emails,
+                        self.verified_emails.c.account_id == self.accounts.c.id,
+                    )
+                    .where(self.accounts.c.id == account_id)
+                    .where(self.verified_emails.c.email == self.accounts.c.email)
+                )
+                .mappings()
+                .first()
+            )
+            if address is None:
+                return
+            existing = conn.execute(
+                sa.select(self.email_outbox.c.id).where(self.email_outbox.c.id == resolved_order_id)
+            ).first()
+            if existing is not None:
+                return
+            conn.execute(
+                self.email_outbox.insert().values(
+                    id=resolved_order_id,
+                    account_id=str(account_id),
+                    kind=kind,
+                    email=str(address["email"]),
+                    original_email="",
+                    locale=str(address["locale"]),
+                    created_at=stamp,
+                    expires_at=_iso(at + timedelta(days=7)),
+                    used_at=None,
+                    status="queued",
+                    attempts=0,
+                    next_attempt_at=stamp,
+                    lease_until="",
+                    sent_at="",
+                )
+            )
+
+        def link_payment_intent(conn: Any, resolved_order_id: str) -> None:
+            recorded_mode = conn.execute(
+                sa.select(orders.c.livemode).where(orders.c.id == resolved_order_id)
+            ).scalar()
+            if (
+                recorded_mode is not None
+                and payment_livemode is not None
+                and bool(recorded_mode) != payment_livemode
+            ):
+                raise ValueError("paid session mode disagrees with order")
+            if recorded_mode is None and payment_livemode is not None:
+                conn.execute(
+                    orders.update()
+                    .where(orders.c.id == resolved_order_id)
+                    .values(livemode=payment_livemode)
+                )
+            if payment_intent_id:
+                self.record_payment_intent_in_tx(
+                    conn,
+                    resolved_order_id,
+                    session_id,
+                    payment_intent_id,
+                    at,
+                    livemode=payment_livemode,
+                )
+
+        def ensure_pack(conn: Any, resolved_order_id: str) -> None:
+            """Repair a legacy crash or grant two rights to a new pack once."""
+            digest = hash_access_code(pack_code)
+            code_id = conn.execute(
+                sa.select(self.access_codes.c.id).where(self.access_codes.c.code_sha256 == digest)
+            ).scalar()
+            if code_id is None:
+                code_id = secrets.token_hex(6)
+                conn.execute(
+                    self.access_codes.insert().values(
+                        id=code_id,
+                        code_sha256=digest,
+                        credits_total=2,
+                        credits_used=0,
+                        note="Paquete pagado con tarjeta",
+                        created_at=stamp,
+                        expires_at=None,
+                        disabled=False,
+                    )
+                )
+            grant = conn.execute(
+                sa.select(self.credit_grants.c.code_id).where(
+                    self.credit_grants.c.code_id == code_id
+                )
+            ).first()
+            if grant is None:
+                conn.execute(
+                    self.credit_grants.insert().values(
+                        code_id=code_id,
+                        origin="purchase",
+                        order_id=resolved_order_id,
+                        credits=2,
+                        created_at=stamp,
+                    )
+                )
+            else:
+                conn.execute(
+                    self.credit_grants.update()
+                    .where(self.credit_grants.c.code_id == code_id)
+                    .values(origin="purchase", order_id=resolved_order_id)
+                )
+            owner = conn.execute(
+                sa.select(self.account_audits.c.account_id).where(
+                    self.account_audits.c.audit_id == audit_id
+                )
+            ).scalar()
+            linked = conn.execute(
+                sa.select(self.account_codes.c.account_id).where(
+                    self.account_codes.c.code_id == code_id
+                )
+            ).scalar()
+            if owner and linked is None:
+                conn.execute(
+                    self.account_codes.insert().values(
+                        code_id=code_id, account_id=str(owner), linked_at=stamp
+                    )
+                )
+
+        for _ in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    by_session = (
+                        conn.execute(
+                            sa.select(orders)
+                            .where(orders.c.session_id == session_id)
+                            .with_for_update()
+                        )
+                        .mappings()
+                        .first()
+                    )
+                    row = by_session
+                    if row is None and order_id:
+                        row = (
+                            conn.execute(
+                                sa.select(orders).where(orders.c.id == order_id).with_for_update()
+                            )
+                            .mappings()
+                            .first()
+                        )
+                        if row is None:
+                            raise ValueError("unknown checkout order")
+                        if row["session_id"] and row["session_id"] != session_id:
+                            # Stripe's idempotency window is finite. If it
+                            # returns a different *paid* session for the
+                            # same order metadata, preserve the first charge
+                            # and record this session as a separate order.
+                            row = None
+                    if row is None:
+                        # Payment Links from older deployments have no order at
+                        # Checkout start. Record their paid session now.
+                        order_id = secrets.token_hex(16)
+                        owner = conn.execute(
+                            sa.select(self.account_audits.c.account_id).where(
+                                self.account_audits.c.audit_id == audit_id
+                            )
+                        ).scalar()
+                        conn.execute(
+                            orders.insert().values(
+                                id=order_id,
+                                audit_id=audit_id,
+                                account_id=str(owner or ""),
+                                plan=plan,
+                                amount_cents=expected_cents,
+                                currency=currency,
+                                status="creating",
+                                session_id=session_id,
+                                checkout_url="",
+                                created_at=stamp,
+                                expires_at=stamp,
+                                paid_amount_cents=0,
+                                confirmed_at="",
+                                resolution="",
+                                livemode=payment_livemode,
+                            )
+                        )
+                        row = (
+                            conn.execute(sa.select(orders).where(orders.c.id == order_id))
+                            .mappings()
+                            .one()
+                        )
+                    if (
+                        row["audit_id"] != audit_id
+                        or row["plan"] != plan
+                        or int(row["amount_cents"]) != expected_cents
+                        or row["currency"] != currency
+                        or (row["session_id"] and row["session_id"] != session_id)
+                    ):
+                        raise ValueError("paid session disagrees with frozen order")
+                    if (
+                        row["livemode"] is not None
+                        and payment_livemode is not None
+                        and bool(row["livemode"]) != payment_livemode
+                    ):
+                        raise ValueError("paid session mode disagrees with frozen order")
+                    order_id = str(row["id"])
+                    if row["status"] == "duplicate":
+                        original_session = conn.execute(
+                            sa.select(audits.c.stripe_session_id).where(audits.c.id == audit_id)
+                        ).scalar()
+                        if original_session == session_id:
+                            # An older deployment could have recorded a
+                            # false duplicate while migrating to this ledger.
+                            if plan == "pack":
+                                ensure_pack(conn, order_id)
+                            conn.execute(
+                                orders.update()
+                                .where(orders.c.id == order_id)
+                                .values(status="delivered", resolution="legacy_reconciled")
+                            )
+                            link_payment_intent(conn, order_id)
+                            queue_purchase_notice(conn, order_id, "purchase")
+                            return PaymentOutcome("delivered", order_id)
+                    if row["status"] in ("delivered", "duplicate"):
+                        link_payment_intent(conn, order_id)
+                        queue_purchase_notice(
+                            conn,
+                            order_id,
+                            "charge_review" if row["status"] == "duplicate" else "purchase",
+                        )
+                        return PaymentOutcome(str(row["status"]), order_id)
+                    conn.execute(
+                        orders.update()
+                        .where(orders.c.id == order_id)
+                        .values(
+                            session_id=session_id,
+                            paid_amount_cents=paid_cents,
+                            confirmed_at=stamp,
+                            livemode=payment_livemode,
+                        )
+                    )
+                    delivered = conn.execute(
+                        audits.update()
+                        .where(audits.c.id == audit_id)
+                        .where(audits.c.paid.is_(False))
+                        .values(paid=True, paid_at=stamp, stripe_session_id=session_id)
+                    ).rowcount
+                    if not delivered:
+                        original_session = conn.execute(
+                            sa.select(audits.c.stripe_session_id).where(audits.c.id == audit_id)
+                        ).scalar()
+                        if original_session == session_id:
+                            # A pre-ledger report was already delivered by
+                            # this exact charge. Backfill its purchase row
+                            # and repair a pack code missing after a crash.
+                            if plan == "pack":
+                                ensure_pack(conn, order_id)
+                            conn.execute(
+                                orders.update()
+                                .where(orders.c.id == order_id)
+                                .values(status="delivered", resolution="legacy_reconciled")
+                            )
+                            link_payment_intent(conn, order_id)
+                            queue_purchase_notice(conn, order_id, "purchase")
+                            return PaymentOutcome("delivered", order_id)
+                        conn.execute(
+                            orders.update()
+                            .where(orders.c.id == order_id)
+                            .values(status="duplicate", resolution="manual_refund_review")
+                        )
+                        link_payment_intent(conn, order_id)
+                        queue_purchase_notice(conn, order_id, "charge_review")
+                        return PaymentOutcome("duplicate", order_id)
+                    if plan == "pack":
+                        ensure_pack(conn, order_id)
+                    conn.execute(
+                        orders.update()
+                        .where(orders.c.id == order_id)
+                        .values(status="delivered", resolution="")
+                    )
+                    link_payment_intent(conn, order_id)
+                    queue_purchase_notice(conn, order_id, "purchase")
+                    return PaymentOutcome("delivered", order_id)
+            except sa.exc.IntegrityError:
+                # Competing webhook inserted this session. It has either
+                # committed a result or will roll back; a fresh read decides.
+                continue
+        raise RuntimeError("could not settle card payment")
+
+    def list_checkout_orders(self, limit: int = 50) -> list[CheckoutOrder]:
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    self._sa.select(self.checkout_orders)
+                    .order_by(self.checkout_orders.c.created_at.desc())
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+        return [self._checkout_order(row) for row in rows]
+
+    def record_payment_intent_in_tx(
+        self,
+        conn: Any,
+        order_id: str,
+        session_id: str,
+        pi_id: str,
+        at: datetime,
+        *,
+        livemode: bool | None = None,
+    ) -> None:
+        """Bind a paid Checkout session to its PaymentIntent in the settlement transaction."""
+        if not pi_id:
+            return  # older Checkout payloads may not carry this field
+        if not _stripe_object_id(pi_id, "pi_"):
+            raise ValueError("invalid payment intent id")
+        sa, links = self._sa, self.stripe_payment_intents
+        prior = conn.execute(
+            sa.select(links.c.order_id, links.c.session_id, links.c.livemode).where(
+                links.c.payment_intent_id == pi_id
+            )
+        ).first()
+        if prior is None:
+            conn.execute(
+                links.insert().values(
+                    payment_intent_id=pi_id,
+                    order_id=order_id,
+                    session_id=session_id,
+                    livemode=livemode,
+                    recorded_at=_iso(at),
+                )
+            )
+        elif str(prior[0]) != order_id or str(prior[1]) != session_id:
+            raise ValueError("payment intent belongs to another order")
+        elif prior[2] is not None and livemode is not None and bool(prior[2]) != livemode:
+            raise ValueError("payment intent mode disagrees with order")
+        elif prior[2] is None and livemode is not None:
+            conn.execute(
+                links.update().where(links.c.payment_intent_id == pi_id).values(livemode=livemode)
+            )
+        refunds = self.stripe_refunds
+        if livemode is not None:
+            conn.execute(
+                refunds.update()
+                .where(refunds.c.payment_intent_id == pi_id)
+                .where(refunds.c.livemode == livemode)
+                .where(refunds.c.order_id == "")
+                .values(order_id=order_id)
+            )
+
+    @staticmethod
+    def _stripe_refund(row: Any) -> StripeRefundRecord:
+        return StripeRefundRecord(
+            refund_id=str(row["refund_id"]),
+            payment_intent_id=str(row["payment_intent_id"]),
+            charge_id=str(row["charge_id"]),
+            order_id=str(row["order_id"]),
+            amount_minor=int(row["amount_minor"]),
+            currency=str(row["currency"]),
+            status=str(row["status"]),
+            livemode=bool(row["livemode"]),
+            first_seen_at=str(row["first_seen_at"]),
+            last_seen_at=str(row["last_seen_at"]),
+        )
+
+    def record_stripe_refund(
+        self,
+        *,
+        refund_id: str,
+        payment_intent_id: str,
+        charge_id: str,
+        amount_minor: int,
+        currency: str,
+        status: str,
+        livemode: bool,
+        event_id: str,
+        at: datetime,
+    ) -> StripeRefundRecord:
+        """Keep one signed snapshot per refund, robust to retries and stale events.
+
+        A card refund can go from succeeded to failed. Failed and canceled
+        therefore supersede earlier succeeded snapshots, while a late pending
+        or succeeded snapshot can never undo a known failure. Conflicting
+        immutable fields or terminal states need manual review and count zero.
+        """
+        if not _stripe_object_id(refund_id, "re_") or not _stripe_object_id(event_id, "evt_"):
+            raise ValueError("invalid Stripe refund or event id")
+        if not (
+            (_stripe_object_id(payment_intent_id, "pi_") if payment_intent_id else True)
+            and (_stripe_object_id(charge_id, "ch_") if charge_id else True)
+            and (payment_intent_id or charge_id)
+        ):
+            raise ValueError("invalid Stripe payment reference")
+        if (
+            isinstance(amount_minor, bool)
+            or not isinstance(amount_minor, int)
+            or amount_minor < 1
+            or len(currency) != 3
+            or not currency.isascii()
+            or not currency.isalpha()
+            or currency.lower() != currency
+            or type(livemode) is not bool
+            or status not in ("pending", "requires_action", "succeeded", "failed", "canceled")
+        ):
+            raise ValueError("invalid Stripe refund data")
+        table, links, sa = self.stripe_refunds, self.stripe_payment_intents, self._sa
+        stamp = _iso(at)
+        rank = {
+            "pending": 0,
+            "requires_action": 0,
+            "succeeded": 1,
+            "failed": 2,
+            "canceled": 2,
+            "review": 3,
+        }
+        for _ in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    order_id = ""
+                    if payment_intent_id:
+                        mapped = conn.execute(
+                            sa.select(links.c.order_id, links.c.livemode).where(
+                                links.c.payment_intent_id == payment_intent_id
+                            )
+                        ).first()
+                        if (
+                            mapped is not None
+                            and mapped[1] is not None
+                            and bool(mapped[1]) == livemode
+                        ):
+                            order_id = str(mapped[0])
+                    prior = (
+                        conn.execute(
+                            sa.select(table).where(table.c.refund_id == refund_id).with_for_update()
+                        )
+                        .mappings()
+                        .first()
+                    )
+                    if prior is None:
+                        conn.execute(
+                            table.insert().values(
+                                refund_id=refund_id,
+                                payment_intent_id=payment_intent_id,
+                                charge_id=charge_id,
+                                order_id=order_id,
+                                amount_minor=amount_minor,
+                                currency=currency,
+                                status=status,
+                                livemode=livemode,
+                                first_seen_at=stamp,
+                                last_seen_at=stamp,
+                                succeeded_at=stamp if status == "succeeded" else "",
+                                event_id=event_id,
+                            )
+                        )
+                    else:
+                        previous_status = str(prior["status"])
+                        pi = str(prior["payment_intent_id"] or payment_intent_id)
+                        charge = str(prior["charge_id"] or charge_id)
+                        linked_order = str(prior["order_id"] or order_id)
+                        conflict = (
+                            int(prior["amount_minor"]) != amount_minor
+                            or str(prior["currency"]) != currency
+                            or bool(prior["livemode"]) != livemode
+                            or bool(
+                                prior["payment_intent_id"]
+                                and payment_intent_id
+                                and prior["payment_intent_id"] != payment_intent_id
+                            )
+                            or bool(
+                                prior["charge_id"] and charge_id and prior["charge_id"] != charge_id
+                            )
+                            or bool(
+                                prior["order_id"] and order_id and prior["order_id"] != order_id
+                            )
+                            or (
+                                rank[previous_status] == rank[status] == 2
+                                and previous_status != status
+                            )
+                        )
+                        next_status = (
+                            "review"
+                            if conflict
+                            else status
+                            if rank[status] > rank[previous_status]
+                            else previous_status
+                        )
+                        conn.execute(
+                            table.update()
+                            .where(table.c.refund_id == refund_id)
+                            .values(
+                                payment_intent_id=pi,
+                                charge_id=charge,
+                                order_id=linked_order,
+                                status=next_status,
+                                last_seen_at=stamp,
+                                succeeded_at=(
+                                    str(prior["succeeded_at"] or stamp)
+                                    if next_status == "succeeded"
+                                    else str(prior["succeeded_at"] or "")
+                                ),
+                                event_id=event_id,
+                            )
+                        )
+                    saved = (
+                        conn.execute(sa.select(table).where(table.c.refund_id == refund_id))
+                        .mappings()
+                        .one()
+                    )
+                    return self._stripe_refund(saved)
+            except sa.exc.IntegrityError:
+                continue  # another worker inserted the refund first
+        raise RuntimeError("could not record Stripe refund")
+
+    def list_stripe_refunds(self, limit: int = 50) -> list[StripeRefundRecord]:
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    self._sa.select(self.stripe_refunds)
+                    .order_by(self.stripe_refunds.c.last_seen_at.desc())
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+        return [self._stripe_refund(row) for row in rows]
+
     def redeem_for_audit(self, audit_id: str, code: str, *, at: datetime) -> bool:
         """Unlock an existing unpaid audit with one credit of ``code``.
 
@@ -971,6 +1880,15 @@ class Store:
                     disabled=False,
                 )
             )
+            conn.execute(
+                self.credit_grants.insert().values(
+                    code_id=code_id,
+                    origin="unknown",
+                    order_id="",
+                    credits=credits,
+                    created_at=_iso(at),
+                )
+            )
         record = AccessCodeRecord(
             id=code_id,
             note=note,
@@ -1010,6 +1928,20 @@ class Store:
                         created_at=_iso(at),
                         expires_at=None,
                         disabled=False,
+                    )
+                )
+                code_id = conn.execute(
+                    sa.select(self.access_codes.c.id).where(
+                        self.access_codes.c.code_sha256 == digest
+                    )
+                ).scalar_one()
+                conn.execute(
+                    self.credit_grants.insert().values(
+                        code_id=str(code_id),
+                        origin="unknown",
+                        order_id="",
+                        credits=credits,
+                        created_at=_iso(at),
                     )
                 )
                 return True
@@ -1310,14 +2242,29 @@ class Store:
 
     # -- deletion on request ---------------------------------------------
     def delete_audit(self, audit_id: str) -> bool:
-        """Remove every trace of one audit: row, hashes, files and publication.
+        """Remove one audit, its files and private links.
 
         Unlike the retention purge nothing verifiable is kept: this answers a
-        client's deletion request. ``False`` when the id is unknown.
+        client's deletion request. Charged order ids and amounts stay for
+        accounting, but their report/account references are removed.
+        ``False`` when the id is unknown.
         """
         if not _usable_key(audit_id):
             return False
         with self.engine.begin() as conn:
+            conn.execute(
+                self.checkout_orders.update()
+                .where(self.checkout_orders.c.audit_id == audit_id)
+                .values(audit_id="", account_id="", checkout_url="")
+            )
+            conn.execute(
+                self.checkout_slots.delete().where(self.checkout_slots.c.audit_id == audit_id)
+            )
+            conn.execute(
+                self.refused_payments.update()
+                .where(self.refused_payments.c.audit_id == audit_id)
+                .values(audit_id="")
+            )
             conn.execute(self.publications.delete().where(self.publications.c.audit_id == audit_id))
             conn.execute(
                 self.publication_views.delete().where(self.publication_views.c.audit_id == audit_id)
@@ -1336,7 +2283,13 @@ class Store:
 
     # -- accounts ----------------------------------------------------------
     def create_account(
-        self, *, email: str, password_hash: str, locale: str, at: datetime
+        self,
+        *,
+        email: str,
+        password_hash: str,
+        locale: str,
+        at: datetime,
+        email_confirmation: bool = False,
     ) -> AccountRecord | None:
         """A new account, or ``None`` when that e-mail already has one."""
         sa = self._sa
@@ -1357,6 +2310,10 @@ class Store:
                         created_at=_iso(at),
                     )
                 )
+                if email_confirmation:
+                    self._enqueue_email(
+                        conn, account_id, "verify", email, email, locale, at, hours=24
+                    )
         except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same e-mail
             return None
         return AccountRecord(id=account_id, email=email, locale=locale, created_at=_iso(at))
@@ -1421,6 +2378,484 @@ class Store:
             return False
         return bool(result.rowcount)
 
+    # -- verified email and durable delivery ------------------------------
+    def _enqueue_email(
+        self,
+        conn: Any,
+        account_id: str,
+        kind: str,
+        email: str,
+        original_email: str,
+        locale: str,
+        at: datetime,
+        *,
+        hours: int,
+    ) -> str:
+        """Queue one challenge inside the caller's transaction.
+
+        Repeated requests reuse its id/token until expiry. A sent challenge
+        can be resent after ten minutes, without changing the token.
+        """
+        sa, table = self._sa, self.email_outbox
+        now = _iso(at)
+        existing = (
+            conn.execute(
+                sa.select(table)
+                .where(table.c.account_id == account_id)
+                .where(table.c.kind == kind)
+                .where(table.c.email == email)
+                .where(table.c.used_at.is_(None))
+                .where(table.c.expires_at > now)
+                .where(table.c.status != "dead")
+                .order_by(table.c.created_at.desc())
+            )
+            .mappings()
+            .first()
+        )
+        if existing is not None:
+            if existing["status"] == "sent" and str(existing["sent_at"]) < _iso(
+                at - timedelta(minutes=10)
+            ):
+                conn.execute(
+                    table.update()
+                    .where(table.c.id == existing["id"])
+                    .values(status="queued", next_attempt_at=now)
+                )
+            return str(existing["id"])
+        challenge_id = secrets.token_hex(16)
+        conn.execute(
+            table.insert().values(
+                id=challenge_id,
+                account_id=account_id,
+                kind=kind,
+                email=email,
+                original_email=original_email,
+                locale=locale,
+                created_at=now,
+                expires_at=_iso(at + timedelta(hours=hours)),
+                used_at=None,
+                status="queued",
+                attempts=0,
+                next_attempt_at=now,
+                lease_until="",
+                sent_at="",
+            )
+        )
+        return challenge_id
+
+    def email_verified(self, account_id: str) -> bool:
+        sa = self._sa
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.select(self.verified_emails.c.account_id)
+                .select_from(
+                    self.verified_emails.join(
+                        self.accounts,
+                        self.accounts.c.id == self.verified_emails.c.account_id,
+                    )
+                )
+                .where(self.verified_emails.c.account_id == account_id)
+                .where(self.verified_emails.c.email == self.accounts.c.email)
+            ).first()
+        return row is not None
+
+    def pending_email_change(self, account_id: str, now: datetime) -> str:
+        table = self.email_outbox
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.email)
+                .where(table.c.account_id == account_id)
+                .where(table.c.kind == "change")
+                .where(table.c.used_at.is_(None))
+                .where(table.c.expires_at > _iso(now))
+                .order_by(table.c.created_at.desc())
+            ).first()
+        return str(row[0]) if row else ""
+
+    def request_email_verification(self, account_id: str, *, at: datetime) -> str:
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                self._sa.select(self.accounts.c.email, self.accounts.c.locale).where(
+                    self.accounts.c.id == account_id
+                )
+            ).first()
+            if row is None:
+                return ""
+            verified = conn.execute(
+                self._sa.select(self.verified_emails.c.account_id)
+                .where(self.verified_emails.c.account_id == account_id)
+                .where(self.verified_emails.c.email == row[0])
+            ).first()
+            if verified is not None:
+                return ""
+            return self._enqueue_email(
+                conn, account_id, "verify", str(row[0]), str(row[0]), str(row[1]), at, hours=24
+            )
+
+    def request_email_change(
+        self, account_id: str, email: str, *, locale: str, at: datetime
+    ) -> str:
+        """Return ``pending``, ``same``, ``taken`` or ``missing``."""
+        sa = self._sa
+        with self.engine.begin() as conn:
+            current = conn.execute(
+                sa.select(self.accounts.c.email).where(self.accounts.c.id == account_id)
+            ).scalar()
+            if current is None:
+                return "missing"
+            if current == email:
+                return "same"
+            taken = conn.execute(
+                sa.select(self.accounts.c.id).where(self.accounts.c.email == email)
+            ).first()
+            if taken is not None:
+                return "taken"
+            table = self.email_outbox
+            conn.execute(
+                table.update()
+                .where(table.c.account_id == account_id)
+                .where(table.c.kind == "change")
+                .where(table.c.email != email)
+                .where(table.c.used_at.is_(None))
+                .values(used_at=_iso(at), status="dead")
+            )
+            self._enqueue_email(
+                conn, account_id, "change", email, str(current), locale, at, hours=24
+            )
+        return "pending"
+
+    def request_email_reset(self, email: str, *, locale: str, at: datetime) -> str:
+        """Queue a reset only for a verified address; return empty for all others."""
+        account = self.find_account(email)
+        if account is None or not self.email_verified(account.id):
+            return ""
+        with self.engine.begin() as conn:
+            return self._enqueue_email(conn, account.id, "reset", email, email, locale, at, hours=1)
+
+    def email_confirmation_available(self, challenge_id: str, at: datetime) -> bool:
+        """Read-only check for a preview-safe confirmation GET."""
+        table = self.email_outbox
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.id)
+                .where(table.c.id == challenge_id)
+                .where(table.c.kind.in_(("verify", "change")))
+                .where(table.c.used_at.is_(None))
+                .where(table.c.expires_at > _iso(at))
+                .where(table.c.status != "dead")
+            ).first()
+        return row is not None
+
+    def confirm_email_challenge(self, challenge_id: str, *, at: datetime) -> tuple[str, str] | None:
+        """Atomically confirm current/change email once after HMAC validation."""
+        sa, table = self._sa, self.email_outbox
+        now = _iso(at)
+        try:
+            with self.engine.begin() as conn:
+                row = (
+                    conn.execute(
+                        sa.select(table).where(table.c.id == challenge_id).with_for_update()
+                    )
+                    .mappings()
+                    .first()
+                )
+                if (
+                    row is None
+                    or row["kind"] not in ("verify", "change")
+                    or row["used_at"] is not None
+                    or row["expires_at"] <= now
+                    or row["status"] == "dead"
+                ):
+                    return None
+                account_id = str(row["account_id"])
+                if row["kind"] == "change":
+                    changed = conn.execute(
+                        self.accounts.update()
+                        .where(self.accounts.c.id == account_id)
+                        .where(self.accounts.c.email == row["original_email"])
+                        .values(email=row["email"])
+                    )
+                    if not changed.rowcount:
+                        return None
+                else:
+                    current = conn.execute(
+                        sa.select(self.accounts.c.email).where(self.accounts.c.id == account_id)
+                    ).scalar()
+                    if current != row["email"]:
+                        return None
+                conn.execute(
+                    self.verified_emails.delete().where(
+                        self.verified_emails.c.account_id == account_id
+                    )
+                )
+                conn.execute(
+                    self.verified_emails.insert().values(
+                        account_id=account_id, email=row["email"], verified_at=now
+                    )
+                )
+                conn.execute(
+                    table.update()
+                    .where(table.c.id == challenge_id)
+                    .where(table.c.used_at.is_(None))
+                    .values(used_at=now)
+                )
+                return str(row["kind"]), account_id
+        except sa.exc.IntegrityError:
+            return None
+
+    def consume_email_reset(
+        self, challenge_id: str, password_hash: str, *, at: datetime
+    ) -> str | None:
+        """Use a reset token and change password/revoke sessions in one commit."""
+        sa, table = self._sa, self.email_outbox
+        now = _iso(at)
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(sa.select(table).where(table.c.id == challenge_id).with_for_update())
+                .mappings()
+                .first()
+            )
+            if (
+                row is None
+                or row["kind"] != "reset"
+                or row["used_at"] is not None
+                or row["expires_at"] <= now
+                or row["status"] == "dead"
+            ):
+                return None
+            account_id = str(row["account_id"])
+            changed = conn.execute(
+                self.accounts.update()
+                .where(self.accounts.c.id == account_id)
+                .where(self.accounts.c.email == row["email"])
+                .values(password_hash=password_hash)
+            )
+            if not changed.rowcount:
+                return None
+            conn.execute(
+                self.account_sessions.delete().where(
+                    self.account_sessions.c.account_id == account_id
+                )
+            )
+            conn.execute(
+                self.session_info.delete().where(self.session_info.c.account_id == account_id)
+            )
+            conn.execute(
+                table.update()
+                .where(table.c.id == challenge_id)
+                .where(table.c.used_at.is_(None))
+                .values(used_at=now)
+            )
+            return account_id
+
+    def email_reset_account(self, challenge_id: str, now: datetime) -> str | None:
+        """Read an unused reset challenge without consuming it."""
+        table = self.email_outbox
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.account_id)
+                .where(table.c.id == challenge_id)
+                .where(table.c.kind == "reset")
+                .where(table.c.used_at.is_(None))
+                .where(table.c.expires_at > _iso(now))
+                .where(table.c.status != "dead")
+            ).first()
+        return str(row[0]) if row else None
+
+    def _purchase_email_issue_filter(self, at: datetime) -> Any:
+        table = self.email_outbox
+        overdue_at = _iso(at - timedelta(minutes=15))
+        overdue = ((table.c.status == "queued") & (table.c.next_attempt_at <= overdue_at)) | (
+            (table.c.status == "sending") & (table.c.lease_until <= overdue_at)
+        )
+        return (
+            table.c.kind.in_(("purchase", "charge_review"))
+            & table.c.used_at.is_(None)
+            & ((table.c.status == "dead") | overdue)
+        )
+
+    def purchase_email_warning_counts(self, *, at: datetime) -> dict[str, int]:
+        """Count dead or overdue purchase notices; never expose recipients."""
+        sa, table = self._sa, self.email_outbox
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(table.c.status, sa.func.count())
+                .where(self._purchase_email_issue_filter(at))
+                .group_by(table.c.status)
+            ).all()
+        counts = {"dead": 0, "overdue": 0}
+        for status, count in rows:
+            counts["dead" if status == "dead" else "overdue"] += int(count)
+        return counts
+
+    def list_purchase_email_issues(
+        self, *, at: datetime, limit: int = 50
+    ) -> list[EmailDeliveryIssue]:
+        """Return the oldest delivery problems with no address or token."""
+        sa, table = self._sa, self.email_outbox
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    sa.select(
+                        table.c.id,
+                        table.c.kind,
+                        table.c.status,
+                        table.c.attempts,
+                        table.c.created_at,
+                        table.c.next_attempt_at,
+                    )
+                    .where(self._purchase_email_issue_filter(at))
+                    .order_by(table.c.created_at, table.c.id)
+                    .limit(max(0, min(limit, 200)))
+                )
+                .mappings()
+                .all()
+            )
+        return [EmailDeliveryIssue(**dict(row)) for row in rows]
+
+    def requeue_purchase_email(self, challenge_id: str, *, at: datetime) -> bool:
+        """Retry one dead notice only while its live order and address still agree.
+
+        The order, account and verification rows are locked with the outbox row
+        on PostgreSQL. A conditional update prevents two operators from
+        requeueing the same dead notice. Expiry is renewed for seven days.
+        """
+        if not challenge_id or len(challenge_id) > 32 or not _usable_key(challenge_id):
+            return False
+        sa, table, orders = self._sa, self.email_outbox, self.checkout_orders
+        account, verified = self.accounts, self.verified_emails
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    sa.select(
+                        table.c.kind,
+                        table.c.expires_at,
+                        orders.c.status,
+                    )
+                    .select_from(
+                        table.join(orders, orders.c.id == table.c.id)
+                        .join(account, account.c.id == table.c.account_id)
+                        .join(verified, verified.c.account_id == account.c.id)
+                    )
+                    .where(table.c.id == challenge_id)
+                    .where(table.c.kind.in_(("purchase", "charge_review")))
+                    .where(table.c.status == "dead")
+                    .where(table.c.used_at.is_(None))
+                    .where(table.c.sent_at == "")
+                    .where(orders.c.account_id == table.c.account_id)
+                    .where(orders.c.livemode.is_(True))
+                    .where(account.c.email == table.c.email)
+                    .where(verified.c.email == account.c.email)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if row is None or row["status"] != (
+                "delivered" if row["kind"] == "purchase" else "duplicate"
+            ):
+                return False
+            expires_at = max(str(row["expires_at"]), _iso(at + timedelta(days=7)))
+            updated = conn.execute(
+                table.update()
+                .where(table.c.id == challenge_id)
+                .where(table.c.status == "dead")
+                .where(table.c.used_at.is_(None))
+                .where(table.c.sent_at == "")
+                .values(
+                    status="queued",
+                    attempts=0,
+                    next_attempt_at=_iso(at),
+                    lease_until="",
+                    expires_at=expires_at,
+                )
+            )
+            return bool(updated.rowcount)
+
+    def claim_email_delivery(self, now: datetime) -> dict[str, Any] | None:
+        """Lease one queued message. A crashed worker releases after 90 seconds."""
+        sa, table = self._sa, self.email_outbox
+        stamp = _iso(now)
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    sa.select(table)
+                    .where(table.c.used_at.is_(None))
+                    .where(table.c.expires_at > stamp)
+                    .where(table.c.attempts < 8)
+                    .where(
+                        (table.c.status == "queued")
+                        | ((table.c.status == "sending") & (table.c.lease_until < stamp))
+                    )
+                    .where(table.c.next_attempt_at <= stamp)
+                    .order_by(table.c.next_attempt_at, table.c.created_at)
+                    .limit(1)
+                    .with_for_update(skip_locked=True)
+                )
+                .mappings()
+                .first()
+            )
+            if row is None:
+                return None
+            result = conn.execute(
+                table.update()
+                .where(table.c.id == row["id"])
+                .where(table.c.status == row["status"])
+                .where(table.c.attempts == row["attempts"])
+                .values(
+                    status="sending",
+                    attempts=int(row["attempts"]) + 1,
+                    lease_until=_iso(now + timedelta(seconds=90)),
+                )
+            )
+            if not result.rowcount:
+                return None
+            return {**dict(row), "attempts": int(row["attempts"]) + 1}
+
+    def finish_email_delivery(self, challenge_id: str, *, at: datetime) -> None:
+        table = self.email_outbox
+        with self.engine.begin() as conn:
+            conn.execute(
+                table.update()
+                .where(table.c.id == challenge_id)
+                .where(table.c.status == "sending")
+                .values(status="sent", sent_at=_iso(at), lease_until="")
+            )
+
+    def retry_email_delivery(self, challenge_id: str, *, at: datetime) -> None:
+        table = self.email_outbox
+        with self.engine.begin() as conn:
+            attempts = conn.execute(
+                self._sa.select(table.c.attempts).where(table.c.id == challenge_id)
+            ).scalar()
+            if attempts is None:
+                return
+            terminal = int(attempts) >= 8
+            delay = min(3600, 30 * 2 ** min(int(attempts), 7))
+            conn.execute(
+                table.update()
+                .where(table.c.id == challenge_id)
+                .where(table.c.status == "sending")
+                .values(
+                    status="dead" if terminal else "queued",
+                    next_attempt_at=_iso(at + timedelta(seconds=delay)),
+                    lease_until="",
+                )
+            )
+
+    def email_referral_candidates(self, account_id: str) -> list[tuple[str, str, str]]:
+        """Invites awaiting a free report and both addresses' confirmation."""
+        sa, r, w = self._sa, self.referrals, self.welcome_reports
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(r.c.invitee_id, r.c.inviter_id, w.c.device_sha256)
+                .select_from(r.join(w, w.c.account_id == r.c.invitee_id))
+                .where(r.c.outcome == "")
+                .where(w.c.audit_id != "")
+                .where((r.c.invitee_id == account_id) | (r.c.inviter_id == account_id))
+            ).all()
+        return [(str(a), str(b), str(c or "")) for a, b, c in rows]
+
     def count_accounts(self) -> int:
         sa = self._sa
         with self.engine.connect() as conn:
@@ -1448,9 +2883,16 @@ class Store:
             ]
         deleted = [a for a in audit_ids if self.delete_audit(a)] if with_reports else []
         with self.engine.begin() as conn:
+            conn.execute(
+                self.checkout_orders.update()
+                .where(self.checkout_orders.c.account_id == account_id)
+                .values(account_id="")
+            )
             for table in (
                 self.account_sessions,
                 self.account_resets,
+                self.verified_emails,
+                self.email_outbox,
                 self.account_codes,
                 self.account_audits,
                 self.column_maps,
@@ -2312,8 +3754,6 @@ class Store:
                 return "account"
             if device_sha256 and used(table.c.device_sha256 == device_sha256):
                 return "device"
-            if file_sha256 and used(table.c.file_sha256 == file_sha256):
-                return "file"
             if client_ip and (
                 used((table.c.client_ip == client_ip) & (table.c.created_at >= _iso(since)))
                 >= per_ip
@@ -2497,35 +3937,42 @@ class Store:
         at: datetime,
         credits: int,
         monthly_cap: int,
+        global_monthly_cap: int = 100,
     ) -> str:
         """Credit the inviter once ``invitee_id`` got its free first report.
 
         Call it only after :meth:`grant_welcome` succeeded for the invitee.
-        Returns ``credited``, ``self`` (the invitee's browser or address is
-        one the inviter used), ``cap`` (the inviter's calendar month already
-        holds ``monthly_cap`` credited invites) or ``""`` (no pending invite).
+        Returns ``credited``, ``self`` (the invitee's browser is one the
+        inviter used), ``cap`` (the inviter's calendar month already
+        holds ``monthly_cap`` credited invites), ``budget`` (the shared
+        monthly reward budget is full) or ``""`` (no pending invite).
         """
         if credits < 1:
             raise ValueError("credits must be at least 1")
-        from quant_trade.audit.accounts import network_address
-
+        if global_monthly_cap < 0:
+            raise ValueError("global monthly cap cannot be negative")
         sa = self._sa
         r = self.referrals
         now = _iso(at)
         month = now[:7]
         with self.engine.begin() as conn:
-            row = conn.execute(
-                sa.select(r.c.inviter_id, r.c.device_sha256)
+            claimed = conn.execute(
+                r.update()
                 .where(r.c.invitee_id == invitee_id)
                 .where(r.c.outcome == "")
-            ).first()
-            if row is None:
+                .values(outcome="settling")
+            )
+            if not claimed.rowcount:
                 return ""
+            row = conn.execute(
+                sa.select(r.c.inviter_id, r.c.device_sha256).where(r.c.invitee_id == invitee_id)
+            ).one()
             inviter_id, signup_device = str(row[0]), str(row[1] or "")
-            devices, addresses = self._inviter_marks(conn, inviter_id)
+            devices, _ = self._inviter_marks(conn, inviter_id)
             marks = {device_sha256, signup_device} - {""}
             outcome = ""
-            if marks & devices or (client_ip and network_address(client_ip) in addresses):
+            # A shared household or office network is not proof of self-referral.
+            if marks & devices:
                 outcome = "self"
             slot = ""
             if not outcome:
@@ -2533,16 +3980,42 @@ class Store:
                     candidate = f"{inviter_id}:{month}:{n}"
                     try:
                         with conn.begin_nested():
-                            conn.execute(
+                            claimed = conn.execute(
                                 r.update()
                                 .where(r.c.invitee_id == invitee_id)
+                                .where(r.c.outcome == "settling")
+                                .where(r.c.reward_slot.is_(None))
                                 .values(reward_slot=candidate)
                             )
+                            if not claimed.rowcount:
+                                return ""
                     except sa.exc.IntegrityError:
                         continue
                     slot = candidate
                     break
                 outcome = "credited" if slot else "cap"
+            if outcome == "credited":
+                budget_slot = False
+                for n in range(global_monthly_cap):
+                    try:
+                        with conn.begin_nested():
+                            conn.execute(
+                                self.referral_global_slots.insert().values(
+                                    month=month, slot=n, created_at=now
+                                )
+                            )
+                    except sa.exc.IntegrityError:
+                        continue
+                    budget_slot = True
+                    break
+                if not budget_slot:
+                    outcome = "budget"
+                    conn.execute(
+                        r.update()
+                        .where(r.c.invitee_id == invitee_id)
+                        .where(r.c.outcome == "settling")
+                        .values(reward_slot=None)
+                    )
             code_id = None
             if outcome == "credited":
                 code_id = secrets.token_hex(6)
@@ -2561,6 +4034,15 @@ class Store:
                     )
                 )
                 conn.execute(
+                    self.credit_grants.insert().values(
+                        code_id=code_id,
+                        origin="referral",
+                        order_id="",
+                        credits=credits,
+                        created_at=now,
+                    )
+                )
+                conn.execute(
                     self.account_codes.insert().values(
                         code_id=code_id, account_id=inviter_id, linked_at=now
                     )
@@ -2568,7 +4050,7 @@ class Store:
             conn.execute(
                 r.update()
                 .where(r.c.invitee_id == invitee_id)
-                .where(r.c.outcome == "")
+                .where(r.c.outcome == "settling")
                 .values(outcome=outcome, decided_at=now, code_id=code_id)
             )
         return outcome
@@ -3280,8 +4762,8 @@ class Store:
             previews = self.free_previews
             by_account("previews", previews.c.created_at, previews.c.account_id, previews)
             audits = self.audits
-            paid = conn.execute(
-                sa.select(audits.c.paid_at, audits.c.stripe_session_id, acc.c.locale, refs.c.ref)
+            redeemed = conn.execute(
+                sa.select(audits.c.paid_at, acc.c.locale, refs.c.ref)
                 .select_from(
                     audits.outerjoin(links, links.c.audit_id == audits.c.id)
                     .outerjoin(acc, acc.c.id == links.c.account_id)
@@ -3289,14 +4771,94 @@ class Store:
                 )
                 .where(audits.c.paid.is_(True))
                 .where(audits.c.paid_at >= since_day)
+                .where(audits.c.stripe_session_id.like(CODE_REFERENCE_PREFIX + "%"))
             ).all()
-        out["paid_code"], out["paid_card"] = [], []
-        for when, reference, locale, ref in paid:
-            reference = str(reference or "")
-            if reference.startswith(WELCOME_REFERENCE_PREFIX):
+            out["credit_used"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), 1)
+                for when, locale, ref in redeemed
+            ]
+            grants = self.credit_grants
+            account_codes = self.account_codes
+            gifts = conn.execute(
+                sa.select(grants.c.created_at, acc.c.locale, refs.c.ref, grants.c.credits)
+                .select_from(
+                    grants.outerjoin(account_codes, account_codes.c.code_id == grants.c.code_id)
+                    .outerjoin(acc, acc.c.id == account_codes.c.account_id)
+                    .outerjoin(refs, refs.c.account_id == account_codes.c.account_id)
+                )
+                .where(grants.c.origin == "referral")
+                .where(grants.c.created_at >= since_day)
+            ).all()
+            out["gift_credits"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), int(credits))
+                for when, locale, ref, credits in gifts
+            ]
+            orders = self.checkout_orders
+            refunds = self.stripe_refunds
+            returned = conn.execute(
+                sa.select(
+                    refunds.c.succeeded_at,
+                    refunds.c.amount_minor,
+                    acc.c.locale,
+                    refs.c.ref,
+                )
+                .select_from(
+                    refunds.join(orders, orders.c.id == refunds.c.order_id)
+                    .outerjoin(acc, acc.c.id == orders.c.account_id)
+                    .outerjoin(refs, refs.c.account_id == orders.c.account_id)
+                )
+                .where(refunds.c.status == "succeeded")
+                .where(refunds.c.currency == "usd")
+                .where(refunds.c.livemode.is_(True))
+                .where(orders.c.livemode.is_(True))
+                .where(refunds.c.succeeded_at >= since_day)
+            ).all()
+            out["refund_usd_cents"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), int(amount))
+                for when, amount, locale, ref in returned
+            ]
+            purchases = conn.execute(
+                sa.select(
+                    orders.c.confirmed_at,
+                    orders.c.account_id,
+                    orders.c.plan,
+                    orders.c.status,
+                    orders.c.paid_amount_cents,
+                    acc.c.locale,
+                    refs.c.ref,
+                )
+                .select_from(
+                    orders.outerjoin(acc, acc.c.id == orders.c.account_id).outerjoin(
+                        refs, refs.c.account_id == orders.c.account_id
+                    )
+                )
+                .where(orders.c.status.in_(("delivered", "duplicate")))
+                .where(orders.c.livemode.is_(True))
+                .order_by(orders.c.confirmed_at, orders.c.id)
+            ).all()
+        for stage in (
+            "purchases",
+            "buyers",
+            "repeat_purchases",
+            "rights_sold",
+            "gross_usd_cents",
+        ):
+            out[stage] = []
+        seen_buyers: set[str] = set()
+        for when, account_id, plan, status, amount, locale, ref in purchases:
+            account_id = str(account_id or "")
+            repeat = bool(account_id and account_id in seen_buyers)
+            if account_id:
+                seen_buyers.add(account_id)
+            if str(when) < since_day:
                 continue
-            stage = "paid_code" if reference.startswith(CODE_REFERENCE_PREFIX) else "paid_card"
-            out[stage].append((str(when)[:10], str(locale or "-"), str(ref or ""), 1))
+            event = (str(when)[:10], str(locale or "-"), str(ref or ""))
+            out["purchases"].append((*event, 1))
+            out["gross_usd_cents"].append((*event, int(amount)))
+            if status == "delivered":
+                out["rights_sold"].append((*event, 3 if plan == "pack" else 1))
+            if account_id:
+                out["repeat_purchases" if repeat else "buyers"].append((*event, 1))
         return out
 
     # -- retention ---------------------------------------------------------
@@ -3324,6 +4886,11 @@ class Store:
             if dry_run:
                 return count
             store_hooks.on_purge(self, conn, cutoff=cutoff)
+            conn.execute(
+                self.email_outbox.delete().where(
+                    self.email_outbox.c.expires_at < _iso(now - timedelta(days=30))
+                )
+            )
             conn.execute(
                 self.refused_payments.delete().where(self.refused_payments.c.created_at < cutoff)
             )
@@ -3442,6 +5009,17 @@ def _usable_key(value: str) -> bool:
     PostgreSQL refuses text holding a NUL, so ``/v/%00`` was a server error;
     no id ever holds one, so the lookup simply finds nothing."""
     return "\x00" not in value
+
+
+def _stripe_object_id(value: str, prefix: str) -> bool:
+    """Accept opaque Stripe ids, never control characters or unlimited input."""
+    return (
+        value.startswith(prefix)
+        and len(prefix) < len(value) <= 255
+        and all(
+            ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-" for ch in value
+        )
+    )
 
 
 def make_store(url: str) -> Store:

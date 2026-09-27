@@ -50,6 +50,9 @@ from quant_trade.audit import (
 )
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
+from quant_trade.audit import (
+    mail as mail_lib,
+)
 from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
@@ -122,8 +125,8 @@ from quant_trade.audit.store import (
 from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
 
-#: ``(settings, audit_id, token, *, plan, locale) -> Stripe Checkout URL``.
-CheckoutFactory = Callable[..., str]
+#: ``(settings, audit_id, token, *, plan, locale, order_id, amount_cents)``.
+CheckoutFactory = Callable[..., str | dict[str, Any]]
 #: ``(settings, session_id) -> the Checkout session as Stripe returns it``.
 SessionLookup = Callable[[AuditSettings, str], dict[str, Any]]
 
@@ -133,6 +136,7 @@ STRIPE_TOLERANCE_SECONDS = 300
 #: Webhook events that can mean a Checkout session was paid; ``fulfil``
 #: still checks ``payment_status`` (a delayed method completes unpaid).
 PAID_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_succeeded")
+WEBHOOK_BODY_LIMIT = 256 * 1024
 #: The page languages; Spanish is the default everywhere.
 LOCALES = ("es", "en")
 #: The report's languages: its pages, its PDF and the sample. Screens with no
@@ -239,8 +243,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Payments are not enabled on this service.",
     },
     "card_paid": {
-        "es": "Pago recibido: este es el informe completo. Stripe te envía el recibo por correo.",
-        "en": "Payment received: this is the full report. Stripe emails you the receipt.",
+        "es": "Pago recibido: este es el informe completo. Si necesitas ayuda, contacta soporte.",
+        "en": "Payment received: this is the full report. Contact support if you need help.",
+    },
+    "card_duplicate": {
+        "es": (
+            "Se registró un segundo cobro de este informe. Tu acceso sigue activo y el cargo "
+            "adicional requiere revisión. Conserva la referencia de Stripe para soporte."
+        ),
+        "en": (
+            "A second charge for this report was recorded. Your access remains active and "
+            "the additional charge needs review. Keep your Stripe reference for support."
+        ),
+        "pt": (
+            "Foi registrada uma segunda cobrança deste relatório. Seu acesso continua ativo e "
+            "a cobrança adicional requer revisão. Guarde a referência da Stripe para o suporte."
+        ),
     },
     "card_pending": {
         "es": (
@@ -270,6 +288,21 @@ MESSAGES: dict[str, dict[str, str]] = {
             "vuelve a enviar el archivo en un minuto."
         ),
         "en": "The service is busy with other audits right now; submit the file again in a minute.",
+    },
+    "incident_paused": {
+        "es": "Las nuevas auditorías están pausadas temporalmente; vuelve a intentarlo más tarde.",
+        "en": "New audits are temporarily paused; try again later.",
+        "pt": "Novas auditorias estão temporariamente pausadas; tente novamente mais tarde.",
+    },
+    "email_link_invalid": {
+        "es": "Este enlace de correo ya no sirve o caducó. Solicita uno nuevo desde tu cuenta.",
+        "en": "Email link expired or used. Request another from your account.",
+        "pt": "Este link de e-mail expirou ou já foi usado. Peça um novo na sua conta.",
+    },
+    "email_delivery_unavailable": {
+        "es": "La confirmación por correo no está disponible ahora. Inténtalo más tarde.",
+        "en": "Email confirmation is unavailable right now. Try again later.",
+        "pt": "A confirmação por e-mail não está disponível agora. Tente mais tarde.",
     },
     "pdf_busy": {
         "es": "Estamos preparando otros PDF en este momento. Vuelve a intentarlo en unos segundos.",
@@ -693,6 +726,47 @@ class BodyLimitMiddleware:
             await self.reject(scope)(scope, receive, send)
 
 
+class AuditAdmissionMiddleware:
+    """Bound multipart parsing before Starlette reads or spools an audit upload.
+
+    This limit is per process, like ``audit_slots``. An emergency pause is
+    checked here so a stopped upload never consumes a free claim or credit.
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        *,
+        slots: threading.BoundedSemaphore,
+        paused: bool,
+        reject: Callable[[Any, str], Any],
+    ) -> None:
+        self.app = app
+        self.slots = slots
+        self.paused = paused
+        self.reject = reject
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if (
+            scope.get("type") != "http"
+            or scope.get("method") != "POST"
+            or scope.get("path") != "/audits"
+        ):
+            await self.app(scope, receive, send)
+            return
+        reason = "incident_paused" if self.paused else ""
+        acquired = False if reason else self.slots.acquire(blocking=False)
+        if not reason and not acquired:
+            reason = "busy"
+        if reason:
+            await self.reject(scope, reason)(scope, receive, send)
+            return
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            self.slots.release()
+
+
 class UploadTooLarge(Exception):
     def __init__(self, what: str) -> None:
         super().__init__(what)
@@ -858,6 +932,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         raise ImportError(REQUIRE_WEB) from exc
 
     cfg = settings or AuditSettings.from_env()
+    pause_new_audits = os.environ.get("AUDIT_PAUSE_NEW_AUDITS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    pause_new_checkout = os.environ.get("AUDIT_PAUSE_NEW_CHECKOUT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
     market_data = MarketData() if cfg.public_data else None
     if market_data is not None:
         market_data.warm()
@@ -866,17 +952,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     db = store or make_store(cfg.database_url)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
     visits = funnel.VisitCounter(db)
+    mail_worker = mail_lib.MailWorker(db, cfg)
 
     @contextlib.asynccontextmanager
     async def lifespan(_: Any) -> AsyncIterator[None]:
         if cfg.auto_purge:
             retention.start()
         visits.start()
+        mail_worker.start()
         try:
             yield
         finally:
             retention.stop()
             visits.stop()
+            mail_worker.stop()
 
     app = FastAPI(
         title=BRAND,
@@ -889,8 +978,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.store = db
     app.state.retention = retention
     app.state.visits = visits
+    app.state.mail_worker = mail_worker
     app.state.checkout_factory = payments.stripe_checkout
     app.state.session_lookup = payments.stripe_session
+    app.state.pause_new_audits = pause_new_audits
+    app.state.pause_new_checkout = pause_new_checkout
     upload_attempts = AttemptLog()
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
@@ -904,6 +996,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # thread pool.
     audit_slots = anyio.CapacityLimiter(cfg.max_concurrent_audits)
     app.state.audit_slots = audit_slots
+    max_inflight_uploads = cfg.max_concurrent_audits + 1
+    upload_admission_slots = threading.BoundedSemaphore(max_inflight_uploads)
+    app.state.upload_admission_slots = upload_admission_slots
     report_upload_bytes = cfg.max_upload_bytes * REPORT_SIZE_FACTOR
     body_limit = request_body_limit(cfg.max_upload_bytes)
 
@@ -926,6 +1021,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _too_large_response(scope: Any) -> Any:
         path = scope.get("path", "")
+        if path == "/webhooks/stripe":
+            webhook_response = PlainTextResponse("Payload too large", status_code=413)
+            webhook_response.headers["Connection"] = "close"
+            return _secure(webhook_response, path=path)
         if path in CHECK_PATHS:
             # The check page keeps its own form and message, in the page's language.
             check_locale = CHECK_PATHS[path]
@@ -951,9 +1050,26 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         BodyLimitMiddleware,
         limit=body_limit,
         reject=_too_large_response,
-        path_limits=dict.fromkeys(CHECK_PATHS, check_body_limit()),
+        path_limits={
+            **dict.fromkeys(CHECK_PATHS, check_body_limit()),
+            "/webhooks/stripe": WEBHOOK_BODY_LIMIT,
+        },
     )
     app.add_middleware(HeadAsGetMiddleware)
+
+    def _admission_response(scope: Any, reason: str) -> Any:
+        locale = _scope_locale(scope)
+        request = Request(scope)
+        response = _html_error(request, 503, message(reason, locale), locale)
+        response.headers["Connection"] = "close"
+        return _secure(response, path=scope.get("path", ""))
+
+    app.add_middleware(
+        AuditAdmissionMiddleware,
+        slots=upload_admission_slots,
+        paused=pause_new_audits,
+        reject=_admission_response,
+    )
 
     #: Where a visit counts for the owner's funnel, and in which language.
     visit_paths: dict[str, str] = {path: loc for loc, path in LANDING_PATHS.items()}
@@ -1108,6 +1224,53 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "version": deployed_version(),
         }
 
+    @app.get("/live")
+    def live() -> dict[str, str]:
+        """Process liveness only: no storage or PDF work on this path."""
+        return {"status": "alive"}
+
+    @app.get("/ready")
+    def ready() -> Response:
+        """Traffic readiness: the database and paid-report PDF must work."""
+        from sqlalchemy import text as sql_text
+
+        database_ok = False
+        try:
+            with db.engine.connect() as connection:
+                connection.execute(sql_text("SELECT 1 FROM audits LIMIT 1"))
+            database_ok = True
+        except Exception:  # noqa: BLE001 - never disclose connection details publicly
+            logger.warning("readiness database probe failed")
+        checks = {"database": database_ok, "pdf": pdf_ok}
+        if cfg.email_verification_required:
+            checks["email_delivery"] = cfg.email_delivery_ready
+        warnings = {
+            "purchase_mail_dead": 0,
+            "purchase_mail_overdue": 0,
+            "purchase_mail_probe_failed": 0,
+        }
+        if database_ok:
+            try:
+                mail_counts = db.purchase_email_warning_counts(at=datetime.now(UTC))
+                warnings["purchase_mail_dead"] = mail_counts["dead"]
+                warnings["purchase_mail_overdue"] = mail_counts["overdue"]
+            except Exception:  # noqa: BLE001 - outbox monitoring must not cause a restart
+                logger.warning("readiness email outbox probe failed")
+                warnings["purchase_mail_probe_failed"] = 1
+        else:
+            warnings["purchase_mail_probe_failed"] = 1
+        return JSONResponse(
+            {
+                "status": "ready" if all(checks.values()) else "unavailable",
+                "checks": checks,
+                "warnings": warnings,
+                "pause_new_audits": pause_new_audits,
+                "pause_new_checkout": pause_new_checkout,
+                "max_inflight_uploads_per_process": max_inflight_uploads,
+            },
+            status_code=200 if all(checks.values()) else 503,
+        )
+
     @app.get(PANEL_PATH, response_class=HTMLResponse)
     def panel_login() -> str:
         if not cfg.admin_enabled:
@@ -1124,6 +1287,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         expires_days: Annotated[str, Form()] = "",
         code_id: Annotated[str, Form()] = "",
         email: Annotated[str, Form(max_length=320)] = "",
+        mail_id: Annotated[str, Form(max_length=64)] = "",
     ) -> Response:
         """The owner panel. The key comes in the body on every request, is
         compared in constant time, and wrong keys are limited per address."""
@@ -1159,6 +1323,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         elif action == "disable":
             flash = "disabled" if db.disable_access_code(code_id.strip()[:64]) else ""
             error = "" if flash else "not_found"
+        elif action == "mail_requeue":
+            flash = "mail_requeued" if db.requeue_purchase_email(mail_id.strip(), at=now) else ""
+            error = "" if flash else "mail_not_requeued"
         reset_link = ""
         if action == "reset":
             account = db.find_account(acct.normalise_email(email))
@@ -1180,6 +1347,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 key=key,
                 codes=db.list_access_codes(),
                 refused=db.list_refused_payments(),
+                orders=db.list_checkout_orders(),
+                refunds=db.list_stripe_refunds(),
+                mail_issues=db.list_purchase_email_issues(at=now),
+                mail_warning_counts=db.purchase_email_warning_counts(at=now),
                 new_code=new_code,
                 flash=flash,
                 error=error,
@@ -1251,8 +1422,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def index_pt(
         request: Request, joined: int = 0, error: str | None = None, extras: int = 0
     ) -> str:
-        """The landing in Portuguese; the pages it links to that are not
-        translated yet (report, account, sample, terms) open in English."""
+        """The Portuguese landing and its own account, report, sample and legal paths."""
         return _landing(request, "pt", joined=joined, error=error, extras=extras)
 
     @app.post("/waitlist")
@@ -1406,6 +1576,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "passkey_added",
         "passkey_removed",
         "email_changed",
+        "email_pending",
+        "email_verified",
+        "email_verification_sent",
     )
     account_errors = (
         "email_bad",
@@ -1433,7 +1606,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _referrals_on() -> bool:
         # The reward is paid when the invitee's free first report exists.
-        return not cfg.free_mode and acct.WELCOME_FULL_REPORT
+        return not cfg.free_mode and acct.WELCOME_FULL_REPORT and cfg.referral_rewards
 
     def _note_invite(request: Request, account_id: str, token: str, now: datetime) -> None:
         """Note who invited a new account; a failure never breaks the sign-up."""
@@ -1459,7 +1632,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _reward_invite(account_id: str, device_sha256: str, ip: str, now: datetime) -> None:
         """Credit whoever invited this account, now that its free report exists."""
+        if not _referrals_on():
+            return
         try:
+            if cfg.email_verification_required:
+                ready = any(
+                    invitee_id == account_id
+                    and db.email_verified(invitee_id)
+                    and db.email_verified(inviter_id)
+                    for invitee_id, inviter_id, _ in db.email_referral_candidates(account_id)
+                )
+                if not ready:
+                    return
             db.reward_referral(
                 account_id,
                 device_sha256=device_sha256,
@@ -1467,9 +1651,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 at=now,
                 credits=acct.REFERRAL_CREDITS,
                 monthly_cap=acct.REFERRAL_MONTHLY_CAP,
+                global_monthly_cap=cfg.referral_global_monthly_cap,
             )
         except Exception:  # noqa: BLE001 - the customer's report comes first
             logger.warning("could not settle an invite")
+
+    def _settle_confirmed_invites(account_id: str, now: datetime) -> None:
+        if not _referrals_on() or not cfg.email_verification_required:
+            return
+        for invitee_id, inviter_id, device in db.email_referral_candidates(account_id):
+            if db.email_verified(invitee_id) and db.email_verified(inviter_id):
+                _reward_invite(invitee_id, device, "", now)
 
     def _signup_get(path_locale: str) -> Callable[..., Response]:
         def handler(
@@ -1531,7 +1723,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if problem:
                 return again(problem, 400)
             account = db.create_account(
-                email=clean, password_hash=acct.hash_password(password), locale=locale, at=now
+                email=clean,
+                password_hash=acct.hash_password(password),
+                locale=locale,
+                at=now,
+                email_confirmation=cfg.email_verification_required,
             )
             if account is None:
                 return again("taken", 409)
@@ -2151,6 +2347,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     access_codes=cfg.access_codes_enabled,
                     card_payments=cfg.stripe_enabled,
                     contact_url=cfg.contact_url,
+                    email_verified=db.email_verified(account.id),
+                    email_pending=db.pending_email_change(account.id, now),
+                    email_delivery_ready=cfg.email_delivery_ready,
+                    email_verification_required=cfg.email_verification_required,
                     free_mode=cfg.free_mode,
                     price_cents=cfg.price_usd_cents,
                     pack_price_cents=cfg.pack_price_usd_cents,
@@ -2530,12 +2730,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return handler
 
     def _email_post(path_locale: str) -> Callable[..., Response]:
-        """A new sign-in e-mail, typed twice, with the current password.
-
-        There is no e-mail service yet to confirm the address, so the second
-        copy is what catches a typo; the other sessions are signed out as on
-        a password change.
-        """
+        """Request a confirmed email change when delivery is configured."""
 
         def handler(
             request: Request,
@@ -2563,11 +2758,100 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return refused("email_mismatch")
             if clean == account.email:
                 return refused("email_same")
+            if cfg.email_verification_required:
+                if not cfg.email_delivery_ready:
+                    return _html_error(
+                        request, 503, message("email_delivery_unavailable", locale), locale
+                    )
+                outcome = db.request_email_change(
+                    account.id, clean, locale=locale, at=datetime.now(UTC)
+                )
+                if outcome != "pending":
+                    return refused("email_taken" if outcome == "taken" else "email_same")
+                return RedirectResponse(
+                    f"{base}?done=email_pending#verificar-correo", status_code=303
+                )
             if not db.set_email(account.id, clean):
                 return refused("email_taken")
             db.delete_sessions(account.id, keep=session_hash)
             _note_event(request, account.id, "email_changed")
             return RedirectResponse(f"{base}?done=email_changed", status_code=303)
+
+        return handler
+
+    def _email_verification_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            if not cfg.email_delivery_ready:
+                return _html_error(
+                    request, 503, message("email_delivery_unavailable", locale), locale
+                )
+            db.request_email_verification(account.id, at=datetime.now(UTC))
+            account_url = account_pages.path("account", locale)
+            return RedirectResponse(
+                f"{account_url}?done=email_verification_sent#verificar-correo",
+                status_code=303,
+            )
+
+        return handler
+
+    def _confirm_email_get(path_locale: str) -> Callable[..., Response]:
+        def handler(request: Request, token: str = "", lang: str | None = None) -> Response:
+            locale = _account_locale(path_locale, lang)
+            challenge_id = mail_lib.challenge_from_token(token, cfg.email_token_secret)
+            if challenge_id is None or not db.email_confirmation_available(
+                challenge_id, datetime.now(UTC)
+            ):
+                return _html_error(request, 410, message("email_link_invalid", locale), locale)
+            csrf = _anon_csrf(request)
+            page = account_pages.email_confirm_page(
+                locale=locale,
+                action_path=mail_lib.PATHS[locale]["verify"],
+                token=token,
+                csrf=csrf,
+            )
+            response = _anon_page(page, csrf)
+            response.headers["Cache-Control"] = "private, no-store"
+            response.headers["Referrer-Policy"] = "no-referrer"
+            return response
+
+        return handler
+
+    def _confirm_email_post(path_locale: str) -> Callable[..., Response]:
+        def handler(
+            request: Request,
+            token: Annotated[str, Form(max_length=200)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            if not _anon_ok(request, csrf) or _cross_site(request):
+                return _html_error(request, 400, message("invalid_form", locale), locale)
+            challenge_id = mail_lib.challenge_from_token(token, cfg.email_token_secret)
+            if challenge_id is None:
+                return _html_error(request, 410, message("email_link_invalid", locale), locale)
+            confirmed = db.confirm_email_challenge(challenge_id, at=datetime.now(UTC))
+            if confirmed is None:
+                return _html_error(request, 410, message("email_link_invalid", locale), locale)
+            kind, account_id = confirmed
+            if kind == "change":
+                session = _session(request)
+                keep = session[2] if session is not None and session[0].id == account_id else ""
+                db.delete_sessions(account_id, keep=keep)
+                _note_event(request, account_id, "email_changed")
+            _settle_confirmed_invites(account_id, datetime.now(UTC))
+            done = "email_changed" if kind == "change" else "email_verified"
+            return RedirectResponse(
+                f"{account_pages.path('account', locale)}?done={done}#verificar-correo",
+                status_code=303,
+            )
 
         return handler
 
@@ -2595,11 +2879,47 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return handler
 
     def _forgot_get(path_locale: str) -> Callable[..., Response]:
-        def handler(request: Request, lang: str | None = None) -> Response:
+        def handler(request: Request, lang: str | None = None, done: str = "") -> Response:
             locale = _account_locale(path_locale, lang)
             csrf = _anon_csrf(request)
-            page = account_pages.forgot_page(locale=locale, contact_url=cfg.contact_url, csrf=csrf)
+            page = account_pages.forgot_page(
+                locale=locale,
+                contact_url=cfg.contact_url,
+                csrf=csrf,
+                email_delivery_ready=cfg.email_delivery_ready,
+                flash=done if done == "email_reset_requested" else "",
+            )
             return _anon_page(page, csrf)
+
+        return handler
+
+    def _forgot_email_post(path_locale: str) -> Callable[..., Response]:
+        """Generic answer whether or not a verified account exists."""
+
+        def handler(
+            request: Request,
+            email: Annotated[str, Form(max_length=320)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            locale = _account_locale(path_locale, lang)
+            if not _anon_ok(request, csrf) or _cross_site(request):
+                return _html_error(request, 400, message("email_link_invalid", locale), locale)
+            if not cfg.email_delivery_ready:
+                return _html_error(
+                    request, 503, message("email_delivery_unavailable", locale), locale
+                )
+            now = datetime.now(UTC)
+            clean = acct.normalise_email(email)
+            net = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
+            by_net = recovery_attempts.hit("mail:" + net, now)
+            by_email = recovery_attempts.hit("mail-email:" + acct.hash_secret(clean), now)
+            if max(by_net, by_email) < acct.MAX_RECOVERY_TRIES_PER_HOUR and acct.valid_email(clean):
+                db.request_email_reset(clean, locale=locale, at=now)
+            return RedirectResponse(
+                account_pages.path("forgot", locale) + "?done=email_reset_requested",
+                status_code=303,
+            )
 
         return handler
 
@@ -2626,6 +2946,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     csrf=new_csrf,
                     error=error,
                     email=clean if acct.valid_email(clean) else "",
+                    email_delivery_ready=cfg.email_delivery_ready,
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -2829,13 +3150,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         def handler(request: Request, token: str = "", lang: str | None = None) -> Response:
             locale = _account_locale(path_locale, lang)
             csrf = _anon_csrf(request)
+            email_id = mail_lib.challenge_from_token(token, cfg.email_token_secret)
             valid = (
                 bool(token)
                 and len(token) <= 128
-                and (db.reset_account(acct.hash_secret(token), datetime.now(UTC)) is not None)
+                and (
+                    db.email_reset_account(email_id, datetime.now(UTC)) is not None
+                    if email_id
+                    else db.reset_account(acct.hash_secret(token), datetime.now(UTC)) is not None
+                )
             )
             page = account_pages.reset_page(
-                locale=locale, csrf=csrf, token=token if valid else "", valid=valid
+                locale=locale,
+                csrf=csrf,
+                token=token if valid else "",
+                valid=valid,
+                email_link=bool(email_id),
             )
             return _anon_page(page, csrf, 200 if valid else 410)
 
@@ -2852,8 +3182,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             new_csrf = _anon_csrf(request)
             now = datetime.now(UTC)
-            digest = acct.hash_secret(token) if token else ""
-            resetting = db.reset_account(digest, now) if token else None
+            email_id = mail_lib.challenge_from_token(token, cfg.email_token_secret)
+            digest = acct.hash_secret(token) if token and not email_id else ""
+            resetting = (
+                db.email_reset_account(email_id, now)
+                if email_id
+                else db.reset_account(digest, now)
+                if digest
+                else None
+            )
             if resetting is None:
                 page = account_pages.reset_page(locale=locale, csrf=new_csrf, token="", valid=False)
                 return _anon_page(page, new_csrf, 410)
@@ -2864,15 +3201,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
             if error:
                 page = account_pages.reset_page(
-                    locale=locale, csrf=new_csrf, token=token, error=error
+                    locale=locale,
+                    csrf=new_csrf,
+                    token=token,
+                    error=error,
+                    email_link=bool(email_id),
                 )
                 return _anon_page(page, new_csrf, 400)
-            account_id = db.use_reset(digest, now)
+            if email_id:
+                account_id = db.consume_email_reset(email_id, acct.hash_password(password), at=now)
+            else:
+                account_id = db.use_reset(digest, now)
             if account_id is None:  # pragma: no cover - spent between the two reads
                 page = account_pages.reset_page(locale=locale, csrf=new_csrf, token="", valid=False)
                 return _anon_page(page, new_csrf, 410)
-            db.set_password(account_id, acct.hash_password(password))
-            db.delete_sessions(account_id)
+            if not email_id:
+                db.set_password(account_id, acct.hash_password(password))
+                db.delete_sessions(account_id)
             _note_event(request, account_id, "password_reset")
             return _signin_redirect(locale, done="reset_done")
 
@@ -2893,6 +3238,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]
         )
         app.add_api_route(paths["account"] + "/correo", _email_post(path_locale), methods=["POST"])
+        app.add_api_route(
+            paths["account"] + "/verificar-correo",
+            _email_verification_post(path_locale),
+            methods=["POST"],
+        )
+        confirm_path = mail_lib.PATHS[path_locale]["verify"]
+        app.add_api_route(confirm_path, _confirm_email_get(path_locale), **html_get)
+        app.add_api_route(confirm_path, _confirm_email_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"] + "/borrar", _delete_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"] + "/datos", _account_data(path_locale), methods=["GET"])
         strategies_base = account_pages.strategies_path(path_locale)
@@ -2915,6 +3268,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         app.add_api_route(paths["forgot"], _forgot_get(path_locale), **html_get)
         app.add_api_route(paths["forgot"], _forgot_post(path_locale), methods=["POST"])
+        app.add_api_route(
+            paths["forgot"] + "/enlace", _forgot_email_post(path_locale), methods=["POST"]
+        )
         app.add_api_route(
             paths["account"] + "/recuperacion", _recovery_post(path_locale), methods=["POST"]
         )
@@ -2996,6 +3352,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             bootstrap_samples=cfg.bootstrap_samples,
             now=now,
             market=market_data.closes if market_data is not None else None,
+            source_commit_sha=os.environ.get("RAILWAY_GIT_COMMIT_SHA"),
         )
         extra_files: dict[str, bytes] = {}
         if uploads["report"] and report_name:
@@ -3223,7 +3580,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     keys = (
                         f"welcome:account:{account_id}",
                         f"welcome:device:{device_sha256}",
-                        f"welcome:file:{fingerprint}",
                     )
                     if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
                         return None
@@ -3724,9 +4080,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # Only known values are shown, so the query cannot inject text.
         notice = None
         if session_id and cfg.stripe_enabled:
-            if not record.paid:
-                record = _confirm_card_payment(record, session_id, request)
-            notice = message("card_paid" if record.paid else "card_pending", locale)
+            record = _confirm_card_payment(record, session_id, request)
+            order = db.get_checkout_session(session_id)
+            notice = message(
+                "card_duplicate"
+                if order is not None and order.status == "duplicate"
+                else "card_paid"
+                if record.paid
+                else "card_pending",
+                locale,
+            )
         elif pay == "done" and cfg.links_enabled:
             # Back from a Payment Link: the webhook unlocks, this page only reports.
             notice = message("card_paid" if record.paid else "card_pending", locale)
@@ -3773,7 +4136,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         session = _session(request)
         owner = db.account_for_audit(record.id)
         query = f"?token={token}&lang={locale}" if token else f"?lang={locale}"
-        locked = not record.paid and cfg.access_codes_enabled
+        # Earned and purchased account credits stay spendable even when the
+        # operator has stopped selling new manual access codes.
+        locked = not record.paid and not cfg.free_mode
         if session is None:
             if not token:
                 return ""
@@ -3841,7 +4206,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not isinstance(checked, tuple):
             return checked
         record, session = checked
-        if not cfg.access_codes_enabled:
+        if cfg.free_mode:
             raise HTTPException(status_code=404, detail="codes_disabled")
         locale = _view_locale(record, lang)
         back = f"/audits/{audit_id}?token={token}" if token else f"/audits/{audit_id}?"
@@ -3868,6 +4233,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """
         if not session_id.startswith(payments.SESSION_PREFIX) or len(session_id) > 255:
             return record
+        known = db.get_checkout_session(session_id)
+        if (
+            known is not None
+            and known.audit_id == record.id
+            and known.status
+            in (
+                "delivered",
+                "duplicate",
+            )
+        ):
+            return db.get_audit(record.id) or record
         now = datetime.now(UTC)
         if failed_card_sessions.count(session_id, now):
             return record
@@ -3890,7 +4266,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if str((session.get("metadata") or {}).get("audit_id") or "") != record.id:
             failed_card_sessions.hit(session_id, now)
             return record
-        payments.fulfil(db, cfg, session, at=now)
+        try:
+            payments.fulfil(db, cfg, session, at=now)
+        except Exception:  # noqa: BLE001 - webhook retries if return-path delivery fails
+            logger.exception("checkout delivery failed for audit %s", record.id)
+            return record
         paid = db.get_audit(record.id) or record
         if not paid.paid:
             failed_card_sessions.hit(session_id, now)
@@ -4224,6 +4604,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pack_price_usd=cfg.pack_price_usd,
             retention_days=cfg.retention_days,
             max_uploads_per_hour_per_ip=cfg.max_uploads_per_hour_per_ip,
+            email_delivery_ready=cfg.email_delivery_ready,
+            email_verification_required=cfg.email_verification_required,
         )
 
     def _terms(request: Request, locale: str) -> str:
@@ -4393,19 +4775,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/terminos", response_class=HTMLResponse)
     def terms_es(request: Request, lang: str | None = None) -> str:
-        return _terms(request, _locale(lang or "es"))
+        return _terms(request, _report_locale(lang or "es"))
 
     @app.get("/terms", response_class=HTMLResponse)
     def terms_en(request: Request, lang: str | None = None) -> str:
-        return _terms(request, _locale(lang or "en"))
+        return _terms(request, _report_locale(lang or "en"))
+
+    @app.get("/pt/termos", response_class=HTMLResponse)
+    def terms_pt(request: Request, lang: str | None = None) -> str:
+        return _terms(request, _report_locale(lang or "pt"))
 
     @app.get("/privacidad", response_class=HTMLResponse)
     def privacy_es(request: Request, lang: str | None = None) -> str:
-        return _privacy(request, _locale(lang or "es"))
+        return _privacy(request, _report_locale(lang or "es"))
 
     @app.get("/privacy", response_class=HTMLResponse)
     def privacy_en(request: Request, lang: str | None = None) -> str:
-        return _privacy(request, _locale(lang or "en"))
+        return _privacy(request, _report_locale(lang or "en"))
+
+    @app.get("/pt/privacidade", response_class=HTMLResponse)
+    def privacy_pt(request: Request, lang: str | None = None) -> str:
+        return _privacy(request, _report_locale(lang or "pt"))
 
     @app.post("/audits/{audit_id}/checkout")
     def checkout(
@@ -4425,16 +4815,73 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(
                 f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
             )
+        if pause_new_checkout:
+            return _html_error(request, 503, message("incident_paused", locale), locale)
+        if cfg.email_verification_required:
+            buyer_session = _session(request)
+            account_id = db.account_for_audit(audit_id)
+            if (
+                buyer_session is None
+                or not account_id
+                or buyer_session[0].id != account_id
+                or not db.email_verified(account_id)
+            ):
+                return _html_error(
+                    request,
+                    403,
+                    account_pages.COPY[locale]["email_checkout_required"],
+                    locale,
+                )
         # The pack is sold only while it is on sale; anything else is one audit.
         if plan != payments.PLAN_PACK or not cfg.pack_price_usd:
             plan = payments.PLAN_SINGLE
+        now = datetime.now(UTC)
+        try:
+            order = db.reserve_checkout(
+                audit_id,
+                account_id=db.account_for_audit(audit_id) or "",
+                plan=plan,
+                amount_cents=payments.plan_price_cents(cfg, plan),
+                currency=payments.CURRENCY,
+                at=now,
+            )
+        except ValueError:
+            return RedirectResponse(
+                f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
+            )
+        if order.checkout_url and order.expires_at > now.isoformat().replace("+00:00", "Z"):
+            return RedirectResponse(order.checkout_url, status_code=303)
         factory: CheckoutFactory = app.state.checkout_factory
-        url = factory(cfg, audit_id, token or "", plan=plan, locale=locale)
+        created = factory(
+            cfg,
+            audit_id,
+            token or "",
+            plan=plan,
+            locale=locale,
+            order_id=order.id,
+            amount_cents=order.amount_cents,
+        )
+        if isinstance(created, str):  # compatible with an injected test provider
+            url, session_id, expires = created, "", None
+        else:
+            url = str(created.get("url") or "")
+            session_id = str(created.get("id") or "")
+            expiration = created.get("expires_at")
+            expires = (
+                datetime.fromtimestamp(expiration, UTC)
+                if isinstance(expiration, int) and not isinstance(expiration, bool)
+                else None
+            )
+        db.attach_checkout_session(
+            order.id, session_id=session_id, checkout_url=url, expires_at=expires
+        )
         return RedirectResponse(url, status_code=303)
 
     @app.post("/webhooks/stripe")
     async def stripe_webhook(request: Request) -> Response:
-        if not (cfg.stripe_configured or cfg.links_configured):
+        # Keep receiving historical paid events after Payment Links are
+        # removed from the public buying flow.
+        if not cfg.stripe_webhook_secret.startswith("whsec_"):
             raise _not_found()
         payload = await request.body()
         header = request.headers.get("stripe-signature")
@@ -4448,6 +4895,37 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = event.get("data", {}).get("object", {})
             if isinstance(session, dict):
                 await run_in_threadpool(payments.fulfil, db, cfg, session, at=datetime.now(UTC))
+        elif event.get("type") in ("refund.created", "refund.updated", "refund.failed"):
+            refund = event.get("data", {}).get("object", {})
+            if not isinstance(refund, dict) or refund.get("object") != "refund":
+                raise HTTPException(status_code=400, detail="invalid refund event")
+
+            def stripe_id(value: Any) -> str:
+                return str(value.get("id") or "") if isinstance(value, dict) else str(value or "")
+
+            status = str(refund.get("status") or "")
+            if event["type"] == "refund.failed" and status != "failed":
+                raise HTTPException(status_code=400, detail="invalid refund status")
+            event_livemode = event.get("livemode")
+            if not isinstance(event_livemode, bool):
+                raise HTTPException(status_code=400, detail="invalid refund mode")
+            if "livemode" in refund and refund["livemode"] is not event_livemode:
+                raise HTTPException(status_code=400, detail="invalid refund mode")
+            try:
+                await run_in_threadpool(
+                    db.record_stripe_refund,
+                    refund_id=str(refund.get("id") or ""),
+                    payment_intent_id=stripe_id(refund.get("payment_intent")),
+                    charge_id=stripe_id(refund.get("charge")),
+                    amount_minor=refund.get("amount"),
+                    currency=str(refund.get("currency") or ""),
+                    status=status,
+                    livemode=event_livemode,
+                    event_id=str(event.get("id") or ""),
+                    at=datetime.now(UTC),
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="invalid refund event") from exc
         return JSONResponse({"received": True})
 
     # Hidden features mount here with the app's own closures; each module's

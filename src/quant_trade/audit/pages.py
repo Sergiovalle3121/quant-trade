@@ -1444,8 +1444,8 @@ def _footer(locale: str) -> str:
         f"<li><a href='{_e(method_url(locale))}'>{_e(_method_title(locale))}</a></li>"
     )
     legal = (
-        f"<li><a href='{_e(legal_url('terms', linked))}'>{_e(copy['terms_link'])}</a></li>"
-        f"<li><a href='{_e(legal_url('privacy', linked))}'>{_e(copy['privacy_link'])}</a></li>"
+        f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
+        f"<li><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></li>"
     )
     return (
         "<footer class='foot'><div class='wrap'><div class='foot-grid'>"
@@ -1934,13 +1934,12 @@ def _trust(
     """Why trust Rigor, each point with the page that proves it (in free mode
     nothing is sold, so the refund point is left out)."""
     words = TRUST_COPY[locale]
-    linked = link_locale(locale)
     hrefs = {
         "sample": _sample_url(locale),
         "method": method_url(locale),
         "check": _check_url(locale),
-        "privacy": legal_url("privacy", linked),
-        "terms": legal_url("terms", linked),
+        "privacy": legal_url("privacy", locale),
+        "terms": legal_url("terms", locale),
     }
     cards = "".join(
         f"<div class='card spot' data-reveal style='--i:{i % 3}'>"
@@ -2361,8 +2360,8 @@ def _upload_form(
         + "<label class='check'><input type='checkbox' name='consent' value='on' required>"
         f"<span>{_e(copy['consent'].format(retention=retention_days))} "
         f"{_e(copy['consent_read'])} "
-        f"<a href='{_e(legal_url('terms', linked))}'>{_e(copy['terms_link'])}</a> · "
-        f"<a href='{_e(legal_url('privacy', linked))}'>{_e(copy['privacy_link'])}</a></span>"
+        f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a> · "
+        f"<a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></span>"
         "</label>" + "<div class='submit-row'><button class='btn btn-primary btn-lg btn-block' "
         f"type='submit'>{_e(copy['submit'])}<span class='go'>{icon('arrow')}</span></button></div>"
         + "</form></div></div>"
@@ -2753,19 +2752,21 @@ def legal_page(
     locale = _locale(locale)
     copy = _COPY[locale]
     ui = _UI[locale]
-    other = "en" if locale == "es" else "es"
     path = legal_url(kind, locale).split("?", 1)[0]
-    description = f"{text.title} · {copy['title']}. {DISCLAIMER[locale]}"
+    description = f"{text.title} · {copy['title']}. {_disclaimer(locale)}"
     meta = _public_meta(text.title, description, locale, path, base_url)
     warning = f"<div class='error'>{_e(text.warning)}</div>" if text.warning else ""
     sections = [
         (heading, "".join(f"<p>{_e(line)}</p>" for line in lines))
         for heading, lines in text.sections
     ]
-    crumbs = (
-        f"<a href='/?lang={_e(locale)}'>{_e(copy['back'])}</a><span>/</span>"
-        f"<a href='?lang={other}'>{_other_name(locale)}</a>"
+    alternates = {lang: legal_url(kind, lang) for lang in ("es", "en", "pt")}
+    languages = " · ".join(
+        f"<a href='{_e(url)}' hreflang='{lang}'>{_e(LANGUAGE_NAMES[lang])}</a>"
+        for lang, url in alternates.items()
+        if lang != locale
     )
+    crumbs = f"<a href='{_home(locale)}'>{_e(copy['back'])}</a><span>/</span>{languages}"
     body = (
         _page_hero(ui["legal_eyebrow"], text.title, crumbs=crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
@@ -2773,9 +2774,7 @@ def legal_page(
         + f"<p class='muted doc-foot'>{_e(copy['legal_updated'])}: {_e(text.updated)}</p>"
         "</div></div>"
     )
-    return _page(
-        text.title, locale, body, meta_html=meta, switch_href=f"?lang={other}", solid_nav=True
-    )
+    return _page(text.title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
 def compare_page(

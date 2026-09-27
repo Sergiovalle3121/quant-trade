@@ -42,18 +42,13 @@ TEMPLATE_ONLY_PATTERNS: tuple[str, ...] = (
 )
 
 
-#: The owner asked to sell before giving anything away ("antes de dar pruebas
-#: gratis necesito vender algo bien"), so no template offers a free audit or
-#: a free full report. The free preview is the only free thing and may be
-#: named.
-FREE_AUDIT_PATTERNS: tuple[str, ...] = (
-    r"\bauditor[ií]as?\s+(?:completas?\s+)?gratis",
-    r"\binformes?\s+(?:completos?\s+)?gratis",
-    r"\bprimer[ao]s?\s+(?:\d+\s+)?(?:auditor[ií]as?|informes?)\s+(?:es|son)?\s*gratis",
+#: The product grants one full report to a new account. Marketing must not
+#: imply an unlimited giveaway or offer reports in exchange for testimonials.
+UNBOUNDED_GIVEAWAY_PATTERNS: tuple[str, ...] = (
+    r"\b(?:\d+|varios|muchos)\s+(?:informes?|auditor[ií]as?)\s+(?:complet[ao]s?\s+)?gratis",
     r"\bgratis\s+a\s+cambio\b",
-    r"\bfree\s+(?:full\s+)?(?:audits?|reports?)\b",
-    r"\b(?:audit|report)s?\s+(?:is|are)\s+free\b",
-    r"\bfor\s+free\b",
+    r"\b(?:\d+|many|unlimited)\s+free\s+(?:full\s+)?(?:audits?|reports?)\b",
+    r"\bfree\s+(?:full\s+)?(?:audits?|reports?)\s+in\s+exchange\b",
 )
 
 
@@ -124,26 +119,34 @@ def test_every_community_row_has_a_url_and_a_check_date() -> None:
         assert re.search(r"\b2026-\d{2}-\d{2}\b", row)
 
 
-def test_no_template_offers_a_free_audit() -> None:
+def test_no_template_offers_an_unbounded_giveaway() -> None:
     for match in _templates():
         lowered = match["body"].lower()
-        hits = [pattern for pattern in FREE_AUDIT_PATTERNS if re.search(pattern, lowered)]
+        hits = [pattern for pattern in UNBOUNDED_GIVEAWAY_PATTERNS if re.search(pattern, lowered)]
         assert hits == [], f"{match['id']}-{match['lang']}"
 
 
-def test_free_audit_patterns_catch_the_old_offers() -> None:
+def test_giveaway_patterns_catch_unbounded_old_offers() -> None:
     offers = [
-        "La primera auditoría es gratis",
-        "Primeras 10 auditorías completas gratis a cambio de opinión",
-        "The first audit is free",
-        "I will audit the public backtest of 10 robots for free",
+        "10 auditorías completas gratis a cambio de opinión",
+        "Many free full reports in exchange for a review",
     ]
     for offer in offers:
-        assert any(re.search(pattern, offer.lower()) for pattern in FREE_AUDIT_PATTERNS)
+        assert any(re.search(pattern, offer.lower()) for pattern in UNBOUNDED_GIVEAWAY_PATTERNS)
     assert not any(
-        re.search(pattern, "la vista previa es gratis; the preview is free")
-        for pattern in FREE_AUDIT_PATTERNS
+        re.search(pattern, "primer informe completo gratis con cuenta; first full report free")
+        for pattern in UNBOUNDED_GIVEAWAY_PATTERNS
     )
+
+
+def test_first_contact_templates_explain_the_free_first_report() -> None:
+    first = {(match["id"], match["lang"]): match["body"].lower() for match in _templates()}
+    for key in (("P1", "ES"), ("W1", "ES")):
+        assert "primer informe completo" in first[key]
+        assert "cuenta" in first[key]
+    for key in (("P1", "EN"), ("W1", "EN")):
+        assert "first full report" in first[key]
+        assert "account" in first[key]
 
 
 def test_playbook_uses_the_brand_and_current_prices() -> None:

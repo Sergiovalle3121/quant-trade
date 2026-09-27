@@ -1504,18 +1504,19 @@ def _parse_mt5_tester(reader: _TableReader) -> _Draft:
 
 
 def _deal_balance_drawdown(deals: list[_Deal]) -> float:
-    """Deepest fall of the report's own Balance column, deal by deal, in money.
+    """Deepest fall of the deal-money chain, deal by deal, in money.
 
     This is how the tester computes "Balance Drawdown Maximal", so the two
-    agree on an untouched report (checked on 13 real reports).
+    agree on an untouched report (checked on 13 real reports). A broken
+    printed Balance cell cannot rewrite the drawdown check.
     """
+    balance = 0.0
     peak: float | None = None
     deepest = 0.0
     for deal in deals:
-        if deal.balance is None:
-            continue
-        peak = deal.balance if peak is None else max(peak, deal.balance)
-        deepest = max(deepest, peak - deal.balance)
+        balance += deal.amount
+        peak = balance if peak is None else max(peak, balance)
+        deepest = max(deepest, peak - balance)
     return deepest
 
 
@@ -3567,6 +3568,8 @@ def _balance_curve(
         warnings.append(f"{ignored} cash flow(s) after the last trade ignored")
     balance = initial
     breaks = 0
+    largest_balance_difference = 0.0
+    last_reported_balance: float | None = None
     closing: dict[date, float] = {}
     flows: dict[date, float] = {}
     # The balance just before and just after each deposit or withdrawal, so a
@@ -3576,9 +3579,13 @@ def _balance_curve(
         pre = balance
         balance += item.amount
         if item.reported_balance is not None:
-            if abs(item.reported_balance - balance) > 0.011:
+            last_reported_balance = item.reported_balance
+            difference = abs(item.reported_balance - balance)
+            largest_balance_difference = max(largest_balance_difference, difference)
+            if difference > 0.011:
                 breaks += 1
-            balance = item.reported_balance
+            # A broken printed balance must not become the return series that
+            # the customer sees as a measured result. Keep the row P&L chain.
         day = item.time.date()
         closing[day] = balance
         if item.is_flow:
@@ -3587,8 +3594,13 @@ def _balance_curve(
     if breaks:
         warnings.append(
             f"{breaks} Balance cell(s) do not equal the previous balance plus the row's "
-            "money; the reported Balance was kept"
+            "money; the row amounts were used for returns"
         )
+    draft.metadata["reconstructed_final_balance"] = f"{balance:.6f}"
+    draft.metadata["balance_chain_breaks"] = str(breaks)
+    draft.metadata["largest_balance_difference"] = f"{largest_balance_difference:.6f}"
+    if last_reported_balance is not None:
+        draft.metadata["reported_final_balance"] = f"{last_reported_balance:.6f}"
 
     business = not any(item.time.weekday() >= 5 for item in in_range if not item.is_flow) and (
         not any(trip.exit_time.weekday() >= 5 for trip in trips)
