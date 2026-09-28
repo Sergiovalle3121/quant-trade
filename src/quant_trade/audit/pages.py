@@ -36,7 +36,7 @@ from quant_trade.audit.guides import (
 )
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
-from quant_trade.audit.method import REFERENCES, dimension_rows, method_url
+from quant_trade.audit.method import dimension_rows, method_url, references
 from quant_trade.audit.portuguese import (
     AUDIENCES_PT,
     CLASS_B_PT,
@@ -128,7 +128,7 @@ SAMPLE_PAGE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample", "pt": "/
 
 SAMPLE_BANNER: dict[str, str] = {
     "es": (
-        "Informe de ejemplo con datos sintéticos generados por ordenador: no es la cuenta ni "
+        "Informe de ejemplo con datos sintéticos generados por computadora: no es la cuenta ni "
         "la estrategia de nadie. Así se ve un informe completo."
     ),
     "en": (
@@ -337,7 +337,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "pago te enviamos un código de acceso y lo escribes en el formulario o en el informe."
         ),
         "contact": "Pedir un código",
-        "price_pack": "Pack de {n} informes: USD {price:.0f} (USD {each:.0f} cada uno).",
+        "price_pack": "Paquete de {n} informes: USD {price:.0f} (USD {each:.0f} cada uno).",
         "account_note": (
             "Tu primer informe completo, gratis al crear tu cuenta; después, "
             f"{_FREE} vistas previas gratis al mes, y tus informes y créditos en un solo lugar."
@@ -390,7 +390,7 @@ _COPY: dict[str, dict[str, Any]] = {
                 "supuestos escritos, no predicciones.",
             ),
             (
-                "¿Comprobáis mis operaciones con el bróker?",
+                "¿Comprueban mis operaciones con el bróker?",
                 "No. Auditamos los datos que aportas; no nos conectamos a ningún bróker ni "
                 "pedimos claves. Por eso el sello dice que los datos no están comprobados con "
                 "el bróker.",
@@ -788,9 +788,9 @@ _UI: dict[str, dict[str, Any]] = {
         "mock_is": "Dentro de muestra",
         "mock_oos": "Fuera de muestra",
         "mock_kpis": [
-            ("0,97", "Sharpe deflactado"),
+            ("0.97", "Sharpe deflactado"),
             ("120", "Intentos contados"),
-            ("3,2 pb", "Coste de equilibrio"),
+            ("3.2 pb", "Coste de equilibrio"),
         ],
         "chip_trials": "Intentos reales desde el XML de MT5",
         "chip_hash": "Cada número con su evidencia",
@@ -805,7 +805,7 @@ _UI: dict[str, dict[str, Any]] = {
         ),
         "example_case": {
             "eyebrow": "Así lo detecta en el ejemplo",
-            "title": "Sharpe de 1,8 en el probador. Clase C en Rigor.",
+            "title": "Sharpe de 1.8 en el probador. Clase C en Rigor.",
             "text": (
                 "El informe de ejemplo es un backtest de MT5 hecho con datos sintéticos. Rigor le "
                 "baja la clase por tres cosas que el probador no enseña:"
@@ -3152,7 +3152,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
     flags = "".join(
         f"<li>{_e(titles.get(locale, titles['en']))}</li>" for titles in FLAG_TITLES.values()
     )
-    refs = "".join(f"<li>{_e(ref)}</li>" for ref in REFERENCES)
+    refs = "".join(f"<li>{_e(ref)}</li>" for ref in references(locale))
     alternates = {lang: method_url(lang) for lang in METHOD_COPY}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(GUIDES_COPY[locale]['back'])}</a>" + (
         _language_crumbs(alternates, locale)

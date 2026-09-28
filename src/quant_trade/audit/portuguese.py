@@ -117,7 +117,7 @@ COPY_PT: dict[str, Any] = {
         "investimento, e que o arquivo é apagado após {retention} dias se não for pago. "
         "Aceito os termos do serviço e a política de privacidade."
     ),
-    "consent_read": "Leia antes de enviar (em inglês):",
+    "consent_read": "Leia antes de enviar:",
     "terms_link": "Termos do serviço",
     "privacy_link": "Política de privacidade",
     "legal_updated": "Última atualização",
@@ -259,8 +259,8 @@ COPY_PT: dict[str, Any] = {
         ),
         (
             "Em que idioma sai o relatório?",
-            "Por enquanto, em inglês ou espanhol, à sua escolha no formulário. O site já está em "
-            "português; o relatório e o PDF em português vêm em seguida.",
+            "Em português, espanhol ou inglês, à sua escolha no formulário. O PDF sai no mesmo "
+            "idioma do relatório.",
         ),
         (
             "Por que enviar o XML de otimização do MT5?",
@@ -375,9 +375,9 @@ UI_PT: dict[str, Any] = {
     "mock_is": "Dentro da amostra",
     "mock_oos": "Fora da amostra",
     "mock_kpis": [
-        ("0,97", "Sharpe deflacionado"),
+        ("0.97", "Sharpe deflacionado"),
         ("120", "Tentativas contadas"),
-        ("3,2 pb", "Custo de equilíbrio"),
+        ("3.2 pb", "Custo de equilíbrio"),
     ],
     "chip_trials": "Tentativas reais a partir do XML do MT5",
     "chip_hash": "Cada número com a sua evidência",
@@ -392,7 +392,7 @@ UI_PT: dict[str, Any] = {
     ),
     "example_case": {
         "eyebrow": "Como ele detecta isso no exemplo",
-        "title": "Sharpe de 1,8 no testador. Classe C no Rigor.",
+        "title": "Sharpe de 1.8 no testador. Classe C no Rigor.",
         "text": (
             "O relatório de exemplo é um backtest de MT5 feito com dados sintéticos. O Rigor "
             "baixa a sua classe por três coisas que o testador não mostra:"
@@ -670,7 +670,7 @@ TRUST_PT: dict[str, Any] = {
             "eye",
             "Veja um relatório inteiro antes de pagar",
             "O exemplo é um relatório completo, com o PDF, feito com dados sintéticos: você vê "
-            "exatamente o que recebe (em inglês).",
+            "exatamente o que recebe.",
             "Ver o exemplo",
             "sample",
         ),

@@ -340,8 +340,7 @@ GUIDES: tuple[Guide, ...] = (
                     "direito > Report > HTML.",
                     "No MetaTrader 4: Terminal > Account History > botão direito > 'All "
                     "History', e depois 'Save as Detailed Report'.",
-                    "Envie o arquivo e abra a seção do relatório 'The account's real money' (o "
-                    "relatório sai em inglês).",
+                    "Envie o arquivo e abra a seção do relatório 'O dinheiro real da conta'.",
                 ),
                 upload="No campo 'Relatório da sua plataforma'.",
                 tips=(

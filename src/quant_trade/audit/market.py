@@ -64,10 +64,11 @@ PROVIDER_URLS: dict[str, tuple[str, str]] = {
         "https://www.bankofcanada.ca/valet/observations/{series}/csv",
         "https://www.bankofcanada.ca/rates/price-indexes/cpi/",
     ),
+    # The open-data portal has no page for series 433; its SGS page answers.
     "bcb": (
         "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json",
-        "https://dadosabertos.bcb.gov.br/dataset/{series}-indice-nacional-de-precos-ao-"
-        "consumidor-amplo-ipca",
+        "https://www3.bcb.gov.br/sgspub/consultarvalores/consultarValoresSeries.do"
+        "?method=consultarGraficoPorId&hdOidSeriesSelecionadas={series}",
     ),
     # INEGI's open-data zip of the INPC (base second half of July 2018); the
     # series name only labels it.

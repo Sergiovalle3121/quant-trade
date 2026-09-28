@@ -47,7 +47,7 @@ def test_pack_is_on_sale_only_with_codes_and_a_real_discount() -> None:
 def test_landing_shows_the_pack_and_no_refund_promise_when_selling(tmp_path: Path) -> None:
     client = _client(tmp_path, **SELLING)
     es = client.get("/?lang=es").text
-    assert "Pack de 3 informes: USD 69 (USD 23 cada uno)." in es
+    assert "Paquete de 3 informes: USD 69 (USD 23 cada uno)." in es
     # Sales are final (owner's decision): the landing promises no refund.
     assert "devolvemos" not in es and "reembolso" not in es
     en = client.get("/?lang=en").text
@@ -58,7 +58,7 @@ def test_landing_shows_the_pack_and_no_refund_promise_when_selling(tmp_path: Pat
 
 def test_free_mode_shows_neither(tmp_path: Path) -> None:
     page = _client(tmp_path).get("/?lang=es").text
-    assert "Pack de 3" not in page
+    assert "Paquete de 3" not in page
 
 
 def test_locked_report_offers_the_pack(tmp_path: Path) -> None:

@@ -174,7 +174,7 @@ def test_public_pages_have_title_description_canonical_and_open_graph(tmp_path: 
             assert _meta(text, "og:url") == BASE + path, path
             assert _meta(text, "og:title"), path
             assert _meta(text, "og:description") == description, path
-            assert _meta(text, "og:locale") == {"es": "es_ES", "en": "en_US", "pt": "pt_BR"}[locale]
+            assert _meta(text, "og:locale") == {"es": "es_MX", "en": "en_US", "pt": "pt_BR"}[locale]
             assert "hreflang='x-default'" in text, path
             assert find_claims(text) == [], path
 

@@ -3931,3 +3931,32 @@ production load capacity follows from these functional tests.
 Never replace a production database with an older snapshot without first
 listing and reconciling card sessions and webhook deliveries that happened
 after the snapshot; a database rollback alone can discard paid entitlements.
+
+## Customer audit of the public texts (2026-09-28)
+
+Wording, labels and links only; no figure, threshold, class or detection
+changed. Tests: `tests/test_audit_customer_copy.py`.
+
+- A report links the check page, the terms and the privacy policy of its own
+  language (`seo.CHECK_PATH`, `legal.LEGAL_PATHS`), also in Portuguese.
+- The Portuguese site says the report and its PDF come in Portuguese,
+  Spanish or English.
+- Spanish is Latin American Spanish: no "vosotros" form, "computadora",
+  "videos", "tasas"; `og:locale` is `es_MX`. "costes" stays as it is.
+- The platform table names four more fields in the three languages
+  (`balance_chain_breaks`, `largest_balance_difference`,
+  `reconstructed_final_balance`, `reported_final_balance`).
+  `report.platform_value` shows the three amounts with 2 decimals and the
+  count as an integer. The stored result keeps the importer's text.
+- Brazil's inflation series (SGS 433) links its SGS page; the open-data
+  portal has no page for it. The Selic link (SGS 4189) is unchanged.
+- The landing writes decimals with a point, as the report does.
+- The forgot-password pages show the operator's address
+  (`AUDIT_OPERATOR_CONTACT`) before the chat link while automatic mail is
+  off. No new variable.
+- The sources of the methodology join their authors with "y", "and" or "e"
+  by language (`method.references`).
+- The sample PDF's title ends in "ejemplo" or "exemplo", as its page does.
+- The stress count agrees in number when one scenario breaks
+  (`stress_count_one`).
+- The terms describe password recovery as the site does it.

@@ -316,8 +316,10 @@ def test_portuguese_pages_link_english_only_where_there_is_no_portuguese(tmp_pat
 
     client = _web_client(tmp_path)
     sample = client.get("/pt/exemplo").text
-    # The terms exist in Spanish and English: a Portuguese reader gets English.
-    assert "?lang=en'" in sample and "/terminos?lang=es" not in sample
+    # The terms and the privacy policy exist in Portuguese: the report links those.
+    assert "href='/pt/termos?lang=pt'" in sample and "href='/pt/privacidade?lang=pt'" in sample
+    assert "/terms?lang=en" not in sample and "/privacy?lang=en" not in sample
+    assert "/terminos?lang=es" not in sample
     assert "hreflang='en'" in sample and ">English</a>" in sample and ">Español</a>" in sample
     files = {"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")}
     posted = client.post(
@@ -331,6 +333,44 @@ def test_portuguese_pages_link_english_only_where_there_is_no_portuguese(tmp_pat
     assert published.headers["location"].endswith("?lang=pt")
     public = client.get(published.headers["location"]).text
     assert "<html lang='pt'>" in public
+
+
+def test_every_report_links_the_pages_of_its_own_language() -> None:
+    expected = {
+        "es": ("/comprobar", "/terminos?lang=es", "/privacidad?lang=es", "/metodologia"),
+        "en": ("/check", "/terms?lang=en", "/privacy?lang=en", "/methodology"),
+        "pt": ("/pt/comprovar", "/pt/termos?lang=pt", "/pt/privacidade?lang=pt", "/pt/metodologia"),
+    }
+    for locale, own in expected.items():
+        page = render_html(
+            _sample(), watermark=False, locale=locale, legal_links=True, pdf_url="/r.pdf"
+        )
+        for href in own:
+            assert f"href='{href}'" in page, (locale, href)
+        for other, paths in expected.items():
+            if other != locale:
+                for href in paths:
+                    assert f"href='{href}'" not in page, (locale, href)
+
+
+def test_platform_balance_fields_read_in_portuguese_with_rounded_values() -> None:
+    data = _sample().model_dump(mode="json")
+    data["inputs"]["report_metadata"] = {
+        "balance_chain_breaks": "0",
+        "largest_balance_difference": "0.000000",
+        "reconstructed_final_balance": "27369.750000",
+        "reported_final_balance": "27369.750000",
+    }
+    page = render_html(AuditResult.model_validate(data), watermark=False, locale="pt")
+    for label, value in (
+        ("Células de saldo que não conferem", "0"),
+        ("Maior diferença de saldo", "0.00"),
+        ("Saldo final reconstruído", "27,369.75"),
+        ("Saldo final informado", "27,369.75"),
+    ):
+        assert f"<td>{label}</td><td>{value}</td>" in page
+    assert "27369.750000" not in page and "Balance chain breaks" not in page
+    assert find_claims(page) == []
 
 
 def test_the_compare_box_speaks_portuguese() -> None:

@@ -418,6 +418,7 @@ COPY_PT: dict[str, str] = {
         "que o e-mail da conta é seu e enviamos um link de uso único para criar uma nova senha."
     ),
     "forgot_contact": "Escrever pelo WhatsApp",
+    "forgot_mail": "Escrever para {email}",
     "forgot_message": f"Olá, esqueci a senha da minha conta {BRAND}. Meu e-mail é: ",
     "recover_title": "Com sua chave de recuperação",
     "recover_lead": (
