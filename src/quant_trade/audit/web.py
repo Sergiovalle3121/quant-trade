@@ -2965,6 +2965,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     currency=payments.CURRENCY,
                     at=now,
                     declared_country=declared_country,
+                    locale=locale,
                 )
             except ValueError:
                 return RedirectResponse(f"{base}?error=buy_review", status_code=303)
@@ -5231,6 +5232,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 currency=payments.CURRENCY,
                 at=now,
                 declared_country=declared_country if not cfg.card_test_mode else "",
+                locale=locale,
             )
         except ValueError as exc:
             if str(exc) in ("checkout market changed", "checkout market review"):
