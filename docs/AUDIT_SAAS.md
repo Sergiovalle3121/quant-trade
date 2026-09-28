@@ -730,10 +730,10 @@ Every leaf value in the JSON carries an evidence tag:
   is stated next to it.
 
 On the site's pages (landing, upload form, guides, methodology, verification,
-contact) a reader sees these tags as words in the page's language: Medido /
-Declarado / No medido, Measured / Declared / Not measured, Medido / Declarado
-/ Não medido (`pages.EVIDENCE_LABELS`). The codes stay in the JSON, the badge
-CSS classes and the reports.
+contact) and in the HTML and PDF reports a reader sees these tags as words in
+the page's language: Medido / Declarado / No medido, Measured / Declared / Not
+measured, Medido / Declarado / Não medido (`report.EVIDENCE_LABELS`). The codes
+stay in the JSON, the Markdown report and the badge CSS classes.
 
 | Section | Estimator | Source module |
 |---|---|---|
@@ -2063,6 +2063,7 @@ Routes:
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
+| `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
 Languages. Spanish is the default on every route, and the Spanish URLs and
