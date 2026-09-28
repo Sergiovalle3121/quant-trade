@@ -1216,19 +1216,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         visits.add(day=today, locale=locale, ref=kept or arrived)
 
     canonical_host = urlsplit(cfg.base_url).netloc.lower()
+    www_host = f"www.{canonical_host}"
 
     @app.middleware("http")
     async def old_address(request: Request, call_next: Any) -> Any:
         """Send a visit to Railway's own address on to the site's domain.
 
-        Only reads (GET, HEAD) move: a card-payment webhook or a form post to
-        the old address keeps working. Health checks stay where Railway
-        looks for them.
+        The ``www`` name of the domain moves the same way, so a visitor has
+        one address and one session. Only reads (GET, HEAD) move: a
+        card-payment webhook or a form post to the old address keeps
+        working. Health checks stay where Railway looks for them.
         """
         host = request.headers.get("host", "").lower().split(":", 1)[0]
         if (
             cfg.base_url.startswith("https://")
-            and host.endswith(RAILWAY_HOST_SUFFIX)
+            and (host.endswith(RAILWAY_HOST_SUFFIX) or host == www_host)
             and host != canonical_host
             and request.method in ("GET", "HEAD")
             and request.url.path not in ("/health", "/ready")

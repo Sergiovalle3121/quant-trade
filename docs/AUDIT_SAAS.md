@@ -2216,8 +2216,10 @@ the service neither sends nor stores it.
    Keep the Railway address attached after the move: while `AUDIT_BASE_URL`
    is an `https` custom domain, a GET or HEAD on any `*.up.railway.app`
    host answers 308 to the same path and query on `AUDIT_BASE_URL`, so old
-   report, verification and badge links keep working. POSTs (the Stripe
-   webhook, forms) and `/health`, `/ready` are served where they arrive.
+   report, verification and badge links keep working. The `www` name of
+   that domain moves the same way, so a visitor keeps one address and one
+   session. POSTs (the Stripe webhook, forms) and `/health`, `/ready` are
+   served where they arrive.
    See "Moving to the custom domain" below for the whole move.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
@@ -2255,7 +2257,8 @@ The site's address is `https://rigorscore.com`. What the move consists of:
 - **Old address.** The Railway address stays attached to the service. A GET
   or HEAD on any `*.up.railway.app` host answers 308 to the same path and
   query on `AUDIT_BASE_URL` (`old_address` in `audit/web.py`), the icon files
-  included. `/health` and `/ready` are never redirected, so Railway's own
+  included. `https://www.rigorscore.com` is attached too and moves the same
+  way. `/health` and `/ready` are never redirected, so Railway's own
   probe keeps answering where it looks.
 - **Stripe webhook.** The endpoint is `POST /webhooks/stripe`. A POST is
   never redirected on either host, so an endpoint still registered in Stripe
