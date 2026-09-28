@@ -5504,6 +5504,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # The owner panel, at ``AUDIT_PANEL_PATH`` when that is a valid path whose
     # first segment no public route uses. Without a key nothing is mounted, so
     # its address answers like any page that does not exist, whatever the method.
+    # A hidden feature mounted below that brings a new first segment must add
+    # its paths here, as track-seal does, or the panel could take its place.
     route_paths = [str(getattr(route, "path", "")) for route in app.routes]
     for hidden_paths in track_seal_pages.PATHS.values():
         route_paths.extend(hidden_paths.values())

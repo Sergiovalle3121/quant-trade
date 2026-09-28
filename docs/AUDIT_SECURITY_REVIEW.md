@@ -147,8 +147,13 @@ Every change below has an offline, deterministic test in
   only in POST bodies, is compared in constant time, and five wrong keys per
   address per hour answer 429 (`attempts` table). Limits: a custom path is
   obscurity, not a second secret, and it appears in Railway's own request
-  log; with a key set, the path still answers 405 to methods other than
-  GET, HEAD and POST. The track-record panel (`/historiales` under the panel
+  log; with a key set, the path can still be told from an unknown page: it
+  answers 405 to methods other than GET, HEAD and POST, 400 to a POST
+  without the key field or with a key over 256 characters, and 307 to the
+  same path with a trailing slash. The check for a first segment already in
+  use sees the routes mounted before the panel plus the hidden track-record
+  paths; a hidden feature that brings a new first segment has to be added
+  to it. The track-record panel (`/historiales` under the panel
   path) follows the same path and rules and stays off with `TRACK_SEAL_ENABLED`.
 - "Mi cuenta" in four parts (2026-09-28; `tests/test_audit_account_parts.py`):
   layout only. No form, action, CSRF field, limit or redirect changed; the

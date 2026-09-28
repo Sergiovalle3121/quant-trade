@@ -295,6 +295,32 @@ def test_an_overlong_key_is_refused_before_it_is_compared(tmp_path: Path) -> Non
     assert client.post("/panel", data={"key": "x" * 256}).status_code == 403
 
 
+def test_with_a_key_the_recorded_limits_are_the_only_tells(tmp_path: Path) -> None:
+    # docs/AUDIT_SECURITY_REVIEW.md lists these as what still tells the path
+    # from an unknown page once a key is set; a new one belongs in that list.
+    client, store = _client(tmp_path, panel_path=CUSTOM)
+    answers = [client.request(method, CUSTOM) for method in ("PUT", "PATCH", "DELETE", "OPTIONS")]
+    assert {response.status_code for response in answers} == {405}
+    no_field = client.post(CUSTOM, data={"action": "create"})
+    assert no_field.status_code == 400
+    slash = client.get(CUSTOM + "/", follow_redirects=False)
+    assert slash.status_code == 307
+    for response in (*answers, no_field, slash):
+        assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert KEY not in response.text
+    assert store.list_access_codes() == []  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("panel_path", [DEFAULT_PANEL_PATH, CUSTOM])
+def test_only_the_panel_uses_the_first_segment_of_its_path(tmp_path: Path, panel_path: str) -> None:
+    client, _ = _client(tmp_path, panel_path=panel_path)
+    first = panel_path.split("/")[1].lower()
+    paths = [str(getattr(route, "path", "")) for route in client.app.routes]  # type: ignore[attr-defined]
+    shared = {path for path in paths if path.lower().split("/")[1:2] == [first]}
+    assert shared == {panel_path}
+
+
 @pytest.mark.parametrize("panel_path", [DEFAULT_PANEL_PATH, CUSTOM])
 def test_robots_and_the_sitemap_never_name_the_panel(tmp_path: Path, panel_path: str) -> None:
     client, _ = _client(tmp_path, panel_path=panel_path)

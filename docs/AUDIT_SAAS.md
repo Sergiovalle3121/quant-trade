@@ -2401,7 +2401,10 @@ carry `X-Robots-Tag: noindex, nofollow` and `Cache-Control: no-store`
 themselves. Without a valid `AUDIT_ADMIN_KEY` the panel routes are not
 mounted at all, so the path gives the ordinary localized 404 for GET, HEAD,
 POST (with or without a key) and every other method: same status, body and
-headers as an unknown page. The key field accepts at most 256 characters,
+headers as an unknown page. With a key set the path can still be told from
+an unknown page: 405 to other methods, 400 to a POST without the key field
+or with a key that is too long, 307 to the path with a trailing slash. The
+key field accepts at most 256 characters,
 and the access log redacts `key=` like `token=` and `code=`, in case
 someone types the key into a link by mistake.
 
