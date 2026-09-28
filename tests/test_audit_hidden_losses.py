@@ -116,7 +116,7 @@ def test_the_trade_pace_is_a_fact_card() -> None:
     page = render_html(_result(), watermark=False, locale="es")
     assert (
         "Operaciones cerradas por año en el historial "
-        '<span class="badge MEASURED">MEASURED</span></p></div>' in page
+        '<span class="badge MEASURED">Medido</span></p></div>' in page
     )
     assert "Operaciones por año:" not in _visible(page)
 

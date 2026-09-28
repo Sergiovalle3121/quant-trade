@@ -828,9 +828,9 @@ REPORT: dict[str, Any] = {
             "seu site. Nunca mostra seus arquivos, operações nem descrição."
         ),
         "evidence_legend": (
-            "Cada número leva sua etiqueta: MEASURED, calculado a partir dos seus arquivos; "
-            "DECLARED, declarado por você ou pelo vendedor, sem conferência; NOT_MEASURED, "
-            "faltou um dado para calculá-lo."
+            "Cada número leva sua etiqueta: «Medido» quando calculado a partir dos seus "
+            "arquivos; «Declarado» quando afirmado por você ou pelo vendedor, sem conferência; "
+            "«Não medido» quando faltou um dado para calculá-lo."
         ),
         "next": "O que fazer agora",
         "next_intro": (
