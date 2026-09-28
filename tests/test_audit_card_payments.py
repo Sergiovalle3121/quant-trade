@@ -468,6 +468,91 @@ def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path
     assert store.funnel_country_events("2000-01-01") == [("MX", 1, 1, 2900)]
 
 
+@pytest.mark.parametrize(("first_country", "second_country"), [("MX", "US"), ("US", "MX")])
+def test_two_paid_sessions_with_one_order_metadata_keep_separate_charges(
+    tmp_path: Path, first_country: str, second_country: str
+) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_market_first",
+        "url": "https://checkout.stripe.test/market-first",
+    }
+    assert (
+        client.post(
+            f"/audits/{audit_id}/checkout?token={token}",
+            data={"billing_country": "MX"},
+            follow_redirects=False,
+        ).status_code
+        == 303
+    )
+    store = client.app.state.store
+    original = store.list_checkout_orders()[0]
+    metadata = {
+        "audit_id": audit_id,
+        "plan": PLAN_SINGLE,
+        "app": "rigor",
+        "order_id": original.id,
+    }
+    first = _session(
+        audit_id,
+        sid="cs_market_first",
+        metadata=metadata,
+        customer_details={"address": {"country": first_country}},
+        payment_intent="pi_market_first",
+    )
+    second = _session(
+        audit_id,
+        sid="cs_market_second",
+        metadata=metadata,
+        customer_details={"address": {"country": second_country}},
+        payment_intent="pi_market_second",
+    )
+    assert _webhook(client, first) == 200
+    assert _webhook(client, second) == 200
+    assert _webhook(client, first) == 200
+    assert _webhook(client, second) == 200
+
+    orders = {order.session_id: order for order in store.list_checkout_orders()}
+    assert set(orders) == {"cs_market_first", "cs_market_second"}
+    expected_status = {"MX": "delivered", "US": "paid_review"}
+    assert orders["cs_market_first"].status == expected_status[first_country]
+    assert orders["cs_market_second"].status == expected_status[second_country]
+    assert store.checkout_market(original.id) == ("MX", first_country)
+    assert store.checkout_market(orders["cs_market_second"].id) == ("MX", second_country)
+    with store.engine.connect() as conn:
+        links = dict(
+            conn.execute(
+                sa.select(
+                    store.stripe_payment_intents.c.payment_intent_id,
+                    store.stripe_payment_intents.c.order_id,
+                )
+            ).all()
+        )
+    assert links == {
+        "pi_market_first": original.id,
+        "pi_market_second": orders["cs_market_second"].id,
+    }
+    counts = funnel.build(store.funnel_events("2000-01-01")).total.counts
+    assert counts["purchases"] == 2
+    assert counts["deliveries"] == 1
+    assert counts["gross_usd_cents"] == 5800
+    refund = store.record_stripe_refund(
+        refund_id="re_market_second",
+        payment_intent_id="pi_market_second",
+        charge_id="ch_market_second",
+        amount_minor=1000,
+        currency="usd",
+        status="succeeded",
+        livemode=True,
+        event_id="evt_market_second",
+        at=NOW,
+    )
+    assert refund.order_id == orders["cs_market_second"].id
+    counts = funnel.build(store.funnel_events("2000-01-01")).total.counts
+    assert counts["refund_usd_cents"] == 1000
+
+
 def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Path) -> None:
     client = _client(tmp_path)
     audit_id, token = _upload(client)

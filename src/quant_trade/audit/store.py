@@ -1284,14 +1284,40 @@ class Store:
             ).first()
         return row is not None
 
-    def record_checkout_market(self, order_id: str, billing_country: str, *, at: datetime) -> None:
-        """Keep the provider-observed country for reconciliation and cohort reporting."""
-        with self.engine.begin() as conn:
-            conn.execute(
-                self.checkout_order_markets.update()
-                .where(self.checkout_order_markets.c.order_id == order_id)
-                .values(billing_country=billing_country, checked_at=_iso(at))
-            )
+    def record_checkout_market(
+        self, order_id: str, billing_country: str, *, declared_country: str, at: datetime
+    ) -> None:
+        """Keep both countries on the order that this paid session actually settled."""
+        sa, markets = self._sa, self.checkout_order_markets
+        for _ in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    row = conn.execute(
+                        sa.select(markets.c.declared_country)
+                        .where(markets.c.order_id == order_id)
+                        .with_for_update()
+                    ).first()
+                    if row is None:
+                        conn.execute(
+                            markets.insert().values(
+                                order_id=order_id,
+                                declared_country=declared_country,
+                                billing_country=billing_country,
+                                checked_at=_iso(at),
+                            )
+                        )
+                    else:
+                        if str(row[0]) != declared_country:
+                            raise ValueError("checkout market disagrees with order")
+                        conn.execute(
+                            markets.update()
+                            .where(markets.c.order_id == order_id)
+                            .values(billing_country=billing_country, checked_at=_iso(at))
+                        )
+                return
+            except sa.exc.IntegrityError:
+                continue  # a concurrent webhook inserted this order's market row
+        raise RuntimeError("could not record checkout market")
 
     def record_market_review(
         self,
@@ -1306,50 +1332,128 @@ class Store:
         at: datetime,
     ) -> None:
         """Keep a charged, market-rejected order and operator issue atomically."""
-        sa = self._sa
-        with self.engine.begin() as conn:
-            conn.execute(
-                sa.select(self.audits.c.id).where(self.audits.c.id == audit_id).with_for_update()
-            ).first()
-            conn.execute(
-                self.checkout_order_markets.update()
-                .where(self.checkout_order_markets.c.order_id == order_id)
-                .values(billing_country=billing_country, checked_at=_iso(at))
-            )
-            conn.execute(
-                self.checkout_orders.update()
-                .where(self.checkout_orders.c.id == order_id)
-                .where(self.checkout_orders.c.status.in_(("creating", "open", "paid_review")))
-                .values(
-                    status="paid_review",
-                    paid_amount_cents=paid_cents,
-                    confirmed_at=_iso(at),
-                    resolution="manual_refund_review",
-                    livemode=True,
-                )
-            )
-            self.record_payment_intent_in_tx(
-                conn,
-                order_id,
-                session_id,
-                payment_intent_id,
-                at,
-                livemode=True,
-            )
-            known = conn.execute(
-                sa.select(self.refused_payments.c.session_id).where(
-                    self.refused_payments.c.session_id == session_id
-                )
-            ).first()
-            if known is None:
-                conn.execute(
-                    self.refused_payments.insert().values(
-                        session_id=session_id[:255],
-                        audit_id=audit_id[:80],
-                        reason=reason[:80],
-                        created_at=_iso(at),
+        sa, orders, markets = self._sa, self.checkout_orders, self.checkout_order_markets
+        stamp = _iso(at)
+        for _ in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        sa.select(self.audits.c.id)
+                        .where(self.audits.c.id == audit_id)
+                        .with_for_update()
+                    ).first()
+                    original = (
+                        conn.execute(
+                            sa.select(orders).where(orders.c.id == order_id).with_for_update()
+                        )
+                        .mappings()
+                        .one()
                     )
-                )
+                    original_market = conn.execute(
+                        sa.select(markets.c.declared_country).where(markets.c.order_id == order_id)
+                    ).scalar_one()
+                    if original["audit_id"] != audit_id:
+                        raise ValueError("market review audit disagrees with order")
+                    target = (
+                        conn.execute(
+                            sa.select(orders)
+                            .where(orders.c.session_id == session_id)
+                            .with_for_update()
+                        )
+                        .mappings()
+                        .first()
+                    )
+                    if target is None and not original["session_id"]:
+                        target = original
+                    if target is None and original["session_id"] == session_id:
+                        target = original
+                    if target is None:
+                        # A second paid Stripe session retained the original
+                        # metadata. It must have its own order and refund link.
+                        resolved_order_id = secrets.token_hex(16)
+                        conn.execute(
+                            orders.insert().values(
+                                id=resolved_order_id,
+                                audit_id=audit_id,
+                                account_id=original["account_id"],
+                                plan=original["plan"],
+                                amount_cents=original["amount_cents"],
+                                currency=original["currency"],
+                                status="paid_review",
+                                session_id=session_id,
+                                checkout_url="",
+                                created_at=stamp,
+                                expires_at=stamp,
+                                paid_amount_cents=paid_cents,
+                                confirmed_at=stamp,
+                                resolution="manual_refund_review",
+                                livemode=True,
+                            )
+                        )
+                        conn.execute(
+                            markets.insert().values(
+                                order_id=resolved_order_id,
+                                declared_country=original_market,
+                                billing_country=billing_country,
+                                checked_at=stamp,
+                            )
+                        )
+                    else:
+                        if (
+                            target["audit_id"] != audit_id
+                            or target["plan"] != original["plan"]
+                            or target["amount_cents"] != original["amount_cents"]
+                            or target["currency"] != original["currency"]
+                        ):
+                            raise ValueError("market review session disagrees with order")
+                        resolved_order_id = str(target["id"])
+                        if target["status"] not in ("delivered", "duplicate"):
+                            conn.execute(
+                                markets.update()
+                                .where(markets.c.order_id == resolved_order_id)
+                                .values(billing_country=billing_country, checked_at=stamp)
+                            )
+                            if target["status"] != "paid_review":
+                                conn.execute(
+                                    orders.update()
+                                    .where(orders.c.id == resolved_order_id)
+                                    .values(
+                                        status="paid_review",
+                                        session_id=session_id,
+                                        paid_amount_cents=paid_cents,
+                                        confirmed_at=stamp,
+                                        resolution="manual_refund_review",
+                                        livemode=True,
+                                    )
+                                )
+                    self.record_payment_intent_in_tx(
+                        conn,
+                        resolved_order_id,
+                        session_id,
+                        payment_intent_id,
+                        at,
+                        livemode=True,
+                    )
+                    if target is not None and target["status"] in ("delivered", "duplicate"):
+                        return
+                    known = conn.execute(
+                        sa.select(self.refused_payments.c.session_id).where(
+                            self.refused_payments.c.session_id == session_id
+                        )
+                    ).first()
+                    if known is None:
+                        conn.execute(
+                            self.refused_payments.insert().values(
+                                session_id=session_id[:255],
+                                audit_id=audit_id[:80],
+                                reason=reason[:80],
+                                created_at=stamp,
+                            )
+                        )
+                return
+            except sa.exc.IntegrityError:
+                continue  # a competing webhook recorded this session first
+        raise RuntimeError("could not record market review")
 
     def attach_checkout_session(
         self, order_id: str, *, session_id: str, checkout_url: str, expires_at: datetime | None

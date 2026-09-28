@@ -367,6 +367,8 @@ def fulfil(
     payment_intent = session.get("payment_intent")
     if isinstance(payment_intent, Mapping):
         payment_intent = payment_intent.get("id")
+    declared_country = ""
+    billing_country = ""
     if order is not None and session.get("livemode") is True:
         market = store.checkout_market(order.id)
         if market is not None:
@@ -400,7 +402,6 @@ def fulfil(
                     _safe(audit_id),
                 )
                 return None
-            store.record_checkout_market(order.id, billing_country, at=at)
     try:
         outcome = store.settle_card_payment(
             order_id=order_id,
@@ -434,6 +435,13 @@ def fulfil(
                 at=at,
             )
         return None
+    if declared_country:
+        store.record_checkout_market(
+            outcome.order_id,
+            billing_country,
+            declared_country=declared_country,
+            at=at,
+        )
     if outcome.status == "duplicate":
         logger.warning(
             "paid Stripe session %s is a second charge for audit %s; manual refund review",
