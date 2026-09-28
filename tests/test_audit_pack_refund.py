@@ -44,12 +44,15 @@ def test_pack_is_on_sale_only_with_codes_and_a_real_discount() -> None:
     assert hidden.pack_price_usd == 0.0
 
 
-def test_landing_shows_pack_when_selling(tmp_path: Path) -> None:
+def test_landing_shows_the_pack_and_no_refund_promise_when_selling(tmp_path: Path) -> None:
     client = _client(tmp_path, **SELLING)
     es = client.get("/?lang=es").text
     assert "Pack de 3 informes: USD 69 (USD 23 cada uno)." in es
+    # Sales are final (owner's decision): the landing promises no refund.
+    assert "devolvemos" not in es and "reembolso" not in es
     en = client.get("/?lang=en").text
     assert "Pack of 3 reports: USD 69 (USD 23 each)." in en
+    assert "refund" not in en.lower()
     assert find_claims(es) == [] and find_claims(en) == []
 
 

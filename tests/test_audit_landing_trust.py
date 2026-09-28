@@ -46,17 +46,13 @@ def test_every_landing_has_the_trust_section_with_its_proofs(locale: str) -> Non
 
 def test_trust_links_point_to_pages_that_exist_in_the_page_language() -> None:
     es = _section(_paid("es"))
-    for href in ("/ejemplo?lang=es", "/metodologia", "/comprobar", "/privacidad", "/terminos"):
+    # Three cards: the sample, no bots or signals, your file (methodology and the
+    # check page stay linked from pricing, the footer and the report).
+    for href in ("/ejemplo?lang=es", "/privacidad"):
         assert f"href='{href}" in es, href
     # Portuguese legal pages are translated and linked in the same language.
     pt = _section(_paid("pt"))
-    for href in (
-        "/pt/exemplo",
-        "/pt/metodologia",
-        "/pt/comprovar",
-        "/pt/privacidade",
-        "/pt/termos",
-    ):
+    for href in ("/pt/exemplo", "/pt/privacidade"):
         assert f"href='{href}" in pt, href
 
 

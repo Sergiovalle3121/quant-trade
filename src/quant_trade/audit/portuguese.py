@@ -93,7 +93,13 @@ COPY_PT: dict[str, Any] = {
     "benchmark": "Benchmark (CSV, opcional)",
     "variants": "Matriz de variantes (CSV, opcional)",
     "variants_help": "Uma coluna de retornos por variante testada; habilita o PBO.",
-    "trials": "Configurações testadas antes de escolher esta (vazio = não declarado)",
+    "trials": "Quantas configurações ou versões foram testadas antes de escolher esta?",
+    "trials_help": (
+        "O Rigor só pode descontar a sorte de testar muitas se você disser quantas. Se você "
+        "enviar o XML de otimização do MT5, elas são contadas "
+        "sozinhas. Num histórico de conta ou de fundo, indique quantas estratégias ou fundos o "
+        "mesmo gestor administra. Se não souber, deixe em branco."
+    ),
     "cost_bps": (
         "Custo extra por lado em pontos-base, além do que o seu relatório já detalha (vazio = 0)"
     ),
@@ -128,7 +134,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "signin_create": "Criar conta grátis",
     "signin_enter": "Já tenho conta",
-    "waitlist_title": "Avise-me quando houver novidades",
+    "waitlist_title": "Receba guias e novidades",
     "email": "E-mail",
     "join": "Quero receber",
     "joined": "Inscrito. Obrigado.",
@@ -137,10 +143,9 @@ COPY_PT: dict[str, Any] = {
     "disclaimer": "Aviso",
     "sample_link": "Ver um relatório de exemplo completo (dados sintéticos)",
     "meta_description": (
-        "Auditoria estatística de backtests e históricos de trading para forex, ações, futuros "
-        "e cripto. Envie o relatório do MetaTrader, TradingView, NinjaTrader, Python ou a sua "
-        "curva de equity e receba um veredito de A a D, com cada número etiquetado segundo a "
-        "sua evidência."
+        "Envie o arquivo que você já tem (MetaTrader, TradingView, NinjaTrader, Python ou a sua "
+        "curva de equity) e o Rigor mostra quanto do seu resultado se sustenta com custos, "
+        "quantos testes houve por trás e se os dados fecham. Classe de A a D."
     ),
     "sample_description": (
         "Relatório completo de exemplo da auditoria de backtests, feito com dados sintéticos: "
@@ -186,13 +191,12 @@ COPY_PT: dict[str, Any] = {
     "v_description": "{cls_label} {overall} · auditada em {date} · {notice}.",
     "how_title": "Como funciona",
     "how": [
+        "Crie a sua conta com o seu e-mail: o seu primeiro relatório completo é grátis.",
         "Envie o arquivo da sua plataforma como está: um backtest, o histórico de uma conta ou "
         "uma série de retornos.",
-        "Em segundos você vê, de graça, a classe de A a D, os gráficos, as bandeiras vermelhas "
-        "e o que cada dimensão significa em linguagem simples.",
-        "Se quiser todos os números, desbloqueia o relatório completo na mesma página e o "
-        "guarda em PDF.",
-        "Se quiser, publique uma página de verificação com selo para compartilhar.",
+        "Você vê a classe de A a D, os gráficos e o que cada dimensão significa, em linguagem "
+        "simples.",
+        "Cada auditoria seguinte é paga pela sua conta, e os seus relatórios ficam guardados lá.",
     ],
     "prices_title": "Preços",
     "price_free_title": "Prévia",
@@ -219,10 +223,6 @@ COPY_PT: dict[str, Any] = {
     ),
     "contact": "Pedir um código",
     "price_pack": "Pacote de {n} relatórios: USD {price:.0f} (USD {each:.0f} cada um).",
-    "refund_note": (
-        "Se o relatório ler mal o seu arquivo (operações, saldo ou datas que não batem com a "
-        "sua plataforma) e não conseguirmos corrigir, devolvemos o valor desse relatório."
-    ),
     "account_note": (
         "O seu primeiro relatório completo, grátis ao criar a sua conta; depois, "
         f"{_FREE} prévias grátis por mês, e os seus relatórios e créditos num só lugar."
@@ -251,8 +251,8 @@ COPY_PT: dict[str, Any] = {
             "qualquer ativo.",
         ),
         (
-            "O que eu recebo e quanto demora?",
-            "Em segundos, a prévia gratuita: classe de A a D, gráficos, bandeiras vermelhas e o "
+            "O que eu recebo?",
+            "De graça, a prévia: classe de A a D, gráficos, bandeiras vermelhas e o "
             "que cada dimensão significa. O relatório completo acrescenta cada número, testes de "
             "estresse, risco e capital, simulador de desafios, a conta real frente ao backtest "
             "se você a enviar, perguntas para o vendedor e o PDF. Veja o exemplo completo antes "
@@ -357,28 +357,26 @@ UI_PT: dict[str, Any] = {
     "cta": "Começar grátis",
     "cta_full": "Comece com a prévia grátis",
     "cta_short": "Auditar",
-    "hero_a": "Envie seu backtest ou seu histórico.",
-    "hero_b": "Dizemos se é evidência ou sorte.",
+    "hero_a": "Vantagem real",
+    "hero_b": "ou pura sorte?",
+    "nav_lang": "Idioma",
     "trust": [
-        ("shield", "Sem conexão com a sua corretora"),
-        ("hash", "Impressão SHA-256 de cada arquivo"),
-        ("globe", "Relatório em português, inglês ou espanhol"),
+        ("shield", "Não se conecta à sua corretora nem recomenda operações"),
+        ("hash", "Todo relatório pode ser comprovado"),
         ("key", "Primeiro relatório completo grátis com a sua conta"),
     ],
     "mock_url": "relatório · classe B",
     "mock_k": "Veredito",
     "cta_sample": "Ver um relatório de exemplo",
     "hero_lead": (
-        "Para traders de qualquer mercado, quem compra um robô, quem vai fazer um desafio de "
-        "prop firm e quem investe com um gestor. Envie o arquivo que você já tem e receba em "
-        "segundos um veredito de A a D sobre sobreajuste, custos, fora da amostra e qualidade "
-        "dos dados, com cada número etiquetado segundo a sua evidência."
+        "Envie o backtest ou o histórico que você já tem. O Rigor o testa contra custos, "
+        "testes repetidos e dados com erros, e dá uma classe de A a D."
     ),
     "mock_cap": "Ilustração com dados sintéticos",
     "mock_is": "Dentro da amostra",
     "mock_oos": "Fora da amostra",
     "mock_kpis": [
-        ("0,41", "Sharpe deflacionado"),
+        ("0,97", "Sharpe deflacionado"),
         ("120", "Tentativas contadas"),
         ("3,2 pb", "Custo de equilíbrio"),
     ],
@@ -389,9 +387,26 @@ UI_PT: dict[str, Any] = {
     "problem_eyebrow": "O problema",
     "problem_title": ("Um backtest bonito", "não é evidência."),
     "problem_lead": (
-        "Quase qualquer estratégia fica bonita no papel. Estes são os três motivos pelos quais "
-        "a maioria não se sustenta fora do testador."
+        "Quase qualquer estratégia fica bonita no papel. O Rigor existe para que uma curva "
+        "bonita não engane você antes de arriscar o seu dinheiro ou pagar por um robô. Estes "
+        "são os três motivos pelos quais a maioria não se sustenta fora do testador."
     ),
+    "example_case": {
+        "eyebrow": "Como ele detecta isso no exemplo",
+        "title": "Sharpe de 1,8 no testador. Classe C no Rigor.",
+        "text": (
+            "O relatório de exemplo é um backtest de MT5 feito com dados sintéticos. O Rigor "
+            "baixa a sua classe por três coisas que o testador não mostra:"
+        ),
+        "points": (
+            "Saiu de 120 configurações testadas; ao descontá-las, o seu Sharpe já não chega ao "
+            "limite.",
+            "Com o dobro do custo de referência termina em prejuízo.",
+            "A sua conta real, de 180 operações, fica fora do que o seu próprio backtest faria "
+            "esperar.",
+        ),
+        "cta": "Ver o relatório de exemplo",
+    },
     "problems": [
         (
             "Sobreajuste",
@@ -412,8 +427,9 @@ UI_PT: dict[str, Any] = {
     "dims_eyebrow": "O que medimos",
     "dims_title": ("Seis dimensões.", "Um veredito de A a D."),
     "dims_lead": (
-        "Cada dimensão sai como Passa, Fraca, Não passa ou Não medida, com duas frases em "
-        "linguagem simples sobre o que significa para você."
+        "O Rigor revisa o seu arquivo em seis pontos. Cada um sai como Passa, Fraca, Não passa "
+        "ou Não medida, com duas frases em linguagem simples sobre o que significa para você. "
+        "Os métodos são públicos e estão escritos na metodologia."
     ),
     "stats": [
         ("6", "dimensões auditadas"),
@@ -491,7 +507,7 @@ UI_PT: dict[str, Any] = {
     "pricing_eyebrow": "Preços",
     "plan_free": "Prévia",
     "plan_free_amount": "Grátis",
-    "plan_free_note": f"com a sua conta: o primeiro relatório completo e {_FREE} por mês",
+    "plan_free_note": f"o seu primeiro relatório completo; depois, {_FREE} prévias por mês",
     "plan_full": "Relatório completo",
     "plan_full_note": "por auditoria",
     "plan_badge": "Completo",
@@ -660,15 +676,6 @@ TRUST_PT: dict[str, Any] = {
             "sample",
         ),
         (
-            "layers",
-            "Métodos publicados, não uma caixa-preta",
-            "Sharpe probabilístico e deflacionado (Bailey e López de Prado), probabilidade de "
-            "sobreajuste e bootstrap estacionário (Politis e Romano). Cada teste e cada limite "
-            "estão escritos.",
-            "Ler a metodologia (em inglês)",
-            "method",
-        ),
-        (
             "shield",
             "Não vendemos robôs nem sinais",
             "Não executamos ordens nem pedimos as chaves da sua corretora, e nenhum relatório "
@@ -677,28 +684,12 @@ TRUST_PT: dict[str, Any] = {
             "",
         ),
         (
-            "hash",
-            "Um relatório que não pode ser retocado",
-            "Cada relatório leva a impressão SHA-256 dos seus arquivos e do resultado; qualquer "
-            "pessoa pode conferir que um PDF ou um JSON não foi editado.",
-            "Conferir um relatório (em inglês)",
-            "check",
-        ),
-        (
             "lock",
             "O seu arquivo é seu",
             "Nunca é publicado. Se você não desbloquear o relatório, é apagado após {retention} "
             "dias, e você pode apagar a sua conta e os seus relatórios quando quiser.",
             "Política de privacidade",
             "privacy",
-        ),
-        (
-            "card",
-            "Se ler mal o seu arquivo, devolvemos o valor",
-            "Se as operações, o saldo ou as datas não batem com a sua plataforma e não "
-            "conseguimos corrigir, devolvemos o que você pagou por esse relatório.",
-            "Termos do serviço",
-            "terms",
         ),
     ],
     "who": "Quem está por trás: {name}, {address}.",

@@ -151,8 +151,6 @@ def test_methodology_page_uses_cards_badges_and_chips() -> None:
 
 
 def test_every_footer_and_the_landing_link_the_methodology(tmp_path: Path) -> None:
-    from quant_trade.audit.pages import INVESTOR_COPY
-
     client = _client(tmp_path)
     for path, target in (
         ("/", "/metodologia"),
@@ -162,12 +160,13 @@ def test_every_footer_and_the_landing_link_the_methodology(tmp_path: Path) -> No
         page = client.get(path).text
         foot = page.split("<footer", 1)[1]
         assert f"href='{target}'" in foot
-    for locale, path in (("es", "/"), ("en", "/en")):
+    # Investors still find their page from the landing's audience cards.
+    for path, target in (
+        ("/", "/para/inversores-gestores-fondos"),
+        ("/en", "/for/investors-managers-funds"),
+    ):
         page = client.get(path).text
-        assert "class='investor'" in page and INVESTOR_COPY[locale]["title"] in page
-        assert (
-            "/guias/cuenta-proveedor'" if locale == "es" else "/guides/provider-account'"
-        ) in page
+        assert f"href='{target}'" in page
         assert find_claims(page) == []
 
 

@@ -72,6 +72,18 @@
       counters.forEach(function (el) { co.observe(el); });
     }
 
+    // The language and phone menus close on a click outside them or on Escape.
+    var menus = d.querySelectorAll("details.langs, details.menu");
+    if (menus.length) {
+      d.addEventListener("click", function (ev) {
+        menus.forEach(function (m) { if (m.open && !m.contains(ev.target)) m.open = false; });
+      });
+      d.addEventListener("keydown", function (ev) {
+        if (ev.key !== "Escape") return;
+        menus.forEach(function (m) { m.open = false; });
+      });
+    }
+
     // A soft light that follows the pointer over cards.
     d.addEventListener("pointermove", function (ev) {
       var card = ev.target && ev.target.closest ? ev.target.closest(".spot") : null;

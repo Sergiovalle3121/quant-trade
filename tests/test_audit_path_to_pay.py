@@ -41,59 +41,39 @@ def test_start_free_goes_to_sign_up_when_an_upload_needs_an_account(locale: str)
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_the_landing_sells_what_the_full_report_now_measures(locale: str) -> None:
+    # The long feature cards left the landing (too much text); the price card still
+    # names what the full report measures, and the language menu offers all three.
     ui = _UI[locale]
-    titles = [title for _, title, _ in ui["diffs"]]
-    assert len(titles) == 7
     words = {
         "es": ("efectivo", "VIX", "inflación"),
         "en": ("cash", "VIX", "inflation"),
         "pt": ("caixa", "VIX", "inflação"),
     }[locale]
-    text = _text(landing(locale=locale, free_mode=False, signed_in=False))
+    page = landing(locale=locale, free_mode=False, signed_in=False)
+    text = _text(page)
     for word in words:
-        assert word in " ".join(t for _, _, t in ui["diffs"]), word
         assert word in " ".join(ui["full_items"]), word
-    assert "FRED" in text and "3" in text
-    # The report and its public page exist in three languages, and the chip says so.
-    chip = " ".join(t for _, t in ui["trust"])
-    assert {"es": "portugués", "en": "Portuguese", "pt": "português"}[locale] in chip
+        assert word in text, word
+    assert "class='langs'" in page
+    for name in ("Español", "English", "Português"):
+        assert name in text
     assert find_claims(text) == []
 
 
 @pytest.mark.parametrize(
-    ("locale", "own_inflation", "available", "official", "obsolete"),
+    ("locale", "own_inflation", "available"),
     [
-        (
-            "es",
-            "propia inflación",
-            "índices de precios disponibles",
-            "fuentes estadísticas oficiales",
-            "inflación de EE. UU.",
-        ),
-        (
-            "en",
-            "own inflation",
-            "price indexes are available",
-            "official statistical sources",
-            "after US inflation",
-        ),
-        (
-            "pt",
-            "própria inflação",
-            "índices de preços disponíveis",
-            "fontes estatísticas oficiais",
-            "inflação dos EUA",
-        ),
+        ("es", "inflación propia", "con datos disponibles"),
+        ("en", "its own inflation", "where data is available"),
+        ("pt", "inflação própria", "com dados disponíveis"),
     ],
 )
 def test_landing_names_each_currency_inflation_and_its_data_limit(
-    locale: str, own_inflation: str, available: str, official: str, obsolete: str
+    locale: str, own_inflation: str, available: str
 ) -> None:
     text = _text(landing(locale=locale, free_mode=False, signed_in=False))
     assert own_inflation in text
     assert available in text
-    assert official in text and "FRED" in text
-    assert obsolete not in text
     assert find_claims(text) == []
 
 
@@ -260,3 +240,35 @@ def test_the_landing_says_a_pdf_statement_is_accepted(locale: str) -> None:
     assert phrase in page.replace("\n", " ")
     assert "accept='.htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf'" in page
     assert not find_claims(page)
+
+
+@pytest.mark.parametrize("locale", sorted(SIGNUP))
+def test_the_landing_shows_what_rigor_catches_in_the_sample(locale: str) -> None:
+    words = _UI[locale]["example_case"]
+    page = html.unescape(landing(locale=locale, free_mode=False))
+    texts = [words["eyebrow"], words["title"], words["text"], *words["points"], words["cta"]]
+    assert all(text in page for text in texts)
+    assert find_claims(" ".join(texts)) == []
+
+
+def test_the_sample_case_on_the_landing_matches_the_sample_report() -> None:
+    # Every figure in the landing's sample case is read here from the sample itself, so
+    # the landing cannot drift from what /ejemplo shows.
+    from quant_trade.audit.sample import sample_result
+
+    result = sample_result("es").model_dump(mode="json")
+    assert result["verdict"]["overall"] == "C"
+    assert round(result["performance"]["sharpe"]["value"], 1) == 1.8
+    multiplicity = result["multiplicity"]
+    assert multiplicity["trials_used"]["value"] == 120
+    dsr_pass = result["verdict"]["thresholds"]["dsr_pass"]
+    assert multiplicity["dsr_at_trials_used"]["value"] < dsr_pass
+    double = next(row for row in result["costs"]["rows"] if row["multiplier"] == 2.0)
+    assert double["net_pnl"]["value"] < 0
+    assert result["live"]["outcome"] == "INCONSISTENT"
+    assert result["live"]["live"]["trades"]["value"] == 180
+    for locale in SIGNUP:
+        words = _UI[locale]["example_case"]
+        text = " ".join(words["points"])
+        assert "120" in text and "180" in text and "1,8" in words["title"].replace(".", ",")
+        assert words["title"].rstrip(".").endswith(("C en Rigor", "C in Rigor", "C no Rigor"))
