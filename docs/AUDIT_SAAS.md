@@ -3403,16 +3403,19 @@ of its time span make the comparison `NOT_MEASURED`.
 
 A platform Balance cell which differs materially from the deal-money chain
 produces `MONETARY_RECONCILIATION_MISMATCH` (`FAIL` for data quality), and
-the return uses the reconstructed deal amounts. For an independently uploaded
+the return uses the reconstructed deal amounts. When the importer reports a
+position still open at the end, or a close whose money is in the balance but
+not in the trade list, the gap is `NOT_MEASURED` instead: those deals move the
+balance without being closed trades. For an independently uploaded
 curve, an unexplained difference produces
 `MONETARY_RECONCILIATION_UNEXPLAINED` (`WARN`) and the equation stays
 `NOT_MEASURED` because unreported deposits, open positions or conversion
 could explain it. Neither alert claims fraud. The calibrated forensic battery
 is also run over the original platform bytes; a `BALANCE_CHAIN SIGNAL` adds
 `FORENSIC_BALANCE_CHAIN_SIGNAL` (`WARN`) with method version and calibration,
-without treating a heuristic as proof of alteration. The altered MT5 tester
-fixture and a restored control, and a 519-trade curve scaled only in its
-variation, are covered in `tests/test_audit_monetary_integrity.py` and through
+without treating a heuristic as proof of alteration. An MT5 tester report
+altered in memory with the clean fixture as its control, and a 519-trade
+curve scaled only in its variation, are covered in `tests/test_audit_monetary_integrity.py` and through
 the persisted web report in `tests/test_audit_money_web.py`.
 
 The generic trades CSV accepts commission/fee as charges with either sign,

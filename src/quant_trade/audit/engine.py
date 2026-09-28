@@ -964,6 +964,27 @@ def _safe_text(text: str) -> str:
     return WITHHELD_TEXT if find_claims(text) else text
 
 
+#: Importer warnings saying the balance holds money the closed-trade list
+#: leaves out (fees of positions still open, closes without an entry).
+_INCOMPLETE_LEDGER_WARNINGS = (
+    "still open at the end of the report",
+    "opened in the report were not closed",
+    "position(s) never closed",
+    "in the balance but not in the trade list",
+)
+_INCOMPLETE_LEDGER_REASON = (
+    "open positions or closes missing from the trade list could explain the difference"
+)
+
+
+def _incomplete_ledger(inputs: AuditInputs) -> bool:
+    return any(
+        warning.startswith("report: ") and marker in warning
+        for warning in inputs.warnings
+        for marker in _INCOMPLETE_LEDGER_WARNINGS
+    )
+
+
 def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.RedFlag]]:
     """Compare the monetary curve with the closed-trade ledger where possible.
 
@@ -1074,6 +1095,10 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
             ),
             **common,
         }, []
+    if inputs.balance_only and _incomplete_ledger(inputs):
+        # The printed balance also moves with deals the closed-trade list
+        # leaves out, so the gap is not a contradiction of the deal amounts.
+        return {"status": "NOT_MEASURED", "reason": _INCOMPLETE_LEDGER_REASON, **common}, []
     if inputs.balance_only and reported is not None:
         flag = redflags.RedFlag(
             "MONETARY_RECONCILIATION_MISMATCH",

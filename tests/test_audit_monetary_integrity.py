@@ -265,6 +265,12 @@ def test_dependent_2000_returns_cannot_receive_class_a_from_plain_psr() -> None:
     adjusted = dependence_adjusted_psr(pd.Series(dependent))["psr"]["value"]
     assert 0.0 < adjusted < 0.95
     assert result.significance["psr"]["value"] >= adjusted
+    engine_adjusted = result.significance["dependence"]["psr"]
+    assert engine_adjusted["evidence"] == "MEASURED"
+    statistical = next(d for d in result.verdict.dimensions if d.name == "statistical_significance")
+    # The verdict grades the dependence-adjusted PSR, not the plain one.
+    assert statistical.inputs["psr"]["value"] == pytest.approx(engine_adjusted["value"])
+    assert statistical.inputs["psr"]["value"] < statistical.inputs["psr_unadjusted"]["value"]
     assert result.verdict.overall != "A"
 
 
@@ -313,3 +319,34 @@ def test_variants_bad_dates_cannot_feed_cscv() -> None:
             variants_bytes=variants.to_csv(index=False).encode(),
             now=NOW,
         )
+
+
+def test_mt5_position_open_at_the_end_is_not_a_monetary_contradiction() -> None:
+    """An entry deal still open at the end moves the balance by its commission
+    without appearing in the closed trades: the gap (5.00, above the 1 bp
+    tolerance) cannot be reconciled, so it is NOT_MEASURED, never a
+    contradiction that forces class D."""
+    clean = MT5.read_bytes()
+    last_deal = b"<td>10 063.05</td><td>end of test</td></tr>"
+    opened = (
+        b'\n   <tr bgcolor="#FFFFFF" align=right><td>2024.01.08 11:00:00</td><td>11</td>'
+        b"<td>EURUSD</td><td>buy</td><td>in</td><td>0.1</td><td>1.09000</td><td>11</td>"
+        b"<td>-5.00</td><td>0.00</td><td>0.00</td><td>10 058.05</td><td></td></tr>"
+    )
+    assert clean.count(last_deal) == 1
+    changed = clean.replace(last_deal, last_deal + opened)
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(cost_bps_per_side=1),
+        report_bytes=changed,
+        report_filename="mt5_tester.html",
+        now=NOW,
+    )
+    assert any("still open at the end of the report" in w for w in inputs.warnings)
+    result = _run(inputs)
+    assert result.reconciliation is not None
+    assert result.reconciliation["status"] == "NOT_MEASURED"
+    assert result.reconciliation["difference"]["value"] == pytest.approx(-5.0)
+    assert "open positions" in result.reconciliation["reason"]
+    codes = {(flag["code"], flag["severity"]) for flag in result.red_flags}
+    assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") not in codes

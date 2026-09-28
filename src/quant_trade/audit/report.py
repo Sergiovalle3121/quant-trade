@@ -4814,6 +4814,13 @@ RECON_REASONS: dict[str, tuple[str, str, str]] = {
         "The printed balance contradicts the deal amounts.",
         "O saldo impresso contradiz os valores das operações.",
     ),
+    "open positions or closes missing from the trade list could explain the difference": (
+        "Las posiciones abiertas o los cierres que faltan en la lista de operaciones "
+        "podrían explicar la diferencia.",
+        "Open positions or closes missing from the trade list could explain the difference.",
+        "Posições abertas ou fechamentos ausentes da lista de operações podem explicar "
+        "a diferença.",
+    ),
     "flows, currency conversion or open positions could explain the difference": (
         "Los flujos, el cambio de moneda o las posiciones abiertas podrían explicar la diferencia.",
         "Flows, currency conversion or open positions could explain the difference.",

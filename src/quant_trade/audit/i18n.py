@@ -2058,6 +2058,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "el balance impreso contradice los importes de las operaciones",
     ),
     (
+        "open positions or closes missing from the trade list could explain the difference",
+        "las posiciones abiertas o los cierres que faltan en la lista de operaciones "
+        "podrían explicar la diferencia",
+    ),
+    (
         "printed final balance differs from initial balance plus flows and net closed "
         "P&L by {difference} {currency}; the return was rebuilt from deal amounts",
         "el balance final impreso difiere del balance inicial más los flujos y el P/L "
