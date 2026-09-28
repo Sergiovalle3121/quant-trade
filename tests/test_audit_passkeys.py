@@ -560,8 +560,8 @@ def test_the_protection_card_counts_what_is_on_and_links_what_is_off(tmp_path: P
     # Two-step needs the recovery key first, so its link goes there.
     assert "Primero crea tu clave de recuperación." in card
     assert card.count("href='#recuperacion'") == 2 and "href='#llaves'" in card
-    # It sits above the reports, where a new customer looks first.
-    assert page.index(PROTECT) < page.index("id='llaves'")
+    # It opens the security part, above the cards it links to.
+    assert page.index("id='seguridad'") < page.index(PROTECT) < page.index("id='llaves'")
     assert find_claims(page) == []
 
     _turn_on_two_step(client)
@@ -570,7 +570,8 @@ def test_the_protection_card_counts_what_is_on_and_links_what_is_off(tmp_path: P
 
     _add_passkey(client, Device())
     page = client.get("/cuenta").text
-    assert PROTECT not in page
+    # The card shrinks to one line and keeps its id, so old links still land.
+    assert "acct-card acct-protect" not in page and page.count(PROTECT) == 1
     assert "Tienes activas todas las protecciones que ofrecemos." in page
 
 
