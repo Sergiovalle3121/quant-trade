@@ -47,3 +47,32 @@ def test_other_hosts_are_not_redirected(tmp_path: Path) -> None:
     client = _client(tmp_path, "https://rigor.example")
     response = client.get("/", headers={"host": "rigor.example"}, follow_redirects=False)
     assert response.status_code == 200
+    # Only the domain's own www name moves, never a look-alike.
+    for host in ("www.rigor.example.evil.test", "wwwrigor.example", "app.rigor.example"):
+        other = client.get("/", headers={"host": host}, follow_redirects=False)
+        assert other.status_code == 200, host
+
+
+def test_www_forwards_reads_to_the_domain(tmp_path: Path) -> None:
+    client = _client(tmp_path, "https://rigor.example")
+    www = {"host": "www.rigor.example"}
+    response = client.get("/en/audit?lang=en", headers=www, follow_redirects=False)
+    assert response.status_code == 308
+    assert response.headers["location"] == "https://rigor.example/en/audit?lang=en"
+    head = client.head("/", headers={"host": "WWW.rigor.example:443"}, follow_redirects=False)
+    assert head.status_code == 308
+    assert head.headers["location"] == "https://rigor.example/"
+
+
+def test_posts_and_health_stay_on_www(tmp_path: Path) -> None:
+    client = _client(tmp_path, "https://rigor.example")
+    www = {"host": "www.rigor.example"}
+    assert client.get("/health", headers=www).status_code == 200
+    assert client.get("/ready", headers=www, follow_redirects=False).status_code != 308
+    assert client.post("/webhooks/stripe", content=b"{}", headers=www).status_code != 308
+
+
+def test_www_is_not_moved_without_an_https_domain(tmp_path: Path) -> None:
+    client = _client(tmp_path, "http://rigor.example")
+    response = client.get("/", headers={"host": "www.rigor.example"}, follow_redirects=False)
+    assert response.status_code == 200

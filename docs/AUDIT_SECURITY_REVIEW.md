@@ -131,7 +131,10 @@ Every change below has an offline, deterministic test in
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on
-  the `Host` header, and HSTS is turned on.
+  the `Host` header, and HSTS is turned on. Reads on the Railway address and
+  on the domain's `www` name answer 308 to that fixed address (the target
+  never comes from the request), so a visitor has one origin and one
+  session; POSTs, `/health` and `/ready` are served where they arrive.
 - `AUDIT_TRUSTED_PROXY_HOPS=1`, as before, so rate limits count the real
   client.
 - Optional: `AUDIT_MAX_CONCURRENT_AUDITS` (default 2) and
