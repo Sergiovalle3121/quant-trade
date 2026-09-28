@@ -94,8 +94,9 @@ def test_trader_pages_link_the_universal_csv_guide(tmp_path: Path) -> None:
     client = _client(tmp_path)
     assert "/guias/csv-universal" in client.get("/para/traders-acciones-futuros-cripto").text
     assert "/guides/universal-csv" in client.get("/for/stock-futures-crypto-traders").text
-    assert "cualquier bróker, exchange o diario" in client.get("/").text
-    assert "any broker, exchange or journal" in client.get("/en").text
+    # The landing names the formats it recognises and links the same guide.
+    assert "/guias/csv-universal" in client.get("/").text
+    assert "/guides/universal-csv" in client.get("/en").text
 
 
 def test_named_platforms_match_the_universal_guide_and_show_on_the_pages(tmp_path: Path) -> None:
