@@ -240,8 +240,9 @@ def test_undeclared_trials_read_as_the_most_favourable_case() -> None:
     from quant_trade.audit.verdict import _TEXT, MULTIPLICITY, summary
 
     for locale in ("es", "en"):
-        for status in ("PASS", "WEAK", "FAIL"):
+        for status in ("NOT_MEASURED", "WEAK", "FAIL"):
             assert f"{MULTIPLICITY}.{status}.undeclared" in _TEXT[locale]
+        assert f"{MULTIPLICITY}.PASS.undeclared" not in _TEXT[locale]
     result = run_audit(
         _inputs(DeclaredMetadata(trials_declared=False)),
         now=NOW,
