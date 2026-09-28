@@ -95,6 +95,10 @@ COPY: dict[str, dict[str, str]] = {
             "Tus compras con tarjeta o código, con fecha"
         ),
         "email_bad": "Ese correo no parece válido.",
+        "email_simple": (
+            "Usa un correo simple, como nombre@ejemplo.com: sin espacios, comillas, comas, "
+            "paréntesis ni acentos."
+        ),
         "email_disposable": (
             "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
             "ahí te llegan la confirmación y la recuperación de tu cuenta."
@@ -140,6 +144,11 @@ COPY: dict[str, dict[str, str]] = {
         "csrf": "El formulario caducó. Recarga la página y vuelve a enviarlo.",
         "signed_out": "Saliste de tu cuenta.",
         "welcome": "Cuenta creada. Ya puedes subir un archivo: el informe se guarda aquí.",
+        "welcome_confirm": (
+            "Cuenta creada. Te enviamos un enlace de confirmación a tu correo: ábrelo para "
+            "desbloquear tu primer informe completo gratis y las compras. Si no lo ves, revisa "
+            "la carpeta de spam."
+        ),
         "account_title": "Mis informes",
         "account_lead": "Todo lo que auditaste con esta cuenta, en un solo lugar.",
         "signed_in_as": "Sesión iniciada como",
@@ -373,12 +382,12 @@ COPY: dict[str, dict[str, str]] = {
         "email_status_title": "Correo de tu cuenta",
         "email_verified_status": "Correo confirmado.",
         "email_unverified_status": (
-            "Tu correo aún no está confirmado. Tu primer informe completo gratis sigue "
-            "disponible; confirma el correo para comprar o recibir créditos por invitaciones."
+            "Tu correo aún no está confirmado. Confírmalo para desbloquear tu primer informe "
+            "completo gratis, las compras y los créditos por invitaciones."
         ),
         "email_delivery_unavailable": (
-            "El envío de correos no está disponible ahora. Puedes usar tu primer informe "
-            "gratis; las compras y los créditos por invitaciones requieren confirmación."
+            "El envío de correos no está disponible ahora. El primer informe completo gratis, "
+            "las compras y los créditos por invitaciones requieren confirmar el correo."
         ),
         "email_request_button": "Enviar enlace de confirmación",
         "email_pending_note": (
@@ -395,8 +404,8 @@ COPY: dict[str, dict[str, str]] = {
             "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
         ),
         "email_checkout_required": (
-            "Confirma tu correo desde Mi cuenta antes de pagar. Tu primer informe completo "
-            "gratis sigue disponible."
+            "Confirma tu correo desde Mi cuenta antes de pagar. Confirmarlo también "
+            "desbloquea tu primer informe completo gratis."
         ),
         "email_now": "Ahora entras con {email}. Desde el cambio entrarás con el correo nuevo.",
         "email_new": "Correo nuevo",
@@ -772,6 +781,10 @@ COPY: dict[str, dict[str, str]] = {
             "Your card and code purchases, with dates"
         ),
         "email_bad": "That e-mail address does not look valid.",
+        "email_simple": (
+            "Use a plain e-mail address, like name@example.com: no spaces, quotes, commas, "
+            "brackets or accents."
+        ),
         "email_disposable": (
             "That address belongs to a temporary-inbox service. Use an address you keep: "
             "your account's confirmation and recovery go there."
@@ -818,6 +831,11 @@ COPY: dict[str, dict[str, str]] = {
         "csrf": "The form expired. Reload the page and submit it again.",
         "signed_out": "You signed out.",
         "welcome": "Account created. Upload a file now: the report is saved here.",
+        "welcome_confirm": (
+            "Account created. We sent a confirmation link to your e-mail: open it to unlock "
+            "your first free full report and purchases. If you do not see it, check your spam "
+            "folder."
+        ),
         "account_title": "My reports",
         "account_lead": "Everything you audited with this account, in one place.",
         "signed_in_as": "Signed in as",
@@ -1048,12 +1066,12 @@ COPY: dict[str, dict[str, str]] = {
         "email_status_title": "Your account e-mail",
         "email_verified_status": "E-mail confirmed.",
         "email_unverified_status": (
-            "Your e-mail is not confirmed yet. Your first free full report is still available; "
-            "confirm the e-mail to buy reports or receive referral credits."
+            "Your e-mail is not confirmed yet. Confirm it to unlock your first free full "
+            "report, purchases and referral credits."
         ),
         "email_delivery_unavailable": (
-            "E-mail delivery is unavailable now. You can use your first free report; "
-            "purchases and referral credits require confirmation."
+            "E-mail delivery is unavailable now. The first free full report, purchases and "
+            "referral credits require a confirmed e-mail."
         ),
         "email_request_button": "Send a confirmation link",
         "email_pending_note": (
@@ -1068,8 +1086,8 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
         "email_checkout_required": (
-            "Confirm your e-mail from My account before paying. Your first free full report "
-            "is still available."
+            "Confirm your e-mail from My account before paying. Confirming it also unlocks "
+            "your first free full report."
         ),
         "email_now": "You sign in with {email}. After the change you sign in with the new address.",
         "email_new": "New e-mail",
@@ -1958,10 +1976,11 @@ def compare_mine_note(locale: str) -> str:
     )
 
 
-def gate_page(*, locale: str, reason: str, limit: int) -> str:
+def gate_page(*, locale: str, reason: str, limit: int, extras: bool = False) -> str:
     """Why an upload did not run: no account, a bad code, or the month's free previews used.
 
-    ``reason`` is ``signin``, ``code``, ``quota`` or ``network``.
+    ``reason`` is ``signin``, ``code``, ``quota`` or ``network``; ``extras`` brings the
+    visitor back to the upload page with its extra boxes open.
     """
     locale = _locale(locale)
     copy = COPY[locale]
@@ -1970,7 +1989,7 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
 
     if reason in ("signin", "code"):
         # After signing up or in, back to the upload page: the file was not kept.
-        back = "?next=" + _e(_q(AUDIT_PATHS[locale]))
+        back = "?next=" + _e(_q(AUDIT_PATHS[locale] + ("?extras=1" if extras else "")))
         buttons = (
             f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}{back}'>"
             f"{_e(copy['gate_signup'])}</a>"
@@ -2870,7 +2889,6 @@ def report_box(
     csrf: str = "",
     credits: int = 0,
     locked: bool = False,
-    next_path: str = "",
     card_offer: bool = False,
 ) -> str:
     """The account line on a report page.
@@ -2879,18 +2897,21 @@ def report_box(
     ``unsaved`` (signed in, not on any account) or ``other`` (on another
     account). ``query`` is the report's own query string (token and language)
     for the forms; ``credits`` offers the one-click unlock when ``locked``.
+    A signed-out visitor goes to sign-up or sign-in through a form, so the
+    report's key is never written inside a ``next`` address.
     """
     locale = _locale(locale)
     copy = COPY[locale]
     base = f"/audits/{audit_id}"
     parts: list[str] = []
     if state == "anon":
-        suffix = f"?next={_e(_q(next_path))}" if next_path else ""
         parts.append(
             f"<span>{_e(copy['anon_box'])}</span>"
-            f"<a class='btn btn-dark btn-sm' href='{path('signup', locale)}{suffix}'>"
-            f"{_e(copy['anon_signup'])}</a>"
-            f"<a href='{path('signin', locale)}{suffix}'>{_e(copy['anon_signin'])}</a>"
+            f"<form method='post' action='{_e(base)}/account{_e(query)}'>"
+            "<button class='btn btn-dark btn-sm' type='submit' name='go' value='signup'>"
+            f"{_e(copy['anon_signup'])}</button> "
+            "<button class='btn btn-ghost btn-sm' type='submit' name='go' value='signin'>"
+            f"{_e(copy['anon_signin'])}</button></form>"
         )
     elif state == "mine":
         parts.append(

@@ -1268,9 +1268,10 @@ def test_checkout_needs_the_signed_in_account_that_owns_the_report(tmp_path: Pat
     assert response.status_code == 303
     location = response.headers["location"]
     assert location.startswith(account_pages.path("signin", "es") + "?next=")
-    assert parse_qs(urlsplit(location).query)["next"] == [
-        f"/audits/{audit_id}?token={token}&lang=es"
-    ]
+    # The report's key waits in its own cookie, never inside ``next``.
+    assert parse_qs(urlsplit(location).query)["next"] == [f"/audits/{audit_id}?lang=es"]
+    assert token not in location
+    assert f"rigor_report={audit_id}.{token};" in response.headers["set-cookie"]
 
     # A post from another site is refused before anything is recorded.
     forged = client.post(

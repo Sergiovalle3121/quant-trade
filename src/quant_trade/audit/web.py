@@ -35,7 +35,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 from pydantic import ValidationError
 
@@ -103,6 +103,7 @@ from quant_trade.audit.pages import (
 )
 from quant_trade.audit.payments import stripe_checkout
 from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
+from quant_trade.audit.prop_presets import DEFAULT_PRESET
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
@@ -114,7 +115,14 @@ from quant_trade.audit.schema import (
     live_digest_name,
     report_digest_name,
 )
-from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
+from quant_trade.audit.seo import (
+    BRAND,
+    NOINDEX,
+    PUBLIC_PAGES,
+    is_private_path,
+    robots_txt,
+    sitemap_xml,
+)
 from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings, resolve_panel_path
 from quant_trade.audit.store import (
     CODE_REFERENCE_PREFIX,
@@ -127,7 +135,7 @@ from quant_trade.audit.store import (
     make_store,
     strategy_name,
 )
-from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
+from quant_trade.audit.theme import ICON_PATHS, STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
 
 #: ``(settings, audit_id, token, *, plan, locale, order_id, amount_cents)``.
@@ -976,6 +984,21 @@ SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf", "pt": "/pt/exempl
 SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
 
 
+def _route_roots(locale: str) -> frozenset[str]:
+    """The first step of every address the pages have in ``locale`` (``/guides/mt5``
+    gives ``guides``), read from the tables the routes are built from."""
+    paths = [pair[locale] for pair in PUBLIC_PAGES if locale in pair]
+    paths += account_pages.PATHS[locale].values()
+    paths += mail_lib.PATHS[locale].values()
+    paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale]]
+    return frozenset(path.split("/")[1] for path in paths)
+
+
+#: Where an English page lives: ``/en`` and the English addresses without a
+#: prefix (``/guides``, ``/sample``, ``/login``). An error under them is in English.
+ENGLISH_ROOTS = _route_roots("en") - _route_roots("es")
+
+
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         import anyio
@@ -1089,14 +1112,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # path), so its pages carry the header themselves.
         panel_at = str(getattr(app.state, "panel_path", ""))
         in_panel = bool(panel_at) and (path == panel_at or path.startswith(panel_at + "/"))
-        if path.startswith(DISALLOWED_PATHS) or in_panel or response.status_code >= 400:
+        if is_private_path(path) or in_panel or response.status_code >= 400:
             response.headers["X-Robots-Tag"] = NOINDEX
         return response
+
+    #: ``ENGLISH_ROOTS`` plus the short addresses that forward to an English page.
+    english_roots = set(ENGLISH_ROOTS)
+
+    def _path_locale(path: str) -> str:
+        """Portuguese under ``/pt``, English under an English route, else Spanish."""
+        root = path.lstrip("/").split("/", 1)[0]
+        if root == "pt":
+            return "pt"
+        return "en" if root in english_roots else "es"
 
     def _scope_locale(scope: Any) -> str:
         query = scope.get("query_string", b"").decode("latin-1")
         match = re.search(r"(?:^|&)lang=(es|en|pt)(?:&|$)", query)
-        return match.group(1) if match else "es"
+        return match.group(1) if match else _path_locale(scope.get("path", ""))
 
     def _too_large_response(scope: Any) -> Any:
         path = scope.get("path", "")
@@ -1188,19 +1221,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         visits.add(day=today, locale=locale, ref=kept or arrived)
 
     canonical_host = urlsplit(cfg.base_url).netloc.lower()
+    www_host = f"www.{canonical_host}"
 
     @app.middleware("http")
     async def old_address(request: Request, call_next: Any) -> Any:
         """Send a visit to Railway's own address on to the site's domain.
 
-        Only reads (GET, HEAD) move: a card-payment webhook or a form post to
-        the old address keeps working. Health checks stay where Railway
-        looks for them.
+        The ``www`` name of the domain moves the same way, so a visitor has
+        one address and one session. Only reads (GET, HEAD) move: a
+        card-payment webhook or a form post to the old address keeps
+        working. Health checks stay where Railway looks for them.
         """
         host = request.headers.get("host", "").lower().split(":", 1)[0]
         if (
             cfg.base_url.startswith("https://")
-            and host.endswith(RAILWAY_HOST_SUFFIX)
+            and (host.endswith(RAILWAY_HOST_SUFFIX) or host == www_host)
             and host != canonical_host
             and request.method in ("GET", "HEAD")
             and request.url.path not in ("/health", "/ready")
@@ -1215,7 +1250,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         response = await call_next(request)
         _funnel_visit(request, response)
         ok = response.status_code == 200
-        if request.url.path.startswith("/static/") and ok:
+        if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
         else:
             public = request.url.path.startswith("/v/") and ok
@@ -1243,12 +1278,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return value if value in LOCALES else "es"
 
     def _error_locale(request: Request) -> str:
-        """The language of an error page: ``?lang=``, else Portuguese under ``/pt``."""
+        """The language of an error page: ``?lang=``, else the one of the address
+        (Portuguese under ``/pt``, English under an English route), else Spanish."""
         lang = request.query_params.get("lang")
         if lang in REPORT_LOCALES:
             return str(lang)
-        path = request.url.path
-        return "pt" if path == "/pt" or path.startswith("/pt/") else "es"
+        return _path_locale(request.url.path)
 
     def _html_error(
         request: Request, status: int, message: str, locale: str, *, kind: str = "audit"
@@ -1482,6 +1517,29 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         content, media_type = found
         return Response(content=content, media_type=media_type)
 
+    # The icon where browsers, phones and search engines ask for it.
+    def _icon(name: str) -> Callable[[], Response]:
+        def handler() -> Response:  # the name is fixed: nothing is read from the request
+            return static(name)
+
+        return handler
+
+    for icon_path, icon_name in ICON_PATHS.items():
+        app.add_api_route(icon_path, _icon(icon_name), methods=["GET"], include_in_schema=False)
+
+    def _forward(alias: str, target: str) -> None:
+        """A short address that forwards to a fixed page of the site.
+
+        The handler takes no parameter: the target never comes from the request.
+        """
+
+        def handler() -> Response:
+            return RedirectResponse(target, status_code=301)
+
+        if _path_locale(urlsplit(target).path) == "en":
+            english_roots.add(alias.split("/")[1])
+        app.add_api_route(alias, handler, methods=["GET"], include_in_schema=False)
+
     @app.get("/robots.txt", response_class=PlainTextResponse)
     def robots(request: Request) -> str:
         return robots_txt(_site_url(request))
@@ -1526,15 +1584,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return HTMLResponse(page)
 
-    def _audit_form(request: Request, locale: str, extras: int) -> Response:
+    def _audit_form(request: Request, locale: str, extras: int, done: str = "") -> Response:
         signed_in = _session(request) is not None
+        # Only the known value is shown, so the query cannot inject text.
+        notice = ""
+        if done == "welcome_confirm" and _confirm_pending(request):
+            notice = account_pages.COPY[locale]["welcome_confirm"]
         if not signed_in and not cfg.free_mode:
             # Uploads need an account: sign up (or sign in) first, then come back here,
             # so nobody fills the form and loses it.
             signup = _ACCOUNT_PATHS[locale][0]
-            return RedirectResponse(
-                f"{signup}?next={quote(AUDIT_PATHS[locale], safe='/')}", status_code=303
-            )
+            back = AUDIT_PATHS[locale] + (f"?{acct.NEXT_EXTRAS_QUERY}" if extras else "")
+            return RedirectResponse(f"{signup}?next={quote(back, safe='/')}", status_code=303)
         return HTMLResponse(
             upload_page(
                 locale=locale,
@@ -1545,21 +1606,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 base_url=_site_url(request),
                 extras_open=bool(extras),
                 signed_in=signed_in,
+                notice=notice,
             )
         )
 
     @app.get("/auditar", response_class=HTMLResponse)
-    def audit_form_es(request: Request, extras: int = 0) -> Response:
+    def audit_form_es(request: Request, extras: int = 0, done: str = "") -> Response:
         """The upload form on its own page (Spanish)."""
-        return _audit_form(request, "es", extras)
+        return _audit_form(request, "es", extras, done)
 
     @app.get("/en/audit", response_class=HTMLResponse)
-    def audit_form_en(request: Request, extras: int = 0) -> Response:
-        return _audit_form(request, "en", extras)
+    def audit_form_en(request: Request, extras: int = 0, done: str = "") -> Response:
+        return _audit_form(request, "en", extras, done)
 
     @app.get("/pt/auditar", response_class=HTMLResponse)
-    def audit_form_pt(request: Request, extras: int = 0) -> Response:
-        return _audit_form(request, "pt", extras)
+    def audit_form_pt(request: Request, extras: int = 0, done: str = "") -> Response:
+        return _audit_form(request, "pt", extras, done)
 
     # The legal pages under the other addresses people guess for them.
     for legal_alias, legal_path in (
@@ -1570,11 +1632,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/pt/termos-de-uso", "/pt/termos"),
         ("/pt/privacidad", "/pt/privacidade"),
     ):
-
-        def _to_legal(legal_path: str = legal_path) -> Response:
-            return RedirectResponse(legal_path, status_code=301)
-
-        app.add_api_route(legal_alias, _to_legal, methods=["GET"], include_in_schema=False)
+        _forward(legal_alias, legal_path)
 
     # Addresses people type or share for the prices: the landing's price section.
     for price_path, landing_path in (
@@ -1583,11 +1641,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/en/pricing", "/en"),
         ("/pt/precos", "/pt"),
     ):
-
-        def _prices(landing_path: str = landing_path) -> Response:
-            return RedirectResponse(f"{landing_path}#pricing", status_code=301)
-
-        app.add_api_route(price_path, _prices, methods=["GET"], include_in_schema=False)
+        _forward(price_path, f"{landing_path}#pricing")
 
     def _contact(request: Request, locale: str) -> HTMLResponse:
         return HTMLResponse(
@@ -1620,11 +1674,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/en/support", "/en/contact"),
         ("/pt/suporte", "/pt/contato"),
     ):
-
-        def _to_contact(contact_path: str = contact_path) -> Response:
-            return RedirectResponse(contact_path, status_code=301)
-
-        app.add_api_route(alias, _to_contact, methods=["GET"], include_in_schema=False)
+        _forward(alias, contact_path)
 
     @app.get("/en", response_class=HTMLResponse)
     def index_en(request: Request, extras: int = 0) -> Response:
@@ -1752,19 +1802,80 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         _note_event(request, account.id, event)
         _cookie(response, acct.SESSION_COOKIE, token, max_age=acct.SESSION_DAYS * 86400)
         response.delete_cookie(acct.CSRF_COOKIE, path="/")
+        if request.cookies.get(acct.REPORT_KEY_COOKIE):
+            response.delete_cookie(acct.REPORT_KEY_COOKIE, path="/")
 
     def _account_redirect(locale: str, done: str = "") -> Response:
         target = account_pages.path("account", locale) + (f"?done={done}" if done else "")
         return RedirectResponse(target, status_code=303)
 
+    def _keep_report_key(response: Any, report_key: str) -> None:
+        """A report's key waits in its own short-lived cookie, never inside ``next``."""
+        if report_key:
+            _cookie(
+                response,
+                acct.REPORT_KEY_COOKIE,
+                report_key,
+                max_age=acct.REPORT_KEY_MINUTES * 60,
+            )
+
+    def _back_to(request: Request, next_path: str, *, mailed: bool = False) -> Response:
+        """To ``next`` after signing in; a report gets back the key its cookie kept.
+
+        The cookie is used once: ``_start_session`` clears it. ``mailed`` asks the
+        upload page or the report for the "confirmation link sent" notice.
+        """
+        kept = request.cookies.get(acct.REPORT_KEY_COOKIE)
+        target = acct.join_report_key(next_path, kept)
+        parts = urlsplit(target)
+        name = (
+            "done"
+            if parts.path in AUDIT_PATHS.values()
+            else "acct"
+            if re.fullmatch(r"/audits/[A-Za-z0-9_-]+", parts.path)
+            else ""
+        )
+        if mailed and name:
+            query = f"{parts.query}&" if parts.query else ""
+            target = f"{parts.path}?{query}{name}=welcome_confirm"
+            if parts.fragment:
+                target += f"#{parts.fragment}"
+        return RedirectResponse(target, status_code=303)
+
+    def _confirm_pending(request: Request) -> bool:
+        """Signed in, a confirmation link can be sent and the address is not confirmed."""
+        session = _session(request)
+        return (
+            session is not None
+            and cfg.email_verification_required
+            and cfg.email_delivery_ready
+            and not db.email_verified(session[0].id)
+        )
+
+    def _without_report_key(request: Request, next_path: str) -> Response | None:
+        """An older link with a report's key inside ``next``: the same page without it."""
+        clean, report_key = acct.split_report_key(next_path)
+        if clean == next_path:
+            return None
+        query = [
+            (name, clean if name == "next" else value)
+            for name, value in request.query_params.multi_items()
+        ]
+        response = RedirectResponse(f"{request.url.path}?{urlencode(query)}", status_code=303)
+        _keep_report_key(response, report_key)
+        return response
+
     def _signin_redirect(locale: str, *, done: str = "", next_path: str = "") -> Response:
         query = []
         if done:
             query.append(f"done={done}")
+        next_path, report_key = acct.split_report_key(next_path)
         if next_path:
             query.append("next=" + quote(next_path, safe=""))
         target = account_pages.path("signin", locale) + ("?" + "&".join(query) if query else "")
-        return RedirectResponse(target, status_code=303)
+        response = RedirectResponse(target, status_code=303)
+        _keep_report_key(response, report_key)
+        return response
 
     def _account_email(account_id: str) -> str:
         found = db.get_account(account_id)
@@ -1778,6 +1889,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_flashes = ("signed_out", "deleted", "reset_done", "recovered", "two_step_expired")
     account_flashes = (
         "welcome",
+        "welcome_confirm",
         "code_linked",
         "password_changed",
         "filed",
@@ -1801,6 +1913,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "buy_email",
         "buy_review",
         "email_bad",
+        "email_simple",
         "email_disposable",
         "email_no_domain",
         "email_mismatch",
@@ -1983,6 +2096,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             if _session(request):
                 return _account_redirect(locale)
+            cleaned = _without_report_key(request, acct.safe_next(next))
+            if cleaned is not None:
+                return cleaned
             csrf = _anon_csrf(request)
             page = account_pages.signup_page(
                 retention_days=cfg.retention_days,
@@ -2037,6 +2153,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
+            # A new address is a plain one; sign-in keeps accepting older ones.
+            if not acct.simple_email(clean):
+                return again("email_simple", 400)
             if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
                 return again("email_bad", 400)
             if inbox.is_disposable(clean):
@@ -2069,10 +2188,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     db.set_account_ref(account.id, ref, at=now)
                 except Exception:  # noqa: BLE001 - the account and its session come first
                     logger.warning("could not keep a sign-up tag")
+            # The confirmation link was queued with the account.
+            mailed = cfg.email_verification_required and cfg.email_delivery_ready
             if next_path:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response: Response = _back_to(request, next_path, mailed=mailed)
             else:
-                response = _account_redirect(locale, "welcome")
+                response = _account_redirect(locale, "welcome_confirm" if mailed else "welcome")
             _start_session(response, account, request, event="signup")
             return response
 
@@ -2085,11 +2206,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
             if _session(request):
-                return (
-                    RedirectResponse(next_path, status_code=303)
-                    if next_path
-                    else _account_redirect(locale)
-                )
+                if not next_path:
+                    return _account_redirect(locale)
+                response = _back_to(request, next_path)
+                response.delete_cookie(acct.REPORT_KEY_COOKIE, path="/")
+                return response
+            cleaned = _without_report_key(request, next_path)
+            if cleaned is not None:
+                return cleaned
             csrf = _anon_csrf(request)
             page = account_pages.signin_page(
                 locale=locale,
@@ -2177,9 +2301,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     minutes=acct.TWO_STEP_CHALLENGE_MINUTES,
                 )
                 target = account_pages.two_step_path(locale)
+                next_path, report_key = acct.split_report_key(next_path)
                 if next_path:
                     target += "?next=" + quote(next_path, safe="")
                 response: Response = RedirectResponse(target, status_code=303)
+                _keep_report_key(response, report_key)
                 _cookie(
                     response,
                     acct.TWO_STEP_COOKIE,
@@ -2188,7 +2314,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 return response
             if next_path:
-                response = RedirectResponse(next_path, status_code=303)
+                response = _back_to(request, next_path)
             else:
                 response = _account_redirect(found[0].locale if lang is None else locale)
             _start_session(response, found[0], request, event="signin")
@@ -2212,6 +2338,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pending = _challenge(request)
             if pending is None:
                 return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
+            cleaned = _without_report_key(request, next_path)
+            if cleaned is not None:
+                return cleaned
             csrf = _anon_csrf(request)
             page = account_pages.two_step_page(
                 locale=locale,
@@ -2278,7 +2407,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not db.end_two_step_challenge(digest) and not done:
                 return again("code_bad", 400)  # pragma: no cover - finished twice at once
             if next_path and not done:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response: Response = _back_to(request, next_path)
             else:
                 response = _account_redirect(locale, done)
             response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
@@ -2525,10 +2654,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if step
                 else account_pages.path("signin", locale)
             )
+            # A form from before the key left ``next`` can still bring it.
+            next_path, report_key = acct.split_report_key(next_path)
             if next_path:
                 back += "?next=" + quote(next_path, safe="")
             if not _passkey_started(request, now):
-                return RedirectResponse(back, status_code=303)
+                limited = RedirectResponse(back, status_code=303)
+                _keep_report_key(limited, report_key)
+                return limited
             token, challenge = _new_passkey_challenge(now, "step" if step else "signin", account_id)
             options = pk.authentication_options(rp, challenge=challenge, allowed=allowed)
             action = (
@@ -2536,7 +2669,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if step
                 else account_pages.passkey_signin_path(locale)
             ) + "/entrar"
-            return _passkey_page(
+            page = _passkey_page(
                 request,
                 locale=locale,
                 csrf=_anon_csrf(request),
@@ -2548,6 +2681,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 token=token,
                 anon=True,
             )
+            _keep_report_key(page, report_key)
+            return page
 
         return handler
 
@@ -2607,7 +2742,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if pending is not None:
                 db.end_two_step_challenge(pending[0])
             if next_path:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response: Response = _back_to(request, next_path)
             else:
                 response = _account_redirect(account.locale if lang is None else locale)
             response.delete_cookie(pk.COOKIE, path="/")
@@ -3165,6 +3300,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             clean = acct.normalise_email(email)
             if not acct.valid_email(clean):
                 return refused("email_bad")
+            if not acct.simple_email(clean):
+                return refused("email_simple")
             if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
                 return refused("email_bad")
             if inbox.is_disposable(clean):
@@ -3892,7 +4029,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = _session(request)
             # Account first: every upload, code or not, belongs to an account.
             if session is None:
-                return _gate(request, report_loc, "signin", 401)
+                # Whoever filled an extra box finds them open after signing up.
+                # The challenge list always sends its first choice: that is no choice.
+                chose_extras = bool(
+                    (optimization is not None and optimization.filename)
+                    or (live is not None and live.filename)
+                    or challenge.strip() not in ("", DEFAULT_PRESET)
+                )
+                return _gate(request, report_loc, "signin", 401, extras=chose_extras)
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
             if not usable:
@@ -4343,12 +4487,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         page = mapping.mapping_page(table, text, locale=locale, carried=carried, chosen=chosen)
         return HTMLResponse(page, status_code=422)
 
-    def _gate(request: Request, locale: str, reason: str, status: int) -> Response:
+    def _gate(
+        request: Request, locale: str, reason: str, status: int, *, extras: bool = False
+    ) -> Response:
         """The answer to an upload the free tier does not cover."""
         if _wants_json(request):
             return JSONResponse({"error": f"free_tier_{reason}"}, status_code=status)
         page = account_pages.gate_page(
-            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH
+            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH, extras=extras
         )
         return HTMLResponse(page, status_code=status)
 
@@ -4552,6 +4698,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         elif acct_done == "saved":
             notice = account_pages.COPY[ui]["saved_notice"]
+        elif acct_done == "welcome_confirm" and _confirm_pending(request):
+            notice = account_pages.COPY[ui]["welcome_confirm"]
         elif (
             acct_done
             and acct_done.startswith("preview_")
@@ -4574,6 +4722,33 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account_box=_account_box(request, record, valid_token or "", locale),
         )
 
+    @app.post("/audits/{audit_id}/account")
+    def report_to_account(
+        request: Request,
+        audit_id: str,
+        go: Annotated[str, Form(max_length=10)] = "",
+        token: str | None = None,
+        lang: str | None = None,
+    ) -> Response:
+        """From a report opened by its link to sign-up or sign-in, and back afterwards.
+
+        ``next`` names the report only; its key waits in a short-lived cookie.
+        """
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", _locale(lang)), _locale(lang))
+        record = _load(audit_id, token, request)
+        locale = _view_locale(record, lang)
+        back = f"/audits/{record.id}?token={token or ''}&lang={locale}"
+        if _session(request) is not None:
+            return RedirectResponse(back, status_code=303)
+        if go != "signup":
+            return _signin_redirect(locale, next_path=back)
+        back, report_key = acct.split_report_key(back)
+        target = account_pages.path("signup", locale) + "?next=" + quote(back, safe="")
+        response = RedirectResponse(target, status_code=303)
+        _keep_report_key(response, report_key)
+        return response
+
     def _account_box(request: Request, record: Any, token: str, locale: str) -> str:
         """The account line on a report: sign up, save, saved, or unlock with a credit."""
         session = _session(request)
@@ -4590,7 +4765,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 state="anon",
                 audit_id=record.id,
                 query=query,
-                next_path=f"/audits/{record.id}{query}",
             )
         account, csrf, _ = session
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
@@ -4948,6 +5122,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     locale=locale,
                     head_meta=sample_meta(locale, base_url),
                     pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
+                )
+                # The tab title ends with the report's id, "sample": show the
+                # page's own word. Nothing inside the report changes.
+                html_text = html_text.replace(
+                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
                 )
                 sample_cache[key] = html_text
             return sample_cache[key]

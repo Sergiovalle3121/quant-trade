@@ -161,10 +161,68 @@ Every change below has an offline, deterministic test in
   Security Policy is as before. The page's message is still one of the fixed
   texts chosen by an allow-listed `done=` or `error=` code, never echoed.
 
+## Launch basics (2026-09-28)
+
+Reviewed against `main` at 9c77197. Scope: which pages search engines may
+list, the icon files, the language of error pages and the short addresses
+that forward to a page. No control was
+relaxed: the Content Security Policy, the other security headers, the rate
+limits and the redirect from Railway's address are unchanged. Every change
+has an offline, deterministic test in `tests/test_audit_launch_basics.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| L1 | The `X-Robots-Tag` header was decided with `path.startswith(DISALLOWED_PATHS)`, so the public `/pt/contato` was caught by the account prefix `/pt/conta` and kept out of search engines, by the header and by `robots.txt`. No private page was exposed. | Low | `seo.is_private_path` matches an entry or a page below it (`/pt/conta`, `/pt/conta/...`), not a longer word. `robots.txt` keeps every `Disallow` line and adds `Allow: /pt/contato` before them. Every route was compared with every private prefix: this was the only pair, and a test keeps it so. Every account, report, webhook and health path keeps its header. |
+| L2 | The comparison pages (`/comparar`, `/compare`, `/pt/comparar`) and the e-mail confirmation pages (`/confirmar-correo`, `/confirm-email`, `/pt/confirmar-email`) were private only by `<meta name="robots">`; their 200 answers had no `X-Robots-Tag`. | Low | They send `X-Robots-Tag: noindex, nofollow` (`seo.NOINDEX_PATHS`), on every status. They are left out of `robots.txt` on purpose, so a crawler that follows a link reads the header. |
+| L3 | `/favicon.ico` answered 404. | Low | `/favicon.ico` and `/apple-touch-icon.png` serve two files from the static allow-list (`theme.STATIC_FILES`, `theme.ICON_PATHS`): the route takes no file name from the request (a first version took `?icon_name=` and could answer another file of the allow-list; caught in review before merge, and a test asks with that query). They carry every security header and `Cache-Control: public, max-age=604800`, the same as `/static/`; every other route stays `no-store`. The policy `img-src 'self' data:` already allowed them. A read on Railway's address is forwarded to the domain like any other. |
+| L4 | An error page under an English address was in Spanish. | Low | The language comes from the first step of the path, compared with a fixed set built from the route tables (`web.ENGLISH_ROOTS`); `?lang=` still accepts only `es`, `en` or `pt`. Nothing from the request is echoed. The 413 and "busy" pages, built before routing, follow the same rule. |
+| L5 | Open redirect, already on `main`: the short addresses that forward to a page (`/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte`, `/precios`, `/pricing`, `/en/pricing`, `/pt/precos` and the legal aliases under `/en` and `/pt`) were handlers whose target was a default argument, which FastAPI reads as a query parameter. `/soporte?contact_path=https://elsewhere.example/` answered 301 to that site. | Medium | One helper (`_forward` in `web.py`) registers them with a handler that takes no parameter, so the target is the one written in the code. A test asks every kind of alias with `contact_path`, `landing_path`, `legal_path`, `target` and `next` set to another site and gets the fixed page. |
+
+Not changed here: `/panel` is not in `robots.txt` (another change handles
+the panel).
+
+## Accounts and e-mail hardening (2026-09-28)
+
+Reviewed against `main` at 9c77197, before the public launch. Every change
+below has an offline, deterministic test in
+`tests/test_audit_account_hardening.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| A1 | Sign-up and e-mail change accepted any `x@y.z` without spaces: quotes, angle brackets, commas, malformed domains (`gmail..com`, `-gmail.com`) and IP addresses. The stored address goes into the `To` header, where `a,b@gmail.com` can read as two recipients. | Medium | New addresses must pass `accounts.simple_email` (ASCII, one `@`, name of `[A-Za-z0-9._%+-]` with no leading, trailing or doubled dot, domain of two or more labels ending in letters, 254 characters at most); the refusal is `email_simple` in the three languages. The reserved, disposable, typo and DNS checks run after it as before. Sign-in, recovery and the reset request keep `valid_email`, so an older account is never locked out. |
+| A2 | "Send the link again" queued the same outbox row again: the same Message-ID and the same `Idempotency-Key`, which Resend does not deliver twice within 24 hours, so the customer probably got no second message. The row also kept its count of tries, so after eight claims a resent row stayed `queued` and was never sent. | Medium | A resend the customer asks for keeps the challenge, its link and its expiry, but starts its own tries and gets its own Message-ID and idempotency key (`mail.message_key`). Automatic retries of one message keep their key, so a retry after a lost reply is never delivered twice. The ten-minute spacing, the hourly limits and the token lifetimes are unchanged; a row left waiting by the old code, or left `sending` with its last try used and its lease expired, is sent on the next request. |
+| A4 | The report's private token travelled inside `next` (double-encoded in the two-step and passkey redirects) in the links of the report's account box and in the sign-in redirects of save, credit, card check, redeem and checkout. `Referrer-Policy: no-referrer` and the log redaction covered it, but it was written into page HTML, browser history and any proxy log. | Medium | `next` names the report only. The key waits up to an hour in the cookie `rigor_report` (HttpOnly, SameSite=Lax, Secure on https), set when a signed-out visitor leaves a report through one of its forms (`POST /audits/{id}/account` for the account box) after the token was checked. After sign-in the cookie can only add `token=` to the address of that same report, which `safe_next` already accepted; its value must match `id.token` in URL-safe characters, so it cannot change the destination or inject a parameter. It is cleared at every sign-in. An older link with the key inside `next` is redirected to the clean address (sign-in, sign-up and second-step pages), and the passkey page moves it to the cookie. `POST /audits/{id}/account` refuses a post from another site (403), so another site cannot plant the cookie. |
+| A5 | The choice `?extras=1` was lost for a visitor without an account: `next` was rebuilt without it and `safe_next` refused any query on the upload pages. | Low | `safe_next` accepts the three upload pages with exactly `?extras=1` (no other query, no anchor); the redirect to sign-up, the "account first" answer and the language switch of the form keep it. Every other query on those pages is still refused. |
+
+Also changed, texts only (A3): while confirmation is required, the account
+notice and the checkout refusal no longer say the free report is available
+to an unconfirmed address, and the notice after sign-up says a confirmation
+link was sent (only when delivery is configured). It shows on the account
+page, or on the upload page or report a sign-up returns to; there only the
+fixed value `welcome_confirm` is read from the query, and only a signed-in
+account with an unconfirmed address sees the text.
+
+Limits that remain from this pass:
+
+- An account made before A1 keeps its address. If one holds a comma or a
+  quote, mail to it is still composed from the stored value; the owner can
+  list such accounts and ask those customers to change the address.
+- The report token still appears in the report's own address and form
+  actions, and in the Checkout return address sent to Stripe, as described
+  above. A form rendered before this change can post the key inside `next`
+  once; it works as before and the next page is clean.
+- With two reports open, the cookie keeps the key of the last one a visitor
+  left to sign in. Signing in from the other tab lands on that report
+  without its key (a 404 for an account that does not hold it); opening the
+  link again works.
+
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on
-  the `Host` header, and HSTS is turned on.
+  the `Host` header, and HSTS is turned on. Reads on the Railway address and
+  on the domain's `www` name answer 308 to that fixed address (the target
+  never comes from the request), so a visitor has one origin and one
+  session; POSTs, `/health` and `/ready` are served where they arrive.
 - `AUDIT_TRUSTED_PROXY_HOPS=1`, as before, so rate limits count the real
   client.
 - Optional: `AUDIT_MAX_CONCURRENT_AUDITS` (default 2) and

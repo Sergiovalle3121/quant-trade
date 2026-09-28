@@ -55,6 +55,10 @@ COPY_PT: dict[str, str] = {
         "Suas compras com cartão e com código, com data"
     ),
     "email_bad": "Esse e-mail não parece válido.",
+    "email_simple": (
+        "Use um e-mail simples, como nome@exemplo.com: sem espaços, aspas, vírgulas, "
+        "parênteses ou acentos."
+    ),
     "email_disposable": (
         "Esse e-mail é de um serviço de caixas temporárias. Use um e-mail que você mantenha: "
         "a confirmação e a recuperação da conta chegam nele."
@@ -98,6 +102,11 @@ COPY_PT: dict[str, str] = {
     "csrf": "O formulário expirou. Recarregue a página e envie de novo.",
     "signed_out": "Você saiu da conta.",
     "welcome": "Conta criada. Envie um arquivo agora: o relatório fica salvo aqui.",
+    "welcome_confirm": (
+        "Conta criada. Enviamos um link de confirmação para o seu e-mail: abra-o para "
+        "liberar seu primeiro relatório completo gratuito e as compras. Se não encontrar, "
+        "confira a pasta de spam."
+    ),
     "account_title": "Meus relatórios",
     "account_lead": "Tudo o que você auditou com esta conta, num só lugar.",
     "signed_in_as": "Conectado como",
@@ -330,13 +339,12 @@ COPY_PT: dict[str, str] = {
     "email_status_title": "E-mail da sua conta",
     "email_verified_status": "E-mail confirmado.",
     "email_unverified_status": (
-        "Seu e-mail ainda não foi confirmado. Seu primeiro relatório completo gratuito "
-        "continua disponível; confirme o e-mail para comprar relatórios ou receber créditos "
-        "por indicações."
+        "Seu e-mail ainda não foi confirmado. Confirme-o para liberar seu primeiro "
+        "relatório completo gratuito, as compras e os créditos por indicações."
     ),
     "email_delivery_unavailable": (
-        "O envio de e-mails não está disponível agora. Você pode usar seu primeiro relatório "
-        "gratuito; compras e créditos por indicações exigem confirmação."
+        "O envio de e-mails não está disponível agora. O primeiro relatório completo "
+        "gratuito, as compras e os créditos por indicações exigem e-mail confirmado."
     ),
     "email_request_button": "Enviar link de confirmação",
     "email_pending_note": (
@@ -349,8 +357,8 @@ COPY_PT: dict[str, str] = {
     "email_pending": ("A troca está pendente. Abra o link enviado ao novo e-mail para concluí-la."),
     "email_verified": "E-mail confirmado. Você já pode usar compras e recompensas disponíveis.",
     "email_checkout_required": (
-        "Confirme seu e-mail em Minha conta antes de pagar. Seu primeiro relatório "
-        "completo gratuito continua disponível."
+        "Confirme seu e-mail em Minha conta antes de pagar. A confirmação também "
+        "libera seu primeiro relatório completo gratuito."
     ),
     "email_now": "Você entra com {email}. Depois da troca, você entra com o e-mail novo.",
     "email_new": "E-mail novo",

@@ -2517,11 +2517,13 @@ def upload_page(
     base_url: str = "",
     extras_open: bool = False,
     signed_in: bool | None = None,
+    notice: str = "",
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
     ``signed_in=False`` in paid mode keeps the "account first" note above the fields
-    (the web layer normally sends such a visitor to sign-up before this page)."""
+    (the web layer normally sends such a visitor to sign-up before this page).
+    ``notice`` is one line above the fields, such as "confirmation link sent"."""
     locale = _locale(locale)
     copy = _COPY[locale]
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
@@ -2537,15 +2539,19 @@ def upload_page(
         copy,
         locale,
         note=note,
-        flash="",
+        flash=f"<div class='flash'>{_e(notice)}</div>" if notice else "",
         err="",
         access_codes=access_codes,
         retention_days=retention_days,
         extras_open=extras_open,
         signin_first=signed_in is False and not free_mode,
     )
+    # The language switch keeps the extra boxes open.
+    alternates = {
+        lang: href + ("?extras=1" if extras_open else "") for lang, href in AUDIT_PATHS.items()
+    }
     return _page(
-        copy["form_title"], locale, body, meta_html=meta, solid_nav=True, alternates=AUDIT_PATHS
+        copy["form_title"], locale, body, meta_html=meta, solid_nav=True, alternates=alternates
     )
 
 

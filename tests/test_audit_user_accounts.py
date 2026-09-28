@@ -294,7 +294,8 @@ def test_a_report_opened_by_link_can_be_saved(tmp_path: Path) -> None:
     audit_id = _audit_id(location)
     anon = client.get(location).text
     assert "Crea una cuenta gratis para guardar este informe" in anon
-    assert "/registro?next=" in anon
+    # The report's key is never written inside a ``next`` address.
+    assert f"action='/audits/{audit_id}/account?token=" in anon and "next=" not in anon
     _signup(client, "f@example.com")
     page = client.get(location).text
     assert "Guardar en mi cuenta" in page
@@ -3277,9 +3278,9 @@ def test_every_account_screen_is_kept_out_of_search_engines(tmp_path: Path) -> N
             got = client.get(account_pages.path(name, locale), follow_redirects=False)
             assert got.headers.get("x-robots-tag") == seo.NOINDEX, (locale, name)
         assert account_pages.two_step_path(locale).startswith(seo.DISALLOWED_PATHS)
-    # No public page is caught by an account prefix.
+    # No public page is caught by an account prefix: /pt/contato is not under /pt/conta.
     public = [p for pair in seo.PUBLIC_PAGES for p in pair.values()]
-    assert not [p for p in public if p.startswith(seo.DISALLOWED_PATHS)]
+    assert not [p for p in public if seo.is_private_path(p)]
 
 
 NOTICE = "class='acct-card acct-notice'"
