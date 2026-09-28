@@ -723,8 +723,8 @@ STATUS_TEXT_PT: dict[str, str] = {
     "NOT_APPLICABLE": "Não se aplica",
 }
 CLASS_B_PT = (
-    "Classe B: a estatística se sustenta, mas faltam peças (custos, fora da amostra ou "
-    "benchmark) para uma conclusão completa."
+    "Classe B: a estatística se sustenta, mas faltam peças (custos, fora da amostra, "
+    "benchmark ou número de tentativas) para uma conclusão completa."
 )
 DISCLAIMER_PT = (
     "Esta auditoria é uma ferramenta de pesquisa estatística aplicada a dados fornecidos pelo "
