@@ -4,7 +4,8 @@ The owner publishes each text of the first-sales guide with its own tag
 (``?ref=f4``). The first tag a browser arrives with is kept for
 :data:`REF_DAYS` in a cookie that holds only the tag, and stored with the
 account if one is created, so ``/panel`` can show, per day, language and tag:
-visits, accounts, free first reports, free previews and paid reports.
+visits, accounts, verified email, stored uploads, referrals, Checkout sessions,
+free reports and paid orders. A tag is an attribution estimate, not a person.
 
 Only tags listed in :data:`REF_TAGS` count; anything else is "directo", so a
 stranger cannot fill the table with made-up tags. Visits are aggregate
@@ -113,13 +114,18 @@ def since_day(now: datetime, days: int = FUNNEL_DAYS) -> str:
 STAGES: tuple[str, ...] = (
     "visits",
     "signups",
+    "email_verified",
+    "uploads",
     "welcome",
     "previews",
+    "referrals_accepted",
+    "checkout_started",
     "credit_used",
     "gift_credits",
     "purchases",
     "buyers",
     "repeat_purchases",
+    "deliveries",
     "rights_sold",
     "gross_usd_cents",
     "refund_usd_cents",
@@ -128,13 +134,18 @@ STAGES: tuple[str, ...] = (
 STAGE_LABELS: dict[str, str] = {
     "visits": "Visitas",
     "signups": "Cuentas",
+    "email_verified": "Correos confirmados",
+    "uploads": "Informes subidos y guardados",
     "welcome": "Informe gratis",
     "previews": "Vistas previas",
+    "referrals_accepted": "Invitaciones aceptadas al crear cuenta",
+    "checkout_started": "Sesiones Checkout creadas",
     "credit_used": "Créditos canjeados",
     "gift_credits": "Créditos regalados",
     "purchases": "Compras confirmadas",
     "buyers": "Compradores con cuenta",
     "repeat_purchases": "Compras repetidas",
+    "deliveries": "Compras live entregadas",
     "rights_sold": "Derechos vendidos",
     "gross_usd_cents": "Cobro bruto en centavos USD",
     "refund_usd_cents": "Devoluciones confirmadas en centavos USD",
@@ -157,16 +168,18 @@ class FunnelCounts:
 
 @dataclass
 class Funnel:
-    """Counts by ``(day, locale)`` and by tag over the last :data:`FUNNEL_DAYS`."""
+    """Counts by day/language, tag, and tag/language over :data:`FUNNEL_DAYS`."""
 
     by_day: dict[tuple[str, str], FunnelCounts] = field(default_factory=dict)
     by_ref: dict[str, FunnelCounts] = field(default_factory=dict)
+    by_ref_locale: dict[tuple[str, str], FunnelCounts] = field(default_factory=dict)
     total: FunnelCounts = field(default_factory=FunnelCounts)
 
     def add(self, stage: str, *, day: str, locale: str, ref: str, amount: int = 1) -> None:
         ref = ref if ref in REF_TAGS else DIRECT
         self.by_day.setdefault((day, locale), FunnelCounts()).add(stage, amount)
         self.by_ref.setdefault(ref, FunnelCounts()).add(stage, amount)
+        self.by_ref_locale.setdefault((ref, locale), FunnelCounts()).add(stage, amount)
         self.total.add(stage, amount)
 
 

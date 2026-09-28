@@ -108,19 +108,44 @@ TEXT: dict[str, str] = {
         "etiqueta»."
     ),
     "funnel_by_ref": "Por etiqueta",
+    "funnel_by_ref_locale": "Por canal e idioma",
     "funnel_by_day": "Por día e idioma",
+    "funnel_country": "Por país del comprador",
+    "funnel_country_missing": (
+        "NOT_MEASURED: ni las cuentas ni las órdenes guardan un país de facturación "
+        "comprobado. No se deduce el país del idioma, la IP ni la tarjeta. Las cohortes "
+        "por canal e idioma de abajo sí se basan en datos guardados."
+    ),
+    "funnel_contribution": (
+        "Contribución = cobro bruto confirmado − devoluciones − comisiones de pago y cambio "
+        "− impuestos sobre esas comisiones − coste variable de informes gratis y pagados "
+        "− infraestructura − soporte − adquisición. NOT_MEASURED hasta registrar esos costes "
+        "observados por cohorte; el saldo tras devoluciones no es beneficio ni ingreso neto."
+    ),
     "funnel_empty": "Todavía no hay nada que contar en estos días.",
     "funnel_ref_cols": (
-        "Etiqueta|Qué es|Visitas estimadas|Cuentas|Informe gratis|Vistas previas|"
-        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|Derechos vendidos|"
+        "Etiqueta|Qué es|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
+        "Informe gratis|Vistas previas|Invitaciones aceptadas|Sesiones Checkout creadas|"
+        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
+        "Compras live entregadas|Derechos vendidos|"
         "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
-        "Saldo de cobros USD tras devoluciones registradas"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
     ),
     "funnel_day_cols": (
-        "Día|Idioma|Visitas estimadas|Cuentas|Informe gratis|Vistas previas|"
-        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|Derechos vendidos|"
+        "Día|Idioma|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
+        "Informe gratis|Vistas previas|Invitaciones aceptadas|Sesiones Checkout creadas|"
+        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
+        "Compras live entregadas|Derechos vendidos|"
         "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
-        "Saldo de cobros USD tras devoluciones registradas"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
+    ),
+    "funnel_ref_locale_cols": (
+        "Etiqueta|Idioma|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
+        "Informe gratis|Vistas previas|Invitaciones aceptadas|Sesiones Checkout creadas|"
+        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
+        "Compras live entregadas|Derechos vendidos|"
+        "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
     ),
     "funnel_total": "Total",
     "funnel_direct": "sin etiqueta",
@@ -128,7 +153,8 @@ TEXT: dict[str, str] = {
     "funnel_limits": (
         "Las visitas son de la página principal y de las páginas de cada caso, sin robots ni "
         "vistas previas de enlaces; solo se guarda un contador por día, idioma y etiqueta, sin "
-        "dirección ni cookie. La etiqueta se recuerda {ref_days} días en el navegador y queda "
+        "dirección ni identificador de navegador en la base de visitas. La etiqueta se recuerda "
+        "{ref_days} días en el navegador y queda "
         "en la cuenta si se crea. Los pagos e informes se cuentan por el idioma de la cuenta; "
         "sin cuenta aparecen con «-». Las visitas son navegadores observados, no personas únicas. "
         "El cobro bruto proviene de sesiones live confirmadas en USD antes de devoluciones, "
@@ -141,7 +167,12 @@ TEXT: dict[str, str] = {
         "también requieren conciliación en Stripe. Sesiones test o de modo desconocido "
         "se muestran arriba para revisión pero se excluyen del embudo. "
         "La cuenta asociada pertenece al informe y no identifica al titular de la tarjeta. "
-        "Los códigos manuales no cuentan como compras sin cobro verificado."
+        "Los códigos manuales no cuentan como compras sin cobro verificado. "
+        "Los correos confirmados son los que aún coinciden con la cuenta; las cargas son informes "
+        "importados y guardados, no intentos fallidos. Una invitación aceptada es una cuenta "
+        "creada con enlace válido, no un premio. Checkout cuenta sesiones con URL creada, "
+        "no visitas a Stripe ni cargos; incluye test y live. Las entregas son órdenes live "
+        "marcadas entregadas, no todos los informes gratuitos ni canjes."
     ),
 }
 
@@ -357,17 +388,23 @@ def _counts_cells(counts: FunnelCounts) -> list[str]:
     return [
         str(c["visits"]),
         str(c["signups"]),
+        str(c["email_verified"]),
+        str(c["uploads"]),
         str(c["welcome"]),
         str(c["previews"]),
+        str(c["referrals_accepted"]),
+        str(c["checkout_started"]),
         str(c["purchases"]),
         str(c["buyers"]),
         str(c["repeat_purchases"]),
+        str(c["deliveries"]),
         str(c["rights_sold"]),
         str(c["gift_credits"]),
         str(c["credit_used"]),
         f"{c['gross_usd_cents'] / 100:.2f}",
         f"{c['refund_usd_cents'] / 100:.2f}",
         f"{(c['gross_usd_cents'] - c['refund_usd_cents']) / 100:.2f}",
+        "NOT_MEASURED",
     ]
 
 
@@ -406,6 +443,22 @@ def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
             for ref, counts in ordered
         ]
         ref_rows.append([TEXT["funnel_total"], "", *_counts_cells(funnel.total)])
+        ref_locale_rows = [
+            [
+                TEXT["funnel_direct"] if ref == DIRECT else ref,
+                LOCALE_NAMES.get(locale, locale),
+                *_counts_cells(counts),
+            ]
+            for (ref, locale), counts in sorted(
+                funnel.by_ref_locale.items(),
+                key=lambda item: (
+                    -item[1].paid,
+                    -item[1].counts["signups"],
+                    -item[1].counts["visits"],
+                    item[0],
+                ),
+            )
+        ]
         day_rows = [
             [day, LOCALE_NAMES.get(locale, locale), *_counts_cells(counts)]
             for (day, locale), counts in sorted(
@@ -415,11 +468,16 @@ def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
         out += (
             f"<h3>{_e(TEXT['funnel_by_ref'])}</h3>"
             + _table(TEXT["funnel_ref_cols"], ref_rows)
+            + f"<h3>{_e(TEXT['funnel_by_ref_locale'])}</h3>"
+            + _table(TEXT["funnel_ref_locale_cols"], ref_locale_rows)
             + f"<h3>{_e(TEXT['funnel_by_day'])}</h3>"
             + _table(TEXT["funnel_day_cols"], day_rows)
         )
     tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items())
     out += (
+        f"<h3>{_e(TEXT['funnel_country'])}</h3>"
+        f"<p class='muted'>{_e(TEXT['funnel_country_missing'])}</p>"
+        f"<p class='muted'>{_e(TEXT['funnel_contribution'])}</p>"
         f"<details><summary>{_e(TEXT['funnel_tags'])}</summary><p class='muted'>{_e(tags)}</p>"
         "</details>"
         f"<p class='muted'>{_e(TEXT['funnel_limits'].format(ref_days=REF_DAYS))}</p>"

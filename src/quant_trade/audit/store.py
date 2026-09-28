@@ -4747,6 +4747,44 @@ class Store:
                 out[stage] = [(str(r[0])[:10], str(r[1] or "-"), str(r[2] or ""), 1) for r in rows]
 
             by_account("signups", acc.c.created_at, acc.c.id, acc)
+            verified = self.verified_emails
+            rows = conn.execute(
+                sa.select(verified.c.verified_at, acc.c.locale, refs.c.ref)
+                .select_from(
+                    verified.join(acc, acc.c.id == verified.c.account_id).outerjoin(
+                        refs, refs.c.account_id == verified.c.account_id
+                    )
+                )
+                .where(verified.c.verified_at >= since_day)
+                .where(verified.c.email == acc.c.email)
+            ).all()
+            out["email_verified"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), 1)
+                for when, locale, ref in rows
+            ]
+            audits = self.audits
+            uploaded = conn.execute(
+                sa.select(audits.c.created_at, acc.c.locale, refs.c.ref)
+                .select_from(
+                    audits.outerjoin(
+                        links,
+                        sa.and_(links.c.audit_id == audits.c.id, links.c.via == VIA_UPLOAD),
+                    )
+                    .outerjoin(acc, acc.c.id == links.c.account_id)
+                    .outerjoin(refs, refs.c.account_id == links.c.account_id)
+                )
+                .where(audits.c.created_at >= since_day)
+            ).all()
+            out["uploads"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), 1)
+                for when, locale, ref in uploaded
+            ]
+            by_account(
+                "referrals_accepted",
+                self.referrals.c.joined_at,
+                self.referrals.c.invitee_id,
+                self.referrals,
+            )
             welcome = self.welcome_reports
             rows = conn.execute(
                 sa.select(welcome.c.created_at, acc.c.locale, refs.c.ref)
@@ -4761,7 +4799,6 @@ class Store:
             out["welcome"] = [(str(r[0])[:10], str(r[1] or "-"), str(r[2] or ""), 1) for r in rows]
             previews = self.free_previews
             by_account("previews", previews.c.created_at, previews.c.account_id, previews)
-            audits = self.audits
             redeemed = conn.execute(
                 sa.select(audits.c.paid_at, acc.c.locale, refs.c.ref)
                 .select_from(
@@ -4794,6 +4831,20 @@ class Store:
                 for when, locale, ref, credits in gifts
             ]
             orders = self.checkout_orders
+            started = conn.execute(
+                sa.select(orders.c.created_at, acc.c.locale, refs.c.ref)
+                .select_from(
+                    orders.outerjoin(acc, acc.c.id == orders.c.account_id).outerjoin(
+                        refs, refs.c.account_id == orders.c.account_id
+                    )
+                )
+                .where(orders.c.created_at >= since_day)
+                .where(orders.c.checkout_url != "")
+            ).all()
+            out["checkout_started"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), 1)
+                for when, locale, ref in started
+            ]
             refunds = self.stripe_refunds
             returned = conn.execute(
                 sa.select(
@@ -4840,6 +4891,7 @@ class Store:
             "purchases",
             "buyers",
             "repeat_purchases",
+            "deliveries",
             "rights_sold",
             "gross_usd_cents",
         ):
@@ -4856,6 +4908,7 @@ class Store:
             out["purchases"].append((*event, 1))
             out["gross_usd_cents"].append((*event, int(amount)))
             if status == "delivered":
+                out["deliveries"].append((*event, 1))
                 out["rights_sold"].append((*event, 3 if plan == "pack" else 1))
             if account_id:
                 out["repeat_purchases" if repeat else "buyers"].append((*event, 1))
