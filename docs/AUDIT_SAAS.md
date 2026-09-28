@@ -729,6 +729,12 @@ Every leaf value in the JSON carries an evidence tag:
 - `NOT_MEASURED`: could not be computed from what was supplied; the reason
   is stated next to it.
 
+On the site's pages (landing, upload form, guides, methodology, verification,
+contact) a reader sees these tags as words in the page's language: Medido /
+Declarado / No medido, Measured / Declared / Not measured, Medido / Declarado
+/ Não medido (`pages.EVIDENCE_LABELS`). The codes stay in the JSON, the badge
+CSS classes and the reports.
+
 | Section | Estimator | Source module |
 |---|---|---|
 | Performance | annualised return, volatility, Sharpe, Sortino, max drawdown | `metrics/performance.py` |
@@ -2042,7 +2048,10 @@ Routes:
 
 | Route | What it does |
 |---|---|
-| `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. `GET /en` is the English landing, a short address to share. |
+| `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its `#subir` band and every start button link to the upload page; old `?extras=1` links redirect there. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. |
+| `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
+| `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |

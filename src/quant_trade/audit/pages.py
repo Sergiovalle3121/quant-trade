@@ -204,10 +204,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "variants_help": "Una columna de retornos por variante probada; habilita el PBO.",
         "trials": "¿Cuántas configuraciones o versiones se probaron antes de elegir esta?",
         "trials_help": (
-            "Rigor solo puede descontar la suerte de haber probado muchas si le dices cuántas. "
-            "Si subes el XML de optimización de MT5 se cuentan solas. En un "
-            "historial de cuenta o de fondo, pon cuántas estrategias o fondos lleva el mismo "
-            "gestor. Si no lo sabes, déjalo vacío."
+            "Configuraciones probadas antes de elegir esta. Si lo dejas vacío, el informe usa 1 "
+            "(el caso más favorable) y la clase queda como máximo en B. Si subes el XML de "
+            "optimización de MT5 se cuentan solas."
         ),
         "cost_bps": (
             "Coste extra por lado en puntos básicos, además del que ya detalla tu informe "
@@ -239,7 +238,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "signin_first": (
             "Antes de subir, crea tu cuenta gratis: tu primer informe sale completo, con PDF, "
-            "sin pagar. Si ya compraste un código, puedes subir sin cuenta."
+            "sin pagar."
         ),
         "signin_create": "Crear cuenta gratis",
         "signin_enter": "Ya tengo cuenta",
@@ -512,10 +511,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "variants_help": "One return column per variant tried; enables the PBO.",
         "trials": "How many configurations or versions were tried before choosing this one?",
         "trials_help": (
-            "Rigor can only discount the luck of trying many if you tell it how many. If you "
-            "upload the MT5 optimisation XML they are counted for you. For an account or fund "
-            "history, enter how many strategies or funds the same manager runs. If you do not "
-            "know, leave it blank."
+            "Configurations tried before choosing this one. Left blank, the report uses 1 (the "
+            "most favourable case) and the class is at most B. If you upload the MT5 "
+            "optimisation XML they are counted for you."
         ),
         "cost_bps": (
             "Extra cost per side in basis points, on top of what your report already itemises "
@@ -547,7 +545,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "signin_first": (
             "Before you upload, create your free account: your first report comes out in full, "
-            "with the PDF, at no cost. If you bought a code, you can upload without an account."
+            "with the PDF, at no cost."
         ),
         "signin_create": "Create a free account",
         "signin_enter": "I have an account",
@@ -1299,6 +1297,15 @@ def _home(locale: str) -> str:
     return {"en": "/en", "pt": "/pt"}.get(locale, "/")
 
 
+#: The upload form's own page in each language. Without an account (when uploads
+#: need one) it sends the visitor to sign-up first and back here after.
+AUDIT_PATHS: dict[str, str] = {"es": "/auditar", "en": "/en/audit", "pt": "/pt/auditar"}
+
+
+def audit_path(locale: str) -> str:
+    return AUDIT_PATHS.get(locale, AUDIT_PATHS["es"])
+
+
 def _other_name(locale: str) -> str:
     return "English" if locale == "es" else "Español"
 
@@ -1311,8 +1318,32 @@ def _class_text(overall: str, locale: str) -> str:
     return CLASS_B_PT if locale == "pt" and overall == "B" else class_text(overall, locale)
 
 
+#: Evidence tags as a reader sees them on the site; the codes stay in data, CSS classes
+#: and reports' machine-readable parts.
+EVIDENCE_LABELS: dict[str, dict[str, str]] = {
+    "es": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "No medido"},
+    "en": {"MEASURED": "Measured", "DECLARED": "Declared", "NOT_MEASURED": "Not measured"},
+    "pt": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "Não medido"},
+}
+
+
+def evidence_label(tag: str, locale: str) -> str:
+    return EVIDENCE_LABELS.get(locale, EVIDENCE_LABELS["en"]).get(tag, tag)
+
+
+def _localize_tags(text: str, locale: str) -> str:
+    """Replace the tag codes in a sentence by their labels (NOT_MEASURED first)."""
+    for tag in ("NOT_MEASURED", "MEASURED", "DECLARED"):
+        text = re.sub(rf"\b{tag}\b", evidence_label(tag, locale), text)
+    return text
+
+
+def _badge(tag: str, locale: str) -> str:
+    return f"<span class='badge {_e(tag)}'>{_e(evidence_label(tag, locale))}</span>"
+
+
 def _disclaimer(locale: str) -> str:
-    return DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale]
+    return _localize_tags(DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale], locale)
 
 
 def _method_title(locale: str) -> str:
@@ -1409,14 +1440,15 @@ def _nav(
         f"<nav class='menu-panel' aria-label='{_e(ui['nav_menu'])}'>{links}"
         + _switch_links(locale, switch_href, alternates, menu=True)
         + f"<a href='{account}'>{_e(ui['nav_account'])}</a>"
-        + f"<a class='btn btn-primary' href='{home}#subir'>{_e(ui['cta'])}</a></nav></details>"
+        + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta'])}</a>"
+        "</nav></details>"
     )
     return (
         f"<header class='nav{' nav-solid' if solid else ''}'><div class='wrap nav-in'>"
         + logo(home)
         + f"<nav class='nav-links' aria-label='{_e(BRAND)}'>{links}</nav>"
         + f"<div class='nav-end'>{switch}<a class='lang' href='{account}'>"
-        f"{_e(ui['nav_account'])}</a><a class='btn btn-sm' href='{home}#subir'>"
+        f"{_e(ui['nav_account'])}</a><a class='btn btn-sm' href='{audit_path(locale)}'>"
         f"{_e(ui['cta_short'])}</a>{menu}</div></div></header>"
     )
 
@@ -1452,10 +1484,17 @@ def _page(
         _head(title, locale, meta_html)
         + f"<body><a class='skip' href='#main'>{_e(ui['skip'])}</a>"
         + _nav(locale, switch_href, solid=solid_nav, alternates=alternates)
-        + f"<main id='main'>{body}</main>"
+        + f"<main id='main'>{_localize_text_nodes(body, locale)}</main>"
         + _footer(locale)
         + "</body></html>"
     )
+
+
+def _localize_text_nodes(markup: str, locale: str) -> str:
+    """Show the evidence codes as words in the page's language, in text only.
+
+    Attributes (the badge CSS classes, links) keep the codes."""
+    return re.sub(r">([^<]+)<", lambda m: f">{_localize_tags(m.group(1), locale)}<", markup)
 
 
 def _public_meta(
@@ -1516,6 +1555,7 @@ def _footer(locale: str) -> str:
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
         f"<li><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></li>"
+        f"<li><a href='{CONTACT_PATHS[locale]}'>{_e(CONTACT_COPY[locale]['eyebrow'])}</a></li>"
     )
     return (
         "<footer class='foot'><div class='wrap'><div class='foot-grid'>"
@@ -1600,9 +1640,8 @@ def _mock(locale: str) -> str:
         f"<text class='spark-lbl' x='6' y='12'>{_e(ui['mock_is'])}</text>"
         f"<text class='spark-lbl' x='{split + 6}' y='12'>{_e(ui['mock_oos'])}</text></svg>"
         f"<div class='mock-kpis'>{kpis}</div>"
-        "<div class='mock-tags'><span class='badge MEASURED'>MEASURED</span>"
-        "<span class='badge DECLARED'>DECLARED</span>"
-        "<span class='badge NOT_MEASURED'>NOT_MEASURED</span></div></div></div></div>"
+        f"<div class='mock-tags'>{_badge('MEASURED', locale)}{_badge('DECLARED', locale)}"
+        f"{_badge('NOT_MEASURED', locale)}</div></div></div></div>"
         f"<div class='mock-cap'>{_e(ui['mock_cap'])}</div></div>"
     )
 
@@ -1625,7 +1664,7 @@ def _hero(locale: str, sample: str) -> str:
         f"<em class='l rise' style='--i:2'>{_e(ui['hero_b'])}</em></h1>"
         f"<p class='lead rise' style='--i:3'>{_e(ui['hero_lead'])}</p>"
         "<div class='hero-cta rise' style='--i:4'>"
-        f"<a class='btn btn-primary btn-lg' href='#subir'>{_e(ui['cta'])}"
+        f"<a class='btn btn-primary btn-lg' href='{audit_path(locale)}'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
         f"<ul class='trust rise' style='--i:5'>{trust}</ul></div>"
@@ -1854,9 +1893,7 @@ def _dimensions(locale: str, copy: dict[str, Any]) -> str:
         for i, (name, text) in enumerate(zip(DIMENSION_ORDER, copy["measure"], strict=False))
     )
     # Where each number comes from, in one line under the cards.
-    legend = "".join(
-        f"<li><span class='badge {tag}'>{tag}</span>{_e(text)}</li>" for tag, text in ui["evidence"]
-    )
+    legend = "".join(f"<li>{_badge(tag, locale)}{_e(text)}</li>" for tag, text in ui["evidence"])
     return (
         "<section class='section dark' id='measure'><div class='wrap'>"
         + _section_head(copy["measure_title"], _title_pair(ui["dims_title"]))
@@ -2080,7 +2117,8 @@ def _prices_html(
             f"<div class='price-amount'>{_e(ui['plan_free_amount'])}</div>"
             f"<p class='muted'>{_e(copy['price_free_mode'])}</p>"
             + _checks(ui["free_items"] + ui["full_items"])
-            + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta'])}</a></div></div>"
+            + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta'])}</a>"
+            + "</div></div>"
         )
     else:
         ways = []
@@ -2101,7 +2139,7 @@ def _prices_html(
             f"<small>{_e(ui['plan_free_note'])}</small></div>"
             f"<p class='muted'>{_e(copy['price_free'])}</p>"
             + _checks(ui["free_items"])
-            + f"<a class='btn btn-ghost' href='#subir'>{_e(ui['cta'])}</a></div>"
+            + f"<a class='btn btn-ghost' href='{audit_path(locale)}'>{_e(ui['cta'])}</a></div>"
             f"<div class='price featured' data-reveal style='--i:1'>"
             f"<span class='ribbon'>{_e(ui['plan_badge'])}</span>"
             f"<span class='price-name'>{_e(copy['price_full_title'])}"
@@ -2120,7 +2158,8 @@ def _prices_html(
                 else ""
             )
             + _checks(ui["full_items"])
-            + f"<a class='btn btn-primary' href='#subir'>{_e(ui['cta_full'])}</a></div></div>"
+            + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta_full'])}</a>"
+            + "</div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='muted account-note' data-reveal>{_e(copy['account_note'])} "
             f"<a href='{_ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS['es'])[0]}'>"
@@ -2388,16 +2427,18 @@ def _faq_html(copy: dict[str, Any], locale: str, *, retention_days: int) -> str:
     )
 
 
-def _final_cta(copy: dict[str, Any], locale: str, sample: str, *, joined: bool) -> str:
+def _final_cta(
+    copy: dict[str, Any], locale: str, sample: str, *, joined: bool, err: str = ""
+) -> str:
     ui = _UI[locale]
-    flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
+    flash = (f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else "") + err
     return (
         "<section class='section dark' style='padding-top:0'><div class='wrap'>"
         "<div class='cta-band center' data-reveal style='max-width:900px'>"
         + _title_pair(ui["final_title"])
         + f"<p class='lead' style='margin-top:24px'>{_e(ui['final_lead'])}</p>"
         "<div class='hero-cta' style='justify-content:center'>"
-        f"<a class='btn btn-primary btn-lg' href='#subir'>{_e(ui['cta'])}"
+        f"<a class='btn btn-primary btn-lg' href='{audit_path(locale)}'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
         f"<div class='news center' id='news'><p class='label'>{_e(copy['waitlist_title'])}</p>"
@@ -2430,17 +2471,15 @@ def landing(
     signed_in: bool | None = None,
     operator: tuple[str, str] = ("", ""),
 ) -> str:
-    """``signed_in=False`` says, above the file fields, that an upload needs an account.
+    """The public landing; the upload form lives on its own page (``upload_page``).
 
+    ``extras_open`` and ``signed_in`` are accepted for old callers and not used here.
     ``operator`` (name, address) is shown under "who is behind it" when both are set."""
     locale = _locale(locale)
     copy = _COPY[locale]
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
-    note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
     sample = _sample_url(locale)
-    flash = f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else ""
     err = f"<div class='error'>{_e(error)}</div>" if error else ""
-    signin_first = signed_in is False and not free_mode
     body = (
         _hero(locale, sample)
         + _specs(locale)
@@ -2465,39 +2504,83 @@ def landing(
             contact_url=contact_url,
             pack_price_usd=pack_price_usd,
         )
-        + _upload_form(
-            copy,
-            locale,
-            note=note,
-            flash=flash if not joined else "",
-            err=err,
-            access_codes=access_codes,
-            retention_days=retention_days,
-            extras_open=extras_open,
-            signin_first=signin_first,
-        )
+        + _start_band(locale)
         + _faq_html(copy, locale, retention_days=retention_days)
-        + _final_cta(copy, locale, sample, joined=joined)
+        + _final_cta(copy, locale, sample, joined=joined, err=err)
     )
-    if signin_first:
-        # "Start free" goes straight to sign-up: the form would only send a visitor
-        # without an account there, a screen further down.
-        body = body.replace("href='#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
-    page = _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
-    if signin_first:
-        # The top bar and the phone menu carry the same button.
-        page = page.replace(f"href='{_home(locale)}#subir'", f"href='{_ACCOUNT_PATHS[locale][0]}'")
-    return page
+    return _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
 
 
-def _evidence_value(item: Any) -> str:
+def _start_band(locale: str) -> str:
+    """Where the form used to sit: what an audit gives and the button to its page.
+
+    Keeps ``id='subir'`` so links already shared as ``/#subir`` still land on a way in."""
+    ui = _UI[locale]
+    points = "".join(
+        f"<li>{icon('check')}<span>{_e(point)}</span></li>" for point in ui["upload_points"]
+    )
+    return (
+        "<section class='section light' id='subir'><div class='wrap upload'>"
+        "<div>"
+        + _section_head(ui["upload_eyebrow"], _title_pair(ui["upload_title"]), ui["upload_lead"])
+        + f"<div class='hero-cta' data-reveal><a class='btn btn-primary btn-lg' "
+        f"href='{audit_path(locale)}'>{_e(ui['cta'])}<span class='go'>{icon('arrow')}</span></a>"
+        "</div></div>"
+        + f"<div class='panel' data-reveal><ul class='checks'>{points}</ul></div>"
+        + "</div></section>"
+    )
+
+
+def upload_page(
+    *,
+    locale: str = "es",
+    free_mode: bool = True,
+    price_usd: float = 0.0,
+    access_codes: bool = False,
+    retention_days: int = 30,
+    base_url: str = "",
+    extras_open: bool = False,
+    signed_in: bool | None = None,
+) -> str:
+    """The upload form on its own page, so the landing can stay short.
+
+    ``signed_in=False`` in paid mode keeps the "account first" note above the fields
+    (the web layer normally sends such a visitor to sign-up before this page)."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
+    meta = _public_meta(
+        f"{copy['form_title']} · {BRAND}",
+        copy["meta_description"],
+        locale,
+        audit_path(locale),
+        base_url,
+    )
+    # No page hero: the form section carries its own heading, right under a solid bar.
+    body = _upload_form(
+        copy,
+        locale,
+        note=note,
+        flash="",
+        err="",
+        access_codes=access_codes,
+        retention_days=retention_days,
+        extras_open=extras_open,
+        signin_first=signed_in is False and not free_mode,
+    )
+    return _page(
+        copy["form_title"], locale, body, meta_html=meta, solid_nav=True, alternates=AUDIT_PATHS
+    )
+
+
+def _evidence_value(item: Any, locale: str = "es") -> str:
     """A figure and its evidence tag as HTML: "120" then the DECLARED badge."""
     if isinstance(item, dict) and "value" in item:
         value = item.get("value")
         shown = "—" if value is None else _e(f"{value:,}" if isinstance(value, int) else value)
         evidence = str(item.get("evidence", ""))
         tag = (
-            f" <span class='badge {_e(evidence)}'>{_e(evidence)}</span>"
+            f" {_badge(evidence, locale)}"
             if evidence in ("MEASURED", "DECLARED", "NOT_MEASURED")
             else ""
         )
@@ -2610,7 +2693,7 @@ def verification_page(
     detail_rows = (
         "".join(f"<tr><td>{_e(label)}</td><td>{_e(value)}</td></tr>" for label, value in details)
         + "".join(
-            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item)}</td></tr>"
+            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item, locale)}</td></tr>"
             for label, item in (
                 (copy["v_trials_declared"], declared.get("trials")),
                 (copy["v_trials_used"], trials_used),
@@ -2775,6 +2858,148 @@ def legal_page(
     return _page(text.title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
+#: The contact page in each language; /soporte, /support and /pt/suporte lead here.
+CONTACT_PATHS: dict[str, str] = {"es": "/contacto", "en": "/en/contact", "pt": "/pt/contato"}
+
+CONTACT_COPY: dict[str, dict[str, Any]] = {
+    "es": {
+        "eyebrow": "Contacto",
+        "title": "Habla con una persona",
+        "lead": (
+            "Dudas sobre un informe, tu cuenta o un pago: escríbenos y te respondemos por el "
+            "mismo medio."
+        ),
+        "email": "Correo",
+        "email_text": "Para dudas sobre informes, cuentas, pagos y borrado de datos.",
+        "chat": "WhatsApp",
+        "chat_text": "Para una pregunta corta.",
+        "open": "Escribir",
+        "none": "El operador todavía no ha publicado un medio de contacto.",
+        "before_title": "Antes de escribir",
+        "before": (
+            "Si es sobre un informe, incluye su identificador (está en la dirección del informe).",
+            "Nunca envíes tu contraseña, tu clave de recuperación ni los datos de tu tarjeta: "
+            "nadie de Rigor te los va a pedir.",
+            "Para borrar tus datos o tu cuenta, lo puedes hacer tú desde Mi cuenta; la política "
+            "de privacidad explica qué se guarda.",
+        ),
+        "links_title": "Quizá ya está respondido",
+        "faq": "Preguntas frecuentes",
+        "guides": "Guías para exportar tu archivo",
+        "account": "Mi cuenta",
+        "privacy": "Política de privacidad",
+    },
+    "en": {
+        "eyebrow": "Contact",
+        "title": "Talk to a person",
+        "lead": (
+            "Questions about a report, your account or a payment: write to us and we reply "
+            "the same way."
+        ),
+        "email": "E-mail",
+        "email_text": "For questions about reports, accounts, payments and data deletion.",
+        "chat": "WhatsApp",
+        "chat_text": "For a short question.",
+        "open": "Write",
+        "none": "The operator has not published a contact channel yet.",
+        "before_title": "Before you write",
+        "before": (
+            "If it is about a report, include its id (it is in the report's address).",
+            "Never send your password, your recovery key or your card details: nobody from "
+            "Rigor will ask for them.",
+            "You can delete your data or your account yourself from My account; the privacy "
+            "policy explains what is kept.",
+        ),
+        "links_title": "It may already be answered",
+        "faq": "Frequent questions",
+        "guides": "Guides to export your file",
+        "account": "My account",
+        "privacy": "Privacy policy",
+    },
+    "pt": {
+        "eyebrow": "Contato",
+        "title": "Fale com uma pessoa",
+        "lead": (
+            "Dúvidas sobre um relatório, a sua conta ou um pagamento: escreva para nós e "
+            "respondemos pelo mesmo meio."
+        ),
+        "email": "E-mail",
+        "email_text": "Para dúvidas sobre relatórios, contas, pagamentos e exclusão de dados.",
+        "chat": "WhatsApp",
+        "chat_text": "Para uma pergunta curta.",
+        "open": "Escrever",
+        "none": "O operador ainda não publicou um meio de contato.",
+        "before_title": "Antes de escrever",
+        "before": (
+            "Se for sobre um relatório, inclua o identificador dele (está no endereço do "
+            "relatório).",
+            "Nunca envie a sua senha, a sua chave de recuperação nem os dados do seu cartão: "
+            "ninguém da Rigor vai pedi-los.",
+            "Você mesmo pode excluir os seus dados ou a sua conta em Minha conta; a política de "
+            "privacidade explica o que é guardado.",
+        ),
+        "links_title": "Talvez já esteja respondido",
+        "faq": "Perguntas frequentes",
+        "guides": "Guias para exportar o seu arquivo",
+        "account": "Minha conta",
+        "privacy": "Política de privacidade",
+    },
+}
+
+
+def contact_page(
+    *, locale: str = "es", email: str = "", contact_url: str = "", base_url: str = ""
+) -> str:
+    """Who to write to: the operator's e-mail and chat link, both from the environment.
+
+    Nothing is shown that the operator did not configure: no default address exists."""
+    locale = _locale(locale)
+    words = CONTACT_COPY[locale]
+    path = CONTACT_PATHS[locale]
+    meta = _public_meta(f"{words['title']} · {BRAND}", words["lead"], locale, path, base_url)
+    cards = []
+    if "@" in email and " " not in email:
+        cards.append(("chat", words["email"], words["email_text"], f"mailto:{email}", email))
+    if contact_url:
+        cards.append(("chat", words["chat"], words["chat_text"], contact_url, words["open"]))
+    channels = (
+        "<div class='cards cards-2'>"
+        + "".join(
+            f"<div class='card spot'><div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3>"
+            f"<p>{_e(text)}</p><p><a class='btn btn-dark btn-sm' href='{_e(href)}' rel='noopener'>"
+            f"{_e(label)}</a></p></div>"
+            for name, title, text, href, label in cards
+        )
+        + "</div>"
+        if cards
+        else f"<p class='muted'>{_e(words['none'])}</p>"
+    )
+    before = "".join(
+        f"<li>{icon('shield')}<span>{_e(line)}</span></li>" for line in words["before"]
+    )
+    links = " · ".join(
+        f"<a href='{_e(href)}'>{_e(label)}</a>"
+        for href, label in (
+            (f"{_home(locale)}#faq", words["faq"]),
+            (guides_index_url(locale), words["guides"]),
+            (_ACCOUNT_PATHS[locale][2], words["account"]),
+            (legal_url("privacy", locale), words["privacy"]),
+        )
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["lead"])
+        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + channels
+        + f"<h2 class='label' style='margin-top:36px'>{_e(words['before_title'])}</h2>"
+        + f"<ul class='checks'>{before}</ul>"
+        + f"<h2 class='label' style='margin-top:28px'>{_e(words['links_title'])}</h2>"
+        + f"<p>{links}</p></div></div>"
+    )
+    return _page(
+        words["title"], locale, body, meta_html=meta, alternates=CONTACT_PATHS, solid_nav=True
+    )
+
+
 def compare_page(
     content: str,
     *,
@@ -2885,8 +3110,7 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     ui = _UI[locale]
     other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
-    # "/" has no Portuguese: the Portuguese form is at /pt.
-    back = LANDING_PATHS["pt"] if locale == "pt" else f"/?lang={locale}"
+    back = audit_path(locale) if kind == "audit" else _home(locale)
     # A Portuguese page offers both other languages in the bar, not a third button.
     switch = (
         ""
@@ -2898,7 +3122,7 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
         _page_hero(ui["error_eyebrow"], title, dot="warn")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"{_error_card(message, locale)}<div class='back-row'>"
-        f"<a class='btn btn-dark' href='{_e(back)}#subir'>{_e(copy['back'])}</a>"
+        f"<a class='btn btn-dark' href='{_e(back)}'>{_e(copy['back'])}</a>"
         f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
         f"{_e(GUIDES_COPY[locale]['title'])}</a>{switch}</div></div></div>"
     )
@@ -2941,8 +3165,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
         for cls, text in CLASS_LADDER[locale]
     )
     evidence = "".join(
-        f"<li><span class='badge {_e(tag)}'>{_e(tag)}</span><span>{_e(text)}</span></li>"
-        for tag, text in words["evidence"]
+        f"<li>{_badge(tag, locale)}<span>{_e(text)}</span></li>" for tag, text in words["evidence"]
     )
     flags = "".join(
         f"<li>{_e(titles.get(locale, titles['en']))}</li>" for titles in FLAG_TITLES.values()
@@ -3001,8 +3224,8 @@ _GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
 
 
 def _form_url(locale: str) -> str:
-    """The landing's upload form in ``locale``."""
-    return "/pt#subir" if locale == "pt" else f"/?lang={locale}#subir"
+    """The upload form's page in ``locale``."""
+    return audit_path(locale)
 
 
 def _language_crumbs(alternates: dict[str, str], locale: str) -> str:
@@ -3160,10 +3383,7 @@ def audience_page(
         if page.slug != audience.slug
     )
     # Robot buyers land on the form with the live-account box already open.
-    if locale == "pt":
-        start = "/pt" + ("?extras=1" if audience.open_extras else "") + "#subir"
-    else:
-        start = f"/?lang={locale}" + ("&extras=1" if audience.open_extras else "") + "#subir"
+    start = audit_path(locale) + ("?extras=1" if audience.open_extras else "")
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(words['start'])}"

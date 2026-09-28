@@ -499,7 +499,7 @@ def test_the_page_speaks_portuguese_when_the_upload_came_from_pt(tmp_path: Path)
     assert "Diga-nos o que é cada coluna" in page
     assert "Compra · ex. 2300" in page
     assert "Data e hora de entrada" in page and "Saldo ou patrimônio da conta" in page
-    assert "href='/pt#subir'" in page
+    assert "href='/pt/auditar'" in page
     assert "name='locale' value='pt'" in page
     assert "Tell us what each column is" not in page and "Dinos qué es" not in page
     assert find_claims(page) == []

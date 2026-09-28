@@ -86,8 +86,8 @@ def test_fund_page_and_upload_help_mention_the_factsheet_table(tmp_path: Path) -
         page = client.get(path).text
         for word in words:
             assert word in page
-    assert "tabla de rentabilidades mensuales de un fondo" in client.get("/").text
-    assert "monthly returns table (a year per row" in client.get("/en").text
+    assert "tabla de rentabilidades mensuales de un fondo" in client.get("/auditar").text
+    assert "monthly returns table (a year per row" in client.get("/en/audit").text
 
 
 def test_trader_pages_link_the_universal_csv_guide(tmp_path: Path) -> None:
@@ -127,12 +127,20 @@ def test_named_platforms_match_the_universal_guide_and_show_on_the_pages(tmp_pat
 
 def test_robot_buyers_land_on_the_form_with_the_extra_files_open(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    for path, lang in (("/para/compradores-de-robots", "es"), ("/for/robot-buyers", "en")):
-        assert f"href='/?lang={lang}&amp;extras=1#subir'" in client.get(path).text
+    for path, form in (
+        ("/para/compradores-de-robots", "/auditar"),
+        ("/for/robot-buyers", "/en/audit"),
+    ):
+        assert f"href='{form}?extras=1'" in client.get(path).text
     for path in ("/para/retos-prop-firm", "/for/investors-managers-funds"):
         assert "extras=1" not in client.get(path).text
-    assert "<details class='adv extras' open>" in client.get("/?lang=es&extras=1").text
-    assert "<details class='adv extras'>" in client.get("/").text
+    assert "<details class='adv extras' open>" in client.get("/auditar?extras=1").text
+    assert "<details class='adv extras'>" in client.get("/auditar").text
+    # Links shared before the form had its own page still open the extra boxes.
+    old = client.get("/?lang=es&extras=1", follow_redirects=False)
+    assert old.status_code == 303 and old.headers["location"] == "/auditar?extras=1"
+    old_en = client.get("/en?extras=1", follow_redirects=False)
+    assert old_en.status_code == 303 and old_en.headers["location"] == "/en/audit?extras=1"
 
 
 @pytest.mark.parametrize(

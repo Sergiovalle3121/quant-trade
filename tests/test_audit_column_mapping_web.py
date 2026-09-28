@@ -12,7 +12,7 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.pages import landing  # noqa: E402
+from quant_trade.audit.pages import upload_page  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.universal import ROLES  # noqa: E402
@@ -49,7 +49,7 @@ MAPPING = {
 
 def test_the_form_offers_a_field_per_column_role_in_both_languages() -> None:
     for locale in ("es", "en"):
-        page = landing(locale=locale)
+        page = upload_page(locale=locale)
         assert "id='report-columns'" in page
         for role in ROLES:
             if role in {"swap", "account"}:
