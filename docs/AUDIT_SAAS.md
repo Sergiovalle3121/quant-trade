@@ -2963,6 +2963,40 @@ An open Checkout session is reused only in the language it was opened in
 Portuguese gets Stripe's page and product name in that language
 (`tests/test_audit_account_credit_purchase.py::test_switching_language_opens_a_checkout_in_that_language`).
 
+The session left open in the other language is then expired at Stripe
+(`POST /v1/checkout/sessions/{id}/expire`), so the same purchase is not
+payable twice for a day. Rules (`payments.expire_superseded`,
+`tests/test_audit_checkout_language.py`):
+
+- Only the same purchase: the same report, or the same account's credits,
+  and the same plan, held by the reuse slot of another language. Another
+  plan, another report and another account are left alone.
+- Only an order that is `open`, has a session id and is not past its expiry.
+  An order that is `paid_review`, `delivered` or `duplicate` is never sent to
+  Stripe, and Stripe itself refuses to expire a session that is complete, so
+  a payment that got there first is never undone.
+- Best effort, after the redirect: the call runs as a background task once
+  the buyer has been sent to the new session, with one attempt and a
+  10-second timeout (`payments.EXPIRE_TIMEOUT_SECONDS`). A refusal, a timeout
+  or any error is logged with the session id and the error class only and
+  changes nothing: the old order stays reusable in its language, as before
+  this rule, and the next new session of that purchase tries again.
+- Once Stripe answers `expired`, the old order keeps its status `open`, its
+  session id and its checkout URL, takes an expiry of now and
+  `resolution=expired_language_change`. That is the state of a session that
+  expired by itself, so the slot gives a new order the next time and the
+  funnel count of started checkouts does not change.
+- A paid webhook for such an order (a payment that raced the expiry) settles
+  like any other: the report is delivered once, a second paid session for the
+  same report is a `duplicate` for manual refund review, and each paid credit
+  order puts its own credits on the account once.
+- The no-charge card check (setup mode) is not covered: it charges nothing,
+  keeps no order and no session id, and finishing any of its sessions records
+  the same card once. Its open sessions expire by themselves at Stripe.
+- Two language switches at the same moment can each expire the other's
+  session; the buyer then sees Stripe's expired page and the next click opens
+  a new session. Nothing is charged in that case.
+
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card
 payments (Stripe) or access codes are on, the retention window and the

@@ -127,6 +127,29 @@ Every change below has an offline, deterministic test in
   sign-in, sign-up and panel counters moved to the database (`attempts`,
   hashed keys), so deploys no longer reset them. Parked: sign-up's 409
   confirms an e-mail exists (needs e-mail verification); scrypt N=2^14.
+- Checkout sessions and the language switch (payments, 2026-09-28, local
+  review with Stripe simulated; `tests/test_audit_checkout_language.py`).
+  Before, a buyer who changed language left the first Checkout session
+  payable at Stripe for up to a day next to the new one, so the same purchase
+  could be paid twice. Now the session of the other language is expired at
+  Stripe after the redirect to the new one. What keeps it safe: only an
+  `open` order of the same report (or account) and plan is sent, never one
+  that is `paid_review`, `delivered` or `duplicate`; Stripe refuses to expire
+  a complete session, so a payment that won the race stays paid and its
+  webhook delivers; the local order is changed only after Stripe answers
+  `expired`, with a conditional update that leaves a paid order untouched,
+  and it keeps its session id, so a late paid webhook still settles once
+  (a second charge is a `duplicate` for manual refund review, as before).
+  The call is one attempt with a 10-second timeout in a background task, so
+  it cannot delay or fail the new checkout; failures are logged with the
+  session id and the error class only, never the key or Stripe's message.
+  No new route, form field or redirect target; the Stripe key is used for
+  one more endpoint. Limits: best effort (a failed expiry leaves the old
+  session open, as it was before); the no-charge card check is not covered
+  (no charge, no order); two switches at the same moment can expire each
+  other's session, which charges nothing. Also fixed: the two redirects of
+  `POST /audits/{id}/checkout` that wrote `token=None` when the signed-in
+  owner paid without the token in the URL now write an empty token.
 
 ## What the operator sets on Railway
 

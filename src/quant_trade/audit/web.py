@@ -997,6 +997,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             RedirectResponse,
             Response,
         )
+        from starlette.background import BackgroundTask
         from starlette.concurrency import run_in_threadpool
         from starlette.exceptions import HTTPException as StarletteHTTPException
     except ImportError as exc:
@@ -1053,6 +1054,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.checkout_factory = payments.stripe_checkout
     app.state.account_checkout_factory = payments.stripe_account_checkout
     app.state.session_lookup = payments.stripe_session
+    app.state.session_expirer = payments.stripe_expire_session
     app.state.mail_domain_check = inbox.domain_takes_mail
     app.state.card_check_factory = payments.stripe_card_check
     app.state.card_fingerprint = payments.stripe_card_fingerprint
@@ -3029,6 +3031,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
+    def _expire_superseded(order_id: str, at: datetime) -> BackgroundTask:
+        """After the redirect: close the session this one replaced in another language."""
+        return BackgroundTask(
+            payments.expire_superseded,
+            db,
+            cfg,
+            order_id,
+            expirer=app.state.session_expirer,
+            at=at,
+        )
+
     def _buy_post(path_locale: str) -> Callable[..., Response]:
         """Buy credits by card from "My account": one report or the pack.
 
@@ -3101,7 +3114,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     else None
                 ),
             )
-            return RedirectResponse(url, status_code=303)
+            return RedirectResponse(
+                url, status_code=303, background=_expire_superseded(order.id, now)
+            )
 
         return handler
 
@@ -5335,7 +5350,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         _link_to_session(request, audit_id)
         if record.paid:
             return RedirectResponse(
-                f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
+                f"/audits/{audit_id}?token={token or ''}&lang={locale}", status_code=303
             )
         if pause_new_checkout:
             return _html_error(request, 503, message("incident_paused", locale), locale)
@@ -5407,7 +5422,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 }
                 return _html_error(request, 409, changed[locale], locale)
             return RedirectResponse(
-                f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
+                f"/audits/{audit_id}?token={token or ''}&lang={locale}", status_code=303
             )
         db.record_final_sale(order.id, terms_version=LEGAL_UPDATED, at=now)
         if order.checkout_url and order.expires_at > now.isoformat().replace("+00:00", "Z"):
@@ -5436,7 +5451,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         db.attach_checkout_session(
             order.id, session_id=session_id, checkout_url=url, expires_at=expires
         )
-        return RedirectResponse(url, status_code=303)
+        return RedirectResponse(url, status_code=303, background=_expire_superseded(order.id, now))
 
     @app.post("/webhooks/stripe")
     async def stripe_webhook(request: Request) -> Response:

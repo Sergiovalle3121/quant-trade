@@ -1618,6 +1618,75 @@ class Store:
             )
         return self._checkout_order(updated)
 
+    def superseded_checkouts(self, order_id: str, *, at: datetime) -> list[CheckoutOrder]:
+        """Open sessions of the same purchase that ``order_id`` replaces.
+
+        Only orders another reuse slot of the same report (or account) and
+        plan still holds: the same purchase started in another language. An
+        order that is paid, in review, delivered or past its expiry is never
+        listed, and nothing is listed until the new order has its own session.
+        """
+        if not _usable_key(order_id):
+            return []
+        sa = self._sa
+        orders, slots = self.checkout_orders, self.checkout_slots
+        stamp = _iso(at)
+        with self.engine.connect() as conn:
+            new = conn.execute(sa.select(orders).where(orders.c.id == order_id)).mappings().first()
+            if (
+                new is None
+                or not new["audit_id"]
+                or new["status"] != "open"
+                or not new["checkout_url"]
+            ):
+                return []
+            rows = (
+                conn.execute(
+                    sa.select(orders)
+                    .join(slots, slots.c.order_id == orders.c.id)
+                    .where(slots.c.audit_id == new["audit_id"])
+                    .where(
+                        sa.or_(
+                            slots.c.plan == new["plan"],
+                            slots.c.plan.like(f"{new['plan']}:%"),
+                        )
+                    )
+                    .where(orders.c.id != order_id)
+                    .where(orders.c.audit_id == new["audit_id"])
+                    .where(orders.c.account_id == new["account_id"])
+                    .where(orders.c.plan == new["plan"])
+                    .where(orders.c.status == "open")
+                    .where(orders.c.session_id.is_not(None))
+                    .where(orders.c.session_id != "")
+                    .where(orders.c.expires_at > stamp)
+                    .order_by(orders.c.created_at, orders.c.id)
+                )
+                .mappings()
+                .all()
+            )
+        return [self._checkout_order(row) for row in rows]
+
+    def mark_checkout_expired(self, order_id: str, *, session_id: str, at: datetime) -> bool:
+        """Stop reusing an order whose session Stripe has just expired.
+
+        The order stays ``open`` with its session id and an expiry of now,
+        the same state as a session that expired by itself, so a late paid
+        webhook for it still settles. An order that was paid, held for review
+        or delivered in the meantime is left untouched (``False``).
+        """
+        if not _usable_key(order_id) or not session_id:
+            return False
+        orders = self.checkout_orders
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                orders.update()
+                .where(orders.c.id == order_id)
+                .where(orders.c.session_id == session_id)
+                .where(orders.c.status == "open")
+                .values(expires_at=_iso(at), resolution="expired_language_change")
+            )
+            return bool(result.rowcount)
+
     def settle_card_payment(
         self,
         *,

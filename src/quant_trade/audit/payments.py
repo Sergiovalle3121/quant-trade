@@ -26,7 +26,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -63,6 +63,8 @@ CURRENCY = "usd"
 CARD_LOOKUPS_PER_HOUR = 10
 #: Stripe Checkout session ids start with this; code-paid audits carry ``code:``.
 SESSION_PREFIX = "cs_"
+#: Seconds the best-effort expiry of a superseded session may take, one attempt.
+EXPIRE_TIMEOUT_SECONDS = 10
 #: The lowest advertised price before the order ledger existed. Historical
 #: sessions have no frozen order id, so their paid amount is checked against
 #: this floor when today's configured price has increased.
@@ -432,6 +434,68 @@ def stripe_session(settings: AuditSettings, session_id: str) -> dict[str, Any]:
     return _plain(session)
 
 
+def stripe_expire_session(
+    settings: AuditSettings, session_id: str, *, http_client: Any = None
+) -> dict[str, Any]:
+    """Ask Stripe to expire an open Checkout session (needs the SDK).
+
+    Stripe refuses a session that is already complete or expired, so a
+    payment that got there first is never undone. One attempt with a short
+    timeout: the call is best effort and runs after the buyer's redirect.
+    """
+    import stripe
+
+    client = stripe.StripeClient(
+        settings.stripe_secret_key,
+        max_network_retries=0,
+        http_client=http_client or stripe.new_default_http_client(timeout=EXPIRE_TIMEOUT_SECONDS),
+    )
+    return _plain(client.v1.checkout.sessions.expire(session_id))
+
+
+def expire_superseded(
+    store: Store,
+    settings: AuditSettings,
+    order_id: str,
+    *,
+    expirer: Callable[[AuditSettings, str], Mapping[str, Any]],
+    at: datetime,
+) -> int:
+    """Expire the open sessions ``order_id`` replaced; how many Stripe expired.
+
+    A buyer who switches language gets a new session, so the one opened in
+    the other language is closed at Stripe instead of staying payable for a
+    day. Best effort and never raises: a refusal (the session was paid or
+    had expired), a timeout or any other failure leaves the old order as it
+    was, and the webhook still settles whatever Stripe charged.
+    """
+    expired = 0
+    try:
+        for old in store.superseded_checkouts(order_id, at=at):
+            if not old.session_id.startswith(SESSION_PREFIX):
+                continue
+            try:
+                result = expirer(settings, old.session_id)
+            except Exception as exc:  # noqa: BLE001 - Stripe refused or is unreachable
+                # The class only: a Stripe error message can quote the request.
+                logger.warning(
+                    "could not expire superseded Checkout session %s: %s",
+                    _safe(old.session_id),
+                    type(exc).__name__,
+                )
+                continue
+            if result.get("id") != old.session_id or result.get("status") != "expired":
+                logger.warning(
+                    "superseded Checkout session %s was not expired", _safe(old.session_id)
+                )
+                continue
+            if store.mark_checkout_expired(old.id, session_id=old.session_id, at=at):
+                expired += 1
+    except Exception as exc:  # noqa: BLE001 - never fail the checkout that replaced it
+        logger.warning("could not review superseded Checkout sessions: %s", type(exc).__name__)
+    return expired
+
+
 def refusal(
     settings: AuditSettings,
     session: Mapping[str, Any],
@@ -781,6 +845,7 @@ __all__ = [
     "account_checkout_params",
     "checkout_params",
     "credit_code",
+    "expire_superseded",
     "fulfil",
     "pack_code",
     "pack_for",
@@ -789,5 +854,6 @@ __all__ = [
     "refusal",
     "stripe_account_checkout",
     "stripe_checkout",
+    "stripe_expire_session",
     "stripe_session",
 ]
