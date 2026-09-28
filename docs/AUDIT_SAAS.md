@@ -730,7 +730,7 @@ Every leaf value in the JSON carries an evidence tag:
   is stated next to it.
 
 On the site's pages (landing, upload form, guides, methodology, verification,
-contact) and in the HTML and PDF reports a reader sees these tags as words in
+contact, terms, privacy) and in the HTML and PDF reports a reader sees these tags as words in
 the page's language: Medido / Declarado / No medido, Measured / Declared / Not
 measured, Medido / Declarado / Não medido (`report.EVIDENCE_LABELS`). The codes
 stay in the JSON, the Markdown report and the badge CSS classes.

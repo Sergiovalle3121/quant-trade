@@ -124,3 +124,20 @@ def test_reports_show_evidence_labels_in_their_own_language() -> None:
         assert "MEASURED" not in text and "DECLARED" not in text, locale
         # The badge keeps the code as its class, for its colour.
         assert 'class="badge MEASURED"' in page
+
+
+def test_legal_pages_name_the_evidence_labels_as_words(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path, word in (
+        ("/terminos", "«No medido»"),
+        ("/terms?lang=en", "“Not measured”"),
+        ("/pt/termos", "«Não medido»"),
+        ("/privacidad", ""),
+        ("/privacy?lang=en", ""),
+        ("/pt/privacidade", ""),
+    ):
+        text = _text(client.get(path).text.split("</head>", 1)[1])
+        assert word in text, path
+        for code in ("MEASURED", "DECLARED"):
+            assert code not in text, (path, code)
+        assert find_claims(text) == [], path
