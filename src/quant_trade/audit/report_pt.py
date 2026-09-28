@@ -5686,6 +5686,10 @@ RULES: tuple[tuple[str, str], ...] = (
         "o saldo impresso contradiz os valores das operações",
     ),
     (
+        "open positions or closes missing from the trade list could explain the difference",
+        "posições abertas ou fechamentos ausentes da lista de operações podem explicar a diferença",
+    ),
+    (
         "printed final balance differs from initial balance plus flows and net closed P&L by "
         "{difference} {currency}; the return was rebuilt from deal amounts",
         "o saldo final impresso difere do saldo inicial mais os fluxos e o resultado líquido "
