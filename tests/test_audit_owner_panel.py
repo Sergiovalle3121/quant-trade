@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,9 +14,9 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.owner import MAX_FAILED_LOGINS_PER_HOUR, TEXT  # noqa: E402
+from quant_trade.audit.owner import MAX_FAILED_LOGINS_PER_HOUR, TEXT, _orders_table  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import hash_access_code, make_store  # noqa: E402
+from quant_trade.audit.store import CheckoutOrder, hash_access_code, make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 
 KEY = "k" * 40
@@ -103,3 +104,27 @@ def test_disable_stops_a_code(tmp_path: Path) -> None:
 def test_panel_texts_pass_the_guard() -> None:
     for text in TEXT.values():
         assert find_claims(text) == [], text
+
+
+def test_paid_review_charge_is_visible_with_held_delivery_and_refund_review() -> None:
+    charged = CheckoutOrder(
+        id="order-review",
+        audit_id="audit-review",
+        account_id="account-review",
+        plan="single",
+        amount_cents=2900,
+        currency="usd",
+        status="paid_review",
+        session_id="cs_live_review",
+        checkout_url="https://checkout.stripe.test/review",
+        expires_at="2026-09-28T00:00:00Z",
+        paid_amount_cents=2900,
+        confirmed_at="2026-09-27T12:00:00Z",
+        resolution="manual_refund_review",
+        livemode=True,
+    )
+    html = _orders_table([replace(charged, status="open"), charged])
+    assert html.count("cs_live_review") == 1
+    assert "<td>29.00</td><td>cobrado; entrega retenida</td>" in html
+    assert "<td>revisar reembolso manualmente</td>" in html
+    assert "registrar la revisión no ejecuta el reembolso" in html

@@ -66,7 +66,8 @@ TEXT: dict[str, str] = {
     "orders_title": "Compras con tarjeta registradas",
     "orders_lead": (
         "Una fila es una sesión pagada, no un informe ni un crédito. Un duplicado es otro cobro "
-        "que requiere revisión de reembolso; registrar la revisión no ejecuta el reembolso. "
+        "que requiere revisión de reembolso. Un cobro retenido no entregó el informe y también "
+        "requiere revisión; registrar la revisión no ejecuta el reembolso. "
         "Solo cobros con entorno live confirmado entran en el embudo comercial."
     ),
     "orders_cols": "Fecha|Sesión|Informe|Plan|Entorno|Cobro registrado USD|Entrega|Resolución",
@@ -279,7 +280,7 @@ def _orders_table(orders: Sequence[CheckoutOrder]) -> str:
         return ""
     rows: list[list[str]] = []
     for order in orders:
-        if order.status not in ("delivered", "duplicate"):
+        if order.status not in ("delivered", "duplicate", "paid_review"):
             continue
         cells = (
             order.confirmed_at[:16].replace("T", " "),
@@ -294,7 +295,13 @@ def _orders_table(orders: Sequence[CheckoutOrder]) -> str:
                 else "no medido"
             ),
             f"{order.paid_amount_cents / 100:.2f}",
-            "entregado" if order.status == "delivered" else "cargo duplicado",
+            (
+                "entregado"
+                if order.status == "delivered"
+                else "cargo duplicado"
+                if order.status == "duplicate"
+                else "cobrado; entrega retenida"
+            ),
             (
                 "revisar reembolso manualmente"
                 if order.resolution == "manual_refund_review"
