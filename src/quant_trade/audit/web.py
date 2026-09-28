@@ -77,7 +77,6 @@ from quant_trade.audit.owner import (
     MAX_EXPIRES_DAYS,
     MAX_FAILED_LOGINS_PER_HOUR,
     MAX_NOTE_CHARS,
-    PANEL_PATH,
     funnel_section,
     login_page,
     panel_page,
@@ -116,7 +115,7 @@ from quant_trade.audit.schema import (
     report_digest_name,
 )
 from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
-from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings
+from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings, resolve_panel_path
 from quant_trade.audit.store import (
     CODE_REFERENCE_PREFIX,
     REQUIRE_WEB,
@@ -433,10 +432,11 @@ REPORT_SIZE_FACTOR = 2
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 #: Railway's own addresses; a read there moves to ``AUDIT_BASE_URL`` once it differs.
 RAILWAY_HOST_SUFFIX = ".up.railway.app"
-#: Query values that are secrets: the owner token and an access code.
-_SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code)=)[^&\s\"]*", re.IGNORECASE)
+#: Query values that are secrets: the owner token, an access code and the
+#: panel key (it travels in the body; a mistyped link must not log it).
+_SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code|key)=)[^&\s\"]*", re.IGNORECASE)
 #: The same inside a URL-encoded ``next`` (``%3Ftoken%3D…``, ``%26code%3D…``).
-_SECRET_QUERY_ENCODED = re.compile(r"((?:%3F|%26)(?:token|code)%3D)[^&\s\"%]*", re.IGNORECASE)
+_SECRET_QUERY_ENCODED = re.compile(r"((?:%3F|%26)(?:token|code|key)%3D)[^&\s\"%]*", re.IGNORECASE)
 
 #: The file names as the error sentences use them.
 UPLOAD_NAMES: dict[str, dict[str, str]] = {
@@ -476,8 +476,8 @@ def message(key: str, locale: str, **values: Any) -> str:
 
 
 def redact_secrets(text: str) -> str:
-    """``text`` with the value of every ``token=`` and ``code=`` query parameter
-    replaced, so an access log line never carries an owner token."""
+    """``text`` with the value of every ``token=``, ``code=`` and ``key=`` query
+    parameter replaced, so an access log line never carries an owner token."""
     text = _SECRET_QUERY.sub(r"\1[redacted]", text)
     return _SECRET_QUERY_ENCODED.sub(r"\1[redacted]", text)
 
@@ -1085,7 +1085,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             response.headers["Strict-Transport-Security"] = HSTS
         if "Cache-Control" not in response.headers:
             response.headers["Cache-Control"] = "no-store"
-        if path.startswith(DISALLOWED_PATHS) or response.status_code >= 400:
+        # The owner panel is never listed in robots.txt (that would reveal its
+        # path), so its pages carry the header themselves.
+        panel_at = str(getattr(app.state, "panel_path", ""))
+        in_panel = bool(panel_at) and (path == panel_at or path.startswith(panel_at + "/"))
+        if path.startswith(DISALLOWED_PATHS) or in_panel or response.status_code >= 400:
             response.headers["X-Robots-Tag"] = NOINDEX
         return response
 
@@ -1370,16 +1374,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             status_code=200 if all(checks.values()) else 503,
         )
 
-    @app.get(PANEL_PATH, response_class=HTMLResponse)
+    # Both panel routes are mounted at the end of ``create_app``, at the
+    # configured path and only when there is a key.
     def panel_login() -> str:
         if not cfg.admin_enabled:
             raise _not_found()
-        return login_page()
+        return login_page(panel_path=app.state.panel_path)
 
-    @app.post(PANEL_PATH, response_class=HTMLResponse)
     def panel(
         request: Request,
-        key: Annotated[str, Form()],
+        key: Annotated[str, Form(max_length=256)],
         action: Annotated[str, Form()] = "list",
         credits: Annotated[str, Form()] = "1",
         note: Annotated[str, Form()] = "",
@@ -1395,10 +1399,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         now = datetime.now(UTC)
         if panel_failures.count(ip, now) >= MAX_FAILED_LOGINS_PER_HOUR:
-            return HTMLResponse(login_page(error="too_many"), status_code=429)
+            return HTMLResponse(
+                login_page(error="too_many", panel_path=app.state.panel_path), status_code=429
+            )
         if not hmac.compare_digest(key.encode(), cfg.admin_key.encode()):
             panel_failures.hit(ip, now)
-            return HTMLResponse(login_page(error="wrong_key"), status_code=403)
+            return HTMLResponse(
+                login_page(error="wrong_key", panel_path=app.state.panel_path), status_code=403
+            )
         new_code = flash = error = ""
         if action == "create":
             try:
@@ -1461,6 +1469,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
                     country_rows=db.funnel_country_events(funnel.since_day(now)),
                 ),
+                panel_path=app.state.panel_path,
             )
         )
 
@@ -5491,6 +5500,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail="invalid refund event") from exc
         return JSONResponse({"received": True})
+
+    # The owner panel, at ``AUDIT_PANEL_PATH`` when that is a valid path whose
+    # first segment no public route uses. Without a key nothing is mounted, so
+    # its address answers like any page that does not exist, whatever the method.
+    route_paths = [str(getattr(route, "path", "")) for route in app.routes]
+    for hidden_paths in track_seal_pages.PATHS.values():
+        route_paths.extend(hidden_paths.values())
+    taken = {found.split("/")[1] for found in route_paths if found.startswith("/")}
+    app.state.panel_path = resolve_panel_path(cfg.panel_path, taken=taken)
+    if app.state.panel_path != cfg.panel_path:
+        # The value is not logged: the path is the owner's to keep private.
+        logger.warning("AUDIT_PANEL_PATH is not usable; the owner panel keeps its default path")
+    if cfg.admin_enabled:
+        panel_at = str(app.state.panel_path)
+        app.add_api_route(panel_at, panel_login, methods=["GET"], response_class=HTMLResponse)
+        app.add_api_route(panel_at, panel, methods=["POST"], response_class=HTMLResponse)
 
     # Hidden features mount here with the app's own closures; each module's
     # switch is a constant, and while it is off nothing is registered.
