@@ -391,6 +391,7 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     assert store.get_checkout_order(order.id).status == "paid_review"
     assert store.get_checkout_order(order.id).paid_amount_cents == 2900
     assert store.checkout_market(order.id) == ("MX", "US")
+    assert store.funnel_country_events("2000-01-01") == [("US", 1, 0, 2900)]
     assert len(store.list_refused_payments()) == 1
     assert _webhook(client, bad) == 200
     assert len(store.list_refused_payments()) == 1
@@ -417,6 +418,7 @@ def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path
     assert _webhook(client, paid) == 200
     assert store.get_audit(audit_id).paid
     assert store.checkout_market(order.id) == ("MX", "MX")
+    assert store.funnel_country_events("2000-01-01") == [("MX", 1, 1, 2900)]
 
 
 def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Path) -> None:

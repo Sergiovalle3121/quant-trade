@@ -2216,28 +2216,27 @@ production. A Payment Link cannot reserve a local order before redirecting
 to Stripe, so this path does not meet the launch requirement for durable
 pre-payment order tracking and Checkout retry reuse. The instructions below
 describe legacy compatibility only. Public card sales require the secret-key
-Checkout flow above. New link sales require the explicit
-`AUDIT_LEGACY_PAYMENT_LINKS_ENABLED=true` compatibility switch; setting only
-the old URLs and webhook secret leaves new link sales off. A historical paid
-webhook is still fulfilled with the switch off. Retire the links in Stripe
-before a price increase: an active old link can still charge the old amount,
-and the service accepts its signed paid callback to protect that buyer.
+Checkout flow above. The service no longer presents **live** Payment Links as a
+new buying path, even with the compatibility switch, because they bypass
+market admission. A historical paid webhook is still fulfilled with the
+switch off. Disable the links in Stripe **before opening live charges**: an
+active old link remains externally accessible and can still charge its old
+amount, while the service accepts its signed callback to protect that buyer.
 
-1. Create two Payment Links in Stripe: one for a report (USD 29) with
-   metadata `app=rigor` and one for the pack (USD 69) with metadata
-   `app=rigor` and `plan=pack`, card only and no promotion codes. Leave the confirmation
-   page as Stripe's own; the buyer comes back to the report tab.
-2. Create the webhook endpoint as above and put its signing secret in
+1. For historical reconciliation, inspect existing Payment Links and retain
+   their metadata (`app=rigor`, `plan=pack` where relevant) in the private
+   Stripe record. Do not create new public Payment Links for this launch.
+2. Keep the webhook endpoint as above and put its signing secret in
    `STRIPE_WEBHOOK_SECRET`.
 3. For an isolated legacy migration test only, set
    `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK`, and
    `AUDIT_LEGACY_PAYMENT_LINKS_ENABLED=true`, and leave `STRIPE_SECRET_KEY`
-   empty. Turn the switch off and retire the links before public launch.
+   empty. Turn the switch off and retire the links in Stripe before public launch.
 
-The locked report links to them with `client_reference_id=<audit id>` in a
-new tab. The signed webhook is the only confirmation (the service has no key
-to ask Stripe), and "Ya pagué: ver mi informe" reloads the report. The pack
-code works as below, keyed by the Checkout session the link created.
+Historically the locked report linked to them with
+`client_reference_id=<audit id>` in a new tab. For an existing link payment,
+the signed webhook remains the confirmation (the service has no key to ask
+Stripe). The pack code remains keyed by the Checkout session the link created.
 
 How it works: the checkout carries `metadata.audit_id` and `metadata.plan`.
 The payment is confirmed by the signed webhook and, when the buyer comes

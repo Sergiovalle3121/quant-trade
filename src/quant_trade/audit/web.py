@@ -1360,6 +1360,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     funnel.build(db.funnel_events(funnel.since_day(now))),
                     days=funnel.FUNNEL_DAYS,
                     example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
+                    country_rows=db.funnel_country_events(funnel.since_day(now)),
                 ),
             )
         )

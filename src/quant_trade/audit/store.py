@@ -4991,7 +4991,7 @@ class Store:
                         refs, refs.c.account_id == orders.c.account_id
                     )
                 )
-                .where(orders.c.status.in_(("delivered", "duplicate")))
+                .where(orders.c.status.in_(("delivered", "duplicate", "paid_review")))
                 .where(orders.c.livemode.is_(True))
                 .order_by(orders.c.confirmed_at, orders.c.id)
             ).all()
@@ -5021,6 +5021,40 @@ class Store:
             if account_id:
                 out["repeat_purchases" if repeat else "buyers"].append((*event, 1))
         return out
+
+    def funnel_country_events(self, since_day: str) -> list[tuple[str, int, int, int]]:
+        """Live paid orders by provider billing country; older orders stay unknown.
+
+        Returns (country, purchases, deliveries, gross USD cents). A country
+        declared before Checkout is not substituted for Stripe's observed one.
+        """
+        sa = self._sa
+        orders = self.checkout_orders
+        markets = self.checkout_order_markets
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(
+                    orders.c.status,
+                    orders.c.paid_amount_cents,
+                    markets.c.billing_country,
+                )
+                .select_from(orders.outerjoin(markets, markets.c.order_id == orders.c.id))
+                .where(orders.c.status.in_(("delivered", "duplicate", "paid_review")))
+                .where(orders.c.livemode.is_(True))
+                .where(orders.c.confirmed_at >= since_day)
+            ).all()
+        buckets: dict[str, list[int]] = {}
+        for status, amount, country in rows:
+            code = str(country or "").upper()
+            code = code if len(code) == 2 and code.isalpha() else "NOT_MEASURED"
+            counts = buckets.setdefault(code, [0, 0, 0])
+            counts[0] += 1
+            counts[1] += int(status == "delivered")
+            counts[2] += int(amount)
+        return [
+            (country, values[0], values[1], values[2])
+            for country, values in sorted(buckets.items())
+        ]
 
     # -- retention ---------------------------------------------------------
     def purge_expired(self, now: datetime, *, retention_days: int, dry_run: bool = False) -> int:

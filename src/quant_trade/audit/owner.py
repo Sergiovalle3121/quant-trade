@@ -112,10 +112,11 @@ TEXT: dict[str, str] = {
     "funnel_by_day": "Por día e idioma",
     "funnel_country": "Por país del comprador",
     "funnel_country_missing": (
-        "NOT_MEASURED: ni las cuentas ni las órdenes guardan un país de facturación "
-        "comprobado. No se deduce el país del idioma, la IP ni la tarjeta. Las cohortes "
-        "por canal e idioma de abajo sí se basan en datos guardados."
+        "Sólo las compras nuevas con dirección de facturación comprobada por Stripe tienen "
+        "país observado. Las compras anteriores figuran NOT_MEASURED. Visitas, registros y "
+        "cargas por país siguen NOT_MEASURED; no se deducen del idioma ni la IP."
     ),
+    "funnel_country_cols": "País facturado|Compras live|Entregas|Cobro bruto USD",
     "funnel_contribution": (
         "Contribución = cobro bruto confirmado − devoluciones − comisiones de pago y cambio "
         "− impuestos sobre esas comisiones − coste variable de informes gratis y pagados "
@@ -417,7 +418,13 @@ def _table(cols: str, rows: list[list[str]]) -> str:
     )
 
 
-def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
+def funnel_section(
+    funnel: Funnel,
+    *,
+    days: int,
+    example: str,
+    country_rows: Sequence[tuple[str, int, int, int]] = (),
+) -> str:
     """Visits, accounts, free reports, previews and payments by tag and by day."""
     title = TEXT["funnel_title"].format(days=days)
     lead = TEXT["funnel_lead"].format(example=example)
@@ -474,10 +481,22 @@ def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
             + _table(TEXT["funnel_day_cols"], day_rows)
         )
     tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items())
+    country_table = (
+        _table(
+            TEXT["funnel_country_cols"],
+            [
+                [country, str(purchases), str(deliveries), f"{gross / 100:.2f}"]
+                for country, purchases, deliveries, gross in country_rows
+            ],
+        )
+        if country_rows
+        else ""
+    )
     out += (
         f"<h3>{_e(TEXT['funnel_country'])}</h3>"
         f"<p class='muted'>{_e(TEXT['funnel_country_missing'])}</p>"
-        f"<p class='muted'>{_e(TEXT['funnel_contribution'])}</p>"
+        + country_table
+        + f"<p class='muted'>{_e(TEXT['funnel_contribution'])}</p>"
         f"<details><summary>{_e(TEXT['funnel_tags'])}</summary><p class='muted'>{_e(tags)}</p>"
         "</details>"
         f"<p class='muted'>{_e(TEXT['funnel_limits'].format(ref_days=REF_DAYS))}</p>"
