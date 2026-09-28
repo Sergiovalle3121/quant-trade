@@ -424,6 +424,11 @@ REPORT_SIZE_FACTOR = 2
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 #: Query values that are secrets: the owner token and an access code.
 _SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code)=)[^&\s\"]*", re.IGNORECASE)
+# The same parameters URL-encoded inside another one, e.g. a sign-in link's
+# ``next=%2Faudits%2Fid%3Ftoken%3D...%26lang%3Des``.
+_ENCODED_SECRET_QUERY = re.compile(
+    r"((?:%3F|%26)(?:token|code)%3D)(?:(?!%26)[^&\s\"])*", re.IGNORECASE
+)
 
 #: The file names as the error sentences use them.
 UPLOAD_NAMES: dict[str, dict[str, str]] = {
@@ -465,7 +470,7 @@ def message(key: str, locale: str, **values: Any) -> str:
 def redact_secrets(text: str) -> str:
     """``text`` with the value of every ``token=`` and ``code=`` query parameter
     replaced, so an access log line never carries an owner token."""
-    return _SECRET_QUERY.sub(r"\1[redacted]", text)
+    return _ENCODED_SECRET_QUERY.sub(r"\1[redacted]", _SECRET_QUERY.sub(r"\1[redacted]", text))
 
 
 def shorten_client_address(address: str) -> str:
@@ -4892,6 +4897,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
             raise HTTPException(status_code=503, detail="payments_disabled")
         locale = _view_locale(record, lang)
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", locale), locale)
         if db.has_checkout_review(audit_id):
             review = {
                 "es": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",

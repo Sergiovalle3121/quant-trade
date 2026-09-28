@@ -396,6 +396,12 @@ def test_access_log_lines_never_carry_a_token_or_code() -> None:
     assert redact_secrets("/audits/abc?lang=es&token=SECRET_T") == (
         "/audits/abc?lang=es&token=[redacted]"
     )
+    # A sign-in link carries the report's link, token included, URL-encoded.
+    encoded = "/entrar?next=%2Faudits%2Fabc%3Ftoken%3DSECRET_T%26lang%3Des HTTP/1.1"
+    assert redact_secrets(encoded) == (
+        "/entrar?next=%2Faudits%2Fabc%3Ftoken%3D[redacted]%26lang%3Des HTTP/1.1"
+    )
+    assert "SECRET_T" not in redact_secrets("/x?next=%2Fa%3Flang%3Des%26TOKEN%3DSECRET_T")
     record = logging.LogRecord(
         "uvicorn.access",
         logging.INFO,

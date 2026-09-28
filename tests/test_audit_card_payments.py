@@ -1272,6 +1272,12 @@ def test_checkout_needs_the_signed_in_account_that_owns_the_report(tmp_path: Pat
         f"/audits/{audit_id}?token={token}&lang=es"
     ]
 
+    # A post from another site is refused before anything is recorded.
+    forged = client.post(
+        url, data=form, headers={"sec-fetch-site": "cross-site"}, follow_redirects=False
+    )
+    assert forged.status_code == 403
+
     # Another account cannot pay for (and take) this report.
     other = signed_in(TestClient(client.app), email="other@example.com")
     refused = other.post(url, data=form, follow_redirects=False)
