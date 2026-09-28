@@ -229,9 +229,11 @@ COPY: dict[str, dict[str, object]] = {
             "anual, y estos datos están disponibles gratis en bankofcanada.ca.",
             "Tasa Selic mensual de Brasil: Banco Central do Brasil, serie 4189, bajo la Open "
             "Database License (ODbL).",
-            "Tasas de política monetaria de México, Japón y Suiza. Fuente: BIS (Banco de Pagos "
-            "Internacionales). Son las tasas oficiales de cada banco central, no tasas de "
-            "mercado.",
+            "Tasas de política monetaria de México, Japón, Suiza, Australia, Nueva Zelanda, "
+            "India, Sudáfrica, Corea del Sur, Suecia, Noruega, Dinamarca, Polonia, Chequia, "
+            "Hungría, Rumanía, Islandia, Turquía, Israel, Arabia Saudita, Indonesia, Tailandia, "
+            "Malasia, Chile, Colombia y Perú. Fuente: BIS (Banco de Pagos Internacionales). Son "
+            "las tasas oficiales de cada banco central, no tasas de mercado.",
             "Precios al consumidor de la zona del euro y de Suiza: Eurostat.",
             "Precios al consumidor del Reino Unido: Office for National Statistics, bajo la "
             "Open Government Licence v3.0.",
@@ -305,8 +307,11 @@ COPY: dict[str, dict[str, object]] = {
             "and this data is available free of charge at bankofcanada.ca.",
             "Brazil's monthly Selic rate: Banco Central do Brasil, series 4189, under the Open "
             "Database License (ODbL).",
-            "Policy rates of Mexico, Japan and Switzerland. Source: BIS (Bank for International "
-            "Settlements). They are each central bank's official rate, not market rates.",
+            "Policy rates of Mexico, Japan, Switzerland, Australia, New Zealand, India, South "
+            "Africa, South Korea, Sweden, Norway, Denmark, Poland, Czechia, Hungary, Romania, "
+            "Iceland, Türkiye, Israel, Saudi Arabia, Indonesia, Thailand, Malaysia, Chile, "
+            "Colombia and Peru. Source: BIS (Bank for International Settlements). They are each "
+            "central bank's official rate, not market rates.",
             "Consumer prices for the euro area and Switzerland: Eurostat.",
             "Consumer prices for the United Kingdom: Office for National Statistics, licensed "
             "under the Open Government Licence v3.0.",
@@ -379,9 +384,12 @@ COPY: dict[str, dict[str, object]] = {
             "anual, e esses dados estão disponíveis grátis em bankofcanada.ca.",
             "Taxa Selic mensal do Brasil: Banco Central do Brasil, série 4189, sob a Open "
             "Database License (ODbL).",
-            "Taxas de política monetária do México, do Japão e da Suíça. Fonte: BIS (Banco de "
-            "Compensações Internacionais). São as taxas oficiais de cada banco central, não "
-            "taxas de mercado.",
+            "Taxas de política monetária do México, do Japão, da Suíça, da Austrália, da Nova "
+            "Zelândia, da Índia, da África do Sul, da Coreia do Sul, da Suécia, da Noruega, da "
+            "Dinamarca, da Polônia, da Tchéquia, da Hungria, da Romênia, da Islândia, da "
+            "Turquia, de Israel, da Arábia Saudita, da Indonésia, da Tailândia, da Malásia, do "
+            "Chile, da Colômbia e do Peru. Fonte: BIS (Banco de Compensações Internacionais). "
+            "São as taxas oficiais de cada banco central, não taxas de mercado.",
             "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
             "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
             "Government Licence v3.0.",
