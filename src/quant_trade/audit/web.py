@@ -115,7 +115,14 @@ from quant_trade.audit.schema import (
     live_digest_name,
     report_digest_name,
 )
-from quant_trade.audit.seo import BRAND, DISALLOWED_PATHS, NOINDEX, robots_txt, sitemap_xml
+from quant_trade.audit.seo import (
+    BRAND,
+    NOINDEX,
+    PUBLIC_PAGES,
+    is_private_path,
+    robots_txt,
+    sitemap_xml,
+)
 from quant_trade.audit.settings import DEFAULT_BASE_URL, AuditSettings
 from quant_trade.audit.store import (
     CODE_REFERENCE_PREFIX,
@@ -128,7 +135,7 @@ from quant_trade.audit.store import (
     make_store,
     strategy_name,
 )
-from quant_trade.audit.theme import STATIC_CACHE_CONTROL, static_file
+from quant_trade.audit.theme import ICON_PATHS, STATIC_CACHE_CONTROL, static_file
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
 
 #: ``(settings, audit_id, token, *, plan, locale, order_id, amount_cents)``.
@@ -976,6 +983,21 @@ SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf", "pt": "/pt/exempl
 SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
 
 
+def _route_roots(locale: str) -> frozenset[str]:
+    """The first step of every address the pages have in ``locale`` (``/guides/mt5``
+    gives ``guides``), read from the tables the routes are built from."""
+    paths = [pair[locale] for pair in PUBLIC_PAGES if locale in pair]
+    paths += account_pages.PATHS[locale].values()
+    paths += mail_lib.PATHS[locale].values()
+    paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale]]
+    return frozenset(path.split("/")[1] for path in paths)
+
+
+#: Where an English page lives: ``/en`` and the English addresses without a
+#: prefix (``/guides``, ``/sample``, ``/login``). An error under them is in English.
+ENGLISH_ROOTS = _route_roots("en") - _route_roots("es")
+
+
 def create_app(settings: AuditSettings | None = None, store: Store | None = None) -> Any:
     try:
         import anyio
@@ -1085,7 +1107,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             response.headers["Strict-Transport-Security"] = HSTS
         if "Cache-Control" not in response.headers:
             response.headers["Cache-Control"] = "no-store"
-        if path.startswith(DISALLOWED_PATHS) or response.status_code >= 400:
+        if is_private_path(path) or response.status_code >= 400:
             response.headers["X-Robots-Tag"] = NOINDEX
         return response
 
@@ -1211,7 +1233,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         response = await call_next(request)
         _funnel_visit(request, response)
         ok = response.status_code == 200
-        if request.url.path.startswith("/static/") and ok:
+        if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
         else:
             public = request.url.path.startswith("/v/") and ok
@@ -1239,12 +1261,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return value if value in LOCALES else "es"
 
     def _error_locale(request: Request) -> str:
-        """The language of an error page: ``?lang=``, else Portuguese under ``/pt``."""
+        """The language of an error page: ``?lang=``, else the one of the address
+        (Portuguese under ``/pt``, English under an English route), else Spanish."""
         lang = request.query_params.get("lang")
         if lang in REPORT_LOCALES:
             return str(lang)
-        path = request.url.path
-        return "pt" if path == "/pt" or path.startswith("/pt/") else "es"
+        root = request.url.path.lstrip("/").split("/", 1)[0]
+        if root == "pt":
+            return "pt"
+        return "en" if root in ENGLISH_ROOTS else "es"
 
     def _html_error(
         request: Request, status: int, message: str, locale: str, *, kind: str = "audit"
@@ -1472,6 +1497,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise _not_found()
         content, media_type = found
         return Response(content=content, media_type=media_type)
+
+    # The icon where browsers, phones and search engines ask for it.
+    for icon_path, icon_name in ICON_PATHS.items():
+
+        def _icon(icon_name: str = icon_name) -> Response:
+            return static(icon_name)
+
+        app.add_api_route(icon_path, _icon, methods=["GET"], include_in_schema=False)
 
     @app.get("/robots.txt", response_class=PlainTextResponse)
     def robots(request: Request) -> str:
@@ -4939,6 +4972,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     locale=locale,
                     head_meta=sample_meta(locale, base_url),
                     pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
+                )
+                # The tab title ends with the report's id, "sample": show the
+                # page's own word. Nothing inside the report changes.
+                html_text = html_text.replace(
+                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
                 )
                 sample_cache[key] = html_text
             return sample_cache[key]

@@ -3277,9 +3277,9 @@ def test_every_account_screen_is_kept_out_of_search_engines(tmp_path: Path) -> N
             got = client.get(account_pages.path(name, locale), follow_redirects=False)
             assert got.headers.get("x-robots-tag") == seo.NOINDEX, (locale, name)
         assert account_pages.two_step_path(locale).startswith(seo.DISALLOWED_PATHS)
-    # No public page is caught by an account prefix.
+    # No public page is caught by an account prefix: /pt/contato is not under /pt/conta.
     public = [p for pair in seo.PUBLIC_PAGES for p in pair.values()]
-    assert not [p for p in public if p.startswith(seo.DISALLOWED_PATHS)]
+    assert not [p for p in public if seo.is_private_path(p)]
 
 
 NOTICE = "class='acct-card acct-notice'"
