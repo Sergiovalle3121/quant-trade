@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from audit_fixtures import tampered_mt5_tester_bytes
 
 from quant_trade.audit.engine import _reconciliation, dependence_adjusted_psr, run_audit
 from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs, parse_trades_csv
@@ -89,7 +90,7 @@ def test_mixed_currency_and_unreadable_cost_are_refused() -> None:
 
 
 def test_mt5_printed_balance_conflict_does_not_inflate_measured_return() -> None:
-    changed = MT5.read_bytes()
+    changed = tampered_mt5_tester_bytes(MT5.read_bytes())
     assert changed.count(b"11 063.05") == 1
     inputs = build_inputs(
         None,

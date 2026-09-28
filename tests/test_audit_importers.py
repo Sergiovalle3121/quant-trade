@@ -148,8 +148,8 @@ def test_mt5_tester_pairs_partial_closes_hedges_and_reversals(encode) -> None:  
     assert report.metadata["history_quality"] == "100% real ticks"
     assert (report.metadata["start"], report.metadata["end"]) == ("2024-01-01", "2024-01-09")
     assert_recomputed_matches(report)
-    # The frozen fixture now has a deliberately changed last Balance cell.
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    # Every declared total reconciles, so no mismatch warning appears.
+    assert not any("the report states" in w for w in report.warnings)
 
 
 def test_mt5_tester_quantity_is_lots_times_contract_size() -> None:
@@ -863,7 +863,7 @@ def test_mt5_build_1940_headers_trade_and_profit_column() -> None:
     assert equity_rows(report)[-1] == ("2024-01-08", pytest.approx(10_063.05))
     assert report.metadata["declared_total_net_profit"] == "63.05"
     assert report.metadata["declared_total_trades"] == "5"
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
 
 
 RUSSIAN_MT5 = (
@@ -926,7 +926,7 @@ def test_mt5_summary_labels_in_other_languages(labels: tuple[tuple[str, str], ..
     assert report.metadata["declared_total_trades"] == "5"
     assert report.metadata["declared_total_deals"] == "9"
     assert report.currency == "USD"
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
 
 
 BALANCE_DRAWDOWN_ROW = (
@@ -942,7 +942,7 @@ def test_mt5_balance_drawdown_is_checked_against_the_deals() -> None:
     # The Balance column falls from 10 085.05 to 10 063.05: 22.00.
     report = import_report(_mt5_tester_variant((old, new.format(value="22.00"))))
     assert report.metadata["declared_balance_drawdown_maximal"] == "22.00 (0.22%)"
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
     edited = import_report(_mt5_tester_variant((old, new.format(value="12.00"))))
     assert any(
         "balance drawdown maximal: the report states 12.00 but the rows add up to 22.00" in w
@@ -992,10 +992,7 @@ def test_mt5_xlsx_export_reads_like_the_html_report(name: str, expected: str) ->
     assert report.fees == html_report.fees
     assert equity_rows(report) == equity_rows(html_report)
     assert report.metadata.get("declared_total_net_profit") is not None
-    if name == "mt5_tester.html":
-        assert any("net profit: the report states 63.05" in w for w in report.warnings)
-    else:
-        assert not any("the report states" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
 
 
 #: The Deals header of a real Traditional Chinese terminal export (no Fee column).
