@@ -75,7 +75,17 @@ PRODUCT_NAMES = {
         PLAN_SINGLE: f"{BRAND} · full report",
         PLAN_PACK: f"{BRAND} · pack of {PACK_CREDITS} reports",
     },
+    "pt": {
+        PLAN_SINGLE: f"{BRAND} · relatório completo",
+        PLAN_PACK: f"{BRAND} · pacote de {PACK_CREDITS} relatórios",
+    },
 }
+
+
+def _payment_locales(locale: str) -> tuple[str, str]:
+    """Return the app language and the corresponding Stripe locale."""
+    lang = locale if locale in PRODUCT_NAMES else "es"
+    return lang, "pt-BR" if lang == "pt" else lang
 
 
 def card_mode(settings: AuditSettings) -> str:
@@ -98,7 +108,7 @@ def payment_link_urls(settings: AuditSettings, audit_id: str, locale: str) -> tu
     ``client_reference_id`` is how the webhook knows which audit was paid;
     the pack link is empty when the pack is not on sale or has no link.
     """
-    lang = "en" if locale == "en" else "es"
+    _, stripe_locale = _payment_locales(locale)
 
     def tagged(url: str) -> str:
         if not url:
@@ -109,7 +119,7 @@ def payment_link_urls(settings: AuditSettings, audit_id: str, locale: str) -> tu
             for pair in parse_qsl(parts.query, keep_blank_values=True)
             if pair[0] not in ("client_reference_id", "locale")
         ]
-        query.extend((("client_reference_id", audit_id), ("locale", lang)))
+        query.extend((("client_reference_id", audit_id), ("locale", stripe_locale)))
         return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
 
     single = tagged(settings.stripe_link_single)
@@ -162,7 +172,7 @@ def checkout_params(
     """The Checkout session Stripe is asked to create; pure, so it is tested."""
     if plan not in PLANS:
         raise ValueError(f"unknown plan {plan!r}")
-    lang = "en" if locale == "en" else "es"
+    lang, stripe_locale = _payment_locales(locale)
     back = f"{settings.base_url}/audits/{audit_id}?token={token}&lang={lang}"
     if plan == PLAN_SINGLE and settings.stripe_price_id and amount_cents is None:
         line: dict[str, Any] = {"price": settings.stripe_price_id, "quantity": 1}
@@ -187,7 +197,7 @@ def checkout_params(
         "metadata": metadata,
         "payment_intent_data": {"metadata": metadata},
         "client_reference_id": audit_id,
-        "locale": lang,
+        "locale": stripe_locale,
     }
 
 

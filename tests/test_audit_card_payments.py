@@ -154,6 +154,39 @@ def test_checkout_params_price_each_plan_and_come_back_to_the_report(tmp_path: P
         checkout_params(settings, "a1", "t", plan="gift", locale="es")
 
 
+@pytest.mark.parametrize(
+    ("plan", "amount", "product"),
+    [
+        (PLAN_SINGLE, 2900, "Rigor · relatório completo"),
+        (PLAN_PACK, 6900, "Rigor · pacote de 3 relatórios"),
+    ],
+)
+def test_pt_checkout_uses_portuguese_product_and_returns_to_pt_report(
+    tmp_path: Path, plan: str, amount: int, product: str
+) -> None:
+    params = checkout_params(
+        _settings(tmp_path), "report123", "private-token", plan=plan, locale="pt"
+    )
+    assert params["locale"] == "pt-BR"
+    assert params["line_items"] == [
+        {
+            "price_data": {
+                "currency": "usd",
+                "unit_amount": amount,
+                "product_data": {"name": product},
+            },
+            "quantity": 1,
+        }
+    ]
+    assert params["success_url"] == (
+        "https://rigor.example/audits/report123?token=private-token"
+        "&lang=pt&session_id={CHECKOUT_SESSION_ID}"
+    )
+    assert params["cancel_url"] == (
+        "https://rigor.example/audits/report123?token=private-token&lang=pt&pay=cancelled"
+    )
+
+
 def test_pack_code_is_stable_secret_bound_and_well_formed() -> None:
     code = pack_code("whsec_a", "cs_test_1")
     assert code == pack_code("whsec_a", "cs_test_1")
@@ -690,6 +723,14 @@ def test_payment_link_tags_append_to_an_existing_query() -> None:
     }
     assert parse_qs(urlsplit(pack).query)["client_reference_id"] == ["report123"]
     assert urlsplit(single).fragment == ""
+    pt_single, pt_pack = payment_link_urls(settings, "report123", "pt")
+    assert pt_single == (
+        "https://buy.stripe.com/abc?prefilled_email=a%40b&client_reference_id=report123"
+        "&locale=pt-BR"
+    )
+    assert pt_pack == (
+        "https://buy.stripe.com/pack?promo=1&client_reference_id=report123&locale=pt-BR"
+    )
 
 
 def test_report_links_carry_the_audit_and_the_webhook_unlocks_it(tmp_path: Path) -> None:
