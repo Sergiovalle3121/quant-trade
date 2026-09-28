@@ -1160,10 +1160,21 @@ class Store:
             try:
                 with self.engine.begin() as conn:
                     audit = conn.execute(
-                        sa.select(self.audits.c.paid).where(self.audits.c.id == audit_id)
+                        sa.select(self.audits.c.paid)
+                        .where(self.audits.c.id == audit_id)
+                        .with_for_update()
                     ).first()
                     if audit is None or bool(audit[0]):
                         raise ValueError("audit unavailable for checkout")
+                    unresolved = conn.execute(
+                        sa.select(orders.c.id)
+                        .where(orders.c.audit_id == audit_id)
+                        .where(orders.c.status == "paid_review")
+                        .with_for_update()
+                        .limit(1)
+                    ).first()
+                    if unresolved is not None:
+                        raise ValueError("checkout market review")
                     slot = conn.execute(
                         sa.select(slots.c.order_id)
                         .where(slots.c.audit_id == audit_id)
@@ -1260,6 +1271,19 @@ class Store:
             return None
         return str(row["declared_country"]), str(row["billing_country"])
 
+    def has_checkout_review(self, audit_id: str) -> bool:
+        """A charged audit awaiting operator resolution must not be sold again."""
+        if not _usable_key(audit_id):
+            return False
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(self.checkout_orders.c.id)
+                .where(self.checkout_orders.c.audit_id == audit_id)
+                .where(self.checkout_orders.c.status == "paid_review")
+                .limit(1)
+            ).first()
+        return row is not None
+
     def record_checkout_market(self, order_id: str, billing_country: str, *, at: datetime) -> None:
         """Keep the provider-observed country for reconciliation and cohort reporting."""
         with self.engine.begin() as conn:
@@ -1283,6 +1307,9 @@ class Store:
         """Keep a charged, market-rejected order and operator issue atomically."""
         sa = self._sa
         with self.engine.begin() as conn:
+            conn.execute(
+                sa.select(self.audits.c.id).where(self.audits.c.id == audit_id).with_for_update()
+            ).first()
             conn.execute(
                 self.checkout_order_markets.update()
                 .where(self.checkout_order_markets.c.order_id == order_id)

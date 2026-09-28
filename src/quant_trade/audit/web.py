@@ -3962,10 +3962,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         account_box: str = "",
     ) -> str:
         result = AuditResult.model_validate_json(record.result_json)
-        unlockable = not record.paid and cfg.stripe_enabled and cfg.card_for(record.id)
+        market_review = db.has_checkout_review(record.id)
+        unlockable = (
+            not record.paid and not market_review and cfg.stripe_enabled and cfg.card_for(record.id)
+        )
         link_single, link_pack = (
             payments.payment_link_urls(cfg, record.id, locale)
-            if not record.paid and cfg.links_enabled and cfg.card_for(record.id)
+            if not record.paid
+            and not market_review
+            and cfg.links_enabled
+            and cfg.card_for(record.id)
             else ("", "")
         )
         redeemable = not record.paid and cfg.access_codes_enabled
@@ -3986,7 +3992,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pay_links=(link_single, link_pack, f"{base}{query}&pay=done") if link_single else None,
             redeem_url=f"{base}/redeem{query}" if redeemable else None,
             publish_url=f"{base}/publish{query}" if publishable else None,
-            notice=notice,
+            notice=(
+                notice
+                or {
+                    "es": "Hay un cobro en revisión. No vuelvas a pagar; pide ayuda.",
+                    "en": "A charge is under review. Do not pay again; ask for help.",
+                    "pt": "Há uma cobrança em análise. Não pague novamente; peça ajuda.",
+                }[locale]
+                if market_review
+                else notice
+            ),
             contact_url=cfg.contact_url if redeemable else None,
             pack_price_usd=(
                 cfg.pack_price_usd if (redeemable or unlockable or link_single) else 0.0
@@ -4812,6 +4827,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
             raise HTTPException(status_code=503, detail="payments_disabled")
         locale = _view_locale(record, lang)
+        if db.has_checkout_review(audit_id):
+            review = {
+                "es": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
+                "en": "A charge is under review. Do not pay again; ask for help.",
+                "pt": "Há uma cobrança em análise. Não pague novamente; peça ajuda.",
+            }
+            return _html_error(request, 409, review[locale], locale)
         # Bought while signed in: the report (and a pack's code) lands on the account.
         _link_to_session(request, audit_id)
         if record.paid:
@@ -4858,7 +4880,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 declared_country=declared_country if not cfg.card_test_mode else "",
             )
         except ValueError as exc:
-            if str(exc) == "checkout market changed":
+            if str(exc) in ("checkout market changed", "checkout market review"):
                 changed = {
                     "es": "El país de esta compra pendiente no puede cambiar. Pide ayuda.",
                     "en": "The country on this pending purchase cannot change. Ask for help.",

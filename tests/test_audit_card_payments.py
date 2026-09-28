@@ -392,6 +392,20 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     assert store.get_checkout_order(order.id).paid_amount_cents == 2900
     assert store.checkout_market(order.id) == ("MX", "US")
     assert store.funnel_country_events("2000-01-01") == [("US", 1, 0, 2900)]
+    blocked = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    assert blocked.status_code == 409
+    assert len(store.list_checkout_orders()) == 1
+    assert "No vuelvas a pagar" in client.get(f"/audits/{audit_id}?token={token}").text
+    with pytest.raises(ValueError, match="checkout market review"):
+        store.reserve_checkout(
+            audit_id,
+            account_id=store.account_for_audit(audit_id) or "",
+            plan=PLAN_SINGLE,
+            amount_cents=2900,
+            currency="usd",
+            at=NOW,
+            declared_country="MX",
+        )
     assert len(store.list_refused_payments()) == 1
     assert _webhook(client, bad) == 200
     assert len(store.list_refused_payments()) == 1
