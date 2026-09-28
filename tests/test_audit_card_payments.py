@@ -1225,3 +1225,40 @@ def test_a_sale_from_another_app_is_not_listed_on_the_panel(tmp_path: Path) -> N
     assert _webhook(client, marked) == 200
     listed = [r.session_id for r in client.app.state.store.list_refused_payments()]
     assert listed == ["cs_marked"]
+
+
+# -- the buyer's account --------------------------------------------------------
+def test_checkout_needs_the_signed_in_account_that_owns_the_report(tmp_path: Path) -> None:
+    from quant_trade.audit import account_pages
+
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    calls: list[str] = []
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: (
+        calls.append("x") or "https://checkout.stripe.test/s"
+    )
+    url = f"/audits/{audit_id}/checkout?token={token}&lang=es"
+    form = {"plan": "single", "billing_country": "MX"}
+
+    # A visitor without a session is sent to sign in, and back to the report.
+    visitor = TestClient(client.app, base_url=str(client.base_url))
+    response = visitor.post(url, data=form, follow_redirects=False)
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location.startswith(account_pages.path("signin", "es") + "?next=")
+    assert parse_qs(urlsplit(location).query)["next"] == [
+        f"/audits/{audit_id}?token={token}&lang=es"
+    ]
+
+    # Another account cannot pay for (and take) this report.
+    other = signed_in(TestClient(client.app), email="other@example.com")
+    refused = other.post(url, data=form, follow_redirects=False)
+    assert refused.status_code == 403
+    assert "otra cuenta" in refused.text
+    assert calls == [] and client.app.state.store.list_checkout_orders() == []
+
+    # The owner pays, and the order is on the owner's account.
+    paid = client.post(url, data=form, follow_redirects=False)
+    assert paid.headers["location"] == "https://checkout.stripe.test/s"
+    (order,) = client.app.state.store.list_checkout_orders()
+    assert order.account_id == client.app.state.store.account_for_audit(audit_id)

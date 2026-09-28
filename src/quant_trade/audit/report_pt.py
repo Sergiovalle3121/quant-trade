@@ -110,7 +110,8 @@ REPORT: dict[str, Any] = {
         "pay_pack": "Comprar o pacote de 3 (USD {price:.0f})",
         "pay_secure": (
             "Pagamento seguro com Stripe. Você vê o relatório completo assim que o pagamento é "
-            "confirmado; nós nunca vemos nem guardamos os dados do seu cartão."
+            "confirmado; nós nunca vemos nem guardamos os dados do seu cartão. Todas as vendas "
+            "são finais."
         ),
         "pay_links_note": (
             "O pagamento abre em outra aba. Quando terminar, volte aqui: o relatório é "
@@ -816,7 +817,7 @@ REPORT: dict[str, Any] = {
         "pack": "pacote de 3 relatórios: USD {price:.0f}",
         "buy_includes": (
             "Todos os números de cada seção|PDF para guardar ou enviar|Página pública de "
-            "verificação para compartilhar|Reembolso se o relatório ler seu arquivo errado"
+            "verificação para compartilhar|Correção ou novo crédito se ler seu arquivo errado"
         ),
         "publish": "Publicar verificação pública",
         "publish_help": (

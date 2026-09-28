@@ -30,7 +30,7 @@ from quant_trade.audit.funnel import REF_COOKIE, REF_DAYS, SEEN_COOKIE
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
-LEGAL_UPDATED = "2026-09-27"
+LEGAL_UPDATED = "2026-09-28"
 
 STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
 
@@ -199,52 +199,6 @@ def _account_email_status(ctx: LegalContext, locale: str) -> str:
     }[locale]
 
 
-def _card_refund_es(ctx: LegalContext) -> str:
-    """How a refund reaches a card, said only while card payment is on."""
-    if not ctx.card_payments:
-        return ""
-    share = (
-        f" Si el informe era parte de un paquete, devolvemos su parte (USD "
-        f"{ctx.pack_price_usd / PACK_CREDITS:.2f}) o, si lo prefieres, un crédito nuevo."
-        if ctx.pack_price_usd
-        else ""
-    )
-    return (
-        "Si pagaste con tarjeta, el reembolso vuelve a la misma tarjeta a través de Stripe; tu "
-        f"banco puede tardar unos días en mostrarlo.{share}"
-    )
-
-
-def _card_refund_en(ctx: LegalContext) -> str:
-    if not ctx.card_payments:
-        return ""
-    share = (
-        f" If the report was part of a pack, we refund its share (USD "
-        f"{ctx.pack_price_usd / PACK_CREDITS:.2f}) or, if you prefer, issue a new credit."
-        if ctx.pack_price_usd
-        else ""
-    )
-    return (
-        "If you paid by card, the refund goes back to the same card through Stripe; your bank "
-        f"may take a few days to show it.{share}"
-    )
-
-
-def _card_refund_pt(ctx: LegalContext) -> str:
-    if not ctx.card_payments:
-        return ""
-    share = (
-        f" Se o relatório fazia parte de um pacote, devolvemos sua parte (USD "
-        f"{ctx.pack_price_usd / PACK_CREDITS:.2f}) ou, se você preferir, emitimos um novo crédito."
-        if ctx.pack_price_usd
-        else ""
-    )
-    return (
-        "Se você pagou com cartão, o reembolso volta para o mesmo cartão pelo Stripe; "
-        f"o banco pode levar alguns dias para mostrá-lo.{share}"
-    )
-
-
 def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.free_mode:
         return (
@@ -288,19 +242,16 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.card_payments or ctx.access_codes:
         lines.append(
             "Si el informe completo lee mal tu archivo (operaciones, saldo o fechas que no "
-            "coinciden con lo que muestra tu plataforma) y no podemos corregirlo, escríbenos con "
-            "el identificador del informe: devolvemos el importe de ese informe o, si lo "
-            "prefieres, entregamos un crédito nuevo."
+            "coinciden con lo que muestra tu plataforma), escríbenos con el identificador del "
+            "informe: lo corregimos o, si no se puede, te damos un crédito nuevo."
         )
     lines.append(
-        "Si pagaste y el informe completo no se generó por un fallo del servicio, escríbenos: "
-        "devolvemos el importe o entregamos un código nuevo. Como el informe se entrega al "
-        "momento, no devolvemos un informe ya desbloqueado por cambio de opinión. Sí "
-        "atendemos errores del informe que no podamos corregir, fallos de entrega y los "
-        "derechos que conceda la ley aplicable."
+        "Todas las ventas son finales: el informe se entrega al momento, así que no "
+        "devolvemos el dinero de un informe ya desbloqueado. Solo devolvemos un cobro "
+        "duplicado o un cobro que no entregó ningún informe; si el informe no se generó por "
+        "un fallo del servicio, también puedes pedir un código nuevo. Esto no limita los "
+        "derechos que te conceda la ley aplicable."
     )
-    if ctx.card_payments:
-        lines.append(_card_refund_es(ctx))
     return tuple(lines)
 
 
@@ -344,18 +295,15 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.card_payments or ctx.access_codes:
         lines.append(
             "If the full report misreads your file (trades, balance or dates that do not match "
-            "what your platform shows) and we cannot fix it, write to us with the report's "
-            "identifier: we refund that report or, if you prefer, issue a new credit."
+            "what your platform shows), write to us with the report's identifier: we fix it "
+            "or, if that is not possible, give you a new credit."
         )
     lines.append(
-        "If you paid and the full report was not produced because of a fault in the service, "
-        "write to us: we refund the amount or issue a new code. Because the report is "
-        "delivered at once, we do not refund an unlocked report for a change of mind. "
-        "We do address report errors we cannot fix, failed delivery and rights under "
-        "applicable law."
+        "All sales are final: the report is delivered at once, so we do not refund a report "
+        "that has been unlocked. We only refund a duplicate charge or a charge that delivered "
+        "no report; if the report was not produced because of a fault in the service, you "
+        "can also ask for a new code. This does not limit your rights under applicable law."
     )
-    if ctx.card_payments:
-        lines.append(_card_refund_en(ctx))
     return tuple(lines)
 
 
@@ -401,23 +349,16 @@ def _price_pt(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.card_payments or ctx.access_codes:
         lines.append(
             "Se o relatório completo ler seu arquivo incorretamente (operações, saldo ou "
-            "datas que não correspondem à plataforma) e não conseguirmos corrigir, entre "
-            "em contato com o identificador do relatório: devolvemos o valor desse relatório "
-            "ou, se você preferir, emitimos um novo crédito."
+            "datas que não correspondem à plataforma), entre em contato com o identificador "
+            "do relatório: nós o corrigimos ou, se não for possível, damos um novo crédito."
         )
     lines.append(
-        "Se você pagou e o relatório completo não foi gerado por uma falha do serviço, "
-        "entre em contato: devolvemos o valor ou emitimos um novo código. Como o relatório "
-        "é entregue na hora, não reembolsamos um relatório já liberado por mudança de "
-        "ideia. Atendemos erros que não possamos corrigir, falhas na entrega e direitos "
-        "previstos na lei aplicável."
+        "Todas as vendas são finais: o relatório é entregue na hora, então não devolvemos o "
+        "valor de um relatório já liberado. Só devolvemos uma cobrança duplicada ou uma "
+        "cobrança que não entregou nenhum relatório; se o relatório não foi gerado por uma "
+        "falha do serviço, você também pode pedir um novo código. Isso não limita os "
+        "direitos previstos na lei aplicável."
     )
-    if ctx.card_payments:
-        lines.append(_card_refund_pt(ctx))
-        lines.append(
-            "Se houver cobrança duplicada, entre em contato com os identificadores dos "
-            "pagamentos para analisarmos o reembolso manualmente."
-        )
     return tuple(lines)
 
 

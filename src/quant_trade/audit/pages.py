@@ -332,8 +332,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "contact": "Pedir un código",
         "price_pack": "Pack de {n} informes: USD {price:.0f} (USD {each:.0f} cada uno).",
         "refund_note": (
-            "Si el informe lee mal tu archivo (operaciones, saldo o fechas que no coinciden con "
-            "tu plataforma) y no podemos corregirlo, te devolvemos el importe de ese informe."
+            "Todas las ventas son finales. Si el informe lee mal tu archivo (operaciones, saldo o "
+            "fechas que no coinciden con tu plataforma), lo corregimos o te damos un crédito "
+            "nuevo."
         ),
         "account_note": (
             "Tu primer informe completo, gratis al crear tu cuenta; después, "
@@ -633,8 +634,8 @@ _COPY: dict[str, dict[str, Any]] = {
         "contact": "Ask for a code",
         "price_pack": "Pack of {n} reports: USD {price:.0f} (USD {each:.0f} each).",
         "refund_note": (
-            "If the report misreads your file (trades, balance or dates that do not match your "
-            "platform) and we cannot fix it, we refund that report."
+            "All sales are final. If the report misreads your file (trades, balance or dates "
+            "that do not match your platform), we fix it or give you a new credit."
         ),
         "account_note": (
             "Your first full report, free when you create your account; then "
@@ -1862,9 +1863,9 @@ TRUST_COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "card",
-                "Si lee mal tu archivo, te devolvemos el importe",
-                "Si las operaciones, el saldo o las fechas no coinciden con tu plataforma y no "
-                "podemos corregirlo, te devolvemos lo que pagaste por ese informe.",
+                "Si lee mal tu archivo, lo corregimos",
+                "Si las operaciones, el saldo o las fechas no coinciden con tu plataforma, lo "
+                "corregimos o te damos un crédito nuevo para otro informe.",
                 "Términos del servicio",
                 "terms",
             ),
@@ -1926,9 +1927,9 @@ TRUST_COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "card",
-                "If it misreads your file, you get your money back",
-                "If the trades, balance or dates do not match your platform and we cannot fix "
-                "it, we refund what you paid for that report.",
+                "If it misreads your file, we fix it",
+                "If the trades, balance or dates do not match your platform, we fix it or give "
+                "you a new credit for another report.",
                 "Terms of service",
                 "terms",
             ),
@@ -1950,7 +1951,7 @@ def _trust(
     free_mode: bool = False,
 ) -> str:
     """Why trust Rigor, each point with the page that proves it (in free mode
-    nothing is sold, so the refund point is left out)."""
+    nothing is sold, so the credit point is left out)."""
     words = TRUST_COPY[locale]
     hrefs = {
         "sample": _sample_url(locale),

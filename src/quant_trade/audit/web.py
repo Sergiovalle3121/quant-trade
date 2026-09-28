@@ -4906,6 +4906,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         if pause_new_checkout:
             return _html_error(request, 503, message("incident_paused", locale), locale)
+        # Every purchase belongs to a signed-in account: a visitor signs in (or
+        # creates the account) first and comes back to this report to pay.
+        buyer = _session(request)
+        if buyer is None:
+            return _signin_redirect(
+                locale, next_path=f"/audits/{audit_id}?token={token or ''}&lang={locale}"
+            )
+        if db.account_for_audit(audit_id) != buyer[0].id:
+            other_account = {
+                "es": "Este informe está en otra cuenta. Entra con esa cuenta para pagarlo.",
+                "en": "This report is on another account. Sign in with that account to pay.",
+                "pt": "Este relatório está em outra conta. Entre com essa conta para pagar.",
+            }
+            return _html_error(request, 403, other_account[locale], locale)
         declared_country = billing_country.strip().upper()
         if not cfg.card_test_mode and declared_country not in cfg.approved_markets:
             market_error = {
