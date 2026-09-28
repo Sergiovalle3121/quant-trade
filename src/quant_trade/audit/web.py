@@ -35,7 +35,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 from pydantic import ValidationError
 
@@ -1523,9 +1523,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # Uploads need an account: sign up (or sign in) first, then come back here,
             # so nobody fills the form and loses it.
             signup = _ACCOUNT_PATHS[locale][0]
-            return RedirectResponse(
-                f"{signup}?next={quote(AUDIT_PATHS[locale], safe='/')}", status_code=303
-            )
+            back = AUDIT_PATHS[locale] + (f"?{acct.NEXT_EXTRAS_QUERY}" if extras else "")
+            return RedirectResponse(f"{signup}?next={quote(back, safe='/')}", status_code=303)
         return HTMLResponse(
             upload_page(
                 locale=locale,
@@ -1743,19 +1742,55 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         _note_event(request, account.id, event)
         _cookie(response, acct.SESSION_COOKIE, token, max_age=acct.SESSION_DAYS * 86400)
         response.delete_cookie(acct.CSRF_COOKIE, path="/")
+        if request.cookies.get(acct.REPORT_KEY_COOKIE):
+            response.delete_cookie(acct.REPORT_KEY_COOKIE, path="/")
 
     def _account_redirect(locale: str, done: str = "") -> Response:
         target = account_pages.path("account", locale) + (f"?done={done}" if done else "")
         return RedirectResponse(target, status_code=303)
 
+    def _keep_report_key(response: Any, report_key: str) -> None:
+        """A report's key waits in its own short-lived cookie, never inside ``next``."""
+        if report_key:
+            _cookie(
+                response,
+                acct.REPORT_KEY_COOKIE,
+                report_key,
+                max_age=acct.REPORT_KEY_MINUTES * 60,
+            )
+
+    def _back_to(request: Request, next_path: str) -> Response:
+        """To ``next`` after signing in; a report gets back the key its cookie kept.
+
+        The cookie is used once: ``_start_session`` clears it.
+        """
+        kept = request.cookies.get(acct.REPORT_KEY_COOKIE)
+        return RedirectResponse(acct.join_report_key(next_path, kept), status_code=303)
+
+    def _without_report_key(request: Request, next_path: str) -> Response | None:
+        """An older link with a report's key inside ``next``: the same page without it."""
+        clean, report_key = acct.split_report_key(next_path)
+        if clean == next_path:
+            return None
+        query = [
+            (name, clean if name == "next" else value)
+            for name, value in request.query_params.multi_items()
+        ]
+        response = RedirectResponse(f"{request.url.path}?{urlencode(query)}", status_code=303)
+        _keep_report_key(response, report_key)
+        return response
+
     def _signin_redirect(locale: str, *, done: str = "", next_path: str = "") -> Response:
         query = []
         if done:
             query.append(f"done={done}")
+        next_path, report_key = acct.split_report_key(next_path)
         if next_path:
             query.append("next=" + quote(next_path, safe=""))
         target = account_pages.path("signin", locale) + ("?" + "&".join(query) if query else "")
-        return RedirectResponse(target, status_code=303)
+        response = RedirectResponse(target, status_code=303)
+        _keep_report_key(response, report_key)
+        return response
 
     def _account_email(account_id: str) -> str:
         found = db.get_account(account_id)
@@ -1769,6 +1804,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_flashes = ("signed_out", "deleted", "reset_done", "recovered", "two_step_expired")
     account_flashes = (
         "welcome",
+        "welcome_confirm",
         "code_linked",
         "password_changed",
         "filed",
@@ -1792,6 +1828,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "buy_email",
         "buy_review",
         "email_bad",
+        "email_simple",
         "email_disposable",
         "email_no_domain",
         "email_mismatch",
@@ -1974,6 +2011,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             if _session(request):
                 return _account_redirect(locale)
+            cleaned = _without_report_key(request, acct.safe_next(next))
+            if cleaned is not None:
+                return cleaned
             csrf = _anon_csrf(request)
             page = account_pages.signup_page(
                 retention_days=cfg.retention_days,
@@ -2028,6 +2068,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
+            # A new address is a plain one; sign-in keeps accepting older ones.
+            if not acct.simple_email(clean):
+                return again("email_simple", 400)
             if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
                 return again("email_bad", 400)
             if inbox.is_disposable(clean):
@@ -2061,9 +2104,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 except Exception:  # noqa: BLE001 - the account and its session come first
                     logger.warning("could not keep a sign-up tag")
             if next_path:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response: Response = _back_to(request, next_path)
             else:
-                response = _account_redirect(locale, "welcome")
+                # The confirmation link was queued with the account.
+                mailed = cfg.email_verification_required and cfg.email_delivery_ready
+                response = _account_redirect(locale, "welcome_confirm" if mailed else "welcome")
             _start_session(response, account, request, event="signup")
             return response
 
@@ -2076,11 +2121,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
             if _session(request):
-                return (
-                    RedirectResponse(next_path, status_code=303)
-                    if next_path
-                    else _account_redirect(locale)
-                )
+                if not next_path:
+                    return _account_redirect(locale)
+                response = _back_to(request, next_path)
+                response.delete_cookie(acct.REPORT_KEY_COOKIE, path="/")
+                return response
+            cleaned = _without_report_key(request, next_path)
+            if cleaned is not None:
+                return cleaned
             csrf = _anon_csrf(request)
             page = account_pages.signin_page(
                 locale=locale,
@@ -2168,9 +2216,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     minutes=acct.TWO_STEP_CHALLENGE_MINUTES,
                 )
                 target = account_pages.two_step_path(locale)
+                next_path, report_key = acct.split_report_key(next_path)
                 if next_path:
                     target += "?next=" + quote(next_path, safe="")
                 response: Response = RedirectResponse(target, status_code=303)
+                _keep_report_key(response, report_key)
                 _cookie(
                     response,
                     acct.TWO_STEP_COOKIE,
@@ -2179,7 +2229,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 return response
             if next_path:
-                response = RedirectResponse(next_path, status_code=303)
+                response = _back_to(request, next_path)
             else:
                 response = _account_redirect(found[0].locale if lang is None else locale)
             _start_session(response, found[0], request, event="signin")
@@ -2269,7 +2319,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not db.end_two_step_challenge(digest) and not done:
                 return again("code_bad", 400)  # pragma: no cover - finished twice at once
             if next_path and not done:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response: Response = _back_to(request, next_path)
             else:
                 response = _account_redirect(locale, done)
             response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
@@ -2598,7 +2648,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if pending is not None:
                 db.end_two_step_challenge(pending[0])
             if next_path:
-                response: Response = RedirectResponse(next_path, status_code=303)
+                response: Response = _back_to(request, next_path)
             else:
                 response = _account_redirect(account.locale if lang is None else locale)
             response.delete_cookie(pk.COOKIE, path="/")
@@ -3156,6 +3206,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             clean = acct.normalise_email(email)
             if not acct.valid_email(clean):
                 return refused("email_bad")
+            if not acct.simple_email(clean):
+                return refused("email_simple")
             if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
                 return refused("email_bad")
             if inbox.is_disposable(clean):
@@ -3883,7 +3935,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             session = _session(request)
             # Account first: every upload, code or not, belongs to an account.
             if session is None:
-                return _gate(request, report_loc, "signin", 401)
+                # Whoever filled an extra box finds them open after signing up.
+                chose_extras = bool(
+                    (optimization is not None and optimization.filename)
+                    or (live is not None and live.filename)
+                    or challenge.strip()
+                )
+                return _gate(request, report_loc, "signin", 401, extras=chose_extras)
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
             if not usable:
@@ -4334,12 +4392,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         page = mapping.mapping_page(table, text, locale=locale, carried=carried, chosen=chosen)
         return HTMLResponse(page, status_code=422)
 
-    def _gate(request: Request, locale: str, reason: str, status: int) -> Response:
+    def _gate(
+        request: Request, locale: str, reason: str, status: int, *, extras: bool = False
+    ) -> Response:
         """The answer to an upload the free tier does not cover."""
         if _wants_json(request):
             return JSONResponse({"error": f"free_tier_{reason}"}, status_code=status)
         page = account_pages.gate_page(
-            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH
+            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH, extras=extras
         )
         return HTMLResponse(page, status_code=status)
 
@@ -4565,6 +4625,31 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account_box=_account_box(request, record, valid_token or "", locale),
         )
 
+    @app.post("/audits/{audit_id}/account")
+    def report_to_account(
+        request: Request,
+        audit_id: str,
+        go: Annotated[str, Form(max_length=10)] = "",
+        token: str | None = None,
+        lang: str | None = None,
+    ) -> Response:
+        """From a report opened by its link to sign-up or sign-in, and back afterwards.
+
+        ``next`` names the report only; its key waits in a short-lived cookie.
+        """
+        record = _load(audit_id, token, request)
+        locale = _view_locale(record, lang)
+        back = f"/audits/{record.id}?token={token or ''}&lang={locale}"
+        if _session(request) is not None:
+            return RedirectResponse(back, status_code=303)
+        if go != "signup":
+            return _signin_redirect(locale, next_path=back)
+        back, report_key = acct.split_report_key(back)
+        target = account_pages.path("signup", locale) + "?next=" + quote(back, safe="")
+        response = RedirectResponse(target, status_code=303)
+        _keep_report_key(response, report_key)
+        return response
+
     def _account_box(request: Request, record: Any, token: str, locale: str) -> str:
         """The account line on a report: sign up, save, saved, or unlock with a credit."""
         session = _session(request)
@@ -4581,7 +4666,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 state="anon",
                 audit_id=record.id,
                 query=query,
-                next_path=f"/audits/{record.id}{query}",
             )
         account, csrf, _ = session
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")

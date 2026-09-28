@@ -128,6 +128,38 @@ Every change below has an offline, deterministic test in
   hashed keys), so deploys no longer reset them. Parked: sign-up's 409
   confirms an e-mail exists (needs e-mail verification); scrypt N=2^14.
 
+## Accounts and e-mail hardening (2026-09-28)
+
+Reviewed against `main` at 9c77197, before the public launch. Every change
+below has an offline, deterministic test in
+`tests/test_audit_account_hardening.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| A1 | Sign-up and e-mail change accepted any `x@y.z` without spaces: quotes, angle brackets, commas, malformed domains (`gmail..com`, `-gmail.com`) and IP addresses. The stored address goes into the `To` header, where `a,b@gmail.com` can read as two recipients. | Medium | New addresses must pass `accounts.simple_email` (ASCII, one `@`, name of `[A-Za-z0-9._%+-]` with no leading, trailing or doubled dot, domain of two or more labels ending in letters, 254 characters at most); the refusal is `email_simple` in the three languages. The reserved, disposable, typo and DNS checks run after it as before. Sign-in, recovery and the reset request keep `valid_email`, so an older account is never locked out. |
+| A2 | "Send the link again" queued the same outbox row again: the same Message-ID and the same `Idempotency-Key`, which Resend does not deliver twice within 24 hours, so the customer probably got no second message. The row also kept its count of tries, so after eight claims a resent row stayed `queued` and was never sent. | Medium | A resend the customer asks for keeps the challenge, its link and its expiry, but starts its own tries and gets its own Message-ID and idempotency key (`mail.message_key`). Automatic retries of one message keep their key, so a retry after a lost reply is never delivered twice. The ten-minute spacing, the hourly limits and the token lifetimes are unchanged; a row left waiting by the old code is sent on the next request. |
+| A4 | The report's private token travelled inside `next` (double-encoded in the two-step and passkey redirects) in the links of the report's account box and in the sign-in redirects of save, credit, card check, redeem and checkout. `Referrer-Policy: no-referrer` and the log redaction covered it, but it was written into page HTML, browser history and any proxy log. | Medium | `next` names the report only. The key waits up to an hour in the cookie `rigor_report` (HttpOnly, SameSite=Lax, Secure on https), set when a signed-out visitor leaves a report through one of its forms (`POST /audits/{id}/account` for the account box) after the token was checked. After sign-in the cookie can only add `token=` to the address of that same report, which `safe_next` already accepted; its value must match `id.token` in URL-safe characters, so it cannot change the destination or inject a parameter. It is cleared at every sign-in. An older link with the key inside `next` is redirected to the clean address. |
+| A5 | The choice `?extras=1` was lost for a visitor without an account: `next` was rebuilt without it and `safe_next` refused any query on the upload pages. | Low | `safe_next` accepts the three upload pages with exactly `?extras=1` (no other query, no anchor); the redirect to sign-up, the "account first" answer and the language switch of the form keep it. Every other query on those pages is still refused. |
+
+Also changed, texts only (A3): while confirmation is required, the account
+notice and the checkout refusal no longer say the free report is available
+to an unconfirmed address, and the notice after sign-up says a confirmation
+link was sent (only when delivery is configured).
+
+Limits that remain from this pass:
+
+- An account made before A1 keeps its address. If one holds a comma or a
+  quote, mail to it is still composed from the stored value; the owner can
+  list such accounts and ask those customers to change the address.
+- The report token still appears in the report's own address and form
+  actions, and in the Checkout return address sent to Stripe, as described
+  above. A form rendered before this change can post the key inside `next`
+  once; it works as before and the next page is clean.
+- With two reports open, the cookie keeps the key of the last one a visitor
+  left to sign in. Signing in from the other tab lands on that report
+  without its key (a 404 for an account that does not hold it); opening the
+  link again works.
+
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on

@@ -2877,7 +2877,10 @@ class Store:
         """Queue one challenge inside the caller's transaction.
 
         Repeated requests reuse its id/token until expiry. A sent challenge
-        can be resent after ten minutes, without changing the token.
+        can be resent after ten minutes, without changing the token: the
+        resend is a new message with its own retries (``attempts`` starts
+        again), and ``sent_at`` keeps the last delivery so the message gets
+        its own Message-ID (``mail.message_key``).
         """
         sa, table = self._sa, self.email_outbox
         now = _iso(at)
@@ -2896,13 +2899,18 @@ class Store:
             .first()
         )
         if existing is not None:
-            if existing["status"] == "sent" and str(existing["sent_at"]) < _iso(
+            resend = existing["status"] == "sent" and str(existing["sent_at"]) < _iso(
                 at - timedelta(minutes=10)
-            ):
+            )
+            # Queued with its tries used up: an earlier resend that kept the
+            # old count and was never claimed again.
+            stalled = existing["status"] == "queued" and int(existing["attempts"]) >= 8
+            if resend or stalled:
                 conn.execute(
                     table.update()
                     .where(table.c.id == existing["id"])
-                    .values(status="queued", next_attempt_at=now)
+                    .where(table.c.status == existing["status"])
+                    .values(status="queued", attempts=0, next_attempt_at=now, lease_until="")
                 )
             return str(existing["id"])
         challenge_id = secrets.token_hex(16)

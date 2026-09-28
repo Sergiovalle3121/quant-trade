@@ -2049,7 +2049,7 @@ Routes:
 | Route | What it does |
 |---|---|
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its `#subir` band and every start button link to the upload page; old `?extras=1` links redirect there. |
-| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
@@ -2450,7 +2450,18 @@ an account never changes what a report says.
   The claim stays after the account is deleted (hash only). While
   `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, an account with an unconfirmed
   address gets a preview with reason `unverified` and keeps its free
-  report for after confirming. Sign-up and e-mail change refuse addresses
+  report for after confirming. The account notice and the checkout refusal
+  say so plainly (confirming unlocks the first free full report and
+  purchases), and the notice after sign-up says a confirmation link was sent
+  and to check spam (`welcome_confirm`, only while delivery is configured).
+  Sign-up and e-mail change accept plain addresses only
+  (`accounts.simple_email`, error `email_simple`): ASCII, one `@`, a name of
+  1 to 64 characters from letters, digits and `._%+-` with no leading,
+  trailing or doubled dot, and a domain of two labels or more (letters,
+  digits, inner hyphens, 1 to 63 characters each) that ends in letters; no
+  quotes, brackets, commas, spaces or IP addresses, 254 characters at most.
+  Sign-in, recovery and the reset request keep the older, wider check, so an
+  account made before the rule is never locked out. Sign-up and e-mail change refuse addresses
   on a short list of well-known temporary-inbox services
   (`inbox.DISPOSABLE_DOMAINS`, exact or parent domain; error
   `email_disposable`); the list is not exhaustive.
@@ -2594,7 +2605,13 @@ an account never changes what a report says.
   is one-use, valid for one hour and revokes sessions. The durable outbox keeps
   recipient, purpose, locale, state, attempts and expiry, but derives the
   usable link from a random id plus a stable HMAC secret only during sending.
-  Failed SMTP attempts are retried after a lease; the retention purge removes
+  Failed SMTP attempts are retried after a lease, under one Message-ID (which
+  is also the provider's idempotency key), so a retry is never delivered
+  twice. A resend the customer asks for (at most one every ten minutes per
+  challenge) keeps the challenge, its link and its expiry, starts its own
+  eight tries and gets its own Message-ID (`mail.message_key`: the outbox id
+  plus a mark made from the last delivery's time), so the provider delivers
+  it. The retention purge removes
   expired rows after a 30-day cleanup window when the scheduled purge is
   enabled or the operator runs it. No real messages are sent by the test suite.
   With `AUDIT_EMAIL_VERIFICATION_REQUIRED=false`, the older immediate email
@@ -2643,7 +2660,15 @@ an account never changes what a report says.
   `attempts` table (keys hashed, rows older than the hour deleted), so a
   deploy does not reset them. A password change or reset signs out the other
   sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
-  `/` and `/en` (with an anchor). POST `/audits` answers 403 to a browser
+  `/` and `/en` (with an anchor), or an upload page, alone or with exactly
+  `?extras=1`. A report's private key is never written inside `next`: a
+  signed-out visitor leaves a report through `POST /audits/{id}/account`
+  (or any report form), which names the report in `next` and keeps the key
+  for up to an hour in the cookie `rigor_report` (HttpOnly, SameSite=Lax,
+  Secure on https). After sign-in (password, second step or passkey) the
+  cookie gives the key back to that same report only and is cleared; an
+  older link with the key inside `next` is redirected to the clean address.
+  POST `/audits` answers 403 to a browser
   post from another site, a second layer beside the `SameSite=Lax` cookie:
   `Sec-Fetch-Site` decides when present (only `same-origin` and `none` pass;
   `same-site` is refused, as other apps on the parent domain count as same

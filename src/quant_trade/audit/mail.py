@@ -4,7 +4,8 @@ The outbox stores a random message id, recipient, purpose and delivery state.
 Challenge URL tokens are derived from the id and a deployment HMAC secret
 only while composing. Purchase messages contain no token. Delivery is at
 least once: a crash after SMTP acceptance can resend the same Message-ID,
-while the confirmation itself is consumed only once.
+while the confirmation itself is consumed only once. A resend the customer
+asks for is a new message (its own Message-ID) carrying the same link.
 """
 
 from __future__ import annotations
@@ -181,6 +182,22 @@ def challenge_from_token(token: str, secret: str) -> str | None:
     return challenge_id if hmac.compare_digest(token_for(challenge_id, secret), token) else None
 
 
+def message_key(row: Mapping[str, Any]) -> str:
+    """What names one message: its Message-ID and the provider's idempotency key.
+
+    The first message of a challenge is named by the outbox id alone. A resend
+    the customer asked for keeps the id (and so the link) and adds a mark made
+    from the last delivery's time, so the provider takes it as a new message.
+    Automatic retries of one message leave that time untouched and keep its
+    name: a retry after a lost reply is never delivered twice.
+    """
+    sent_at = str(row.get("sent_at") or "")
+    if not sent_at:
+        return f"rigor-{row['id']}"
+    mark = hashlib.sha256(sent_at.encode("utf-8")).hexdigest()[:12]
+    return f"rigor-{row['id']}-{mark}"
+
+
 def compose(
     row: Mapping[str, Any], settings: AuditSettings, store: Store | None = None
 ) -> EmailMessage:
@@ -213,7 +230,7 @@ def compose(
     message["To"] = str(row["email"])
     message["Subject"] = subject
     domain = parseaddr(settings.smtp_from)[1].rsplit("@", 1)[-1]
-    message["Message-ID"] = f"<rigor-{row['id']}@{domain}>"
+    message["Message-ID"] = f"<{message_key(row)}@{domain}>"
     message.set_content(body)
     return message
 
@@ -260,7 +277,8 @@ def send_resend(
     """Send one message through Resend's HTTPS API.
 
     The Message-ID doubles as the idempotency key, so a retry after a lost
-    reply is not delivered twice within Resend's 24-hour window.
+    reply is not delivered twice within Resend's 24-hour window. A resend the
+    customer asked for has its own Message-ID (``message_key``).
     """
     if not settings.email_delivery_ready or not settings.resend_ready:
         raise RuntimeError("Resend is not configured")

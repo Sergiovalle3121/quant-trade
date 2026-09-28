@@ -2544,8 +2544,12 @@ def upload_page(
         extras_open=extras_open,
         signin_first=signed_in is False and not free_mode,
     )
+    # The language switch keeps the extra boxes open.
+    alternates = {
+        lang: href + ("?extras=1" if extras_open else "") for lang, href in AUDIT_PATHS.items()
+    }
     return _page(
-        copy["form_title"], locale, body, meta_html=meta, solid_nav=True, alternates=AUDIT_PATHS
+        copy["form_title"], locale, body, meta_html=meta, solid_nav=True, alternates=alternates
     )
 
 
