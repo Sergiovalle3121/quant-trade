@@ -780,6 +780,12 @@ floor is the sampling variance of the Sharpe estimator itself,
 sampling error. With this floor, the best of 100 unskilled random walks has
 a PSR near 0.99 and a DSR near 0.5 at 100 declared trials, which is the
 behaviour the test suite pins.
+When neither a declaration nor an uploaded artifact supplies a trial count,
+the one-trial DSR is only a favorable bound. It may still establish a weak or
+failing result, but it cannot by itself pass the multiplicity dimension or
+award class A; multiplicity stays `NOT_MEASURED` if that bound would pass.
+An uploaded variant count is an observed lower bound, not proof that no other
+configurations were tried.
 
 ### Trade analytics, resampled risk and prop-firm challenges
 
@@ -1903,6 +1909,10 @@ every JSON under `verdict.thresholds`.
 | Data quality | no flags | WARN flags only | any FAIL flag |
 | Benchmark | excess > 0, drawdown ratio ≤ 1, IR > 0 | excess > 0 | excess ≤ 0 |
 
+For multiplicity, a favorable DSR computed from one assumed trial is
+`NOT_MEASURED` when no trial count was declared or observed; a measured bad
+PBO or a weak/failing DSR still determines the weaker outcome.
+
 Class: **D** if data quality or significance fails, or two or more
 dimensions fail. **C** if exactly one fails, or significance or
 multiplicity is WEAK. **B** if significance and multiplicity pass and any of
@@ -1982,9 +1992,15 @@ or a Portuguese rule.
   an ounce of gold per side, and failed the cost dimension on a cost it had
   already paid.
 - CSCV needs the variants matrix; without it the PBO is NOT_MEASURED and
-  multiplicity relies on the DSR alone.
+  multiplicity relies on the DSR alone. Exact duplicate return columns count
+  as one effective variant for CSCV, so repeated uploads cannot change PBO.
+  When fewer than two distinct variants remain, PBO is `NOT_MEASURED`. This
+  does not reduce the declared trial count used by DSR: a distinct parameter
+  search is still a trial even if its returns happen to match another trial.
 - The bootstrap is per period and does not annualise; its block size is
-  `min(20, n/10)`.
+  `min(20, n/10)`. The research bootstrap's maximum drawdown starts at unit
+  initial wealth before the first resampled return, so a loss on the first
+  period is included.
 - Nothing here is a forecast. A strategy that passes every dimension has a
   track record that is hard to explain by luck, data errors or costs alone.
   That is all the audit says.
@@ -3503,10 +3519,16 @@ render. `MONETARY_RECONCILIATION_MISMATCH` (`FAIL`) remains the only
 monetary-reconciliation flag, and it does not claim fraud. The calibrated forensic battery
 is also run over the original platform bytes; a `BALANCE_CHAIN SIGNAL` adds
 `FORENSIC_BALANCE_CHAIN_SIGNAL` (`WARN`) with method version and calibration,
-without treating a heuristic as proof of alteration. An MT5 tester report
-altered in memory with the clean fixture as its control, and a 519-trade
-curve scaled only in its variation, are covered in `tests/test_audit_monetary_integrity.py` and through
-the persisted web report in `tests/test_audit_money_web.py`.
+without treating a heuristic as proof of alteration. The MT5 tester report
+is altered in memory, with the committed clean fixture as its control.
+An MT5 partial close can leave some entry commission with the open remainder;
+the importer checks residual deal volume as well as unmatched rows before
+classifying the closed-trade gap. A clean deal-money chain leaves that gap
+`NOT_MEASURED`, while an independently altered Balance remains a
+`CONTRADICTION`.
+A 519-trade curve scaled only in its variation is covered in
+`tests/test_audit_monetary_integrity.py` and through the persisted web report
+in `tests/test_audit_money_web.py`.
 
 The generic trades CSV accepts commission/fee as charges with either sign,
 and a signed swap (positive credits the account). Its zero-extra-cost row
@@ -3521,6 +3543,10 @@ the audited curve or its return rows before CSCV/PBO. A date-less matrix is
 still accepted by row position but is labelled `NOT_MEASURED` for temporal
 alignment and selected-variant provenance. A declared OOS start remains
 `selection_verified=false`; the upload cannot prove it was chosen in advance.
+Forensic report cells say they are calibrated for the file family only when
+the corpus gate granted that calibration. The corpus runner exits unsuccessfully
+for missing, malformed or empty expected fixtures rather than treating an
+incomplete denominator as a passing calibration.
 `run_audit` accepts an optional 40-hex `source_commit_sha` from its caller;
 the web layer uses Railway's `RAILWAY_GIT_COMMIT_SHA` when a GitHub-triggered
 deployment supplies it. The result labels it `DECLARED` rather than claiming

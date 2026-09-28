@@ -86,6 +86,10 @@ def _summary_matrix(paths: np.ndarray) -> pd.DataFrame:
     equity = np.cumprod(1.0 + paths, axis=1)
     total_return = equity[:, -1] - 1.0
     peak = np.maximum.accumulate(equity, axis=1)
+    # The initial wealth of 1.0 is a real peak, even if every observed period
+    # loses money. Keep it implicit so the bootstrap does not allocate another
+    # full (samples, n + 1) matrix just to include the starting point.
+    np.maximum(peak, 1.0, out=peak)
     drawdown = equity / peak - 1.0
     max_drawdown = drawdown.min(axis=1)
     return pd.DataFrame(

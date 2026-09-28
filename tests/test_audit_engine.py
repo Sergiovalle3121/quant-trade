@@ -20,7 +20,7 @@ from audit_fixtures import (
     variants_bytes,
 )
 
-from quant_trade.audit.engine import run_audit, sharpe_sampling_variance
+from quant_trade.audit.engine import _cscv, run_audit, sharpe_sampling_variance
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 from quant_trade.evidence.canonical_json import canonical_dumps
 
@@ -206,3 +206,11 @@ def test_variants_matrix_is_trimmed_to_a_multiple_of_the_partitions() -> None:
     assert payload["cscv"]["observations_used"] == 96
     assert payload["cscv"]["observations_dropped"] == 4
     assert isinstance(matrix, np.ndarray)
+
+
+def test_audit_leaves_pbo_unmeasured_for_duplicate_only_variants() -> None:
+    path = np.tile([0.01, -0.02, 0.03, 0.00], 16)
+    cscv, pbo = _cscv(np.column_stack([path, path]))
+    assert cscv["status"] == "NOT_MEASURED"
+    assert "two distinct parameter variants" in cscv["reason"]
+    assert pbo is None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 from itertools import combinations
 from typing import Any
 
@@ -75,6 +76,29 @@ def _average_ascending_rank(values: np.ndarray, selected: int) -> float:
     return 1.0 + lower + (equal - 1) / 2.0
 
 
+def _distinct_variant_indices(matrix: np.ndarray) -> list[int]:
+    """One original column index per distinct return path, in a stable order.
+
+    Duplicating a parameter column adds no selection opportunity. Ranking the
+    copies separately would move the OOS median and could change PBO without
+    changing any return path. The content order also keeps IS tie breaks
+    independent of where a duplicate column was inserted.
+    """
+    by_digest: dict[bytes, list[int]] = {}
+    distinct: list[tuple[bytes, int]] = []
+    for index in range(matrix.shape[1]):
+        # Canonicalise signed zero: +0.0 and -0.0 are the same return path.
+        values = np.where(matrix[:, index] == 0.0, 0.0, matrix[:, index])
+        digest = sha256(values.tobytes()).digest()
+        peers = by_digest.setdefault(digest, [])
+        if any(np.array_equal(matrix[:, index], matrix[:, prior]) for prior in peers):
+            continue
+        peers.append(index)
+        distinct.append((digest, index))
+    distinct.sort()
+    return [index for _, index in distinct]
+
+
 def cscv_probability_of_backtest_overfitting(
     variant_returns: Any,
     *,
@@ -98,8 +122,8 @@ def cscv_probability_of_backtest_overfitting(
     matrix = np.asarray(variant_returns, dtype=float)
     if matrix.ndim != 2:
         raise ValueError("variant_returns must be a 2-D observations-by-variants matrix")
-    observations, variants = matrix.shape
-    if variants < 2:
+    observations, submitted_variants = matrix.shape
+    if submitted_variants < 2:
         raise ValueError("CSCV requires at least two parameter variants")
     if not np.isfinite(matrix).all():
         raise ValueError("variant_returns must contain only finite values")
@@ -113,6 +137,12 @@ def cscv_probability_of_backtest_overfitting(
         )
     if not math.isfinite(max_pbo) or not 0 < max_pbo <= 1:
         raise ValueError("max_pbo must be finite and in (0, 1]")
+
+    original_indices = _distinct_variant_indices(matrix)
+    if len(original_indices) < 2:
+        raise ValueError("CSCV requires at least two distinct parameter variants")
+    matrix = matrix[:, original_indices]
+    variants = len(original_indices)
 
     blocks = np.split(np.arange(observations), partitions)
     half = partitions // 2
@@ -131,7 +161,7 @@ def cscv_probability_of_backtest_overfitting(
         rank = _average_ascending_rank(test_scores, selected)
         omega = rank / (variants + 1.0)
         logit = math.log(omega / (1.0 - omega))
-        selected_variants.append(selected)
+        selected_variants.append(original_indices[selected])
         rank_percentiles.append(omega)
         logits.append(logit)
 

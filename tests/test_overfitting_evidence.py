@@ -59,6 +59,40 @@ def test_cscv_rejects_incomplete_or_non_finite_matrices():
         cscv_probability_of_backtest_overfitting(broken, partitions=4)
 
 
+def test_cscv_is_invariant_to_exact_duplicate_parameter_columns():
+    # These four distinct paths fail the PBO threshold. Appending eight exact
+    # copies of the second path used to make the same evidence PASS.
+    block_returns = np.array(
+        [
+            [0.01226, -0.02172, -0.00370, 0.00164],
+            [0.00860, 0.01762, 0.00993, -0.00292],
+            [0.00728, -0.01262, 0.01430, -0.00156],
+            [-0.00674, -0.00639, -0.00061, -0.00393],
+        ]
+    )
+    matrix = np.repeat(block_returns, 4, axis=0)
+    original = cscv_probability_of_backtest_overfitting(matrix, partitions=4)
+    assert original.pbo == pytest.approx(0.5)
+    assert original.decision == "NO-GO"
+    for column in range(matrix.shape[1]):
+        with_copies = np.column_stack([matrix, *([matrix[:, column]] * 8)])
+        duplicate = cscv_probability_of_backtest_overfitting(with_copies, partitions=4)
+        assert duplicate.pbo == original.pbo
+        assert duplicate.decision == original.decision
+        assert duplicate.parameter_variants == matrix.shape[1]
+        prepended = cscv_probability_of_backtest_overfitting(
+            np.column_stack([matrix[:, column], matrix]), partitions=4
+        )
+        assert prepended.pbo == original.pbo
+        assert prepended.decision == original.decision
+
+
+def test_cscv_cannot_measure_pbo_with_one_distinct_path():
+    path = np.tile([0.01, -0.02, 0.03, 0.00], 4)
+    with pytest.raises(ValueError, match="two distinct parameter variants"):
+        cscv_probability_of_backtest_overfitting(np.column_stack([path, path]), partitions=4)
+
+
 def test_walk_forward_overfitting_evidence_passes_stable_train_winners():
     evidence = assess_walk_forward_overfitting(
         [1.0, 0.75, 1.0, 0.75],
