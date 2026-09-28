@@ -3574,6 +3574,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         fingerprint = ""
         # The free tier counts networks: an IPv6 address stands for its /64.
         net = acct.network_address(ip) if ip else ""
+        # A shared carrier IPv4 address gets larger caps than an IPv6 /64.
+        preview_cap = acct.network_cap(
+            net,
+            per_ip=acct.FREE_PREVIEWS_PER_IP_PER_MONTH,
+            per_ipv4=acct.FREE_PREVIEWS_PER_IPV4_PER_MONTH,
+        )
+        welcome_cap = acct.network_cap(
+            net,
+            per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+            per_ipv4=acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH,
+        )
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.
         welcome_refused = ""
@@ -3583,10 +3594,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             nonlocal free_preview, spend_credit
             used = db.free_previews_since(start, account_id=account_id)
             network = db.free_previews_since(start, client_ip=net)
-            if (
-                used < acct.FREE_PREVIEWS_PER_MONTH
-                and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
-            ):
+            if used < acct.FREE_PREVIEWS_PER_MONTH and network < preview_cap:
                 free_preview = True
             elif db.account_credits(account_id, now) > 0:
                 spend_credit = True
@@ -3605,10 +3613,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             }
             if ip:
                 net_key = acct.network_key(ip)
-                slots["network"] = [
-                    f"preview:ip:{net_key}:{month}:{n}"
-                    for n in range(acct.FREE_PREVIEWS_PER_IP_PER_MONTH)
-                ]
+                slots["network"] = [f"preview:ip:{net_key}:{month}:{n}" for n in range(preview_cap)]
             return db.claim_free(reservation, keys=(), slots=slots, at=now)
 
         def claim_free_use(account_id: str, inputs: Any) -> Response | None:
@@ -3622,7 +3627,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     file_sha256=fingerprint,
                     client_ip=net,
                     since=start,
-                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                    per_ip=welcome_cap,
                 )
                 if not refused:
                     month = acct.claim_month(now)
@@ -3630,7 +3635,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         {
                             "network": [
                                 f"welcome:ip:{acct.network_key(ip)}:{month}:{n}"
-                                for n in range(acct.WELCOME_REPORTS_PER_IP_PER_MONTH)
+                                for n in range(welcome_cap)
                             ]
                         }
                         if ip
@@ -3667,7 +3672,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     file_sha256="",
                     client_ip=net,
                     since=start,
-                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                    per_ip=welcome_cap,
                 )
                 if acct.WELCOME_FULL_REPORT
                 else "off"

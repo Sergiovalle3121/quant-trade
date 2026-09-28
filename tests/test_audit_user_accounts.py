@@ -872,6 +872,7 @@ def test_free_previews_are_also_counted_per_network(
     from quant_trade.audit import accounts
 
     monkeypatch.setattr(accounts, "FREE_PREVIEWS_PER_IP_PER_MONTH", 2)
+    monkeypatch.setattr(accounts, "FREE_PREVIEWS_PER_IPV4_PER_MONTH", 2)
     client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
     ip = {"X-Forwarded-For": "203.0.113.50"}
     files = {"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")}
@@ -979,6 +980,7 @@ def test_free_reports_are_capped_per_network(
     from quant_trade.audit import accounts
 
     monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 1)
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IPV4_PER_MONTH", 1)
     client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
     ip = {"X-Forwarded-For": "203.0.113.70"}
     _signup(client, "first@example.com", welcome=True)
@@ -1114,6 +1116,7 @@ def test_the_free_report_network_cap_and_previews_hold_when_the_first_look_is_st
     monkeypatch.setattr(store, "welcome_refusal", lambda *a, **k: "")
     monkeypatch.setattr(store, "free_previews_since", lambda *a, **k: 0)
     monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 50)
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IPV4_PER_MONTH", 3)
     ip = {"X-Forwarded-For": "203.0.113.90"}
     welcomes = 0
     for n in range(5):
@@ -3464,3 +3467,48 @@ def test_the_email_card_exists_in_every_language(tmp_path: Path) -> None:
         page = client.get(account).text
         assert title in page and f"action='{account}/correo'" in page
     assert set(account_pages.COPY["pt"]) == set(account_pages.COPY["es"])
+
+
+# -- shared mobile addresses ---------------------------------------------------------
+def test_network_caps_are_larger_for_a_shared_ipv4_address() -> None:
+    from quant_trade.audit import accounts
+
+    cap = accounts.network_cap
+    assert cap("203.0.113.9", per_ip=3, per_ipv4=10) == 10
+    assert cap("2001:db8:1:2::/64", per_ip=3, per_ipv4=10) == 3
+    assert cap("", per_ip=3, per_ipv4=10) == 3
+    assert cap("not an ip", per_ip=3, per_ipv4=10) == 3
+    assert cap("203.0.113.9", per_ip=5, per_ipv4=2) == 5  # never below the base cap
+    assert accounts.WELCOME_REPORTS_PER_IPV4_PER_MONTH > accounts.WELCOME_REPORTS_PER_IP_PER_MONTH
+    assert accounts.FREE_PREVIEWS_PER_IPV4_PER_MONTH > accounts.FREE_PREVIEWS_PER_IP_PER_MONTH
+
+
+def test_new_customers_behind_one_carrier_ipv4_still_get_their_free_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Carrier-grade NAT: many strangers share one IPv4; an IPv6 /64 stays tight."""
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 100)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1, max_uploads_per_hour_per_ip=100)
+
+    def first_upload(n: int, address: str) -> str:
+        browser = TestClient(client.app)
+        _signup(browser, f"phone{n}@example.com", welcome=True)
+        answer = browser.post(
+            "/audits",
+            files=_seeded_file(300 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": address},
+            follow_redirects=False,
+        )
+        return str(answer.headers["location"])
+
+    ipv4_cap = accounts.WELCOME_REPORTS_PER_IPV4_PER_MONTH
+    shared = [first_upload(n, "198.51.100.200") for n in range(ipv4_cap + 1)]
+    assert all("acct=welcome" in where for where in shared[:ipv4_cap])
+    assert "acct=welcome" not in shared[-1] and "acct=preview_network" in shared[-1]
+    ipv6_cap = accounts.WELCOME_REPORTS_PER_IP_PER_MONTH
+    home = [first_upload(100 + n, f"2001:db8:5:6::{n + 1:x}") for n in range(ipv6_cap + 1)]
+    assert all("acct=welcome" in where for where in home[:ipv6_cap])
+    assert "acct=welcome" not in home[-1]
