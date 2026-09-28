@@ -110,6 +110,14 @@ def _audit_id(location: str) -> str:
     return location.split("/audits/")[1].split("?")[0]
 
 
+@pytest.fixture
+def confirmed_emails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every address counts as confirmed: for tests about invite caps, not mail."""
+    from quant_trade.audit.store import Store
+
+    monkeypatch.setattr(Store, "email_verified", lambda self, account_id: True)
+
+
 # -- pure helpers ------------------------------------------------------------------
 def test_passwords_are_hashed_with_scrypt_and_checked() -> None:
     stored = hash_password(PASSWORD)
@@ -981,6 +989,7 @@ def test_free_reports_are_capped_per_network(
 
     monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 1)
     monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IPV4_PER_MONTH", 1)
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IPV4_UNVERIFIED", 1)
     client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
     ip = {"X-Forwarded-For": "203.0.113.70"}
     _signup(client, "first@example.com", welcome=True)
@@ -1415,7 +1424,8 @@ def test_sign_up_and_the_account_say_what_is_kept_and_how_to_delete_it(tmp_path:
         ("/signup", "What we keep and how to delete it"),
     ):
         page = client.get(path).text
-        assert words in page and "21" in page and "Stripe" in page
+        # One line on the form; the full list is the privacy policy's.
+        assert words in page and ("/privacidad" in page or "/privacy" in page)
         assert not find_claims(re.sub(r"<[^>]+>", " ", page))
     _signup(client)
     upload = _upload(client)
@@ -1916,6 +1926,7 @@ def _seeded_file(seed: int) -> dict[str, tuple[str, bytes, str]]:
     return {"equity": ("e.csv", csv_bytes(positive_drift(430, seed=seed)), "text/csv")}
 
 
+@pytest.mark.usefixtures("confirmed_emails")
 def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report(
     tmp_path: Path,
 ) -> None:
@@ -1989,6 +2000,7 @@ def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report
     assert json.loads(bea.get("/cuenta/datos").text)["invites"]["joined_through_an_invite"]
 
 
+@pytest.mark.usefixtures("confirmed_emails")
 def test_invites_ignore_bad_tokens_the_signed_in_inviter_and_the_monthly_cap(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2022,6 +2034,7 @@ def test_invites_ignore_bad_tokens_the_signed_in_inviter_and_the_monthly_cap(
     assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
 
 
+@pytest.mark.usefixtures("confirmed_emails")
 def test_global_referral_budget_is_atomic_and_stays_spent_after_deletion(
     tmp_path: Path,
 ) -> None:
@@ -2107,6 +2120,7 @@ def test_invite_screens_exist_in_every_language_and_pass_the_guard() -> None:
         assert account_pages.COPY[locale]["invited_banner"] in signup
 
 
+@pytest.mark.usefixtures("confirmed_emails")
 def test_deleting_credited_invitees_never_frees_the_monthly_cap(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2206,6 +2220,7 @@ def test_a_preview_says_why_it_was_not_the_free_full_report(tmp_path: Path) -> N
     )
 
 
+@pytest.mark.usefixtures("confirmed_emails")
 def test_ipv6_counts_by_its_64_in_the_free_tier_and_invites(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3504,7 +3519,10 @@ def test_new_customers_behind_one_carrier_ipv4_still_get_their_free_report(
         )
         return str(answer.headers["location"])
 
-    ipv4_cap = accounts.WELCOME_REPORTS_PER_IPV4_PER_MONTH
+    # E-mail confirmation is off here, so a shared IPv4 keeps the tight cap;
+    # the carrier-sized one applies once addresses are confirmed.
+    ipv4_cap = accounts.WELCOME_REPORTS_PER_IPV4_UNVERIFIED
+    assert ipv4_cap < accounts.WELCOME_REPORTS_PER_IPV4_PER_MONTH
     shared = [first_upload(n, "198.51.100.200") for n in range(ipv4_cap + 1)]
     assert all("acct=welcome" in where for where in shared[:ipv4_cap])
     assert "acct=welcome" not in shared[-1] and "acct=preview_network" in shared[-1]
@@ -3602,3 +3620,51 @@ def test_inbox_basic_form_and_disposable_list() -> None:
     assert inbox.is_disposable("x@sub.mailinator.com")
     assert not inbox.is_disposable("x@gmail.com")
     assert not inbox.is_disposable("x@notmailinator.com")
+
+
+def test_review_fixes_reserved_domains_pt_alias_and_upload_next(tmp_path: Path) -> None:
+    from quant_trade.audit import inbox
+
+    assert inbox.is_reserved("a@example.com") and inbox.is_reserved("a@x.test")
+    assert inbox.is_reserved("a@mail.example.org") and not inbox.is_reserved("a@gmail.com")
+    assert safe_next("/auditar") == "/auditar" and safe_next("/en/audit") == "/en/audit"
+    assert safe_next("/auditarx") == "" and safe_next("//auditar") == ""
+    client, store, _ = _client(tmp_path, refuse_reserved_emails=True)
+    refused = _signup(client, "fake@example.com", welcome=True)
+    assert refused.status_code == 400 and store.find_account("fake@example.com") is None
+    alias = client.get("/pt/registro?next=/pt/auditar", follow_redirects=False)
+    assert alias.status_code == 308
+    assert alias.headers["location"] == "/pt/cadastro?next=/pt/auditar"
+    page = client.get("/registro").text
+    assert "Todo lo que guardamos" in page and "La dirección IP de cada subida" not in page
+
+
+def test_forgot_page_has_no_chat_detour_once_mail_is_on() -> None:
+    on = account_pages.forgot_page(
+        locale="es", contact_url="https://wa.me/1", csrf="c", email_delivery_ready=True
+    )
+    off = account_pages.forgot_page(locale="es", contact_url="https://wa.me/1", csrf="c")
+    assert "wa.me" not in on and "wa.me" in off
+    assert "Todavía no enviamos correos" not in off
+
+
+def test_an_invite_is_not_credited_before_both_addresses_are_confirmed(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    _signup(client, "host@example.com", welcome=True)
+    host = store.find_account("host@example.com")
+    assert host is not None
+    link = re.search(r"id='invite-link'[^>]*value='([^']+)'", client.get("/cuenta").text)
+    assert link is not None
+    token = link.group(1).split("invita=")[1]
+    guest = TestClient(client.app)
+    csrf = _csrf(guest.get(f"/registro?invita={token}").text)
+    guest.post(
+        "/registro",
+        data={"email": "guest@example.com", "password": PASSWORD, "csrf": csrf, "invite": token},
+        follow_redirects=False,
+    )
+    upload = guest.post(
+        "/audits", files=_seeded_file(31), data={"consent": "on"}, follow_redirects=False
+    )
+    assert "acct=welcome" in upload.headers["location"]
+    assert store.account_credits(host.id, datetime.now(UTC)) == 0

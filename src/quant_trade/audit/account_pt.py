@@ -169,6 +169,11 @@ COPY_PT: dict[str, str] = {
     "purchases_title": "Suas compras",
     "purchases_none": "Ainda não há compras na sua conta.",
     "col_report": "Relatório",
+    "stores_short": (
+        "Seu e-mail e uma impressão da sua senha, nunca a senha. Seus dados não são vendidos "
+        "e você pode excluir a conta quando quiser."
+    ),
+    "stores_more": "Tudo o que guardamos",
     "stores_title": "O que guardamos e como apagar",
     "stores": (
         "Seu e-mail e uma impressão digital da sua senha (scrypt): nunca a senha em si.|"
@@ -351,8 +356,8 @@ COPY_PT: dict[str, str] = {
         "um link para trocar a senha."
     ),
     "forgot_lead": (
-        "Ainda não enviamos e-mails. Escreva para nós a partir do e-mail da sua conta e "
-        "enviamos um link de uso único para criar uma nova senha."
+        "O link automático por e-mail ainda não está ativo. Escreva para nós: confirmamos "
+        "que o e-mail da conta é seu e enviamos um link de uso único para criar uma nova senha."
     ),
     "forgot_contact": "Escrever pelo WhatsApp",
     "forgot_message": f"Olá, esqueci a senha da minha conta {BRAND}. Meu e-mail é: ",

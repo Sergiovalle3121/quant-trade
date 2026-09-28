@@ -1721,15 +1721,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not _referrals_on():
             return
         try:
-            if cfg.email_verification_required:
-                ready = any(
-                    invitee_id == account_id
-                    and db.email_verified(invitee_id)
-                    and db.email_verified(inviter_id)
-                    for invitee_id, inviter_id, _ in db.email_referral_candidates(account_id)
-                )
-                if not ready:
-                    return
+            # Both addresses confirmed, always: an unconfirmed sign-up is not
+            # a colleague, and with no mail service no invite is credited.
+            ready = any(
+                invitee_id == account_id
+                and db.email_verified(invitee_id)
+                and db.email_verified(inviter_id)
+                for invitee_id, inviter_id, _ in db.email_referral_candidates(account_id)
+            )
+            if not ready:
+                return
             db.reward_referral(
                 account_id,
                 device_sha256=device_sha256,
@@ -1743,11 +1744,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             logger.warning("could not settle an invite")
 
     def _settle_confirmed_invites(account_id: str, now: datetime) -> None:
-        if not _referrals_on() or not cfg.email_verification_required:
+        if not _referrals_on():
             return
         for invitee_id, inviter_id, device in db.email_referral_candidates(account_id):
             if db.email_verified(invitee_id) and db.email_verified(inviter_id):
                 _reward_invite(invitee_id, device, "", now)
+
+    def _alias_to(target: str) -> Callable[..., Response]:
+        def handler(request: Request) -> Response:
+            query = request.url.query
+            return RedirectResponse(target + (f"?{query}" if query else ""), status_code=308)
+
+        return handler
 
     def _signup_get(path_locale: str) -> Callable[..., Response]:
         def handler(
@@ -1804,6 +1812,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if signup_attempts.hit(acct.network_address(ip), now) >= acct.MAX_SIGNUPS_PER_HOUR:
                 return again("too_many", 429)
             if not acct.valid_email(clean):
+                return again("email_bad", 400)
+            if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
                 return again("email_bad", 400)
             if inbox.is_disposable(clean):
                 return again("email_disposable", 400)
@@ -2842,6 +2852,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             clean = acct.normalise_email(email)
             if not acct.valid_email(clean):
                 return refused("email_bad")
+            if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
+                return refused("email_bad")
             if inbox.is_disposable(clean):
                 return refused("email_disposable")
             if clean != acct.normalise_email(email_again):
@@ -3317,6 +3329,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         paths = account_pages.PATHS[path_locale]
         html_get = {"methods": ["GET"], "response_class": HTMLResponse}
         app.add_api_route(paths["signup"], _signup_get(path_locale), **html_get)
+        for alias in account_pages.SIGNUP_ALIASES.get(path_locale, ()):
+            app.add_api_route(alias, _alias_to(paths["signup"]), methods=["GET"])
         app.add_api_route(paths["signup"], _signup_post(path_locale), methods=["POST"])
         app.add_api_route(paths["signin"], _signin_get(path_locale), **html_get)
         app.add_api_route(paths["signin"], _signin_post(path_locale), methods=["POST"])
@@ -3614,7 +3628,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         welcome_cap = acct.network_cap(
             net,
             per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
-            per_ipv4=acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH,
+            # Until addresses are confirmed a shared IPv4 is the only brake
+            # on made-up accounts, so it keeps the tighter cap.
+            per_ipv4=(
+                acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH
+                if cfg.email_verification_required
+                else acct.WELCOME_REPORTS_PER_IPV4_UNVERIFIED
+            ),
         )
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.

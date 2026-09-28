@@ -2434,6 +2434,17 @@ changes what a report says.
   on a short list of well-known temporary-inbox services
   (`inbox.DISPOSABLE_DOMAINS`, exact or parent domain; error
   `email_disposable`); the list is not exhaustive.
+  Sign-up and e-mail change also refuse reserved domains (example.com/net/org
+  and `.example`, `.test`, `.invalid`, `.localhost`, `.local`) as `email_bad`
+  when `AUDIT_ALLOW_RESERVED_EMAILS` is not `true` (the service default).
+  While e-mail confirmation is off, a shared IPv4 address gets
+  `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
+  the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
+  An invite is credited only once both the inviter's and the invitee's
+  addresses are confirmed, whether or not confirmation is required
+  elsewhere; with no mail service, no invite is credited.
+  `/pt/registro` and `/pt/signup` answer 308 to `/pt/cadastro`, and a
+  `next` may also be the upload pages `/auditar`, `/en/audit`, `/pt/auditar`.
 - **Networks** (`accounts.network_address`): every free-tier limit that
   counts an address (free reports and previews per network, and their claim
   keys) counts an IPv6 address as its /64, since

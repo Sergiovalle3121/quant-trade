@@ -202,6 +202,11 @@ COPY: dict[str, dict[str, str]] = {
         "purchases_none": "Aún no hay compras en tu cuenta.",
         "col_report": "Informe",
         "stores_title": "Qué guardamos y cómo borrarlo",
+        "stores_short": (
+            "Tu correo y una huella de tu contraseña, nunca la contraseña. Tus datos no se "
+            "venden y puedes borrar tu cuenta cuando quieras."
+        ),
+        "stores_more": "Todo lo que guardamos",
         "stores": (
             "Tu correo y una huella de tu contraseña (scrypt): nunca la contraseña en sí.|"
             "Tus informes y los archivos que subes. De los que no se pagan borramos archivos e "
@@ -386,8 +391,9 @@ COPY: dict[str, dict[str, str]] = {
             "enlace para cambiar la contraseña."
         ),
         "forgot_lead": (
-            "Todavía no enviamos correos. Escríbenos desde el correo de tu cuenta y te "
-            "mandamos un enlace de un solo uso para poner una contraseña nueva."
+            "El enlace automático por correo aún no está activo. Escríbenos: comprobamos que el "
+            "correo de la cuenta es tuyo y te mandamos un enlace de un solo uso para poner una "
+            "contraseña nueva."
         ),
         "forgot_contact": "Escribir por WhatsApp",
         "forgot_message": f"Hola, olvidé la contraseña de mi cuenta de {BRAND}. Mi correo es: ",
@@ -822,6 +828,11 @@ COPY: dict[str, dict[str, str]] = {
         "purchases_none": "No purchases on your account yet.",
         "col_report": "Report",
         "stores_title": "What we keep and how to delete it",
+        "stores_short": (
+            "Your e-mail and a fingerprint of your password, never the password. Your data is "
+            "not sold and you can delete your account whenever you want."
+        ),
+        "stores_more": "Everything we keep",
         "stores": (
             "Your e-mail and a fingerprint of your password (scrypt): never the password itself.|"
             "Your reports and the files you upload. For unpaid ones we delete the files and the "
@@ -1002,8 +1013,8 @@ COPY: dict[str, dict[str, str]] = {
             "reset link will arrive."
         ),
         "forgot_lead": (
-            "We do not send e-mails yet. Write to us from your account's e-mail and we send "
-            "you a one-time link to set a new password."
+            "The automatic e-mail link is not active yet. Write to us: we check that the "
+            "account's e-mail is yours and send you a one-time link to set a new password."
         ),
         "forgot_contact": "Write on WhatsApp",
         "forgot_message": f"Hi, I forgot the password of my {BRAND} account. My e-mail is: ",
@@ -1280,6 +1291,8 @@ COPY: dict[str, dict[str, str]] = {
 }
 COPY["pt"] = COPY_PT
 PATHS["pt"] = PATHS_PT
+#: Addresses people type by analogy with another language's sign-up path.
+SIGNUP_ALIASES: dict[str, tuple[str, ...]] = {"pt": ("/pt/registro", "/pt/signup")}
 #: The languages every account screen exists in.
 LANGUAGES = ("es", "en", "pt")
 
@@ -1506,6 +1519,17 @@ def _benefits(copy: dict[str, str]) -> str:
     return f"<div class='acct-card acct-perks'><ul class='acct-list'>{items}</ul></div>"
 
 
+def _stores_short(copy: dict[str, str], locale: str) -> str:
+    """One line under the sign-up form; the full list lives in the privacy policy."""
+    from quant_trade.audit.legal import legal_url
+
+    return (
+        f"<div class='acct-card acct-stores'><h3>{icon('shield')}{_e(copy['stores_title'])}</h3>"
+        f"<p class='muted'>{_e(copy['stores_short'])}</p>"
+        f"<p><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['stores_more'])}</a></p></div>"
+    )
+
+
 def _stores(copy: dict[str, str], retention_days: int) -> str:
     """What the account keeps and how to delete it, in plain words."""
     items = "".join(
@@ -1594,7 +1618,7 @@ def signup_page(
     )
     body = (
         f"<div class='acct-grid'><div class='acct-form'>{form}</div>"
-        f"<div class='acct-side'>{_benefits(copy)}{_stores(copy, retention_days)}</div></div>"
+        f"<div class='acct-side'>{_benefits(copy)}{_stores_short(copy, locale)}</div></div>"
     )
     return _shell(
         locale,
@@ -1668,7 +1692,7 @@ def forgot_page(
     locale = _locale(locale)
     copy = COPY[locale]
     button = ""
-    if contact_url:
+    if contact_url and not email_delivery_ready:
         from quant_trade.audit.report import _prefilled
 
         href = _prefilled(contact_url, copy["forgot_message"])
@@ -1718,15 +1742,19 @@ def forgot_page(
             + f"<button class='btn btn-primary btn-lg' type='submit'>"
             f"{_e(copy['recover_button'])}</button></form>"
         )
-    help_key = "forgot_email_lead" if email_delivery_ready else "forgot_lead"
+    # With mail on, the e-mail link is the way back: no chat detour.
+    none = (
+        ""
+        if email_delivery_ready
+        else f"<h2>{_e(copy['recover_none_title'])}</h2>"
+        f"<p class='muted'>{_e(copy['forgot_lead'])}</p>" + button
+    )
     body = (
         "<div class='wrap-narrow'>"
         + _alert(copy, error, flash)
         + email_request
         + recover
-        + f"<h2>{_e(copy['recover_none_title'])}</h2>"
-        f"<p class='muted'>{_e(copy[help_key])}</p>"
-        + button
+        + none
         + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
         "</p></div>"
     )

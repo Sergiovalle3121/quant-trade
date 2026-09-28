@@ -179,6 +179,10 @@ class AuditSettings:
     #: holding the market it trades. On by default in the service
     #: (``AUDIT_PUBLIC_DATA=false`` turns it off); off when built directly.
     public_data: bool = False
+    #: Refuse sign-ups on example.com, .test and other reserved domains. On
+    #: in the service (``AUDIT_ALLOW_RESERVED_EMAILS=true`` turns it off, for
+    #: a staging copy); off when built directly, as in tests.
+    refuse_reserved_emails: bool = False
 
     def __post_init__(self) -> None:
         if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
@@ -393,6 +397,8 @@ class AuditSettings:
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
             admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
             public_data=env.get("AUDIT_PUBLIC_DATA", "true").strip().lower() in TRUE_VALUES,
+            refuse_reserved_emails=env.get("AUDIT_ALLOW_RESERVED_EMAILS", "").strip().lower()
+            not in TRUE_VALUES,
         )
 
 

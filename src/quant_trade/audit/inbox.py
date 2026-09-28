@@ -85,6 +85,11 @@ DISPOSABLE_DOMAINS = frozenset(
 )
 
 
+#: Domains no one can receive mail at (RFC 2606 and RFC 6761).
+RESERVED_DOMAINS = frozenset({"example.com", "example.net", "example.org"})
+RESERVED_SUFFIXES = (".example", ".test", ".invalid", ".localhost", ".local")
+
+
 def _split(email: str) -> tuple[str, str]:
     local, _, domain = email.strip().lower().rpartition("@")
     return local, domain.rstrip(".")
@@ -111,3 +116,11 @@ def is_disposable(email: str) -> bool:
     _, domain = _split(email)
     labels = domain.split(".")
     return any(".".join(labels[i:]) in DISPOSABLE_DOMAINS for i in range(len(labels) - 1))
+
+
+def is_reserved(email: str) -> bool:
+    """True for documentation and test domains that never receive mail."""
+    _, domain = _split(email)
+    labels = domain.split(".")
+    parents = {".".join(labels[i:]) for i in range(len(labels))}
+    return bool(parents & RESERVED_DOMAINS) or ("." + domain).endswith(RESERVED_SUFFIXES)
