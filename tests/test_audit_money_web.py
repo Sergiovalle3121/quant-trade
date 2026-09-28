@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from audit_fixtures import signed_in
+from audit_fixtures import signed_in, tampered_mt5_tester_bytes
 from fastapi.testclient import TestClient
 
 from quant_trade.audit.settings import AuditSettings
@@ -29,7 +29,9 @@ def test_mt5_money_and_forensic_evidence_reaches_free_full_report(tmp_path: Path
     )
     uploaded = client.post(
         "/audits",
-        files={"report": ("tester.html", FIXTURE.read_bytes(), "text/html")},
+        files={
+            "report": ("tester.html", tampered_mt5_tester_bytes(FIXTURE.read_bytes()), "text/html")
+        },
         data={"consent": "on", "locale": "es", "cost_bps": "1"},
         follow_redirects=False,
     )
@@ -60,12 +62,15 @@ def test_paid_delivery_preserves_the_same_monetary_and_forensic_limits(tmp_path:
         access_codes=False,
         stripe_secret_key="sk_live_synthetic_test",
         stripe_webhook_secret="whsec_synthetic_test",
+        # Live Checkout opens only for a reviewed market and a declared country.
         approved_markets=frozenset({"MX"}),
     )
     client = signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
     uploaded = client.post(
         "/audits",
-        files={"report": ("tester.html", FIXTURE.read_bytes(), "text/html")},
+        files={
+            "report": ("tester.html", tampered_mt5_tester_bytes(FIXTURE.read_bytes()), "text/html")
+        },
         data={"consent": "on", "locale": "es", "cost_bps": "1"},
         follow_redirects=False,
     )

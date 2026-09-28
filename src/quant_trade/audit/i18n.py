@@ -2008,6 +2008,34 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("the curve has no point on most days", "la curva no tiene puntos en la mayoría de los días"),
     ("fewer than three calendar months", "menos de tres meses naturales"),
     (
+        "fewer than 81 days; the worst 5 % would hold fewer than 5",
+        "menos de 81 días; el peor 5 % tendría menos de 5",
+    ),
+    (
+        "fewer than 40 months; the worst 5 % would hold fewer than 2",
+        "menos de 40 meses; el peor 5 % tendría menos de 2",
+    ),
+    (
+        "average of the worst 5 % of the days",
+        "media del peor 5 % de los días",
+    ),
+    (
+        "average of the worst 5 % of the months",
+        "media del peor 5 % de los meses",
+    ),
+    (
+        "compound annual return over the depth of the deepest fall",
+        "retorno anual compuesto dividido entre la profundidad de la mayor caída",
+    ),
+    (
+        "under a year of history; it divides an annual return",
+        "menos de un año de historial; divide un retorno anual",
+    ),
+    (
+        "the deepest fall is under 1 %, too shallow to divide by",
+        "la mayor caída es de menos del 1 %, demasiado poco para dividir entre ella",
+    ),
+    (
         "calendar days from the uploaded equity curve; months from each month's last point",
         "días naturales de la curva de equity aportada; meses con el último punto de cada mes",
     ),
@@ -2350,6 +2378,23 @@ _REASONS_PT: tuple[tuple[str, re.Pattern[str], str], ...] = tuple(
 )
 
 
+#: A number the engine printed with English grouping: ``-9,082,362.36``.
+_ENGLISH_NUMBER = re.compile(r"[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
+#: The engine's unit phrase when the account currency is not stated.
+_FILE_UNITS = {"es": "en unidades del archivo", "pt": "em unidades do arquivo"}
+
+
+def local_number(value: str) -> str:
+    """``-9,082,362.36`` as Spanish and Portuguese write it: ``-9.082.362,36``.
+
+    The same convention as the Portuguese refusals (``errors_pt``); text that
+    is not a plain English-formatted number comes back unchanged.
+    """
+    if not _ENGLISH_NUMBER.fullmatch(value):
+        return value
+    return value.replace(",", " ").replace(".", ",").replace(" ", ".")
+
+
 def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, str]:
     """Placeholders that are themselves fixed English phrases."""
     compared, trials, initial = (
@@ -2358,6 +2403,10 @@ def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, s
         else (_COMPARED, _TRIAL_SOURCES, _INITIAL_SOURCES)
     )
     out = dict(values)
+    if "difference" in out:
+        out["difference"] = local_number(out["difference"])
+    if out.get("currency") == "in file units":
+        out["currency"] = _FILE_UNITS[locale]
     if "what" in out:
         out["what"] = compared.get(out["what"], out["what"])
     if "source" in out:

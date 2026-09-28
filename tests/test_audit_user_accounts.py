@@ -872,6 +872,7 @@ def test_free_previews_are_also_counted_per_network(
     from quant_trade.audit import accounts
 
     monkeypatch.setattr(accounts, "FREE_PREVIEWS_PER_IP_PER_MONTH", 2)
+    monkeypatch.setattr(accounts, "FREE_PREVIEWS_PER_IPV4_PER_MONTH", 2)
     client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
     ip = {"X-Forwarded-For": "203.0.113.50"}
     files = {"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")}
@@ -944,9 +945,7 @@ def test_a_new_account_gets_its_first_full_report_free_then_previews(tmp_path: P
     assert "class='lockbox'" in client.get(second.headers["location"]).text
 
 
-def test_the_free_report_is_once_per_browser_but_a_shared_file_remains_eligible(
-    tmp_path: Path,
-) -> None:
+def test_the_free_report_is_once_per_browser_and_once_per_file(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     _signup(client, "first@example.com", welcome=True)
     assert "acct=welcome" in _upload(client).headers["location"]
@@ -961,11 +960,11 @@ def test_the_free_report_is_once_per_browser_but_a_shared_file_remains_eligible(
     )
     assert same_browser.status_code == 303
     assert "acct=welcome" not in same_browser.headers["location"]
-    # A different eligible account may inspect the same file from a fresh browser.
+    # A fresh browser with the same file gets a preview too.
     fresh = TestClient(client.app)
     _signup(fresh, "third@example.com", welcome=True)
     same_file = _upload(fresh)
-    assert same_file.status_code == 303 and "acct=welcome" in same_file.headers["location"]
+    assert same_file.status_code == 303 and "acct=welcome" not in same_file.headers["location"]
     # ...while a fresh browser with a new file still gets its free full report.
     other = TestClient(client.app)
     _signup(other, "fourth@example.com", welcome=True)
@@ -981,6 +980,7 @@ def test_free_reports_are_capped_per_network(
     from quant_trade.audit import accounts
 
     monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IP_PER_MONTH", 1)
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IPV4_PER_MONTH", 1)
     client, _, _ = _client(tmp_path, trusted_proxy_hops=1)
     ip = {"X-Forwarded-For": "203.0.113.70"}
     _signup(client, "first@example.com", welcome=True)
@@ -1051,6 +1051,12 @@ def test_the_free_report_address_is_cleared_by_the_purge(tmp_path: Path) -> None
         )
         == "device"
     )
+    assert (
+        store.welcome_refusal(  # type: ignore[attr-defined]
+            "x", device_sha256="", file_sha256="f", client_ip="", since=since, per_ip=1
+        )
+        == "file"
+    )
 
 
 # -- the limits hold under simultaneous uploads ------------------------------------
@@ -1110,6 +1116,7 @@ def test_the_free_report_network_cap_and_previews_hold_when_the_first_look_is_st
     monkeypatch.setattr(store, "welcome_refusal", lambda *a, **k: "")
     monkeypatch.setattr(store, "free_previews_since", lambda *a, **k: 0)
     monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 50)
+    monkeypatch.setattr(accounts, "WELCOME_REPORTS_PER_IPV4_PER_MONTH", 3)
     ip = {"X-Forwarded-For": "203.0.113.90"}
     welcomes = 0
     for n in range(5):
@@ -1140,10 +1147,8 @@ def test_the_free_report_network_cap_and_previews_hold_when_the_first_look_is_st
     assert len(store.account_audits_list(account.id)) == 3  # type: ignore[attr-defined]
 
 
-def test_one_extra_byte_keeps_the_fingerprint_but_a_new_account_remains_eligible(
-    tmp_path: Path,
-) -> None:
-    client, store, _ = _client(tmp_path)
+def test_one_extra_byte_does_not_make_a_new_file(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
     body = csv_bytes(positive_drift(450, seed=11))
     _signup(client, "a@example.com", welcome=True)
     first = client.post(
@@ -1161,11 +1166,7 @@ def test_one_extra_byte_keeps_the_fingerprint_but_a_new_account_remains_eligible
         data={"consent": "on"},
         follow_redirects=False,
     )
-    assert again.status_code == 303 and "acct=welcome" in again.headers["location"]
-    with store.engine.connect() as conn:  # type: ignore[attr-defined]
-        rows = conn.execute(store.welcome_reports.select()).mappings().all()  # type: ignore[attr-defined]
-    assert len(rows) == 2
-    assert len({row["file_sha256"] for row in rows}) == 1
+    assert again.status_code == 303 and "acct=welcome" not in again.headers["location"]
 
 
 def test_network_claims_hold_only_a_hash_and_the_purge_drops_them(tmp_path: Path) -> None:
@@ -1447,7 +1448,7 @@ def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> N
             "/account",
             "paid ones and your free report stay",
             "The IP address of each upload",
-            "They remain without your e-mail even if you delete the account",
+            "They stay even if you delete the account, without your e-mail",
         ),
     ):
         page = re.sub(r"\s+", " ", client.get(path).text)
@@ -1456,9 +1457,9 @@ def test_what_we_keep_matches_the_purge_for_the_free_report(tmp_path: Path) -> N
     es = " ".join(" ".join(p) for _, p in privacy_text(ctx, "es").sections)
     en = " ".join(" ".join(p) for _, p in privacy_text(ctx, "en").sections)
     assert "tu primer informe completo gratis: se conservan" in es
-    assert "dos hashes se quedan sin tu correo aunque borres la cuenta" in es
+    assert "aunque borres tu cuenta y sin tu correo" in es
     assert "your free first full report: kept" in en
-    assert "two hashes stay without your e-mail even if you delete your account" in en
+    assert "even if you delete your account and without your e-mail" in en
 
 
 def test_the_account_screens_exist_in_portuguese(tmp_path: Path) -> None:
@@ -2172,16 +2173,16 @@ def test_the_upload_gate_and_a_missing_strategy_speak_the_visitors_language(
         assert "encontramos esa audit" not in missing.text and "find that audit" not in missing.text
 
 
-def test_shared_file_and_network_allow_two_real_accounts_their_free_report(tmp_path: Path) -> None:
+def test_a_preview_says_why_it_was_not_the_free_full_report(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     _signup(client, "first@example.com", welcome=True)
     assert "acct=welcome" in _upload(client).headers["location"]
-    # Colleagues can examine the same robot from one office network.
+    # The same file from a fresh browser on another account: a preview, told why.
     fresh = TestClient(client.app)
     _signup(fresh, "second@example.com", welcome=True)
     same_file = _upload(fresh).headers["location"]
-    assert "acct=welcome" in same_file
-    assert fresh.get(same_file).status_code == 200
+    assert "acct=preview_file" in same_file
+    assert account_pages.COPY["es"]["welcome_refused_file"] in fresh.get(same_file).text
     # The same browser with a new file on a third account, in Portuguese.
     device = client.cookies.get("rigor_device")
     again = TestClient(client.app)
@@ -3466,3 +3467,48 @@ def test_the_email_card_exists_in_every_language(tmp_path: Path) -> None:
         page = client.get(account).text
         assert title in page and f"action='{account}/correo'" in page
     assert set(account_pages.COPY["pt"]) == set(account_pages.COPY["es"])
+
+
+# -- shared mobile addresses ---------------------------------------------------------
+def test_network_caps_are_larger_for_a_shared_ipv4_address() -> None:
+    from quant_trade.audit import accounts
+
+    cap = accounts.network_cap
+    assert cap("203.0.113.9", per_ip=3, per_ipv4=10) == 10
+    assert cap("2001:db8:1:2::/64", per_ip=3, per_ipv4=10) == 3
+    assert cap("", per_ip=3, per_ipv4=10) == 3
+    assert cap("not an ip", per_ip=3, per_ipv4=10) == 3
+    assert cap("203.0.113.9", per_ip=5, per_ipv4=2) == 5  # never below the base cap
+    assert accounts.WELCOME_REPORTS_PER_IPV4_PER_MONTH > accounts.WELCOME_REPORTS_PER_IP_PER_MONTH
+    assert accounts.FREE_PREVIEWS_PER_IPV4_PER_MONTH > accounts.FREE_PREVIEWS_PER_IP_PER_MONTH
+
+
+def test_new_customers_behind_one_carrier_ipv4_still_get_their_free_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Carrier-grade NAT: many strangers share one IPv4; an IPv6 /64 stays tight."""
+    from quant_trade.audit import accounts
+
+    monkeypatch.setattr(accounts, "MAX_SIGNUPS_PER_HOUR", 100)
+    client, _, _ = _client(tmp_path, trusted_proxy_hops=1, max_uploads_per_hour_per_ip=100)
+
+    def first_upload(n: int, address: str) -> str:
+        browser = TestClient(client.app)
+        _signup(browser, f"phone{n}@example.com", welcome=True)
+        answer = browser.post(
+            "/audits",
+            files=_seeded_file(300 + n),
+            data={"consent": "on"},
+            headers={"X-Forwarded-For": address},
+            follow_redirects=False,
+        )
+        return str(answer.headers["location"])
+
+    ipv4_cap = accounts.WELCOME_REPORTS_PER_IPV4_PER_MONTH
+    shared = [first_upload(n, "198.51.100.200") for n in range(ipv4_cap + 1)]
+    assert all("acct=welcome" in where for where in shared[:ipv4_cap])
+    assert "acct=welcome" not in shared[-1] and "acct=preview_network" in shared[-1]
+    ipv6_cap = accounts.WELCOME_REPORTS_PER_IP_PER_MONTH
+    home = [first_upload(100 + n, f"2001:db8:5:6::{n + 1:x}") for n in range(ipv6_cap + 1)]
+    assert all("acct=welcome" in where for where in home[:ipv6_cap])
+    assert "acct=welcome" not in home[-1]

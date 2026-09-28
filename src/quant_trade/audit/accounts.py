@@ -64,13 +64,20 @@ MAX_ACCOUNT_ACTIONS_PER_HOUR = 30
 FREE_PREVIEWS_PER_MONTH = 3
 #: Free previews per network address per calendar month, across accounts:
 #: slows throwaway accounts without blocking a shared office or carrier.
+#: An IPv6 /64 is one household or phone; an IPv4 address is often a mobile
+#: carrier's shared address (CGNAT), used by many strangers at once, so it
+#: gets the larger cap (see ``network_cap``).
 FREE_PREVIEWS_PER_IP_PER_MONTH = 10
+FREE_PREVIEWS_PER_IPV4_PER_MONTH = 30
 
 #: A new account's first upload comes out as a free full report, once. The
 #: same browser (``DEVICE_COOKIE``) or the same file never gets a second one
 #: on another account, and each network address gets a few a month.
 WELCOME_FULL_REPORT = True
 WELCOME_REPORTS_PER_IP_PER_MONTH = 3
+#: The same for an IPv4 address: a new customer on a phone in Mexico or
+#: Brazil shares it with many others and must still get the free report.
+WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10
 #: "Invita a un colega": an account whose invite link brings a new account
 #: gets this many full-report credits once the new account's free first
 #: report exists (so the free tier's browser, file and address limits
@@ -512,6 +519,7 @@ __all__ = [
     "CSRF_COOKIE",
     "DEVICE_COOKIE",
     "EMAIL_HOOKS",
+    "FREE_PREVIEWS_PER_IPV4_PER_MONTH",
     "FREE_PREVIEWS_PER_IP_PER_MONTH",
     "FREE_PREVIEWS_PER_MONTH",
     "MAX_FAILED_SIGNINS_PER_EMAIL",
@@ -528,6 +536,7 @@ __all__ = [
     "SIGNIN_TRIES_PAST_EMAIL_CEILING",
     "SESSION_DAYS",
     "WELCOME_FULL_REPORT",
+    "WELCOME_REPORTS_PER_IPV4_PER_MONTH",
     "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
     "common_password",
@@ -537,6 +546,7 @@ __all__ = [
     "hash_secret",
     "month_start",
     "network_address",
+    "network_cap",
     "network_key",
     "new_secret",
     "normalise_email",
@@ -553,9 +563,8 @@ def content_fingerprint(frame: Any) -> str:
 
     The curve's timestamps and returns rounded to five decimals: the same
     track record with a trailing newline, other line endings, extra spaces
-    or renamed columns gives the same fingerprint. The mark supports audit
-    and reconciliation; another eligible account is not blocked by the file
-    alone while its browser and network limits still apply.
+    or renamed columns gives the same fingerprint, so it cannot collect a
+    second free full report on another account.
     """
     digest = hashlib.sha256()
     for stamp, ret in zip(frame["timestamp"], frame["ret"], strict=False):
@@ -584,6 +593,22 @@ def network_address(client_ip: str) -> str:
             return str(address.ipv4_mapped)
         return str(ipaddress.ip_network(f"{address}/64", strict=False))
     return str(address)
+
+
+def network_cap(network: str, *, per_ip: int, per_ipv4: int) -> int:
+    """The monthly cap for ``network`` (as ``network_address`` gives it).
+
+    An IPv4 address is often shared by a mobile carrier's customers (CGNAT),
+    so it gets ``per_ipv4`` (never below ``per_ip``); an IPv6 /64 or anything
+    else gets ``per_ip``.
+    """
+    try:
+        address = ipaddress.ip_address(network)
+    except ValueError:
+        return per_ip
+    if isinstance(address, ipaddress.IPv4Address):
+        return max(per_ip, per_ipv4)
+    return per_ip
 
 
 def network_key(client_ip: str) -> str:

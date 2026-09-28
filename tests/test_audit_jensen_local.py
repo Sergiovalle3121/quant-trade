@@ -82,7 +82,7 @@ def test_the_local_span_cash_is_none_when_it_cannot_cover_every_span() -> None:
     late = pd.Series(BRL_PERCENT, index=pd.date_range("2023-09-01", periods=20, freq="MS"))
     assert local_span_cash(stamps, late, "BRL") is None
     assert local_span_cash(stamps, None, "BRL") is None
-    assert local_span_cash(stamps, _monthly(DAYS, 4.0), "AUD") is None
+    assert local_span_cash(stamps, _monthly(DAYS, 4.0), "ARS") is None
     broken = pd.Series(["x"] * 30, index=pd.date_range("2022-06-01", periods=30, freq="MS"))
     assert local_span_cash(stamps, broken, "BRL") is None
 
@@ -197,7 +197,7 @@ def test_the_note_has_spanish_and_portuguese_rules() -> None:
         assert localize(LOCAL_CASH_NOTE, locale) != LOCAL_CASH_NOTE
 
 
-@pytest.mark.parametrize("currency", ["AUD", "ARS", " ars "])
+@pytest.mark.parametrize("currency", ["HKD", "ARS", " ars "])
 def test_another_currency_without_a_rate_here_never_loses_the_bill(currency: str) -> None:
     inputs, rates = _brl_account()
     inputs = replace(inputs, account_currency=currency)

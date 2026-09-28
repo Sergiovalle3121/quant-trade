@@ -289,6 +289,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         ),
         "en": "The service is busy with other audits right now; submit the file again in a minute.",
     },
+    "upload_timeout": {
+        "es": "El archivo tardó demasiado en llegar y la subida se canceló; vuelve a enviarlo.",
+        "en": "The file took too long to arrive and the upload was cancelled; send it again.",
+    },
     "incident_paused": {
         "es": "Las nuevas auditorías están pausadas temporalmente; vuelve a intentarlo más tarde.",
         "en": "New audits are temporarily paused; try again later.",
@@ -726,11 +730,25 @@ class BodyLimitMiddleware:
             await self.reject(scope)(scope, receive, send)
 
 
+#: Upload requests admitted per audit slot. Admission bounds how many bodies
+#: are spooled at once; the CPU work waits in the ``audit_slots`` queue, so a
+#: few slow uploads must not fill admission for everyone else.
+UPLOAD_ADMISSION_PER_AUDIT_SLOT = 16
+#: Seconds an admitted upload has to deliver its whole body.
+UPLOAD_BODY_SECONDS = 120.0
+
+
+class UploadBodyTimeout(Exception):
+    """The upload body did not arrive before its deadline."""
+
+
 class AuditAdmissionMiddleware:
     """Bound multipart parsing before Starlette reads or spools an audit upload.
 
     This limit is per process, like ``audit_slots``. An emergency pause is
     checked here so a stopped upload never consumes a free claim or credit.
+    A body that does not arrive within ``body_seconds`` is cut off, so a
+    stalled client gives its admission slot back.
     """
 
     def __init__(
@@ -740,11 +758,13 @@ class AuditAdmissionMiddleware:
         slots: threading.BoundedSemaphore,
         paused: bool,
         reject: Callable[[Any, str], Any],
+        body_seconds: float = UPLOAD_BODY_SECONDS,
     ) -> None:
         self.app = app
         self.slots = slots
         self.paused = paused
         self.reject = reject
+        self.body_seconds = body_seconds
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         if (
@@ -761,10 +781,47 @@ class AuditAdmissionMiddleware:
         if reason:
             await self.reject(scope, reason)(scope, receive, send)
             return
+        import anyio
+
+        deadline = time.monotonic() + self.body_seconds
+        body_done = False
+        timed_out = False
+        started = False
+
+        async def timed_receive() -> Any:
+            nonlocal body_done, timed_out
+            if body_done:
+                return await receive()
+            try:
+                with anyio.fail_after(max(deadline - time.monotonic(), 0.0)):
+                    message = await receive()
+            except TimeoutError:
+                timed_out = True
+                raise UploadBodyTimeout from None
+            if message["type"] != "http.request" or not message.get("more_body", False):
+                body_done = True
+            return message
+
+        async def tracked_send(message: Any) -> None:
+            nonlocal started
+            if timed_out:
+                # Whatever the app answers to a cut-off body is replaced below.
+                return
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
         try:
-            await self.app(scope, receive, send)
+            await self.app(scope, timed_receive, tracked_send)
+        except Exception:
+            # The framework may wrap the cut-off in its own error; only an
+            # error unrelated to the deadline is re-raised.
+            if not timed_out:
+                raise
         finally:
             self.slots.release()
+        if timed_out and not started:
+            await self.reject(scope, "upload_timeout")(scope, receive, send)
 
 
 class UploadTooLarge(Exception):
@@ -996,7 +1053,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # thread pool.
     audit_slots = anyio.CapacityLimiter(cfg.max_concurrent_audits)
     app.state.audit_slots = audit_slots
-    max_inflight_uploads = cfg.max_concurrent_audits + 1
+    max_inflight_uploads = cfg.max_concurrent_audits * UPLOAD_ADMISSION_PER_AUDIT_SLOT
     upload_admission_slots = threading.BoundedSemaphore(max_inflight_uploads)
     app.state.upload_admission_slots = upload_admission_slots
     report_upload_bytes = cfg.max_upload_bytes * REPORT_SIZE_FACTOR
@@ -1060,7 +1117,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _admission_response(scope: Any, reason: str) -> Any:
         locale = _scope_locale(scope)
         request = Request(scope)
-        response = _html_error(request, 503, message(reason, locale), locale)
+        status = 408 if reason == "upload_timeout" else 503
+        response = _html_error(request, status, message(reason, locale), locale)
         response.headers["Connection"] = "close"
         return _secure(response, path=scope.get("path", ""))
 
@@ -3516,6 +3574,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         fingerprint = ""
         # The free tier counts networks: an IPv6 address stands for its /64.
         net = acct.network_address(ip) if ip else ""
+        # A shared carrier IPv4 address gets larger caps than an IPv6 /64.
+        preview_cap = acct.network_cap(
+            net,
+            per_ip=acct.FREE_PREVIEWS_PER_IP_PER_MONTH,
+            per_ipv4=acct.FREE_PREVIEWS_PER_IPV4_PER_MONTH,
+        )
+        welcome_cap = acct.network_cap(
+            net,
+            per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+            per_ipv4=acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH,
+        )
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.
         welcome_refused = ""
@@ -3525,10 +3594,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             nonlocal free_preview, spend_credit
             used = db.free_previews_since(start, account_id=account_id)
             network = db.free_previews_since(start, client_ip=net)
-            if (
-                used < acct.FREE_PREVIEWS_PER_MONTH
-                and network < acct.FREE_PREVIEWS_PER_IP_PER_MONTH
-            ):
+            if used < acct.FREE_PREVIEWS_PER_MONTH and network < preview_cap:
                 free_preview = True
             elif db.account_credits(account_id, now) > 0:
                 spend_credit = True
@@ -3547,10 +3613,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             }
             if ip:
                 net_key = acct.network_key(ip)
-                slots["network"] = [
-                    f"preview:ip:{net_key}:{month}:{n}"
-                    for n in range(acct.FREE_PREVIEWS_PER_IP_PER_MONTH)
-                ]
+                slots["network"] = [f"preview:ip:{net_key}:{month}:{n}" for n in range(preview_cap)]
             return db.claim_free(reservation, keys=(), slots=slots, at=now)
 
         def claim_free_use(account_id: str, inputs: Any) -> Response | None:
@@ -3564,7 +3627,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     file_sha256=fingerprint,
                     client_ip=net,
                     since=start,
-                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                    per_ip=welcome_cap,
                 )
                 if not refused:
                     month = acct.claim_month(now)
@@ -3572,7 +3635,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         {
                             "network": [
                                 f"welcome:ip:{acct.network_key(ip)}:{month}:{n}"
-                                for n in range(acct.WELCOME_REPORTS_PER_IP_PER_MONTH)
+                                for n in range(welcome_cap)
                             ]
                         }
                         if ip
@@ -3581,6 +3644,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     keys = (
                         f"welcome:account:{account_id}",
                         f"welcome:device:{device_sha256}",
+                        f"welcome:file:{fingerprint}",
                     )
                     if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
                         return None
@@ -3608,7 +3672,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     file_sha256="",
                     client_ip=net,
                     since=start,
-                    per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+                    per_ip=welcome_cap,
                 )
                 if acct.WELCOME_FULL_REPORT
                 else "off"

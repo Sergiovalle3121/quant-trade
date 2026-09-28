@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from audit_fixtures import clean_mt5_tester_bytes
+from audit_fixtures import tampered_mt5_tester_bytes
 
 from quant_trade.audit.engine import _reconciliation, dependence_adjusted_psr, run_audit
 from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs, parse_trades_csv
@@ -90,7 +90,7 @@ def test_mixed_currency_and_unreadable_cost_are_refused() -> None:
 
 
 def test_mt5_printed_balance_conflict_does_not_inflate_measured_return() -> None:
-    changed = MT5.read_bytes()
+    changed = tampered_mt5_tester_bytes(MT5.read_bytes())
     assert changed.count(b"11 063.05") == 1
     inputs = build_inputs(
         None,
@@ -181,10 +181,12 @@ def test_legitimate_deposit_rounding_and_unknown_curve_currency() -> None:
     assert matched["currency"] == "UNKNOWN"
     assert flags == []
 
-    # An unexplained change in a separate curve remains inconclusive, not fraud.
+    # An unexplained change in a separate curve remains inconclusive: it is
+    # NOT_MEASURED with its reason and raises no red flag.
     without_flow, flags = _reconciliation(replace(inputs, cash_flows=[]))
     assert without_flow["status"] == "NOT_MEASURED"
-    assert {flag.code for flag in flags} == {"MONETARY_RECONCILIATION_UNEXPLAINED"}
+    assert "could explain the difference" in without_flow["reason"]
+    assert flags == []
 
 
 def test_build_commit_sha_is_declared_only_when_explicit_and_valid() -> None:
@@ -229,7 +231,11 @@ def _seed_812_files() -> tuple[bytes, bytes, bytes]:
     return rows.to_csv(index=False).encode(), curve(1.0), curve(20.0)
 
 
-def test_seed_812_scaled_curve_is_unexplained_and_control_is_consistent() -> None:
+def test_seed_812_scaled_curve_is_not_measured_without_a_flag() -> None:
+    """A separate curve 20x the trades' variation (a scaled index, floating
+    P&L or undisclosed flows look the same) cannot be reconciled: the section
+    says NOT_MEASURED and why, and no red flag or data-quality penalty follows,
+    because genuine files with separate curves produce the same gap."""
     trades, honest_curve, inflated_curve = _seed_812_files()
     declared = DeclaredMetadata(cost_bps_per_side=5)
     control = _run(build_inputs(honest_curve, declared, trades_bytes=trades, now=NOW))
@@ -241,9 +247,10 @@ def test_seed_812_scaled_curve_is_unexplained_and_control_is_consistent() -> Non
     assert suspect.reconciliation is not None
     assert suspect.reconciliation["status"] == "NOT_MEASURED"
     assert suspect.reconciliation["difference"]["value"] > 19000
-    assert "MONETARY_RECONCILIATION_UNEXPLAINED" in {f["code"] for f in suspect.red_flags}
-    assert next(d for d in suspect.verdict.dimensions if d.name == "data_quality").status != "PASS"
-    assert suspect.verdict.overall != "A"
+    assert "could explain the difference" in suspect.reconciliation["reason"]
+    assert not any(f["code"].startswith("MONETARY_") for f in suspect.red_flags)
+    quality = {d.name: d.status for d in suspect.verdict.dimensions}["data_quality"]
+    assert quality == {d.name: d.status for d in control.verdict.dimensions}["data_quality"]
 
 
 def test_dependent_2000_returns_cannot_receive_class_a_from_plain_psr() -> None:
@@ -322,7 +329,7 @@ def test_variants_bad_dates_cannot_feed_cscv() -> None:
 
 
 def _mt5_with_open_position() -> bytes:
-    clean = clean_mt5_tester_bytes(MT5.read_bytes())
+    clean = MT5.read_bytes()
     last_deal = b"<td>10 063.05</td><td>end of test</td></tr>"
     opened = (
         b'\n   <tr bgcolor="#FFFFFF" align=right><td>2024.01.08 11:00:00</td><td>11</td>'
@@ -374,3 +381,50 @@ def test_open_position_does_not_hide_a_tampered_balance_cell() -> None:
     assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") in {
         (flag["code"], flag["severity"]) for flag in result.red_flags
     }
+
+
+@pytest.mark.parametrize(
+    ("code", "detail"),
+    [
+        (
+            "MONETARY_RECONCILIATION_MISMATCH",
+            "printed final balance differs from initial balance plus flows and net closed P&L "
+            "by 9,082,362.36 in file units; the return was rebuilt from deal amounts",
+        ),
+        (
+            "MONETARY_RECONCILIATION_UNEXPLAINED",
+            "separate curve and closed trades differ by -9,082,362.36 in file units; provide "
+            "cash flows, currency conversion and open-position valuation to reconcile them",
+        ),
+    ],
+)
+def test_monetary_details_localize_unit_phrase_and_number_grouping(code: str, detail: str) -> None:
+    from quant_trade.audit.i18n import localize
+    from quant_trade.audit.report import render_html
+
+    changed = tampered_mt5_tester_bytes(MT5.read_bytes())
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(cost_bps_per_side=1),
+        report_bytes=changed,
+        report_filename="mt5_tester.html",
+        now=NOW,
+    )
+    result = _run(inputs)
+    flag = {"code": code, "severity": "FAIL", "detail": detail, "value": 9082362.36}
+    result = result.model_copy(update={"red_flags": [flag]})
+    expected = {
+        "es": ("9.082.362,36 en unidades del archivo", "en 330,61 en unidades del archivo"),
+        "pt": ("9.082.362,36 em unidades do arquivo", "em 330,61 em unidades do arquivo"),
+    }
+    for locale, (grouped, small) in expected.items():
+        page = render_html(result, watermark=False, free_mode=True, locale=locale)
+        assert "in file units" not in page
+        assert "9,082,362.36" not in page
+        assert grouped in page
+        short = localize(
+            detail.replace("-9,082,362.36", "330.61").replace("9,082,362.36", "330.61"), locale
+        )
+        assert small in short and "in file units" not in short
+    english = render_html(result, watermark=False, free_mode=True, locale="en")
+    assert "9,082,362.36 in file units" in english

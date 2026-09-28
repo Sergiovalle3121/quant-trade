@@ -749,6 +749,12 @@ Three details a buyer reading a real MetaTrader report asked about:
   Sharpe (sample standard deviation, the audit's periods per year). The
   platform's own Sharpe is shown apart, as DECLARED, and can differ (MT5
   computes it another way).
+- Year by year: each calendar year starts from the previous year's last
+  value, so the yearly returns compound to the total. A first year that
+  holds only the starting point (a fund record's opening value dated
+  31 December, or a curve that starts on a year's last day) has no return
+  in it and is left out of the table (`engine._subperiods`); before, it
+  showed as a year of 0.0 %.
 - Drawdown with open trades: a report rebuilt from closed trades cannot see
   open losses. When the file prints the platform's equity drawdown (MT5
   "Equity Drawdown Maximal/Relative", in any language the importer reads),
@@ -1153,6 +1159,22 @@ that open losses do not show. Hidden on fund records, whose own section
 already shows months and time under water. The depth itself is not repeated:
 the summary tiles show it.
 
+The same section lists the five deepest falls, the way a fund fact sheet
+does: each runs from the last point at a high to its lowest point and ends on
+the first date back at that high (or stays open at the file's end), with its
+depth, the days down, the days back and the total. It also shows the Calmar
+ratio over the whole file, with its span in years (the summary's compound
+annual return over the depth of the deepest fall; from 365 days of history
+and a deepest fall of at least 1 %, so a too-smooth curve never prints it in
+the thousands), and the expected shortfall: the average of the worst 5 % of
+daily returns (from 81 days, so the 5 % holds at least five, and only when
+the curve has a point on most days) and of monthly returns (from 40 months,
+at least two), always with how many it averages. On a fund record the
+falls, the Calmar ratio and the monthly figure appear in the fund's own
+section, in months. A first month that holds only the starting point (a fund
+record's opening value) is the base, not a month with a return of zero. All
+are MEASURED and informational: none enters a dimension, a flag or the class.
+
 ### Losing streaks next to chance (`audit/streaks.py`)
 
 The trade statistics put the longest losing run next to the one chance
@@ -1509,7 +1531,20 @@ annualised on 252 business days (Banco Central do Brasil SGS 4189, monthly,
 from January 1995: before the Real plan it ran in the thousands a year) and,
 for the peso, the yen and the franc, the central bank's policy rate as the
 BIS compiles it (`WS_CBPOL`, `M.MX`, `M.JP`, `M.CH`, monthly, end of
-period). The BIS figures are official policy rates, not market rates, and so
+period). The same BIS series gives the cash rate of 22 more currencies
+(`market.BIS_POLICY_AREAS`: AUD, NZD, INR, ZAR, KRW, SEK, NOK, DKK, PLN, CZK,
+HUF, RON, ISK, TRY, ILS, SAR, IDR, THB, MYR, CLP, COP, PEN), each read whole on
+26 September 2026 with every month present and within the rate bounds. Each
+quote uses its overnight market's day count (`cashrate.BIS_BASIS`: 365 days
+for AUD, NZD, INR, ZAR, KRW, NOK, PLN, ILS, THB, MYR and TRY, 360 for the rest; at
+5 % the two differ by under a tenth of a point a year). Left out: the rouble
+(210 % in 1993-94, above the bound), the Argentine peso (the BIS series stops in
+mid-2025), the Philippine peso (missing months), the Singapore dollar (no
+series; the MAS steers the exchange rate), the yuan (the BIS series is a
+lending rate, above what cash earned) and the Hong Kong dollar (the base rate
+is the discount window's penalty rate). A policy rate can sit away from what
+overnight cash actually earned (Türkiye's corridor years, for one), which the
+label's "policy rate" says. The BIS figures are official policy rates, not market rates, and so
 are the ECB rates before €STR. The splice picks, for each era, the ECB rate
 closest to what overnight cash earned: in the corridor years before
 October 2008 overnight euro rates (EONIA) sat near the MRO rate, about a point
@@ -1545,7 +1580,7 @@ These series may be negative (the franc, euro and yen rates were); a reply
 outside -5 % to 200 % a year (`MIN_LOCAL_RATE`, `MAX_LOCAL_RATE`; Brazil's
 monthly Selic reached 85 % in April 1995) is taken as broken. An account in US dollars (`USD`, `USC`, `USDT`, `USDC`,
 `currency.DOLLAR_CODES`) or with no named currency gets the US bill's line.
-Another named currency with no series here (`AUD`, `ARS`…), or whose rates
+Another named currency with no series here (`ARS`, `HKD`, `CNY`…), or whose rates
 cannot be read or do not cover the history, gets no line: the section is
 `NOT_MEASURED` (`NO_LOCAL_CASH`), since the bill is not what cash in that
 currency paid (for pesos argentinos the gap is tens of points a year). The
@@ -1835,7 +1870,7 @@ reuse with attribution, and credits each source where it is shown and on
   data is available free at bankofcanada.ca, which the credit lines do.
 - Banco Central do Brasil (IPCA, Selic SGS 4189): Open Database License
   (ODbL), credited by name.
-- BIS policy rates (MXN, JPY, CHF): "The use of the statistics is
+- BIS policy rates (MXN, JPY, CHF and the 22 of `BIS_POLICY_AREAS`): "The use of the statistics is
   unrestricted, provided that ... the BIS must be cited ... as the source";
   their inclusion must not add a charge, and the report's price does not
   change with them. Cited as "Source: BIS".
@@ -2320,7 +2355,9 @@ and a report paid with an access code work without one, and an account never
 changes what a report says.
 
 - **Free tier** (`accounts.FREE_PREVIEWS_PER_MONTH = 3`,
-  `FREE_PREVIEWS_PER_IP_PER_MONTH = 10`; not in free mode). An upload
+  `FREE_PREVIEWS_PER_IP_PER_MONTH = 10` per IPv6 /64,
+  `FREE_PREVIEWS_PER_IPV4_PER_MONTH = 30` per IPv4 address; not in free
+  mode). An upload
   without a working access code needs a signed-in account (401 page with
   "Crear cuenta gratis" otherwise; `{"error": "free_tier_signin"}` for JSON).
   Each account gets 3 free previews per calendar month (UTC), counted in
@@ -2336,20 +2373,26 @@ changes what a report says.
   cap and the 5 sign-ups per hour per address only slow that down. Enabling
   SMTP and verified-email gating closes the reward and new-Checkout paths.
 - **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
-  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3`; not in free mode). A signed-in
+  `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
+  `WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10` per IPv4 address; not in free
+  mode). Why IPv4 gets more (`accounts.network_cap`): mobile carriers in
+  Mexico, Brazil and elsewhere put many customers behind one shared IPv4
+  address (carrier-grade NAT), so a cap of 3 would turn a stranger's very
+  first upload on a phone into a preview. The cost: someone on one IPv4
+  connection who clears cookies and opens accounts with made-up addresses
+  and different files can get up to 10 free reports a month instead of 3.
+  E-mail confirmation (needs a mail provider) would close that. A signed-in
   account's first upload comes out as a full report with PDF and a
   publishable verification page, paid with the reference `welcome:<id>`
   (`paid_with = "welcome"`, `acct=welcome` shows the notice). It does not
   use a monthly preview. It is refused (the upload falls back to the
   free-preview rules) when the account already had it, when this browser
   already gave one (a `rigor_device` cookie holding a random id, stored as
-  its SHA-256), or when the network address reached the monthly cap. Two
-  real users may examine the same file from the same network, within its
-  monthly cap. The
+  its SHA-256), when the same file (SHA-256 of the upload) already got one
+  on any account, or when the network address reached the monthly cap. The
   `welcome_reports` row outlives the account, so deleting and signing up
   again does not repeat it. The purge clears the address; the device and
-  file hashes stay for audit evidence, not a cross-account refusal. "Mi cuenta"
-  shows it as Disponible/Usado. The "file" is
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
   a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
   and returns rounded to 5 decimals), so a trailing newline, other line
   endings or renamed columns do not make a new file. When the account's
@@ -2366,7 +2409,7 @@ changes what a report says.
 - **Limits under simultaneous uploads** (`free_claims` table). The checks
   above are a first look that answers at once; after parsing, the upload
   takes its claims in one transaction, all or nothing: the free report takes
-  `welcome:account:`, `welcome:device:` and one numbered
+  `welcome:account:`, `welcome:device:`, `welcome:file:` and one numbered
   per-network slot of the month; a free preview takes one of the account's
   3 numbered slots of the month and one of the network's 10. A claim that
   is taken sends the upload down the next rule (preview, credit, 402 with
@@ -2719,6 +2762,37 @@ certificates in product listings, so the badge is for the seller's own site,
 Telegram, forums and videos. The guard refuses "verificado", "certificado",
 "aprobado", "pasarás", "certified", "approved" and "verified track record"
 unless directly negated, which is what lets the fixed wording through.
+
+### File consistency page (`audit/forensics_web.py`, behind a switch)
+
+Planned and hidden: `forensics_web.FORENSICS_ENABLED` is a constant in the
+repository (not a Railway variable) and, while it is `False`, `register`
+mounts nothing and every path answers 404. When on, `GET
+/audits/{audit_id}/coherencia` (Spanish), `/consistency` (English) and
+`/coerencia` (Portuguese; `?lang=` overrides the path's language as on the
+report) shows the private "Coherencia del archivo" page: it opens exactly
+like the report (its token or the signed-in owner, 404 for a stranger, 410
+once purged) and only for a paid report or in free mode (402 otherwise),
+re-reads the stored platform file (the `report.*` blob, else `live.*`, else
+a monthly table uploaded as the equity file) after checking its SHA-256
+against the digest recorded at upload, runs the battery
+(`audit/forensics/review`) under an audit slot (503 with a retry note when
+none is free), keeps results in an in-process LRU of 256 keyed by audit,
+`METHOD_VERSION` and file hash, and limits uncached reviews to 30 per client
+address and hour (429). The page shows the file's family, format and method
+version, a summary (a sentence per SIGNAL or INFO check made of the measured
+fact, "puede tener explicaciones legítimas; conviene aclararlo con quien
+generó el archivo" and, for INFO, why it is not a signal; with no finding,
+"no encontramos las huellas que revisamos; eso no prueba que el archivo sea
+original"), the table of every check with its status chip ("Señal", "Dato",
+"Sin hallazgo", "No medido"; never "limpio"), its figures with their
+evidence tags, the reason of every `NOT_MEASURED` in words, the calibration
+line per check, and the limits (a carefully edited file passes; nothing
+proves the broker issued the file). Every sentence lives in
+`audit/forensics/copy.py` with identical keys in es, en and pt and passes
+the guard; figures are counts, codes, dates and row indexes, so no text of
+the file reaches the page, and nothing here changes a class. The report's
+link to the page is added by the report's owner later.
 
 ### Export guides, search engines and link previews
 
@@ -3404,22 +3478,33 @@ states USD; same units are an assumption, not verified conversion. Trades
 outside the curve or an uncovered last 1 %
 of its time span make the comparison `NOT_MEASURED`.
 
+The importer counts a printed Balance cell as a break only when it differs
+from the previous balance plus the row's money by more than printing rounding:
+the larger of 0.011 units (a cent plus float slack) and one part per million of
+the printed balance (`importers.balance_rounding`). Within that rounding the
+chain restarts from the printed cell, so sub-cent rounding of row amounts
+(0.33 over thousands of MT4 tester rows) cannot add up to false breaks; an
+edited cell is outside it, is counted once and is never adopted.
+
 A platform Balance cell which differs materially from the deal-money chain
 produces `MONETARY_RECONCILIATION_MISMATCH` (`FAIL` for data quality), and
 the return uses the reconstructed deal amounts. When the importer reports a
 position still open at the end, or a close whose money is in the balance but
 not in the trade list, a gap against closed trades is `NOT_MEASURED` only if
-the printed balance still agrees with the complete row-money chain. A broken
-Balance cell remains a contradiction. For an independently uploaded
-curve, an unexplained difference produces
-`MONETARY_RECONCILIATION_UNEXPLAINED` (`WARN`) and the equation stays
-`NOT_MEASURED` because unreported deposits, open positions or conversion
-could explain it. Neither alert claims fraud. The calibrated forensic battery
+the printed balance still agrees with the complete row-money chain; a broken
+Balance cell remains a contradiction, so an open position cannot hide it. For an independently uploaded
+curve, an unexplained difference leaves the equation `NOT_MEASURED` with the
+reason shown, and raises **no** red flag and no data-quality penalty:
+unreported deposits, floating P&L in the curve, conversion or a scaled index
+could explain it, and genuine files with separate equity curves show the same
+gap (7 of 40 in a real-file gate). `MONETARY_RECONCILIATION_UNEXPLAINED` is
+no longer raised; its title and advice stay only so stored reports still
+render. `MONETARY_RECONCILIATION_MISMATCH` (`FAIL`) remains the only
+monetary-reconciliation flag, and it does not claim fraud. The calibrated forensic battery
 is also run over the original platform bytes; a `BALANCE_CHAIN SIGNAL` adds
 `FORENSIC_BALANCE_CHAIN_SIGNAL` (`WARN`) with method version and calibration,
-without treating a heuristic as proof of alteration. The committed MT5 tester
-fixture has one altered Balance cell; its clean control is rebuilt in memory.
-A 519-trade
+without treating a heuristic as proof of alteration. An MT5 tester report
+altered in memory with the clean fixture as its control, and a 519-trade
 curve scaled only in its variation, are covered in `tests/test_audit_monetary_integrity.py` and through
 the persisted web report in `tests/test_audit_money_web.py`.
 
@@ -3479,11 +3564,16 @@ access, and payment reconciliation continue. Restore either flag to `false`
 only after the incident is resolved. The values are read at process start,
 so editing an environment variable without restarting has no effect.
 
-At most `AUDIT_MAX_CONCURRENT_AUDITS + 1` audit request bodies can be in
+At most `16 × AUDIT_MAX_CONCURRENT_AUDITS` audit request bodies can be in
 multipart parsing or later audit processing per process. Additional requests
-get a 503 before their bodies are read. An admitted body is still bounded by
-the existing total request limit and by each field's size limit. This is an
-admission guard, not a durable job queue; an upload rejected with 503 must be
+get a 503 before their bodies are read. An admitted body must arrive within
+120 seconds, or the upload is cut off with a 408 and its admission slot is
+freed, so a few slow or stalled clients cannot make every other upload busy.
+An admitted body is still bounded by the existing total request limit and by
+each field's size limit. The audit computation itself still runs at most
+`AUDIT_MAX_CONCURRENT_AUDITS` at a time; a parsed upload waits up to
+`AUDIT_QUEUE_SECONDS` for a slot before it is told the service is busy. This
+is an admission guard, not a durable job queue; an upload rejected with 503 must be
 sent again. Limits and attempt counters are per process, so adding replicas
 requires shared admission and quota design before claiming greater capacity.
 The controls and DB/PDF failure probes are exercised in

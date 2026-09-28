@@ -1503,6 +1503,21 @@ def _parse_mt5_tester(reader: _TableReader) -> _Draft:
     return draft
 
 
+#: Rounding allowed between a printed Balance cell and the previous balance
+#: plus the row's money. The chain restarts from every printed cell within it,
+#: so one comparison carries only one row's rounding: the balances and amounts
+#: are printed to the cent (half a cent each way), so one cent plus float slack
+#: (0.011) bounds it; a large account printed with fewer significant digits
+#: gets one part per million of its balance instead.
+BALANCE_ROUNDING_ABSOLUTE = 0.011
+BALANCE_ROUNDING_RELATIVE = 1e-6
+
+
+def balance_rounding(printed_balance: float) -> float:
+    """Largest gap that printing rounding explains for one Balance cell."""
+    return max(BALANCE_ROUNDING_ABSOLUTE, BALANCE_ROUNDING_RELATIVE * abs(printed_balance))
+
+
 def _deal_balance_drawdown(deals: list[_Deal]) -> float:
     """Deepest fall of the deal-money chain, deal by deal, in money.
 
@@ -3582,10 +3597,16 @@ def _balance_curve(
             last_reported_balance = item.reported_balance
             difference = abs(item.reported_balance - balance)
             largest_balance_difference = max(largest_balance_difference, difference)
-            if difference > 0.011:
+            if difference > balance_rounding(item.reported_balance):
                 breaks += 1
-            # A broken printed balance must not become the return series that
-            # the customer sees as a measured result. Keep the row P&L chain.
+                # A broken printed balance must not become the return series
+                # that the customer sees as a measured result. Keep the row
+                # P&L chain.
+            else:
+                # Printing rounding, not a break: continue from the printed
+                # cell so sub-cent drift of the row amounts cannot pile up
+                # over thousands of rows into false breaks.
+                balance = item.reported_balance
         day = item.time.date()
         closing[day] = balance
         if item.is_flow:

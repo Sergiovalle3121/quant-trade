@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -179,7 +180,7 @@ def test_email_legal_copy_follows_delivery_and_checkout_flag() -> None:
         assert find_claims(terms) == [] and find_claims(privacy) == []
 
 
-def test_legal_copy_matches_shared_file_and_purchase_notice_rules() -> None:
+def test_legal_copy_matches_once_per_file_and_purchase_notice_rules() -> None:
     ctx = LegalContext(
         **OPERATOR,
         free_mode=False,
@@ -188,19 +189,36 @@ def test_legal_copy_matches_shared_file_and_purchase_notice_rules() -> None:
         email_delivery_ready=True,
         email_verification_required=True,
     )
-    for locale, shared, notice, exception in (
-        ("es", "mismo archivo en otra cuenta elegible", "avisos de compra", "cambio de opinión"),
+    # The free full report is given once per account, browser and file.
+    for locale, once, same, notice, exception in (
+        (
+            "es",
+            "una vez por cuenta, navegador y archivo",
+            "el mismo navegador o archivo lo reciba una sola vez",
+            "avisos de compra",
+            "cambio de opinión",
+        ),
         (
             "en",
-            "same file on another eligible account",
+            "once per account, browser and file",
+            "the same browser or file gets it only once",
             "purchase or additional-charge",
             "change of mind",
         ),
-        ("pt", "mesmo arquivo em outra conta elegível", "avisos de compra", "mudança de ideia"),
+        (
+            "pt",
+            "uma vez por conta, navegador e arquivo",
+            "o mesmo navegador ou arquivo o receba uma só vez",
+            "avisos de compra",
+            "mudança de ideia",
+        ),
     ):
-        terms = legal_page(terms_text(ctx, locale), locale=locale)
-        privacy = legal_page(privacy_text(ctx, locale), locale=locale)
-        assert shared in terms and shared in privacy
+        terms = re.sub(r"\s+", " ", legal_page(terms_text(ctx, locale), locale=locale))
+        privacy = re.sub(r"\s+", " ", legal_page(privacy_text(ctx, locale), locale=locale))
+        assert once in terms and same in privacy
+        assert "otra cuenta elegible" not in terms + privacy
+        assert "another eligible account" not in terms + privacy
+        assert "outra conta elegível" not in terms + privacy
         assert notice in privacy
         assert exception in terms
 

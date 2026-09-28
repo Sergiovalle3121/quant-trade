@@ -172,20 +172,105 @@ def test_paused_upload_keeps_existing_report_access(tmp_path: Path, monkeypatch:
     assert paused.state.store.count_audits() == count
 
 
+def _hold_all(slots: threading.BoundedSemaphore) -> int:
+    held = 0
+    while slots.acquire(blocking=False):
+        held += 1
+    return held
+
+
 def test_full_admission_limit_rejects_before_form_parse(tmp_path: Path) -> None:
     app = _app(tmp_path)
     slots = app.state.upload_admission_slots
-    for _ in range(3):
-        assert slots.acquire(blocking=False)
+    held = _hold_all(slots)
     try:
         with TestClient(app) as client:
             response = client.post("/audits?lang=en", data={"consent": "on"})
     finally:
-        for _ in range(3):
+        for _ in range(held):
             slots.release()
     assert response.status_code == 503
     assert message("busy", "en") in response.text
     assert app.state.store.count_audits() == 0
+
+
+def test_slow_uploads_holding_admission_do_not_block_another_upload(tmp_path: Path) -> None:
+    """Three clients still sending their bodies (more than the audit slots)
+    leave room for another upload, which queues for the CPU work as usual."""
+    app = _app(tmp_path)
+    slots = app.state.upload_admission_slots
+    slow_clients = app.state.audit_slots.total_tokens + 1
+    for _ in range(slow_clients):
+        assert slots.acquire(blocking=False)
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/audits",
+                files={"equity": ("equity.csv", csv_bytes(positive_drift(300)), "text/csv")},
+                data={"consent": "on"},
+                follow_redirects=False,
+            )
+            ready = client.get("/ready").json()
+    finally:
+        for _ in range(slow_clients):
+            slots.release()
+    assert response.status_code == 303, response.text
+    assert ready["max_inflight_uploads_per_process"] > slow_clients
+
+
+def test_stalled_upload_body_is_cut_off_and_frees_admission() -> None:
+    slots = threading.BoundedSemaphore(2)
+    stalled_forever = asyncio.Event()
+
+    async def read_body_app(scope: Any, receive: Any, send: Any) -> None:
+        body = b""
+        while True:
+            chunk = await receive()
+            body += chunk.get("body", b"")
+            if not chunk.get("more_body", False):
+                break
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": body})
+
+    middleware = AuditAdmissionMiddleware(
+        read_body_app,
+        slots=slots,
+        paused=False,
+        reject=lambda scope, reason: PlainTextResponse(reason, status_code=408),
+        body_seconds=0.2,
+    )
+    scope = {"type": "http", "method": "POST", "path": "/audits", "headers": []}
+
+    async def stalled_receive() -> Any:
+        await stalled_forever.wait()
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def whole_receive() -> Any:
+        return {"type": "http.request", "body": b"file", "more_body": False}
+
+    async def call(receive: Any) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
+
+        async def send(message: dict[str, Any]) -> None:
+            messages.append(message)
+
+        await middleware(scope, receive, send)
+        return messages
+
+    async def scenario() -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+        stalled = asyncio.create_task(call(stalled_receive))
+        await asyncio.sleep(0)
+        normal = await call(whole_receive)
+        finished_first = not stalled.done()
+        return await stalled, normal, finished_first
+
+    stalled, normal, normal_finished_first = asyncio.run(scenario())
+    assert normal_finished_first
+    assert normal[0]["status"] == 200 and normal[1]["body"] == b"file"
+    assert stalled[0]["status"] == 408
+    assert stalled[1]["body"] == b"upload_timeout"
+    assert _hold_all(slots) == 2  # both requests gave their slot back
+    assert message("upload_timeout", "pt") != message("upload_timeout", "es")
 
 
 def test_sqlite_backup_restores_account_credit_payment_and_report(tmp_path: Path) -> None:

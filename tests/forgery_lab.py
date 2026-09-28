@@ -38,7 +38,6 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from audit_fixtures import clean_mt5_tester_bytes
 
 from quant_trade.audit import factsheet, importers
 from quant_trade.audit.forensics import edit, families, money, review, rows, symbols
@@ -1960,13 +1959,8 @@ SAMPLES: dict[str, bytes] = {
 
 
 def fixture_files() -> list[tuple[str, bytes]]:
-    """Clean controls built in memory from repo fixtures, then inline samples."""
-    files = []
-    for name in FIXTURE_NAMES:
-        data = (FIXTURES / name).read_bytes()
-        if name == "mt5_tester.html":
-            data = clean_mt5_tester_bytes(data)
-        files.append((name, data))
+    """The repo fixtures the lab runs on, then the inline samples."""
+    files = [(name, (FIXTURES / name).read_bytes()) for name in FIXTURE_NAMES]
     files.extend(sorted(SAMPLES.items()))
     return files
 

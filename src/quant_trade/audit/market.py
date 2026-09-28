@@ -277,6 +277,38 @@ JAPAN_NO_POLICY_RATE: tuple[tuple[str, str], ...] = (
 #: 85 % a year in April 1995; the Swiss policy rate went to -0.75 % in 2015).
 MAX_LOCAL_RATE = 200.0
 MIN_LOCAL_RATE = -5.0
+#: More currencies whose cash rate is the central bank's policy rate as the BIS
+#: compiles it, by the BIS's area code. Each series was read whole on
+#: 2026-09-26: every month from its start to mid-2026 present, within
+#: ``MIN_LOCAL_RATE``..``MAX_LOCAL_RATE``. Left out: the rouble (210 % in 1993-94,
+#: above ``MAX_LOCAL_RATE``), the Argentine peso (stale since mid-2025), the
+#: Philippine peso (missing months), the Singapore dollar (no series; the MAS
+#: steers the exchange rate), the yuan (the BIS series is a lending rate) and the
+#: Hong Kong dollar (the base rate is the discount window's penalty rate).
+BIS_POLICY_AREAS: dict[str, str] = {
+    "AUD": "AU",
+    "NZD": "NZ",
+    "INR": "IN",
+    "ZAR": "ZA",
+    "KRW": "KR",
+    "SEK": "SE",
+    "NOK": "NO",
+    "DKK": "DK",
+    "PLN": "PL",
+    "CZK": "CZ",
+    "HUF": "HU",
+    "RON": "RO",
+    "ISK": "IS",
+    "TRY": "TR",
+    "ILS": "IL",
+    "SAR": "SA",
+    "IDR": "ID",
+    "THB": "TH",
+    "MYR": "MY",
+    "CLP": "CL",
+    "COP": "CO",
+    "PEN": "PE",
+}
 #: What cash earned in each currency of ``FX``, in percent a year, from its
 #: originator: the euro's €STR (ECB) and sterling's SONIA (Bank of England),
 #: both through FRED; Canada's CORRA (Bank of Canada) and Brazil's monthly
@@ -305,6 +337,7 @@ LOCAL_CASH: tuple[Asset, ...] = tuple(
         ("JPY", "JP", "bis"),
         ("CAD", "AVG.INTWO", "boc_rate"),
         ("CHF", "CH", "bis"),
+        *((code, area, "bis") for code, area in BIS_POLICY_AREAS.items()),
     )
 )
 

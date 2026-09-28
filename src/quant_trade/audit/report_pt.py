@@ -397,6 +397,24 @@ REPORT: dict[str, Any] = {
         "ride_positive": (
             "Meses no positivo ({k} de {n}); maior sequência de meses no negativo: {run}"
         ),
+        "ride_calmar": (
+            "Índice Calmar em {years} anos: retorno anual composto dividido pela maior queda"
+        ),
+        "ride_tail_day": "Rentabilidade média por dia nos piores 5 % dos dias ({k} de {n})",
+        "ride_tail_month": "Rentabilidade média por mês nos piores 5 % dos meses ({k} de {n})",
+        "ride_day_one": "1 dia",
+        "falls_title": "As quedas mais profundas",
+        "falls_intro": (
+            "Cada queda vai do último ponto em uma máxima até o seu ponto mais baixo e termina na "
+            "primeira data de volta a essa máxima. Uma que não volta antes da última data do "
+            "arquivo continua aberta."
+        ),
+        "falls_depth": "Queda",
+        "falls_down": "Da máxima ao mínimo",
+        "falls_back": "De volta à máxima",
+        "falls_total": "Duração total",
+        "falls_below": "Meses abaixo da máxima",
+        "falls_open": "continua aberta",
         "ride_closed": (
             "A curva é reconstruída com operações fechadas: as perdas abertas não aparecem, "
             "então as quedas reais duraram e mediram pelo menos isto."
@@ -1222,6 +1240,28 @@ REPORT: dict[str, Any] = {
         "cash_rate_JPY": "taxa de política monetária do Japão (BIS)",
         "cash_rate_CAD": "taxa de um dia do Canadá, CORRA (Banco do Canadá)",
         "cash_rate_CHF": "taxa de política monetária da Suíça (BIS)",
+        "cash_rate_AUD": "taxa de política monetária da Austrália (BIS)",
+        "cash_rate_NZD": "taxa de política monetária da Nova Zelândia (BIS)",
+        "cash_rate_INR": "taxa de política monetária da Índia (BIS)",
+        "cash_rate_ZAR": "taxa de política monetária da África do Sul (BIS)",
+        "cash_rate_KRW": "taxa de política monetária da Coreia do Sul (BIS)",
+        "cash_rate_SEK": "taxa de política monetária da Suécia (BIS)",
+        "cash_rate_NOK": "taxa de política monetária da Noruega (BIS)",
+        "cash_rate_DKK": "taxa de política monetária da Dinamarca (BIS)",
+        "cash_rate_PLN": "taxa de política monetária da Polônia (BIS)",
+        "cash_rate_CZK": "taxa de política monetária da Tchéquia (BIS)",
+        "cash_rate_HUF": "taxa de política monetária da Hungria (BIS)",
+        "cash_rate_RON": "taxa de política monetária da Romênia (BIS)",
+        "cash_rate_ISK": "taxa de política monetária da Islândia (BIS)",
+        "cash_rate_TRY": "taxa de política monetária da Turquia (BIS)",
+        "cash_rate_ILS": "taxa de política monetária de Israel (BIS)",
+        "cash_rate_SAR": "taxa de política monetária da Arábia Saudita (BIS)",
+        "cash_rate_IDR": "taxa de política monetária da Indonésia (BIS)",
+        "cash_rate_THB": "taxa de política monetária da Tailândia (BIS)",
+        "cash_rate_MYR": "taxa de política monetária da Malásia (BIS)",
+        "cash_rate_CLP": "taxa de política monetária do Chile (BIS)",
+        "cash_rate_COP": "taxa de política monetária da Colômbia (BIS)",
+        "cash_rate_PEN": "taxa de política monetária do Peru (BIS)",
         "regime": "Como foi com o mercado tranquilo e com o mercado agitado?",
         "regime_intro": (
             "Cada rentabilidade do arquivo é atribuída segundo o VIX (quanto o mercado de opções "
@@ -1414,9 +1454,12 @@ REPORT: dict[str, Any] = {
             "anual, e esses dados estão disponíveis grátis em bankofcanada.ca.",
             "Taxa Selic mensal do Brasil: Banco Central do Brasil, série 4189, sob a Open "
             "Database License (ODbL).",
-            "Taxas de política monetária do México, do Japão e da Suíça. Fonte: BIS (Banco de "
-            "Compensações Internacionais). São as taxas oficiais de cada banco central, não "
-            "taxas de mercado.",
+            "Taxas de política monetária do México, do Japão, da Suíça, da Austrália, da Nova "
+            "Zelândia, da Índia, da África do Sul, da Coreia do Sul, da Suécia, da Noruega, da "
+            "Dinamarca, da Polônia, da Tchéquia, da Hungria, da Romênia, da Islândia, da "
+            "Turquia, de Israel, da Arábia Saudita, da Indonésia, da Tailândia, da Malásia, do "
+            "Chile, da Colômbia e do Peru. Fonte: BIS (Banco de Compensações Internacionais). "
+            "São as taxas oficiais de cada banco central, não taxas de mercado.",
             "Preços ao consumidor da zona do euro e da Suíça: Eurostat.",
             "Preços ao consumidor do Reino Unido: Office for National Statistics, sob a Open "
             "Government Licence v3.0.",
@@ -4744,6 +4787,34 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "fewer than three calendar months",
         "menos de três meses corridos",
+    ),
+    (
+        "fewer than 81 days; the worst 5 % would hold fewer than 5",
+        "menos de 81 dias; os piores 5 % teriam menos de 5",
+    ),
+    (
+        "fewer than 40 months; the worst 5 % would hold fewer than 2",
+        "menos de 40 meses; os piores 5 % teriam menos de 2",
+    ),
+    (
+        "average of the worst 5 % of the days",
+        "média dos piores 5 % dos dias",
+    ),
+    (
+        "average of the worst 5 % of the months",
+        "média dos piores 5 % dos meses",
+    ),
+    (
+        "compound annual return over the depth of the deepest fall",
+        "retorno anual composto dividido pela profundidade da maior queda",
+    ),
+    (
+        "under a year of history; it divides an annual return",
+        "menos de um ano de histórico; ele divide um retorno anual",
+    ),
+    (
+        "the deepest fall is under 1 %, too shallow to divide by",
+        "a maior queda é de menos de 1 %, pouco demais para dividir por ela",
     ),
     (
         "calendar days from the uploaded equity curve; months from each month's last point",

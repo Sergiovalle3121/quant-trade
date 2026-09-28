@@ -148,8 +148,8 @@ def test_mt5_tester_pairs_partial_closes_hedges_and_reversals(encode) -> None:  
     assert report.metadata["history_quality"] == "100% real ticks"
     assert (report.metadata["start"], report.metadata["end"]) == ("2024-01-01", "2024-01-09")
     assert_recomputed_matches(report)
-    # The frozen fixture now has a deliberately changed last Balance cell.
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    # Every declared total reconciles, so no mismatch warning appears.
+    assert not any("the report states" in w for w in report.warnings)
 
 
 def test_mt5_tester_quantity_is_lots_times_contract_size() -> None:
@@ -863,7 +863,7 @@ def test_mt5_build_1940_headers_trade_and_profit_column() -> None:
     assert equity_rows(report)[-1] == ("2024-01-08", pytest.approx(10_063.05))
     assert report.metadata["declared_total_net_profit"] == "63.05"
     assert report.metadata["declared_total_trades"] == "5"
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
 
 
 RUSSIAN_MT5 = (
@@ -926,7 +926,7 @@ def test_mt5_summary_labels_in_other_languages(labels: tuple[tuple[str, str], ..
     assert report.metadata["declared_total_trades"] == "5"
     assert report.metadata["declared_total_deals"] == "9"
     assert report.currency == "USD"
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
 
 
 BALANCE_DRAWDOWN_ROW = (
@@ -942,7 +942,7 @@ def test_mt5_balance_drawdown_is_checked_against_the_deals() -> None:
     # The Balance column falls from 10 085.05 to 10 063.05: 22.00.
     report = import_report(_mt5_tester_variant((old, new.format(value="22.00"))))
     assert report.metadata["declared_balance_drawdown_maximal"] == "22.00 (0.22%)"
-    assert any("net profit: the report states 63.05" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
     edited = import_report(_mt5_tester_variant((old, new.format(value="12.00"))))
     assert any(
         "balance drawdown maximal: the report states 12.00 but the rows add up to 22.00" in w
@@ -992,10 +992,7 @@ def test_mt5_xlsx_export_reads_like_the_html_report(name: str, expected: str) ->
     assert report.fees == html_report.fees
     assert equity_rows(report) == equity_rows(html_report)
     assert report.metadata.get("declared_total_net_profit") is not None
-    if name == "mt5_tester.html":
-        assert any("net profit: the report states 63.05" in w for w in report.warnings)
-    else:
-        assert not any("the report states" in w for w in report.warnings)
+    assert not any("the report states" in w for w in report.warnings)
 
 
 #: The Deals header of a real Traditional Chinese terminal export (no Fee column).
@@ -1318,3 +1315,67 @@ def test_mt5_symbols_keep_the_file_s_case() -> None:
     ]
     report = import_report(_mt5_deals_report(deals))
     assert report.symbols == ["EURUSD.m"]
+
+
+def _mt4_tester_with_rounding_drift(trades: int, edit_row: int | None = None) -> bytes:
+    """An MT4 tester report whose Profit cells are rounded to the cent while
+    the tester's Balance runs on the unrounded profit (1.004 a trade), so the
+    sum of printed profits falls a further 0.004 behind every trade."""
+    clean = (FIXTURES / "mt4_tester.htm").read_text()
+    head, _, rest = clean.partition("<tr align=right><td>1</td>")
+    _, _, tail = rest.partition("</table>")
+    rows: list[str] = []
+    balance = 10000.0
+    start = date(2024, 1, 2)
+    for trade in range(trades):
+        day = start + timedelta(days=trade // 4 + 2 * (trade // 20))
+        hour = 8 + 2 * (trade % 4)
+        balance += 1.004
+        printed = round(balance, 2) + (1000.0 if trade == edit_row else 0.0)
+        for number, kind, when, money in (
+            (2 * trade + 1, "buy", hour, ""),
+            (
+                2 * trade + 2,
+                "close",
+                hour + 1,
+                f"<td class=mspt>1.00</td><td class=mspt>{printed:.2f}</td>",
+            ),
+        ):
+            rows.append(
+                f"<tr align=right><td>{number}</td><td class=msdate>"
+                f"{day:%Y.%m.%d} {when:02d}:00</td><td>{kind}</td><td>{trade + 1}</td>"
+                "<td class=mspt>0.10</td><td>1.10000</td><td align=right>0.00000</td>"
+                f"<td align=right>0.00000</td>{money or '<td colspan=2></td>'}</tr>"
+            )
+    body = head + "\n".join(rows) + "\n</table>" + tail
+    return body.replace(
+        "<td align=right>95.10</td>", f"<td align=right>{trades * 1.004:.2f}</td>"
+    ).encode()
+
+
+def _balance_breaks(report: ImportedReport) -> int:
+    counts = [
+        int(match.group(1))
+        for warning in report.warnings
+        if (match := re.search(r"(\d+) Balance cell\(s\) do not equal", warning))
+    ]
+    return counts[0] if counts else 0
+
+
+def test_mt4_tester_rounding_drift_is_not_a_balance_break() -> None:
+    """Sub-cent rounding of the row amounts adds up to more than 0.30 over
+    100 trades; the chain restarts from each printed cell within rounding, so
+    it never counts a break, while one edited cell is still counted once."""
+    trades = 100
+    data = _mt4_tester_with_rounding_drift(trades)
+    report = import_report(data, "tester.htm")
+    assert report.source_format == MT4_TESTER_HTML
+    assert len(report.trades.trades) == trades
+    assert sum(trade.pnl for trade in report.trades.trades) == pytest.approx(100.0)
+    assert float(report.metadata["reported_final_balance"]) == pytest.approx(10100.40)
+    assert _balance_breaks(report) == 0
+    assert report.metadata["balance_chain_breaks"] == "0"
+
+    edited = import_report(_mt4_tester_with_rounding_drift(trades, edit_row=50), "tester.htm")
+    assert _balance_breaks(edited) == 1
+    assert edited.metadata["balance_chain_breaks"] == "1"

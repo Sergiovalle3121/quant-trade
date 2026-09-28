@@ -590,8 +590,9 @@ def _subperiods(frame: pd.DataFrame) -> list[dict[str, Any]]:
     table = subperiod_analysis(frame[["timestamp", "equity"]])
     years = pd.to_datetime(frame["timestamp"], utc=True).dt.year
     if len(table) > 1 and int((years == int(table["year"].iloc[0])).sum()) == 1:
-        # An opening value alone has no return; the following year already
-        # measures its return from that value.
+        # A first year holding only the starting point (a fund record's opening
+        # value on 31 December) has no return in it; the next year already
+        # chains from that point, so the yearly returns still compound to the total.
         table = table.iloc[1:]
     return [
         {
@@ -994,7 +995,7 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
     """Compare the monetary curve with the closed-trade ledger where possible.
 
     A separate uploaded curve can contain undisclosed flows or open positions.
-    An unexplained difference is therefore a warning, not an accusation. A
+    An unexplained difference is therefore NOT_MEASURED and raises no flag. A
     platform balance cell that contradicts its own deal chain is testable.
     """
     if inputs.trades is None or not inputs.trades.trades:
@@ -1122,19 +1123,15 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
             "reason": "printed balance contradicts deal amounts",
             **common,
         }, [flag]
-    flag = redflags.RedFlag(
-        "MONETARY_RECONCILIATION_UNEXPLAINED",
-        "WARN",
-        f"separate curve and closed trades differ by {difference:,.2f} "
-        "in file units; provide cash flows, currency conversion "
-        "and open-position valuation to reconcile them",
-        difference,
-    )
+    # A separate curve can include floating P&L, flows, conversion or a scaled
+    # index: the gap is not measured, so it raises no red flag either (the
+    # section shows NOT_MEASURED and its reason). Only a platform balance that
+    # contradicts its own deal amounts is a finding.
     return {
         "status": "NOT_MEASURED",
         "reason": "flows, currency conversion or open positions could explain the difference",
         **common,
-    }, [flag]
+    }, []
 
 
 def _trade_stats(inputs: AuditInputs) -> dict[str, Any]:

@@ -15,10 +15,14 @@ MT5_TESTER_TAMPERED_BALANCE = b"<td>11 063.05</td>"
 MT5_TESTER_CLEAN_BALANCE = b"<td>10 063.05</td>"
 
 
-def clean_mt5_tester_bytes(data: bytes) -> bytes:
-    """Reconstruct a clean control in memory; keep the committed tamper intact."""
-    assert data.count(MT5_TESTER_TAMPERED_BALANCE) == 1
-    return data.replace(MT5_TESTER_TAMPERED_BALANCE, MT5_TESTER_CLEAN_BALANCE)
+def tampered_mt5_tester_bytes(data: bytes) -> bytes:
+    """The clean MT5 tester fixture with its last deal's Balance cell edited.
+
+    The committed fixture stays clean; tests that want a tampered report build
+    it in memory from the clean bytes.
+    """
+    assert data.count(MT5_TESTER_CLEAN_BALANCE) == 1
+    return data.replace(MT5_TESTER_CLEAN_BALANCE, MT5_TESTER_TAMPERED_BALANCE)
 
 
 def business_days(n: int, start: str = START) -> pd.DatetimeIndex:

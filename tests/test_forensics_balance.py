@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 import pytest
-from audit_fixtures import clean_mt5_tester_bytes
+from audit_fixtures import tampered_mt5_tester_bytes
 from test_audit_importers import _as_workbook_rows, xlsx
 
 from quant_trade.audit import importers
@@ -64,12 +64,11 @@ HISTORY_COST_ROW = (
 
 
 def _fixture(name: str) -> bytes:
-    data = (FIXTURES / name).read_bytes()
-    return clean_mt5_tester_bytes(data) if name == "mt5_tester.html" else data
+    return (FIXTURES / name).read_bytes()
 
 
-def test_committed_mt5_tester_balance_tamper_is_detected() -> None:
-    raw = (FIXTURES / "mt5_tester.html").read_bytes()
+def test_mt5_tester_balance_tamper_is_detected() -> None:
+    raw = tampered_mt5_tester_bytes((FIXTURES / "mt5_tester.html").read_bytes())
     outcome = _run("BALANCE_CHAIN", raw)
     assert outcome.hits == 1
     assert outcome.examples == (32,)

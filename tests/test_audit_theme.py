@@ -573,8 +573,12 @@ def test_phone_report_is_compact_and_reads_in_words() -> None:
 
 def test_landing_form_help_is_short_and_the_footer_says_things_once() -> None:
     for locale, short, question in (
-        ("es", "Tal cual lo guarda tu plataforma: HTML, XLSX o CSV, hasta 10 MB.", "¿Qué archivo"),
-        ("en", "As your platform saves it: HTML, XLSX or CSV, up to 10 MB.", "Which file"),
+        (
+            "es",
+            "Tal cual lo guarda tu plataforma: HTML, XLSX, CSV o PDF, hasta 10 MB.",
+            "¿Qué archivo",
+        ),
+        ("en", "As your platform saves it: HTML, XLSX, CSV or PDF, up to 10 MB.", "Which file"),
     ):
         page = landing(locale=locale, free_mode=False, price_usd=29, access_codes=True)
         # One line under the main file; the formats and export guides open on demand.
@@ -1160,8 +1164,10 @@ def test_phone_walk_fixes_scroll_cue_evidence_cards_and_firm_titles() -> None:
     assert "animation-timeline:scroll(self inline)" in phone
     assert "100%{-webkit-mask-image:none;mask-image:none}" in phone
     assert ".paper table:not(.ev):not(.firms)" in phone
-    # Evidence cards: the value sits beside the name, the tag goes underneath.
-    assert ".metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}" in phone
+    # Evidence cards: the value sits beside the name, its tag right under the
+    # value and the note beside the tag, so a row with a note spends no line on it.
+    assert ".metrics.ev td:nth-child(3){grid-area:2/2;justify-self:end;align-self:start}" in phone
+    assert ".metrics.ev td:nth-child(4){grid-area:2/1}" in phone
     # Prop-firm cards read their challenge name as the card's title.
     assert ".firms td:first-child small{display:block" in phone
 
