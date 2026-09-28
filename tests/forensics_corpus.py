@@ -13,9 +13,9 @@ deterministic: per family, entries sorted by SHA-256, every third one
 calibration two thirds run; with it, the reserved third; ``--all`` runs both.
 
 As a pytest module it is skipped unless ``FORENSICS_CORPUS_MANIFEST`` and
-``FORENSICS_CORPUS_DIR`` are set, in which case it asserts that no check
-answers SIGNAL on a genuine file (the calibration table is empty until a
-frozen run grants a cell, so this guards the table, not the checks).
+``FORENSICS_CORPUS_DIR`` are set. The configured run pins the frozen manifest,
+requires all 197 genuine files to import and pass the battery, and asserts
+that no check answers SIGNAL.
 """
 
 from __future__ import annotations
@@ -41,6 +41,9 @@ from quant_trade.audit.forensics import (
 )
 from quant_trade.audit.forensics.results import ForensicResult
 
+FROZEN_MANIFEST_SHA256 = "3fcf50a65cbe40159fc643c4a4124f5376eaa11e5de09216855ca4d2536838c9"
+FROZEN_GENUINE_FILES = 197
+
 
 def split(entries: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Calibration two thirds and reserved third, per family, by SHA-256."""
@@ -65,13 +68,11 @@ def run_one(path: Path, entry: dict[str, Any]) -> tuple[ForensicResult, list[str
     digest = hashlib.sha256(data).hexdigest()
     if digest != entry["sha256"]:
         raise ValueError(f"{path}: sha256 {digest} != manifest {entry['sha256']}")
-    warnings: list[str] = []
-    try:
-        imported = importers.import_report(data, path.name)
-        warnings = list(imported.warnings)
-        currency = imported.currency
-    except Exception:  # noqa: BLE001 - the battery still runs without the import
-        currency = None
+    # The service imports before running this battery. A file the importer
+    # cannot read is not a successful calibration trial.
+    imported = importers.import_report(data, path.name)
+    warnings = list(imported.warnings)
+    currency = imported.currency
     result = review(
         data,
         source_format=entry["format"],
@@ -141,7 +142,20 @@ def run(manifest: Path, root: Path, *, which: str) -> dict[str, Any]:
                 "hits_groups": len(hit_groups[(check_id, family)]),
             }
         )
-    return {"which": which, "files": files, "table": table}
+    return {"which": which, "selected_files": len(chosen), "files": files, "table": table}
+
+
+def run_errors(result: dict[str, Any]) -> list[str]:
+    """Reject an empty or incomplete corpus rather than certifying zero hits."""
+    errors = [f"{item['path']}: {item['error']}" for item in result["files"] if "error" in item]
+    if result["selected_files"] == 0:
+        errors.append("no genuine files selected")
+    if len(result["files"]) != result["selected_files"]:
+        errors.append("processed file count differs from selected file count")
+    for item in result["files"]:
+        if "checks" in item and set(item["checks"]) != set(CHECK_ORDER):
+            errors.append(f"{item['path']}: incomplete check set")
+    return errors
 
 
 def print_table(result: dict[str, Any]) -> None:
@@ -174,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.out:
         args.out.write_text(json.dumps(result, indent=1, sort_keys=True))
         print("written", args.out)
-    return 0
+    return 1 if run_errors(result) else 0
 
 
 MANIFEST = os.environ.get("FORENSICS_CORPUS_MANIFEST", "")
@@ -183,7 +197,13 @@ ROOT = os.environ.get("FORENSICS_CORPUS_DIR", "")
 
 @pytest.mark.skipif(not (MANIFEST and ROOT), reason="no corpus configured")
 def test_no_signal_on_genuine_files() -> None:
-    result = run(Path(MANIFEST), Path(ROOT), which="all")
+    manifest = Path(MANIFEST)
+    assert hashlib.sha256(manifest.read_bytes()).hexdigest() == FROZEN_MANIFEST_SHA256
+    entries = json.loads(manifest.read_text())
+    assert sum(bool(entry.get("genuine")) for entry in entries) == FROZEN_GENUINE_FILES
+    result = run(manifest, Path(ROOT), which="all")
+    assert result["selected_files"] == FROZEN_GENUINE_FILES
+    assert run_errors(result) == []
     signals = [
         (item["path"], check_id)
         for item in result["files"]
@@ -192,7 +212,7 @@ def test_no_signal_on_genuine_files() -> None:
         if check["status"] == STATUS_SIGNAL
     ]
     assert signals == []
-    assert set(CHECK_ORDER) >= {row["check"] for row in result["table"]}
+    assert {row["check"] for row in result["table"]} <= set(CHECK_ORDER)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from audit_fixtures import csv_bytes, positive_drift, variants_bytes
+from audit_fixtures import (
+    benchmark_lower_drift,
+    csv_bytes,
+    positive_drift,
+    trades_following,
+    variants_bytes,
+)
 
 from quant_trade.audit.engine import run_audit, trial_count
 from quant_trade.audit.guard import find_claims
@@ -42,6 +48,35 @@ def test_trials_left_blank_are_assumed_not_declared() -> None:
         bootstrap_samples=50,
     )
     assert "TRIALS_BELOW_VARIANTS" in {flag["code"] for flag in declared.red_flags}
+
+
+def test_undeclared_trials_cannot_receive_class_a_with_other_checks_passing() -> None:
+    curve = positive_drift(1500)
+    inputs = build_inputs(
+        csv_bytes(curve),
+        DeclaredMetadata(
+            trials=1,
+            trials_declared=False,
+            cost_bps_per_side=5,
+            oos_start="2023-01-01",
+        ),
+        trades_bytes=csv_bytes(trades_following(curve)),
+        benchmark_bytes=csv_bytes(benchmark_lower_drift(1500)),
+    )
+    result = run_audit(
+        inputs,
+        now=NOW,
+        audit_id="unknown-trials",
+        bootstrap_samples=100,
+        risk_samples=100,
+        challenge_samples=100,
+    )
+    statuses = {dimension.name: dimension.status for dimension in result.verdict.dimensions}
+    assert statuses["statistical_significance"] == "PASS"
+    assert statuses["multiplicity"] == "NOT_MEASURED"
+    assert all(status == "PASS" for name, status in statuses.items() if name != "multiplicity")
+    assert result.multiplicity["trials_used"]["evidence"] == "NOT_MEASURED"
+    assert result.verdict.overall != "A"
 
 
 def test_generic_preset_shows_no_internal_path_and_no_repeated_phase() -> None:

@@ -448,11 +448,14 @@ def cscv(
     usable = len(matrix) - (len(matrix) % partitions)
     if usable < partitions:
         return {"status": NOT_MEASURED, "reason": "too few aligned observations for CSCV"}
-    evidence = cscv_probability_of_backtest_overfitting(
-        matrix.iloc[len(matrix) - usable :].to_numpy(dtype=float),
-        partitions=partitions,
-        max_pbo=max_pbo,
-    )
+    try:
+        evidence = cscv_probability_of_backtest_overfitting(
+            matrix.iloc[len(matrix) - usable :].to_numpy(dtype=float),
+            partitions=partitions,
+            max_pbo=max_pbo,
+        )
+    except ValueError as exc:
+        return {"status": NOT_MEASURED, "reason": str(exc)}
     payload = evidence.to_dict()
     payload["status"] = "MEASURED"
     payload["trial_ids"] = list(matrix.columns)

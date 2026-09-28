@@ -420,6 +420,7 @@ def _cscv(variant_returns: dict[str, Any]) -> dict[str, Any]:
         "pbo": float(evidence.pbo),
         "observations": evidence.observations,
         "parameter_variants": evidence.parameter_variants,
+        "effective_variants": evidence.effective_variants,
         "combinations": evidence.combinations,
         "variants": sorted(series),
         "threshold": float(evidence.max_pbo),

@@ -75,6 +75,31 @@ def test_multiplicity_follows_unmeasured_statistics() -> None:
     assert dim.status == "NOT_MEASURED"
 
 
+@pytest.mark.parametrize(
+    ("dsr", "pbo", "expected"),
+    [
+        (0.99, None, "NOT_MEASURED"),
+        (0.80, None, "WEAK"),
+        (0.49, None, "FAIL"),
+        (0.99, 0.50, "FAIL"),
+    ],
+)
+def test_undeclared_trial_count_cannot_pass_multiplicity(
+    dsr: float, pbo: float | None, expected: str
+) -> None:
+    dim = assess_multiplicity(
+        dsr=dsr,
+        trials=1,
+        pbo=pbo,
+        statistical_status="PASS",
+        trials_evidence="NOT_MEASURED",
+    )
+    assert dim.status == expected
+    if expected == "NOT_MEASURED":
+        assert "not declared" in dim.reasons[0]
+        assert "sin declarar" in dim.reasons_es[0]
+
+
 def _rows(net_1x: float, net_3x: float) -> list[RecostRow]:
     return [
         RecostRow(m, 5.0 * m, 100.0, 0.0, net, 0.5, net / 10, 10)
